@@ -3,8 +3,15 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { flags } from '@/lib/env';
+import { redis } from '@/lib/redis';
+
+type DbSocialLink = typeof socialLinks.$inferSelect;
 
 export async function GET(req: Request) {
+  if (!flags.feature_social_links) {
+    return NextResponse.json({ error: 'Not enabled' }, { status: 404 });
+  }
   try {
     return await withDbSession(async clerkUserId => {
       const url = new URL(req.url);
@@ -16,16 +23,18 @@ export async function GET(req: Request) {
         );
       }
 
-      // Verify the profile belongs to the authenticated user
+      // Verify the profile belongs to the authenticated user before checking cache
       const [profile] = await db
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(
-          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+          and(
+            eq(creatorProfiles.id, profileId),
+            eq(users.clerkId, clerkUserId)
+          )
         )
         .limit(1);
-
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
@@ -33,11 +42,54 @@ export async function GET(req: Request) {
         );
       }
 
-      const links = await db
-        .select()
-        .from(socialLinks)
-        .where(eq(socialLinks.creatorProfileId, profileId))
+      const cacheKey = `social_links:${profileId}`;
+      const cached = await redis.get<DbSocialLink[]>(cacheKey);
+      if (cached) {
+        return NextResponse.json({ links: cached }, { status: 200 });
+      }
+
+      const rows = await db
+        .select({
+          profileId: creatorProfiles.id,
+          linkId: socialLinks.id,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          sortOrder: socialLinks.sortOrder,
+          isActive: socialLinks.isActive,
+          displayText: socialLinks.displayText,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .leftJoin(
+          socialLinks,
+          eq(socialLinks.creatorProfileId, creatorProfiles.id)
+        )
+        .where(
+          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+        )
         .orderBy(socialLinks.sortOrder);
+
+      if (rows.length === 0) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404 }
+        );
+      }
+
+      const links = rows
+        .filter(r => r.linkId !== null)
+        .map(r => ({
+          id: r.linkId!,
+          platform: r.platform!,
+          platformType: r.platformType!,
+          url: r.url!,
+          sortOrder: r.sortOrder!,
+          isActive: r.isActive!,
+          displayText: r.displayText,
+        }));
+
+      await redis.set(cacheKey, links, { ex: 60 });
 
       return NextResponse.json({ links }, { status: 200 });
     });
@@ -54,6 +106,9 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if (!flags.feature_social_links) {
+    return NextResponse.json({ error: 'Not enabled' }, { status: 404 });
+  }
   try {
     return await withDbSession(async clerkUserId => {
       const body = (await req.json().catch(() => null)) as {
@@ -113,6 +168,8 @@ export async function PUT(req: Request) {
 
         await db.insert(socialLinks).values(insertPayload);
       }
+
+      await redis.del(`social_links:${profileId}`);
 
       return NextResponse.json({ ok: true }, { status: 200 });
     });

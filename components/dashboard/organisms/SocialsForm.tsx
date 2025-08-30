@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { track } from '@/lib/analytics';
 import { Artist } from '@/types/db';
 
 interface SocialLink {
@@ -59,13 +60,12 @@ export function SocialsForm({ artist }: SocialsFormProps) {
       // Insert new social links via server API
       const linksToInsert = socialLinks
         .filter(link => link.url.trim())
-        .map(link => ({
-          creator_profile_id: artist.id,
+        .map((link, index) => ({
           platform: link.platform,
-          platform_type: link.platform,
+          platformType: link.platform,
           url: link.url.trim(),
-          sort_order: 0,
-          is_active: true,
+          sortOrder: index,
+          isActive: true,
         }));
 
       const res = await fetch('/api/dashboard/social-links', {
@@ -80,6 +80,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
         throw new Error(err?.error ?? 'Failed to update social links');
       }
       setSuccess(true);
+      track('dashboard_social_links_saved', { profileId: artist.id });
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Error:', error);
