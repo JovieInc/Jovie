@@ -18,7 +18,7 @@ export default function PricingPage() {
     { title: 'Blazing-fast profiles, SEO-optimized' },
     { title: 'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)' },
     { title: 'Constant A/B testing and machine learning to maximize conversion' },
-    { title: 'Smart deep links (/listen, /tip, etc.) for Instagram\'s multiple link slots' },
+    { title: 'Smart deep links (/listen, /tip, etc.) for Instagram&apos;s multiple link slots' },
     { title: 'Clean dark/light mode, desktop QR code handoff' },
     { title: 'App deep links (no browser/login friction)' },
     { title: 'Analytics focused on conversion (clicks → conversions, referrers, countries)' },
@@ -40,7 +40,7 @@ export default function PricingPage() {
 
       // Use the appropriate price based on billing interval
       const priceOption = pricingData.options?.find(
-        (option: any) => option.interval === (isYearly ? 'year' : 'month')
+        (option: { interval: string; priceId: string }) => option.interval === (isYearly ? 'year' : 'month')
       );
       
       const priceId = priceOption?.priceId;
@@ -94,7 +94,7 @@ export default function PricingPage() {
               Free forever. $5/month or $50/year to remove the branding.
             </h1>
             <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
-              Your Jovie profile is the fastest, smartest, most beautiful link you'll ever share.
+              Your Jovie profile is the fastest, smartest, most beautiful link you&apos;ll ever share.
             </p>
           </motion.div>
 
@@ -124,7 +124,7 @@ export default function PricingPage() {
                 </div>
 
                 <FeatureList 
-                  title="What's included:"
+                  title="What&apos;s included:"
                   features={freeFeatures}
                 />
 
