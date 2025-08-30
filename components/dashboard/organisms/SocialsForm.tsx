@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { track } from '@/lib/analytics';
 import { Artist } from '@/types/db';
 
 interface SocialLink {
@@ -80,6 +81,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
         throw new Error(err?.error ?? 'Failed to update social links');
       }
       setSuccess(true);
+      track('dashboard_social_links_saved', { profileId: artist.id });
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
       console.error('Error:', error);

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { flags } from '@/lib/env';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { SocialsForm } from './organisms';
 
 interface DashboardLinksProps {
   initialData: DashboardData;
@@ -16,8 +18,8 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
   );
   // Note: Profile switching functionality will be implemented in the future
 
-  if (!artist) {
-    return null; // This shouldn't happen given the server-side logic
+  if (!artist || !flags.feature_social_links) {
+    return null; // Feature disabled or artist missing
   }
 
   return (
@@ -35,14 +37,7 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
           <h3 className='text-lg font-medium text-primary-token mb-4'>
             Your Links
           </h3>
-          <div className='space-y-4'>
-            {/* This is a placeholder for the links management UI */}
-            <p className='text-secondary-token'>
-              This is where you&apos;ll manage your social and streaming links.
-              The actual links management UI will be implemented in a future
-              update.
-            </p>
-          </div>
+          <SocialsForm artist={artist} />
         </div>
       </div>
     </div>
