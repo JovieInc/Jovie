@@ -137,6 +137,7 @@ jobs:
     env:
       NEON_URL: ${{ secrets.NEON_DATABASE_URL }}
       DB_URL: ${{ secrets.DATABASE_URL }}
+      DB_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -221,6 +222,8 @@ jobs:
             echo "DATABASE_URL=$NEON_URL" >> $GITHUB_ENV
           elif [[ -n "$DB_URL" ]]; then
             echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+          elif [[ -n "$DB_URL_PREVIEW" ]]; then
+            echo "DATABASE_URL=$DB_URL_PREVIEW" >> $GITHUB_ENV
           else
             echo "No DATABASE_URL secret configured." >&2
             exit 1
