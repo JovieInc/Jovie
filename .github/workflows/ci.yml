@@ -27,25 +27,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pr-policy:
-    name: pr-policy
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const base = context.payload.pull_request.base.ref;
-            const head = context.payload.pull_request.head.ref;
-            if (base === 'production' && head !== 'preview') {
-              core.setFailed(`Only allow preview -> production. Got ${head} -> ${base}`);
-            } else if (base === 'preview' && head === 'production') {
-              core.setFailed(`Do not merge production -> preview. Use feature/* -> preview`);
-            } else {
-              core.info('PR policy OK');
-            }
-
   up-to-date-with-preview:
     name: PR Up-to-date with Preview
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' }}
@@ -131,7 +112,7 @@ jobs:
   neon-db:
     name: Neon DB
     # Run whenever Drizzle Check would run
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -181,7 +162,7 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [ci-typecheck, ci-lint, neon-db]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -193,29 +174,38 @@ jobs:
         id: resolve_db
         run: |
           CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db job outputs"
             echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
-            exit 0
-          fi
-          if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+            SRC="neon-job-output"
+          elif [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
             echo "Using NEON_DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
-            exit 0
-          fi
-          if [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+            SRC="secret:NEON_DATABASE_URL"
+          elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
             echo "Using DATABASE_URL_PREVIEW secret"
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
-            exit 0
-          fi
-          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            SRC="secret:DATABASE_URL_PREVIEW"
+          elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
             echo "Using DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
-            exit 0
+            SRC="secret:DATABASE_URL"
+          else
+            echo "No DATABASE_URL could be resolved (likely a fork PR)."
+            SRC="unresolved"
           fi
-          echo "No DATABASE_URL could be resolved (likely a fork PR)."
 
-      # Path guard: Check if changes affect DB/schema files (only for pushes and non-preview PRs)
+          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
+          {
+            echo "### Drizzle Check: DATABASE_URL Resolution"
+            echo "- Source: $SRC"
+            if [ "$SRC" = "unresolved" ]; then
+              echo "- Note: No URL available; downstream steps may skip gracefully."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Path guard: Check if changes affect DB/schema files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
         run: |
@@ -233,9 +223,9 @@ jobs:
             exit 0
           fi
 
-          # For PRs to preview, always run Drizzle check (skip path guards)
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "preview" ]]; then
-            echo "Running Drizzle check for PR to preview branch"
+          # For PRs to production, always run Drizzle check (skip path guards)
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "production" ]]; then
+            echo "Running Drizzle check for PR to production branch"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -307,19 +297,19 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs and merge queue: aggregate fast checks
-    if: ${{ github.event_name == 'pull_request' }}
-    needs: [ci-typecheck, ci-lint, ci-drizzle-check]
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck, Lint, and Drizzle Check succeeded"
+          echo "ci-fast passed: Typecheck and Lint succeeded"
 
   ci-build:
     name: Build
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -327,7 +317,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      # Path guard: Check if changes affect critical files (only for pushes and non-preview PRs)
+      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
         run: |
@@ -345,9 +335,9 @@ jobs:
             exit 0
           fi
 
-          # For PRs to preview, always run full CI (skip path guards)
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "preview" ]]; then
-            echo "Running full CI for PR to preview branch"
+          # For PRs to production, always run full CI (skip path guards)
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "production" ]]; then
+            echo "Running full CI for PR to production branch"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -421,7 +411,7 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -447,9 +437,9 @@ jobs:
             exit 0
           fi
 
-          # For PRs to preview, always run full CI (skip path guards)
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "preview" ]]; then
-            echo "Running full CI for PR to preview branch"
+          # For PRs to production, always run full CI (skip path guards)
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "production" ]]; then
+            echo "Running full CI for PR to production branch"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -542,7 +532,7 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, ci-unit-tests]
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     env:
       # Use the Neon database URL from GitHub secrets
@@ -574,12 +564,7 @@ jobs:
             exit 0
           fi
 
-          # For PRs to preview, always run full CI (skip path guards)
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "preview" ]]; then
-            echo "Running full CI for PR to preview branch"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
+          # PRs to preview do not automatically force full CI here; job-level conditions control execution.
 
           # For merge queue events, always run full CI
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
