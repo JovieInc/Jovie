@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   pr-policy:
-    name: PR Policy
+    name: pr-policy
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -233,6 +233,18 @@ jobs:
       - name: Run Drizzle Check
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm run drizzle:check
+
+  ci-fast:
+    name: ci-fast
+    # Gate for PRs and merge queue: aggregate fast checks
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint, ci-drizzle-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All fast checks passed
+        run: |
+          echo "ci-fast passed: Typecheck, Lint, and Drizzle Check succeeded"
 
   ci-build:
     name: Build
