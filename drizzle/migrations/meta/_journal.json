@@ -15,6 +15,13 @@
       "when": 1756309875017,
       "tag": "0001_acoustic_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1756581590000,
+      "tag": "0002_schema_sync_fix",
+      "breakpoints": true
     }
   ]
 }

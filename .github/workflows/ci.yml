@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   pr-policy:
-    name: PR Policy
+    name: pr-policy
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -128,19 +128,92 @@ jobs:
       - name: Lint (enforce zero warnings)
         run: pnpm run lint --max-warnings=0
 
+  neon-db:
+    name: Neon DB
+    # Run whenever Drizzle Check would run
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      db_url: ${{ steps.finalize-urls.outputs.db_url }}
+      db_url_pooled: ${{ steps.finalize-urls.outputs.db_url_pooled }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Determine sanitized branch name
+        id: sanitize-branch
+        run: |
+          RAW="${{ github.head_ref || github.ref_name }}"
+          # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
+          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          echo "Using sanitized branch name: $SANITIZED"
+          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+      - name: Create or reuse Neon branch
+        id: create-branch
+        uses: neondatabase/create-branch-action@v6
+        continue-on-error: true
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ steps.sanitize-branch.outputs.name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - name: Finalize Neon DB URLs
+        id: finalize-urls
+        run: |
+          DB_URL="${{ steps.create-branch.outputs.db_url }}"
+          DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
+
+          if [ -z "$DB_URL" ]; then
+            echo "Neon branch creation did not return db_url; falling back to repository secrets."
+            if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+              DB_URL="${{ secrets.NEON_DATABASE_URL }}"
+            elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL_PREVIEW }}"
+            elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL }}"
+            fi
+          fi
+
+          echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
+          echo "db_url_pooled=$DB_URL_POOLED" >> $GITHUB_OUTPUT
+
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    needs: [ci-typecheck, ci-lint, neon-db]
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      NEON_URL: ${{ secrets.NEON_DATABASE_URL }}
-      DB_URL: ${{ secrets.DATABASE_URL }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
+      - name: Resolve DATABASE_URL
+        id: resolve_db
+        run: |
+          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          if [ -n "$CANDIDATE" ]; then
+            echo "Using Neon DB URL from neon-db job outputs"
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+            echo "Using NEON_DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+            echo "Using DATABASE_URL_PREVIEW secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "Using DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          echo "No DATABASE_URL could be resolved (likely a fork PR)."
 
       # Path guard: Check if changes affect DB/schema files (only for pushes and non-preview PRs)
       - name: Check for relevant changes
@@ -150,6 +223,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing Drizzle check due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If no DB URL is available (common for forked PRs), skip gracefully
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No DATABASE_URL available (likely a fork PR). Skipping Drizzle check."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -214,17 +294,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: '**/pnpm-lock.yaml'
 
-      - name: Configure DATABASE_URL env
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          if [[ -n "$NEON_URL" ]]; then
-            echo "DATABASE_URL=$NEON_URL" >> $GITHUB_ENV
-          elif [[ -n "$DB_URL" ]]; then
-            echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
-          else
-            echo "No DATABASE_URL secret configured." >&2
-            exit 1
-          fi
+      # DATABASE_URL already resolved; proceed with install and check
 
       - name: Install dependencies
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -234,10 +304,22 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm run drizzle:check
 
+  ci-fast:
+    name: ci-fast
+    # Gate for PRs and merge queue: aggregate fast checks
+    if: ${{ github.event_name == 'pull_request' }}
+    needs: [ci-typecheck, ci-lint, ci-drizzle-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All fast checks passed
+        run: |
+          echo "ci-fast passed: Typecheck, Lint, and Drizzle Check succeeded"
+
   ci-build:
     name: Build
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -253,6 +335,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping Build job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -332,7 +421,7 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -348,6 +437,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping Unit Tests job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -417,10 +513,36 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm test
 
+  ci-merge-smoke:
+    name: Merge Group Smoke
+    if: ${{ github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build (smoke)
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, ci-unit-tests]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     env:
       # Use the Neon database URL from GitHub secrets
@@ -442,6 +564,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping E2E Tests job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -536,6 +665,70 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  ci-pr-vercel-preview:
+    name: Preview Deploy (PR)
+    needs: [ci-drizzle-check, neon-db]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies for build
+        run: pnpm install --frozen-lockfile
+      - name: Pull env (preview)
+        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build (PR preview)
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (PR preview, pooled DB only for this deployment)
+        id: pr_deploy
+        run: |
+          # Prefer pooled URL from Neon branch; fall back to non-pooled/secrets if not available
+          POOLED_URL="$DB_URL_POOLED"
+          if [ -z "$POOLED_URL" ]; then
+            echo "Pooled DB URL not provided by Neon action; falling back to non-pooled/secrets"
+            if [ -n "$DB_URL_NON_POOLED" ]; then
+              POOLED_URL="$DB_URL_NON_POOLED"
+            elif [ -n "$DATABASE_URL_PREVIEW" ]; then
+              POOLED_URL="$DATABASE_URL_PREVIEW"
+            else
+              POOLED_URL="$DATABASE_URL"
+            fi
+          fi
+
+          # Deploy preview with DATABASE_URL injected only for this deployment
+          deployment_url=$(vercel deploy --prebuilt \
+            --env DATABASE_URL="$POOLED_URL" \
+            --env GIT_BRANCH="${GIT_BRANCH}" \
+            --token $VERCEL_TOKEN)
+
+          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled }}
+          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url }}
+          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   deploy:
     needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy
