@@ -1,25 +1,19 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-import { Suspense } from 'react';
-import { BenefitsSection } from '@/components/home/BenefitsSection';
-import { SocialProofSection } from '@/components/home/ComparisonSection';
-import { FeaturedArtists } from '@/components/home/FeaturedArtists';
-import { HomeHero } from '@/components/home/HomeHero';
-import { HowItWorks } from '@/components/home/HowItWorks';
-import { ProblemSolutionSection } from '@/components/home/ProblemSolutionSection';
-import { CTASection } from '@/components/organisms/CTASection';
-
-const TipPromo = dynamic(() => import('@/components/TipPromo'));
-
+import { NewHomeHero } from '@/components/home/NewHomeHero';
+import { NewFeaturedArtists } from '@/components/home/NewFeaturedArtists';
+import { NewFeaturesSection } from '@/components/home/NewFeaturesSection';
+import { NewUpgradeTeaser } from '@/components/home/NewUpgradeTeaser';
+import { NewHowItWorks } from '@/components/home/NewHowItWorks';
+import { NewPreFooterCTA } from '@/components/home/NewPreFooterCTA';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Root layout handles dynamic rendering
 export const revalidate = 3600; // Revalidate every hour
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} - Link in bio for music artists`;
+  const title = `${APP_NAME} - Claim your @handle`;
   const description =
-    'Connect your music, social media, and merch in one link. No design needed. Live in under 90 seconds.';
+    'Secure your name. Share a profile that\'s fast, beautiful, and optimized to convert.';
   const keywords = [
     'link in bio',
     'music artist',
@@ -68,7 +62,7 @@ export async function generateMetadata(): Promise<Metadata> {
           url: '/og/default.png',
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Link in bio for music artists`,
+          alt: `${APP_NAME} - Claim your @handle`,
           type: 'image/png',
         },
       ],
@@ -113,7 +107,7 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: APP_NAME,
-            description: 'Link in bio for music artists',
+            description: 'Claim your @handle',
             url: APP_URL,
             potentialAction: {
               '@type': 'SearchAction',
@@ -140,66 +134,27 @@ export default function HomePage() {
         }}
       />
 
-      {/* Linear-inspired design with theme support */}
+      {/* Main content */}
       <div className='relative min-h-screen bg-white text-gray-900 dark:bg-[#0D0E12] dark:text-white'>
-        {/* Subtle grid background pattern */}
-        <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]' />
+        {/* 1. Hero Section (above the fold) */}
+        <NewHomeHero />
 
-        {/* Gradient orbs - more subtle like Linear */}
-        <div className='absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl' />
-        <div className='absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl' />
+        {/* 2. Artist carousel (visual proof, not endorsement) */}
+        <NewFeaturedArtists />
 
-        {/* Hero Section */}
-        <HomeHero />
+        {/* 3. Features (what Free includes, forever) */}
+        <NewFeaturesSection />
 
-        {/* Content sections with optimized spacing */}
-        <div className='relative z-10'>
-          {/* Featured Artists with glass morphism */}
-          <section className='py-10 md:py-14'>
-            <Suspense
-              fallback={
-                <div className='flex items-center justify-center py-6'>
-                  <div className='animate-pulse text-gray-600 dark:text-white/60'>
-                    Loading featured artists...
-                  </div>
-                </div>
-              }
-            >
-              <FeaturedArtists />
-            </Suspense>
-          </section>
+        {/* 4. Upgrade teaser (lightweight, not a pricing page) */}
+        <NewUpgradeTeaser />
 
-          {/* Problem & Solution section */}
-          <ProblemSolutionSection />
-
-          {/* How It Works with step indicators */}
-          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
-            <HowItWorks />
-          </section>
-
-          {/* Benefits with grid layout */}
-          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
-            <BenefitsSection />
-          </section>
-
-          {/* Comparison with modern table design */}
-          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
-            <SocialProofSection />
-          </section>
-
-          {/* Tip Promo - feature flagged */}
-          <TipPromo />
-        </div>
+        {/* 5. How it works (3 steps) */}
+        <NewHowItWorks />
       </div>
 
-      {/* CTA section with glass morphism */}
-      <CTASection
-        title='Ready to showcase your music?'
-        buttonText='Get Started Free'
-        buttonHref='/onboarding'
-        description='Join thousands of artists already using Jovie to connect with their fans.'
-        variant='primary'
-      />
+      {/* Pre-footer CTA */}
+      <NewPreFooterCTA />
     </>
   );
 }
+
