@@ -192,7 +192,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 15
           # Wait for all required checks from ruleset
-          check-regexp: (?i)(pr.policy|typecheck|lint|drizzle.check|build|unit.tests|e2e.tests)
+          check-regexp: (?i)^(CI / )?(PR Policy|PR Up-to-date with Preview|Typecheck|Lint|Drizzle Check|Build|Unit Tests|E2E Tests)$
           allowed-conclusions: success,skipped
           timeout-minutes: 30
 
