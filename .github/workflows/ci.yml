@@ -602,6 +602,70 @@ jobs:
             test-results/
           retention-days: 7
 
+  ci-pr-vercel-preview:
+    name: Preview Deploy (PR)
+    needs: [ci-drizzle-check, neon-db]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - uses: pnpm/action-setup@v4
+      - name: Install dependencies for build
+        run: pnpm install --frozen-lockfile
+      - name: Pull env (preview)
+        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build (PR preview)
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (PR preview, pooled DB only for this deployment)
+        id: pr_deploy
+        run: |
+          # Prefer pooled URL from Neon branch; fall back to non-pooled/secrets if not available
+          POOLED_URL="$DB_URL_POOLED"
+          if [ -z "$POOLED_URL" ]; then
+            echo "Pooled DB URL not provided by Neon action; falling back to non-pooled/secrets"
+            if [ -n "$DB_URL_NON_POOLED" ]; then
+              POOLED_URL="$DB_URL_NON_POOLED"
+            elif [ -n "$DATABASE_URL_PREVIEW" ]; then
+              POOLED_URL="$DATABASE_URL_PREVIEW"
+            else
+              POOLED_URL="$DATABASE_URL"
+            fi
+          fi
+
+          # Deploy preview with DATABASE_URL injected only for this deployment
+          deployment_url=$(vercel deploy --prebuilt \
+            --env DATABASE_URL="$POOLED_URL" \
+            --env GIT_BRANCH="${GIT_BRANCH}" \
+            --token $VERCEL_TOKEN)
+
+          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled }}
+          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url }}
+          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+
   deploy:
     needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
