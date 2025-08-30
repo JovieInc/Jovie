@@ -12,7 +12,6 @@
 
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
-import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import { existsSync, readFileSync } from 'fs';
