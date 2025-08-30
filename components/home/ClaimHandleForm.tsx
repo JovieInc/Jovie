@@ -14,7 +14,7 @@ interface ClaimHandleFormProps {
   onHandleChange?: (handle: string) => void;
 }
 
-export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps = {}) {
+export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
@@ -486,4 +486,3 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps = {}) {
     </form>
   );
 }
-

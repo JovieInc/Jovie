@@ -10,10 +10,15 @@ interface QRCodeCardProps {
 
 export function QRCodeCard({ handle }: QRCodeCardProps) {
   const [qrCodeUrl, setQrCodeUrl] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
   const profileUrl = `${APP_URL}/${handle}`;
   
   // Generate QR code URL using a free QR code API
   useEffect(() => {
+    setIsLoading(true);
+    setHasError(false);
+    
     // Using QR Code API to generate QR code
     // We're encoding the profile URL to be viewed on mobile
     const encodedUrl = encodeURIComponent(profileUrl);
@@ -27,13 +32,18 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
         <div className="flex flex-col items-center">
           {/* QR Code */}
           <div className="w-[120px] h-[120px] bg-white rounded-lg p-2 shadow-sm">
-            {qrCodeUrl ? (
+            {qrCodeUrl && !hasError ? (
               <Image 
                 src={qrCodeUrl} 
                 alt={`QR code for ${handle}`} 
                 width={100} 
                 height={100}
                 className="w-full h-full"
+                onLoad={() => setIsLoading(false)}
+                onError={() => {
+                  setIsLoading(false);
+                  setHasError(true);
+                }}
               />
             ) : (
               <div className="w-full h-full bg-gray-200 animate-pulse rounded"></div>
@@ -52,4 +62,3 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
     </div>
   );
 }
-
