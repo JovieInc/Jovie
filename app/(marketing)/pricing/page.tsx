@@ -3,11 +3,27 @@
 import { useAuth } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Container } from '@/components/site/Container';
+import { PricingToggle } from '@/components/pricing/PricingToggle';
+import { FeatureList } from '@/components/pricing/FeatureList';
+import { PricingCTA } from '@/components/pricing/PricingCTA';
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [isYearly, setIsYearly] = useState(false);
+
+  const freeFeatures = [
+    { title: 'Blazing-fast profiles, SEO-optimized' },
+    { title: 'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)' },
+    { title: 'Constant A/B testing and machine learning to maximize conversion' },
+    { title: 'Smart deep links (/listen, /tip, etc.) for Instagram\'s multiple link slots' },
+    { title: 'Clean dark/light mode, desktop QR code handoff' },
+    { title: 'App deep links (no browser/login friction)' },
+    { title: 'Analytics focused on conversion (clicks → conversions, referrers, countries)' },
+    { title: 'Unique Jovie handle (jov.ie/yourname)' },
+  ];
 
   const handleSubscribe = async () => {
     if (!isSignedIn) {
@@ -22,8 +38,12 @@ export default function PricingPage() {
       const pricingResponse = await fetch('/api/stripe/pricing-options');
       const pricingData = await pricingResponse.json();
 
-      // Use the first available price (monthly intro pricing)
-      const priceId = pricingData.options?.[0]?.priceId;
+      // Use the appropriate price based on billing interval
+      const priceOption = pricingData.options?.find(
+        (option: any) => option.interval === (isYearly ? 'year' : 'month')
+      );
+      
+      const priceId = priceOption?.priceId;
 
       if (!priceId) {
         console.error('No pricing options available');
@@ -56,72 +76,152 @@ export default function PricingPage() {
   };
 
   return (
-    <div className='min-h-screen bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800'>
-      <Container>
-        <div className='py-24 sm:py-32'>
-          <div className='text-center mb-16'>
-            <h1 className='text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl'>
-              Simple, transparent pricing
+    <div className='min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
+      <Container size="md">
+        <motion.div 
+          className='py-24 sm:py-32'
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div 
+            className='text-center mb-16'
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl max-w-4xl mx-auto leading-tight'>
+              Free forever. $5/month or $50/year to remove the branding.
             </h1>
-            <p className='mt-6 text-lg leading-8 text-gray-600 dark:text-gray-300'>
-              Start free. Upgrade any time to remove branding.
+            <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
+              Your Jovie profile is the fastest, smartest, most beautiful link you'll ever share.
             </p>
+          </motion.div>
+
+          <div className='grid md:grid-cols-2 gap-12 items-start'>
+            {/* Free Plan */}
+            <motion.div 
+              className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden'
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <div className='p-8'>
+                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
+                  Free Forever
+                </h2>
+                <p className='mt-2 text-gray-600 dark:text-gray-400'>
+                  Everything you need to create a beautiful profile.
+                </p>
+                
+                <div className='mt-6 flex items-baseline'>
+                  <span className='text-5xl font-bold text-gray-900 dark:text-white'>
+                    $0
+                  </span>
+                  <span className='ml-1 text-xl text-gray-500 dark:text-gray-400'>
+                    /forever
+                  </span>
+                </div>
+
+                <FeatureList 
+                  title="What's included:"
+                  features={freeFeatures}
+                />
+
+                <div className='mt-8'>
+                  <Link
+                    href='/'
+                    className='inline-flex w-full items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 px-6 py-3 text-base font-medium text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200'
+                  >
+                    Continue with free
+                  </Link>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Paid Plan */}
+            <motion.div 
+              className='rounded-2xl border border-blue-100 dark:border-blue-900 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              {/* Highlight banner */}
+              <div className='bg-blue-600 text-white text-sm font-medium px-4 py-2 text-center'>
+                The Apple-clean version
+              </div>
+              
+              <div className='p-8'>
+                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
+                  Remove Branding
+                </h2>
+                <p className='mt-2 text-gray-600 dark:text-gray-400'>
+                  Everything in Free, plus a clean, brandless experience.
+                </p>
+                
+                <div className='mt-6'>
+                  <PricingToggle onChange={setIsYearly} />
+                </div>
+
+                <div className='mt-8'>
+                  <p className='text-sm text-gray-500 dark:text-gray-400 mb-4'>
+                    All free features, plus:
+                  </p>
+                  <ul className='space-y-3'>
+                    <li className='flex items-start'>
+                      <svg 
+                        className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5' 
+                        fill='none' 
+                        viewBox='0 0 24 24' 
+                        stroke='currentColor'
+                      >
+                        <path 
+                          strokeLinecap='round' 
+                          strokeLinejoin='round' 
+                          strokeWidth={2} 
+                          d='M5 13l4 4L19 7' 
+                        />
+                      </svg>
+                      <span className='ml-3 text-base text-gray-700 dark:text-gray-300'>
+                        <strong>Remove the Jovie branding</strong> for a clean, professional look
+                      </span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className='mt-8'>
+                  <motion.button
+                    onClick={handleSubscribe}
+                    disabled={isLoading}
+                    className='inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200'
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {isLoading
+                      ? 'Processing...'
+                      : isSignedIn
+                        ? 'Remove branding →'
+                        : 'Upgrade →'}
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
           </div>
 
-          <div className='max-w-xl mx-auto'>
-            <div className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60 backdrop-blur p-8 shadow-sm'>
-              <h2 className='text-2xl font-semibold text-gray-900 dark:text-white'>
-                Remove branding
-              </h2>
-              <p className='mt-2 text-sm text-gray-600 dark:text-gray-400'>
-                The only paid feature right now. Everything else is included for
-                free.
-              </p>
-
-              <div className='mt-6 flex items-baseline gap-2'>
-                <span className='text-4xl font-bold text-gray-900 dark:text-white'>
-                  $5
-                </span>
-                <span className='text-sm text-gray-500 dark:text-gray-400'>
-                  /mo
-                </span>
-              </div>
-
-              <ul className='mt-6 space-y-2 text-sm text-gray-700 dark:text-gray-300'>
-                <li>• All core features</li>
-                <li>• Remove the Jovie branding badge</li>
-                <li>• Cancel anytime</li>
-              </ul>
-
-              <div className='mt-8 flex items-center gap-3'>
-                <button
-                  onClick={handleSubscribe}
-                  disabled={isLoading}
-                  className='inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-white font-medium hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed'
-                >
-                  {isLoading
-                    ? 'Processing...'
-                    : isSignedIn
-                      ? 'Subscribe now'
-                      : 'Get started'}
-                </button>
-                <Link
-                  href='/'
-                  className='inline-flex items-center justify-center rounded-md px-4 py-2 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                >
-                  Continue free
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          <div className='mt-16 text-center'>
+          {/* CTA Section */}
+          <PricingCTA onUpgrade={handleSubscribe} isLoading={isLoading} />
+          
+          <motion.div 
+            className='mt-16 text-center'
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+          >
             <p className='text-sm text-gray-500 dark:text-gray-400'>
-              All plans include unlimited updates and our 30-day money-back
-              guarantee.
+              All plans include unlimited updates and our 30-day money-back guarantee.
             </p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </Container>
     </div>
   );
