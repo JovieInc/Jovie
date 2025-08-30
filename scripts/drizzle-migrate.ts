@@ -237,14 +237,7 @@ async function runMigrations() {
 
     db = drizzle(sql);
 
-    // Ensure we operate in the public schema without attempting to create it
-    try {
-      await db.execute(drizzleSql`SET search_path TO public`);
-    } catch (e) {
-      log.warning(
-        `Could not set search_path to public: ${(e as Error).message}`
-      );
-    }
+    // Using default public schema
 
     log.success('Database connection established');
   } catch (error) {
@@ -259,8 +252,7 @@ async function runMigrations() {
     const start = Date.now();
     await migrate(db, {
       migrationsFolder: './drizzle/migrations',
-      // Use default search_path (public) and avoid CREATE SCHEMA by not passing migrationsSchema
-      migrationsTable: 'drizzle__journal',
+      migrationsTable: '__drizzle_migrations',
     });
     const duration = ((Date.now() - start) / 1000).toFixed(2);
 
