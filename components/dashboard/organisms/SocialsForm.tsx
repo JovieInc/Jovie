@@ -60,13 +60,12 @@ export function SocialsForm({ artist }: SocialsFormProps) {
       // Insert new social links via server API
       const linksToInsert = socialLinks
         .filter(link => link.url.trim())
-        .map(link => ({
-          creator_profile_id: artist.id,
+        .map((link, index) => ({
           platform: link.platform,
-          platform_type: link.platform,
+          platformType: link.platform,
           url: link.url.trim(),
-          sort_order: 0,
-          is_active: true,
+          sortOrder: index,
+          isActive: true,
         }));
 
       const res = await fetch('/api/dashboard/social-links', {

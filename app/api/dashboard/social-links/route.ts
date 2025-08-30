@@ -23,26 +23,28 @@ export async function GET(req: Request) {
         );
       }
 
+      // Verify the profile belongs to the authenticated user before checking cache
+      const [profile] = await db
+        .select({ id: creatorProfiles.id })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(
+          and(
+            eq(creatorProfiles.id, profileId),
+            eq(users.clerkId, clerkUserId)
+          )
+        )
+        .limit(1);
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404 }
+        );
+      }
+
       const cacheKey = `social_links:${profileId}`;
       const cached = await redis.get<DbSocialLink[]>(cacheKey);
       if (cached) {
-        const [profile] = await db
-          .select({ id: creatorProfiles.id })
-          .from(creatorProfiles)
-          .innerJoin(users, eq(users.id, creatorProfiles.userId))
-          .where(
-            and(
-              eq(creatorProfiles.id, profileId),
-              eq(users.clerkId, clerkUserId)
-            )
-          )
-          .limit(1);
-        if (!profile) {
-          return NextResponse.json(
-            { error: 'Profile not found' },
-            { status: 404 }
-          );
-        }
         return NextResponse.json({ links: cached }, { status: 200 });
       }
 

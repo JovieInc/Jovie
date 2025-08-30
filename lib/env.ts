@@ -154,7 +154,7 @@ export const env = {
 export const flags = {
   // Feature flags controlled via feature-flags.ts instead of env
   feature_image_cdn_cloudinary: false,
-  feature_social_links: false,
+  feature_social_links: true,
 } as const;
 
 // Environment validation utilities
