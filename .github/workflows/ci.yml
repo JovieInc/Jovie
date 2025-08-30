@@ -217,14 +217,31 @@ jobs:
       - name: Configure DATABASE_URL env
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
+          SOURCE="none"
           if [[ -n "$NEON_URL" ]]; then
             echo "DATABASE_URL=$NEON_URL" >> $GITHUB_ENV
+            SOURCE="NEON_DATABASE_URL secret"
           elif [[ -n "$DB_URL" ]]; then
             echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
+            SOURCE="DATABASE_URL secret"
           else
             echo "No DATABASE_URL secret configured." >&2
+            # Keep behavior: fail if Drizzle check is required but no DB URL available
+            echo "RESOLVED_DB_SOURCE=$SOURCE" >> $GITHUB_ENV
+            {
+              echo "### Drizzle Check: DATABASE_URL source"
+              echo ""
+              echo "- No DATABASE_URL resolved (likely fork PR or missing secrets)."
+            } >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+          echo "RESOLVED_DB_SOURCE=$SOURCE" >> $GITHUB_ENV
+          {
+            echo "### Drizzle Check: DATABASE_URL source"
+            echo ""
+            echo "- Resolved from: $SOURCE"
+          } >> $GITHUB_STEP_SUMMARY
 
       - name: Install dependencies
         if: steps.check_changes.outputs.run_full_ci == 'true'
