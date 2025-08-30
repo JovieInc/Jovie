@@ -46,7 +46,13 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
                 }}
               />
             ) : (
-              <div className="w-full h-full bg-gray-200 animate-pulse rounded"></div>
+              <div className="w-full h-full bg-gray-200 animate-pulse rounded">
+                {isLoading && (
+                  <div className="flex items-center justify-center h-full text-xs text-gray-500">
+                    Loading...
+                  </div>
+                )}
+              </div>
             )}
           </div>
           

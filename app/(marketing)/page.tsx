@@ -13,7 +13,7 @@ export const revalidate = 3600; // Revalidate every hour
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} - Claim your @handle`;
   const description =
-    'Secure your name. Share a profile that's fast, beautiful, and optimized to convert.';
+    'Secure your name. Share a profile that\'s fast, beautiful, and optimized to convert.';
   const keywords = [
     'link in bio',
     'music artist',

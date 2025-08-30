@@ -2,8 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Container } from '@/components/site/Container';
-import { FeaturedCreatorsSection } from '@/components/organisms/FeaturedArtistsSection';
-import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
+import { FeaturedCreatorsSection, type FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 
 // Mock data for artist profiles
 const mockArtists: FeaturedCreator[] = [

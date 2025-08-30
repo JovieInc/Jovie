@@ -44,7 +44,7 @@ export function NewHomeHero() {
             </h1>
             
             <p className="mt-4 text-lg text-gray-600 dark:text-gray-300 sm:text-xl max-w-2xl mx-auto lg:mx-0">
-              Secure your name. Share a profile that's fast, beautiful, and optimized to convert.
+              Secure your name. Share a profile that&apos;s fast, beautiful, and optimized to convert.
             </p>
             
             {/* Handle claim form */}

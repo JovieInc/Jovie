@@ -104,7 +104,7 @@ export const Button = forwardRef<
 
     return (
       <Component 
-        ref={ref as any} 
+        ref={ref as React.Ref<HTMLElement>} 
         className={classes} 
         disabled={Component === 'button' ? isDisabled : undefined} 
         {...props}
