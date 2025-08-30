@@ -10,7 +10,11 @@ import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { APP_URL } from '@/constants/app';
 
-export function ClaimHandleForm() {
+interface ClaimHandleFormProps {
+  onHandleChange?: (handle: string) => void;
+}
+
+export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps = {}) {
   const router = useRouter();
   const { isSignedIn } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
@@ -45,6 +49,13 @@ export function ClaimHandleForm() {
       return 'Handle cannot start or end with a hyphen';
     return null;
   }, [handle]);
+
+  // Notify parent component about handle changes
+  useEffect(() => {
+    if (onHandleChange) {
+      onHandleChange(handle);
+    }
+  }, [handle, onHandleChange]);
 
   // Optimistic prefetch when handle becomes available
   useEffect(() => {
@@ -172,7 +183,7 @@ export function ClaimHandleForm() {
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
   const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnLabel = available === true ? 'Create Profile' : 'Create Profile';
+  const btnLabel = available === true ? 'Claim @handle →' : 'Claim @handle →';
   const btnColor: 'green' | 'indigo' = available === true ? 'green' : 'indigo';
   const btnDisabled = !canSubmit;
 
@@ -475,3 +486,4 @@ export function ClaimHandleForm() {
     </form>
   );
 }
+
