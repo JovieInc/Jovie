@@ -4,6 +4,7 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'plain';
   size?: 'sm' | 'md' | 'lg';
+  color?: 'green' | 'indigo' | 'blue' | 'red' | 'gray';
   children: React.ReactNode;
   href?: string;
   className?: string;
@@ -15,11 +16,15 @@ export interface ButtonProps
   loading?: boolean;
 }
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = forwardRef<
+  HTMLButtonElement | HTMLAnchorElement,
+  ButtonProps
+>(
   (
     {
       variant = 'primary',
       size = 'md',
+      color,
       className = '',
       children,
       as: Component = 'button',
@@ -55,8 +60,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       lg: 'px-6 py-3 text-lg',
     };
 
+    const colorClasses = {
+      green: 'bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600',
+      indigo: 'bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600',
+      blue: 'bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600',
+      red: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600',
+      gray: 'bg-gray-600 text-white hover:bg-gray-700 focus-visible:ring-gray-500 dark:bg-gray-500 dark:hover:bg-gray-600',
+    };
+
     // Determine which classes to use based on props
     let variantClass = variantClasses[variant];
+    if (color && variant === 'primary') {
+      variantClass = colorClasses[color];
+    }
     if (outline) variantClass = variantClasses.outline;
     if (plain) variantClass = variantClasses.plain;
 
@@ -87,7 +103,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
 
     return (
-      <Component ref={ref} className={classes} disabled={isDisabled} {...props}>
+      <Component 
+        ref={ref as React.Ref<HTMLElement>} 
+        className={classes} 
+        disabled={Component === 'button' ? isDisabled : undefined} 
+        {...props}
+      >
         {loading && (
           <div className='absolute inset-0 flex items-center justify-center'>
             <div className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin' />
