@@ -29,7 +29,7 @@ export function FeaturedCreatorsSection({
   return (
     <section
       aria-label='Featured creators'
-      className={`relative py-8 md:py-12 ${className}`}
+      className={`relative py-6 md:py-10 ${className}`}
       data-testid='featured-creators'
     >
       <div className='container mx-auto px-4'>
@@ -42,11 +42,11 @@ export function FeaturedCreatorsSection({
 
         {/* Desktop: horizontal scroll with fade */}
         <div className='hidden md:block relative'>
-          {/* Left fade gradient */}
-          <div className='absolute left-0 top-0 bottom-4 w-8 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          {/* Left fade gradient - more subtle */}
+          <div className='absolute left-0 top-0 bottom-4 w-6 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
 
-          {/* Right fade gradient */}
-          <div className='absolute right-0 top-0 bottom-4 w-16 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          {/* Right fade gradient - more subtle */}
+          <div className='absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
 
           <ul className='flex items-center gap-8 overflow-x-auto scroll-smooth pb-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {creators.map(creator => (
@@ -66,11 +66,11 @@ export function FeaturedCreatorsSection({
 
         {/* Mobile: swipe with fade */}
         <div className='md:hidden relative'>
-          {/* Left fade gradient - mobile */}
-          <div className='absolute left-0 top-0 bottom-0 w-6 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          {/* Left fade gradient - mobile, more subtle */}
+          <div className='absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
 
-          {/* Right fade gradient - mobile */}
-          <div className='absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
+          {/* Right fade gradient - mobile, more subtle */}
+          <div className='absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#0D0E12] to-transparent z-10 pointer-events-none' />
 
           <ul className='flex items-center gap-4 overflow-x-auto scroll-smooth px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
             {creators.map(creator => (

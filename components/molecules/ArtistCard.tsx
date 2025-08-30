@@ -30,19 +30,19 @@ export function ArtistCard({
   const containerAnimationProps = prefersReducedMotion
     ? {
         // Minimal animations for reduced motion preference
-        whileHover: { y: -2 },
-        whileFocus: { y: -2 },
+        whileHover: { y: -1 },
+        whileFocus: { y: -1 },
         transition: { duration: 0.1 },
       }
     : {
-        // Full animations for normal motion preference - removed scale to prevent cropping
-        whileHover: { y: -5 },
-        whileFocus: { y: -5 },
+        // Full animations for normal motion preference - more subtle lift
+        whileHover: { y: -3 },
+        whileFocus: { y: -3 },
         transition: {
           type: 'spring',
-          stiffness: 400,
-          damping: 17,
-          mass: 0.8,
+          stiffness: 300,
+          damping: 20,
+          mass: 0.7,
         },
       };
 

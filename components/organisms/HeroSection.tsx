@@ -63,7 +63,7 @@ export function HeroSection({
 
   return (
     <section
-      className={`relative flex min-h-screen flex-col items-center justify-center px-6 py-20 md:py-24 ${className}`}
+      className={`relative flex flex-col items-center justify-center px-6 py-16 md:py-20 ${className}`}
       role='banner'
       aria-labelledby='hero-headline'
     >

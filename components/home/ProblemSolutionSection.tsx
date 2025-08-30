@@ -14,7 +14,7 @@ export function ProblemSolutionSection() {
       aria-labelledby='problem-solution-heading'
       className='relative border-t border-gray-200 dark:border-white/10'
     >
-      <div className='mx-auto max-w-5xl px-4 py-20 md:py-24 text-center'>
+      <div className='mx-auto max-w-5xl px-4 py-14 md:py-18 text-center'>
         {/* Unified badge with Linear-inspired styling */}
         <div className='inline-flex items-center rounded-full bg-gray-100/80 dark:bg-white/5 px-4 py-2 text-sm font-medium text-gray-700 dark:text-white/80 backdrop-blur-sm border border-gray-200 dark:border-white/10'>
           <div className='flex h-2 w-2 items-center justify-center mr-2'>
@@ -40,7 +40,7 @@ export function ProblemSolutionSection() {
         </h3>
 
         {/* Unified narrative flow */}
-        <div className='mt-8 space-y-6 max-w-4xl mx-auto'>
+        <div className='mt-6 space-y-4 max-w-4xl mx-auto'>
           <p className='text-lg text-gray-600 dark:text-white/70 leading-relaxed'>
             Every extra tap taxes attention. &ldquo;Cute&rdquo; layouts bleed
             streams, follows, and ticket sales.
@@ -52,7 +52,7 @@ export function ProblemSolutionSection() {
         </div>
 
         {/* Linear-inspired CTA button */}
-        <div className='mt-12'>
+        <div className='mt-8'>
           <Link
             href='/onboarding'
             onClick={handleClick}

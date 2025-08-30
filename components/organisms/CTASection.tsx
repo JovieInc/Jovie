@@ -29,7 +29,7 @@ export function CTASection({
       aria-labelledby='cta-heading'
       className={`${variantClasses[variant]} ${className}`}
     >
-      <div className='mx-auto max-w-7xl px-6 py-12 md:py-16 flex flex-col md:flex-row items-center justify-between gap-8'>
+      <div className='mx-auto max-w-7xl px-6 py-10 md:py-14 flex flex-col md:flex-row items-center justify-between gap-6'>
         <div className={variant === 'secondary' ? 'text-center space-y-4' : ''}>
           <SectionHeading
             id='cta-heading'

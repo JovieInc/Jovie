@@ -118,14 +118,14 @@ export function HowItWorksSection({
   const icons = [LinkIcon, LockIcon, MusicIcon];
 
   return (
-    <section className={`relative py-24 sm:py-32 ${className}`}>
+    <section className={`relative py-14 sm:py-18 ${className}`}>
       {/* Section accent border */}
       {showAccentBorder && (
         <div className='absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-cyan-500/50' />
       )}
 
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
-        <div className='mx-auto max-w-3xl text-center mb-16'>
+        <div className='mx-auto max-w-3xl text-center mb-12'>
           <div className='mb-8'>
             <StatusBadge variant='purple' icon={LightningIcon}>
               {badgeText}

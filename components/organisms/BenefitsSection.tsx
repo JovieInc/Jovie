@@ -117,9 +117,9 @@ export function BenefitsSection({
   const icons = [LightningIcon, ChartIcon, BulbIcon];
 
   return (
-    <section className={`relative py-24 sm:py-32 ${className}`}>
+    <section className={`relative py-14 sm:py-18 ${className}`}>
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
-        <div className='mx-auto max-w-3xl text-center mb-16'>
+        <div className='mx-auto max-w-3xl text-center mb-12'>
           <div className='mb-8'>
             <StatusBadge variant='green' icon={CheckIcon}>
               {badgeText}

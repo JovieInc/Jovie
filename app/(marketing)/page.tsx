@@ -155,10 +155,10 @@ export default function HomePage() {
         {/* Content sections with optimized spacing */}
         <div className='relative z-10'>
           {/* Featured Artists with glass morphism */}
-          <section className='py-8 md:py-12'>
+          <section className='py-10 md:py-14'>
             <Suspense
               fallback={
-                <div className='flex items-center justify-center py-8'>
+                <div className='flex items-center justify-center py-6'>
                   <div className='animate-pulse text-gray-600 dark:text-white/60'>
                     Loading featured artists...
                   </div>
@@ -173,17 +173,17 @@ export default function HomePage() {
           <ProblemSolutionSection />
 
           {/* How It Works with step indicators */}
-          <section className='py-16 md:py-20 border-t border-gray-200 dark:border-white/5'>
+          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
             <HowItWorks />
           </section>
 
           {/* Benefits with grid layout */}
-          <section className='py-16 md:py-20 border-t border-gray-200 dark:border-white/5'>
+          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
             <BenefitsSection />
           </section>
 
           {/* Comparison with modern table design */}
-          <section className='py-16 md:py-20 border-t border-gray-200 dark:border-white/5'>
+          <section className='py-14 md:py-18 border-t border-gray-200 dark:border-white/5'>
             <SocialProofSection />
           </section>
 
