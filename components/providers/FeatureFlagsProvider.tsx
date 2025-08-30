@@ -18,6 +18,7 @@ const FeatureFlagsContext = createContext<FeatureFlagsContextType>({
     universalNotificationsEnabled: false,
     featureClickAnalyticsRpc: false,
     progressiveOnboardingEnabled: true,
+    profileSettingsEnabled: true,
   },
   isLoading: true,
   error: null,
@@ -45,6 +46,7 @@ export function FeatureFlagsProvider({
       universalNotificationsEnabled: false,
       featureClickAnalyticsRpc: false,
       progressiveOnboardingEnabled: true,
+      profileSettingsEnabled: true,
     }
   );
   const [isLoading, setIsLoading] = useState(!initialFlags);

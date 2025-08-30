@@ -13,6 +13,8 @@ export interface FeatureFlags {
   minimalistOnboardingEnabled?: boolean;
   // New Apple-style full-screen onboarding with improved UX (JOV-134)
   appleStyleOnboardingEnabled?: boolean;
+  // Profile settings feature flag
+  profileSettingsEnabled?: boolean;
 }
 
 // PostHog feature flag names (match what's defined in PostHog dashboard)
@@ -26,6 +28,7 @@ export const POSTHOG_FLAGS = {
   PROGRESSIVE_ONBOARDING_ENABLED: 'feature_progressive_onboarding_enabled',
   MINIMALIST_ONBOARDING_ENABLED: 'feature_minimalist_onboarding_enabled',
   APPLE_STYLE_ONBOARDING_ENABLED: 'feature_apple_style_onboarding_enabled',
+  PROFILE_SETTINGS_ENABLED: 'feature_profile_settings',
 } as const;
 
 // Default feature flags (fallback)
@@ -44,6 +47,8 @@ const defaultFeatureFlags: FeatureFlags = {
   minimalistOnboardingEnabled: true,
   // New Apple-style full-screen onboarding with improved UX (JOV-134)
   appleStyleOnboardingEnabled: true,
+  // Profile settings enabled by default
+  profileSettingsEnabled: true,
 };
 
 // Get feature flags (v4-compatible: attempts fetch from discovery endpoint)
@@ -74,6 +79,7 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
         typeof data?.tipPromoEnabled !== 'undefined' ||
         typeof data?.universalNotificationsEnabled !== 'undefined' ||
         typeof data?.progressiveOnboardingEnabled !== 'undefined' ||
+        typeof data?.profileSettingsEnabled !== 'undefined' ||
         hasRpcFlag
       ) {
         return {
@@ -106,6 +112,10 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
                     'feature_click_analytics_rpc'
                   ])
               : defaultFeatureFlags.featureClickAnalyticsRpc
+          ),
+          profileSettingsEnabled: Boolean(
+            (data as Record<string, unknown>).profileSettingsEnabled ??
+              defaultFeatureFlags.profileSettingsEnabled
           ),
         };
       }
@@ -157,6 +167,7 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
             data2.flags?.progressiveOnboardingEnabled?.default ??
               defaultFeatureFlags.progressiveOnboardingEnabled
           ),
+          profileSettingsEnabled: defaultFeatureFlags.profileSettingsEnabled,
         };
       }
     }
@@ -196,6 +207,7 @@ async function getPostHogServerFlags(
       progressiveOnboardingEnabled,
       minimalistOnboardingEnabled,
       appleStyleOnboardingEnabled,
+      profileSettingsEnabled,
     ] = await Promise.all([
       client.isFeatureEnabled(POSTHOG_FLAGS.ARTIST_SEARCH_ENABLED, distinctId),
       client.isFeatureEnabled(POSTHOG_FLAGS.DEBUG_BANNER_ENABLED, distinctId),
@@ -221,6 +233,10 @@ async function getPostHogServerFlags(
         POSTHOG_FLAGS.APPLE_STYLE_ONBOARDING_ENABLED,
         distinctId
       ),
+      client.isFeatureEnabled(
+        POSTHOG_FLAGS.PROFILE_SETTINGS_ENABLED,
+        distinctId
+      ),
     ]);
 
     await client.shutdown();
@@ -244,6 +260,9 @@ async function getPostHogServerFlags(
       }),
       ...(typeof appleStyleOnboardingEnabled === 'boolean' && {
         appleStyleOnboardingEnabled,
+      }),
+      ...(typeof profileSettingsEnabled === 'boolean' && {
+        profileSettingsEnabled,
       }),
     };
   } catch (error) {
@@ -296,6 +315,7 @@ export async function getServerFeatureFlags(
             featureClickAnalyticsRpc: Boolean(
               data.featureClickAnalyticsRpc || data.feature_click_analytics_rpc
             ),
+            profileSettingsEnabled: Boolean(data.profileSettingsEnabled),
           };
         }
       } catch {
@@ -341,6 +361,10 @@ export async function getServerFeatureFlags(
         postHogFlags.appleStyleOnboardingEnabled ??
         localFlags.appleStyleOnboardingEnabled ??
         defaultFeatureFlags.appleStyleOnboardingEnabled,
+      profileSettingsEnabled:
+        postHogFlags.profileSettingsEnabled ??
+        localFlags.profileSettingsEnabled ??
+        defaultFeatureFlags.profileSettingsEnabled,
     };
   } catch (error) {
     console.warn('[Feature Flags] Server flags failed:', error);

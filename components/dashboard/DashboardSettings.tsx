@@ -1,21 +1,31 @@
 'use client';
 
 import { useState } from 'react';
-import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
+import { useFeatureFlags } from '@/components/providers/FeatureFlagsProvider';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardSettingsProps {
   initialData: DashboardData;
 }
 
 export function DashboardSettings({ initialData }: DashboardSettingsProps) {
-  const [artist] = useState<Artist | null>(
+  const { flags } = useFeatureFlags();
+  const [artist, setArtist] = useState<Artist | null>(
     initialData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
   // Note: Profile switching functionality will be implemented in the future
+
+  if (!flags.profileSettingsEnabled) {
+    return (
+      <p className='text-secondary-token'>
+        Profile settings aren&rsquo;t available right now.
+      </p>
+    );
+  }
 
   if (!artist) {
     return null; // This shouldn't happen given the server-side logic
@@ -31,7 +41,7 @@ export function DashboardSettings({ initialData }: DashboardSettingsProps) {
       </div>
 
       {/* Settings content */}
-      <SettingsPolished artist={artist} onArtistUpdate={() => {}} />
+      <SettingsPolished artist={artist} onArtistUpdate={setArtist} />
     </div>
   );
 }
