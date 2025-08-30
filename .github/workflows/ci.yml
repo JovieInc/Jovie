@@ -128,14 +128,36 @@ jobs:
       - name: Lint (enforce zero warnings)
         run: pnpm run lint --max-warnings=0
 
+  neon-db:
+    name: Neon DB
+    # Run whenever Drizzle Check would run
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      db_url: ${{ steps.create-branch.outputs.db_url }}
+      db_url_pooled: ${{ steps.create-branch.outputs.db_url_pooled }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Create or reuse Neon branch
+        id: create-branch
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ github.head_ref || github.ref_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
   ci-drizzle-check:
     name: Drizzle Check
-    needs: [ci-typecheck, ci-lint]
+    needs: [ci-typecheck, ci-lint, neon-db]
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      NEON_URL: ${{ secrets.NEON_DATABASE_URL }}
+      NEON_URL: ${{ needs.neon-db.outputs.db_url || secrets.NEON_DATABASE_URL }}
       DB_URL: ${{ secrets.DATABASE_URL }}
       DB_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
     steps:
