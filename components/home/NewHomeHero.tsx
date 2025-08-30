@@ -1,11 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
 import { ClaimHandleForm } from './ClaimHandleForm';
 import { Container } from '@/components/site/Container';
 import { QRCodeCard } from './QRCodeCard';
-import { APP_URL } from '@/constants/app';
 
 export function NewHomeHero() {
   const [isMounted, setIsMounted] = useState(false);
