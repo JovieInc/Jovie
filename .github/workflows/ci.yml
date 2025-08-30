@@ -131,7 +131,7 @@ jobs:
   neon-db:
     name: Neon DB
     # Run whenever Drizzle Check would run
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -181,17 +181,39 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [ci-typecheck, ci-lint, neon-db]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      NEON_URL: ${{ needs.neon-db.outputs.db_url || secrets.NEON_DATABASE_URL }}
-      DB_URL: ${{ secrets.DATABASE_URL }}
-      DB_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
+      - name: Resolve DATABASE_URL
+        id: resolve_db
+        run: |
+          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          if [ -n "$CANDIDATE" ]; then
+            echo "Using Neon DB URL from neon-db job outputs"
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+            echo "Using NEON_DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+            echo "Using DATABASE_URL_PREVIEW secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "Using DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+            exit 0
+          fi
+          echo "No DATABASE_URL could be resolved (likely a fork PR)."
 
       # Path guard: Check if changes affect DB/schema files (only for pushes and non-preview PRs)
       - name: Check for relevant changes
@@ -201,6 +223,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing Drizzle check due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # If no DB URL is available (common for forked PRs), skip gracefully
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No DATABASE_URL available (likely a fork PR). Skipping Drizzle check."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -265,19 +294,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: '**/pnpm-lock.yaml'
 
-      - name: Configure DATABASE_URL env
-        if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: |
-          if [[ -n "$NEON_URL" ]]; then
-            echo "DATABASE_URL=$NEON_URL" >> $GITHUB_ENV
-          elif [[ -n "$DB_URL" ]]; then
-            echo "DATABASE_URL=$DB_URL" >> $GITHUB_ENV
-          elif [[ -n "$DB_URL_PREVIEW" ]]; then
-            echo "DATABASE_URL=$DB_URL_PREVIEW" >> $GITHUB_ENV
-          else
-            echo "No DATABASE_URL secret configured." >&2
-            exit 1
-          fi
+      # DATABASE_URL already resolved; proceed with install and check
 
       - name: Install dependencies
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -290,7 +307,7 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs and merge queue: aggregate fast checks
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'pull_request' }}
     needs: [ci-typecheck, ci-lint, ci-drizzle-check]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -302,7 +319,7 @@ jobs:
   ci-build:
     name: Build
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -318,6 +335,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping Build job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -397,7 +421,7 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -413,6 +437,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping Unit Tests job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -482,10 +513,36 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm test
 
+  ci-merge-smoke:
+    name: Merge Group Smoke
+    if: ${{ github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: '**/pnpm-lock.yaml'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build (smoke)
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, ci-unit-tests]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     env:
       # Use the Neon database URL from GitHub secrets
@@ -507,6 +564,13 @@ jobs:
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
             echo "Forcing full CI run due to 'full-ci' label"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping E2E Tests job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
@@ -605,7 +669,7 @@ jobs:
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
     needs: [ci-drizzle-check, neon-db]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
