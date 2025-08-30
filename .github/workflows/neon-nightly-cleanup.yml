@@ -1,0 +1,90 @@
+name: Neon Nightly Cleanup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * *' # 9:00 UTC daily
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  discover_stale_neon_branches:
+    name: Discover stale Neon PR branches
+    runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.discover.outputs.stale }}
+    steps:
+      - name: Discover stale branches
+        id: discover
+        uses: actions/github-script@v7
+        env:
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        with:
+          script: |
+            const projectId = process.env.NEON_PROJECT_ID;
+            const apiKey = process.env.NEON_API_KEY;
+            if (!projectId || !apiKey) {
+              core.setFailed('NEON_PROJECT_ID or NEON_API_KEY not configured');
+              return;
+            }
+
+            // 1) Fetch Neon branches
+            const neonRes = await fetch(`https://console.neon.tech/api/v2/projects/${projectId}/branches`, {
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                Accept: 'application/json'
+              }
+            });
+            if (!neonRes.ok) {
+              core.setFailed(`Failed to fetch Neon branches: ${neonRes.status} ${neonRes.statusText}`);
+              return;
+            }
+            const neonJson = await neonRes.json();
+            const neonBranches = (neonJson.branches || []).map(b => b.name).filter(Boolean);
+
+            // 2) Filter to preview/pr-<number>
+            const prBranchRegex = /^preview\/pr-(\d+)$/;
+            const neonPr = neonBranches.filter(name => prBranchRegex.test(name));
+
+            // 3) Get open PRs targeting preview
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              base: 'preview',
+              per_page: 100,
+            });
+            const openNumbers = new Set(openPRs.map(p => p.number.toString()));
+
+            // 4) Determine stale branches (no matching open PR number)
+            const stale = [];
+            for (const name of neonPr) {
+              const m = name.match(prBranchRegex);
+              const num = m && m[1];
+              if (num && !openNumbers.has(num)) {
+                stale.push(name);
+              }
+            }
+
+            core.info(`Found ${stale.length} stale Neon branches: ${JSON.stringify(stale)}`);
+            core.setOutput('stale', JSON.stringify(stale));
+
+  cleanup_stale_branches:
+    name: Cleanup stale Neon PR branches
+    needs: discover_stale_neon_branches
+    if: ${{ needs.discover_stale_neon_branches.outputs.stale != '[]' && needs.discover_stale_neon_branches.outputs.stale != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        branch: ${{ fromJson(needs.discover_stale_neon_branches.outputs.stale) }}
+    steps:
+      - name: Delete Neon Branch ${{ matrix.branch }}
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch: ${{ matrix.branch }}
+          api_key: ${{ secrets.NEON_API_KEY }}

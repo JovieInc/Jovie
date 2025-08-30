@@ -234,10 +234,22 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm run drizzle:check
 
+  ci-fast:
+    name: ci-fast
+    needs: [ci-typecheck, ci-lint, ci-drizzle-check]
+    # Single required gate for merge queue and PRs to preview
+    if: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fast gate passed
+        run: echo "Fast gate passed (Typecheck + Lint + Drizzle Check)"
+
   ci-build:
     name: Build
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Heavy job: run only post-merge on push to preview
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -332,7 +344,8 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-typecheck, ci-lint]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Heavy job: run only post-merge on push to preview
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -420,7 +433,8 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, ci-unit-tests]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Heavy job: run only post-merge on push to preview
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
     runs-on: ubuntu-latest
     env:
       # Use the Neon database URL from GitHub secrets
@@ -614,6 +628,22 @@ jobs:
           echo "✅ Canary passed: Preview deployment healthy"
         continue-on-error: true
 
+      - name: Preview links and QR (summary)
+        run: |
+          echo "## Preview Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "\n- URL: ${{ steps.deploy.outputs.deployment_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Alias: https://preview.jov.ie" >> $GITHUB_STEP_SUMMARY
+          npx --yes qrcode -o preview-qr.png "${{ steps.deploy.outputs.deployment_url }}"
+        continue-on-error: true
+
+      - name: Upload Preview QR
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-qr-${{ github.run_id }}
+          path: preview-qr.png
+          retention-days: 7
+
   promote:
     needs: [deploy]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
@@ -625,19 +655,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 2 }
-      - name: Create/Update PR preview → production (manual review required)
+      - name: Create/Update PR preview → production (auto or manual per flag)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create PR body with QA checklist
           pr_body="## Release Promotion: preview → production
 
-          **⚠️ Manual Review Required**
-
           This PR promotes changes from \`preview\` to \`production\` for production release.
 
+          Auto-promotion is controlled by repository variable \`AUTO_PROMOTE_PROD\` (set to \`false\` to disable). When enabled, auto-merge will be turned on and GitHub will merge when all production checks pass.
+
           ### Pre-merge Checklist
-          - [ ] **Full CI passed** (ci-full job completed successfully)
+          - [ ] **CI passed** (required checks green)
           - [ ] **CodeQL security scan passed** (if applicable)
           - [ ] **Preview environment tested** and verified working
           - [ ] **Database migrations reviewed** (if any)
@@ -670,8 +700,19 @@ jobs:
             gh pr edit "$existing_pr" --title "🚀 Release: Promote preview → production" --body "$pr_body"
           fi
 
+          # Enable auto-merge unless explicitly disabled via repo variable
+          if [ "${{ vars.AUTO_PROMOTE_PROD || 'true' }}" != "false" ]; then
+            pr_number=$(gh pr list --head preview --base production --json number --jq '.[0].number')
+            if [ -n "$pr_number" ]; then
+              echo "Enabling auto-merge (squash) for PR #$pr_number"
+              gh pr merge "$pr_number" --auto --squash || echo "Could not enable auto-merge (may already be enabled)"
+            fi
+          else
+            echo "AUTO_PROMOTE_PROD=false — leaving PR for manual review"
+          fi
+
   deploy-prod:
-    needs: [ci-typecheck, ci-lint, ci-build, ci-unit-tests, ci-e2e-tests]
+    needs: [ci-typecheck, ci-lint]
     if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

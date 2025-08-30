@@ -1,0 +1,19 @@
+name: Reset PREVIEW DB after Promotion
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - production
+
+jobs:
+  reset_preview_to_production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reset preview branch to its parent (production)
+        uses: neondatabase/reset-branch-action@v1
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          parent: true
+          branch: preview
+          api_key: ${{ secrets.NEON_API_KEY }}
