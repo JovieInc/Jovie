@@ -35,7 +35,23 @@
      4. New PostHog events added
      5. Rollback plan (typically "disable feature flag")
    - Auto-merge to `preview` allowed after green CI.
-   - Promotion to `production` is manual via PR.
+   - **Production Delivery**
+     - For **Fast-Path PRs** (revenue/activation; ≤200 LOC; behind a flag; smoke green): **auto-promote `preview` → `production`**.
+     - For all other PRs: manual promotion via PR.  
+     - Auto-halt promotions if error budget breached (p95 > X ms or error rate > Y% on `/checkout|/portal|/api/billing` in last 60 min).
+
+   ### Fast-Path (MRR/Activation)
+   Eligible: pricing, upgrade/paywall, checkout/portal, onboarding, share/QR, public profile perf.
+
+   Requirements:
+   - ≤200 changed LOC, ≤3 files
+   - Behind `feature_<slug>` with expiry ≤14 days
+   - PostHog events present for the funnel
+   - E2E @smoke passes
+
+   Behavior:
+   - Auto-merge to `preview` after green CI
+   - Auto-promote to `production` (see Production Delivery)
 
 6. **Failure Behavior**
    - Disable feature flag to rollback.
@@ -68,6 +84,20 @@
 
      ## Rollback Plan
      Disable feature flag
+     ```
+
+     ```
+     ### Slim PR Template (Fast-Path only)
+     Title: [feat|fix]: <slug>
+
+     ## Goal
+     <1 line tied to MRR/activation>
+
+     ## Feature Flag
+     feature_<slug> (expires: YYYY-MM-DD; owner: @handle)
+
+     ## Events
+     - <required funnel events touched>
      ```
 
 9. **Post-Open Flow**
@@ -315,6 +345,7 @@ export const db = drizzle(sql);
 
 **Migrations (Node‑only):** run `drizzle-kit` via CI or scripts; never from Edge.
 
+
 **Optional Node driver (non‑Edge):**
 ```ts
 // db/node.ts (Node runtime only)
@@ -322,6 +353,11 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { Pool } from 'pg';
 export const dbNode = drizzle(new Pool({ connectionString: process.env.DATABASE_URL }));
 ```
+
+## Neon Branch Hygiene
+- Auto-create DB branch per feature and auto-delete on PR close/merge.
+- Cap active Neon branches at 15; CI fails if cap exceeded.
+- One migration per PR; no destructive change without data-move plan.
 
 **Per‑request user context (for policies/auditing):**
 ```ts
@@ -552,15 +588,13 @@ pnpm test:e2e:full           # All E2E tests
 
 ### **5. Coverage Targets (Pragmatic)**
 
-- **Functions/Lines**: 80%+ (focus on business logic)
-- **Branches**: 70%+ (edge cases for critical paths only)  
-- **Components**: 60%+ (atoms/molecules, skip complex organisms)
+- Global lines: 50–60% (temporary, pre-PMF)
+- Money-path code (auth, checkout, paywall): must have unit tests for happy paths + one E2E smoke test each
 
-**Don't test**:
-- Third-party libraries (Clerk, Stripe SDKs)
-- Simple pass-through components
-- Styling/layout (use visual regression sparingly)
-- Generated code (Drizzle migrations)
+## Flag Lifecycle
+- Every flag must define: owner, expiry date (≤14 days), kill-switch.
+- CI fails if today > expiry.
+- Remove code paths for expired flags within 48h.
 
 ### **6. Test Organization**
 
@@ -747,8 +781,14 @@ pnpm test:e2e          # Run E2E tests locally
 - **preview**: Protected, requires CI + auto-merge eligible
 - **production**: Protected, requires manual review + full CI
 - Auto-merge handles dependency updates and codegen PRs
+- PRs > 400 changed LOC are rejected by CI (must be split).
+- If preview CI red > 30 min: freeze merges; nearest DRI fixes.
 
 ---
+
+## Stripe Uptime Fallbacks
+- Provide static Checkout link generator & Portal fallback route.
+- Alert if daily `checkout_completed` drops >30% vs trailing 7-day average.
 
 ## 📚 Resources
 

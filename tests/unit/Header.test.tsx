@@ -1,10 +1,17 @@
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // Import the individual atomic components to test them directly
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { NavLink } from '@/components/atoms/NavLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
+
+// Mock Clerk
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({
+    isSignedIn: false,
+  }),
+}));
 
 describe('Atomic Design Structure', () => {
   afterEach(cleanup);
@@ -30,13 +37,11 @@ describe('Atomic Design Structure', () => {
     it('AuthActions component works correctly', () => {
       render(<AuthActions />);
 
-      expect(
-        screen.getByRole('button', { name: 'Sign in' })
-      ).toBeInTheDocument();
-      // Sign up removed from header
+      expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
 
       // Check that it's properly structured
-      const container = screen.getByRole('button', {
+      const container = screen.getByRole('link', {
         name: 'Sign in',
       }).parentElement;
       expect(container).toHaveClass('flex', 'items-center', 'space-x-4');
@@ -53,15 +58,13 @@ describe('Atomic Design Structure', () => {
         </div>
       );
 
-      // Should have logo and sign in button (sign up removed)
+      // Should have logo and sign in/sign up links
       expect(screen.getByRole('link', { name: 'Jovie' })).toHaveAttribute(
         'href',
         '/'
       ); // Logo link
-      expect(
-        screen.getByRole('button', { name: 'Sign in' })
-      ).toBeInTheDocument();
-      // Sign up removed from header
+      expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
     });
   });
 });
