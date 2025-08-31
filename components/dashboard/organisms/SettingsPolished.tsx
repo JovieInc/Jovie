@@ -5,6 +5,7 @@ import {
   CreditCardIcon,
   PaintBrushIcon,
   PhotoIcon,
+  RocketLaunchIcon,
   ShieldCheckIcon,
   SparklesIcon,
   UserIcon,
@@ -78,6 +79,13 @@ const proSettingsNavigation = [
       { name: 'Analytics Dashboard', id: 'advanced-analytics' },
       { name: 'Priority Support', id: 'advanced-support' },
     ],
+  },
+  {
+    name: 'Ad Pixels',
+    id: 'ad-pixels',
+    icon: RocketLaunchIcon,
+    description: 'Drop in ad network tags',
+    subsections: [],
   },
 ];
 
@@ -486,6 +494,101 @@ export function SettingsPolished({
     </div>
   );
 
+  const renderAdPixelsSection = () => (
+    <div className='space-y-8'>
+      <div className='pb-6 border-b border-subtle'>
+        <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+          Ad Pixels
+        </h1>
+        <p className='mt-2 text-sm text-secondary'>
+          Connect Facebook, Google, and TikTok pixels to track every fan
+          conversion.
+        </p>
+      </div>
+
+      <form onSubmit={e => e.preventDefault()} className='space-y-8'>
+        <DashboardCard variant='settings'>
+          <h3 className='text-lg font-medium text-primary mb-6'>Pixel IDs</h3>
+
+          <div className='space-y-6'>
+            <div>
+              <label
+                htmlFor='facebookPixel'
+                className='block text-sm font-medium text-primary mb-2'
+              >
+                Facebook Pixel ID
+              </label>
+              <input
+                type='text'
+                id='facebookPixel'
+                placeholder='1234567890'
+                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor='googleAdsConversion'
+                className='block text-sm font-medium text-primary mb-2'
+              >
+                Google Ads Conversion ID
+              </label>
+              <input
+                type='text'
+                id='googleAdsConversion'
+                placeholder='AW-123456789'
+                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor='tiktokPixel'
+                className='block text-sm font-medium text-primary mb-2'
+              >
+                TikTok Pixel ID
+              </label>
+              <input
+                type='text'
+                id='tiktokPixel'
+                placeholder='ABCDEF1234567890'
+                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor='customPixel'
+                className='block text-sm font-medium text-primary mb-2'
+              >
+                Additional Snippet
+              </label>
+              <textarea
+                id='customPixel'
+                rows={4}
+                placeholder='<script>/* your tag */</script>'
+                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
+              />
+              <p className='mt-2 text-sm text-secondary'>
+                For other ad networks or tag managers.
+              </p>
+            </div>
+          </div>
+        </DashboardCard>
+
+        <div className='flex justify-end pt-4 border-t border-subtle'>
+          <button
+            type='submit'
+            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            Save Pixels
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
   const renderContent = () => {
     switch (currentSection) {
       case 'profile':
@@ -538,6 +641,37 @@ export function SettingsPolished({
             </div>
           </div>
         );
+      case 'ad-pixels':
+        if (!isPro) {
+          return (
+            <div className='space-y-8'>
+              <div className='pb-6 border-b border-subtle'>
+                <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                  Ad Pixels
+                </h1>
+                <p className='mt-2 text-sm text-secondary'>
+                  Upgrade to Pro to add ad network pixels.
+                </p>
+              </div>
+              <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
+                <RocketLaunchIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
+                <h3 className='text-lg font-medium text-primary mb-2'>
+                  Unlock growth tracking
+                </h3>
+                <p className='text-sm text-secondary mb-4'>
+                  Seamlessly integrate Facebook, Google, and TikTok pixels.
+                </p>
+                <button
+                  className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+                  style={{ backgroundColor: 'var(--color-accent)' }}
+                >
+                  Upgrade to Pro
+                </button>
+              </div>
+            </div>
+          );
+        }
+        return renderAdPixelsSection();
       case 'billing':
         return (
           <div className='space-y-8'>
