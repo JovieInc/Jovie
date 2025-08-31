@@ -1,93 +1,79 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import {
+  type FeaturedCreator,
+  FeaturedCreatorsSection,
+} from '@/components/organisms/FeaturedArtistsSection';
 import { Container } from '@/components/site/Container';
-import { FeaturedCreatorsSection, type FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
-
-// Mock data for artist profiles
-const mockArtists: FeaturedCreator[] = [
-  {
-    id: '1',
-    handle: 'artist1',
-    name: 'Artist One',
-    src: '/android-chrome-192x192.png',
-  },
-  {
-    id: '2',
-    handle: 'artist2',
-    name: 'Artist Two',
-    src: '/android-chrome-192x192.png',
-  },
-  {
-    id: '3',
-    handle: 'artist3',
-    name: 'Artist Three',
-    src: '/android-chrome-192x192.png',
-  },
-  {
-    id: '4',
-    handle: 'artist4',
-    name: 'Artist Four',
-    src: '/android-chrome-192x192.png',
-  },
-  {
-    id: '5',
-    handle: 'artist5',
-    name: 'Artist Five',
-    src: '/android-chrome-192x192.png',
-  },
-  {
-    id: '6',
-    handle: 'artist6',
-    name: 'Artist Six',
-    src: '/android-chrome-192x192.png',
-  },
-];
 
 export function NewFeaturedArtists() {
-  const [isLoading, setIsLoading] = useState(true);
   const [artists, setArtists] = useState<FeaturedCreator[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate loading artists from API
   useEffect(() => {
+    let hasCached = false;
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('featured-creators');
+      if (cached) {
+        try {
+          setArtists(JSON.parse(cached));
+          setIsLoading(false);
+          hasCached = true;
+        } catch {
+          // Ignore JSON parse errors and fetch fresh data
+        }
+      }
+    }
+
     const fetchArtists = async () => {
+      setIsLoading(true);
       try {
-        // In a real implementation, this would be an API call
-        // For now, we'll use mock data with a simulated delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Set the artists
-        setArtists(mockArtists);
-      } catch (error) {
-        console.error('Error fetching artists:', error);
-        // Fallback to mock data
-        setArtists(mockArtists);
+        const res = await fetch('/api/featured-creators');
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data: FeaturedCreator[] = await res.json();
+        setArtists(data);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('featured-creators', JSON.stringify(data));
+        }
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching artists:', err);
+        if (!hasCached) {
+          setError(
+            "We're having trouble loading creators right now. Please refresh."
+          );
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchArtists();
+    void fetchArtists();
   }, []);
 
   return (
-    <section className="py-10 bg-white dark:bg-black">
+    <section className='py-10 bg-white dark:bg-black'>
       <Container>
-        <div className="text-center mb-6">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+        <div className='text-center mb-6'>
+          <p className='text-sm font-medium text-gray-600 dark:text-gray-400'>
             Explore example Jovie profiles
           </p>
         </div>
-        
+
         {isLoading ? (
-          <div className="flex items-center justify-center py-6">
-            <div className="animate-pulse text-gray-600 dark:text-white/60">
-              Loading example profiles...
-            </div>
+          <div className='flex items-center justify-center py-6'>
+            <LoadingSpinner showDebounce />
+          </div>
+        ) : error ? (
+          <div className='flex items-center justify-center py-6'>
+            <p className='text-sm text-gray-600 dark:text-gray-400'>{error}</p>
           </div>
         ) : (
-          <FeaturedCreatorsSection 
-            creators={artists} 
+          <FeaturedCreatorsSection
+            creators={artists}
             showTitle={false}
             showNames={true}
           />
@@ -96,4 +82,3 @@ export function NewFeaturedArtists() {
     </section>
   );
 }
-

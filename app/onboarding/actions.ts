@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { sql as drizzleSql } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import {
@@ -9,6 +10,7 @@ import {
   mapDatabaseError,
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
+import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import {
   checkUserHasProfile,
   checkUsernameAvailability,
@@ -52,16 +54,27 @@ export async function completeOnboarding({
     }
 
     // Step 3: Rate limiting check
-    // TODO: Implement rate limiting with Drizzle/Upstash instead of RPC
-    // For now, we'll skip rate limiting since we're migrating away from Supabase RPC
-    // const headersList = await headers();
-    // const forwarded = headersList.get('x-forwarded-for');
-    // const clientIP = forwarded ? forwarded.split(',')[0] : null;
+    const headersList = headers();
+    const forwarded = headersList.get('x-forwarded-for');
+    const realIP = headersList.get('x-real-ip');
+    
+    // Extract and validate IP address with fallback chain
+    let clientIP = 'unknown';
+    if (forwarded) {
+      const firstIP = forwarded.split(',')[0].trim();
+      // Basic IP validation (IPv4 and IPv6)
+      if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(firstIP) || 
+          /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(firstIP)) {
+        clientIP = firstIP;
+      }
+    } else if (realIP && /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(realIP)) {
+      clientIP = realIP;
+    }
+    
+    // Skip IP rate limiting for unknown IPs to avoid shared limits
+    const shouldCheckIP = clientIP !== 'unknown';
 
-    // Skip rate limiting for now during migration
-    console.log(
-      'Rate limiting temporarily disabled during Supabase to Drizzle migration'
-    );
+    await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: shouldCheckIP });
 
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
