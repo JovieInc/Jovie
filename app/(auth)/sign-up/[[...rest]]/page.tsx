@@ -17,7 +17,28 @@ export default function SignUpPage() {
             Create your account
           </h1>
           <p className='text-gray-600 dark:text-white/70'>
-            You’ll be redirected to continue setup.
+            You'll be redirected to continue setup.
+          </p>
+          <p className='mt-4 text-sm text-gray-600 dark:text-white/70'>
+            By creating an account, you agree to our{' '}
+            <a
+              href='/legal/terms'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='font-medium text-blue-600 hover:text-blue-700 underline dark:text-blue-400 dark:hover:text-blue-300'
+            >
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a
+              href='/legal/privacy'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='font-medium text-blue-600 hover:text-blue-700 underline dark:text-blue-400 dark:hover:text-blue-300'
+            >
+              Privacy Policy
+            </a>
+            .
           </p>
         </div>
         <ClerkLoading>

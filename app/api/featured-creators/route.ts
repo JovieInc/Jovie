@@ -1,0 +1,77 @@
+import { and, eq } from 'drizzle-orm';
+import { NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema';
+import { redis } from '@/lib/redis';
+
+export const runtime = 'edge';
+export const revalidate = 3600; // Cache results for 1 hour
+
+async function getFeaturedCreators() {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Database timeout')), 3000);
+  });
+
+  const data = await Promise.race([
+    db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        avatarUrl: creatorProfiles.avatarUrl,
+        creatorType: creatorProfiles.creatorType,
+      })
+      .from(creatorProfiles)
+      .where(
+        and(
+          eq(creatorProfiles.isPublic, true),
+          eq(creatorProfiles.isFeatured, true),
+          eq(creatorProfiles.marketingOptOut, false)
+        )
+      )
+      .orderBy(creatorProfiles.displayName)
+      .limit(12),
+    timeoutPromise,
+  ]);
+
+  return data.map(a => ({
+    id: a.id,
+    handle: a.username,
+    name: a.displayName || a.username,
+    src: a.avatarUrl || '/android-chrome-192x192.png',
+  }));
+}
+
+export async function GET() {
+  const cacheKey = 'featured-creators';
+  
+  try {
+    // Try cache first
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360'
+        }
+      });
+    }
+
+    // Cache miss - fetch from database
+    const creators = await getFeaturedCreators();
+    
+    // Store in Redis with 180s TTL
+    await redis.setex(cacheKey, 180, creators);
+    
+    return NextResponse.json(creators, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching featured creators:', error);
+    return NextResponse.json(
+      { error: 'Failed to load featured creators' },
+      { status: 500 }
+    );
+  }
+}
