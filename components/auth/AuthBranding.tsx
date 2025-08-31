@@ -1,3 +1,5 @@
+'use client';
+
 import { Logo } from '@/components/ui/Logo';
 
 interface AuthBrandingProps {

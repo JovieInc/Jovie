@@ -1,3 +1,5 @@
+'use client';
+
 import { ReactNode } from 'react';
 import { AuthBranding } from './AuthBranding';
 import { AuthFormContainer } from './AuthFormContainer';

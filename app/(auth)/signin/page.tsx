@@ -2,8 +2,12 @@
 
 import { SignIn } from '@clerk/nextjs';
 import { AuthLayout } from '@/components/auth';
+import { useSearchParams } from 'next/navigation';
 
 export default function SignInPage() {
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect_url') || '/dashboard';
+  
   return (
     <AuthLayout
       brandingTitle="Welcome back to Jovie"
@@ -29,7 +33,7 @@ export default function SignInPage() {
             footerActionLink: "text-blue-600 hover:text-blue-500 font-medium",
           }
         }}
-        redirectUrl="/dashboard"
+        redirectUrl={redirectUrl}
         signUpUrl="/signup"
       />
     </AuthLayout>

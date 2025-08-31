@@ -1,3 +1,5 @@
+'use client';
+
 import { ReactNode } from 'react';
 import { Container } from '@/components/site/Container';
 import { Logo } from '@/components/ui/Logo';
