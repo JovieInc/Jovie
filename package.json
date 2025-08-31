@@ -47,6 +47,7 @@
     "drizzle:migrate:preview": "GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:prod": "GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",
     "drizzle:push": "drizzle-kit push",
+    "migration:guard": "bash scripts/check-migrations.sh",
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:check": "drizzle-kit check",
     "drizzle:up": "drizzle-kit up",
@@ -144,6 +145,9 @@
     "vitest": "^3.2.4"
   },
   "lint-staged": {
+    "drizzle/migrations/**/*.{sql,ts}": [
+      "pnpm migration:guard"
+    ],
     "*.{js,jsx,ts,tsx}": [
       "biome check",
       "biome format --write",

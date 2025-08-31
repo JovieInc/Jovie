@@ -816,6 +816,7 @@ pnpm test:e2e          # Run E2E tests locally
 - Provide static Checkout link generator & Portal fallback route.
 - Alert if daily `checkout_completed` drops >30% vs trailing 7-day average.
 
+
 ## 📚 Resources
 
 - Drizzle ORM: https://orm.drizzle.team/docs
@@ -825,3 +826,24 @@ pnpm test:e2e          # Run E2E tests locally
 - Upstash Redis: https://upstash.com/docs/redis
 - PostHog: https://posthog.com/docs
 - Stripe API: https://stripe.com/docs/api
+
+---
+
+## Migration Discipline (No Squash — Linear History Required)
+
+- **Always keep migrations linear & append-only**
+  - **Never squash or merge multiple migrations into one**, unless starting from scratch on a fresh project.
+  - Use Drizzle tooling properly: `drizzle-kit generate`, `drizzle-kit push`.
+  - **Do not manually modify migration history** — doing so can desync local vs production and break migration journals.
+
+- **If refactoring or cleanup is needed**, create a new migration — even for schema resets — do not rewrite past ones.
+
+- **On merge conflicts in migrations (same file paths):**
+  1. Abort rebase (if any).
+  2. Revert local `db/migrations` changes.
+  3. Pull latest `production`/`preview`.
+  4. Rerun: `drizzle-kit generate`.
+  5. Apply with: `drizzle-kit push`.
+  6. Continue PR.
+
+This process keeps history linear and safe.
