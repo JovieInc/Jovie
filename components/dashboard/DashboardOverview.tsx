@@ -1,22 +1,42 @@
 'use client';
 
 import { useState } from 'react';
-import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
+import { type DashboardData, getDashboardData } from '@/app/dashboard/actions';
 import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
+import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import type { DashboardData } from '@/app/dashboard/actions';
 
 interface DashboardOverviewProps {
   initialData: DashboardData;
 }
 
 export function DashboardOverview({ initialData }: DashboardOverviewProps) {
-  const [artist] = useState<Artist | null>(
+  const [creatorProfiles, setCreatorProfiles] = useState(
+    initialData.creatorProfiles
+  );
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
+    initialData.selectedProfile?.id || null
+  );
+  const [artist, setArtist] = useState<Artist | null>(
     initialData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
-  // Note: Profile switching functionality will be implemented in the future
+
+  const handleProfileChange = (profileId: string) => {
+    setSelectedProfileId(profileId);
+    const profile = creatorProfiles.find(p => p.id === profileId);
+    if (profile) {
+      setArtist(convertDrizzleCreatorProfileToArtist(profile));
+    }
+  };
+
+  const handleArtistUpdate = async (updatedArtist: Artist) => {
+    const data = await getDashboardData();
+    setCreatorProfiles(data.creatorProfiles);
+    setSelectedProfileId(updatedArtist.id);
+    setArtist(updatedArtist);
+  };
 
   if (!artist) {
     return null; // This shouldn't happen given the server-side logic
@@ -31,10 +51,34 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
         </p>
       </div>
 
+      {creatorProfiles.length > 1 && (
+        <div className='mb-6'>
+          <label htmlFor='profile-selector' className='sr-only'>
+            Select profile
+          </label>
+          <select
+            id='profile-selector'
+            aria-label='Select profile'
+            value={selectedProfileId ?? ''}
+            onChange={e => handleProfileChange(e.target.value)}
+            className='border border-subtle bg-surface-1 text-primary-token rounded-md p-2'
+          >
+            {creatorProfiles.map(profile => (
+              <option key={profile.id} value={profile.id}>
+                {profile.displayName || profile.username}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Main content */}
       <div className='space-y-6'>
         {/* Profile preview */}
-        <DashboardSplitView artist={artist} onArtistUpdate={() => {}} />
+        <DashboardSplitView
+          artist={artist}
+          onArtistUpdate={handleArtistUpdate}
+        />
 
         {/* Analytics cards */}
         <div className='mt-8'>
