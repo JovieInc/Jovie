@@ -3,10 +3,16 @@
 import { SignUp } from '@clerk/nextjs';
 import { AuthLayout } from '@/components/auth';
 import { useSearchParams } from 'next/navigation';
+import { getSafeRedirectUrl } from '@/lib/auth/redirect-validation';
 
 export default function SignUpPage() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect_url') || '/dashboard';
+  
+  // Get safe redirect URL with validation (consistent with sign-in pages)
+  const redirectUrlParam = searchParams?.get('redirect_url') ?? null;
+  const artistId = searchParams?.get('artistId') ?? null;
+  
+  const redirectUrl = getSafeRedirectUrl(redirectUrlParam, artistId);
   
   return (
     <AuthLayout
@@ -34,6 +40,8 @@ export default function SignUpPage() {
           }
         }}
         redirectUrl={redirectUrl}
+        afterSignInUrl={redirectUrl}
+        afterSignUpUrl={redirectUrl}
         signInUrl="/signin"
       />
     </AuthLayout>
