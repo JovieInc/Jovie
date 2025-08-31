@@ -183,7 +183,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
   const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnLabel = available === true ? 'Claim @handle →' : 'Claim @handle →';
   const btnColor: 'green' | 'indigo' = available === true ? 'green' : 'indigo';
   const btnDisabled = !canSubmit;
 
@@ -349,8 +348,18 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
           ) : available === true ? (
             <>
               <span>Claim @{handle}</span>
-              <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              <svg
+                className='w-4 h-4 transition-transform group-hover:translate-x-1'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  strokeWidth={2}
+                  d='M9 5l7 7-7 7'
+                />
               </svg>
             </>
           ) : (
