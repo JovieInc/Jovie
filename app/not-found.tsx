@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import { Footer } from '@/components/organisms/Footer';
 import { Container } from '@/components/site/Container';
+import { Footer } from '@/components/site/Footer';
 import { Logo } from '@/components/ui/Logo';
 
 export default function NotFound() {
@@ -67,7 +67,7 @@ export default function NotFound() {
                     Find and connect with musicians
                   </div>
                 </Link>
-                
+
                 <Link
                   href='/dashboard'
                   className='p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group'
@@ -85,9 +85,7 @@ export default function NotFound() {
         </Container>
       </main>
 
-      <Container>
-        <Footer variant='minimal' />
-      </Container>
+      <Footer />
     </div>
   );
 }

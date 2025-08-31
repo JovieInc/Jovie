@@ -46,7 +46,7 @@ describe('AuthActions', () => {
     // Use a more robust selector that looks for the container with specific classes
     const signInLink = screen.getByRole('link', { name: /sign in/i });
     expect(signInLink).toBeInTheDocument();
-    
+
     // Check that the parent container has the expected flex classes
     const container = signInLink.closest('div');
     expect(container).toHaveClass('flex', 'items-center', 'space-x-4');

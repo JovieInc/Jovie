@@ -159,6 +159,25 @@ jobs:
           echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
           echo "db_url_pooled=$DB_URL_POOLED" >> $GITHUB_OUTPUT
 
+  drizzle-migration-guard:
+    name: Migration Guard
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Migration Guard
+        run: |
+          # Make script executable
+          chmod +x scripts/check-migrations.sh
+          
+          # Run migration guard
+          ./scripts/check-migrations.sh
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+
   ci-drizzle-check:
     name: Drizzle Check
     needs: [ci-typecheck, ci-lint, neon-db]

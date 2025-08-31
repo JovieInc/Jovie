@@ -27,7 +27,7 @@ export default async function OnboardingPage() {
   // If using Apple-style design, render a clean full-screen layout
   if (useAppleStyle) {
     return (
-      <div className='min-h-screen bg-white dark:bg-black transition-colors'>
+      <div className='min-h-screen bg-[var(--bg)] transition-colors'>
         {/* Theme Toggle */}
         <div className='absolute top-4 right-4 z-20'>
           <ThemeToggle />
@@ -47,12 +47,12 @@ export default async function OnboardingPage() {
   // We cannot access searchParams directly here without defining them in the component signature,
   // so the client form will read from URL and sessionStorage.
   return (
-    <div className='min-h-screen bg-white dark:bg-black transition-colors'>
+    <div className='min-h-screen bg-[var(--bg)] transition-colors'>
       {/* Clean background - no patterns for minimalist design */}
       {!useMinimalistDesign && (
         <>
           {/* Subtle grid background pattern - only shown in non-minimalist mode */}
-          <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]' />
+          <div className='absolute inset-0 grid-bg dark:grid-bg-dark' />
 
           {/* Gradient orbs - only shown in non-minimalist mode */}
           <div className='absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl' />
@@ -70,14 +70,14 @@ export default async function OnboardingPage() {
           {/* Header - simplified for minimalist design */}
           <div className='text-center mb-6'>
             <h1
-              className={`text-3xl font-medium text-black dark:text-white mb-1 transition-colors ${useMinimalistDesign ? 'font-normal' : 'font-semibold'}`}
+              className={`text-3xl font-medium text-[var(--fg)] mb-1 transition-colors ${useMinimalistDesign ? 'font-normal' : 'font-semibold'}`}
             >
               {useMinimalistDesign
                 ? 'Create Your Profile'
                 : `Welcome to ${APP_NAME}`}
             </h1>
             {!useMinimalistDesign && (
-              <p className='text-gray-600 dark:text-white/70 transition-colors'>
+              <p className='text-[var(--muted)] transition-colors'>
                 Claim your handle to launch your artist profile
               </p>
             )}
@@ -87,8 +87,8 @@ export default async function OnboardingPage() {
           <div
             className={`${
               useMinimalistDesign
-                ? 'bg-white dark:bg-black border-gray-100 dark:border-gray-900'
-                : 'bg-white/80 dark:bg-white/5 backdrop-blur-sm border-gray-200/50 dark:border-white/10 shadow-xl'
+                ? 'bg-[var(--bg)] border-[var(--border)]'
+                : 'bg-[var(--bg)]/80 backdrop-blur-sm border-[var(--border)]/50 shadow-xl'
             } border rounded-xl p-6 transition-colors`}
           >
             <OnboardingFormWrapper

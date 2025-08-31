@@ -418,15 +418,15 @@ export function AppleStyleOnboardingForm() {
       case 0:
         return (
           <div className='flex flex-col items-center justify-center h-full text-center space-y-8'>
-            <h1 className='text-4xl font-bold text-black dark:text-white'>
+            <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
               {ONBOARDING_STEPS[0].title}
             </h1>
-            <p className='text-gray-600 dark:text-gray-300 text-xl'>
+            <p className='text-[var(--muted)] text-xl'>
               {ONBOARDING_STEPS[0].prompt}
             </p>
             <Button
               onClick={goToNextStep}
-              className='w-full py-4 text-lg bg-black text-white dark:bg-white dark:text-black rounded-xl hover:opacity-90 transition-opacity'
+              className='btn btn-primary w-full py-4 text-lg rounded-xl'
             >
               Start
             </Button>
@@ -438,10 +438,10 @@ export function AppleStyleOnboardingForm() {
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-black dark:text-white'>
+              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
                 {ONBOARDING_STEPS[1].title}
               </h1>
-              <p className='text-gray-600 dark:text-gray-300 text-xl'>
+              <p className='text-[var(--muted)] text-xl'>
                 {ONBOARDING_STEPS[1].prompt}
               </p>
             </div>
@@ -454,13 +454,13 @@ export function AppleStyleOnboardingForm() {
                     value={handleInput}
                     onChange={e => setHandleInput(e.target.value.toLowerCase())}
                     placeholder='yourhandle'
-                    className={`w-full px-4 py-4 text-lg bg-gray-100 dark:bg-gray-800 border-2 rounded-xl transition-all ${
+                    className={`w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 rounded-xl transition-all ${
                       handleValidation.error
-                        ? 'border-red-500 dark:border-red-500'
+                        ? 'border-red-500'
                         : handleValidation.available
-                          ? 'border-green-500 dark:border-green-500'
-                          : 'border-transparent'
-                    } focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white`}
+                          ? 'border-green-500'
+                          : 'border-[var(--border)]'
+                    } focus-ring text-[var(--fg)]`}
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
@@ -470,11 +470,11 @@ export function AppleStyleOnboardingForm() {
                 </div>
 
                 {/* Live preview */}
-                <div className='text-center p-3 bg-gray-100 dark:bg-gray-800 rounded-xl'>
-                  <p className='text-gray-500 dark:text-gray-400 text-sm'>
+                <div className='text-center p-3 bg-[var(--panel)] rounded-xl border border-[var(--border)]'>
+                  <p className='text-[var(--muted)] text-sm'>
                     Your profile link
                   </p>
-                  <p className='font-mono text-black dark:text-white'>
+                  <p className='font-mono text-[var(--fg)]'>
                     {displayDomain}/{handleInput || 'yourhandle'}
                   </p>
                 </div>
@@ -482,13 +482,13 @@ export function AppleStyleOnboardingForm() {
                 {/* Validation feedback - directly under input */}
                 <div className='min-h-[24px] flex items-center px-1'>
                   {handleValidation.error && (
-                    <div className='text-red-500 dark:text-red-400 text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
+                    <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
                       {handleValidation.error}
                     </div>
                   )}
                   {handleValidation.available &&
                     handleValidation.clientValid && (
-                      <div className='flex items-center gap-2 text-green-600 dark:text-green-400 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                      <div className='flex items-center gap-2 text-green-600 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
                         <svg
                           className='w-4 h-4'
                           fill='currentColor'
@@ -509,7 +509,7 @@ export function AppleStyleOnboardingForm() {
                 {/* Suggestions if handle is taken */}
                 {handleValidation.suggestions.length > 0 && (
                   <div className='space-y-2'>
-                    <p className='text-sm text-gray-600 dark:text-gray-300'>
+                    <p className='text-sm text-[var(--muted)]'>
                       Try one of these instead:
                     </p>
                     <div className='flex flex-wrap gap-2'>
@@ -520,7 +520,7 @@ export function AppleStyleOnboardingForm() {
                             setHandleInput(suggestion);
                             validateHandle(suggestion);
                           }}
-                          className='px-3 py-1 bg-gray-200 dark:bg-gray-700 rounded-lg text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors'
+                          className='px-3 py-1 bg-[var(--panel)] border border-[var(--border)] rounded-lg text-sm text-[var(--fg)] hover:bg-[var(--bg)] transition-colors'
                         >
                           {suggestion}
                         </button>
@@ -540,8 +540,8 @@ export function AppleStyleOnboardingForm() {
                     handleValidation.available &&
                     handleValidation.clientValid &&
                     !state.isSubmitting
-                      ? 'bg-black text-white dark:bg-white dark:text-black hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]'
-                      : 'bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed scale-100'
+                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
                   }`}
                 >
                   {state.isSubmitting ? (
@@ -557,7 +557,7 @@ export function AppleStyleOnboardingForm() {
 
               {/* Error display - only for submission errors */}
               {state.error && (
-                <div className='p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl text-red-600 dark:text-red-300 text-sm space-y-2 animate-in fade-in slide-in-from-top-1 duration-300'>
+                <div className='p-4 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-xl text-red-600 dark:text-red-400 text-sm space-y-2 animate-in fade-in slide-in-from-top-1 duration-300'>
                   <div className='flex items-center gap-2'>
                     <svg
                       className='w-4 h-4 flex-shrink-0'
@@ -575,13 +575,13 @@ export function AppleStyleOnboardingForm() {
                   {state.retryCount < 3 && (
                     <button
                       onClick={retryOperation}
-                      className='text-red-700 dark:text-red-200 underline hover:no-underline font-medium'
+                      className='text-red-600 dark:text-red-400 underline hover:no-underline font-medium'
                     >
                       Try again
                     </button>
                   )}
                   {state.retryCount >= 3 && (
-                    <p className='text-xs text-red-500 dark:text-red-400'>
+                    <p className='text-xs text-red-500'>
                       If it keeps happening, contact support.
                     </p>
                   )}
@@ -591,7 +591,7 @@ export function AppleStyleOnboardingForm() {
               {/* Back button */}
               <button
                 onClick={goToPreviousStep}
-                className='w-full text-center text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 py-2 text-sm'
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
               >
                 Back
               </button>
@@ -604,18 +604,18 @@ export function AppleStyleOnboardingForm() {
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-black dark:text-white'>
+              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
                 {ONBOARDING_STEPS[2].title}
               </h1>
-              <p className='text-gray-600 dark:text-gray-300 text-xl'>
+              <p className='text-[var(--muted)] text-xl'>
                 {ONBOARDING_STEPS[2].prompt}
               </p>
             </div>
 
             <div className='w-full max-w-md space-y-6'>
               {/* Profile link */}
-              <div className='text-center p-4 bg-gray-100 dark:bg-gray-800 rounded-xl'>
-                <p className='font-mono text-lg text-black dark:text-white'>
+              <div className='text-center p-4 bg-[var(--panel)] border border-[var(--border)] rounded-xl'>
+                <p className='font-mono text-lg text-[var(--fg)]'>
                   {displayDomain}/{handle}
                 </p>
               </div>
@@ -623,15 +623,14 @@ export function AppleStyleOnboardingForm() {
               <div className='space-y-3'>
                 <Button
                   onClick={goToDashboard}
-                  className='w-full py-4 text-lg bg-black text-white dark:bg-white dark:text-black rounded-xl hover:opacity-90 transition-opacity'
+                  className='btn btn-primary w-full py-4 text-lg rounded-xl'
                 >
                   Go to Dashboard
                 </Button>
 
                 <Button
                   onClick={copyProfileLink}
-                  variant='outline'
-                  className='w-full py-4 text-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'
+                  className='btn btn-secondary w-full py-4 text-lg rounded-xl'
                 >
                   Copy Link
                 </Button>
@@ -639,7 +638,7 @@ export function AppleStyleOnboardingForm() {
 
               {/* Success message when link is copied */}
               {state.error && (
-                <div className='p-3 bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-xl text-green-600 dark:text-green-300 text-sm text-center'>
+                <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
                   {state.error}
                 </div>
               )}
@@ -656,9 +655,9 @@ export function AppleStyleOnboardingForm() {
   const ProgressIndicator = () => {
     return (
       <div className='fixed top-0 left-0 right-0 z-50'>
-        <div className='h-1 bg-gray-200 dark:bg-gray-800'>
+        <div className='h-1 bg-[var(--border)]'>
           <div
-            className='h-full bg-black dark:bg-white transition-all duration-500 ease-in-out'
+            className='h-full bg-[var(--accent-pro)] transition-all duration-500 ease-in-out'
             style={{
               width: `${((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100}%`,
             }}
@@ -676,7 +675,7 @@ export function AppleStyleOnboardingForm() {
       {/* Skip link for accessibility */}
       <a
         href='#main-content'
-        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 bg-black text-white dark:bg-white dark:text-black px-4 py-2 rounded-md z-50'
+        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 btn btn-primary px-4 py-2 rounded-md z-50'
       >
         Skip to main content
       </a>

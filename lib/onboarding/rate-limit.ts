@@ -36,8 +36,13 @@ export async function enforceOnboardingRateLimit({
   const ipKey = `onboarding:ip:${ip}`;
 
   try {
+    if (!redis) {
+      // Fail open if Redis is not available
+      return;
+    }
+
     // Always check user rate limit
-    const userResult = await redis.set(userKey, 1, 'EX', window, 'NX');
+    const userResult = await redis.set(userKey, 1, { ex: window, nx: true });
     let userCount: number;
 
     if (userResult === 'OK') {
@@ -51,7 +56,7 @@ export async function enforceOnboardingRateLimit({
     // Check IP rate limit only if requested and IP is valid
     let ipCount = 0;
     if (checkIP && ip !== 'unknown') {
-      const ipResult = await redis.set(ipKey, 1, 'EX', window, 'NX');
+      const ipResult = await redis.set(ipKey, 1, { ex: window, nx: true });
 
       if (ipResult === 'OK') {
         // First request for this IP
@@ -75,7 +80,8 @@ export async function enforceOnboardingRateLimit({
       err &&
       typeof err === 'object' &&
       'code' in err &&
-      (err as { code?: OnboardingErrorCode }).code === OnboardingErrorCode.RATE_LIMITED
+      (err as { code?: OnboardingErrorCode }).code ===
+        OnboardingErrorCode.RATE_LIMITED
     ) {
       throw err;
     }

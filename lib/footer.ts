@@ -9,7 +9,7 @@ interface FooterOptions {
 
 /**
  * Generates footer HTML for use in server-side rendered pages like /listen
- * This matches the styling and functionality of the ProfileFooter component
+ * This provides footer HTML for server-side rendered pages
  * Hides branding for Pro plan users or if explicitly set in artist settings
  */
 export async function generateFooterHTML({

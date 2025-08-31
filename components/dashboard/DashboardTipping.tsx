@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardTippingProps {
   initialData: DashboardData;

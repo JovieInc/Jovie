@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1756259141746,
-      "tag": "0000_eager_groot",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1756309875017,
-      "tag": "0001_acoustic_wolfsbane",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1756581590000,
-      "tag": "0002_schema_sync_fix",
+      "when": 1756665556089,
+      "tag": "0000_same_phil_sheldon",
       "breakpoints": true
     }
   ]

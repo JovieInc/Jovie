@@ -55,7 +55,7 @@ function renderContent(
           <h1 id='tipping-title' className='sr-only'>
             Tip {artist.name}
           </h1>
-          
+
           {venmoLink ? (
             <VenmoTipSelector
               venmoLink={venmoLink}

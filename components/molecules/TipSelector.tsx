@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
 import { Button } from '@/components/ui/Button';
 
@@ -37,11 +37,15 @@ export function TipSelector({
       <h3 id='tip-selector-heading' className='sr-only'>
         Select tip amount
       </h3>
-      
+
       {/* Visually hidden live region for screen readers */}
       <div className='sr-only' aria-live='polite' ref={statusRef}></div>
-      
-      <div className='grid grid-cols-3 gap-3' role='group' aria-label='Tip amount options'>
+
+      <div
+        className='grid grid-cols-3 gap-3'
+        role='group'
+        aria-label='Tip amount options'
+      >
         {amounts.map((amount, idx) => (
           <AmountSelector
             key={amount}

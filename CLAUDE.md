@@ -717,6 +717,32 @@ For new features, write tests first:
 
 ---
 
+## 🛡️ Critical Module Protection (No Regressions from AI)
+
+**Scope (protected):**
+- Homepage & marketing: `app/(marketing)/page.tsx`, `app/(marketing)/**/page.tsx`
+- Featured Creators: `components/marketing/FeaturedCreators*`, `lib/data/creators.ts`, `lib/adapters/creators.ts`
+- Money path: checkout/portal routes, pricing, paywall, onboarding
+
+**Rules:**
+- ❌ **No mock/static lists** in protected modules. Use data adapters only (`getFeaturedCreators()` etc.).
+- ❌ Do not duplicate protected components; **modify in place** to keep data plumbing.
+- ✅ If a visual refactor is needed, keep the existing `data-testid` hooks and props contract.
+- ✅ All changes to protected modules require green **homepage smoke** and **money-path smoke**.
+
+**CI Checks (must pass):**
+- `playwright @smoke-home`: visits `/` and asserts `data-testid="featured-creators"` exists and has ≥1 creator card.
+- `ts/lint rule no-mocks-in-prod`: fails if array/object literals matching `Creator` shape appear in `app/(marketing)` or `components/marketing` (outside of `__mocks__|.stories.tsx`).
+- `contract test`: `FeaturedCreators` must import `getFeaturedCreators` (or the adapter) and render from that source.
+- `CODEOWNERS gate`: changes to protected paths require review from `@growth-owner`.
+
+**Implementation notes:**
+- Provide fixtures in `__mocks__` + Storybook only; never inline in production components.
+- Keep a thin **adapter** layer (`lib/adapters/creators.ts`) to decouple UI from DB. Components consume adapters, not direct DB calls.
+- Preserve `data-testid="featured-creators"` and `data-testid="creator-card"` in markup to make smoke tests stable.
+
+---
+
 ## 🔑 Environment Variables (by system)
 
 ```bash
@@ -790,6 +816,7 @@ pnpm test:e2e          # Run E2E tests locally
 - Provide static Checkout link generator & Portal fallback route.
 - Alert if daily `checkout_completed` drops >30% vs trailing 7-day average.
 
+
 ## 📚 Resources
 
 - Drizzle ORM: https://orm.drizzle.team/docs
@@ -799,3 +826,24 @@ pnpm test:e2e          # Run E2E tests locally
 - Upstash Redis: https://upstash.com/docs/redis
 - PostHog: https://posthog.com/docs
 - Stripe API: https://stripe.com/docs/api
+
+---
+
+## Migration Discipline (No Squash — Linear History Required)
+
+- **Always keep migrations linear & append-only**
+  - **Never squash or merge multiple migrations into one**, unless starting from scratch on a fresh project.
+  - Use Drizzle tooling properly: `drizzle-kit generate`, `drizzle-kit push`.
+  - **Do not manually modify migration history** — doing so can desync local vs production and break migration journals.
+
+- **If refactoring or cleanup is needed**, create a new migration — even for schema resets — do not rewrite past ones.
+
+- **On merge conflicts in migrations (same file paths):**
+  1. Abort rebase (if any).
+  2. Revert local `db/migrations` changes.
+  3. Pull latest `production`/`preview`.
+  4. Rerun: `drizzle-kit generate`.
+  5. Apply with: `drizzle-kit push`.
+  6. Continue PR.
+
+This process keeps history linear and safe.

@@ -23,14 +23,22 @@ export function AuthLayout({
   gradientFrom = 'blue-600',
   gradientVia = 'purple-600',
   gradientTo = 'cyan-600',
-  textColorClass = 'text-blue-100'
+  textColorClass = 'text-blue-100',
 }: AuthLayoutProps) {
   // Map the gradient props to the correct variant
   const getGradientVariant = () => {
-    if (gradientFrom === 'blue-600' && gradientVia === 'purple-600' && gradientTo === 'cyan-600') {
+    if (
+      gradientFrom === 'blue-600' &&
+      gradientVia === 'purple-600' &&
+      gradientTo === 'cyan-600'
+    ) {
       return 'blue-purple-cyan';
     }
-    if (gradientFrom === 'purple-600' && gradientVia === 'cyan-600' && gradientTo === 'blue-600') {
+    if (
+      gradientFrom === 'purple-600' &&
+      gradientVia === 'cyan-600' &&
+      gradientTo === 'blue-600'
+    ) {
       return 'purple-cyan-blue';
     }
     // Default fallback
@@ -38,16 +46,14 @@ export function AuthLayout({
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className='min-h-screen flex'>
       <AuthBranding
         title={brandingTitle}
         description={brandingDescription}
         gradientVariant={getGradientVariant()}
         textColorClass={textColorClass}
       />
-      <AuthFormContainer title={formTitle}>
-        {children}
-      </AuthFormContainer>
+      <AuthFormContainer title={formTitle}>{children}</AuthFormContainer>
     </div>
   );
 }

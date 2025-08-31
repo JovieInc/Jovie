@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
-import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
+import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardOverviewProps {
   initialData: DashboardData;

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
-import { track, page } from '@/lib/analytics';
+import { page, track } from '@/lib/analytics';
 
 export function SupportContent() {
   useEffect(() => {
@@ -21,9 +21,9 @@ export function SupportContent() {
   };
 
   return (
-    <Button 
-      as='a' 
-      href='mailto:support@jov.ie' 
+    <Button
+      as='a'
+      href='mailto:support@jov.ie'
       className='mt-8'
       aria-label='Send email to support team at support@jov.ie'
       onClick={handleContactClick}

@@ -35,13 +35,16 @@ test.describe('Artist Profile Pages', () => {
       await expect(listenButton).toBeVisible();
     });
 
-    test('has powered by Jovie footer', async ({ page }) => {
-      const footer = page.getByText('Powered by Jovie');
+    test('has Jovie footer', async ({ page }) => {
+      // Check for copyright text in footer
+      const footer = page.getByText(/© \d{4} Jovie/);
       await expect(footer).toBeVisible();
 
-      // Check if footer link works
-      const footerLink = page.getByRole('link', { name: /Powered by Jovie/ });
-      await expect(footerLink).toBeVisible();
+      // Check if privacy and terms links exist in footer
+      const privacyLink = page.getByRole('link', { name: 'Privacy' });
+      const termsLink = page.getByRole('link', { name: 'Terms' });
+      await expect(privacyLink).toBeVisible();
+      await expect(termsLink).toBeVisible();
     });
 
     test('has proper meta information', async ({ page }) => {

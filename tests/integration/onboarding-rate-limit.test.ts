@@ -15,12 +15,14 @@ const IP_KEY_2 = `onboarding:ip:${TEST_IP_2}`;
 describe('enforceOnboardingRateLimit', () => {
   beforeEach(async () => {
     // Clean up all test keys
-    await Promise.all([
-      redis.del(USER_KEY),
-      redis.del(USER_KEY_2),
-      redis.del(IP_KEY),
-      redis.del(IP_KEY_2),
-    ]);
+    if (redis) {
+      await Promise.all([
+        redis.del(USER_KEY),
+        redis.del(USER_KEY_2),
+        redis.del(IP_KEY),
+        redis.del(IP_KEY_2),
+      ]);
+    }
   });
 
   it('allows attempts under the limit', async () => {
@@ -145,12 +147,13 @@ describe('enforceOnboardingRateLimit', () => {
     );
 
     const results = await Promise.allSettled(promises);
-    
+
     // Should have 2 successful and 1 failed (rate limited)
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(
-      r => r.status === 'rejected' && 
-      (r.reason as any)?.code === OnboardingErrorCode.RATE_LIMITED
+      r =>
+        r.status === 'rejected' &&
+        (r.reason as any)?.code === OnboardingErrorCode.RATE_LIMITED
     ).length;
 
     expect(successful).toBe(2);
