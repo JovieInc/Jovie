@@ -2,6 +2,7 @@
 
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { sql as drizzleSql } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import {
@@ -9,6 +10,7 @@ import {
   mapDatabaseError,
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
+import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import {
   checkUserHasProfile,
   checkUsernameAvailability,
@@ -52,16 +54,11 @@ export async function completeOnboarding({
     }
 
     // Step 3: Rate limiting check
-    // TODO: Implement rate limiting with Drizzle/Upstash instead of RPC
-    // For now, we'll skip rate limiting since we're migrating away from Supabase RPC
-    // const headersList = await headers();
-    // const forwarded = headersList.get('x-forwarded-for');
-    // const clientIP = forwarded ? forwarded.split(',')[0] : null;
+    const headersList = headers();
+    const forwarded = headersList.get('x-forwarded-for');
+    const clientIP = forwarded ? forwarded.split(',')[0] : 'unknown';
 
-    // Skip rate limiting for now during migration
-    console.log(
-      'Rate limiting temporarily disabled during Supabase to Drizzle migration'
-    );
+    await enforceOnboardingRateLimit({ userId, ip: clientIP });
 
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
