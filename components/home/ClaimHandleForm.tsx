@@ -183,7 +183,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
   const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnLabel = available === true ? 'Claim @handle →' : 'Claim @handle →';
   const btnColor: 'green' | 'indigo' = available === true ? 'green' : 'indigo';
   const btnDisabled = !canSubmit;
 
