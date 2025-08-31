@@ -22,6 +22,7 @@ export async function GET() {
     minimalistOnboardingEnabled: true,
     // New Apple-style full-screen onboarding with improved UX (JOV-134)
     appleStyleOnboardingEnabled: true,
+    profileSettingsEnabled: true,
   } as const;
 
   return new NextResponse(JSON.stringify(flags), {
