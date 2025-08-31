@@ -153,7 +153,7 @@ export default function DashboardLayoutClient({
               <nav
                 className={`flex flex-1 flex-col ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
               >
-                <DashboardNav />
+                <DashboardNav collapsed={sidebarCollapsed} />
               </nav>
 
               {/* Theme toggle block (above divider) */}
