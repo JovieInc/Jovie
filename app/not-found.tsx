@@ -20,74 +20,65 @@ export default function NotFound() {
       {/* Main Content */}
       <main className='flex-1'>
         <Container>
-          <div className='flex flex-col items-center justify-center min-h-[calc(100vh-4rem)] text-center px-4'>
-            {/* 404 Number */}
-            <div className='relative mb-8'>
-              <h1 className='text-9xl font-bold text-gray-200 dark:text-gray-800 tracking-tighter'>
+          <div className='flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center px-4'>
+            {/* Elegant 404 Display */}
+            <div className='mb-8 relative'>
+              <div className='absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 opacity-20 blur-xl rounded-full'></div>
+              <h1 className='relative text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 tracking-tight'>
                 404
               </h1>
-              <div className='absolute inset-0 flex items-center justify-center'>
-                <div className='text-6xl font-bold text-gray-900 dark:text-white tracking-tighter'>
-                  404
-                </div>
+            </div>
+
+            {/* Main Message - Apple-style copywriting */}
+            <div className='max-w-md mx-auto space-y-4'>
+              <h2 className='text-2xl font-medium text-gray-900 dark:text-white tracking-tight'>
+                This page is missing.
+              </h2>
+
+              <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed'>
+                The link you followed may be broken, or the page may have moved.
+              </p>
+
+              {/* Primary Action */}
+              <div className='pt-6'>
+                <Link
+                  href='/'
+                  className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
+                >
+                  Return Home
+                </Link>
               </div>
             </div>
 
-            {/* Main Message */}
-            <div className='max-w-2xl mx-auto space-y-6'>
-              <h2 className='text-3xl font-semibold text-gray-900 dark:text-white tracking-tight'>
-                Page not found
-              </h2>
-
-              <p className='text-lg text-gray-600 dark:text-gray-300 leading-relaxed'>
-                The page you&apos;re looking for doesn&apos;t exist. It might
-                have been moved, deleted, or you entered the wrong URL.
+            {/* Helpful Suggestions - Minimal & Elegant */}
+            <div className='mt-16 max-w-lg'>
+              <p className='text-sm font-medium text-gray-900 dark:text-white mb-4'>
+                You might be looking for:
               </p>
-
-              {/* Action Buttons */}
-              <div className='flex flex-col sm:flex-row items-center justify-center gap-4 pt-4'>
-                <Link
-                  href='/'
-                  className='inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base hover:scale-105'
-                >
-                  Go back home
-                </Link>
-
+              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                 <Link
                   href='/artists'
-                  className='inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
+                  className='p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group'
                 >
-                  Browse artists
+                  <div className='font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'>
+                    Discover Artists
+                  </div>
+                  <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
+                    Find and connect with musicians
+                  </div>
                 </Link>
-              </div>
-
-              {/* Helpful Links */}
-              <div className='pt-8 border-t border-gray-200 dark:border-gray-700'>
-                <p className='text-sm text-gray-500 dark:text-gray-400 mb-4'>
-                  Looking for something specific?
-                </p>
-                <div className='flex flex-wrap items-center justify-center gap-4 text-sm'>
-                  <Link
-                    href='/dashboard'
-                    className='text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
-                  >
-                    Dashboard
-                  </Link>
-                  <span className='text-gray-300 dark:text-gray-600'>•</span>
-                  <Link
-                    href='/onboarding'
-                    className='text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
-                  >
-                    Get started
-                  </Link>
-                  <span className='text-gray-300 dark:text-gray-600'>•</span>
-                  <Link
-                    href='/waitlist'
-                    className='text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
-                  >
-                    Join waitlist
-                  </Link>
-                </div>
+                
+                <Link
+                  href='/dashboard'
+                  className='p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group'
+                >
+                  <div className='font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'>
+                    Your Dashboard
+                  </div>
+                  <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
+                    Manage your profile and content
+                  </div>
+                </Link>
               </div>
             </div>
           </div>

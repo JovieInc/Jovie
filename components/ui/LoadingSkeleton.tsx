@@ -111,8 +111,7 @@ export function LoadingSkeleton({
     return (
       <div
         className={clsx(
-          'animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]',
-          'bg-gray-200 dark:bg-gray-700',
+          'skeleton motion-reduce:animate-none',
           roundedClasses[rounded],
           validatedHeight,
           validatedWidth,
@@ -129,8 +128,7 @@ export function LoadingSkeleton({
         <div
           key={index}
           className={clsx(
-            'animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]',
-            'bg-gray-200 dark:bg-gray-700',
+            'skeleton motion-reduce:animate-none',
             roundedClasses[rounded],
             validatedHeight,
             index === lines - 1 ? 'w-3/4' : validatedWidth,
@@ -147,18 +145,18 @@ export function ProfileSkeleton() {
   return (
     <div className='flex flex-col items-center space-y-4 text-center'>
       <div
-        className='h-32 w-32 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]'
+        className='h-32 w-32 rounded-full skeleton motion-reduce:animate-none'
         aria-label='Loading artist profile image'
         role='img'
       />
       <div className='space-y-2'>
         <div
-          className='h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]'
+          className='h-8 w-48 rounded-sm skeleton motion-reduce:animate-none'
           aria-label='Loading artist name'
           role='text'
         />
         <div
-          className='h-6 w-64 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]'
+          className='h-6 w-64 rounded-sm skeleton motion-reduce:animate-none'
           aria-label='Loading artist tagline'
           role='text'
         />
@@ -170,7 +168,7 @@ export function ProfileSkeleton() {
 export function ButtonSkeleton() {
   return (
     <div
-      className='h-12 w-full max-w-sm bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]'
+      className='h-12 w-full max-w-sm rounded-lg skeleton motion-reduce:animate-none'
       aria-label='Loading action button'
       role='button'
     />
@@ -187,7 +185,7 @@ export function SocialBarSkeleton() {
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className='h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]'
+          className='h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
           aria-label={`Loading social link ${index + 1}`}
           role='button'
         />
@@ -201,16 +199,16 @@ export function CardSkeleton() {
     <div className='w-full p-4 border border-gray-200 dark:border-gray-700 rounded-lg'>
       <div className='space-y-3'>
         <div className='flex items-center space-x-3'>
-          <div className='h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+          <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
           <div className='space-y-1 flex-1'>
-            <div className='h-4 w-1/2 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
-            <div className='h-3 w-1/3 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+            <div className='h-4 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
+            <div className='h-3 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
           </div>
         </div>
-        <div className='h-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+        <div className='h-24 rounded-md skeleton motion-reduce:animate-none' />
         <div className='flex justify-between'>
-          <div className='h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
-          <div className='h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+          <div className='h-8 w-24 rounded-md skeleton motion-reduce:animate-none' />
+          <div className='h-8 w-24 rounded-md skeleton motion-reduce:animate-none' />
         </div>
       </div>
     </div>
@@ -225,12 +223,12 @@ export function ListSkeleton({ items = 3 }: { items?: number }) {
           key={index}
           className='flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-md'
         >
-          <div className='h-10 w-10 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+          <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
           <div className='space-y-1 flex-1'>
-            <div className='h-4 w-1/3 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
-            <div className='h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+            <div className='h-4 w-1/3 rounded-sm skeleton motion-reduce:animate-none' />
+            <div className='h-3 w-1/2 rounded-sm skeleton motion-reduce:animate-none' />
           </div>
-          <div className='h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+          <div className='h-8 w-8 rounded-md skeleton motion-reduce:animate-none' />
         </div>
       ))}
     </div>
@@ -250,7 +248,7 @@ export function TableSkeleton({
       <div className='flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'>
         {Array.from({ length: columns }).map((_, index) => (
           <div key={`header-${index}`} className='flex-1 p-3'>
-            <div className='h-5 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]' />
+            <div className='h-5 rounded-sm skeleton motion-reduce:animate-none' />
           </div>
         ))}
       </div>
@@ -265,7 +263,7 @@ export function TableSkeleton({
             <div key={`cell-${rowIndex}-${colIndex}`} className='flex-1 p-3'>
               <div
                 className={clsx(
-                  'h-4 bg-gray-200 dark:bg-gray-700 rounded-sm animate-pulse motion-reduce:animate-[pulse_2s_ease-in-out_infinite]',
+                  'h-4 rounded-sm skeleton motion-reduce:animate-none',
                   colIndex === 0 ? 'w-3/4' : 'w-full'
                 )}
               />
