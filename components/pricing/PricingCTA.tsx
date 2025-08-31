@@ -19,10 +19,10 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
         <div className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 items-center">
           <div>
             <h3 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Ready for the clean version?
+              Make it yours.
             </h3>
             <p className="mt-3 text-base text-gray-500 dark:text-gray-400">
-              No tiers. No confusion. Free forever. $5/month or $50/year removes the logo.
+              Remove the Jovie branding for just $5. That's it.
             </p>
           </div>
           <div className="flex justify-end">
@@ -33,7 +33,7 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
-              {isLoading ? 'Processing...' : 'Remove the branding →'}
+              {isLoading ? 'Processing...' : 'Remove branding →'}
             </motion.button>
           </div>
         </div>
