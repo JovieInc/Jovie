@@ -29,10 +29,7 @@ export async function GET(req: Request) {
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(
-          and(
-            eq(creatorProfiles.id, profileId),
-            eq(users.clerkId, clerkUserId)
-          )
+          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
         )
         .limit(1);
       if (!profile) {
@@ -43,9 +40,11 @@ export async function GET(req: Request) {
       }
 
       const cacheKey = `social_links:${profileId}`;
-      const cached = await redis.get<DbSocialLink[]>(cacheKey);
-      if (cached) {
-        return NextResponse.json({ links: cached }, { status: 200 });
+      if (redis) {
+        const cached = await redis.get<DbSocialLink[]>(cacheKey);
+        if (cached) {
+          return NextResponse.json({ links: cached }, { status: 200 });
+        }
       }
 
       const rows = await db
@@ -89,7 +88,9 @@ export async function GET(req: Request) {
           displayText: r.displayText,
         }));
 
-      await redis.set(cacheKey, links, { ex: 60 });
+      if (redis) {
+        await redis.set(cacheKey, links, { ex: 60 });
+      }
 
       return NextResponse.json({ links }, { status: 200 });
     });
@@ -169,7 +170,9 @@ export async function PUT(req: Request) {
         await db.insert(socialLinks).values(insertPayload);
       }
 
-      await redis.del(`social_links:${profileId}`);
+      if (redis) {
+        await redis.del(`social_links:${profileId}`);
+      }
 
       return NextResponse.json({ ok: true }, { status: 200 });
     });
