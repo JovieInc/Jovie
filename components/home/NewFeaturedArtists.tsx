@@ -29,7 +29,7 @@ export function NewFeaturedArtists() {
     }
 
     const fetchArtists = async () => {
-      if (!hasCached) setIsLoading(true);
+      setIsLoading(true);
       try {
         const res = await fetch('/api/featured-creators');
         if (!res.ok) throw new Error('Failed to fetch');
@@ -47,7 +47,7 @@ export function NewFeaturedArtists() {
           );
         }
       } finally {
-        if (!hasCached) setIsLoading(false);
+        setIsLoading(false);
       }
     };
 
