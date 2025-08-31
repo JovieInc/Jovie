@@ -79,8 +79,13 @@ export default clerkMiddleware(async (auth, req) => {
 
     let res: NextResponse;
 
-    // Handle authenticated user redirects
-    if (userId) {
+    // Handle auth route redirects (normalize to non-hyphenated versions)
+    if (pathname === '/sign-in') {
+      res = NextResponse.redirect(new URL('/signin', req.url));
+    } else if (pathname === '/sign-up') {
+      res = NextResponse.redirect(new URL('/signup', req.url));
+    } else if (userId) {
+      // Handle authenticated user redirects
       if (req.nextUrl.pathname === '/') {
         res = NextResponse.redirect(new URL('/dashboard', req.url));
       } else {
@@ -90,7 +95,7 @@ export default clerkMiddleware(async (auth, req) => {
       // Handle unauthenticated users
       if (req.nextUrl.pathname.startsWith('/dashboard')) {
         // Redirect unauthenticated users to sign-in
-        const signInUrl = new URL('/sign-in', req.url);
+        const signInUrl = new URL('/signin', req.url);
         signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
         res = NextResponse.redirect(signInUrl);
       } else {
