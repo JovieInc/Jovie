@@ -126,6 +126,14 @@ export function SettingsPolished({
     creatorType: 'artist',
   });
 
+  const [pixelData, setPixelData] = useState({
+    facebookPixel: '',
+    googleAdsConversion: '',
+    tiktokPixel: '',
+    customPixel: '',
+  });
+  const [isPixelSaving, setIsPixelSaving] = useState(false);
+
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
       const next = new Set(prev);
@@ -140,6 +148,10 @@ export function SettingsPolished({
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePixelInputChange = (field: string, value: string) => {
+    setPixelData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
@@ -239,6 +251,41 @@ export function SettingsPolished({
       }
     },
     [formData, artist, onArtistUpdate]
+  );
+
+  const handlePixelSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsPixelSaving(true);
+
+      try {
+        const response = await fetch('/api/dashboard/pixels', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            facebookPixel: pixelData.facebookPixel,
+            googleAdsConversion: pixelData.googleAdsConversion,
+            tiktokPixel: pixelData.tiktokPixel,
+            customPixel: pixelData.customPixel,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to save pixels');
+        }
+
+        // Optionally show success message or handle response
+        console.log('Pixels saved successfully');
+      } catch (error) {
+        console.error('Failed to save pixels:', error);
+        // Optionally show error message to user
+      } finally {
+        setIsPixelSaving(false);
+      }
+    },
+    [pixelData]
   );
 
   const appDomain = APP_URL.replace(/^https?:\/\//, '');
@@ -541,7 +588,7 @@ export function SettingsPolished({
         </p>
       </div>
 
-      <form onSubmit={e => e.preventDefault()} className='space-y-8'>
+      <form onSubmit={handlePixelSubmit} className='space-y-8'>
         <DashboardCard variant='settings'>
           <h3 className='text-lg font-medium text-primary mb-6'>Pixel IDs</h3>
 
@@ -556,6 +603,10 @@ export function SettingsPolished({
               <input
                 type='text'
                 id='facebookPixel'
+                value={pixelData.facebookPixel}
+                onChange={e =>
+                  handlePixelInputChange('facebookPixel', e.target.value)
+                }
                 placeholder='1234567890'
                 className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />
@@ -571,6 +622,10 @@ export function SettingsPolished({
               <input
                 type='text'
                 id='googleAdsConversion'
+                value={pixelData.googleAdsConversion}
+                onChange={e =>
+                  handlePixelInputChange('googleAdsConversion', e.target.value)
+                }
                 placeholder='AW-123456789'
                 className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />
@@ -586,6 +641,10 @@ export function SettingsPolished({
               <input
                 type='text'
                 id='tiktokPixel'
+                value={pixelData.tiktokPixel}
+                onChange={e =>
+                  handlePixelInputChange('tiktokPixel', e.target.value)
+                }
                 placeholder='ABCDEF1234567890'
                 className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />
@@ -601,6 +660,10 @@ export function SettingsPolished({
               <textarea
                 id='customPixel'
                 rows={4}
+                value={pixelData.customPixel}
+                onChange={e =>
+                  handlePixelInputChange('customPixel', e.target.value)
+                }
                 placeholder='<script>/* your tag */</script>'
                 className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
               />
@@ -614,10 +677,11 @@ export function SettingsPolished({
         <div className='flex justify-end pt-4 border-t border-subtle'>
           <button
             type='submit'
-            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+            disabled={isPixelSaving}
+            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
             style={{ backgroundColor: 'var(--color-accent)' }}
           >
-            Save Pixels
+            {isPixelSaving ? 'Saving...' : 'Save Pixels'}
           </button>
         </div>
       </form>
@@ -697,10 +761,14 @@ export function SettingsPolished({
                   Seamlessly integrate Facebook, Google, and TikTok pixels.
                 </p>
                 <button
-                  className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+                  onClick={handleBilling}
+                  disabled={isBillingLoading || billingStatus.loading}
+                  className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
                   style={{ backgroundColor: 'var(--color-accent)' }}
                 >
-                  Upgrade to Pro
+                  {isBillingLoading || billingStatus.loading
+                    ? 'Loading...'
+                    : 'Upgrade to Pro'}
                 </button>
               </div>
             </div>
