@@ -321,41 +321,45 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
                     : null
           }
           className={`${isShaking ? 'jv-shake' : ''} ${available === true ? 'jv-available' : ''} transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`}
-          inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-36 sm:pr-40 min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1'
+          inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1'
           statusIcon={<StatusIcon />}
-          trailing={
-            <div className='flex items-center gap-2'>
-              {/* Fixed-size CTA button with cross-fade animation */}
-              <Button
-                type='submit'
-                variant='primary'
-                color={btnColor}
-                size='sm'
-                className='min-w-[136px] w-[136px] h-[36px] justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-105 active:scale-95'
-                disabled={btnDisabled || !handle}
-              >
-                <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-250'>
-                  {showChecking ? (
-                    <>
-                      <LoadingSpinner size='sm' className='text-white' />
-                      <span>Checking…</span>
-                    </>
-                  ) : navigating ? (
-                    <>
-                      <LoadingSpinner size='sm' className='text-white' />
-                      <span>Setting things up…</span>
-                    </>
-                  ) : (
-                    btnLabel
-                  )}
-                </span>
-              </Button>
-            </div>
-          }
         />
       </FormField>
 
-      {/* Compact URL preview under input */}
+      {/* Submit button - separate from input for clean UX */}
+      <Button
+        type='submit'
+        variant='primary'
+        color={btnColor}
+        size='lg'
+        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg active:scale-[0.98] transform-gpu group'
+        disabled={btnDisabled || !handle}
+      >
+        <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
+          {showChecking ? (
+            <>
+              <LoadingSpinner size='sm' className='text-white' />
+              <span>Checking availability…</span>
+            </>
+          ) : navigating ? (
+            <>
+              <LoadingSpinner size='sm' className='text-white' />
+              <span>Creating your profile…</span>
+            </>
+          ) : available === true ? (
+            <>
+              <span>Claim @{handle}</span>
+              <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </>
+          ) : (
+            'Enter your handle'
+          )}
+        </span>
+      </Button>
+
+      {/* Compact URL preview under button */}
       <div className='min-h-[1.25rem]' id='handle-preview-text'>
         {handle ? (
           <div className='flex items-center justify-between text-xs'>

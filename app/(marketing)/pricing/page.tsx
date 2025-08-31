@@ -91,10 +91,10 @@ export default function PricingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
           >
             <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl max-w-4xl mx-auto leading-tight'>
-              Free forever. $5/month or $50/year to remove the branding.
+              Free forever. Remove branding for $5.
             </h1>
             <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
-              Your Jovie profile is the fastest, smartest, most beautiful link you&apos;ll ever share.
+              The link in bio that actually converts. Beautiful, intelligent, impossibly fast.
             </p>
           </motion.div>
 
@@ -148,15 +148,15 @@ export default function PricingPage() {
             >
               {/* Highlight banner */}
               <div className='bg-blue-600 text-white text-sm font-medium px-4 py-2 text-center'>
-                The Apple-clean version
+                Designed for professionals
               </div>
               
               <div className='p-8'>
                 <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
-                  Remove Branding
+                  Pro
                 </h2>
                 <p className='mt-2 text-gray-600 dark:text-gray-400'>
-                  Everything in Free, plus a clean, brandless experience.
+                  Your brand. Your story. Nothing else.
                 </p>
                 
                 <div className='mt-6'>
