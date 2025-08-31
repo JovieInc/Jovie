@@ -15,12 +15,14 @@ const IP_KEY_2 = `onboarding:ip:${TEST_IP_2}`;
 describe('enforceOnboardingRateLimit', () => {
   beforeEach(async () => {
     // Clean up all test keys
-    await Promise.all([
-      redis.del(USER_KEY),
-      redis.del(USER_KEY_2),
-      redis.del(IP_KEY),
-      redis.del(IP_KEY_2),
-    ]);
+    if (redis) {
+      await Promise.all([
+        redis.del(USER_KEY),
+        redis.del(USER_KEY_2),
+        redis.del(IP_KEY),
+        redis.del(IP_KEY_2),
+      ]);
+    }
   });
 
   it('allows attempts under the limit', async () => {

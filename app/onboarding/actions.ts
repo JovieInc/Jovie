@@ -54,7 +54,7 @@ export async function completeOnboarding({
     }
 
     // Step 3: Rate limiting check
-    const headersList = headers();
+    const headersList = await headers();
     const forwarded = headersList.get('x-forwarded-for');
     const realIP = headersList.get('x-real-ip');
 

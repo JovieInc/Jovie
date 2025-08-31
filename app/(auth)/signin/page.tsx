@@ -6,7 +6,7 @@ import { AuthLayout } from '@/components/auth';
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect_url') || '/dashboard';
+  const redirectUrl = searchParams?.get('redirect_url') || '/dashboard';
 
   return (
     <AuthLayout

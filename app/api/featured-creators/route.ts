@@ -47,7 +47,7 @@ export async function GET() {
 
   try {
     // Try cache first
-    const cached = await redis.get(cacheKey);
+    const cached = redis ? await redis.get(cacheKey) : null;
     if (cached) {
       return NextResponse.json(cached, {
         headers: {
@@ -60,7 +60,9 @@ export async function GET() {
     const creators = await getFeaturedCreators();
 
     // Store in Redis with 180s TTL
-    await redis.setex(cacheKey, 180, creators);
+    if (redis) {
+      await redis.setex(cacheKey, 180, creators);
+    }
 
     return NextResponse.json(creators, {
       headers: {
