@@ -9,9 +9,11 @@ import {
   SparklesIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/app';
+import { useBillingStatus } from '@/hooks/use-billing-status';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
@@ -105,7 +107,10 @@ export function SettingsPolished({
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['profile'])
   );
-  const [isPro] = useState(false); // TODO: Get from user subscription status
+  const router = useRouter();
+  const billingStatus = useBillingStatus();
+  const { isPro } = billingStatus;
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: artist.handle || '',
     displayName: artist.name || '',
@@ -151,6 +156,36 @@ export function SettingsPolished({
       }
     } catch (error) {
       console.error('Error saving theme preference:', error);
+    }
+  };
+
+  const handleBilling = async () => {
+    if (isBillingLoading) return;
+
+    setIsBillingLoading(true);
+    try {
+      if (billingStatus.isPro && billingStatus.hasStripeCustomer) {
+        const response = await fetch('/api/stripe/portal', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create billing portal session');
+        }
+
+        const { url } = await response.json();
+        window.location.href = url;
+      } else {
+        router.push('/pricing');
+      }
+    } catch (error) {
+      console.error('Error opening billing portal:', error);
+      router.push('/pricing');
+    } finally {
+      setIsBillingLoading(false);
     }
   };
 
@@ -552,17 +587,22 @@ export function SettingsPolished({
             <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
               <CreditCardIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
               <h3 className='text-lg font-medium text-primary mb-2'>
-                Billing dashboard coming soon
+                Manage your plan
               </h3>
               <p className='text-sm text-secondary mb-4'>
-                Subscription management and billing history will be available
-                here.
+                Update payment details, change plans, or view invoices.
               </p>
               <button
+                onClick={handleBilling}
+                disabled={isBillingLoading || billingStatus.loading}
                 className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
                 style={{ backgroundColor: 'var(--color-accent)' }}
               >
-                Upgrade to Pro
+                {billingStatus.loading
+                  ? 'Loading...'
+                  : billingStatus.isPro
+                    ? 'Open Billing Portal'
+                    : 'Upgrade to Pro'}
               </button>
             </div>
           </div>
