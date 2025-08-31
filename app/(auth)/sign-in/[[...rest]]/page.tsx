@@ -1,7 +1,35 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
+import { ClerkLoaded, ClerkLoading, SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
+import React from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+
+class SignInErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className='mt-4 text-center text-sm text-red-600 dark:text-red-400'>
+          Sign in failed. Please try again.
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
@@ -19,11 +47,21 @@ export default function SignInPage() {
 
   return (
     <div className='flex min-h-screen items-center justify-center bg-white dark:bg-[#0D0E12] transition-colors'>
-      <SignIn
-        redirectUrl={destination}
-        afterSignInUrl={destination}
-        afterSignUpUrl={destination}
-      />
+      <ClerkLoading>
+        <div data-testid='spinner'>
+          <LoadingSpinner size='lg' />
+        </div>
+      </ClerkLoading>
+      <ClerkLoaded>
+        <SignInErrorBoundary>
+          <SignIn
+            redirectUrl={destination}
+            afterSignInUrl={destination}
+            afterSignUpUrl={destination}
+            signUpUrl='/sign-up'
+          />
+        </SignInErrorBoundary>
+      </ClerkLoaded>
     </div>
   );
 }
