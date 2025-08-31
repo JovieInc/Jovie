@@ -2,48 +2,18 @@
 
 import { ClerkLoaded, ClerkLoading, SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-
-class SignInErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className='mt-4 text-center text-sm text-red-600 dark:text-red-400'>
-          Sign in failed. Please try again.
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+import { SignInErrorBoundary } from '@/components/auth';
+import { getSafeRedirectUrl } from '@/lib/auth/redirect-validation';
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
 
-  // Check for redirect_url parameter (e.g., from protected pages like /onboarding)
+  // Get safe redirect URL with validation
   const redirectUrl = searchParams?.get('redirect_url') ?? null;
-
-  // Check for artistId parameter (legacy flow)
   const artistId = searchParams?.get('artistId') ?? null;
-
-  // Determine destination: prioritize redirect_url, then artistId flow, then default to dashboard
-  const destination =
-    redirectUrl ||
-    (artistId ? `/dashboard?artistId=${artistId}` : '/dashboard');
+  
+  const destination = getSafeRedirectUrl(redirectUrl, artistId);
 
   return (
     <div className='flex min-h-screen items-center justify-center bg-white dark:bg-[#0D0E12] transition-colors'>

@@ -2,39 +2,18 @@
 
 import { ClerkLoaded, ClerkLoading, SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import React from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { AuthLayout } from '@/components/auth';
-
-class SignInErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className='mt-4 text-center text-sm text-red-600 dark:text-red-400'>
-          Sign in failed. Please try again.
-        </div>
-      );
-    }
-
-    return this.props.children;
-  }
-}
+import { AuthLayout, SignInErrorBoundary } from '@/components/auth';
+import { getSafeRedirectUrl } from '@/lib/auth/redirect-validation';
 
 export default function SignInPage() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams?.get('redirect_url') || '/dashboard';
+  
+  // Get safe redirect URL with validation (consistent with other sign-in page)
+  const redirectUrlParam = searchParams?.get('redirect_url') ?? null;
+  const artistId = searchParams?.get('artistId') ?? null;
+  
+  const redirectUrl = getSafeRedirectUrl(redirectUrlParam, artistId);
 
   return (
     <AuthLayout
@@ -75,6 +54,8 @@ export default function SignInPage() {
               },
             }}
             redirectUrl={redirectUrl}
+            afterSignInUrl={redirectUrl}
+            afterSignUpUrl={redirectUrl}
             signUpUrl='/signup'
           />
         </SignInErrorBoundary>
