@@ -145,12 +145,13 @@ describe('enforceOnboardingRateLimit', () => {
     );
 
     const results = await Promise.allSettled(promises);
-    
+
     // Should have 2 successful and 1 failed (rate limited)
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(
-      r => r.status === 'rejected' && 
-      (r.reason as any)?.code === OnboardingErrorCode.RATE_LIMITED
+      r =>
+        r.status === 'rejected' &&
+        (r.reason as any)?.code === OnboardingErrorCode.RATE_LIMITED
     ).length;
 
     expect(successful).toBe(2);

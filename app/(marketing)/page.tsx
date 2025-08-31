@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
-import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { NewFeaturedArtists } from '@/components/home/NewFeaturedArtists';
 import { NewFeaturesSection } from '@/components/home/NewFeaturesSection';
-import { NewUpgradeTeaser } from '@/components/home/NewUpgradeTeaser';
+import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { NewHowItWorks } from '@/components/home/NewHowItWorks';
 import { NewPreFooterCTA } from '@/components/home/NewPreFooterCTA';
+import { NewUpgradeTeaser } from '@/components/home/NewUpgradeTeaser';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Root layout handles dynamic rendering
@@ -13,7 +13,7 @@ export const revalidate = 3600; // Revalidate every hour
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} - Claim your @handle`;
   const description =
-    'Secure your name. Share a profile that\'s fast, beautiful, and optimized to convert.';
+    "Secure your name. Share a profile that's fast, beautiful, and optimized to convert.";
   const keywords = [
     'link in bio',
     'music artist',
@@ -157,4 +157,3 @@ export default function HomePage() {
     </>
   );
 }
-

@@ -75,7 +75,8 @@ export async function enforceOnboardingRateLimit({
       err &&
       typeof err === 'object' &&
       'code' in err &&
-      (err as { code?: OnboardingErrorCode }).code === OnboardingErrorCode.RATE_LIMITED
+      (err as { code?: OnboardingErrorCode }).code ===
+        OnboardingErrorCode.RATE_LIMITED
     ) {
       throw err;
     }

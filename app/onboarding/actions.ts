@@ -57,24 +57,37 @@ export async function completeOnboarding({
     const headersList = headers();
     const forwarded = headersList.get('x-forwarded-for');
     const realIP = headersList.get('x-real-ip');
-    
+
     // Extract and validate IP address with fallback chain
     let clientIP = 'unknown';
     if (forwarded) {
       const firstIP = forwarded.split(',')[0].trim();
       // Basic IP validation (IPv4 and IPv6)
-      if (/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(firstIP) || 
-          /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(firstIP)) {
+      if (
+        /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
+          firstIP
+        ) ||
+        /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(firstIP)
+      ) {
         clientIP = firstIP;
       }
-    } else if (realIP && /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(realIP)) {
+    } else if (
+      realIP &&
+      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
+        realIP
+      )
+    ) {
       clientIP = realIP;
     }
-    
+
     // Skip IP rate limiting for unknown IPs to avoid shared limits
     const shouldCheckIP = clientIP !== 'unknown';
 
-    await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: shouldCheckIP });
+    await enforceOnboardingRateLimit({
+      userId,
+      ip: clientIP,
+      checkIP: shouldCheckIP,
+    });
 
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);

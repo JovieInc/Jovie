@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import type { DashboardData } from '@/app/dashboard/actions';
 import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import type { DashboardData } from '@/app/dashboard/actions';
 
 interface DashboardAnalyticsProps {
   initialData: DashboardData;

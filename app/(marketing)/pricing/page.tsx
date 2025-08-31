@@ -1,13 +1,13 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
+import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Container } from '@/components/site/Container';
-import { PricingToggle } from '@/components/pricing/PricingToggle';
 import { FeatureList } from '@/components/pricing/FeatureList';
 import { PricingCTA } from '@/components/pricing/PricingCTA';
+import { PricingToggle } from '@/components/pricing/PricingToggle';
+import { Container } from '@/components/site/Container';
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
@@ -16,12 +16,23 @@ export default function PricingPage() {
 
   const freeFeatures = [
     { title: 'Blazing-fast profiles, SEO-optimized' },
-    { title: 'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)' },
-    { title: 'Constant A/B testing and machine learning to maximize conversion' },
-    { title: 'Smart deep links (/listen, /tip, etc.) for Instagram&apos;s multiple link slots' },
+    {
+      title:
+        'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)',
+    },
+    {
+      title: 'Constant A/B testing and machine learning to maximize conversion',
+    },
+    {
+      title:
+        'Smart deep links (/listen, /tip, etc.) for Instagram&apos;s multiple link slots',
+    },
     { title: 'Clean dark/light mode, desktop QR code handoff' },
     { title: 'App deep links (no browser/login friction)' },
-    { title: 'Analytics focused on conversion (clicks → conversions, referrers, countries)' },
+    {
+      title:
+        'Analytics focused on conversion (clicks → conversions, referrers, countries)',
+    },
     { title: 'Unique Jovie handle (jov.ie/yourname)' },
   ];
 
@@ -40,9 +51,10 @@ export default function PricingPage() {
 
       // Use the appropriate price based on billing interval
       const priceOption = pricingData.options?.find(
-        (option: { interval: string; priceId: string }) => option.interval === (isYearly ? 'year' : 'month')
+        (option: { interval: string; priceId: string }) =>
+          option.interval === (isYearly ? 'year' : 'month')
       );
-      
+
       const priceId = priceOption?.priceId;
 
       if (!priceId) {
@@ -77,14 +89,14 @@ export default function PricingPage() {
 
   return (
     <div className='min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
-      <Container size="md">
-        <motion.div 
+      <Container size='md'>
+        <motion.div
           className='py-24 sm:py-32'
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <motion.div 
+          <motion.div
             className='text-center mb-16'
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -94,13 +106,14 @@ export default function PricingPage() {
               Free forever. Remove branding for $5.
             </h1>
             <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
-              The link in bio that actually converts. Beautiful, intelligent, impossibly fast.
+              The link in bio that actually converts. Beautiful, intelligent,
+              impossibly fast.
             </p>
           </motion.div>
 
           <div className='grid md:grid-cols-2 gap-12 items-start'>
             {/* Free Plan */}
-            <motion.div 
+            <motion.div
               className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden'
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -113,7 +126,7 @@ export default function PricingPage() {
                 <p className='mt-2 text-gray-600 dark:text-gray-400'>
                   Everything you need to create a beautiful profile.
                 </p>
-                
+
                 <div className='mt-6 flex items-baseline'>
                   <span className='text-5xl font-bold text-gray-900 dark:text-white'>
                     $0
@@ -123,8 +136,8 @@ export default function PricingPage() {
                   </span>
                 </div>
 
-                <FeatureList 
-                  title="What&apos;s included:"
+                <FeatureList
+                  title='What&apos;s included:'
                   features={freeFeatures}
                 />
 
@@ -140,7 +153,7 @@ export default function PricingPage() {
             </motion.div>
 
             {/* Paid Plan */}
-            <motion.div 
+            <motion.div
               className='rounded-2xl border border-blue-100 dark:border-blue-900 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -150,7 +163,7 @@ export default function PricingPage() {
               <div className='bg-blue-600 text-white text-sm font-medium px-4 py-2 text-center'>
                 Designed for professionals
               </div>
-              
+
               <div className='p-8'>
                 <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
                   Pro
@@ -158,7 +171,7 @@ export default function PricingPage() {
                 <p className='mt-2 text-gray-600 dark:text-gray-400'>
                   Your brand. Your story. Nothing else.
                 </p>
-                
+
                 <div className='mt-6'>
                   <PricingToggle onChange={setIsYearly} />
                 </div>
@@ -169,21 +182,22 @@ export default function PricingPage() {
                   </p>
                   <ul className='space-y-3'>
                     <li className='flex items-start'>
-                      <svg 
-                        className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5' 
-                        fill='none' 
-                        viewBox='0 0 24 24' 
+                      <svg
+                        className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5'
+                        fill='none'
+                        viewBox='0 0 24 24'
                         stroke='currentColor'
                       >
-                        <path 
-                          strokeLinecap='round' 
-                          strokeLinejoin='round' 
-                          strokeWidth={2} 
-                          d='M5 13l4 4L19 7' 
+                        <path
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                          strokeWidth={2}
+                          d='M5 13l4 4L19 7'
                         />
                       </svg>
                       <span className='ml-3 text-base text-gray-700 dark:text-gray-300'>
-                        <strong>Remove the Jovie branding</strong> for a clean, professional look
+                        <strong>Remove the Jovie branding</strong> for a clean,
+                        professional look
                       </span>
                     </li>
                   </ul>
@@ -210,15 +224,16 @@ export default function PricingPage() {
 
           {/* CTA Section */}
           <PricingCTA onUpgrade={handleSubscribe} isLoading={isLoading} />
-          
-          <motion.div 
+
+          <motion.div
             className='mt-16 text-center'
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.5 }}
           >
             <p className='text-sm text-gray-500 dark:text-gray-400'>
-              All plans include unlimited updates and our 30-day money-back guarantee.
+              All plans include unlimited updates and our 30-day money-back
+              guarantee.
             </p>
           </motion.div>
         </motion.div>

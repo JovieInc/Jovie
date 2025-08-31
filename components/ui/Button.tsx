@@ -61,8 +61,10 @@ export const Button = forwardRef<
     };
 
     const colorClasses = {
-      green: 'bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600',
-      indigo: 'bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600',
+      green:
+        'bg-green-600 text-white hover:bg-green-700 focus-visible:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600',
+      indigo:
+        'bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600',
       blue: 'bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600',
       red: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600',
       gray: 'bg-gray-600 text-white hover:bg-gray-700 focus-visible:ring-gray-500 dark:bg-gray-500 dark:hover:bg-gray-600',
@@ -103,10 +105,10 @@ export const Button = forwardRef<
       `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
 
     return (
-      <Component 
-        ref={ref as React.Ref<HTMLElement>} 
-        className={classes} 
-        disabled={Component === 'button' ? isDisabled : undefined} 
+      <Component
+        ref={ref as React.Ref<HTMLElement>}
+        className={classes}
+        disabled={Component === 'button' ? isDisabled : undefined}
         {...props}
       >
         {loading && (

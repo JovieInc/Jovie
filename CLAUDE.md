@@ -717,6 +717,32 @@ For new features, write tests first:
 
 ---
 
+## 🛡️ Critical Module Protection (No Regressions from AI)
+
+**Scope (protected):**
+- Homepage & marketing: `app/(marketing)/page.tsx`, `app/(marketing)/**/page.tsx`
+- Featured Creators: `components/marketing/FeaturedCreators*`, `lib/data/creators.ts`, `lib/adapters/creators.ts`
+- Money path: checkout/portal routes, pricing, paywall, onboarding
+
+**Rules:**
+- ❌ **No mock/static lists** in protected modules. Use data adapters only (`getFeaturedCreators()` etc.).
+- ❌ Do not duplicate protected components; **modify in place** to keep data plumbing.
+- ✅ If a visual refactor is needed, keep the existing `data-testid` hooks and props contract.
+- ✅ All changes to protected modules require green **homepage smoke** and **money-path smoke**.
+
+**CI Checks (must pass):**
+- `playwright @smoke-home`: visits `/` and asserts `data-testid="featured-creators"` exists and has ≥1 creator card.
+- `ts/lint rule no-mocks-in-prod`: fails if array/object literals matching `Creator` shape appear in `app/(marketing)` or `components/marketing` (outside of `__mocks__|.stories.tsx`).
+- `contract test`: `FeaturedCreators` must import `getFeaturedCreators` (or the adapter) and render from that source.
+- `CODEOWNERS gate`: changes to protected paths require review from `@growth-owner`.
+
+**Implementation notes:**
+- Provide fixtures in `__mocks__` + Storybook only; never inline in production components.
+- Keep a thin **adapter** layer (`lib/adapters/creators.ts`) to decouple UI from DB. Components consume adapters, not direct DB calls.
+- Preserve `data-testid="featured-creators"` and `data-testid="creator-card"` in markup to make smoke tests stable.
+
+---
+
 ## 🔑 Environment Variables (by system)
 
 ```bash

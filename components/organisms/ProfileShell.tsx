@@ -5,8 +5,8 @@ import { CTAButton } from '@/components/atoms/CTAButton';
 import { FrostedButton } from '@/components/atoms/FrostedButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
-import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { Container } from '@/components/site/Container';
+import { Footer } from '@/components/site/Footer';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type ProfileShellProps = {
@@ -180,16 +180,7 @@ export function ProfileShell({
             </div>
           </div>
 
-          {showFooter && (
-            <div className='flex justify-center'>
-              <div className={`${maxWidthClass}`}>
-                <ProfileFooter
-                  artistHandle={artist.handle}
-                  artistSettings={artist.settings}
-                />
-              </div>
-            </div>
-          )}
+          {showFooter && <Footer />}
         </div>
       </Container>
     </div>

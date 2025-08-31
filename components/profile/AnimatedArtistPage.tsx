@@ -82,11 +82,15 @@ function renderContent(
             prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
           }
         >
-          <div className='space-y-4' role='main' aria-labelledby='tipping-title'>
+          <div
+            className='space-y-4'
+            role='main'
+            aria-labelledby='tipping-title'
+          >
             <h1 id='tipping-title' className='sr-only'>
               Tip {artist.name}
             </h1>
-            
+
             {venmoLink ? (
               <VenmoTipSelector
                 venmoLink={venmoLink}

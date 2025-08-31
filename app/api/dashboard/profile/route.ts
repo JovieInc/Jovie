@@ -1,4 +1,4 @@
-import { sql as drizzleSql, eq, and } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
@@ -15,7 +15,7 @@ export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
       const cacheKey = `${CACHE_PREFIX}${clerkUserId}`;
-      
+
       // Check cache only if Redis is available
       if (redis) {
         const cached = await redis.get<CreatorProfile>(cacheKey);
@@ -116,23 +116,21 @@ export async function PUT(req: Request) {
 
       // Cache invalidation and analytics tracking in parallel (non-blocking)
       const backgroundTasks = [];
-      
+
       if (redis) {
         backgroundTasks.push(
-          redis.del(cacheKey).catch(error => 
-            console.warn('Cache invalidation failed:', error)
-          )
+          redis
+            .del(cacheKey)
+            .catch(error => console.warn('Cache invalidation failed:', error))
         );
       }
-      
+
       backgroundTasks.push(
         trackServerEvent(
           'dashboard_profile_updated',
           undefined,
           clerkUserId
-        ).catch(error => 
-          console.warn('Analytics tracking failed:', error)
-        )
+        ).catch(error => console.warn('Analytics tracking failed:', error))
       );
 
       // Run background tasks in parallel without blocking the response
