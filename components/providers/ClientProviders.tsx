@@ -1,8 +1,8 @@
 'use client';
 
-import { ClerkProvider, type ClerkProviderProps } from '@clerk/nextjs';
+import { ClerkProvider } from '@clerk/nextjs';
 import { ThemeProvider } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React, { type ComponentProps, useEffect, useState } from 'react';
 import { Analytics } from '@/components/Analytics';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { env } from '@/lib/env';
@@ -71,7 +71,7 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
             footerActionText: 'text-secondary',
             footerActionLink: 'text-accent-token',
           },
-        } as unknown as ClerkProviderProps['appearance']
+        } as ComponentProps<typeof ClerkProvider>['appearance']
       }
     >
       {children}
