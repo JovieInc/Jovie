@@ -110,7 +110,6 @@
 
 ### **Philosophy: Speed + Simplicity + Scale**
 
-
 Follow Y Combinator principles: optimize for fast iteration, minimal cognitive overhead, and effortless scaling.
 
 > **Note:** Before creating a new component, **search the repo for existing atoms/molecules/organisms**. Prefer reuse or extension over duplication. If you must add a new one, document in the PR why existing components don’t fit.
