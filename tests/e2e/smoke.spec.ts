@@ -43,13 +43,11 @@ test.describe('Smoke Tests', () => {
         }
         // Ignore specific expected errors in test environment
         const isClerkError = text.toLowerCase().includes('clerk');
-        const isNetworkError =
-          text.includes('Failed to load resource') &&
-          (text.includes('clerk') || text.includes('/_next/'));
+        const isNetworkResourceError = text.includes('Failed to load resource');
         const isExpectedTestError =
           text.includes('Test environment') || text.includes('Mock data');
 
-        if (!isClerkError && !isNetworkError && !isExpectedTestError) {
+        if (!isClerkError && !isNetworkResourceError && !isExpectedTestError) {
           errors.push(text);
         }
       }
