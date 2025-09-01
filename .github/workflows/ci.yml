@@ -126,14 +126,33 @@ jobs:
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
 
           if [ -z "$DB_URL" ]; then
-            echo "Neon branch creation did not return db_url; falling back to repository secrets."
+            echo "⚠️ Neon branch creation did not return db_url; falling back to repository secrets."
+            echo "This may happen if:"
+            echo "  - Neon branch limit (10) exceeded"
+            echo "  - Neon API is temporarily unavailable" 
+            echo "  - Branch already exists with different configuration"
+            
             if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.NEON_DATABASE_URL }}"
+              echo "✅ Using NEON_DATABASE_URL secret as fallback"
             elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
               DB_URL="${{ secrets.DATABASE_URL_PREVIEW }}"
+              echo "✅ Using DATABASE_URL_PREVIEW secret as fallback"
             elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.DATABASE_URL }}"
+              echo "✅ Using DATABASE_URL secret as fallback"
+            else
+              echo "❌ No fallback DATABASE_URL available"
             fi
+            
+            # Suggest cleanup if this happens frequently
+            echo ""
+            echo "💡 If this happens frequently, consider:"
+            echo "   1. Running manual cleanup: gh workflow run neon-cleanup.yml"
+            echo "   2. Cleaning up old branches in Neon dashboard"
+            echo "   3. Checking the new neon-cleanup.yml workflow is working"
+          else
+            echo "✅ Successfully created/reused Neon branch"
           fi
 
           echo "db_url=$DB_URL" >> $GITHUB_OUTPUT

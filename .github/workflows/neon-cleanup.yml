@@ -1,0 +1,126 @@
+name: Neon Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Branch name to delete (leave empty for automatic detection)'
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-cleanup-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup-neon-branch:
+    name: Delete Neon Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Determine branch to cleanup
+        id: branch-info
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Manual cleanup via workflow_dispatch
+            BRANCH_NAME="${{ github.event.inputs.branch_name }}"
+            if [[ -z "$BRANCH_NAME" ]]; then
+              echo "ERROR: Branch name required for manual cleanup"
+              exit 1
+            fi
+          else
+            # Automatic cleanup on PR close
+            RAW="${{ github.event.pull_request.head.ref }}"
+            # Use same sanitization logic as creation
+            BRANCH_NAME=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          fi
+          
+          echo "Cleaning up Neon branch: $BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Delete Neon branch
+        id: delete-branch
+        continue-on-error: true
+        run: |
+          BRANCH_NAME="${{ steps.branch-info.outputs.branch_name }}"
+          
+          # Use Neon CLI to delete the branch
+          curl -X DELETE \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/$BRANCH_NAME" \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -w "HTTP Status: %{http_code}\n" \
+            -o /tmp/neon_response.json
+          
+          # Check if deletion was successful
+          HTTP_CODE=$(curl -X DELETE \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches/$BRANCH_NAME" \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -w "%{http_code}" \
+            -s -o /dev/null)
+          
+          if [[ "$HTTP_CODE" == "200" ]] || [[ "$HTTP_CODE" == "204" ]] || [[ "$HTTP_CODE" == "404" ]]; then
+            echo "✅ Successfully deleted Neon branch '$BRANCH_NAME' (HTTP $HTTP_CODE)"
+            echo "success=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Failed to delete Neon branch '$BRANCH_NAME' (HTTP $HTTP_CODE)"
+            if [[ -f /tmp/neon_response.json ]]; then
+              echo "Response:"
+              cat /tmp/neon_response.json
+            fi
+            echo "success=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Cleanup summary
+        if: always()
+        run: |
+          BRANCH_NAME="${{ steps.branch-info.outputs.branch_name }}"
+          SUCCESS="${{ steps.delete-branch.outputs.success }}"
+          
+          if [[ "$SUCCESS" == "true" ]]; then
+            echo "🧹 Neon branch cleanup completed successfully for: $BRANCH_NAME"
+          else
+            echo "⚠️ Neon branch cleanup failed for: $BRANCH_NAME"
+            echo "This is non-critical - the branch may not exist or may have been deleted manually"
+          fi
+
+  # Optional: Clean up old branches that may have been missed
+  cleanup-old-branches:
+    name: Clean up old branches (manual only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: List and clean old Neon branches
+        run: |
+          echo "🔍 Listing all Neon branches..."
+          
+          # Get all branches
+          curl -s \
+            "https://console.neon.tech/api/v2/projects/${{ vars.NEON_PROJECT_ID }}/branches" \
+            -H "Authorization: Bearer ${{ secrets.NEON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -o /tmp/branches.json
+          
+          # Parse and show branch info
+          if command -v jq >/dev/null 2>&1; then
+            echo "Current Neon branches:"
+            jq -r '.branches[] | "- \(.name) (created: \(.created_at))"' /tmp/branches.json || echo "Could not parse branch list"
+            
+            # Count branches
+            BRANCH_COUNT=$(jq '.branches | length' /tmp/branches.json 2>/dev/null || echo "unknown")
+            echo "Total branches: $BRANCH_COUNT"
+            
+            if [[ "$BRANCH_COUNT" != "unknown" ]] && [[ "$BRANCH_COUNT" -gt 8 ]]; then
+              echo "⚠️ Warning: $BRANCH_COUNT branches found. Neon limit is 10."
+              echo "Consider manually deleting unused branches from Neon dashboard."
+            fi
+          else
+            echo "jq not available - showing raw response:"
+            cat /tmp/branches.json
+          fi
