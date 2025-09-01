@@ -4,9 +4,6 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 // flags import removed - pre-launch
-import { redis } from '@/lib/redis';
-
-type DbSocialLink = typeof socialLinks.$inferSelect;
 
 export async function GET(req: Request) {
   // Feature flag check removed - social links enabled by default
@@ -35,14 +32,6 @@ export async function GET(req: Request) {
           { error: 'Profile not found' },
           { status: 404 }
         );
-      }
-
-      const cacheKey = `social_links:${profileId}`;
-      if (redis) {
-        const cached = await redis.get<DbSocialLink[]>(cacheKey);
-        if (cached) {
-          return NextResponse.json({ links: cached }, { status: 200 });
-        }
       }
 
       const rows = await db
@@ -86,11 +75,10 @@ export async function GET(req: Request) {
           displayText: r.displayText,
         }));
 
-      if (redis) {
-        await redis.set(cacheKey, links, { ex: 60 });
-      }
-
-      return NextResponse.json({ links }, { status: 200 });
+      return NextResponse.json(
+        { links },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     });
   } catch (error) {
     console.error('Error fetching social links:', error);
@@ -166,11 +154,10 @@ export async function PUT(req: Request) {
         await db.insert(socialLinks).values(insertPayload);
       }
 
-      if (redis) {
-        await redis.del(`social_links:${profileId}`);
-      }
-
-      return NextResponse.json({ ok: true }, { status: 200 });
+      return NextResponse.json(
+        { ok: true },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     });
   } catch (error) {
     console.error('Error updating social links:', error);
