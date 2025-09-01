@@ -189,8 +189,10 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     if (updateIndicatorRef.current) {
       updateIndicatorRef.current.dataset.show = 'true';
       // Safe alternative to innerHTML - use textContent to prevent XSS
-      updateIndicatorRef.current.textContent = success ? '✅ Updated' : '❌ Error';
-      updateIndicatorRef.current.className = success 
+      updateIndicatorRef.current.textContent = success
+        ? '✅ Updated'
+        : '❌ Error';
+      updateIndicatorRef.current.className = success
         ? 'bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium'
         : 'bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium';
 
@@ -337,13 +339,13 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
       {/* Main Edit Panel */}
       <div className='xl:pr-96'>
         {/* Mobile View Toggle */}
-        <div className='xl:hidden flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-6'>
+        <div className='xl:hidden flex bg-surface-1 rounded-lg p-1 mb-6'>
           <button
             onClick={() => setViewMode('edit')}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               viewMode === 'edit'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400'
+                ? 'bg-surface-2 text-primary-token shadow-sm'
+                : 'text-secondary-token'
             }`}
           >
             Edit
@@ -352,8 +354,8 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
             onClick={() => setViewMode('preview')}
             className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-all ${
               viewMode === 'preview'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
-                : 'text-gray-600 dark:text-gray-400'
+                ? 'bg-surface-2 text-primary-token shadow-sm'
+                : 'text-secondary-token'
             }`}
           >
             Preview
