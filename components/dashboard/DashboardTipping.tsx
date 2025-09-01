@@ -208,8 +208,10 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       {/* Overlay CTA when no Venmo handle */}
       {!hasVenmoHandle && !isEditing && (
         <div className='absolute inset-x-0 top-32 flex justify-center z-30'>
-          <div className='bg-surface-1/95 backdrop-blur-md rounded-2xl p-6 max-w-sm text-center shadow-2xl border border-accent/20'>
-            <WalletIcon className='h-12 w-12 text-accent mx-auto mb-3' />
+          <div className='bg-surface-0/90 backdrop-blur-xl rounded-2xl p-6 max-w-sm text-center shadow-xl border border-subtle/50 ring-1 ring-black/5 dark:ring-white/5'>
+            <div className='inline-flex items-center justify-center w-12 h-12 bg-accent/10 rounded-full mb-3'>
+              <WalletIcon className='h-6 w-6 text-accent' />
+            </div>
             <h3 className='text-lg font-semibold text-primary-token mb-2'>
               Add Your Venmo Handle
             </h3>
@@ -218,7 +220,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
             </p>
             <button
               onClick={() => setIsEditing(true)}
-              className='px-6 py-2.5 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2 font-medium'
+              className='px-6 py-2.5 bg-accent/90 text-white rounded-lg hover:bg-accent transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2 font-medium shadow-sm'
             >
               Get Started
             </button>

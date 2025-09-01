@@ -172,6 +172,22 @@ export function normalizeUrl(url: string): string {
     // Force HTTPS for known platforms
     parsedUrl.protocol = 'https:';
 
+    // Platform-specific URL normalization
+    if (/(?:www\.)?tiktok\.com/i.test(parsedUrl.hostname)) {
+      // Auto-add @ for TikTok handles if missing, but avoid reserved paths
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      const reservedPaths = ['for', 'following', 'live', 'upload', 'search', 'discover', 'trending'];
+      
+      if (pathParts.length > 0 && 
+          !pathParts[0].startsWith('@') && 
+          !reservedPaths.includes(pathParts[0].toLowerCase()) &&
+          // Basic username validation: alphanumeric, dots, underscores only
+          /^[a-zA-Z0-9._]+$/.test(pathParts[0])) {
+        pathParts[0] = '@' + pathParts[0];
+        parsedUrl.pathname = '/' + pathParts.join('/');
+      }
+    }
+
     // Remove UTM parameters and tracking
     const paramsToRemove = [
       'utm_source',
@@ -305,6 +321,8 @@ function validateUrl(url: string, platform: PlatformInfo): boolean {
         return /instagram\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
       case 'twitter':
         return /(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/.test(url);
+      case 'tiktok':
+        return /tiktok\.com\/@[a-zA-Z0-9._]+\/?$/.test(url);
       case 'youtube':
         return (
           /youtube\.com\/(c\/|channel\/|@)[a-zA-Z0-9_-]+/.test(url) ||

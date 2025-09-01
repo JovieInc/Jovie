@@ -265,7 +265,7 @@ export default function DashboardLayoutClient({
                   {/* Profile section (collapsed state) */}
                   <div
                     className={cn(
-                      'flex flex-col items-center gap-2 transition-all duration-200 ease-in-out',
+                      'flex flex-col items-center justify-center gap-3 w-full transition-all duration-200 ease-in-out',
                       sidebarCollapsed
                         ? 'opacity-100 scale-100'
                         : 'opacity-0 scale-95 pointer-events-none absolute inset-0'
@@ -275,15 +275,15 @@ export default function DashboardLayoutClient({
                       content={`You're logged in as @${artist?.handle || 'user'}`}
                       placement='right'
                     >
-                      <div className='relative'>
+                      <div className='relative flex justify-center'>
                         <UserButton artist={artist} showUserInfo={false} />
                         <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-surface-0' />
                       </div>
                     </Tooltip>
                     <Tooltip content='Toggle theme' placement='right'>
-                      <span>
+                      <div className='flex justify-center'>
                         <EnhancedThemeToggle variant='compact' />
-                      </span>
+                      </div>
                     </Tooltip>
                   </div>
                 </div>
