@@ -91,8 +91,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Run whenever Drizzle Check would run
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Only run for push/merge_group and PRs to production (or full-ci label)
+    # Skip for preview PRs to keep fast lane truly fast (UI-only changes don't need DB)
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -488,7 +489,10 @@ jobs:
 
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    needs: [ci-drizzle-check, neon-db]
+    # Always needs build, conditionally needs neon-db (when it runs)
+    needs: [ci-build]
+    # Add neon-db as dependency only when it's expected to run
+    # Note: GitHub will skip this job if any required jobs are skipped
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -515,20 +519,23 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-      - name: Deploy (PR preview, pooled DB only for this deployment)
+      - name: Deploy (PR preview, fallback to secrets DB for fast PRs)
         id: pr_deploy
         run: |
-          # Prefer pooled URL from Neon branch; fall back to non-pooled/secrets if not available
+          # For fast preview PRs: neon-db job is skipped, so use secrets
+          # For full PRs: prefer Neon branch URL, fall back to secrets if needed
           POOLED_URL="$DB_URL_POOLED"
           if [ -z "$POOLED_URL" ]; then
-            echo "Pooled DB URL not provided by Neon action; falling back to non-pooled/secrets"
-            if [ -n "$DB_URL_NON_POOLED" ]; then
-              POOLED_URL="$DB_URL_NON_POOLED"
-            elif [ -n "$DATABASE_URL_PREVIEW" ]; then
+            echo "Neon DB URL not available (fast PR), using preview secrets"
+            if [ -n "$DATABASE_URL_PREVIEW" ]; then
               POOLED_URL="$DATABASE_URL_PREVIEW"
+            elif [ -n "$DB_URL_NON_POOLED" ]; then
+              POOLED_URL="$DB_URL_NON_POOLED"
             else
               POOLED_URL="$DATABASE_URL"
             fi
+          else
+            echo "Using Neon branch DB URL"
           fi
 
           # Deploy preview with DATABASE_URL injected only for this deployment
@@ -542,8 +549,9 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled }}
-          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url }}
+          # Neon DB URLs (may be empty for fast preview PRs)
+          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled || '' }}
+          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url || '' }}
           DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
