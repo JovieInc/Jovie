@@ -3,15 +3,13 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
-import { flags } from '@/lib/env';
+// flags import removed - pre-launch
 import { redis } from '@/lib/redis';
 
 type DbSocialLink = typeof socialLinks.$inferSelect;
 
 export async function GET(req: Request) {
-  if (!flags.feature_social_links) {
-    return NextResponse.json({ error: 'Not enabled' }, { status: 404 });
-  }
+  // Feature flag check removed - social links enabled by default
   try {
     return await withDbSession(async clerkUserId => {
       const url = new URL(req.url);
@@ -107,9 +105,7 @@ export async function GET(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  if (!flags.feature_social_links) {
-    return NextResponse.json({ error: 'Not enabled' }, { status: 404 });
-  }
+  // Feature flag check removed - social links enabled by default
   try {
     return await withDbSession(async clerkUserId => {
       const body = (await req.json().catch(() => null)) as {

@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { env, flags } from '@/lib/env';
+import { env } from '@/lib/env';
 
 function signParams(
   params: Record<string, string | number | undefined>
@@ -29,10 +29,11 @@ function signParams(
 }
 
 export async function POST(req: NextRequest) {
-  // Gate behind feature flag
-  if (!flags.feature_image_cdn_cloudinary) {
-    return NextResponse.json({ error: 'Not enabled' }, { status: 404 });
-  }
+  // Feature flag removed - Cloudinary disabled by default
+  return NextResponse.json(
+    { error: 'Cloudinary not enabled' },
+    { status: 404 }
+  );
 
   const { userId } = await auth();
   if (!userId) {

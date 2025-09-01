@@ -4,7 +4,7 @@ import { Inter } from 'next/font/google';
 import React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { getServerFeatureFlags } from '@/lib/feature-flags';
+// Feature flags removed - pre-launch
 import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator';
 import '@/styles/globals.css';
 import { auth } from '@clerk/nextjs/server';
@@ -120,7 +120,7 @@ export default async function RootLayout({
   await runStartupEnvironmentValidation();
 
   // Fetch feature flags server-side
-  const featureFlags = await getServerFeatureFlags();
+  // Feature flags removed - pre-launch
   const shouldInjectToolbar = process.env.NODE_ENV === 'development';
 
   // Extract domain from APP_URL for analytics
@@ -220,10 +220,7 @@ export default async function RootLayout({
       <body
         className={`${inter.variable} font-sans bg-base text-primary-token`}
       >
-        <ClientProviders
-          initialFeatureFlags={featureFlags}
-          initialThemeMode={initialThemeMode}
-        >
+        <ClientProviders initialThemeMode={initialThemeMode}>
           {children}
         </ClientProviders>
         {showCookieBanner && <CookieBannerSection />}

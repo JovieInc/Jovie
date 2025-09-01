@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { ErrorSummary } from '@/components/ui/ErrorSummary';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
-import { flags } from '@/lib/env';
+// flags import removed - pre-launch
 import {
   Artist,
   CreatorProfile,
@@ -162,8 +162,8 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         }}
       />
 
-      {/* Avatar uploader (feature-flagged) */}
-      {flags.feature_image_cdn_cloudinary && (
+      {/* Avatar uploader (disabled by default) */}
+      {false && (
         <FormField
           label='Profile Image'
           helpText='Upload a profile picture to personalize your profile'

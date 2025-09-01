@@ -6,17 +6,14 @@ import React, { useEffect, useState } from 'react';
 import { Analytics } from '@/components/Analytics';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { env } from '@/lib/env';
-import { FeatureFlags } from '@/lib/feature-flags';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
-import { FeatureFlagsProvider } from './FeatureFlagsProvider';
 import { ToastProvider } from './ToastProvider';
 
 // import { Toolbar } from '@vercel/toolbar/next';
 
 interface ClientProvidersProps {
   children: React.ReactNode;
-  initialFeatureFlags?: FeatureFlags;
   initialThemeMode?: ThemeMode;
 }
 
@@ -66,7 +63,6 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
 
 export function ClientProviders({
   children,
-  initialFeatureFlags,
   initialThemeMode = 'system',
 }: ClientProvidersProps) {
   const [isClient, setIsClient] = useState(false);
@@ -87,9 +83,7 @@ export function ClientProviders({
         vercelEnv: process.env.VERCEL_ENV || 'local',
         nodeEnv: process.env.NODE_ENV,
       });
-      if (initialFeatureFlags) {
-        logger.debug('Initial feature flags', initialFeatureFlags);
-      }
+      // Feature flags removed - pre-launch
       logger.groupEnd();
 
       // Initialize Web Vitals tracking - temporarily disabled due to import issues
@@ -112,7 +106,7 @@ export function ClientProviders({
     }
 
     return () => clearTimeout(timer);
-  }, [initialFeatureFlags]);
+  }, []);
 
   // Show loading state during hydration
   if (!isClient || isLoading) {
@@ -128,21 +122,19 @@ export function ClientProviders({
 
   return (
     <ClerkWrapper>
-      <FeatureFlagsProvider initialFlags={initialFeatureFlags}>
-        <ThemeProvider
-          attribute='class'
-          defaultTheme={initialThemeMode}
-          enableSystem={true}
-          disableTransitionOnChange
-          storageKey='jovie-theme'
-        >
-          <ToastProvider>
-            {children}
-            <Analytics />
-            {/* <Toolbar /> */}
-          </ToastProvider>
-        </ThemeProvider>
-      </FeatureFlagsProvider>
+      <ThemeProvider
+        attribute='class'
+        defaultTheme={initialThemeMode}
+        enableSystem={true}
+        disableTransitionOnChange
+        storageKey='jovie-theme'
+      >
+        <ToastProvider>
+          {children}
+          <Analytics />
+          {/* <Toolbar /> */}
+        </ToastProvider>
+      </ThemeProvider>
     </ClerkWrapper>
   );
 }

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
-import { useFeatureFlags } from '@/components/providers/FeatureFlagsProvider';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardSettingsProps {
@@ -11,21 +10,13 @@ interface DashboardSettingsProps {
 }
 
 export function DashboardSettings({ initialData }: DashboardSettingsProps) {
-  const { flags } = useFeatureFlags();
   const [artist, setArtist] = useState<Artist | null>(
     initialData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
   // Note: Profile switching functionality will be implemented in the future
-
-  if (!flags.profileSettingsEnabled) {
-    return (
-      <p className='text-secondary-token'>
-        Profile settings aren&rsquo;t available right now.
-      </p>
-    );
-  }
+  // Feature flag check removed - settings always enabled
 
   if (!artist) {
     return null; // This shouldn't happen given the server-side logic

@@ -5,7 +5,7 @@ import { CheckIcon, ClipboardIcon } from '@heroicons/react/24/outline';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { flags } from '@/lib/env';
+// flags import removed - pre-launch
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {
@@ -112,14 +112,26 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
   // Initialize links from database
   useEffect(() => {
     const fetchLinks = async () => {
-      if (!session || !artist?.id) return;
+      if (!session || !artist?.id) {
+        // Initialize with empty arrays if no session or artist
+        setSocialLinks([]);
+        setDSPLinks([]);
+        return;
+      }
 
       try {
         const res = await fetch(
           `/api/dashboard/social-links?profileId=${encodeURIComponent(artist.id)}`,
           { cache: 'no-store' }
         );
-        if (!res.ok) throw new Error(`Failed to fetch links (${res.status})`);
+        if (!res.ok) {
+          const errorText = await res.text().catch(() => 'Unknown error');
+          console.error(`API Error: ${res.status} - ${errorText}`);
+          // Instead of throwing, just initialize with empty arrays for now
+          setSocialLinks([]);
+          setDSPLinks([]);
+          return;
+        }
         const json: { links: SocialLink[] } = await res.json();
 
         // Split links into social and DSP categories
@@ -140,6 +152,9 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
         setDSPLinks(dspLinksItems);
       } catch (error) {
         console.error('Error initializing links:', error);
+        // Gracefully handle errors by setting empty arrays
+        setSocialLinks([]);
+        setDSPLinks([]);
       }
     };
 
@@ -318,8 +333,8 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
 
   // Note: Profile switching functionality will be implemented in the future
 
-  if (!artist || !flags.feature_social_links) {
-    return null; // Feature disabled or artist missing
+  if (!artist) {
+    return null; // Artist missing
   }
 
   return (

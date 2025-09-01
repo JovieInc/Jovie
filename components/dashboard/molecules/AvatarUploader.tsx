@@ -2,7 +2,8 @@
 
 import Image from 'next/image';
 import { useCallback, useMemo, useState } from 'react';
-import { flags } from '@/lib/env';
+
+// flags import removed - pre-launch
 
 interface UploadResult {
   public_id: string;
@@ -25,7 +26,7 @@ export default function AvatarUploader({
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const disabled = useMemo(() => !flags.feature_image_cdn_cloudinary, []);
+  const disabled = useMemo(() => true, []); // Cloudinary disabled by default
 
   const onSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
