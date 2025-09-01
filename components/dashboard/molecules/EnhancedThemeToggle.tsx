@@ -126,14 +126,22 @@ export function EnhancedThemeToggle({
         type='button'
         disabled={isUpdating}
         onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-subtle-token bg-surface-hover-token/80 backdrop-blur-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
-          isUpdating ? 'animate-pulse' : ''
-        }`}
+        className={`
+          inline-flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 ease-in-out
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1
+          disabled:opacity-50 disabled:cursor-not-allowed group
+          ${
+            isDark
+              ? 'bg-surface-2 hover:bg-surface-3 text-secondary-token hover:text-primary-token border border-default/40 hover:border-default/60'
+              : 'bg-surface-1 hover:bg-surface-2 text-secondary-token hover:text-primary-token border border-default/30 hover:border-default/50 hover:shadow-sm'
+          }
+          ${isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'}
+        `}
         title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       >
         {isDark ? (
           <svg
-            className='h-4 w-4 text-accent-token'
+            className='h-4 w-4 text-blue-400 group-hover:text-blue-300 transition-colors duration-200'
             fill='currentColor'
             viewBox='0 0 20 20'
           >
@@ -145,7 +153,7 @@ export function EnhancedThemeToggle({
           </svg>
         ) : (
           <svg
-            className='h-4 w-4 text-yellow-500'
+            className='h-4 w-4 text-amber-500 group-hover:text-amber-400 transition-colors duration-200'
             fill='currentColor'
             viewBox='0 0 20 20'
           >

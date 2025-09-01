@@ -95,25 +95,21 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
             See how your profile appears to visitors
           </p>
         </div>
-        <div className='flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400'>
-          <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
-          Live
-        </div>
       </div>
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center mb-6'>
-        <div className='max-w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-1.5 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
+        <div className='w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
           {/* Top notch */}
-          <div className='absolute w-24 h-4 bg-gray-900 dark:bg-gray-800 rounded-b-xl z-10 left-1/2 transform -translate-x-1/2'></div>
+          <div className='absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
 
           <div
-            className='bg-white dark:bg-gray-900 rounded-[1.8rem] overflow-hidden relative'
-            style={{ height: '400px' }}
+            className='bg-white dark:bg-gray-900 rounded-[1.6rem] overflow-hidden relative'
+            style={{ height: '500px' }}
           >
             {/* Status Bar Mockup */}
-            <div className='bg-gray-100 dark:bg-gray-800 h-6 flex items-center justify-between px-4 relative z-20'>
-              <span className='text-[9px] font-medium text-gray-900 dark:text-gray-100'>
+            <div className='bg-gray-100 dark:bg-gray-800 h-7 flex items-center justify-between px-4 relative z-20'>
+              <span className='text-[10px] font-semibold text-gray-900 dark:text-gray-100'>
                 9:41
               </span>
               <div className='flex items-center gap-1'>
@@ -122,23 +118,28 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
                   <div className='w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded'></div>
                   <div className='w-0.5 h-1.5 bg-gray-900 dark:bg-gray-100 rounded'></div>
                   <div className='w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded'></div>
+                  <div className='w-0.5 h-2.5 bg-gray-900 dark:bg-gray-100 rounded'></div>
                 </div>
                 {/* Battery */}
-                <div className='w-4 h-2.5 border border-gray-900 dark:border-gray-100 rounded-sm relative'>
-                  <div className='w-full h-full bg-gray-900 dark:bg-gray-100 rounded-sm scale-x-75 origin-left'></div>
-                  <div className='absolute -right-0.5 top-0.5 w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded-r-sm'></div>
+                <div className='w-5 h-3 border border-gray-900 dark:border-gray-100 rounded-sm relative'>
+                  <div className='w-full h-full bg-green-500 rounded-sm scale-x-80 origin-left'></div>
+                  <div className='absolute -right-0.5 top-0.5 w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded-r-sm'></div>
                 </div>
               </div>
             </div>
 
-            {/* Profile Preview */}
-            <div className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden h-full'>
-              <div className='absolute inset-0 flex items-center justify-center'>
+            {/* Profile Preview - Better scaling and positioning */}
+            <div
+              className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'
+              style={{ height: 'calc(100% - 28px)' }}
+            >
+              <div className='w-full h-full overflow-y-auto'>
                 <div
-                  className='w-full h-full animate-in fade-in duration-300 flex flex-col justify-start'
+                  className='w-full animate-in fade-in duration-300'
                   style={{
-                    transform: 'scale(0.8)',
+                    transform: 'scale(0.85)',
                     transformOrigin: 'top center',
+                    minHeight: '100%',
                   }}
                 >
                   <StaticArtistPage
