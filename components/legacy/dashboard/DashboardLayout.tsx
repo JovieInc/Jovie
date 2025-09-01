@@ -11,9 +11,9 @@ import { Logo } from '@/components/ui/Logo';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
-import { DashboardNavItem } from '../molecules/DashboardNavItem';
-import { EnhancedThemeToggle } from '../molecules/EnhancedThemeToggle';
-import { DashboardSidebar } from './DashboardSidebar';
+import { DashboardNavItem } from '@/components/legacy/dashboard/DashboardNavItem';
+import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedThemeToggle';
+import { DashboardSidebar } from '@/components/legacy/dashboard/DashboardSidebar';
 
 interface NavigationItem {
   name: string;
@@ -101,7 +101,7 @@ export function DashboardLayout({
             </TransitionChild>
 
             {/* Mobile Sidebar Content */}
-            <div className='flex grow flex-col gap-y-5 overflow-y-auto bg-surface-0 backdrop-blur-sm px-6 pb-4 border-r border-subtle'>
+            <div className='flex grow flex-col gap-y-5 overflow-y-auto bg-surface-0 backdrop-blur-sm px-6 pb-4 border-r border-border'>
               <div className='flex h-16 shrink-0 items-center'>
                 <button
                   onClick={() => {
@@ -169,7 +169,7 @@ export function DashboardLayout({
                 </ul>
 
                 {/* Mobile footer */}
-                <div className='mt-auto pt-4 border-t border-subtle space-y-3'>
+                <div className='mt-auto pt-4 border-t border-border space-y-3'>
                   <div className='flex justify-center'>
                     <EnhancedThemeToggle />
                   </div>
@@ -209,7 +209,7 @@ export function DashboardLayout({
         )}
       >
         {/* Mobile header bar */}
-        <div className='sticky top-0 z-40 lg:hidden flex h-12 shrink-0 items-center gap-x-4 bg-surface-0/95 backdrop-blur-md px-4 border-b border-subtle'>
+        <div className='sticky top-0 z-40 lg:hidden flex h-12 shrink-0 items-center gap-x-4 bg-surface-0/95 backdrop-blur-md px-4 border-b border-border'>
           <button
             type='button'
             className='-m-2.5 p-2.5 text-secondary'

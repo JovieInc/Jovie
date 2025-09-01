@@ -318,6 +318,11 @@
   border-color: var(--color-border-default);
 }
 
+/* Bridge utility: `border-border` used across components */
+@utility border-border {
+  border-color: var(--color-border-default);
+}
+
 @utility text-accent-token {
   color: var(--color-accent);
 }

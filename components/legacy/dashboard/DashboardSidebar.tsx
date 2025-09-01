@@ -8,9 +8,9 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
-import { DashboardButton } from '../atoms/DashboardButton';
-import { DashboardNavItem } from '../molecules/DashboardNavItem';
-import { EnhancedThemeToggle } from '../molecules/EnhancedThemeToggle';
+import { DashboardButton } from '@/components/dashboard/atoms/DashboardButton';
+import { DashboardNavItem } from '@/components/legacy/dashboard/DashboardNavItem';
+import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedThemeToggle';
 
 interface NavigationItem {
   name: string;
