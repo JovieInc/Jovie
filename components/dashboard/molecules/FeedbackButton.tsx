@@ -33,24 +33,23 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
     <button
       onClick={handleFeedbackClick}
       className={cn(
-        'flex items-center gap-3 p-2 text-sm font-medium transition-all duration-300 ease-in-out',
-        'text-secondary-token hover:text-primary-token hover:bg-surface-2',
-        'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-        collapsed ? 'justify-center w-8 h-8 p-1' : 'w-full'
+        'flex items-center gap-2 transition-all duration-200 ease-in-out',
+        'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
+        'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+        'group relative overflow-hidden',
+        collapsed ? 'justify-center p-2' : 'w-full px-3 py-2'
       )}
       aria-label={collapsed ? 'Send feedback' : undefined}
     >
-      <ChatBubbleBottomCenterTextIcon className='h-4 w-4 shrink-0 transition-colors duration-200' />
-      {!collapsed && (
-        <span
-          className={cn(
-            'transition-all duration-300 ease-in-out',
-            collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'
-          )}
-        >
-          Send Feedback
-        </span>
-      )}
+      <ChatBubbleBottomCenterTextIcon className='h-3.5 w-3.5 shrink-0 transition-colors duration-200' />
+      <span
+        className={cn(
+          'text-xs font-medium transition-all duration-200 ease-in-out',
+          collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'
+        )}
+      >
+        Feedback
+      </span>
     </button>
   );
 
