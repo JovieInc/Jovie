@@ -189,8 +189,10 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
     if (updateIndicatorRef.current) {
       updateIndicatorRef.current.dataset.show = 'true';
       // Safe alternative to innerHTML - use textContent to prevent XSS
-      updateIndicatorRef.current.textContent = success ? '✅ Updated' : '❌ Error';
-      updateIndicatorRef.current.className = success 
+      updateIndicatorRef.current.textContent = success
+        ? '✅ Updated'
+        : '❌ Error';
+      updateIndicatorRef.current.className = success
         ? 'bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium'
         : 'bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium';
 
