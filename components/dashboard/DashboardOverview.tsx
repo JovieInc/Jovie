@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
-import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
+import { DashboardPreview } from '@/components/dashboard/organisms/DashboardPreview';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -34,7 +34,7 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
       {/* Main content */}
       <div className='space-y-6'>
         {/* Profile preview */}
-        <DashboardSplitView artist={artist} onArtistUpdate={() => {}} />
+        <DashboardPreview artist={artist} />
 
         {/* Analytics cards */}
         <div className='mt-8'>

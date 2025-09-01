@@ -122,11 +122,49 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
         const { url } = await response.json();
         window.location.href = url;
       } else {
-        // User doesn't have a subscription - go to pricing page
-        router.push('/pricing');
+        // User doesn't have a subscription - get default Pro plan price ID and redirect to checkout
+        try {
+          const pricingResponse = await fetch('/api/stripe/pricing-options');
+          if (!pricingResponse.ok) {
+            throw new Error('Failed to fetch pricing options');
+          }
+
+          const { pricingOptions } = await pricingResponse.json();
+          // Get the monthly Pro plan (cheapest option for quick upgrade)
+          const defaultPlan =
+            pricingOptions.find(
+              (option: { interval: string }) => option.interval === 'month'
+            ) || pricingOptions[0];
+
+          if (!defaultPlan?.priceId) {
+            throw new Error('No pricing options available');
+          }
+
+          // Create checkout session for the default Pro plan
+          const checkoutResponse = await fetch('/api/stripe/checkout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              priceId: defaultPlan.priceId,
+            }),
+          });
+
+          if (!checkoutResponse.ok) {
+            throw new Error('Failed to create checkout session');
+          }
+
+          const { url } = await checkoutResponse.json();
+          window.location.href = url;
+        } catch (checkoutError) {
+          console.error('Error creating checkout session:', checkoutError);
+          // Fallback to pricing page
+          router.push('/pricing');
+        }
       }
     } catch (error) {
-      console.error('Error opening billing portal:', error);
+      console.error('Error handling billing:', error);
       // Fallback to pricing page
       router.push('/pricing');
     } finally {
@@ -151,7 +189,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
       <button
         ref={refs.setReference}
         {...getReferenceProps()}
-        className={`flex items-center gap-3 transition-colors focus-ring-themed ${showUserInfo ? 'w-full rounded-md p-2 text-left interactive-hover' : 'justify-center w-8 h-8 rounded-full surface-hover hover:surface-pressed'}`}
+        className={`flex items-center gap-3 transition-all duration-300 ease-in-out focus-ring-themed ${showUserInfo ? 'w-full rounded-md p-2 text-left interactive-hover' : 'justify-center w-8 h-8 rounded-full surface-hover hover:surface-pressed'}`}
       >
         {userImageUrl ? (
           <Image
@@ -168,14 +206,22 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             </span>
           </div>
         )}
-        {showUserInfo && artist && (
-          <div className='flex-1 min-w-0'>
-            <p className='text-sm font-medium text-primary truncate'>
-              {artist.name || artist.handle}
-            </p>
-            <p className='text-xs text-tertiary truncate'>@{artist.handle}</p>
-          </div>
-        )}
+        <div
+          className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${
+            showUserInfo && artist
+              ? 'opacity-100 w-auto overflow-visible'
+              : 'opacity-0 w-0 overflow-hidden'
+          }`}
+        >
+          {artist && (
+            <>
+              <p className='text-sm font-medium text-primary truncate'>
+                {artist.name || artist.handle}
+              </p>
+              <p className='text-xs text-tertiary truncate'>@{artist.handle}</p>
+            </>
+          )}
+        </div>
       </button>
 
       {isOpen && (
@@ -184,13 +230,13 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             <div
               ref={refs.setFloating}
               {...getFloatingProps()}
-              className='z-50 w-64 rounded-lg border menu-background menu-border menu-shadow backdrop-blur-sm focus-visible:outline-none'
+              className='z-50 w-64 rounded-lg border border-subtle bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
               style={{
                 ...floatingStyles,
                 animation: 'user-menu-enter 150ms ease-out',
               }}
             >
-              <div className='p-4 border-b menu-separator'>
+              <div className='p-4 border-b border-subtle'>
                 <div className='flex items-center gap-3'>
                   {userImageUrl ? (
                     <Image
@@ -201,60 +247,31 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                       className='w-10 h-10 rounded-full object-cover'
                     />
                   ) : (
-                    <div className='w-10 h-10 rounded-full surface-pressed flex items-center justify-center'>
-                      <span className='text-sm font-medium text-secondary'>
+                    <div className='w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center'>
+                      <span className='text-sm font-medium text-primary-token'>
                         {userInitials}
                       </span>
                     </div>
                   )}
                   <div className='flex-1 min-w-0'>
-                    <p className='text-sm font-medium text-primary truncate'>
+                    <p className='text-sm font-medium text-primary-token truncate'>
                       {displayName}
                     </p>
-                    <p className='text-xs text-tertiary truncate'>
+                    <p className='text-xs text-secondary-token truncate'>
                       {user.primaryEmailAddress?.emailAddress}
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className='py-2'>
-                <button
-                  onClick={() => {
-                    router.push('/dashboard');
-                    setIsOpen(false);
-                  }}
-                  className='w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-secondary hover:menu-item-hover hover:text-primary focus-ring-themed'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z'
-                    />
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M8 5a2 2 0 012-2h4a2 2 0 012 2v1H8V5z'
-                    />
-                  </svg>
-                  Dashboard
-                </button>
-
+              <div className='py-1'>
                 {artist?.handle && (
                   <button
                     onClick={() => {
                       router.push(`/${artist.handle}`);
                       setIsOpen(false);
                     }}
-                    className='w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-secondary hover:menu-item-hover hover:text-primary focus-ring-themed'
+                    className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
                   >
                     <svg
                       className='w-4 h-4'
@@ -284,7 +301,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                     handleProfile();
                     setIsOpen(false);
                   }}
-                  className='w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-secondary hover:menu-item-hover hover:text-primary focus-ring-themed'
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
                 >
                   <svg
                     className='w-4 h-4'
@@ -308,7 +325,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                     setIsOpen(false);
                   }}
                   disabled={isBillingLoading || billingStatus.loading}
-                  className='w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-secondary hover:menu-item-hover hover:text-primary focus-ring-themed disabled:opacity-50 disabled:cursor-not-allowed'
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
                 >
                   {isBillingLoading ? (
                     <svg
@@ -353,16 +370,39 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                         ? 'Manage Billing'
                         : 'Upgrade to Pro'}
                 </button>
+
+                <button
+                  onClick={() => {
+                    router.push('/support');
+                    setIsOpen(false);
+                  }}
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                >
+                  <svg
+                    className='w-4 h-4'
+                    fill='none'
+                    stroke='currentColor'
+                    viewBox='0 0 24 24'
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      strokeWidth={2}
+                      d='M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                    />
+                  </svg>
+                  Help & Support
+                </button>
               </div>
 
-              <div className='py-2 border-t menu-separator'>
+              <div className='py-1 border-t border-subtle'>
                 <button
                   onClick={() => {
                     handleSignOut();
                     setIsOpen(false);
                   }}
                   disabled={isLoading}
-                  className='w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors text-destructive hover:menu-item-hover focus-ring-themed disabled:opacity-50 disabled:cursor-not-allowed'
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
                 >
                   <svg
                     className='w-4 h-4'

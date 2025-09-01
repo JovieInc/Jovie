@@ -438,27 +438,30 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                   </div>
                 </div>
 
-                {/* Profile Preview - Responsive with scaling */}
+                {/* Profile Preview - Responsive with proper spacing */}
                 <div
                   className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'
                   style={{ minHeight: '300px' }}
                 >
-                  <div className='absolute inset-0 flex items-center justify-center'>
-                    <div
-                      className='w-full h-full animate-in fade-in duration-300 flex flex-col justify-start'
-                      style={{
-                        transform: 'scale(0.8)',
-                        transformOrigin: 'top center',
-                      }}
-                    >
-                      <StaticArtistPage
-                        mode='default'
-                        artist={previewArtist}
-                        socialLinks={previewSocialLinks}
-                        subtitle=''
-                        showTipButton={false}
-                        showBackButton={false}
-                      />
+                  <div className='absolute inset-0 p-2'>
+                    <div className='w-full h-full animate-in fade-in duration-300 overflow-y-auto'>
+                      <div
+                        style={{
+                          transform: 'scale(0.85)',
+                          transformOrigin: 'top center',
+                          minHeight: 'fit-content',
+                        }}
+                        className='w-full'
+                      >
+                        <StaticArtistPage
+                          mode='default'
+                          artist={previewArtist}
+                          socialLinks={previewSocialLinks}
+                          subtitle=''
+                          showTipButton={false}
+                          showBackButton={false}
+                        />
+                      </div>
                     </div>
                   </div>
 

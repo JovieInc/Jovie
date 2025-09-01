@@ -7,9 +7,12 @@ import { Tooltip } from '@/components/atoms/Tooltip';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedThemeToggle';
+import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { UserButton } from '@/components/molecules/UserButton';
 import { Logo } from '@/components/ui/Logo';
+import { cn } from '@/lib/utils';
+import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 import type { DashboardData } from './actions';
 
@@ -29,6 +32,11 @@ export default function DashboardLayoutClient({
     dashboardData.sidebarCollapsed ?? false
   );
   const [, startTransition] = useTransition();
+
+  // Convert selected profile to artist for UserButton
+  const artist = dashboardData.selectedProfile
+    ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
+    : null;
 
   // Initialize collapsed state from localStorage (client-only)
   useEffect(() => {
@@ -128,59 +136,94 @@ export default function DashboardLayoutClient({
             } fixed lg:relative inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out lg:translate-x-0`}
           >
             <div className='flex grow flex-col gap-y-5 overflow-y-auto bg-surface-0 backdrop-blur-sm border-r border-subtle rounded-r-2xl shadow-md lg:shadow-lg pt-2 pb-3 ring-1 ring-black/5 dark:ring-white/5'>
-              <div className='flex h-16 shrink-0 items-center px-4'>
+              <div className='flex h-16 shrink-0 items-center justify-center px-4'>
                 <Link
                   href='/dashboard/overview'
                   className={
-                    'focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md'
+                    'focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md transition-all duration-300 ease-in-out'
                   }
                 >
-                  {sidebarCollapsed ? (
-                    <Image
-                      src='/Jovie-logo.png'
-                      alt='App icon'
-                      width={24}
-                      height={24}
-                      className='h-6 w-6 rounded-md'
-                      priority
-                    />
-                  ) : (
-                    <Logo size='md' />
-                  )}
+                  <div className='relative overflow-hidden'>
+                    <div
+                      className={cn(
+                        'transition-all duration-300 ease-in-out',
+                        sidebarCollapsed
+                          ? 'opacity-100 scale-100'
+                          : 'opacity-0 scale-95 absolute inset-0'
+                      )}
+                    >
+                      <Image
+                        src='/Jovie-logo.png'
+                        alt='App icon'
+                        width={24}
+                        height={24}
+                        className='h-6 w-6 rounded-md'
+                        priority
+                      />
+                    </div>
+                    <div
+                      className={cn(
+                        'transition-all duration-300 ease-in-out',
+                        sidebarCollapsed
+                          ? 'opacity-0 scale-95'
+                          : 'opacity-100 scale-100'
+                      )}
+                    >
+                      <Logo size='md' />
+                    </div>
+                  </div>
                 </Link>
               </div>
 
               <nav
-                className={`flex flex-1 flex-col ${sidebarCollapsed ? 'px-2' : 'px-3'}`}
+                className={cn(
+                  'flex flex-1 flex-col transition-all duration-300 ease-in-out',
+                  sidebarCollapsed ? 'px-2' : 'px-3'
+                )}
               >
-                <DashboardNav />
+                <DashboardNav collapsed={sidebarCollapsed} />
               </nav>
 
-              {/* Theme toggle block (above divider) */}
+              {/* Feedback button block */}
               <div className='flex-shrink-0 p-2'>
-                {/* Moved theme toggle to utility cluster below divider */}
+                <FeedbackButton collapsed={sidebarCollapsed} />
               </div>
 
               {/* Divider and user controls block (below divider) */}
               <div className='flex-shrink-0 border-t border-subtle p-2'>
-                {/* User button (expanded only) */}
-                <div
-                  className={`${sidebarCollapsed ? 'hidden' : 'block px-2'}`}
-                >
-                  <div className='flex items-center gap-2'>
-                    {/* Icon-only theme toggle with tooltip */}
-                    <Tooltip content={'Toggle theme'} placement='top'>
-                      <span>
-                        <EnhancedThemeToggle variant='compact' />
-                      </span>
-                    </Tooltip>
-                    <UserButton />
+                <div className='relative overflow-hidden'>
+                  {/* User button (expanded only) */}
+                  <div
+                    className={cn(
+                      'transition-all duration-300 ease-in-out px-2',
+                      sidebarCollapsed
+                        ? 'opacity-0 scale-95 pointer-events-none absolute inset-0'
+                        : 'opacity-100 scale-100'
+                    )}
+                  >
+                    <div className='flex items-center gap-2'>
+                      {/* Icon-only theme toggle with tooltip */}
+                      <Tooltip content={'Toggle theme'} placement='top'>
+                        <span>
+                          <EnhancedThemeToggle variant='compact' />
+                        </span>
+                      </Tooltip>
+                      <UserButton
+                        artist={artist}
+                        showUserInfo={!sidebarCollapsed}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {/* Centered user button when collapsed with status dot */}
-                {sidebarCollapsed && (
-                  <div className='flex flex-col items-center justify-center gap-2'>
+                  {/* Centered user button when collapsed with status dot */}
+                  <div
+                    className={cn(
+                      'flex flex-col items-center justify-center gap-2 transition-all duration-300 ease-in-out',
+                      sidebarCollapsed
+                        ? 'opacity-100 scale-100'
+                        : 'opacity-0 scale-95 pointer-events-none absolute inset-0'
+                    )}
+                  >
                     {/* Icon-only theme toggle with tooltip (stacked above avatar) */}
                     <Tooltip content={'Toggle theme'} placement='top'>
                       <span aria-label='Toggle theme'>
@@ -188,40 +231,54 @@ export default function DashboardLayoutClient({
                       </span>
                     </Tooltip>
                     <div className='relative'>
-                      <UserButton />
-                      <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500' />
+                      <UserButton artist={artist} showUserInfo={false} />
+                      <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 transition-all duration-300 ease-in-out' />
                     </div>
                   </div>
-                )}
+                </div>
               </div>
-              {/* Floating collapse/expand toggle (desktop only) */}
-              <button
-                id='sidebar-toggle'
-                onClick={handleToggleSidebarCollapsed}
-                className='hidden lg:flex items-center justify-center
-                           absolute top-1/2 -translate-y-1/2 right-[-12px]
-                           z-[60] h-9 w-9 rounded-full shadow-lg border border-black/10 dark:border-white/10
-                           bg-surface-0/90 backdrop-blur-md hover:bg-surface-1
-                           text-secondary-token hover:text-primary-token transition-colors duration-200
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
-                aria-label={
-                  sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
-                }
-              >
-                <svg
-                  className={`w-5 h-5 transition-transform duration-200 ${sidebarCollapsed ? 'rotate-180' : ''}`}
-                  fill='none'
-                  viewBox='0 0 24 24'
-                  stroke='currentColor'
+
+              {/* Collapse/Expand Section */}
+              <div className='flex-shrink-0 border-t border-subtle'>
+                <button
+                  id='sidebar-toggle'
+                  onClick={handleToggleSidebarCollapsed}
+                  className='hidden lg:flex items-center justify-center w-full p-3
+                             text-secondary-token hover:text-primary-token hover:bg-surface-1
+                             transition-all duration-200 ease-in-out
+                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
+                             group'
+                  aria-label={
+                    sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                  }
                 >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M15 19l-7-7 7-7'
-                  />
-                </svg>
-              </button>
+                  <div className='flex items-center gap-2'>
+                    <svg
+                      className={`w-4 h-4 transition-all duration-200 ease-in-out ${sidebarCollapsed ? 'rotate-180' : ''}`}
+                      fill='none'
+                      viewBox='0 0 24 24'
+                      stroke='currentColor'
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M11 19l-7-7 7-7M18 19l-7-7 7-7'
+                      />
+                    </svg>
+                    <span
+                      className={cn(
+                        'text-sm font-medium transition-all duration-300 ease-in-out',
+                        sidebarCollapsed
+                          ? 'opacity-0 w-0 overflow-hidden'
+                          : 'opacity-100 w-auto'
+                      )}
+                    >
+                      Collapse
+                    </span>
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
 

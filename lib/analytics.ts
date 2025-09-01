@@ -47,8 +47,8 @@ if (typeof window !== 'undefined' && ANALYTICS.posthogKey) {
       autocapture: true,
       capture_pageview: false, // we'll send $pageview manually via page()
       persistence: 'localStorage+cookie',
-      // Reduce console noise in development
-      disable_surveys: true,
+      // Enable surveys for feedback collection
+      disable_surveys: false,
       advanced_disable_decide: false, // Keep feature flags enabled
       // Disable session recordings and other features we don't use
       disable_session_recording: false,
