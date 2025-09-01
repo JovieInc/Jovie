@@ -151,11 +151,7 @@ export const env = {
     : process.env.STRIPE_PRICE_STANDARD_YEARLY,
 } as const;
 
-export const flags = {
-  // Feature flags controlled via feature-flags.ts instead of env
-  feature_image_cdn_cloudinary: false,
-  feature_social_links: true,
-} as const;
+// Feature flags removed - pre-launch, will add PostHog flags in future
 
 // Environment validation utilities
 export interface EnvironmentValidationResult {

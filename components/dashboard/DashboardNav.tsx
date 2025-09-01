@@ -89,10 +89,12 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
             className={cn(
               // Apple-style active state - solid pill highlight
               isActive
-                ? 'bg-accent/10 text-primary-token shadow-sm ring-1 ring-accent/20'
+                ? 'bg-accent/10 text-primary-token shadow-sm border border-subtle'
                 : 'text-secondary-token hover:text-primary-token hover:bg-surface-2/80',
               // Base styles with perfect alignment
               'group flex items-center rounded-lg transition-all duration-200 ease-in-out relative',
+              // Focus states
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
               // Responsive padding and spacing
               collapsed ? 'p-2.5 justify-center' : 'px-3 py-2.5 gap-3',
               // Typography hierarchy
