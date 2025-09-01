@@ -8,19 +8,12 @@ import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { getPrimaryItems, getSecondaryItems, getShortcutNumber, STABLE_SHORTCUT_ALIASES } from '@/lib/nav/sidebar';
 import { DashboardButton } from '../atoms/DashboardButton';
 import { DashboardNavItem } from '../molecules/DashboardNavItem';
 import { EnhancedThemeToggle } from '../molecules/EnhancedThemeToggle';
 
-interface NavigationItem {
-  name: string;
-  id: string;
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  isPro?: boolean;
-}
-
 interface DashboardSidebarProps {
-  navigation: NavigationItem[];
   currentNavItem: string;
   onNavigate: (navId: string) => void;
   collapsed: boolean;
@@ -33,7 +26,6 @@ interface DashboardSidebarProps {
 }
 
 export function DashboardSidebar({
-  navigation,
   currentNavItem,
   onNavigate,
   collapsed,
@@ -45,6 +37,18 @@ export function DashboardSidebar({
   className,
 }: DashboardSidebarProps) {
   const router = useRouter();
+  
+  // Get navigation items from centralized config
+  const primaryItems = getPrimaryItems();
+  const secondaryItems = getSecondaryItems();
+  
+  // Helper to get stable aliases for an item
+  const getStableAliases = (itemId: string): string[] => {
+    return STABLE_SHORTCUT_ALIASES
+      .filter(alias => alias.targetId === itemId)
+      .flatMap(alias => Array.isArray(alias.combo) ? alias.combo : [alias.combo])
+      .map(combo => combo.replace(/cmd\+/g, '⌘').replace(/ctrl\+/g, '⌘'));
+  };
 
   return (
     <div
@@ -106,23 +110,67 @@ export function DashboardSidebar({
       {/* Navigation */}
       <nav className='flex flex-1 flex-col'>
         <ul role='list' className='flex flex-1 flex-col gap-y-7'>
-          {/* Main Navigation */}
+          {/* Primary Navigation */}
           <li>
             <ul role='list' className='-mx-2 space-y-1'>
-              {navigation.map(item => (
-                <li key={item.name}>
-                  <DashboardNavItem
-                    label={item.name}
-                    icon={item.icon}
-                    isActive={currentNavItem === item.id}
-                    isPro={item.isPro}
-                    onClick={() => onNavigate(item.id)}
-                    collapsed={collapsed}
-                  />
-                </li>
-              ))}
+              {primaryItems.map((item) => {
+                const shortcutNumber = getShortcutNumber(item.id);
+                const aliases = getStableAliases(item.id);
+                
+                return (
+                  <li key={item.id}>
+                    <DashboardNavItem
+                      label={item.name}
+                      icon={item.icon}
+                      isActive={currentNavItem === item.id}
+                      isPro={item.isPro}
+                      onClick={() => onNavigate(item.id)}
+                      collapsed={collapsed}
+                      shortcutKey={shortcutNumber?.toString()}
+                      shortcutAliases={aliases}
+                    />
+                  </li>
+                );
+              })}
             </ul>
           </li>
+          
+          {/* Divider between primary and secondary */}
+          {secondaryItems.length > 0 && (
+            <li>
+              <div className={cn(
+                'border-t border-subtle/50',
+                collapsed ? 'mx-2' : 'mx-3'
+              )} />
+            </li>
+          )}
+          
+          {/* Secondary Navigation */}
+          {secondaryItems.length > 0 && (
+            <li>
+              <ul role='list' className='-mx-2 space-y-1'>
+                {secondaryItems.map((item) => {
+                  const shortcutNumber = getShortcutNumber(item.id);
+                  const aliases = getStableAliases(item.id);
+                  
+                  return (
+                    <li key={item.id}>
+                      <DashboardNavItem
+                        label={item.name}
+                        icon={item.icon}
+                        isActive={currentNavItem === item.id}
+                        isPro={item.isPro}
+                        onClick={() => onNavigate(item.id)}
+                        collapsed={collapsed}
+                        shortcutKey={shortcutNumber?.toString()}
+                        shortcutAliases={aliases}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          )}
 
           {/* Profile Selector */}
           {!collapsed && creatorProfiles.length > 1 && (
