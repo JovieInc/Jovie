@@ -42,28 +42,21 @@ export async function enforceOnboardingRateLimit({
     }
 
     // Always check user rate limit
-    const userResult = await redis.set(userKey, 1, { ex: window, nx: true });
-    let userCount: number;
+    const userCount = await redis.incr(userKey);
 
-    if (userResult === 'OK') {
-      // First request for this user
-      userCount = 1;
-    } else {
-      // Key already exists, increment it
-      userCount = await redis.incr(userKey);
+    // Set expiry only if this is the first request (count = 1)
+    if (userCount === 1) {
+      await redis.expire(userKey, window);
     }
 
     // Check IP rate limit only if requested and IP is valid
     let ipCount = 0;
     if (checkIP && ip !== 'unknown') {
-      const ipResult = await redis.set(ipKey, 1, { ex: window, nx: true });
+      ipCount = await redis.incr(ipKey);
 
-      if (ipResult === 'OK') {
-        // First request for this IP
-        ipCount = 1;
-      } else {
-        // Key already exists, increment it
-        ipCount = await redis.incr(ipKey);
+      // Set expiry only if this is the first request (count = 1)
+      if (ipCount === 1) {
+        await redis.expire(ipKey, window);
       }
     }
 

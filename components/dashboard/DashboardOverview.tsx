@@ -42,7 +42,6 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
       }
     };
 
-
     fetchSocialLinks();
   }, [artist?.id]);
 

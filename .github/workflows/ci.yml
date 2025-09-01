@@ -390,6 +390,9 @@ jobs:
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm test
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
 
   ci-merge-smoke:
     name: Merge Group Smoke

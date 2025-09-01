@@ -5,7 +5,7 @@ Disallow: /out/
 Disallow: /api/
 
 # Host
-Host: http://localhost:3000
+Host: https://your-domain.com
 
 # Sitemaps
-Sitemap: http://localhost:3000/sitemap.xml
+Sitemap: https://your-domain.com/sitemap.xml
