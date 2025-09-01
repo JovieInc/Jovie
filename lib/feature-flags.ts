@@ -15,6 +15,8 @@ export interface FeatureFlags {
   appleStyleOnboardingEnabled?: boolean;
   // Profile settings feature flag
   profileSettingsEnabled?: boolean;
+  // Avatar upload with Vercel Blob integration
+  avatarUploadEnabled?: boolean;
 }
 
 // PostHog feature flag names (match what's defined in PostHog dashboard)
@@ -29,6 +31,7 @@ export const POSTHOG_FLAGS = {
   MINIMALIST_ONBOARDING_ENABLED: 'feature_minimalist_onboarding_enabled',
   APPLE_STYLE_ONBOARDING_ENABLED: 'feature_apple_style_onboarding_enabled',
   PROFILE_SETTINGS_ENABLED: 'feature_profile_settings',
+  AVATAR_UPLOAD_ENABLED: 'feature_avatar_upload',
 } as const;
 
 // Default feature flags (fallback)
@@ -49,6 +52,8 @@ const defaultFeatureFlags: FeatureFlags = {
   appleStyleOnboardingEnabled: true,
   // Profile settings enabled by default
   profileSettingsEnabled: true,
+  // Avatar upload disabled by default (requires Vercel Blob setup)
+  avatarUploadEnabled: false,
 };
 
 // Get feature flags (v4-compatible: attempts fetch from discovery endpoint)
