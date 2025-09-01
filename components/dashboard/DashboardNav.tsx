@@ -43,18 +43,18 @@ const navigation = [
     description: 'Understand your audience demographics',
   },
   {
-    name: 'Settings',
-    href: '/dashboard/settings',
-    id: 'settings',
-    icon: Cog6ToothIcon,
-    description: 'Configure your account and preferences',
-  },
-  {
     name: 'Tipping',
     href: '/dashboard/tipping',
     id: 'tipping',
     icon: BanknotesIcon,
     description: 'Manage tips and monetization',
+  },
+  {
+    name: 'Settings',
+    href: '/dashboard/settings',
+    id: 'settings',
+    icon: Cog6ToothIcon,
+    description: 'Configure your account and preferences',
   },
 ];
 
@@ -81,7 +81,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
                   isActive
                     ? 'bg-surface-2 text-primary-token ring-1 ring-accent'
                     : 'text-secondary-token hover:text-primary-token hover:bg-surface-2',
-                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold',
+                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all duration-300 ease-in-out',
                   collapsed ? 'justify-center' : ''
                 )}
               >
@@ -90,11 +90,20 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
                     isActive
                       ? 'text-accent'
                       : 'text-secondary-token group-hover:text-primary-token',
-                    'h-6 w-6 shrink-0'
+                    'h-6 w-6 shrink-0 transition-colors duration-200'
                   )}
                   aria-hidden='true'
                 />
-                {!collapsed && item.name}
+                <span
+                  className={cn(
+                    'transition-all duration-300 ease-in-out',
+                    collapsed
+                      ? 'opacity-0 w-0 overflow-hidden'
+                      : 'opacity-100 w-auto'
+                  )}
+                >
+                  {item.name}
+                </span>
               </Link>
             );
 

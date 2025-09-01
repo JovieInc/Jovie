@@ -1,0 +1,201 @@
+'use client';
+
+import { useSession } from '@clerk/nextjs';
+import { CheckIcon, ClipboardIcon } from '@heroicons/react/24/outline';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
+
+interface DashboardPreviewProps {
+  artist: Artist;
+}
+
+export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
+  artist,
+}) => {
+  const { session } = useSession();
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+  const [copySuccess, setCopySuccess] = useState(false);
+
+  // Initialize links from database
+  useEffect(() => {
+    const fetchLinks = async () => {
+      if (!session || !artist.id) return;
+
+      try {
+        const res = await fetch(
+          `/api/dashboard/social-links?profileId=${encodeURIComponent(artist.id)}`,
+          { cache: 'no-store' }
+        );
+        if (!res.ok) throw new Error(`Failed to fetch links (${res.status})`);
+        const json: { links: SocialLink[] } = await res.json();
+
+        setSocialLinks(json.links || []);
+      } catch (error) {
+        console.error('Error fetching links:', error);
+      }
+    };
+
+    fetchLinks();
+  }, [session, artist.id]);
+
+  // Convert social links to LegacySocialLink format for preview
+  const previewSocialLinks = useMemo((): LegacySocialLink[] => {
+    return socialLinks
+      .filter(
+        link =>
+          link.platform !== 'spotify' &&
+          link.platform !== 'apple_music' &&
+          link.platform !== 'youtube_music' &&
+          link.platform !== 'soundcloud' &&
+          link.platform !== 'bandcamp' &&
+          link.platform !== 'tidal' &&
+          link.platform !== 'deezer'
+      )
+      .map(link => ({
+        id: link.id,
+        artist_id: artist.id,
+        platform: link.platform,
+        url: link.url,
+        clicks: 0,
+        created_at: new Date().toISOString(),
+      }));
+  }, [socialLinks, artist.id]);
+
+  // Handle copy to clipboard
+  const handleCopyUrl = useCallback(async () => {
+    const profileUrl = `https://jov.ie/${artist.handle || 'username'}`;
+
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = profileUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    }
+  }, [artist.handle]);
+
+  return (
+    <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
+      <div className='flex items-center justify-between mb-6'>
+        <div>
+          <h3 className='text-lg font-medium text-primary-token'>
+            Profile Preview
+          </h3>
+          <p className='text-sm text-secondary-token mt-1'>
+            See how your profile appears to visitors
+          </p>
+        </div>
+        <div className='flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400'>
+          <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
+          Live
+        </div>
+      </div>
+
+      {/* Mobile Frame Preview */}
+      <div className='flex justify-center mb-6'>
+        <div className='max-w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-1.5 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
+          {/* Top notch */}
+          <div className='absolute w-24 h-4 bg-gray-900 dark:bg-gray-800 rounded-b-xl z-10 left-1/2 transform -translate-x-1/2'></div>
+
+          <div
+            className='bg-white dark:bg-gray-900 rounded-[1.8rem] overflow-hidden relative'
+            style={{ height: '400px' }}
+          >
+            {/* Status Bar Mockup */}
+            <div className='bg-gray-100 dark:bg-gray-800 h-6 flex items-center justify-between px-4 relative z-20'>
+              <span className='text-[9px] font-medium text-gray-900 dark:text-gray-100'>
+                9:41
+              </span>
+              <div className='flex items-center gap-1'>
+                {/* Signal bars */}
+                <div className='flex items-end gap-0.5'>
+                  <div className='w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded'></div>
+                  <div className='w-0.5 h-1.5 bg-gray-900 dark:bg-gray-100 rounded'></div>
+                  <div className='w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded'></div>
+                </div>
+                {/* Battery */}
+                <div className='w-4 h-2.5 border border-gray-900 dark:border-gray-100 rounded-sm relative'>
+                  <div className='w-full h-full bg-gray-900 dark:bg-gray-100 rounded-sm scale-x-75 origin-left'></div>
+                  <div className='absolute -right-0.5 top-0.5 w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded-r-sm'></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile Preview */}
+            <div className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden h-full'>
+              <div className='absolute inset-0 flex items-center justify-center'>
+                <div
+                  className='w-full h-full animate-in fade-in duration-300 flex flex-col justify-start'
+                  style={{
+                    transform: 'scale(0.8)',
+                    transformOrigin: 'top center',
+                  }}
+                >
+                  <StaticArtistPage
+                    mode='default'
+                    artist={artist}
+                    socialLinks={previewSocialLinks}
+                    subtitle=''
+                    showTipButton={false}
+                    showBackButton={false}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Profile URL and Actions */}
+      <div className='text-center space-y-3'>
+        <div className='flex items-center justify-center gap-2'>
+          <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
+            jov.ie/{artist.handle || 'username'}
+          </code>
+          <button
+            onClick={handleCopyUrl}
+            className='p-1 rounded hover:bg-surface-2 transition-colors group'
+            title={copySuccess ? 'Copied!' : 'Copy profile URL'}
+          >
+            {copySuccess ? (
+              <CheckIcon className='w-3 h-3 text-green-600 dark:text-green-400' />
+            ) : (
+              <ClipboardIcon className='w-3 h-3 text-secondary-token group-hover:text-primary-token' />
+            )}
+          </button>
+        </div>
+        <a
+          href={`/${artist.handle}`}
+          target='_blank'
+          rel='noopener noreferrer'
+          className='inline-flex items-center gap-1.5 text-sm font-medium text-accent hover:text-accent/80 transition-colors'
+        >
+          View Profile
+          <svg
+            className='w-4 h-4'
+            fill='none'
+            stroke='currentColor'
+            viewBox='0 0 24 24'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth={2}
+              d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'
+            />
+          </svg>
+        </a>
+      </div>
+    </div>
+  );
+};

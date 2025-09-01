@@ -24,84 +24,39 @@ interface SettingsPolishedProps {
   onArtistUpdate?: (updatedArtist: Artist) => void;
 }
 
-// Organized settings with proper hierarchy
-const coreSettingsNavigation = [
+// Apple-style settings navigation - simplified and clean
+const settingsNavigation = [
   {
     name: 'Profile',
     id: 'profile',
     icon: UserIcon,
-    description: 'Your identity and presence',
-    subsections: [
-      { name: 'Display Name', id: 'profile-name' },
-      { name: 'Bio & Description', id: 'profile-bio' },
-      { name: 'Profile Photo', id: 'profile-photo' },
-    ],
   },
   {
     name: 'Appearance',
     id: 'appearance',
     icon: PaintBrushIcon,
-    description: 'Theme and visual preferences',
-    subsections: [
-      { name: 'Color Theme', id: 'appearance-theme' },
-      { name: 'Layout Preferences', id: 'appearance-layout' },
-    ],
   },
   {
-    name: 'Links & Notifications',
-    id: 'links-notifications',
+    name: 'Notifications',
+    id: 'notifications',
     icon: BellIcon,
-    description: 'Manage your connections',
-    subsections: [
-      { name: 'Link Organization', id: 'links-org' },
-      { name: 'Email Updates', id: 'notifications-email' },
-    ],
-  },
-];
-
-const proSettingsNavigation = [
-  {
-    name: 'Privacy & Security',
-    id: 'privacy',
-    icon: ShieldCheckIcon,
-    description: 'Advanced privacy controls',
-    subsections: [
-      { name: 'Profile Visibility', id: 'privacy-visibility' },
-      { name: 'Data Controls', id: 'privacy-data' },
-      { name: 'Analytics Privacy', id: 'privacy-analytics' },
-    ],
   },
   {
-    name: 'Advanced Features',
-    id: 'advanced',
+    name: 'Remove Branding',
+    id: 'remove-branding',
     icon: SparklesIcon,
-    description: 'Pro-only capabilities',
-    subsections: [
-      { name: 'Custom Branding', id: 'advanced-branding' },
-      { name: 'Analytics Dashboard', id: 'advanced-analytics' },
-      { name: 'Priority Support', id: 'advanced-support' },
-    ],
+    isPro: true,
   },
   {
     name: 'Ad Pixels',
     id: 'ad-pixels',
     icon: RocketLaunchIcon,
-    description: 'Drop in ad network tags',
-    subsections: [],
+    isPro: true,
   },
-];
-
-const billingNavigation = [
   {
     name: 'Billing',
     id: 'billing',
     icon: CreditCardIcon,
-    description: 'Subscription and payments',
-    subsections: [
-      { name: 'Current Plan', id: 'billing-plan' },
-      { name: 'Payment Methods', id: 'billing-payment' },
-      { name: 'Billing History', id: 'billing-history' },
-    ],
   },
 ];
 
@@ -112,9 +67,6 @@ export function SettingsPolished({
   const [currentSection, setCurrentSection] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
   const { theme, setTheme } = useTheme();
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(['profile'])
-  );
   const router = useRouter();
   const billingStatus = useBillingStatus();
   const { isPro } = billingStatus;
@@ -122,9 +74,10 @@ export function SettingsPolished({
   const [formData, setFormData] = useState({
     username: artist.handle || '',
     displayName: artist.name || '',
-    bio: artist.tagline || '',
-    creatorType: 'artist',
   });
+
+  const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
+  const [isMarketingSaving, setIsMarketingSaving] = useState(false);
 
   const [pixelData, setPixelData] = useState({
     facebookPixel: '',
@@ -134,16 +87,66 @@ export function SettingsPolished({
   });
   const [isPixelSaving, setIsPixelSaving] = useState(false);
 
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      if (next.has(sectionId)) {
-        next.delete(sectionId);
-      } else {
-        next.add(sectionId);
+  // State for branding removal toggle
+  const [hideBranding, setHideBranding] = useState(
+    artist.settings?.hide_branding ?? false
+  );
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+
+  const handleBrandingToggle = useCallback(
+    async (enabled: boolean) => {
+      setIsSavingBranding(true);
+      try {
+        const response = await fetch('/api/dashboard/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            updates: {
+              settings: {
+                hide_branding: enabled,
+              },
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update branding settings');
+        }
+
+        setHideBranding(enabled);
+
+        if (onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            settings: {
+              ...artist.settings,
+              hide_branding: enabled,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update branding settings:', error);
+        // Revert the toggle on error
+        setHideBranding(!enabled);
+      } finally {
+        setIsSavingBranding(false);
       }
-      return next;
-    });
+    },
+    [artist, onArtistUpdate]
+  );
+
+  const scrollToSection = (sectionId: string) => {
+    setCurrentSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+        inline: 'nearest',
+      });
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -199,10 +202,49 @@ export function SettingsPolished({
         const { url } = await response.json();
         window.location.href = url;
       } else {
-        router.push('/pricing');
+        // User doesn't have a subscription - get default Pro plan price ID and redirect to checkout
+        try {
+          const pricingResponse = await fetch('/api/stripe/pricing-options');
+          if (!pricingResponse.ok) {
+            throw new Error('Failed to fetch pricing options');
+          }
+
+          const { pricingOptions } = await pricingResponse.json();
+          // Get the monthly Pro plan (cheapest option for quick upgrade)
+          const defaultPlan =
+            pricingOptions.find(
+              (option: { interval: string }) => option.interval === 'month'
+            ) || pricingOptions[0];
+
+          if (!defaultPlan?.priceId) {
+            throw new Error('No pricing options available');
+          }
+
+          // Create checkout session for the default Pro plan
+          const checkoutResponse = await fetch('/api/stripe/checkout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              priceId: defaultPlan.priceId,
+            }),
+          });
+
+          if (!checkoutResponse.ok) {
+            throw new Error('Failed to create checkout session');
+          }
+
+          const { url } = await checkoutResponse.json();
+          window.location.href = url;
+        } catch (checkoutError) {
+          console.error('Error creating checkout session:', checkoutError);
+          // Fallback to pricing page
+          router.push('/pricing');
+        }
       }
     } catch (error) {
-      console.error('Error opening billing portal:', error);
+      console.error('Error handling billing:', error);
       router.push('/pricing');
     } finally {
       setIsBillingLoading(false);
@@ -224,8 +266,6 @@ export function SettingsPolished({
             updates: {
               username: formData.username,
               displayName: formData.displayName,
-              bio: formData.bio,
-              creatorType: formData.creatorType,
             },
           }),
         });
@@ -241,7 +281,6 @@ export function SettingsPolished({
             ...artist,
             handle: profile.username,
             name: profile.displayName,
-            tagline: profile.bio,
           });
         }
       } catch (error) {
@@ -252,6 +291,36 @@ export function SettingsPolished({
     },
     [formData, artist, onArtistUpdate]
   );
+
+  const handleMarketingToggle = useCallback(async (enabled: boolean) => {
+    setIsMarketingSaving(true);
+    try {
+      const response = await fetch('/api/dashboard/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updates: {
+            settings: {
+              marketing_emails: enabled,
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update marketing preferences');
+      }
+
+      setMarketingEmails(enabled);
+    } catch (error) {
+      console.error('Failed to update marketing preferences:', error);
+      setMarketingEmails(!enabled);
+    } finally {
+      setIsMarketingSaving(false);
+    }
+  }, []);
 
   const handlePixelSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -291,27 +360,12 @@ export function SettingsPolished({
   const appDomain = APP_URL.replace(/^https?:\/\//, '');
 
   const renderProfileSection = () => (
-    <div className='space-y-8'>
-      {/* Header */}
-      <div className='pb-6 border-b border-subtle'>
-        <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-          Your Profile
-        </h1>
-        <p className='mt-2 text-sm text-secondary'>
-          This information will be displayed publicly so be mindful what you
-          share.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className='space-y-8'>
+    <div className='space-y-6'>
+      <form onSubmit={handleSubmit} className='space-y-6'>
         {/* Profile Photo Card */}
         <DashboardCard variant='settings'>
           <div className='flex items-center justify-between mb-4'>
             <h3 className='text-lg font-medium text-primary'>Profile Photo</h3>
-            <span className='inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-surface-2 text-secondary border border-subtle'>
-              <SparklesIcon className='w-3 h-3 mr-1' />
-              Pro
-            </span>
           </div>
 
           <div className='flex items-start space-x-6'>
@@ -388,55 +442,11 @@ export function SettingsPolished({
                 placeholder='The name your fans will see'
               />
             </div>
-
-            {/* Bio */}
-            <div>
-              <label
-                htmlFor='bio'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Bio
-              </label>
-              <textarea
-                name='bio'
-                id='bio'
-                rows={4}
-                value={formData.bio}
-                onChange={e => handleInputChange('bio', e.target.value)}
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
-                placeholder='Tell your fans about yourself...'
-              />
-              <p className='mt-2 text-sm text-secondary'>
-                A few sentences about your music and what makes you unique.
-              </p>
-            </div>
-
-            {/* Creator Type */}
-            <div>
-              <label
-                htmlFor='creatorType'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Creator Type
-              </label>
-              <select
-                id='creatorType'
-                name='creatorType'
-                value={formData.creatorType}
-                onChange={e => handleInputChange('creatorType', e.target.value)}
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-              >
-                <option value='artist'>Solo Artist</option>
-                <option value='band'>Band</option>
-                <option value='podcaster'>Podcaster</option>
-                <option value='creator'>Content Creator</option>
-              </select>
-            </div>
           </div>
         </DashboardCard>
 
         {/* Save Button */}
-        <div className='flex justify-end pt-4 border-t border-subtle'>
+        <div className='flex justify-end pt-2'>
           <button
             type='submit'
             disabled={isLoading}
@@ -451,18 +461,7 @@ export function SettingsPolished({
   );
 
   const renderAppearanceSection = () => (
-    <div className='space-y-8'>
-      {/* Apple-styled header */}
-      <div className='mb-8'>
-        <h1 className='text-[22px] font-semibold tracking-[-0.01em] text-primary'>
-          Appearance
-        </h1>
-        <p className='text-sm text-secondary mt-1'>
-          Customize how the interface looks and feels.
-        </p>
-      </div>
-
-      {/* Theme Selection Card */}
+    <div>
       <DashboardCard variant='settings' className='space-y-4'>
         <h3 className='text-lg font-medium text-primary mb-6'>
           Interface Theme
@@ -576,380 +575,390 @@ export function SettingsPolished({
     </div>
   );
 
-  const renderAdPixelsSection = () => (
-    <div className='space-y-8'>
-      <div className='pb-6 border-b border-subtle'>
-        <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-          Ad Pixels
-        </h1>
-        <p className='mt-2 text-sm text-secondary'>
-          Connect Facebook, Google, and TikTok pixels to track every fan
-          conversion.
-        </p>
-      </div>
-
-      <form onSubmit={handlePixelSubmit} className='space-y-8'>
-        <DashboardCard variant='settings'>
-          <h3 className='text-lg font-medium text-primary mb-6'>Pixel IDs</h3>
-
-          <div className='space-y-6'>
-            <div>
-              <label
-                htmlFor='facebookPixel'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Facebook Pixel ID
-              </label>
-              <input
-                type='text'
-                id='facebookPixel'
-                value={pixelData.facebookPixel}
-                onChange={e =>
-                  handlePixelInputChange('facebookPixel', e.target.value)
-                }
-                placeholder='1234567890'
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='googleAdsConversion'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Google Ads Conversion ID
-              </label>
-              <input
-                type='text'
-                id='googleAdsConversion'
-                value={pixelData.googleAdsConversion}
-                onChange={e =>
-                  handlePixelInputChange('googleAdsConversion', e.target.value)
-                }
-                placeholder='AW-123456789'
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='tiktokPixel'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                TikTok Pixel ID
-              </label>
-              <input
-                type='text'
-                id='tiktokPixel'
-                value={pixelData.tiktokPixel}
-                onChange={e =>
-                  handlePixelInputChange('tiktokPixel', e.target.value)
-                }
-                placeholder='ABCDEF1234567890'
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor='customPixel'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Additional Snippet
-              </label>
-              <textarea
-                id='customPixel'
-                rows={4}
-                value={pixelData.customPixel}
-                onChange={e =>
-                  handlePixelInputChange('customPixel', e.target.value)
-                }
-                placeholder='<script>/* your tag */</script>'
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
-              />
-              <p className='mt-2 text-sm text-secondary'>
-                For other ad networks or tag managers.
-              </p>
-            </div>
+  const renderRemoveBrandingSection = () => {
+    return (
+      <DashboardCard variant='settings'>
+        <div className='flex items-start justify-between'>
+          <div className='flex-1'>
+            <h3 className='text-lg font-medium text-primary mb-2'>
+              Hide Jovie Branding
+            </h3>
+            <p className='text-sm text-secondary max-w-md'>
+              When enabled, Jovie branding will be removed from your profile
+              page, giving your fans a fully custom experience.
+            </p>
           </div>
-        </DashboardCard>
 
-        <div className='flex justify-end pt-4 border-t border-subtle'>
-          <button
-            type='submit'
-            disabled={isPixelSaving}
-            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-            style={{ backgroundColor: 'var(--color-accent)' }}
-          >
-            {isPixelSaving ? 'Saving...' : 'Save Pixels'}
-          </button>
+          <div className='ml-6'>
+            <button
+              type='button'
+              className={cn(
+                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+                hideBranding ? 'bg-accent' : 'bg-surface-3',
+                isSavingBranding && 'opacity-50 cursor-not-allowed'
+              )}
+              onClick={() => handleBrandingToggle(!hideBranding)}
+              disabled={isSavingBranding}
+              role='switch'
+              aria-checked={hideBranding}
+              aria-label='Hide Jovie branding'
+            >
+              <span
+                className={cn(
+                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  hideBranding ? 'translate-x-6' : 'translate-x-1'
+                )}
+              />
+            </button>
+          </div>
         </div>
-      </form>
-    </div>
-  );
 
-  const renderContent = () => {
-    switch (currentSection) {
-      case 'profile':
-        return renderProfileSection();
-      case 'appearance':
-        return renderAppearanceSection();
-      case 'notifications':
-        return (
-          <div className='space-y-8'>
-            <div className='pb-6 border-b border-subtle'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Notifications
-              </h1>
-              <p className='mt-2 text-sm text-secondary'>
-                Stay informed about your profile activity.
-              </p>
-            </div>
-            <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
-              <BellIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
-              <h3 className='text-lg font-medium text-primary mb-2'>
-                Notification settings coming soon
-              </h3>
-              <p className='text-sm text-secondary'>
-                We&apos;re working on giving you more control over your
-                notifications.
-              </p>
-            </div>
-          </div>
-        );
-      case 'privacy':
-        return (
-          <div className='space-y-8'>
-            <div className='pb-6 border-b border-subtle'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Privacy & Security
-              </h1>
-              <p className='mt-2 text-sm text-secondary'>
-                Control your profile visibility and data.
-              </p>
-            </div>
-            <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
-              <ShieldCheckIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
-              <h3 className='text-lg font-medium text-primary mb-2'>
-                Privacy settings coming soon
-              </h3>
-              <p className='text-sm text-secondary'>
-                Advanced privacy controls and security settings are in
-                development.
-              </p>
-            </div>
-          </div>
-        );
-      case 'ad-pixels':
-        if (!isPro) {
-          return (
-            <div className='space-y-8'>
-              <div className='pb-6 border-b border-subtle'>
-                <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                  Ad Pixels
-                </h1>
-                <p className='mt-2 text-sm text-secondary'>
-                  Upgrade to Pro to add ad network pixels.
+        {hideBranding && (
+          <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
+            <div className='flex items-start gap-3'>
+              <SparklesIcon className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0' />
+              <div>
+                <p className='text-sm font-medium text-green-800 dark:text-green-200'>
+                  Branding Hidden
+                </p>
+                <p className='text-xs text-green-600 dark:text-green-400 mt-1'>
+                  Your profile now shows a completely custom experience without
+                  Jovie branding.
                 </p>
               </div>
-              <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
-                <RocketLaunchIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
-                <h3 className='text-lg font-medium text-primary mb-2'>
-                  Unlock growth tracking
-                </h3>
-                <p className='text-sm text-secondary mb-4'>
-                  Seamlessly integrate Facebook, Google, and TikTok pixels.
-                </p>
-                <button
-                  onClick={handleBilling}
-                  disabled={isBillingLoading || billingStatus.loading}
-                  className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-                  style={{ backgroundColor: 'var(--color-accent)' }}
-                >
-                  {isBillingLoading || billingStatus.loading
-                    ? 'Loading...'
-                    : 'Upgrade to Pro'}
-                </button>
-              </div>
-            </div>
-          );
-        }
-        return renderAdPixelsSection();
-      case 'billing':
-        return (
-          <div className='space-y-8'>
-            <div className='pb-6 border-b border-subtle'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Billing & Subscription
-              </h1>
-              <p className='mt-2 text-sm text-secondary'>
-                Manage your subscription and billing details.
-              </p>
-            </div>
-            <div className='bg-surface-1 rounded-xl border border-subtle p-8 shadow-sm text-center'>
-              <CreditCardIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
-              <h3 className='text-lg font-medium text-primary mb-2'>
-                Manage your plan
-              </h3>
-              <p className='text-sm text-secondary mb-4'>
-                Update payment details, change plans, or view invoices.
-              </p>
-              <button
-                onClick={handleBilling}
-                disabled={isBillingLoading || billingStatus.loading}
-                className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
-                style={{ backgroundColor: 'var(--color-accent)' }}
-              >
-                {billingStatus.loading
-                  ? 'Loading...'
-                  : billingStatus.isPro
-                    ? 'Open Billing Portal'
-                    : 'Upgrade to Pro'}
-              </button>
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
-  const renderSettingsGroup = (
-    title: string,
-    items: typeof coreSettingsNavigation,
-    showLockIcon = false
-  ) => (
-    <div className='space-y-1'>
-      <div className='flex items-center gap-2 px-3 py-2'>
-        <h4 className='text-xs font-semibold text-secondary uppercase tracking-wider'>
-          {title}
-        </h4>
-        {showLockIcon && (
-          <div className='group relative'>
-            <ShieldCheckIcon className='h-4 w-4 text-orange-500' />
-            <div className='absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap'>
-              Upgrade to unlock
             </div>
           </div>
         )}
-      </div>
+      </DashboardCard>
+    );
+  };
 
-      {items.map(item => {
-        const isExpanded = expandedSections.has(item.id);
-        const Icon = item.icon;
+  const renderAdPixelsSection = () => (
+    <form onSubmit={handlePixelSubmit} className='space-y-6'>
+      <DashboardCard variant='settings'>
+        <h3 className='text-lg font-medium text-primary mb-6'>Pixel IDs</h3>
 
-        return (
-          <div key={item.id} className='space-y-1'>
-            <button
-              onClick={() => {
-                if (showLockIcon && !isPro) {
-                  // Show upgrade modal or redirect
-                  return;
-                }
-                toggleSection(item.id);
-                setCurrentSection(item.id);
-              }}
-              className={cn(
-                'w-full group flex items-center justify-between p-3 text-left rounded-lg transition-all duration-200',
-                currentSection === item.id
-                  ? 'bg-surface-2 text-primary shadow-sm border border-accent/20'
-                  : 'text-secondary hover:text-primary hover:bg-surface-1',
-                showLockIcon && !isPro && 'opacity-60 cursor-not-allowed'
-              )}
-              disabled={showLockIcon && !isPro}
+        <div className='space-y-6'>
+          <div>
+            <label
+              htmlFor='facebookPixel'
+              className='block text-sm font-medium text-primary mb-2'
             >
-              <div className='flex items-center gap-3 flex-1'>
-                <Icon className='h-5 w-5 flex-shrink-0' />
-                <div className='flex-1'>
-                  <div className='flex items-center gap-2'>
-                    <span className='font-medium text-sm'>{item.name}</span>
-                    {showLockIcon && !isPro && (
-                      <ShieldCheckIcon className='h-3 w-3 text-orange-500' />
-                    )}
-                  </div>
-                  <div className='text-xs text-secondary mt-0.5'>
-                    {item.description}
-                  </div>
-                </div>
-              </div>
-
-              <svg
-                className={cn(
-                  'h-4 w-4 text-secondary transition-transform duration-200',
-                  isExpanded && 'transform rotate-180'
-                )}
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth={2}
-                  d='M19 9l-7 7-7-7'
-                />
-              </svg>
-            </button>
-
-            {/* Collapsible Subsections */}
-            {isExpanded && item.subsections && (
-              <div className='ml-8 space-y-1 pb-2'>
-                {item.subsections.map(subsection => (
-                  <button
-                    key={subsection.id}
-                    onClick={() => {
-                      // Switch current section group if needed, then smooth-scroll to the anchor
-                      setCurrentSection(subsection.id);
-                      // Allow the DOM to render the section content before scrolling
-                      setTimeout(() => {
-                        const el = document.getElementById(subsection.id);
-                        if (el) {
-                          el.scrollIntoView({
-                            behavior: 'smooth',
-                            block: 'start',
-                          });
-                        }
-                      }, 0);
-                    }}
-                    className={cn(
-                      'w-full text-left px-3 py-2 rounded text-sm transition-colors',
-                      currentSection === subsection.id
-                        ? 'bg-accent/10 text-accent-token font-medium'
-                        : 'text-secondary hover:text-primary hover:bg-surface-1'
-                    )}
-                  >
-                    {subsection.name}
-                  </button>
-                ))}
-              </div>
-            )}
+              Facebook Pixel ID
+            </label>
+            <input
+              type='text'
+              id='facebookPixel'
+              value={pixelData.facebookPixel}
+              onChange={e =>
+                handlePixelInputChange('facebookPixel', e.target.value)
+              }
+              placeholder='1234567890'
+              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+            />
           </div>
-        );
-      })}
-    </div>
+
+          <div>
+            <label
+              htmlFor='googleAdsConversion'
+              className='block text-sm font-medium text-primary mb-2'
+            >
+              Google Ads Conversion ID
+            </label>
+            <input
+              type='text'
+              id='googleAdsConversion'
+              value={pixelData.googleAdsConversion}
+              onChange={e =>
+                handlePixelInputChange('googleAdsConversion', e.target.value)
+              }
+              placeholder='AW-123456789'
+              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor='tiktokPixel'
+              className='block text-sm font-medium text-primary mb-2'
+            >
+              TikTok Pixel ID
+            </label>
+            <input
+              type='text'
+              id='tiktokPixel'
+              value={pixelData.tiktokPixel}
+              onChange={e =>
+                handlePixelInputChange('tiktokPixel', e.target.value)
+              }
+              placeholder='ABCDEF1234567890'
+              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor='customPixel'
+              className='block text-sm font-medium text-primary mb-2'
+            >
+              Additional Snippet
+            </label>
+            <textarea
+              id='customPixel'
+              rows={4}
+              value={pixelData.customPixel}
+              onChange={e =>
+                handlePixelInputChange('customPixel', e.target.value)
+              }
+              placeholder='<script>/* your tag */</script>'
+              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
+            />
+            <p className='mt-2 text-sm text-secondary'>
+              For other ad networks or tag managers.
+            </p>
+          </div>
+        </div>
+      </DashboardCard>
+
+      <div className='flex justify-end pt-2'>
+        <button
+          type='submit'
+          disabled={isPixelSaving}
+          className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
+          style={{ backgroundColor: 'var(--color-accent)' }}
+        >
+          {isPixelSaving ? 'Saving...' : 'Save Pixels'}
+        </button>
+      </div>
+    </form>
   );
+
+  const renderNotificationsSection = () => (
+    <DashboardCard variant='settings'>
+      <div className='flex items-start justify-between'>
+        <div className='flex-1'>
+          <h3 className='text-lg font-medium text-primary mb-2'>
+            Marketing Emails
+          </h3>
+          <p className='text-sm text-secondary max-w-md'>
+            Receive updates about new features, tips, and promotional offers
+            from Jovie.
+          </p>
+        </div>
+
+        <div className='ml-6'>
+          <button
+            type='button'
+            className={cn(
+              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+              marketingEmails ? 'bg-accent' : 'bg-surface-3',
+              isMarketingSaving && 'opacity-50 cursor-not-allowed'
+            )}
+            onClick={() => handleMarketingToggle(!marketingEmails)}
+            disabled={isMarketingSaving}
+            role='switch'
+            aria-checked={marketingEmails}
+            aria-label='Toggle marketing emails'
+          >
+            <span
+              className={cn(
+                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                marketingEmails ? 'translate-x-6' : 'translate-x-1'
+              )}
+            />
+          </button>
+        </div>
+      </div>
+    </DashboardCard>
+  );
+
+  const renderBillingSection = () => (
+    <DashboardCard variant='settings'>
+      <div className='text-center py-4'>
+        <CreditCardIcon className='mx-auto h-12 w-12 text-secondary mb-4' />
+        <h3 className='text-lg font-medium text-primary mb-2'>
+          Manage your plan
+        </h3>
+        <p className='text-sm text-secondary mb-4'>
+          Update payment details, change plans, or view invoices.
+        </p>
+        <button
+          onClick={handleBilling}
+          disabled={isBillingLoading || billingStatus.loading}
+          className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+          style={{ backgroundColor: 'var(--color-accent)' }}
+        >
+          {billingStatus.loading
+            ? 'Loading...'
+            : billingStatus.isPro
+              ? 'Open Billing Portal'
+              : 'Upgrade to Pro'}
+        </button>
+      </div>
+    </DashboardCard>
+  );
+
+  const renderProUpgradeCard = (
+    title: string,
+    description: string,
+    icon: React.ComponentType<{ className?: string }>
+  ) => {
+    const Icon = icon;
+    return (
+      <DashboardCard variant='settings'>
+        <div className='text-center py-4'>
+          <Icon className='mx-auto h-12 w-12 text-secondary mb-4' />
+          <h3 className='text-lg font-medium text-primary mb-2'>{title}</h3>
+          <p className='text-sm text-secondary mb-4'>{description}</p>
+          <button
+            onClick={handleBilling}
+            disabled={isBillingLoading || billingStatus.loading}
+            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
+            style={{ backgroundColor: 'var(--color-accent)' }}
+          >
+            {isBillingLoading || billingStatus.loading
+              ? 'Loading...'
+              : 'Upgrade to Pro'}
+          </button>
+        </div>
+      </DashboardCard>
+    );
+  };
 
   return (
     <div className='flex gap-8'>
-      {/* Enhanced Settings Navigation */}
-      <div className='w-72 flex-shrink-0'>
-        <div className='sticky top-8 space-y-6'>
-          <nav className='space-y-6'>
-            {/* Core Settings */}
-            {renderSettingsGroup('Core Settings', coreSettingsNavigation)}
+      {/* Apple-style Navigation Sidebar */}
+      <div className='w-64 flex-shrink-0'>
+        <div className='sticky top-8'>
+          <nav className='space-y-1'>
+            {settingsNavigation.map(item => {
+              const Icon = item.icon;
+              const isActive = currentSection === item.id;
+              const isLocked = item.isPro && !isPro;
 
-            {/* Pro Settings */}
-            {renderSettingsGroup('Pro Features', proSettingsNavigation, true)}
-
-            {/* Billing */}
-            {renderSettingsGroup('Billing', billingNavigation)}
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (isLocked) {
+                      scrollToSection('billing');
+                    } else {
+                      scrollToSection(item.id);
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-sm font-medium transition-all duration-200',
+                    isActive
+                      ? 'bg-accent text-white shadow-sm'
+                      : 'text-primary hover:bg-surface-2',
+                    isLocked && 'opacity-60'
+                  )}
+                >
+                  <Icon className='h-5 w-5 flex-shrink-0' />
+                  <span className='flex-1'>{item.name}</span>
+                  {isLocked && (
+                    <ShieldCheckIcon className='h-4 w-4 text-orange-400' />
+                  )}
+                </button>
+              );
+            })}
           </nav>
         </div>
       </div>
 
-      {/* Settings Content */}
-      <div className='flex-1 min-w-0 max-h-[calc(100vh-8rem)] overflow-y-auto pr-2'>
-        {renderContent()}
+      {/* Single Scrollable Settings Content */}
+      <div className='flex-1 min-w-0 max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide'>
+        <div className='space-y-8 pb-8'>
+          {/* Profile Section */}
+          <section id='profile' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Profile
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Manage your public profile and account details.
+              </p>
+            </div>
+            {renderProfileSection()}
+          </section>
+
+          {/* Appearance Section */}
+          <section id='appearance' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Appearance
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Customize how the interface looks and feels.
+              </p>
+            </div>
+            {renderAppearanceSection()}
+          </section>
+
+          {/* Notifications Section */}
+          <section id='notifications' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Notifications
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Manage your email preferences and communication settings.
+              </p>
+            </div>
+            {renderNotificationsSection()}
+          </section>
+
+          {/* Pro Features */}
+          <section id='remove-branding' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Remove Branding
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Hide Jovie branding from your profile for a professional look.
+              </p>
+            </div>
+            {isPro
+              ? renderRemoveBrandingSection()
+              : renderProUpgradeCard(
+                  'Professional Appearance',
+                  'Remove Jovie branding to create a fully custom experience for your fans.',
+                  SparklesIcon
+                )}
+          </section>
+
+          <section id='ad-pixels' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Ad Pixels
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Connect Facebook, Google, and TikTok pixels to track
+                conversions.
+              </p>
+            </div>
+            {isPro
+              ? renderAdPixelsSection()
+              : renderProUpgradeCard(
+                  'Unlock Growth Tracking',
+                  'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+                  RocketLaunchIcon
+                )}
+          </section>
+
+          {/* Billing Section */}
+          <section id='billing' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Billing & Subscription
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Manage your subscription, payment methods, and billing history.
+              </p>
+            </div>
+            {renderBillingSection()}
+          </section>
+        </div>
       </div>
     </div>
   );

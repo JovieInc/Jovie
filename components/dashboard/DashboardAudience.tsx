@@ -1,5 +1,6 @@
 'use client';
 
+import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -23,111 +24,114 @@ export function DashboardAudience({ initialData }: DashboardAudienceProps) {
   return (
     <div>
       <div className='mb-8'>
-        <h1 className='text-2xl font-bold text-primary-token'>Audience</h1>
+        <h1 className='text-2xl font-bold text-primary-token'>Audience CRM</h1>
         <p className='text-secondary-token mt-1'>
-          Understand and grow your audience
+          Manage your fans and build lasting relationships
         </p>
       </div>
 
-      {/* Audience content */}
-      <div className='space-y-6'>
-        {/* Top Countries */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Top Countries
-          </h3>
-          <div className='space-y-4'>
-            <div className='flex justify-between items-center'>
-              <div className='flex items-center gap-3'>
-                <span className='text-2xl'>🇺🇸</span>
-                <span className='text-primary-token font-medium'>
-                  United States
-                </span>
+      {/* CRM Coming Soon */}
+      <div className='relative'>
+        {/* Blurred placeholder table */}
+        <div className='filter blur-sm pointer-events-none select-none'>
+          <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle overflow-hidden'>
+            <div className='px-6 py-4 border-b border-subtle'>
+              <div className='flex items-center justify-between'>
+                <h3 className='text-lg font-medium text-primary-token'>
+                  Fan Contacts
+                </h3>
+                <div className='flex items-center gap-2'>
+                  <button className='px-3 py-1.5 text-sm bg-surface-2 text-secondary-token rounded-lg'>
+                    Export
+                  </button>
+                  <button className='px-3 py-1.5 text-sm bg-accent text-white rounded-lg'>
+                    Add Contact
+                  </button>
+                </div>
               </div>
-              <span className='text-primary-token font-medium'>45%</span>
             </div>
-            <div className='flex justify-between items-center'>
-              <div className='flex items-center gap-3'>
-                <span className='text-2xl'>🇬🇧</span>
-                <span className='text-primary-token font-medium'>
-                  United Kingdom
-                </span>
-              </div>
-              <span className='text-primary-token font-medium'>18%</span>
-            </div>
-            <div className='flex justify-between items-center'>
-              <div className='flex items-center gap-3'>
-                <span className='text-2xl'>🇨🇦</span>
-                <span className='text-primary-token font-medium'>Canada</span>
-              </div>
-              <span className='text-primary-token font-medium'>12%</span>
-            </div>
-            <div className='flex justify-between items-center'>
-              <div className='flex items-center gap-3'>
-                <span className='text-2xl'>🇦🇺</span>
-                <span className='text-primary-token font-medium'>
-                  Australia
-                </span>
-              </div>
-              <span className='text-primary-token font-medium'>8%</span>
-            </div>
+
+            <table className='w-full'>
+              <thead className='bg-surface-2/50'>
+                <tr>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Name
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Email
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Location
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Last Interaction
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Tags
+                  </th>
+                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-subtle'>
+                {[...Array(8)].map((_, i) => (
+                  <tr key={i} className='hover:bg-surface-2/30'>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='flex items-center'>
+                        <div className='h-8 w-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500'></div>
+                        <div className='ml-3'>
+                          <div className='text-sm font-medium text-primary-token'>
+                            Fan Name {i + 1}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='text-sm text-secondary-token'>
+                        fan{i + 1}@email.com
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='text-sm text-secondary-token'>
+                        Los Angeles, CA
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='text-sm text-secondary-token'>
+                        2 days ago
+                      </div>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <span className='px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'>
+                        VIP
+                      </span>
+                    </td>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm'>
+                      <button className='text-accent hover:text-accent/80'>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Age Demographics */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Age Demographics
-          </h3>
-          <div className='space-y-4'>
-            <div className='flex justify-between items-center'>
-              <span className='text-primary-token font-medium'>18-24</span>
-              <div className='flex items-center gap-2'>
-                <div className='w-48 h-4 bg-surface-2 rounded-full'>
-                  <div className='w-3/4 h-full bg-blue-500 rounded-full'></div>
-                </div>
-                <span className='text-primary-token font-medium'>35%</span>
-              </div>
+        {/* Coming Soon Overlay */}
+        <div className='absolute inset-0 flex items-center justify-center'>
+          <div className='bg-surface-1/95 backdrop-blur-md rounded-2xl p-8 max-w-md text-center shadow-2xl border border-accent/20'>
+            <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full mb-4'>
+              <UserGroupIcon className='w-8 h-8 text-white' />
             </div>
-            <div className='flex justify-between items-center'>
-              <span className='text-primary-token font-medium'>25-34</span>
-              <div className='flex items-center gap-2'>
-                <div className='w-48 h-4 bg-surface-2 rounded-full'>
-                  <div className='w-1/2 h-full bg-green-500 rounded-full'></div>
-                </div>
-                <span className='text-primary-token font-medium'>28%</span>
-              </div>
-            </div>
-            <div className='flex justify-between items-center'>
-              <span className='text-primary-token font-medium'>35-44</span>
-              <div className='flex items-center gap-2'>
-                <div className='w-48 h-4 bg-surface-2 rounded-full'>
-                  <div className='w-1/4 h-full bg-purple-500 rounded-full'></div>
-                </div>
-                <span className='text-primary-token font-medium'>22%</span>
-              </div>
-            </div>
-            <div className='flex justify-between items-center'>
-              <span className='text-primary-token font-medium'>45+</span>
-              <div className='flex items-center gap-2'>
-                <div className='w-48 h-4 bg-surface-2 rounded-full'>
-                  <div className='w-1/6 h-full bg-orange-500 rounded-full'></div>
-                </div>
-                <span className='text-primary-token font-medium'>15%</span>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Audience Growth */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Audience Growth
-          </h3>
-          <div className='space-y-4'>
+            <h2 className='text-2xl font-bold text-primary-token mb-2'>
+              Coming Soon
+            </h2>
+
             <p className='text-secondary-token'>
-              Detailed audience growth metrics and charts will be available in a
-              future update.
+              We&apos;re working on this feature.
             </p>
           </div>
         </div>
