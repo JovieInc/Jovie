@@ -489,10 +489,8 @@ jobs:
 
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    # Always needs build, conditionally needs neon-db (when it runs)
+    # Only needs build - no DB dependencies for fast UI-only PRs
     needs: [ci-build]
-    # Add neon-db as dependency only when it's expected to run
-    # Note: GitHub will skip this job if any required jobs are skipped
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -519,23 +517,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-      - name: Deploy (PR preview, fallback to secrets DB for fast PRs)
+      - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
-          # For fast preview PRs: neon-db job is skipped, so use secrets
-          # For full PRs: prefer Neon branch URL, fall back to secrets if needed
-          POOLED_URL="$DB_URL_POOLED"
-          if [ -z "$POOLED_URL" ]; then
-            echo "Neon DB URL not available (fast PR), using preview secrets"
-            if [ -n "$DATABASE_URL_PREVIEW" ]; then
-              POOLED_URL="$DATABASE_URL_PREVIEW"
-            elif [ -n "$DB_URL_NON_POOLED" ]; then
-              POOLED_URL="$DB_URL_NON_POOLED"
-            else
-              POOLED_URL="$DATABASE_URL"
-            fi
+          # For fast preview PRs: use preview secrets (no Neon dependency)
+          # Fallback hierarchy for maximum compatibility
+          POOLED_URL=""
+          if [ -n "$DATABASE_URL_PREVIEW" ]; then
+            POOLED_URL="$DATABASE_URL_PREVIEW"
+            echo "Using preview database URL"
+          elif [ -n "$DATABASE_URL" ]; then
+            POOLED_URL="$DATABASE_URL"
+            echo "Using fallback database URL"
           else
-            echo "Using Neon branch DB URL"
+            # Provide cheap stub for UI-only deployments that might not need DB
+            POOLED_URL="postgresql://stub:stub@localhost:5432/preview_stub"
+            echo "Using stub database URL for UI-only deployment"
           fi
 
           # Deploy preview with DATABASE_URL injected only for this deployment
@@ -549,9 +546,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          # Neon DB URLs (may be empty for fast preview PRs)
-          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled || '' }}
-          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url || '' }}
+          # Use preview secrets - no Neon dependency for fast deployments
           DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
