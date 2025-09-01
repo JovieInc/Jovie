@@ -12,8 +12,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import type { Artist } from '@/types/db';
-import { DatabaseThemeToggle } from '../molecules/DatabaseThemeToggle';
-import { ProfileSettings } from './ProfileSettings';
+import { ProfileSettings } from '../organisms/ProfileSettings';
+import { DatabaseThemeToggle } from './DatabaseThemeToggle';
 
 interface SettingsProps {
   artist: Artist;
@@ -112,7 +112,7 @@ export function Settings({ artist, onArtistUpdate }: SettingsProps) {
                     </p>
                   </div>
                   <DatabaseThemeToggle
-                    onThemeChange={theme => {
+                    onThemeChange={(theme: 'light' | 'dark' | 'system') => {
                       // Optionally update artist data or trigger other updates
                       console.log('Theme changed to:', theme);
                     }}
