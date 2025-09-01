@@ -1,0 +1,53 @@
+name: sync-preview-nightly
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+
+jobs:
+  reset-preview:
+    if: ${{ vars.FREEZE_DB_RESYNC != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW || secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install neonctl
+        run: pnpm dlx neonctl --help
+
+      - name: Schema diff (preview vs parent)
+        continue-on-error: true
+        run: pnpm dlx neonctl branches schema-diff preview ^parent --project-id "$NEON_PROJECT_ID"
+
+      - name: Reset preview from parent (keeps URL)
+        timeout-minutes: 2
+        run: pnpm dlx neonctl branches reset preview --parent --project-id "$NEON_PROJECT_ID"
+
+      - name: Drizzle check & push
+        run: |
+          pnpm drizzle:check
+          pnpm drizzle:push
+
+      - name: Seed preview
+        run: pnpm seed:preview
+
+      - name: E2E smoke
+        run: pnpm test:e2e:smoke
+
+      - name: Summary
+        run: |
+          TS=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "✅ Preview reset at $TS" >> $GITHUB_STEP_SUMMARY
+          echo "SHA: $GITHUB_SHA" >> $GITHUB_STEP_SUMMARY
+          echo "Neon activity: https://console.neon.tech/app/projects/$NEON_PROJECT_ID/branches/preview" >> $GITHUB_STEP_SUMMARY
+          echo '{"env":"preview","action":"reset_from_parent","ts":"'$TS'","sha":"'$GITHUB_SHA'"}'

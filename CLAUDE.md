@@ -378,6 +378,11 @@ export const dbNode = drizzle(new Pool({ connectionString: process.env.DATABASE_
 - Cap active Neon branches at 15; CI fails if cap exceeded.
 - One migration per PR; no destructive change without data-move plan.
 
+### Staging Reset Policy
+- After every successful promotion of `preview` to `production`, the long-lived `preview` branch is reset from its parent to keep schema and data in sync.
+- A nightly safety reset runs at 08:00 UTC to ensure drift never accumulates.
+- Set repo variable `FREEZE_DB_RESYNC` to `"true"` to skip resets when needed.
+
 **Per‑request user context (for policies/auditing):**
 ```ts
 // utils/session.ts
