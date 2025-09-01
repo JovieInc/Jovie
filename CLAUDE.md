@@ -34,7 +34,7 @@
      4. Rollback plan (typically "revert PR")
    - Auto-merge to `preview` allowed after green CI.
    - **Production Delivery**
-     - For **Fast-Path PRs** (revenue/activation; ≤200 LOC; smoke green): **auto-promote `preview` → `production`**.
+     - For **Fast-Path PRs** (revenue/activation; ≤200 LOC; smoke tests pass): **auto-promote `preview` → `production`**.
      - For all other PRs: manual promotion via PR.  
      - Auto-halt promotions if error budget breached (p95 > X ms or error rate > Y% on `/checkout|/portal|/api/billing` in last 60 min).
 
