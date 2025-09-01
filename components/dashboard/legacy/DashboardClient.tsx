@@ -33,7 +33,7 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { PendingClaimHandler } from './PendingClaimHandler';
+import { PendingClaimHandler } from '../PendingClaimHandler';
 
 const navigation = [
   {

@@ -243,13 +243,13 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             <div
               ref={refs.setFloating}
               {...getFloatingProps()}
-              className='z-50 w-64 rounded-lg border border-subtle bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
+              className='z-50 w-64 rounded-lg border border-border bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
               style={{
                 ...floatingStyles,
                 animation: 'user-menu-enter 150ms ease-out',
               }}
             >
-              <div className='p-4 border-b border-subtle'>
+              <div className='p-4 border-b border-border'>
                 <div className='flex items-center gap-3'>
                   {userImageUrl ? (
                     <Image
@@ -408,7 +408,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                 </button>
               </div>
 
-              <div className='py-1 border-t border-subtle'>
+              <div className='py-1 border-t border-border'>
                 <button
                   onClick={() => {
                     handleSignOut();

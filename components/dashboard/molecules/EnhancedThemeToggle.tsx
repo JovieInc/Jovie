@@ -33,7 +33,7 @@ export function EnhancedThemeToggle({
     ) : (
       <div className='flex items-center space-x-3'>
         <span className='text-sm text-secondary-token'>Light</span>
-        <div className='relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border border-subtle-token bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
+        <div className='relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
           <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'></span>
         </div>
         <span className='text-sm text-secondary-token'>Dark</span>
@@ -95,7 +95,7 @@ export function EnhancedThemeToggle({
                 ${
                   theme === option.value
                     ? 'border-accent bg-accent/10 text-primary-token'
-                    : 'border-subtle-token hover:bg-surface-hover-token text-secondary-token'
+                    : 'border-border hover:bg-surface-hover-token text-secondary-token'
                 }
                 disabled:opacity-50 disabled:cursor-not-allowed
               `}
@@ -173,7 +173,7 @@ export function EnhancedThemeToggle({
       type='button'
       disabled={isUpdating}
       onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border border-subtle-token transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
         isDark ? 'bg-accent' : 'bg-surface-hover-token'
       } p-0.5`}
       role='switch'

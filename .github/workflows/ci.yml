@@ -621,7 +621,7 @@ jobs:
           fi
 
           echo "✅ Canary passed: Preview deployment healthy"
-        continue-on-error: true
+        continue-on-error: false
 
   promote:
     needs: [deploy]
