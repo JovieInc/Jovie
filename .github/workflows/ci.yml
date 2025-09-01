@@ -693,9 +693,11 @@ jobs:
         run: pnpm add -g vercel@latest
       - uses: ./.github/actions/setup-node-pnpm
       - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
-        run: pnpm run db:migrate
+        run: pnpm run drizzle:migrate:prod
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: production
+          ALLOW_PROD_MIGRATIONS: true
         continue-on-error: false
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}

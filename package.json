@@ -40,7 +40,7 @@
     "ensure-valid-artist-images": "node scripts/ensure-valid-artist-images.js",
     "prepare": "husky",
     "danger": "danger ci --fail-on-errors --verbose",
-    "db:migrate": "node scripts/db-migrate.js",
+    "db:migrate": "tsx scripts/drizzle-migrate.ts",
     "db:seed": "tsx scripts/drizzle-seed.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "tsx scripts/drizzle-migrate.ts",
