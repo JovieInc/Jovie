@@ -632,6 +632,9 @@ jobs:
         continue-on-error: false
 
   promote:
+    name: Auto Promote to Production (Primary)
+    # PRIMARY: Automatic promotion path - creates/updates preview → production PR
+    # Fallback: Manual promotion available via auto-promote.yml workflow
     needs: [deploy]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
     runs-on: ubuntu-latest
