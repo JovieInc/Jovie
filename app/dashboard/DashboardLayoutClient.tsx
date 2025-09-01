@@ -312,56 +312,42 @@ export default function DashboardLayoutClient({
                 </div>
               </div>
 
-              {/* Support & Utility Section */}
-              <div className='flex-shrink-0 p-3'>
-                {/* Minimal collapse button */}
-                <button
-                  id='sidebar-toggle'
-                  onClick={handleToggleSidebarCollapsed}
-                  className={cn(
-                    'hidden lg:flex items-center w-full rounded-md transition-all duration-200 ease-in-out',
-                    'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-                    'group relative overflow-hidden',
-                    sidebarCollapsed
-                      ? 'justify-center p-2'
-                      : 'justify-start gap-2 px-3 py-2'
-                  )}
-                  aria-label={
-                    sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
-                  }
-                >
-                  {/* Minimal chevron icon */}
-                  <svg
+              {/* Support & Utility Section - Only visible when expanded */}
+              {!sidebarCollapsed && (
+                <div className='flex-shrink-0 p-3'>
+                  {/* Minimal collapse button */}
+                  <button
+                    id='sidebar-toggle'
+                    onClick={handleToggleSidebarCollapsed}
                     className={cn(
-                      'w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0',
-                      sidebarCollapsed ? 'rotate-180' : 'rotate-0'
+                      'hidden lg:flex items-center w-full rounded-md transition-all duration-200 ease-in-out',
+                      'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                      'group relative overflow-hidden',
+                      'justify-start gap-2 px-3 py-2'
                     )}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2.5}
+                    aria-label='Collapse sidebar'
                   >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      d='M15 19l-7-7 7-7'
-                    />
-                  </svg>
+                    {/* Minimal chevron icon */}
+                    <svg
+                      className='w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0'
+                      fill='none'
+                      viewBox='0 0 24 24'
+                      stroke='currentColor'
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M15 19l-7-7 7-7'
+                      />
+                    </svg>
 
-                  {/* Text that fades out */}
-                  <span
-                    className={cn(
-                      'text-xs font-medium transition-all duration-200 ease-in-out',
-                      sidebarCollapsed
-                        ? 'opacity-0 w-0 overflow-hidden'
-                        : 'opacity-100 w-auto'
-                    )}
-                  >
-                    Collapse
-                  </span>
-                </button>
-              </div>
+                    {/* Text label */}
+                    <span className='text-xs font-medium'>Collapse</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

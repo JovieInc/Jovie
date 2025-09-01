@@ -405,10 +405,6 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
             <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
               Live Preview
             </h2>
-            <div className='flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400'>
-              <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
-              Live
-            </div>
           </div>
 
           {/* Preview Container - Flexible height */}
