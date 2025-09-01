@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import React from 'react';
+
+import { JovieIcon } from '@/components/atoms/JovieIcon';
+import { Tooltip } from '@/components/atoms/Tooltip';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedThemeToggle';
 import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { Logo } from '@/components/ui/Logo';
 import { UserButton } from '@/components/molecules/UserButton';
-import React from 'react';
+import { Logo } from '@/components/ui/Logo';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 export interface SidebarProps {
@@ -38,36 +39,16 @@ export function Sidebar({
           <Link
             href='/dashboard/overview'
             className={
-              'focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md transition-all duration-300 ease-in-out'
+              'focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md transition-all duration-300 ease-in-out w-full h-full flex items-center justify-center'
             }
           >
-            <div className='relative overflow-hidden'>
-              <div
-                className={cn(
-                  'transition-all duration-300 ease-in-out',
-                  collapsed
-                    ? 'opacity-100 scale-100'
-                    : 'opacity-0 scale-95 absolute inset-0'
-                )}
-              >
-                <Image
-                  src='/brand/jovie-logo.svg'
-                  alt='App icon'
-                  width={24}
-                  height={24}
-                  className='h-6 w-6 text-primary-token'
-                  priority
-                />
-              </div>
-              <div
-                className={cn(
-                  'transition-all duration-300 ease-in-out',
-                  collapsed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'
-                )}
-              >
+            {collapsed ? (
+              <JovieIcon className='h-6 w-6' />
+            ) : (
+              <div className='transition-all duration-300 ease-in-out'>
                 <Logo size='md' />
               </div>
-            </div>
+            )}
           </Link>
         </div>
 
