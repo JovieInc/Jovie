@@ -3,6 +3,10 @@
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 
+// Constants
+const POLLING_INTERVAL_MS = 2000; // Poll status every 2 seconds
+const POLLING_TIMEOUT_MS = 120000; // Stop polling after 2 minutes
+
 interface UploadResult {
   id: string;
   status: 'uploading' | 'processing' | 'completed' | 'failed';
@@ -128,10 +132,10 @@ export default function AvatarUploader({
       } catch (err) {
         console.error('Status polling error:', err);
       }
-    }, 2000);
+    }, POLLING_INTERVAL_MS);
 
-    // Clean up after 2 minutes
-    setTimeout(() => clearInterval(pollInterval), 120000);
+    // Clean up after timeout
+    setTimeout(() => clearInterval(pollInterval), POLLING_TIMEOUT_MS);
   }, [onStatusChange, initialUrl]);
 
   const [isDragActive, setIsDragActive] = useState(false);

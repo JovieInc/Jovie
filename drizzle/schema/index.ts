@@ -12,29 +12,19 @@ import {
   boolean,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { 
+  creatorTypeEnum, 
+  linkTypeEnum, 
+  themeModeEnum,
+  photoStatusEnum,
+} from '../../lib/db/schema';
 
-// Enums
-export const creatorTypeEnum = pgEnum('creator_type', [
-  'artist',
-  'podcaster',
-  'influencer',
-  'creator',
-]);
-export const linkTypeEnum = pgEnum('link_type', [
-  'listen',
-  'social',
-  'tip',
-  'other',
-]);
-
-// Theme enum for user settings
-export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
+// Enums are imported from main schema to avoid duplication
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -102,13 +92,7 @@ export const socialLinks = pgTable('social_links', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-// Profile photos enum for upload status
-export const photoStatusEnum = pgEnum('photo_status', [
-  'uploading',
-  'processing',
-  'completed',
-  'failed',
-]);
+// Profile photos enum imported from main schema
 
 // Profile photos table for avatar uploads with Vercel Blob
 export const profilePhotos = pgTable('profile_photos', {
@@ -139,6 +123,14 @@ export const profilePhotos = pgTable('profile_photos', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// Re-export enums from main schema
+export {
+  creatorTypeEnum,
+  linkTypeEnum,
+  themeModeEnum,
+  photoStatusEnum,
+} from '../../lib/db/schema';
 
 // Export all schemas
 export const schemas = {

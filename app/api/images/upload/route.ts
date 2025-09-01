@@ -1,10 +1,18 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-// import { put } from '@vercel/blob'; // Note: requires pnpm add @vercel/blob
 import { z } from 'zod';
 import { db, profilePhotos } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
+
+// Dynamic import for Vercel Blob - only import if available
+let put: any = null;
+try {
+  const blobModule = await import('@vercel/blob');
+  put = blobModule.put;
+} catch (error) {
+  console.warn('@vercel/blob not available, using mock implementation');
+}
 
 export const runtime = 'nodejs'; // Required for file upload processing
 
@@ -83,19 +91,24 @@ export async function POST(request: NextRequest) {
     }).returning();
 
     try {
-      // Upload to Vercel Blob
-      // TODO: Uncomment when @vercel/blob is installed
-      // const blob = await put(`avatars/users/${userId}/${photoRecord.id}.${file.name.split('.').pop()}`, file, {
-      //   access: 'public',
-      // });
-
-      // For now, simulate the blob response
-      const simulatedBlobUrl = `https://blob.vercel-storage.com/avatars/users/${userId}/${photoRecord.id}.${file.name.split('.').pop()}`;
+      let blobUrl: string;
+      
+      if (put && process.env.BLOB_READ_WRITE_TOKEN) {
+        // Production: Use Vercel Blob
+        const blob = await put(`avatars/users/${userId}/${photoRecord.id}.${file.name.split('.').pop()}`, file, {
+          access: 'public',
+        });
+        blobUrl = blob.url;
+      } else {
+        // Development/testing: Mock implementation
+        console.warn('Using mock blob implementation - configure BLOB_READ_WRITE_TOKEN for production');
+        blobUrl = `https://blob.vercel-storage.com/avatars/users/${userId}/${photoRecord.id}.${file.name.split('.').pop()}`;
+      }
 
       // Update record with blob URL
       await db.update(profilePhotos)
         .set({
-          blobUrl: simulatedBlobUrl,
+          blobUrl,
           status: 'processing', // Will be updated to 'completed' after image processing
           updatedAt: new Date(),
         })
@@ -104,7 +117,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         id: photoRecord.id,
         status: 'processing',
-        blobUrl: simulatedBlobUrl,
+        blobUrl,
       }, { status: 201 });
 
     } catch (error) {
