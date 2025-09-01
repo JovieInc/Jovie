@@ -1,6 +1,6 @@
 'use client';
 
-import { ClerkProvider } from '@clerk/nextjs';
+import { ClerkProvider, type ClerkProviderProps } from '@clerk/nextjs';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect, useState } from 'react';
 import { Analytics } from '@/components/Analytics';
@@ -49,12 +49,30 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
     <ClerkProvider
       clerkJSVersion='latest'
       publishableKey={publishableKey}
-      appearance={{
-        baseTheme: undefined,
-        variables: {
-          colorPrimary: '#3b82f6',
-        },
-      }}
+      appearance={
+        {
+          variables: {
+            colorPrimary: '#7c3aed',
+            colorText: '#0c0c0c',
+            colorBackground: '#ffffff',
+            colorInputBackground: '#fafbfc',
+            colorInputText: '#0c0c0c',
+            colorInputBorder: '#d1d5db',
+          },
+          elements: {
+            rootBox: 'bg-base text-primary',
+            card: 'bg-surface-1 border border-subtle dark:border-default',
+            headerTitle: 'text-primary',
+            headerSubtitle: 'text-secondary',
+            formFieldInput:
+              'bg-surface-0 border border-default focus-ring-themed',
+            formButtonPrimary: 'btn btn-primary btn-md',
+            socialButtonsBlockButton: 'btn btn-secondary btn-md',
+            footerActionText: 'text-secondary',
+            footerActionLink: 'text-accent-token',
+          },
+        } as unknown as ClerkProviderProps['appearance']
+      }
     >
       {children}
     </ClerkProvider>
