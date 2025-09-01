@@ -1,7 +1,8 @@
 'use client';
 
-import { SignIn } from '@clerk/nextjs';
+import { ClerkLoaded, ClerkLoading, SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
+import { AuthFormSkeleton } from '@/components/ui/LoadingSkeleton';
 import { Logo } from '@/components/ui/Logo';
 
 export default function SignInPage() {
@@ -49,11 +50,18 @@ export default function SignInPage() {
             .
           </p>
         </div>
-        <SignIn
-          redirectUrl={destination}
-          afterSignInUrl={destination}
-          afterSignUpUrl={destination}
-        />
+        <div className='min-h-[400px]'>
+          <ClerkLoading>
+            <AuthFormSkeleton />
+          </ClerkLoading>
+          <ClerkLoaded>
+            <SignIn
+              redirectUrl={destination}
+              afterSignInUrl={destination}
+              afterSignUpUrl={destination}
+            />
+          </ClerkLoaded>
+        </div>
       </div>
     </div>
   );

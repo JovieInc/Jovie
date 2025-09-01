@@ -2,6 +2,7 @@
 
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
+import { AuthFormSkeleton } from '@/components/ui/LoadingSkeleton';
 import { Logo } from '@/components/ui/Logo';
 
 export default function SignUpPage() {
@@ -41,20 +42,20 @@ export default function SignUpPage() {
             .
           </p>
         </div>
-        <ClerkLoading>
-          <div className='text-center text-gray-600 dark:text-white/70'>
-            Loading account form...
-          </div>
-        </ClerkLoading>
-        <ClerkLoaded>
-          <SignUp
-            path='/sign-up'
-            routing='path'
-            signInUrl='/sign-in'
-            redirectUrl={redirect}
-            afterSignUpUrl={redirect}
-          />
-        </ClerkLoaded>
+        <div className='min-h-[500px]'>
+          <ClerkLoading>
+            <AuthFormSkeleton />
+          </ClerkLoading>
+          <ClerkLoaded>
+            <SignUp
+              path='/sign-up'
+              routing='path'
+              signInUrl='/sign-in'
+              redirectUrl={redirect}
+              afterSignUpUrl={redirect}
+            />
+          </ClerkLoaded>
+        </div>
       </div>
     </div>
   );

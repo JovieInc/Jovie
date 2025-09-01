@@ -83,7 +83,20 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
   ]);
 
   if (!isLoaded || !user) {
-    return null;
+    if (showUserInfo) {
+      return (
+        <div className='flex w-full items-center gap-3 p-2'>
+          <div className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none' />
+          <div className='flex-1 space-y-1'>
+            <div className='h-4 w-24 rounded-sm skeleton motion-reduce:animate-none' />
+            <div className='h-3 w-16 rounded-sm skeleton motion-reduce:animate-none' />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none' />
+    );
   }
 
   const handleSignOut = async () => {
