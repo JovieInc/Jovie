@@ -9,9 +9,11 @@ import { useUser } from '@clerk/nextjs';
 export default function BrandingBadge() {
   const { user, isLoaded } = useUser();
 
-  // Don't render anything while loading to prevent flash
+  // Show a placeholder while loading to avoid layout shift
   if (!isLoaded) {
-    return null;
+    return (
+      <div className='h-3 w-24 rounded-sm skeleton motion-reduce:animate-none' />
+    );
   }
 
   // Check if user has Pro plan
