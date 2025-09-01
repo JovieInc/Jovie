@@ -17,9 +17,9 @@
 # build:    Changes that affect the build system or external dependencies
 
 # Rules:
-# - Use lowercase for type
-# - Subject line max 50 chars, no period at end
-# - Body max 72 chars per line
+# - Use lowercase for type (no [brackets])
+# - Subject line max 50 chars, no period at end  
+# - Body max 72 chars per line (commitlint enforces this)
 # - Use imperative mood ("add" not "adds" or "added")
 # - Reference issues/PRs in footer
 

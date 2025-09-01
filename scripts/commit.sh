@@ -30,9 +30,11 @@ read -p "Enter commit body (optional, press Enter to skip): " body
 commit_msg="${type}: ${subject}"
 
 if [[ ! -z "$body" ]]; then
+  # Wrap body text to 72 characters per line
+  wrapped_body=$(echo "$body" | fold -s -w 72)
   commit_msg="${commit_msg}
 
-${body}"
+${wrapped_body}"
 fi
 
 # Add standard footer

@@ -160,7 +160,7 @@
       "biome format --write",
       "eslint --fix --max-warnings=0 --no-warn-ignored"
     ],
-    "*.{json,md,css}": [
+    "*.{json,css}": [
       "biome check --fix",
       "biome format --write"
     ],
