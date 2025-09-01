@@ -56,7 +56,7 @@ describe('BrandingBadge', () => {
     expect(screen.getByText('Made with Jovie')).toBeInTheDocument();
   });
 
-  it('shows nothing while loading', () => {
+  it('shows placeholder while loading', () => {
     (useUser as any).mockReturnValue({
       user: null,
       isLoaded: false,
@@ -64,7 +64,7 @@ describe('BrandingBadge', () => {
 
     const { container } = render(<BrandingBadge />);
 
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).toHaveClass('skeleton');
   });
 
   it('shows branding for unauthenticated users', () => {

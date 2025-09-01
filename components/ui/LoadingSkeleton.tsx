@@ -194,6 +194,21 @@ export function SocialBarSkeleton() {
   );
 }
 
+export function AuthFormSkeleton() {
+  return (
+    <div
+      className='space-y-4'
+      aria-label='Loading authentication form'
+      role='status'
+    >
+      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
+      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
+      <div className='h-10 w-full rounded-md skeleton motion-reduce:animate-none' />
+      <div className='h-12 w-full rounded-md skeleton motion-reduce:animate-none' />
+    </div>
+  );
+}
+
 export function CardSkeleton() {
   return (
     <div className='w-full p-4 border border-gray-200 dark:border-gray-700 rounded-lg'>
