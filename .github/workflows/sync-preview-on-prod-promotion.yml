@@ -13,8 +13,14 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-      DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW || secrets.DATABASE_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
     steps:
+      - name: Ensure DATABASE_URL_PREVIEW is set
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+            echo "DATABASE_URL_PREVIEW secret is required for preview operations."
+            exit 1
+          fi
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
