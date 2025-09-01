@@ -11,8 +11,8 @@ import { Logo } from '@/components/ui/Logo';
 import type { CreatorProfile } from '@/lib/db/schema';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
-import { DashboardNavItem } from '../molecules/DashboardNavItem';
 import { EnhancedThemeToggle } from '../molecules/EnhancedThemeToggle';
+import { DashboardNavItem } from './DashboardNavItem';
 import { DashboardSidebar } from './DashboardSidebar';
 
 interface NavigationItem {

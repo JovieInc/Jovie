@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { DashboardButton } from '../atoms/DashboardButton';
+import { DashboardButton } from './DashboardButton';
 
 interface DashboardNavItemProps {
   label: string;

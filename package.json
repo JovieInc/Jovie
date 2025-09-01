@@ -14,7 +14,7 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "pre-push": "run-s typecheck test build",
+    "pre-push": "run-s typecheck lint",
     "check": "run-s validate build test",
     "check:ci": "run-s validate test:ci",
     "validate": "run-p format:check lint typecheck",

@@ -14,6 +14,9 @@ if (process.env.NODE_ENV === 'test') {
 
   if (!databaseUrl) {
     console.warn('DATABASE_URL is not set. Database tests will be skipped.');
+    // Set a stub DATABASE_URL to prevent warnings in test files
+    process.env.DATABASE_URL =
+      'postgresql://stub:stub@localhost:5432/stub_test_db';
   } else {
     const sql = neon(databaseUrl);
     const db = drizzle(sql, { schema });
