@@ -32,6 +32,7 @@ export const mockCreatorProfile: CreatorProfile = {
   apple_music_url: 'https://music.apple.com/artist/123',
   youtube_url: 'https://youtube.com/channel/123',
   spotify_id: 'spotify-id-1',
+  venmo_handle: null,
   is_public: true,
   is_verified: false,
   is_featured: false,

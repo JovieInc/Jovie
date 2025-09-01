@@ -69,6 +69,7 @@ export const creatorProfiles = pgTable('creator_profiles', {
   spotifyUrl: text('spotify_url'),
   appleMusicUrl: text('apple_music_url'),
   youtubeUrl: text('youtube_url'),
+  venmoHandle: text('venmo_handle'),
   spotifyId: text('spotify_id'),
   isPublic: boolean('is_public').default(true),
   isVerified: boolean('is_verified').default(false),

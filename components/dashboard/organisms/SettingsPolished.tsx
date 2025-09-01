@@ -76,7 +76,9 @@ export function SettingsPolished({
     displayName: artist.name || '',
   });
 
-  const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
+  const [marketingEmails, setMarketingEmails] = useState(
+    artist.settings?.marketing_emails ?? true
+  );
   const [isMarketingSaving, setIsMarketingSaving] = useState(false);
 
   const [pixelData, setPixelData] = useState({
