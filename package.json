@@ -2,6 +2,11 @@
   "name": "jovie",
   "version": "0.1.0",
   "private": true,
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
   "engines": {
     "node": ">=20.17",
     "pnpm": ">=8.0.0"
@@ -32,6 +37,7 @@
     "a11y:ci": "playwright test -g @a11y",
     "format": "biome format --write .",
     "format:check": "biome check .",
+    "commit": "cz",
     "clean": "rm -rf .next out dist coverage .nyc_output",
     "clean:deps": "rm -rf node_modules pnpm-lock.yaml && pnpm install",
     "postbuild": "next-sitemap",
@@ -123,6 +129,8 @@
     "@vercel/toolbar": "^0.1.32",
     "@vitejs/plugin-react": "^5.0.2",
     "@vitest/coverage-v8": "^3.2.4",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
     "danger": "^13.0.4",
     "drizzle-kit": "^0.31.4",
     "drizzle-zod": "^0.8.3",
@@ -148,12 +156,12 @@
       "pnpm migration:guard"
     ],
     "*.{js,jsx,ts,tsx}": [
-      "biome check",
+      "biome check --fix",
       "biome format --write",
       "eslint --fix --max-warnings=0 --no-warn-ignored"
     ],
     "*.{json,md,css}": [
-      "biome check",
+      "biome check --fix",
       "biome format --write"
     ],
     "ignore": [

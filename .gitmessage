@@ -1,0 +1,29 @@
+# <type>: <subject>
+#
+# <body>
+#
+# <footer>
+
+# Types:
+# feat:     New feature
+# fix:      Bug fix
+# docs:     Documentation only changes
+# style:    Changes that don't affect meaning (white-space, formatting, etc)
+# refactor: Code change that neither fixes bug nor adds feature
+# perf:     Change that improves performance
+# test:     Adding missing tests or correcting existing tests
+# chore:    Changes to build process or auxiliary tools/libraries
+# ci:       Changes to CI configuration files and scripts
+# build:    Changes that affect the build system or external dependencies
+
+# Rules:
+# - Use lowercase for type
+# - Subject line max 50 chars, no period at end
+# - Body max 72 chars per line
+# - Use imperative mood ("add" not "adds" or "added")
+# - Reference issues/PRs in footer
+
+# Examples:
+# feat: add user authentication
+# fix: resolve memory leak in dashboard
+# chore: update dependencies to latest versions
