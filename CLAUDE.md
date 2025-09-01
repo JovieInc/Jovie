@@ -10,7 +10,7 @@
 2. **Triggers**
    - Trigger PostHog events for key user actions.
    - Ensure events fire in all UI modes (light/dark).
-   - New functionality ships directly to production after testing.
+   - New functionality ships directly to production only after all CI checks pass, code review approval, and required tests (lint, typecheck, unit, E2E) succeed.
 
 3. **Environment & Branching**
    - Work exclusively on feature branches derived from `preview`.
