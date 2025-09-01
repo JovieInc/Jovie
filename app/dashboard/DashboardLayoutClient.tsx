@@ -81,9 +81,12 @@ export default function DashboardLayoutClient({
       }
       // Fire-and-forget persist to DB
       if (persistSidebarCollapsed) {
-        startTransition(() => {
-          void persistSidebarCollapsed(next);
-        });
+        // Use a timeout to avoid calling startTransition during render
+        setTimeout(() => {
+          startTransition(() => {
+            void persistSidebarCollapsed(next);
+          });
+        }, 0);
       }
       return next;
     });
@@ -153,11 +156,11 @@ export default function DashboardLayoutClient({
                       )}
                     >
                       <Image
-                        src='/Jovie-logo.png'
+                        src='/brand/jovie-logo.svg'
                         alt='App icon'
                         width={24}
                         height={24}
-                        className='h-6 w-6 rounded-md'
+                        className='h-6 w-6 text-primary-token'
                         priority
                       />
                     </div>
@@ -185,7 +188,7 @@ export default function DashboardLayoutClient({
               </nav>
 
               {/* Profile Block - Always show avatar + handle with quick actions */}
-              <div className='flex-shrink-0 border-t border-subtle/50 p-3'>
+              <div className='flex-shrink-0 border-t border-subtle/30 p-3'>
                 <div className='relative overflow-hidden'>
                   {/* Profile section (expanded state) */}
                   <div
@@ -252,12 +255,10 @@ export default function DashboardLayoutClient({
                         </div>
                       </div>
 
-                      {/* Theme toggle */}
-                      <div className='flex items-center gap-2'>
+                      {/* Action buttons group */}
+                      <div className='flex items-center gap-1.5'>
                         <EnhancedThemeToggle variant='compact' />
-                        <span className='text-xs text-secondary-token'>
-                          Theme
-                        </span>
+                        <FeedbackButton collapsed={false} />
                       </div>
                     </div>
                   </div>
@@ -280,67 +281,73 @@ export default function DashboardLayoutClient({
                         <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-surface-0' />
                       </div>
                     </Tooltip>
-                    <Tooltip content='Toggle theme' placement='right'>
-                      <div className='flex justify-center'>
+                    {/* Action buttons group for collapsed state */}
+                    <div className='flex flex-col items-center gap-1.5'>
+                      <Tooltip content='Toggle theme' placement='right'>
                         <EnhancedThemeToggle variant='compact' />
-                      </div>
-                    </Tooltip>
+                      </Tooltip>
+                      <FeedbackButton collapsed={true} />
+                      <Tooltip content='Expand sidebar' placement='right'>
+                        <button
+                          onClick={handleToggleSidebarCollapsed}
+                          className='hidden lg:flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ease-in-out text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                        >
+                          <svg
+                            className='w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0 rotate-180'
+                            fill='none'
+                            viewBox='0 0 24 24'
+                            stroke='currentColor'
+                            strokeWidth={2.5}
+                          >
+                            <path
+                              strokeLinecap='round'
+                              strokeLinejoin='round'
+                              d='M15 19l-7-7 7-7'
+                            />
+                          </svg>
+                        </button>
+                      </Tooltip>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Support & Utility Section */}
-              <div className='flex-shrink-0 space-y-2 p-3'>
-                <FeedbackButton collapsed={sidebarCollapsed} />
-
-                {/* Minimal collapse button */}
-                <button
-                  id='sidebar-toggle'
-                  onClick={handleToggleSidebarCollapsed}
-                  className={cn(
-                    'hidden lg:flex items-center w-full rounded-md transition-all duration-200 ease-in-out',
-                    'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-                    'group relative overflow-hidden',
-                    sidebarCollapsed
-                      ? 'justify-center p-2'
-                      : 'justify-start gap-2 px-3 py-2'
-                  )}
-                  aria-label={
-                    sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
-                  }
-                >
-                  {/* Minimal chevron icon */}
-                  <svg
+              {/* Support & Utility Section - Only visible when expanded */}
+              {!sidebarCollapsed && (
+                <div className='flex-shrink-0 p-3'>
+                  {/* Minimal collapse button */}
+                  <button
+                    id='sidebar-toggle'
+                    onClick={handleToggleSidebarCollapsed}
                     className={cn(
-                      'w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0',
-                      sidebarCollapsed ? 'rotate-180' : 'rotate-0'
+                      'hidden lg:flex items-center w-full rounded-md transition-all duration-200 ease-in-out',
+                      'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                      'group relative overflow-hidden',
+                      'justify-start gap-2 px-3 py-2'
                     )}
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    strokeWidth={2.5}
+                    aria-label='Collapse sidebar'
                   >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      d='M15 19l-7-7 7-7'
-                    />
-                  </svg>
+                    {/* Minimal chevron icon */}
+                    <svg
+                      className='w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0'
+                      fill='none'
+                      viewBox='0 0 24 24'
+                      stroke='currentColor'
+                      strokeWidth={2.5}
+                    >
+                      <path
+                        strokeLinecap='round'
+                        strokeLinejoin='round'
+                        d='M15 19l-7-7 7-7'
+                      />
+                    </svg>
 
-                  {/* Text that fades out */}
-                  <span
-                    className={cn(
-                      'text-xs font-medium transition-all duration-200 ease-in-out',
-                      sidebarCollapsed
-                        ? 'opacity-0 w-0 overflow-hidden'
-                        : 'opacity-100 w-auto'
-                    )}
-                  >
-                    Collapse
-                  </span>
-                </button>
-              </div>
+                    {/* Text label */}
+                    <span className='text-xs font-medium'>Collapse</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
