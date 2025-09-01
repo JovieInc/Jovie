@@ -76,7 +76,7 @@ export function DashboardSidebar({
           <div className='justify-self-end pr-2'>
             <button
               onClick={onToggleCollapsed}
-              className='p-1.5 text-secondary hover:text-primary hover:bg-surface-2 rounded-md transition-colors'
+              className='inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:text-primary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 transition-colors'
               title='Expand sidebar'
             >
               <ChevronRightIcon className='h-4 w-4' />
@@ -95,7 +95,7 @@ export function DashboardSidebar({
           </div>
           <button
             onClick={onToggleCollapsed}
-            className='p-1.5 text-secondary hover:text-primary hover:bg-surface-2 rounded-md transition-colors'
+            className='inline-flex h-8 w-8 items-center justify-center rounded-lg text-secondary hover:text-primary hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 transition-colors'
             title='Collapse sidebar'
           >
             <ChevronLeftIcon className='h-4 w-4' />
