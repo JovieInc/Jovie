@@ -102,7 +102,7 @@ jobs:
               re = '^(Build|Unit Tests|E2E Tests|Drizzle Check)$';
             } else {
               // Fast checks on preview PRs
-              re = '^(ci-fast|PR Up-to-date with Preview)$';
+              re = '^(ci-fast)$';
             }
             core.setOutput('check_re', re);
 
