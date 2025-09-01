@@ -1,0 +1,120 @@
+name: 'Check Path Changes'
+description: 'Determines if CI should run based on changed file paths'
+
+inputs:
+  job-type:
+    description: 'Type of job (build, test, e2e, drizzle)'
+    required: true
+  full-ci-label:
+    description: 'Whether full-ci label is present'
+    required: false
+    default: 'false'
+  base-ref:
+    description: 'Base branch reference'
+    required: false
+    default: ''
+  event-name:
+    description: 'GitHub event name'
+    required: true
+  is-fork:
+    description: 'Whether this is a fork PR'
+    required: false
+    default: 'false'
+
+outputs:
+  run_full_ci:
+    description: 'Whether to run full CI'
+    value: ${{ steps.check.outputs.run_full_ci }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check for relevant changes
+      id: check
+      shell: bash
+      run: |
+        # Force run if full-ci label is present
+        if [[ "${{ inputs.full-ci-label }}" == "true" ]]; then
+          echo "Forcing full CI run due to 'full-ci' label"
+          echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Skip on fork PRs where repo secrets are unavailable (except for drizzle which has its own DB handling)
+        if [[ "${{ inputs.event-name }}" == "pull_request" && "${{ inputs.is-fork }}" == "true" && "${{ inputs.job-type }}" != "drizzle" ]]; then
+          echo "Fork PR detected; skipping ${{ inputs.job-type }} job to avoid missing secrets."
+          echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # For PRs to production, always run full CI (skip path guards)
+        if [[ "${{ inputs.event-name }}" == "pull_request" && "${{ inputs.base-ref }}" == "production" ]]; then
+          echo "Running full CI for PR to production branch"
+          echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # For merge queue events, always run full CI
+        if [[ "${{ inputs.event-name }}" == "merge_group" ]]; then
+          echo "Running full CI for merge queue"
+          echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # For push events to production/preview, always run full CI
+        if [[ "${{ inputs.event-name }}" == "push" && ("$GITHUB_REF" == "refs/heads/production" || "$GITHUB_REF" == "refs/heads/preview") ]]; then
+          echo "Running full CI for push to production/preview branch"
+          echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Determine changed files depending on event type
+        if [[ "${{ inputs.event-name }}" == "pull_request" ]]; then
+          # For PRs, compare against the base ref from origin
+          git fetch origin "${{ inputs.base-ref }}"
+          CHANGED_FILES=$(git diff --name-only "origin/${{ inputs.base-ref }}" HEAD)
+        else
+          # For push/merge_group, compare with previous commit
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+        fi
+
+        # Skip if only documentation/config files changed
+        if echo "$CHANGED_FILES" | grep -v -E '\.(md|txt|yml|yaml)$' | wc -l | grep -q '^0$'; then
+          echo "Only documentation files changed, skipping ${{ inputs.job-type }}"
+          echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Define path patterns based on job type
+        case "${{ inputs.job-type }}" in
+          "build")
+            PATTERN='^(app/|components/|lib/|hooks/|types/|constants/|package.*\.json|next\.config\.js|tailwind\.config\.|postcss\.config\.)'
+            ;;
+          "test")
+            PATTERN='^(app/|components/|lib/|hooks/|types/|tests/unit/|__tests__/|.*\.test\.|.*\.spec\.|package.*\.json|vitest\.config\.)'
+            ;;
+          "e2e")
+            PATTERN='^(app/|components/|tests/e2e/|tests/smoke/|playwright\.config\.|package.*\.json)'
+            ;;
+          "drizzle")
+            PATTERN='^(drizzle/|lib/db/|lib/db/schema|drizzle\.config\.ts|drizzle/config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+            ;;
+          *)
+            # Default pattern
+            PATTERN='^(app/|components/|lib/|hooks/|types/|constants/|package.*\.json|next\.config\.js)'
+            ;;
+        esac
+
+        # Check if relevant paths were modified
+        echo "Checking for changes in ${{ inputs.job-type }} paths..."
+        echo "Pattern: $PATTERN"
+        
+        if echo "$CHANGED_FILES" | grep -q -E "$PATTERN"; then
+          echo "Relevant paths changed, running ${{ inputs.job-type }}"
+          echo "run_full_ci=true" >> $GITHUB_OUTPUT
+        else
+          echo "No relevant paths changed, skipping ${{ inputs.job-type }}"
+          echo "run_full_ci=false" >> $GITHUB_OUTPUT
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+        fi
