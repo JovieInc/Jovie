@@ -27,42 +27,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  up-to-date-with-preview:
-    name: PR Up-to-date with Preview
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: Check branch is up-to-date with preview
-        run: |
-          git fetch origin preview
-          if git merge-base --is-ancestor origin/preview HEAD; then
-            echo "✅ Up to date with preview"
-          else
-            echo "⚠️ Branch is behind preview"
-            echo "This is expected - our auto-merge workflow will update the branch automatically"
-            echo "If auto-merge fails, please manually update your branch:"
-            echo "  git checkout ${{ github.event.pull_request.head.ref }}"
-            echo "  git merge origin/preview"
-            echo "  git push"
-            
-            # Only fail if this is a regular PR without auto-merge labels
-            # Auto-merge workflow will handle updating dependent PRs
-            labels="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
-            author="${{ github.event.pull_request.user.login }}"
-            
-            if [[ "$author" == "dependabot[bot]" ]] || [[ "$labels" =~ codegen ]] || [[ "$labels" =~ auto-merge ]]; then
-              echo "✅ Auto-merge eligible PR - will be updated automatically"
-              exit 0
-            else
-              echo "❌ Manual PR requires up-to-date branch"
-              exit 1
-            fi
-          fi
 
   ci-typecheck:
     name: Typecheck
