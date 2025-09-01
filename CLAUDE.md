@@ -8,10 +8,9 @@
    - Keep scope focused on one primary user-visible outcome.
 
 2. **Triggers**
-   - Use feature flags to gate new functionality.
-   - Name flags using lowercase snake_case: `feature_<slug>`.
    - Trigger PostHog events for key user actions.
    - Ensure events fire in all UI modes (light/dark).
+   - New functionality ships directly to production after testing.
 
 3. **Environment & Branching**
    - Work exclusively on feature branches derived from `preview`.
@@ -31,12 +30,11 @@
    - PR body includes:
      1. Goal (1–2 sentences)
      2. KPI target (if applicable)
-     3. Feature flag name
-     4. New PostHog events added
-     5. Rollback plan (typically "disable feature flag")
+     3. New PostHog events added
+     4. Rollback plan (typically "revert PR")
    - Auto-merge to `preview` allowed after green CI.
    - **Production Delivery**
-     - For **Fast-Path PRs** (revenue/activation; ≤200 LOC; behind a flag; smoke green): **auto-promote `preview` → `production`**.
+     - For **Fast-Path PRs** (revenue/activation; ≤200 LOC; smoke green): **auto-promote `preview` → `production`**.
      - For all other PRs: manual promotion via PR.  
      - Auto-halt promotions if error budget breached (p95 > X ms or error rate > Y% on `/checkout|/portal|/api/billing` in last 60 min).
 
@@ -45,7 +43,6 @@
 
    Requirements:
    - ≤200 changed LOC, ≤3 files
-   - Behind `feature_<slug>` with expiry ≤14 days
    - PostHog events present for the funnel
    - E2E @smoke passes
 
@@ -54,14 +51,13 @@
    - Auto-promote to `production` (see Production Delivery)
 
 6. **Failure Behavior**
-   - Disable feature flag to rollback.
+   - Revert PR to rollback changes.
    - Monitor Sentry and PostHog for errors.
-   - Revert PR if critical issues arise.
+   - Use PostHog feature flags for progressive rollouts if needed.
 
 7. **Success Behavior**
-   - Enable flag internally first.
-   - Verify metrics and events.
-   - Roll out progressively to all users.
+   - Verify metrics and events after deploy.
+   - Monitor key metrics for regressions.
 
 8. **PR Template**
    - Use the standardized template:
@@ -75,15 +71,12 @@
      ## KPI Target
      <if applicable>
 
-     ## Feature Flag
-     feature_<slug>
-
      ## PostHog Events
      - event_name_1
      - event_name_2
 
      ## Rollback Plan
-     Disable feature flag
+     Revert this PR
      ```
 
      ```
@@ -93,9 +86,6 @@
      ## Goal
      <1 line tied to MRR/activation>
 
-     ## Feature Flag
-     feature_<slug> (expires: YYYY-MM-DD; owner: @handle)
-
      ## Events
      - <required funnel events touched>
      ```
@@ -104,8 +94,8 @@
    - Ensure PR is rebased onto latest `preview`.
    - Run all CI checks.
    - Address review comments promptly.
-   - After merge, deploy preview with flag OFF.
-   - Enable flag internally and monitor.
+   - After merge, monitor metrics and events.
+   - Use PostHog feature flags for gradual rollouts if needed.
 
 10. **Branching & Protection**
     - `preview` and `production` are protected.
