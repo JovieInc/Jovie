@@ -33,15 +33,16 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
     <button
       onClick={handleFeedbackClick}
       className={cn(
-        'flex items-center gap-2 transition-all duration-200 ease-in-out',
-        'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
-        'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-        'group relative overflow-hidden',
-        collapsed ? 'justify-center p-2' : 'w-full px-3 py-2'
+        'flex items-center gap-2 transition-all duration-200 ease-in-out group',
+        'text-secondary-token hover:text-primary-token',
+        'rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+        'bg-surface-1 hover:bg-surface-2 border border-default/30 hover:border-default/50',
+        'hover:shadow-sm hover:scale-105 active:scale-95',
+        collapsed ? 'justify-center h-8 w-8' : 'w-full px-3 py-2 h-8'
       )}
       aria-label={collapsed ? 'Send feedback' : undefined}
     >
-      <ChatBubbleBottomCenterTextIcon className='h-3.5 w-3.5 shrink-0 transition-colors duration-200' />
+      <ChatBubbleBottomCenterTextIcon className='h-4 w-4 shrink-0 text-emerald-500 group-hover:text-emerald-400 transition-colors duration-200' />
       <span
         className={cn(
           'text-xs font-medium transition-all duration-200 ease-in-out',

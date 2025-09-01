@@ -50,6 +50,7 @@ const nextConfig = {
       },
     ],
     formats: ['image/avif', 'image/webp'],
+    qualities: [25, 50, 75, 85, 100],
     deviceSizes: [640, 750, 828, 1080, 1200],
     imageSizes: [64, 96, 128, 256, 384, 400],
     minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year for better caching

@@ -1,9 +1,7 @@
 name: Auto Promote to Production
 
 on:
-  push:
-    branches:
-      - preview
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -56,7 +54,8 @@ jobs:
             const body = [
               'This PR promotes the latest changes from `preview` to `production`. ',
               '',
-              '- Auto-created after a successful push to preview.',
+              '- This PR was opened via the manual fallback workflow (workflow_dispatch).',
+              '- Primary path for promotion is CI-gated in `.github/workflows/ci.yml` after a successful preview deploy.',
               '- The auto-merge workflow will wait for full checks (Build, Unit Tests, E2E Tests, Drizzle Check).',
               '',
               'If anything looks off, close this PR to halt promotion.'

@@ -167,7 +167,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       {/* Subtle divider */}
       <div
         className={cn(
-          'border-t border-subtle/50 mb-6',
+          'border-t border-subtle/30 mb-6',
           collapsed ? 'mx-2' : 'mx-3'
         )}
       />

@@ -28,7 +28,7 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
 ### Prerequisites
 
 - Node.js 20.17+
-- npm 10.0.0+
+- pnpm 8.0.0+
 - A Neon PostgreSQL database
 - Clerk account for authentication
 - Stripe account for payments
@@ -45,7 +45,7 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
 2. **Install dependencies**
 
    ```bash
-   npm ci
+   pnpm install
    ```
 
 3. **Set up environment variables**
@@ -58,12 +58,12 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
 4. **Run database migrations**
 
    ```bash
-   npm run drizzle:migrate
+   pnpm run drizzle:migrate
    ```
 
 5. **Start the development server**
    ```bash
-   npm run dev
+   pnpm run dev
    ```
 
 ## Database Migration (Supabase → Drizzle + Neon)
@@ -126,48 +126,48 @@ NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
 
 ```bash
 # Generate migrations from schema changes
-npm run drizzle:generate
+pnpm run drizzle:generate
 
 # Run migrations
-npm run drizzle:migrate
+pnpm run drizzle:migrate
 
 # Open Drizzle Studio (database GUI)
-npm run drizzle:studio
+pnpm run drizzle:studio
 
 # Seed the database with test data
-npm run db:seed
+pnpm run db:seed
 ```
 
 ### Testing
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run tests in watch mode
-npm run test:watch
+pnpm run test:watch
 
 # Run E2E tests
-npm run test:e2e
+pnpm run test:e2e
 
 # Run specific test suites
-npm run test:unit
-npm run test:integration
+pnpm run test:unit
+pnpm run test:integration
 ```
 
 ### Code Quality
 
 ```bash
 # Type checking
-npm run typecheck
+pnpm run typecheck
 
 # Linting
-npm run lint
-npm run lint:fix
+pnpm run lint
+pnpm run lint:fix
 
 # Code formatting
-npm run format
-npm run format:check
+pnpm run format
+pnpm run format:check
 ```
 
 ## Deployment
@@ -189,7 +189,7 @@ export GIT_BRANCH=production
 export ALLOW_PROD_MIGRATIONS=true
 
 # Run production migrations
-npm run drizzle:migrate:prod
+pnpm run drizzle:migrate:prod
 ```
 
 ## Rollback Procedures
@@ -247,7 +247,7 @@ The application includes comprehensive monitoring:
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/your-feature`
 3. Follow the conventional commit format: `feat:`, `fix:`, `chore:`
-4. Ensure all tests pass: `npm run check`
+4. Ensure all tests pass: `pnpm run check`
 5. Submit a pull request
 
 ## License

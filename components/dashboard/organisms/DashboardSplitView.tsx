@@ -2,6 +2,7 @@
 
 import { useSession } from '@clerk/nextjs';
 import { CheckIcon, ClipboardIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import React, {
   useCallback,
   useEffect,
@@ -395,7 +396,7 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
       {/* Preview Panel - Fixed aside on XL screens */}
       <aside
         className={`
-          fixed inset-y-0 right-0 w-96 border-l border-subtle px-4 py-6 sm:px-6 lg:px-8
+          fixed inset-y-0 right-0 w-96 border-l border-border px-4 py-6 sm:px-6 lg:px-8
           ${viewMode === 'preview' ? 'block xl:block' : 'hidden xl:block'}
         `}
       >
@@ -405,19 +406,12 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
             <h2 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>
               Live Preview
             </h2>
-            <div className='flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400'>
-              <div className='w-2 h-2 bg-green-500 rounded-full animate-pulse' />
-              Live
-            </div>
           </div>
 
           {/* Preview Container - Flexible height */}
           <div className='relative flex-1 min-h-0 flex flex-col'>
-            {/* Mobile Frame - Responsive to container height */}
-            <div
-              className='flex-1 max-w-[280px] mx-auto bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-1.5 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300 flex flex-col'
-              style={{ maxHeight: '80vh' }}
-            >
+            {/* Mobile Frame - Closer to real device proportions */}
+            <div className='mx-auto w-full max-w-[360px] aspect-[9/19.5] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-1.5 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 flex flex-col'>
               {/* Top notch */}
               <div className='absolute top-1.5 left-1/2 transform -translate-x-1/2 w-24 h-4 bg-gray-900 dark:bg-gray-800 rounded-b-xl z-10'></div>
 
@@ -442,21 +436,11 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                   </div>
                 </div>
 
-                {/* Profile Preview - Responsive with proper spacing */}
-                <div
-                  className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'
-                  style={{ minHeight: '300px' }}
-                >
+                {/* Profile Preview - Render real component with natural scale */}
+                <div className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'>
                   <div className='absolute inset-0 p-2'>
                     <div className='w-full h-full animate-in fade-in duration-300 overflow-y-auto'>
-                      <div
-                        style={{
-                          transform: 'scale(0.85)',
-                          transformOrigin: 'top center',
-                          minHeight: 'fit-content',
-                        }}
-                        className='w-full'
-                      >
+                      <div className='w-full'>
                         <StaticArtistPage
                           mode='default'
                           artist={previewArtist}
@@ -497,7 +481,7 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
             <div className='space-y-2'>
               <div className='flex items-center justify-center gap-2'>
                 <code className='text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-gray-600 dark:text-gray-300'>
-                  jov.ie/{artist.handle || 'username'}
+                  https://jov.ie/{artist.handle || 'username'}
                 </code>
                 <button
                   onClick={handleCopyUrl}
@@ -511,10 +495,9 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                   )}
                 </button>
               </div>
-              <a
+              <Link
                 href={`/${artist.handle}`}
                 target='_blank'
-                rel='noopener noreferrer'
                 className='inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors'
               >
                 View Profile
@@ -531,7 +514,7 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
                     d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'
                   />
                 </svg>
-              </a>
+              </Link>
             </div>
           </div>
         </div>
