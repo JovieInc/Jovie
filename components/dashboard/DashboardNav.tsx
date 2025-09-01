@@ -89,7 +89,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
             className={cn(
               // Apple-style active state - solid pill highlight
               isActive
-                ? 'bg-accent/10 text-primary-token shadow-sm border border-subtle'
+                ? 'bg-accent/10 text-primary-token shadow-sm border border-border'
                 : 'text-secondary-token hover:text-primary-token hover:bg-surface-2/80',
               // Base styles with perfect alignment
               'group flex items-center rounded-lg transition-all duration-200 ease-in-out relative',
@@ -167,7 +167,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       {/* Subtle divider */}
       <div
         className={cn(
-          'border-t border-subtle/30 mb-6',
+          'border-t border-border border-opacity-30 mb-6',
           collapsed ? 'mx-2' : 'mx-3'
         )}
       />

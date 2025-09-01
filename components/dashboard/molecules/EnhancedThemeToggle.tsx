@@ -132,8 +132,8 @@ export function EnhancedThemeToggle({
           disabled:opacity-50 disabled:cursor-not-allowed group
           ${
             isDark
-              ? 'bg-surface-2 hover:bg-surface-3 text-secondary-token hover:text-primary-token border border-default/40 hover:border-default/60'
-              : 'bg-surface-1 hover:bg-surface-2 text-secondary-token hover:text-primary-token border border-default/30 hover:border-default/50 hover:shadow-sm'
+              ? 'bg-surface-2 hover:bg-surface-3 text-secondary-token hover:text-primary-token border border-border border-opacity-40 hover:border-opacity-60'
+              : 'bg-surface-1 hover:bg-surface-2 text-secondary-token hover:text-primary-token border border-border border-opacity-30 hover:border-opacity-50 hover:shadow-sm'
           }
           ${isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'}
         `}
