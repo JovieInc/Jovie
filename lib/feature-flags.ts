@@ -9,14 +9,14 @@ export interface FeatureFlags {
   featureClickAnalyticsRpc: boolean;
   // Progressive onboarding with multi-step UX improvements
   progressiveOnboardingEnabled: boolean;
+  // Profile settings feature flag
+  profileSettingsEnabled: boolean;
+  // Avatar upload with Vercel Blob integration
+  avatarUploadEnabled?: boolean;
   // Minimalist design for onboarding screens (Apple-inspired)
   minimalistOnboardingEnabled?: boolean;
   // New Apple-style full-screen onboarding with improved UX (JOV-134)
   appleStyleOnboardingEnabled?: boolean;
-  // Profile settings feature flag
-  profileSettingsEnabled?: boolean;
-  // Avatar upload with Vercel Blob integration
-  avatarUploadEnabled?: boolean;
 }
 
 // PostHog feature flag names (match what's defined in PostHog dashboard)
@@ -46,14 +46,14 @@ const defaultFeatureFlags: FeatureFlags = {
   featureClickAnalyticsRpc: false,
   // Progressive onboarding enabled by default for better UX
   progressiveOnboardingEnabled: true,
-  // Minimalist design for onboarding screens (Apple-inspired)
-  minimalistOnboardingEnabled: true,
-  // New Apple-style full-screen onboarding with improved UX (JOV-134)
-  appleStyleOnboardingEnabled: true,
   // Profile settings enabled by default
   profileSettingsEnabled: true,
   // Avatar upload disabled by default (requires Vercel Blob setup)
   avatarUploadEnabled: false,
+  // Minimalist design for onboarding screens (Apple-inspired)
+  minimalistOnboardingEnabled: true,
+  // New Apple-style full-screen onboarding with improved UX (JOV-134)
+  appleStyleOnboardingEnabled: true,
 };
 
 // Get feature flags (v4-compatible: attempts fetch from discovery endpoint)
@@ -85,6 +85,7 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
         typeof data?.universalNotificationsEnabled !== 'undefined' ||
         typeof data?.progressiveOnboardingEnabled !== 'undefined' ||
         typeof data?.profileSettingsEnabled !== 'undefined' ||
+        typeof data?.avatarUploadEnabled !== 'undefined' ||
         hasRpcFlag
       ) {
         return {
@@ -121,6 +122,10 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
           profileSettingsEnabled: Boolean(
             (data as Record<string, unknown>).profileSettingsEnabled ??
               defaultFeatureFlags.profileSettingsEnabled
+          ),
+          avatarUploadEnabled: Boolean(
+            (data as Record<string, unknown>).avatarUploadEnabled ??
+              defaultFeatureFlags.avatarUploadEnabled
           ),
         };
       }
@@ -173,6 +178,10 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
               defaultFeatureFlags.progressiveOnboardingEnabled
           ),
           profileSettingsEnabled: defaultFeatureFlags.profileSettingsEnabled,
+          avatarUploadEnabled: Boolean(
+            data2.flags?.avatarUploadEnabled?.default ??
+              defaultFeatureFlags.avatarUploadEnabled
+          ),
         };
       }
     }
@@ -213,6 +222,7 @@ async function getPostHogServerFlags(
       minimalistOnboardingEnabled,
       appleStyleOnboardingEnabled,
       profileSettingsEnabled,
+      avatarUploadEnabled,
     ] = await Promise.all([
       client.isFeatureEnabled(POSTHOG_FLAGS.ARTIST_SEARCH_ENABLED, distinctId),
       client.isFeatureEnabled(POSTHOG_FLAGS.DEBUG_BANNER_ENABLED, distinctId),
@@ -242,6 +252,10 @@ async function getPostHogServerFlags(
         POSTHOG_FLAGS.PROFILE_SETTINGS_ENABLED,
         distinctId
       ),
+      client.isFeatureEnabled(
+        POSTHOG_FLAGS.AVATAR_UPLOAD_ENABLED,
+        distinctId
+      ),
     ]);
 
     await client.shutdown();
@@ -268,6 +282,9 @@ async function getPostHogServerFlags(
       }),
       ...(typeof profileSettingsEnabled === 'boolean' && {
         profileSettingsEnabled,
+      }),
+      ...(typeof avatarUploadEnabled === 'boolean' && {
+        avatarUploadEnabled,
       }),
     };
   } catch (error) {
@@ -321,6 +338,7 @@ export async function getServerFeatureFlags(
               data.featureClickAnalyticsRpc || data.feature_click_analytics_rpc
             ),
             profileSettingsEnabled: Boolean(data.profileSettingsEnabled),
+            avatarUploadEnabled: Boolean(data.avatarUploadEnabled),
           };
         }
       } catch {
@@ -370,6 +388,10 @@ export async function getServerFeatureFlags(
         postHogFlags.profileSettingsEnabled ??
         localFlags.profileSettingsEnabled ??
         defaultFeatureFlags.profileSettingsEnabled,
+      avatarUploadEnabled:
+        postHogFlags.avatarUploadEnabled ??
+        localFlags.avatarUploadEnabled ??
+        defaultFeatureFlags.avatarUploadEnabled,
     };
   } catch (error) {
     console.warn('[Feature Flags] Server flags failed:', error);
