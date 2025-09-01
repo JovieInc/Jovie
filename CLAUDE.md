@@ -1,4 +1,4 @@
-# Claude AI Guidelines for Jovie Project (Next.js + Edge + Neon + Drizzle + Clerk + Upstash + Tailwind v4 + PostHog + Stripe)
+# Claude AI Guidelines for Jovie Project (Next.js + Edge + Neon + Drizzle + Clerk + Tailwind v4 + PostHog + Stripe)
 
 ## 🚦 Jovie PR & Integration Rules
 
@@ -317,7 +317,7 @@ Before creating a component, ask:
 - **Next.js (App Router, RSC):** `next`, `react`, `react-dom`
 - **DB (Neon + Drizzle):** `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`
 - **Auth (Clerk):** `@clerk/nextjs`
-- **Cache/Rate Limit (Upstash Redis):** `@upstash/redis`, `@upstash/ratelimit`
+- **Caching & Rate Limiting:** ⚠️ **NOT IMPLEMENTED YET** - Redis/Upstash removed following YC principle: "do things that don't scale until you have to." Will be added when performance becomes a bottleneck.
 - **CSS (Tailwind v4):** `tailwindcss` (v4), optional `clsx`, `tailwind-merge`
 - **Headless Components (preferred):** `@headlessui/react` for accessible dialogs, popovers, menus, listboxes, disclosures. Use these primitives with our atoms/molecules; no custom ARIA plumbing.
 - **Positioning/Overlays:** `@floating-ui/react` (or `@floating-ui/dom`) for tooltips, dropdowns, contextual menus, and anchored popovers. Prefer middleware (offset/flip/shift/size) over hand-rolled math.
@@ -420,11 +420,13 @@ for update using (current_setting('app.user_id', true) = user_id);
 
 ## 🚀 Public Profile Performance Recipe
 
+> **⚠️ CACHING DISABLED** - Following YC's "do things that don't scale" principle. Direct DB queries for now; will add Redis when we hit performance bottlenecks.
+
 1. **Runtime:** Edge route/handler (fast TTFB).
-2. **Cache first:** Read `profile:${slug}` from Upstash Redis; on miss, query Neon via `neon-http` and store compact JSON.
-3. **TTL:** 60–180s with simple `DEL` invalidation on writes; consider a version key per profile.
-4. **RSC streaming:** Use Suspense/streaming; ship only the minimal client JS.
-5. **PostHog tracking:** client‑side (deferred) and optionally server event for critical counters.
+2. **Direct DB:** Query Neon via `neon-http` directly - no caching layer yet.
+3. **RSC streaming:** Use Suspense/streaming; ship only the minimal client JS.
+4. **PostHog tracking:** client‑side (deferred) and optionally server event for critical counters.
+5. **Future:** Add Redis caching when profile views exceed ~10k/day.
 
 ## 🖼️ Profile Images (Seeded & User Uploads)
 
@@ -441,7 +443,7 @@ for update using (current_setting('app.user_id', true) = user_id);
 
 3. **Security & Limits**
    - Validate file size ≤ 4MB and type (`jpeg|png|webp`).
-   - Rate-limit uploads with Upstash Redis (e.g., 3/min/user).
+   - ⚠️ **Rate limiting disabled** - will add when needed (YC: do things that don't scale).
    - Optionally preprocess with Sharp for 1024×1024 max, 82% JPEG.
 
 4. **next.config**
@@ -464,17 +466,16 @@ for update using (current_setting('app.user_id', true) = user_id);
 
 ---
 
-## ☁️ Upstash Redis (Edge‑friendly)
+## ☁️ Caching & Rate Limiting (Future Implementation)
 
-```ts
-// lib/redis.ts
-import { Redis } from '@upstash/redis';
-export const redis = Redis.fromEnv();
-```
-
-- Use `@upstash/ratelimit` for IP/slug rate limits on public endpoints.
-- Keep tokens server‑only; never expose to the browser.
-- Optionally use **QStash** for webhook fan‑out/retries (Stripe, Clerk) with DLQ.
+> **⚠️ CURRENTLY DISABLED** - Following Y Combinator's principle: "Do things that don't scale until you have to." 
+> 
+> **Move fast, optimize later.** We'll add Redis/Upstash when:
+> - Profile views exceed ~10k/day
+> - API abuse becomes a problem
+> - Page load times consistently exceed 800ms
+>
+> For now: direct database queries, simple validation, manual abuse handling.
 
 ---
 
@@ -541,7 +542,7 @@ describe('UserDashboard', () => {
 })
 ```
 
-**Mock aggressively**: Stripe, Clerk, Upstash, PostHog, database calls
+**Mock aggressively**: Stripe, Clerk, PostHog, database calls
 
 ### **2. Integration Tests (15% of coverage, < 30s each)**
 
@@ -727,7 +728,7 @@ For new features, write tests first:
 2. **Clerk Host Mismatch:** Frontend URLs (incl. preview domains) must be configured in Clerk or you get `Invalid host/JWT` errors.
 3. **Wrong Neon Client:** Use `@neondatabase/serverless` + `drizzle-orm/neon-http` on Edge. Node pg pool only in Node runtime.
 4. **Running Migrations in Edge:** Never run `drizzle-kit` in Edge paths.
-5. **Cache Invalidation:** Always `DEL` or bump a version key on profile edits/plan changes.
+5. **Cache Invalidation:** ⚠️ Not applicable - caching disabled for now (direct DB queries).
 6. **SSR Feature Flags:** Resolve PostHog flags server‑side when HTML must reflect the split.
 7. **Stripe Webhooks:** Must be Node runtime with raw body; avoid middleware that consumes the body.
 8. **Tailwind v4 Plugin Drift:** Remove/replace plugins not v4‑compatible.
@@ -773,9 +774,9 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
 CLERK_SECRET_KEY=sk_live_...
 # (Optionally) CLERK_WEBHOOK_SECRET=whsec_...
 
-# Upstash
-UPSTASH_REDIS_REST_URL=...
-UPSTASH_REDIS_REST_TOKEN=...
+# Redis/Caching - DISABLED (YC: do things that don't scale)
+# UPSTASH_REDIS_REST_URL=... (will add when needed)
+# UPSTASH_REDIS_REST_TOKEN=... (will add when needed)
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_...
