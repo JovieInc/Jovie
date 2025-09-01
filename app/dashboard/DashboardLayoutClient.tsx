@@ -184,99 +184,161 @@ export default function DashboardLayoutClient({
                 <DashboardNav collapsed={sidebarCollapsed} />
               </nav>
 
-              {/* Feedback button block */}
-              <div className='flex-shrink-0 p-2'>
-                <FeedbackButton collapsed={sidebarCollapsed} />
-              </div>
-
-              {/* Divider and user controls block (below divider) */}
-              <div className='flex-shrink-0 border-t border-subtle p-2'>
+              {/* Profile Block - Always show avatar + handle with quick actions */}
+              <div className='flex-shrink-0 border-t border-subtle/50 p-3'>
                 <div className='relative overflow-hidden'>
-                  {/* User button (expanded only) */}
+                  {/* Profile section (expanded state) */}
                   <div
                     className={cn(
-                      'transition-all duration-300 ease-in-out px-2',
+                      'transition-all duration-200 ease-in-out',
                       sidebarCollapsed
                         ? 'opacity-0 scale-95 pointer-events-none absolute inset-0'
                         : 'opacity-100 scale-100'
                     )}
                   >
-                    <div className='flex items-center gap-2'>
-                      {/* Icon-only theme toggle with tooltip */}
-                      <Tooltip content={'Toggle theme'} placement='top'>
-                        <span>
-                          <EnhancedThemeToggle variant='compact' />
+                    <div className='space-y-3'>
+                      {/* Profile info with quick actions */}
+                      <div className='flex items-center gap-3'>
+                        <UserButton artist={artist} showUserInfo={true} />
+                        {/* Quick action buttons */}
+                        <div className='flex items-center gap-1'>
+                          <Tooltip content='Copy profile URL' placement='top'>
+                            <button
+                              onClick={() => {
+                                if (artist?.handle) {
+                                  navigator.clipboard.writeText(
+                                    `https://jov.ie/${artist.handle}`
+                                  );
+                                }
+                              }}
+                              className='p-1.5 rounded-md hover:bg-surface-2 text-tertiary-token hover:text-secondary-token transition-colors'
+                            >
+                              <svg
+                                className='w-3.5 h-3.5'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z'
+                                />
+                              </svg>
+                            </button>
+                          </Tooltip>
+                          <Tooltip content='Open profile' placement='top'>
+                            <Link
+                              href={`/${artist?.handle || ''}`}
+                              target='_blank'
+                              className='p-1.5 rounded-md hover:bg-surface-2 text-tertiary-token hover:text-secondary-token transition-colors'
+                            >
+                              <svg
+                                className='w-3.5 h-3.5'
+                                fill='none'
+                                stroke='currentColor'
+                                viewBox='0 0 24 24'
+                              >
+                                <path
+                                  strokeLinecap='round'
+                                  strokeLinejoin='round'
+                                  strokeWidth={2}
+                                  d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'
+                                />
+                              </svg>
+                            </Link>
+                          </Tooltip>
+                        </div>
+                      </div>
+
+                      {/* Theme toggle */}
+                      <div className='flex items-center gap-2'>
+                        <EnhancedThemeToggle variant='compact' />
+                        <span className='text-xs text-secondary-token'>
+                          Theme
                         </span>
-                      </Tooltip>
-                      <UserButton
-                        artist={artist}
-                        showUserInfo={!sidebarCollapsed}
-                      />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Centered user button when collapsed with status dot */}
+                  {/* Profile section (collapsed state) */}
                   <div
                     className={cn(
-                      'flex flex-col items-center justify-center gap-2 transition-all duration-300 ease-in-out',
+                      'flex flex-col items-center gap-2 transition-all duration-200 ease-in-out',
                       sidebarCollapsed
                         ? 'opacity-100 scale-100'
                         : 'opacity-0 scale-95 pointer-events-none absolute inset-0'
                     )}
                   >
-                    {/* Icon-only theme toggle with tooltip (stacked above avatar) */}
-                    <Tooltip content={'Toggle theme'} placement='top'>
-                      <span aria-label='Toggle theme'>
+                    <Tooltip
+                      content={`You're logged in as @${artist?.handle || 'user'}`}
+                      placement='right'
+                    >
+                      <div className='relative'>
+                        <UserButton artist={artist} showUserInfo={false} />
+                        <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-surface-0' />
+                      </div>
+                    </Tooltip>
+                    <Tooltip content='Toggle theme' placement='right'>
+                      <span>
                         <EnhancedThemeToggle variant='compact' />
                       </span>
                     </Tooltip>
-                    <div className='relative'>
-                      <UserButton artist={artist} showUserInfo={false} />
-                      <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 transition-all duration-300 ease-in-out' />
-                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Collapse/Expand Section */}
-              <div className='flex-shrink-0 border-t border-subtle'>
+              {/* Support & Utility Section */}
+              <div className='flex-shrink-0 space-y-2 p-3'>
+                <FeedbackButton collapsed={sidebarCollapsed} />
+
+                {/* Minimal collapse button */}
                 <button
                   id='sidebar-toggle'
                   onClick={handleToggleSidebarCollapsed}
-                  className='hidden lg:flex items-center justify-center w-full p-3
-                             text-secondary-token hover:text-primary-token hover:bg-surface-1
-                             transition-all duration-200 ease-in-out
-                             focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2
-                             group'
+                  className={cn(
+                    'hidden lg:flex items-center w-full rounded-md transition-all duration-200 ease-in-out',
+                    'text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                    'group relative overflow-hidden',
+                    sidebarCollapsed
+                      ? 'justify-center p-2'
+                      : 'justify-start gap-2 px-3 py-2'
+                  )}
                   aria-label={
                     sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'
                   }
                 >
-                  <div className='flex items-center gap-2'>
-                    <svg
-                      className={`w-4 h-4 transition-all duration-200 ease-in-out ${sidebarCollapsed ? 'rotate-180' : ''}`}
-                      fill='none'
-                      viewBox='0 0 24 24'
-                      stroke='currentColor'
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        d='M11 19l-7-7 7-7M18 19l-7-7 7-7'
-                      />
-                    </svg>
-                    <span
-                      className={cn(
-                        'text-sm font-medium transition-all duration-300 ease-in-out',
-                        sidebarCollapsed
-                          ? 'opacity-0 w-0 overflow-hidden'
-                          : 'opacity-100 w-auto'
-                      )}
-                    >
-                      Collapse
-                    </span>
-                  </div>
+                  {/* Minimal chevron icon */}
+                  <svg
+                    className={cn(
+                      'w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0',
+                      sidebarCollapsed ? 'rotate-180' : 'rotate-0'
+                    )}
+                    fill='none'
+                    viewBox='0 0 24 24'
+                    stroke='currentColor'
+                    strokeWidth={2.5}
+                  >
+                    <path
+                      strokeLinecap='round'
+                      strokeLinejoin='round'
+                      d='M15 19l-7-7 7-7'
+                    />
+                  </svg>
+
+                  {/* Text that fades out */}
+                  <span
+                    className={cn(
+                      'text-xs font-medium transition-all duration-200 ease-in-out',
+                      sidebarCollapsed
+                        ? 'opacity-0 w-0 overflow-hidden'
+                        : 'opacity-100 w-auto'
+                    )}
+                  >
+                    Collapse
+                  </span>
                 </button>
               </div>
             </div>

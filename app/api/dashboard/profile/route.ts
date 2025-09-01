@@ -87,6 +87,7 @@ export async function PUT(req: Request) {
         'isPublic',
         'settings',
         'theme',
+        'venmo_handle',
       ];
 
       for (const [key, value] of Object.entries(updates)) {

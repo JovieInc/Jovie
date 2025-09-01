@@ -13,7 +13,8 @@ import { usePathname } from 'next/navigation';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { cn } from '@/lib/utils';
 
-const navigation = [
+// Primary Navigation - Core features
+const primaryNavigation = [
   {
     name: 'Overview',
     href: '/dashboard/overview',
@@ -42,6 +43,10 @@ const navigation = [
     icon: UsersIcon,
     description: 'Understand your audience demographics',
   },
+];
+
+// Secondary Navigation - Additional features
+const secondaryNavigation = [
   {
     name: 'Tipping',
     href: '/dashboard/tipping',
@@ -65,62 +70,108 @@ interface DashboardNavProps {
 export function DashboardNav({ collapsed = false }: DashboardNavProps) {
   const pathname = usePathname();
 
-  return (
-    <ul role='list' className='flex flex-1 flex-col gap-y-7'>
-      <li>
-        <ul role='list' className='-mx-2 space-y-1'>
-          {navigation.map(item => {
-            const isActive =
-              pathname === item.href ||
-              (pathname === '/dashboard' && item.id === 'overview');
+  const renderNavSection = (
+    items: typeof primaryNavigation,
+    isPrimary: boolean
+  ) => (
+    <ul
+      role='list'
+      className={cn('-mx-2', collapsed ? 'space-y-1.5' : 'space-y-1')}
+    >
+      {items.map(item => {
+        const isActive =
+          pathname === item.href ||
+          (pathname === '/dashboard' && item.id === 'overview');
 
-            const linkContent = (
-              <Link
-                href={item.href}
-                className={cn(
-                  isActive
-                    ? 'bg-surface-2 text-primary-token ring-1 ring-accent'
-                    : 'text-secondary-token hover:text-primary-token hover:bg-surface-2',
-                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold transition-all duration-300 ease-in-out',
-                  collapsed ? 'justify-center' : ''
-                )}
+        const linkContent = (
+          <Link
+            href={item.href}
+            className={cn(
+              // Apple-style active state - solid pill highlight
+              isActive
+                ? 'bg-accent/10 text-primary-token shadow-sm ring-1 ring-accent/20'
+                : 'text-secondary-token hover:text-primary-token hover:bg-surface-2/80',
+              // Base styles with perfect alignment
+              'group flex items-center rounded-lg transition-all duration-200 ease-in-out relative',
+              // Responsive padding and spacing
+              collapsed ? 'p-2.5 justify-center' : 'px-3 py-2.5 gap-3',
+              // Typography hierarchy
+              isPrimary ? 'font-semibold text-sm' : 'font-medium text-sm',
+              // Hover animations
+              'hover:scale-[1.02] active:scale-[0.98]'
+            )}
+          >
+            {/* Active state glow/halo effect */}
+            {isActive && (
+              <div className='absolute inset-0 bg-accent/5 rounded-lg animate-pulse' />
+            )}
+
+            <item.icon
+              className={cn(
+                isActive
+                  ? 'text-accent'
+                  : isPrimary
+                    ? 'text-secondary-token group-hover:text-primary-token'
+                    : 'text-tertiary-token group-hover:text-secondary-token',
+                'h-5 w-5 shrink-0 transition-all duration-200',
+                // Hover scale animation
+                'group-hover:scale-110 group-active:scale-95'
+              )}
+              aria-hidden='true'
+            />
+
+            <span
+              className={cn(
+                'transition-all duration-200 ease-in-out truncate',
+                collapsed
+                  ? 'opacity-0 w-0 overflow-hidden'
+                  : 'opacity-100 w-auto',
+                // Typography colors
+                isActive
+                  ? 'text-primary-token'
+                  : isPrimary
+                    ? 'text-primary-token'
+                    : 'text-secondary-token'
+              )}
+            >
+              {item.name}
+            </span>
+          </Link>
+        );
+
+        return (
+          <li key={item.name}>
+            {collapsed ? (
+              <Tooltip
+                content={`${item.name} - ${item.description}`}
+                placement='right'
               >
-                <item.icon
-                  className={cn(
-                    isActive
-                      ? 'text-accent'
-                      : 'text-secondary-token group-hover:text-primary-token',
-                    'h-6 w-6 shrink-0 transition-colors duration-200'
-                  )}
-                  aria-hidden='true'
-                />
-                <span
-                  className={cn(
-                    'transition-all duration-300 ease-in-out',
-                    collapsed
-                      ? 'opacity-0 w-0 overflow-hidden'
-                      : 'opacity-100 w-auto'
-                  )}
-                >
-                  {item.name}
-                </span>
-              </Link>
-            );
-
-            return (
-              <li key={item.name}>
-                {collapsed ? (
-                  <Tooltip content={`${item.name} - ${item.description}`}>
-                    {linkContent}
-                  </Tooltip>
-                ) : (
-                  linkContent
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </li>
+                {linkContent}
+              </Tooltip>
+            ) : (
+              linkContent
+            )}
+          </li>
+        );
+      })}
     </ul>
+  );
+
+  return (
+    <nav className='flex flex-1 flex-col'>
+      {/* Primary Navigation Block */}
+      <div className='mb-6'>{renderNavSection(primaryNavigation, true)}</div>
+
+      {/* Subtle divider */}
+      <div
+        className={cn(
+          'border-t border-subtle/50 mb-6',
+          collapsed ? 'mx-2' : 'mx-3'
+        )}
+      />
+
+      {/* Secondary Navigation Block */}
+      <div className='mb-4'>{renderNavSection(secondaryNavigation, false)}</div>
+    </nav>
   );
 }

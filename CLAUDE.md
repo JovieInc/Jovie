@@ -120,7 +120,10 @@
 
 ### **Philosophy: Speed + Simplicity + Scale**
 
+
 Follow Y Combinator principles: optimize for fast iteration, minimal cognitive overhead, and effortless scaling.
+
+> **Note:** Before creating a new component, **search the repo for existing atoms/molecules/organisms**. Prefer reuse or extension over duplication. If you must add a new one, document in the PR why existing components don’t fit.
 
 ### **Directory Structure**
 
@@ -257,10 +260,11 @@ import { ClerkProvider } from '@/components/providers/ClerkProvider'
 ### **8. Component Checklist**
 
 Before creating a component, ask:
-1. **Reusability**: Used in 3+ places? → Atomic hierarchy  
-2. **Domain specificity**: Feature-specific? → Feature directory
-3. **Complexity**: Business logic? → Organism. Simple combination? → Molecule. Primitive? → Atom.
-4. **Naming**: Clear, descriptive, follows existing patterns?
+1. **Search first:** Check `components/` for an existing component that covers ≥80% of the need. Extend/refactor instead of adding a near-duplicate. If adding, explain the gap in the PR.
+1. **Reusability:** Used in 3+ places? → Atomic hierarchy  
+1. **Domain specificity:** Feature-specific? → Feature directory
+1. **Complexity:** Business logic? → Organism. Simple combination? → Molecule. Primitive? → Atom.
+1. **Naming:** Clear, descriptive, follows existing patterns?
 
 ---
 
@@ -294,6 +298,29 @@ Before creating a component, ask:
 
 ---
 
+## 📝 Copywriting Guidelines (Apple-level, YC-aligned)
+
+  - Always refer to a creator’s profile as their **“Jovie profile”.**
+  - Refer to a creator’s handle as their **“Jovie handle”** or **“Jovie username”** (choose one consistently per surface).
+  - Never use “link-in-bio” to describe Jovie itself.
+  - Only use “link-in-bio” when explicitly comparing competitors (e.g., Linktree, Beacons).
+
+- **Tone**
+  - Clear, concise, confident — Apple-level polish.
+  - YC principle: focus on user value + speed to revenue.
+  - Eliminate fluff; every word should move users toward activation or MRR.
+
+- **Examples**
+  - ✅ “Share your Jovie profile and start earning.”
+  - ✅ “Your Jovie profile is ready to share.”
+  - ✅ “Upgrade your Jovie profile to remove branding.”
+  - ❌ “Your link-in-bio is ready.” (Never)
+
+- **Principles**
+  - Make the creator the hero: highlight empowerment, earnings, speed.
+  - Avoid jargon or internal terms in user-facing copy.
+  - Use short sentences, active verbs, and direct calls to action.
+
 ## 🧱 Stack & Packages (Pin to this shape)
 
 - **Package Manager:** pnpm (preferred over npm for speed, determinism, and CI reliability)
@@ -302,6 +329,8 @@ Before creating a component, ask:
 - **Auth (Clerk):** `@clerk/nextjs`
 - **Cache/Rate Limit (Upstash Redis):** `@upstash/redis`, `@upstash/ratelimit`
 - **CSS (Tailwind v4):** `tailwindcss` (v4), optional `clsx`, `tailwind-merge`
+- **Headless Components (preferred):** `@headlessui/react` for accessible dialogs, popovers, menus, listboxes, disclosures. Use these primitives with our atoms/molecules; no custom ARIA plumbing.
+- **Positioning/Overlays:** `@floating-ui/react` (or `@floating-ui/dom`) for tooltips, dropdowns, contextual menus, and anchored popovers. Prefer middleware (offset/flip/shift/size) over hand-rolled math.
 - **Analytics & Flags (PostHog):** `posthog-js` (client), `posthog-node` (server)
 - **Billing (Stripe):** `stripe` (server), `@stripe/stripe-js` (client)
 
@@ -768,6 +797,17 @@ NEXT_PUBLIC_POSTHOG_KEY=phc_...
 POSTHOG_API_KEY=phx_...
 POSTHOG_HOST=https://us.i.posthog.com # or EU/self-host
 ```
+
+### UI Library Preference (Headless UI + Floating UI)
+
+- **Default choice** for interactive components is **Headless UI** + **Floating UI**.
+- **When to use:** dialogs/modals, drawers, menus, listboxes/selects, comboboxes, disclosures, tooltips, popovers, contextual menus.
+- **Rules:**
+  - Compose Headless UI primitives inside our **atoms/molecules**; keep styling in Tailwind v4 classes.
+  - Use Floating UI for positioning/portal logic; prefer middleware (`offset`, `flip`, `shift`, `size`, `hide`).
+  - Avoid custom focus traps/ARIA unless Headless UI cannot cover the case.
+  - Avoid heavyweight UI kits; keep components headless and brand-agnostic.
+- **Testing:** add a simple keyboard-nav test (Tab/Shift+Tab/Escape) for dialogs/menus.  
 
 ---
 
