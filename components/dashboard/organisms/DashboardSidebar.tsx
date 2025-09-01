@@ -49,7 +49,7 @@ export function DashboardSidebar({
   return (
     <div
       className={cn(
-        'flex grow flex-col gap-y-5 overflow-y-auto border-r border-subtle bg-surface-0 backdrop-blur-sm pb-4',
+        'flex grow flex-col gap-y-5 overflow-y-auto border-r border-border bg-surface-0 backdrop-blur-sm pb-4',
         collapsed ? 'px-2' : 'px-6',
         className
       )}
@@ -168,7 +168,7 @@ export function DashboardSidebar({
                   <DashboardButton
                     variant='nav-item'
                     onClick={() => router.push('/onboarding')}
-                    className='border border-dashed border-subtle'
+                    className='border border-dashed border-border'
                   >
                     <svg
                       className='h-6 w-6 shrink-0 text-secondary group-hover:text-primary'
@@ -219,9 +219,9 @@ export function DashboardSidebar({
             )}
 
             {/* Theme toggle and user info */}
-            <div className='pt-4 border-t border-subtle space-y-3'>
+            <div className='pt-4 border-t border-border space-y-2'>
               <div className='flex justify-center'>
-                <EnhancedThemeToggle />
+                <EnhancedThemeToggle variant='compact' />
               </div>
               <div className={cn('flex', collapsed ? 'justify-center' : '')}>
                 {!collapsed && artist ? (
