@@ -12,7 +12,9 @@ const USER_KEY_2 = `onboarding:user:${TEST_USER_2}`;
 const IP_KEY = `onboarding:ip:${TEST_IP}`;
 const IP_KEY_2 = `onboarding:ip:${TEST_IP_2}`;
 
-describe('enforceOnboardingRateLimit', () => {
+// Skip all tests in this describe block if Redis is not available (local dev)
+// In CI, Redis credentials will be provided so tests will run
+describe.runIf(redis)('enforceOnboardingRateLimit', () => {
   beforeEach(async () => {
     // Clean up all test keys
     if (redis) {
