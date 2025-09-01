@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface DashboardOverviewProps {
   initialData: DashboardData;
@@ -16,6 +17,26 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
       : null
   );
 
+  // Fetch social links to determine completion status
+  useEffect(() => {
+    if (!artist?.id) return;
+    
+    const fetchSocialLinks = async () => {
+      try {
+        const response = await fetch(`/api/dashboard/social-links?profileId=${artist.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setHasSocialLinks(data.links && data.links.length > 0);
+        }
+      } catch (error) {
+        console.error('Error fetching social links:', error);
+        // Keep hasSocialLinks as false on error
+      }
+    };
+    
+    fetchSocialLinks();
+  }, [artist?.id]);
+
   if (!artist) {
     return null; // This shouldn't happen given the server-side logic
   }
@@ -25,7 +46,8 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const hasSocialLinks = false; // We'll need to fetch this from social links
+  const [hasSocialLinks, setHasSocialLinks] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
 
@@ -71,14 +93,22 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                 View Profile
               </Link>
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `https://jov.ie/${artist.handle}`
-                  );
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      `${getBaseUrl()}/${artist.handle}`
+                    );
+                    setCopyStatus('success');
+                    setTimeout(() => setCopyStatus('idle'), 2000);
+                  } catch (error) {
+                    console.error('Failed to copy URL:', error);
+                    setCopyStatus('error');
+                    setTimeout(() => setCopyStatus('idle'), 2000);
+                  }
                 }}
                 className='flex-1 px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors text-center text-sm font-medium'
               >
-                Copy URL
+                {copyStatus === 'success' ? '✓ Copied!' : copyStatus === 'error' ? 'Failed to copy' : 'Copy URL'}
               </button>
             </div>
           </div>

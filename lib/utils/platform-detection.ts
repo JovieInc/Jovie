@@ -174,9 +174,15 @@ export function normalizeUrl(url: string): string {
 
     // Platform-specific URL normalization
     if (/(?:www\.)?tiktok\.com/i.test(parsedUrl.hostname)) {
-      // Auto-add @ for TikTok handles if missing
+      // Auto-add @ for TikTok handles if missing, but avoid reserved paths
       const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-      if (pathParts.length > 0 && !pathParts[0].startsWith('@')) {
+      const reservedPaths = ['for', 'following', 'live', 'upload', 'search', 'discover', 'trending'];
+      
+      if (pathParts.length > 0 && 
+          !pathParts[0].startsWith('@') && 
+          !reservedPaths.includes(pathParts[0].toLowerCase()) &&
+          // Basic username validation: alphanumeric, dots, underscores only
+          /^[a-zA-Z0-9._]+$/.test(pathParts[0])) {
         pathParts[0] = '@' + pathParts[0];
         parsedUrl.pathname = '/' + pathParts.join('/');
       }
