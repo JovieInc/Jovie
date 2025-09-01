@@ -1,4 +1,6 @@
 name: sync-preview-nightly
+permissions:
+  contents: read
 
 on:
   schedule:
