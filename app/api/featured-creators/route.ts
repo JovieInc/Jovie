@@ -2,7 +2,6 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
-import { redis } from '@/lib/redis';
 
 export const runtime = 'edge';
 export const revalidate = 3600; // Cache results for 1 hour
@@ -43,26 +42,8 @@ async function getFeaturedCreators() {
 }
 
 export async function GET() {
-  const cacheKey = 'featured-creators';
-
   try {
-    // Try cache first
-    const cached = redis ? await redis.get(cacheKey) : null;
-    if (cached) {
-      return NextResponse.json(cached, {
-        headers: {
-          'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=360',
-        },
-      });
-    }
-
-    // Cache miss - fetch from database
     const creators = await getFeaturedCreators();
-
-    // Store in Redis with 180s TTL
-    if (redis) {
-      await redis.setex(cacheKey, 180, creators);
-    }
 
     return NextResponse.json(creators, {
       headers: {

@@ -2,11 +2,8 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { type CreatorProfile, creatorProfiles, users } from '@/lib/db/schema';
-import { redis } from '@/lib/redis';
+import { creatorProfiles, users } from '@/lib/db/schema';
 import { trackServerEvent } from '@/lib/server-analytics';
-
-const CACHE_PREFIX = 'profile:';
 
 // Use Edge runtime for better performance
 export const runtime = 'edge';
@@ -14,16 +11,6 @@ export const runtime = 'edge';
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
-      const cacheKey = `${CACHE_PREFIX}${clerkUserId}`;
-
-      // Check cache only if Redis is available
-      if (redis) {
-        const cached = await redis.get<CreatorProfile>(cacheKey);
-        if (cached) {
-          return NextResponse.json({ profile: cached }, { status: 200 });
-        }
-      }
-
       const [row] = await db
         .select({ profile: creatorProfiles })
         .from(creatorProfiles)
@@ -40,11 +27,10 @@ export async function GET() {
         );
       }
 
-      // Cache with TTL if Redis is available (2 minutes as per CLAUDE.md guidelines)
-      if (redis) {
-        await redis.set(cacheKey, profile, { ex: 120 });
-      }
-      return NextResponse.json({ profile }, { status: 200 });
+      return NextResponse.json(
+        { profile },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
@@ -61,7 +47,6 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     return await withDbSession(async clerkUserId => {
-      const cacheKey = `${CACHE_PREFIX}${clerkUserId}`;
       const body = (await req.json().catch(() => null)) as {
         updates?: Record<string, unknown>;
       } | null;
@@ -116,28 +101,21 @@ export async function PUT(req: Request) {
       }
 
       // Cache invalidation and analytics tracking in parallel (non-blocking)
-      const backgroundTasks = [];
-
-      if (redis) {
-        backgroundTasks.push(
-          redis
-            .del(cacheKey)
-            .catch(error => console.warn('Cache invalidation failed:', error))
-        );
-      }
-
-      backgroundTasks.push(
+      const backgroundTasks = [
         trackServerEvent(
           'dashboard_profile_updated',
           undefined,
           clerkUserId
-        ).catch(error => console.warn('Analytics tracking failed:', error))
-      );
+        ).catch(error => console.warn('Analytics tracking failed:', error)),
+      ];
 
       // Run background tasks in parallel without blocking the response
       Promise.all(backgroundTasks);
 
-      return NextResponse.json({ profile: updatedProfile }, { status: 200 });
+      return NextResponse.json(
+        { profile: updatedProfile },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
     });
   } catch (error) {
     console.error('Error updating profile:', error);
