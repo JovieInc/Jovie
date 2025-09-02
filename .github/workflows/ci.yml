@@ -67,7 +67,7 @@ jobs:
             ${{ runner.os }}-eslint-${{ github.ref }}-
             ${{ runner.os }}-eslint-
       - name: Lint (enforce zero warnings)
-        run: pnpm run lint
+        run: pnpm run lint -- --max-warnings=0
 
   neon-db:
     name: Neon DB
