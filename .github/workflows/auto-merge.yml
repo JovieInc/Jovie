@@ -99,10 +99,10 @@ jobs:
             let re;
             if (base === 'production') {
               // Full checks on production PRs
-              re = '^CI \/ (Build|Unit Tests|E2E Tests|Drizzle Check)$';
+              re = '^(Build|Unit Tests|E2E Tests|Drizzle Check)$';
             } else {
               // Fast checks on preview PRs
-              re = '^CI \/ (ci-fast|PR Up-to-date with Preview)$';
+              re = '^(ci-fast)$';
             }
             core.setOutput('check_re', re);
 

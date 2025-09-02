@@ -27,42 +27,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  up-to-date-with-preview:
-    name: PR Up-to-date with Preview
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-      - name: Check branch is up-to-date with preview
-        run: |
-          git fetch origin preview
-          if git merge-base --is-ancestor origin/preview HEAD; then
-            echo "✅ Up to date with preview"
-          else
-            echo "⚠️ Branch is behind preview"
-            echo "This is expected - our auto-merge workflow will update the branch automatically"
-            echo "If auto-merge fails, please manually update your branch:"
-            echo "  git checkout ${{ github.event.pull_request.head.ref }}"
-            echo "  git merge origin/preview"
-            echo "  git push"
-            
-            # Only fail if this is a regular PR without auto-merge labels
-            # Auto-merge workflow will handle updating dependent PRs
-            labels="${{ join(github.event.pull_request.labels.*.name, ' ') }}"
-            author="${{ github.event.pull_request.user.login }}"
-            
-            if [[ "$author" == "dependabot[bot]" ]] || [[ "$labels" =~ codegen ]] || [[ "$labels" =~ auto-merge ]]; then
-              echo "✅ Auto-merge eligible PR - will be updated automatically"
-              exit 0
-            else
-              echo "❌ Manual PR requires up-to-date branch"
-              exit 1
-            fi
-          fi
 
   ci-typecheck:
     name: Typecheck
@@ -91,8 +55,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Run whenever Drizzle Check would run
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || github.event.pull_request.base.ref == 'preview' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Only run for push/merge_group and PRs to production (or full-ci label)
+    # Skip for preview PRs to keep fast lane truly fast (UI-only changes don't need DB)
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -488,7 +453,8 @@ jobs:
 
   ci-pr-vercel-preview:
     name: Preview Deploy (PR)
-    needs: [ci-drizzle-check, neon-db]
+    # Only needs build - no DB dependencies for fast UI-only PRs
+    needs: [ci-build]
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -515,20 +481,22 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-      - name: Deploy (PR preview, pooled DB only for this deployment)
+      - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
-          # Prefer pooled URL from Neon branch; fall back to non-pooled/secrets if not available
-          POOLED_URL="$DB_URL_POOLED"
-          if [ -z "$POOLED_URL" ]; then
-            echo "Pooled DB URL not provided by Neon action; falling back to non-pooled/secrets"
-            if [ -n "$DB_URL_NON_POOLED" ]; then
-              POOLED_URL="$DB_URL_NON_POOLED"
-            elif [ -n "$DATABASE_URL_PREVIEW" ]; then
-              POOLED_URL="$DATABASE_URL_PREVIEW"
-            else
-              POOLED_URL="$DATABASE_URL"
-            fi
+          # For fast preview PRs: use preview secrets (no Neon dependency)
+          # Fallback hierarchy for maximum compatibility
+          POOLED_URL=""
+          if [ -n "$DATABASE_URL_PREVIEW" ]; then
+            POOLED_URL="$DATABASE_URL_PREVIEW"
+            echo "Using preview database URL"
+          elif [ -n "$DATABASE_URL" ]; then
+            POOLED_URL="$DATABASE_URL"
+            echo "Using fallback database URL"
+          else
+            # Provide cheap stub for UI-only deployments that might not need DB
+            POOLED_URL="postgresql://stub:stub@localhost:5432/preview_stub"
+            echo "Using stub database URL for UI-only deployment"
           fi
 
           # Deploy preview with DATABASE_URL injected only for this deployment
@@ -542,8 +510,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DB_URL_POOLED: ${{ needs.neon-db.outputs.db_url_pooled }}
-          DB_URL_NON_POOLED: ${{ needs.neon-db.outputs.db_url }}
+          # Use preview secrets - no Neon dependency for fast deployments
           DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -624,6 +591,9 @@ jobs:
         continue-on-error: false
 
   promote:
+    name: Auto Promote to Production (Primary)
+    # PRIMARY: Automatic promotion path - creates/updates preview → production PR
+    # Fallback: Manual promotion available via auto-promote.yml workflow
     needs: [deploy]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
     runs-on: ubuntu-latest

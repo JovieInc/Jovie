@@ -1,4 +1,8 @@
-name: Auto Promote to Production
+name: Manual Promotion (Fallback)
+
+# FALLBACK: Manual promotion workflow
+# Primary promotion path is automatic in ci.yml (promote job on push to preview)
+# This workflow is for manual override when the automatic promotion fails or is skipped
 
 on:
   workflow_dispatch:
@@ -14,7 +18,7 @@ concurrency:
 
 jobs:
   open-promotion-pr:
-    name: Open promotion PR (preview -> production)
+    name: Manual promotion PR (preview -> production)
     runs-on: ubuntu-latest
     steps:
       - name: Ensure not from bot loop

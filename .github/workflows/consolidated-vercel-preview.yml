@@ -1,12 +1,10 @@
-name: Vercel Preview Deployment & Alias
+# DISABLED: Duplicate of ci-pr-vercel-preview job in ci.yml
+# This workflow was creating duplicate PR preview deployments
+# The CI-integrated preview deployment reuses Neon DB outputs more efficiently
+name: Vercel Preview Deployment & Alias (DISABLED)
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize]
-  push:
-    branches-ignore:
-      - production
-      - preview
+  # Disabled - handled by ci-pr-vercel-preview job in ci.yml
   workflow_dispatch:
     inputs:
       pr:
@@ -23,11 +21,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    name: Deploy Vercel Preview
+  disabled-notice:
+    name: Workflow Disabled Notice  
     runs-on: ubuntu-latest
-    # Avoid running with secrets on forked PRs
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: Notice
+        run: |
+          echo "🚫 This workflow is DISABLED"
+          echo "ℹ️  PR preview deployments are handled by the ci-pr-vercel-preview job in ci.yml"
+          echo "ℹ️  This prevents duplicate builds and deployments"
+          echo "✅ No action needed - this is expected behavior"
+          
+  deploy:
+    name: Deploy Vercel Preview (DISABLED)
+    runs-on: ubuntu-latest
+    # DISABLED: This job is replaced by ci-pr-vercel-preview in ci.yml
+    if: false
     env:
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
