@@ -1,0 +1,49 @@
+name: GitHub Copilot PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [preview, production]
+    # Run on all code changes
+    paths:
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.js" 
+      - "**/*.jsx"
+      - "**/*.vue"
+      - "**/*.py"
+      - "**/*.go"
+      - "**/*.rs"
+      - "**/*.java"
+      - "**/*.cs"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  copilot-review:
+    name: GitHub Copilot Review
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: GitHub Copilot PR Review
+        uses: github/copilot-pr-reviewer@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: Customize review behavior
+          review-simple-changes: true
+          review-comment-lgtm: false
+          # Focus on security, performance, and best practices
+          focus-areas: |
+            - Security vulnerabilities
+            - Performance issues
+            - Code quality and best practices
+            - Potential bugs
+            - Accessibility issues
