@@ -1,0 +1,96 @@
+name: CI Optimized
+
+on:
+  pull_request:
+    branches: [preview, production]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  push:
+    branches: [preview, production]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ci-optimized-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: Setup
+    runs-on: ubuntu-latest
+    outputs:
+      cache-key: ${{ steps.setup.outputs.cache-key }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Get cache key
+        id: setup
+        run: |
+          echo "cache-key=${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}" >> $GITHUB_OUTPUT
+
+  ci-typecheck:
+    name: Typecheck
+    needs: setup
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            **/node_modules
+          key: ${{ needs.setup.outputs.cache-key }}
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  ci-lint:
+    name: Lint
+    needs: setup
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            **/node_modules
+          key: ${{ needs.setup.outputs.cache-key }}
+      - name: Lint (enforce zero warnings)
+        run: pnpm run lint --max-warnings=0
+
+  # Add more jobs here following the same pattern
+  # ci-build, ci-unit-tests, etc.
+
+  # Example of test result artifact upload
+  test-results:
+    name: Test Results
+    needs: [ci-typecheck, ci-lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: |
+            test-results/**/*.xml
+            coverage/**/*
+          retention-days: 7
