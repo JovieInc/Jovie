@@ -21,7 +21,6 @@ on:
           - preview
 
 env:
-  PLAYWRIGHT_BROWSERS_PATH: 0
 
 jobs:
   synthetic-test:
@@ -46,16 +45,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        uses: actions/cache@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Browsers
+      - name: Install Playwright Browsers (chromium only)
         run: npx playwright install --with-deps chromium
 
       - name: Set environment URLs

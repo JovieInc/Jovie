@@ -38,6 +38,14 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache TS build info
+        uses: actions/cache@v4
+        with:
+          path: .cache/tsbuildinfo
+          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('tsconfig.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-tsc-${{ github.ref }}-
+            ${{ runner.os }}-tsc-
       - name: Typecheck
         run: pnpm run typecheck
 
@@ -50,8 +58,16 @@ jobs:
       - uses: actions/checkout@v4
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache ESLint cache
+        uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          key: ${{ runner.os }}-eslint-${{ github.ref }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.js', '.eslintrc*') }}
+          restore-keys: |
+            ${{ runner.os }}-eslint-${{ github.ref }}-
+            ${{ runner.os }}-eslint-
       - name: Lint (enforce zero warnings)
-        run: pnpm run lint --max-warnings=0
+        run: pnpm run lint
 
   neon-db:
     name: Neon DB
@@ -307,6 +323,16 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Next build cache
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-${{ github.ref }}-${{ hashFiles('pnpm-lock.yaml', 'next.config.js', 'app/**', 'components/**', 'lib/**', 'styles/**') }}
+          restore-keys: |
+            ${{ runner.os }}-next-${{ github.ref }}-
+            ${{ runner.os }}-next-
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'

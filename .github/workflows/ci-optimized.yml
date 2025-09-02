@@ -1,17 +1,7 @@
 name: CI Optimized
 
 on:
-  pull_request:
-    branches: [preview, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
-  push:
-    branches: [preview, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
+  # Converted to manual only to avoid duplicating primary CI
   workflow_dispatch:
 
 permissions: read-all
