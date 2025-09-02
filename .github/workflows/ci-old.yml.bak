@@ -1,0 +1,786 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [preview, production]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  push:
+    branches: [preview, production]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  merge_group:
+    branches: [preview, production]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - '.vscode/**'
+  workflow_dispatch:
+
+permissions: read-all
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  ci-typecheck:
+    name: Typecheck
+    # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }  # Optimized: no git history needed
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  ci-lint:
+    name: Lint
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }  # Optimized: no git history needed
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Lint (enforce zero warnings)
+        run: pnpm run lint --max-warnings=0
+
+  neon-db:
+    name: Neon DB
+    # Only run for push/merge_group and PRs to production (or full-ci label)
+    # Skip for preview PRs to keep fast lane truly fast (UI-only changes don't need DB)
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      db_url: ${{ steps.finalize-urls.outputs.db_url }}
+      db_url_pooled: ${{ steps.finalize-urls.outputs.db_url_pooled }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Determine sanitized branch name
+        id: sanitize-branch
+        run: |
+          RAW="${{ github.head_ref || github.ref_name }}"
+          # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
+          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          echo "Using sanitized branch name: $SANITIZED"
+          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+      - name: Create or reuse Neon branch
+        id: create-branch
+        uses: neondatabase/create-branch-action@v6
+        continue-on-error: true
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ steps.sanitize-branch.outputs.name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - name: Finalize Neon DB URLs
+        id: finalize-urls
+        run: |
+          DB_URL="${{ steps.create-branch.outputs.db_url }}"
+          DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
+
+          if [ -z "$DB_URL" ]; then
+            echo "Neon branch creation did not return db_url; falling back to repository secrets."
+            if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+              DB_URL="${{ secrets.NEON_DATABASE_URL }}"
+            elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL_PREVIEW }}"
+            elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL }}"
+            fi
+          fi
+
+          echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
+          echo "db_url_pooled=$DB_URL_POOLED" >> $GITHUB_OUTPUT
+
+  drizzle-migration-guard:
+    name: Migration Guard
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run Migration Guard
+        run: |
+          # Make script executable
+          chmod +x scripts/check-migrations.sh
+          
+          # Run migration guard
+          ./scripts/check-migrations.sh
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+
+  ci-drizzle-check:
+    name: Drizzle Check
+    needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve DATABASE_URL
+        id: resolve_db
+        run: |
+          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          SRC=""
+          if [ -n "$CANDIDATE" ]; then
+            echo "Using Neon DB URL from neon-db job outputs"
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            SRC="neon-job-output"
+          elif [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+            echo "Using NEON_DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
+            SRC="secret:NEON_DATABASE_URL"
+          elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
+            echo "Using DATABASE_URL_PREVIEW secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL_PREVIEW"
+          elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "Using DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL"
+          else
+            echo "No DATABASE_URL could be resolved (likely a fork PR)."
+            SRC="unresolved"
+          fi
+
+          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
+          {
+            echo "### Drizzle Check: DATABASE_URL Resolution"
+            echo "- Source: $SRC"
+            if [ "$SRC" = "unresolved" ]; then
+              echo "- Note: No URL available; downstream steps may skip gracefully."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Check if Drizzle-related changes require running this job
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'drizzle'
+          full-ci-label: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      # Custom DB URL check for Drizzle (after path guard)
+      - name: Check DATABASE_URL availability
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          if [[ -z "$DATABASE_URL" ]]; then
+            echo "No DATABASE_URL available (likely a fork PR). Skipping Drizzle check."
+            echo "SKIP_DRIZZLE=true" >> $GITHUB_ENV
+          else
+            echo "SKIP_DRIZZLE=false" >> $GITHUB_ENV
+          fi
+
+      # Skip notification (updated condition)
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true' || env.SKIP_DRIZZLE == 'true'
+        run: |
+          if [[ "${{ steps.check_changes.outputs.run_full_ci }}" != "true" ]]; then
+            echo "Skipping Drizzle check as no DB/schema paths were changed."
+            echo "To force a full CI run, add the 'full-ci' label to the PR."
+          elif [[ "$SKIP_DRIZZLE" == "true" ]]; then
+            echo "Skipping Drizzle check as no DATABASE_URL available (fork PR)."
+          fi
+          exit 0
+
+      # Continue with CI steps only if relevant changes detected and DB URL available
+      - name: Setup Node.js and pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true' && env.SKIP_DRIZZLE != 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run Drizzle Check
+        if: steps.check_changes.outputs.run_full_ci == 'true' && env.SKIP_DRIZZLE != 'true'
+        run: pnpm run drizzle:check
+
+  ci-fast:
+    name: ci-fast
+    # Gate for PRs and merge queue: aggregate fast checks
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All fast checks passed
+        run: |
+          echo "ci-fast passed: Typecheck and Lint succeeded"
+
+  ci-build:
+    name: Build
+    needs: [ci-typecheck, ci-lint]
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
+      - name: Check for relevant changes
+        id: check_changes
+        run: |
+          # Force run if full-ci label is present
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
+            echo "Forcing full CI run due to 'full-ci' label"
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip on fork PRs where repo secrets are unavailable
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "Fork PR detected; skipping Build job to avoid missing secrets."
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For PRs to production, always run full CI (skip path guards)
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "production" ]]; then
+            echo "Running full CI for PR to production branch"
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For merge queue events, always run full CI
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "Running full CI for merge queue"
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # For push events to production/preview, always run full CI
+          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/preview") ]]; then
+            echo "Running full CI for push to production/preview branch"
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Determine changed files depending on event type
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # For PRs, compare against the base ref from origin
+            git fetch origin "${{ github.base_ref }}"
+            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+          else
+            # For push/merge_group, compare with previous commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+
+          # Check if critical paths were modified
+          echo "Checking for changes in critical paths..."
+          if echo "$CHANGED_FILES" | grep -q -E '^(app/|components/|lib/|tests/|package.*\.json|next\.config\.js)'; then
+            echo "Critical paths changed, running full CI"
+            echo "run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "No critical paths changed, skipping full CI"
+            echo "run_full_ci=false" >> $GITHUB_OUTPUT
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+          fi
+
+      # Skip remaining steps if no relevant changes
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping full CI as no critical paths were changed."
+          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          exit 0
+
+      # Continue with CI steps only if relevant changes detected or full-ci label present
+      - name: Setup Node.js and pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
+  ci-unit-tests:
+    name: Unit Tests
+    needs: [ci-typecheck, ci-lint]
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Check if test-related changes require running this job
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'test'
+          full-ci-label: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      # Skip remaining steps if no relevant changes
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping unit tests as no critical paths were changed."
+          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          exit 0
+
+      # Continue with CI steps only if relevant changes detected or full-ci label present
+      - name: Setup Node.js and pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run unit tests
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm test
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+  ci-merge-smoke:
+    name: Merge Group Smoke
+    if: ${{ github.event_name == 'merge_group' }}
+    needs: [ci-typecheck, ci-lint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Build (smoke)
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
+  ci-e2e-tests:
+    name: E2E Tests
+    needs: [ci-build, ci-unit-tests]
+    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    runs-on: ubuntu-latest
+    env:
+      # Use the Neon database URL from GitHub secrets
+      # The Neon GitHub integration should automatically set NEON_DATABASE_URL
+      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
+      NODE_ENV: test
+      # Increase Node.js memory limit for tests
+      NODE_OPTIONS: '--max_old_space_size=4096'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      # Check if E2E-related changes require running this job
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'e2e'
+          full-ci-label: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      # Skip remaining steps if no relevant changes
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping E2E tests as no critical paths were changed."
+          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          exit 0
+
+      # Continue with CI steps only if relevant changes detected or full-ci label present
+      - name: Setup Node.js and pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Cache Playwright Browsers
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        run: npx playwright install --with-deps
+
+      - name: E2E Smoke (PR to Preview)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        run: pnpm run e2e:smoke --trace=retain-on-failure
+        continue-on-error: ${{ github.event_name == 'pull_request' }}
+
+      - name: E2E Full (Preview Branch)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/preview' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        run: pnpm run test:e2e --reporter=line
+
+      - name: Upload Playwright Artifacts on Failure
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  ci-pr-vercel-preview:
+    name: Preview Deploy (PR)
+    # Only needs build - no DB dependencies for fast UI-only PRs
+    needs: [ci-build]
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Pull env (preview)
+        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build (PR preview)
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (PR preview, fast deployment for UI-only changes)
+        id: pr_deploy
+        run: |
+          # For fast preview PRs: use preview secrets (no Neon dependency)
+          # Fallback hierarchy for maximum compatibility
+          POOLED_URL=""
+          if [ -n "$DATABASE_URL_PREVIEW" ]; then
+            POOLED_URL="$DATABASE_URL_PREVIEW"
+            echo "Using preview database URL"
+          elif [ -n "$DATABASE_URL" ]; then
+            POOLED_URL="$DATABASE_URL"
+            echo "Using fallback database URL"
+          else
+            # Provide cheap stub for UI-only deployments that might not need DB
+            POOLED_URL="postgresql://stub:stub@localhost:5432/preview_stub"
+            echo "Using stub database URL for UI-only deployment"
+          fi
+
+          # Deploy preview with DATABASE_URL injected only for this deployment
+          deployment_url=$(vercel deploy --prebuilt \
+            --env DATABASE_URL="$POOLED_URL" \
+            --env GIT_BRANCH="${GIT_BRANCH}" \
+            --token $VERCEL_TOKEN)
+
+          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          # Use preview secrets - no Neon dependency for fast deployments
+          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+  deploy:
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: Preview
+      url: https://preview.jov.ie
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: DB migrate (preview - Drizzle)
+        run: pnpm run drizzle:migrate:preview
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
+          GIT_BRANCH: preview
+        continue-on-error: true
+      - name: DB seed (preview)
+        run: pnpm run db:seed
+        env:
+          GIT_BRANCH: preview
+        continue-on-error: false
+      - name: Pull env (preview)
+        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (prebuilt)
+        id: deploy
+        run: |
+          deployment_url=$(vercel deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }})
+          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Canary health check
+        run: |
+          echo "Running canary health check on preview deployment..."
+          deployment_url="${{ steps.deploy.outputs.deployment_url }}"
+
+          # Wait a moment for deployment to be ready
+          sleep 10
+
+          # Basic health check - verify site loads and key elements exist
+          response_code=$(curl -s -o /dev/null -w "%{http_code}" "$deployment_url" || echo "000")
+
+          if [ "$response_code" != "200" ]; then
+            echo "❌ Canary failed: HTTP $response_code"
+            exit 1
+          fi
+
+          # Check for key content (adjust selector as needed)
+          page_content=$(curl -s "$deployment_url" || echo "")
+          if [[ ! "$page_content" =~ "Jovie" ]]; then
+            echo "❌ Canary failed: Key content missing"
+            exit 1
+          fi
+
+          echo "✅ Canary passed: Preview deployment healthy"
+        continue-on-error: false
+
+  promote:
+    name: Auto Promote to Production (Primary)
+    # PRIMARY: Automatic promotion path - creates/updates preview → production PR
+    # Fallback: Manual promotion available via auto-promote.yml workflow
+    needs: [deploy]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: Create/Update PR preview → production (manual review required)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create PR body with QA checklist
+          pr_body="## Release Promotion: preview → production
+
+          **⚠️ Manual Review Required**
+
+          This PR promotes changes from \`preview\` to \`production\` for production release.
+
+          ### Pre-merge Checklist
+          - [ ] **Full CI passed** (ci-full job completed successfully)
+          - [ ] **CodeQL security scan passed** (if applicable)
+          - [ ] **Preview environment tested** and verified working
+          - [ ] **Database migrations reviewed** (if any)
+          - [ ] **Feature flags configured** appropriately for production
+          - [ ] **Monitoring/alerts reviewed** for new features
+          - [ ] **Performance impact assessed** (no regressions)
+          - [ ] **Rollback plan documented** (feature flags, DB, etc.)
+
+          ### Release QA
+          - [ ] **Smoke tests passed** in preview environment
+          - [ ] **Key user journeys verified** manually
+          - [ ] **Mobile/responsive tested** (if UI changes)
+          - [ ] **Cross-browser compatibility** verified (if applicable)
+          - [ ] **Error handling tested** (edge cases, failures)
+
+          ### Documentation
+          - [ ] **CHANGELOG updated** with user-facing changes
+          - [ ] **Feature documentation** updated (if applicable)
+          - [ ] **API docs updated** (if API changes)
+
+          **🚨 Do not merge until all checks pass and manual QA is complete.**"
+
+          # Check if PR already exists
+          existing_pr=$(gh pr list --head preview --base production --json number --jq '.[0].number // empty')
+          if [ -z "$existing_pr" ]; then
+            echo "Creating new PR: preview → production"
+            gh pr create --base production --head preview --title "🚀 Release: Promote preview → production" --body "$pr_body"
+          else
+            echo "PR already exists: #$existing_pr (updating with latest checklist)"
+            gh pr edit "$existing_pr" --title "🚀 Release: Promote preview → production" --body "$pr_body"
+          fi
+
+  ai-review-gate:
+    name: AI Review Gate
+    # Only for production PRs - fail if MUSTFIX issues found
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Wait for AI reviews
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const prNum = context.payload.pull_request.number;
+            
+            // Wait up to 5 minutes for both AI tools to complete
+            const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+            const checkInterval = 15 * 1000; // 15 seconds
+            const startTime = Date.now();
+            
+            let claudeCompleted = false;
+            let copilotCompleted = false;
+            
+            core.info('Waiting for AI reviews to complete...');
+            
+            while (Date.now() - startTime < maxWaitTime) {
+              // Check for Claude Code Review completion
+              if (!claudeCompleted) {
+                const claudeRuns = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner,
+                  repo,
+                  workflow_id: 'claude-code-review.yml',
+                  head_sha: context.payload.pull_request.head.sha,
+                  per_page: 1
+                });
+                
+                if (claudeRuns.data.workflow_runs.length > 0) {
+                  const run = claudeRuns.data.workflow_runs[0];
+                  if (run.status === 'completed') {
+                    claudeCompleted = true;
+                    core.info('Claude Code Review completed');
+                  }
+                }
+              }
+              
+              // Check for Copilot PR Review completion
+              if (!copilotCompleted) {
+                const copilotRuns = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner,
+                  repo,
+                  workflow_id: 'copilot-pr-review.yml',
+                  head_sha: context.payload.pull_request.head.sha,
+                  per_page: 1
+                });
+                
+                if (copilotRuns.data.workflow_runs.length > 0) {
+                  const run = copilotRuns.data.workflow_runs[0];
+                  if (run.status === 'completed') {
+                    copilotCompleted = true;
+                    core.info('Copilot PR Review completed');
+                  }
+                }
+              }
+              
+              // Both completed - proceed to MUSTFIX check
+              if (claudeCompleted && copilotCompleted) {
+                break;
+              }
+              
+              await new Promise(resolve => setTimeout(resolve, checkInterval));
+            }
+            
+            core.info(`AI review completion status: Claude=${claudeCompleted}, Copilot=${copilotCompleted}`);
+            
+            // Get all PR comments to check for MUSTFIX
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNum,
+              per_page: 100
+            });
+            
+            // Check for MUSTFIX in any comment
+            const mustFixFound = comments.some(comment => 
+              comment.body && comment.body.toUpperCase().includes('MUSTFIX')
+            );
+            
+            if (mustFixFound) {
+              core.setFailed('MUSTFIX issues found in AI reviews. Address these issues before merging to production.');
+            } else {
+              core.info('No MUSTFIX issues found. AI review gate passed.');
+            }
+
+  deploy-prod:
+    needs: [ci-typecheck, ci-lint, ci-build, ci-unit-tests, ci-e2e-tests, ai-review-gate]
+    if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: Production
+      url: https://jov.ie
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
+        run: pnpm run drizzle:migrate:prod
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GIT_BRANCH: production
+          ALLOW_PROD_MIGRATIONS: true
+        continue-on-error: false
+      - name: Pull env (production)
+        run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build (production)
+        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PROD }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (production, prebuilt)
+        run: vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

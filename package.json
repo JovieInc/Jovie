@@ -24,6 +24,7 @@
     "check:ci": "run-s validate test:ci",
     "validate": "run-p format:check lint typecheck",
     "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest run",
+    "test:unit:fast": "vitest run --reporter=dot --bail 1",
     "test:ci": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --reporter=verbose --coverage",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
