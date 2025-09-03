@@ -209,16 +209,35 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
         return;
       }
 
+      // Determine visibility rules by category (social soft cap: 6 visible; music: unlimited)
+      const socialVisibleCount = links.filter(
+        l => l.platform.category === 'social' && l.isVisible
+      ).length;
+
+      const willBeVisible =
+        detectedLink.platform.category === 'social'
+          ? socialVisibleCount < 6
+          : true; // dsp (music) and custom are unlimited visibility for now
+
       const newLink: LinkItem = {
         ...detectedLink,
         id: `link_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         title: detectedLink.suggestedTitle,
-        isVisible: true,
+        isVisible: willBeVisible,
         order: links.length,
       };
 
       const newLinks = [...links, newLink];
       updateLinks(newLinks);
+
+      if (!willBeVisible && detectedLink.platform.category === 'social') {
+        showToast({
+          message:
+            'Added. Social links beyond 6 are hidden from your public page to keep it focused. You can reorder to choose which 6 show.',
+          type: 'info',
+          duration: 6000,
+        });
+      }
 
       // Immediately save when a new link is added (no debounce)
       onLinkAdded?.(newLinks);
@@ -291,24 +310,14 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
         onAdd={handleAddLink}
         disabled={disabled || links.length >= maxLinks}
         existingPlatforms={links.map(link => link.platform.id)}
+        socialVisibleCount={
+          links.filter(l => l.platform.category === 'social' && l.isVisible)
+            .length
+        }
+        socialVisibleLimit={6}
       />
 
-      {/* Links Counter */}
-      {links.length > 0 && (
-        <div
-          className='flex items-center justify-between text-sm text-gray-500 dark:text-gray-400'
-          aria-live='polite'
-        >
-          <span>
-            {links.length} link{links.length === 1 ? '' : 's'}
-          </span>
-          {maxLinks && (
-            <span>
-              {links.length}/{maxLinks} max
-            </span>
-          )}
-        </div>
-      )}
+      {/* Links Counter moved next to Add button inside UniversalLinkInput */}
 
       {/* Sortable Links List */}
       {links.length > 0 && (

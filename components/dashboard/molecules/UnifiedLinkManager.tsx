@@ -61,8 +61,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
             ✨ Add Any Link
           </h3>
           <p className='text-sm text-secondary'>
-            Paste any link and we&apos;ll automatically detect the platform and
-            organize it for you
+            Paste a link — we’ll detect and organize it for you.
           </p>
         </div>
 
@@ -78,11 +77,11 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
         />
       </div>
 
-      {/* Organized Link Groups */}
+      {/* Organized Link Groups (Collapsible) */}
       {(socialLinks.length > 0 ||
         musicLinks.length > 0 ||
         customLinks.length > 0) && (
-        <div className='space-y-6'>
+        <div className='space-y-4'>
           <div className='flex items-center gap-2'>
             <h3 className='text-lg font-semibold text-primary'>Your Links</h3>
             <span className='text-xs text-secondary bg-surface-2 px-2 py-1 rounded-full'>
@@ -91,74 +90,114 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
             </span>
           </div>
 
-          <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
+          <div className='space-y-3'>
             {/* Social Links Group */}
             {socialLinks.length > 0 && (
-              <div className='bg-surface-1 border border-subtle rounded-lg p-4'>
-                <div className='flex items-center gap-2 mb-4'>
-                  <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
-                  <h4 className='text-sm font-medium text-primary'>
-                    Social ({socialLinks.length})
-                  </h4>
-                </div>
-                <div className='space-y-2'>
+              <details className='bg-surface-1 border border-subtle rounded-lg'>
+                <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
+                  <div className='flex items-center gap-2'>
+                    <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
+                    <span className='text-sm font-medium text-primary'>
+                      Social
+                    </span>
+                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                      {socialLinks.length}
+                    </span>
+                  </div>
+                  {(() => {
+                    const visible = socialLinks.filter(l => l.isVisible).length;
+                    const hidden = socialLinks.length - visible;
+                    return (
+                      <div className='flex items-center gap-2'>
+                        <span className='text-xs text-secondary'>
+                          {visible}/6 visible
+                        </span>
+                        {hidden > 0 && (
+                          <span className='text-[10px] text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                            {hidden} hidden
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </summary>
+                <div className='p-3 pt-0 space-y-2'>
                   {socialLinks.map(link => (
                     <div
                       key={link.id}
                       className='flex items-center gap-2 text-xs text-secondary'
                     >
                       <span className='w-1 h-1 bg-blue-500 rounded-full'></span>
-                      {link.platform.name}
+                      <span className='truncate'>
+                        {link.platform.name}
+                        {!link.isVisible && (
+                          <span className='ml-2 text-[10px] text-secondary'>
+                            (hidden)
+                          </span>
+                        )}
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
             )}
 
             {/* Music Links Group */}
             {musicLinks.length > 0 && (
-              <div className='bg-surface-1 border border-subtle rounded-lg p-4'>
-                <div className='flex items-center gap-2 mb-4'>
-                  <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                  <h4 className='text-sm font-medium text-primary'>
-                    Music ({musicLinks.length})
-                  </h4>
-                </div>
-                <div className='space-y-2'>
+              <details className='bg-surface-1 border border-subtle rounded-lg'>
+                <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
+                  <div className='flex items-center gap-2'>
+                    <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                    <span className='text-sm font-medium text-primary'>
+                      Music
+                    </span>
+                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                      {musicLinks.length}
+                    </span>
+                  </div>
+                </summary>
+                <div className='p-3 pt-0 space-y-2'>
                   {musicLinks.map(link => (
                     <div
                       key={link.id}
                       className='flex items-center gap-2 text-xs text-secondary'
                     >
                       <span className='w-1 h-1 bg-green-500 rounded-full'></span>
-                      {link.platform.name}
+                      <span className='truncate'>{link.platform.name}</span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
             )}
 
             {/* Custom Links Group */}
             {customLinks.length > 0 && (
-              <div className='bg-surface-1 border border-subtle rounded-lg p-4'>
-                <div className='flex items-center gap-2 mb-4'>
-                  <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
-                  <h4 className='text-sm font-medium text-primary'>
-                    Custom ({customLinks.length})
-                  </h4>
-                </div>
-                <div className='space-y-2'>
+              <details className='bg-surface-1 border border-subtle rounded-lg'>
+                <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
+                  <div className='flex items-center gap-2'>
+                    <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
+                    <span className='text-sm font-medium text-primary'>
+                      Custom
+                    </span>
+                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                      {customLinks.length}
+                    </span>
+                  </div>
+                </summary>
+                <div className='p-3 pt-0 space-y-2'>
                   {customLinks.map(link => (
                     <div
                       key={link.id}
                       className='flex items-center gap-2 text-xs text-secondary'
                     >
                       <span className='w-1 h-1 bg-purple-500 rounded-full'></span>
-                      {link.title || link.platform.name}
+                      <span className='truncate'>
+                        {link.title || link.platform.name}
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </details>
             )}
           </div>
         </div>
