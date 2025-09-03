@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardOverview } from '@/components/dashboard/DashboardOverview';
+import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import { getDashboardData } from '../actions';
 
 export default async function OverviewPage() {

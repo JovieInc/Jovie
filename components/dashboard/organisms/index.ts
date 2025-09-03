@@ -1,5 +1,7 @@
 export { AppleStyleOnboardingForm } from './AppleStyleOnboardingForm';
 export { ArtistSelectionForm } from './ArtistSelectionForm';
+export { DashboardLinks } from './DashboardLinks';
+export { DashboardPreview } from './DashboardPreview';
 export { ListenNowForm } from './ListenNowForm';
 export { OnboardingForm } from './OnboardingForm';
 export { OnboardingFormWrapper } from './OnboardingFormWrapper';

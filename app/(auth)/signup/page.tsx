@@ -45,7 +45,9 @@ export default function SignUpPage() {
                   'text-purple-600 hover:text-purple-500 font-medium',
               },
             }}
+            routing='hash'
             redirectUrl={redirectUrl}
+            afterSignUpUrl={redirectUrl}
             signInUrl='/signin'
           />
         </ClerkLoaded>

@@ -4,7 +4,15 @@ import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  appearance?: 'icon' | 'segmented';
+  className?: string;
+}
+
+export function ThemeToggle({
+  appearance = 'icon',
+  className = '',
+}: ThemeToggleProps) {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
 
@@ -14,7 +22,17 @@ export function ThemeToggle() {
 
   // Don't render anything until mounted to prevent hydration mismatch
   if (!mounted) {
-    return (
+    return appearance === 'segmented' ? (
+      <div
+        role='toolbar'
+        aria-label='Theme'
+        className={`flex gap-x-1.5 rounded-full bg-gray-600/5 p-1 ring-1 ring-gray-600/5 dark:bg-black/30 dark:ring-white/5 ${className}`}
+      >
+        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
+        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
+        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
+      </div>
+    ) : (
       <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
         <span className='sr-only'>Loading theme toggle</span>
         <div className='h-4 w-4 animate-pulse rounded-sm bg-gray-300 dark:bg-gray-600' />
@@ -93,12 +111,102 @@ export function ThemeToggle() {
     return 'light';
   };
 
+  if (appearance === 'segmented') {
+    const baseBtn =
+      'relative size-5 flex-none rounded-full outline-none transition-colors text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-300';
+    const activeBtn =
+      'bg-white text-gray-800 shadow-[0_1px_5px_-4px_rgba(19,19,22,0.4),0_2px_5px_rgba(34,42,53,0.06)] ring-1 ring-gray-900/10 dark:bg-gray-800 dark:text-gray-300 dark:ring-white/20';
+
+    return (
+      <div
+        role='toolbar'
+        aria-label='Theme'
+        className={`flex gap-x-1.5 rounded-full bg-gray-600/5 p-1 ring-1 ring-gray-600/5 dark:bg-black/30 dark:ring-white/5 ${className}`}
+      >
+        <button
+          type='button'
+          aria-label='Dark'
+          className={`${baseBtn} ${theme === 'dark' ? activeBtn : ''}`}
+          onClick={() => setTheme('dark')}
+        >
+          <span className='absolute inset-[calc(-3/16*1rem)]' />
+          <svg
+            viewBox='0 0 20 20'
+            fill='currentColor'
+            aria-hidden='true'
+            className='size-5'
+          >
+            <path
+              fillRule='evenodd'
+              d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
+              clipRule='evenodd'
+            />
+          </svg>
+        </button>
+        <button
+          type='button'
+          aria-label='Light'
+          className={`${baseBtn} ${theme === 'light' ? activeBtn : ''}`}
+          onClick={() => setTheme('light')}
+        >
+          <span className='absolute inset-[calc(-3/16*1rem)]' />
+          <svg
+            viewBox='0 0 20 20'
+            fill='none'
+            aria-hidden='true'
+            className='size-5'
+          >
+            <g
+              stroke='currentColor'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='1.5'
+            >
+              <circle
+                cx='10'
+                cy='10'
+                r='3.25'
+                fill='currentColor'
+                fillOpacity='.15'
+              ></circle>
+              <path d='M10 3.75v.5M14.42 5.58l-.354.354M16.25 10h-.5M14.42 14.42l-.354-.354M10 15.75v.5M5.934 14.065l-.354.354M4.25 10h-.5M5.934 5.935 5.58 5.58'></path>
+            </g>
+          </svg>
+        </button>
+        <button
+          type='button'
+          aria-label='System'
+          className={`${baseBtn} ${theme === 'system' ? activeBtn : ''}`}
+          onClick={() => setTheme('system')}
+        >
+          <span className='absolute inset-[calc(-3/16*1rem)]' />
+          <svg
+            viewBox='0 0 20 20'
+            fill='none'
+            aria-hidden='true'
+            className='size-5'
+          >
+            <path
+              fill='currentColor'
+              fillOpacity='0.15'
+              stroke='currentColor'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              strokeWidth='1.5'
+              d='M10 12.5v2.75m0 0H7.75m2.25 0h2.25m-6.5-3h8.5a1 1 0 0 0 1-1v-5.5a1 1 0 0 0-1-1h-8.5a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1Z'
+            />
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
   return (
     <Button
       variant='ghost'
       size='sm'
       onClick={cycleTheme}
-      className='h-8 w-8 p-0 flex items-center justify-center'
+      className={`h-8 w-8 p-0 flex items-center justify-center ${className}`}
       title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}`}
     >
       <span className='sr-only'>

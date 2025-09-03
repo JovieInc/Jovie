@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/dashboard');
+    redirect('/signin?redirect_url=/dashboard');
   }
 
   try {

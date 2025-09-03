@@ -1,9 +1,24 @@
 import { Footer as FooterOrganism } from '@/components/organisms/Footer';
 
-export function Footer() {
+type FooterVersion = 1 | 2 | 'minimal' | 'regular';
+
+interface SiteFooterProps {
+  version?: FooterVersion;
+  className?: string;
+}
+
+export function Footer({ version, className }: SiteFooterProps) {
+  const mappedVariant =
+    version === 1 || version === 'minimal'
+      ? 'minimal'
+      : version === 2 || version === 'regular'
+        ? 'regular'
+        : 'regular';
+
   return (
     <FooterOrganism
-      variant='marketing'
+      className={className}
+      variant={mappedVariant}
       showThemeToggle={true}
       links={[
         { href: '/legal/privacy', label: 'Privacy' },

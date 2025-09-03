@@ -51,14 +51,6 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
       publishableKey={publishableKey}
       appearance={
         {
-          variables: {
-            colorPrimary: '#7c3aed',
-            colorText: '#0c0c0c',
-            colorBackground: '#ffffff',
-            colorInputBackground: '#fafbfc',
-            colorInputText: '#0c0c0c',
-            colorInputBorder: '#d1d5db',
-          },
           elements: {
             rootBox: 'bg-base text-primary',
             card: 'bg-surface-1 border border-subtle dark:border-default',

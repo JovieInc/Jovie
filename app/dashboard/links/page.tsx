@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardLinks } from '@/components/dashboard/DashboardLinks';
+import { DashboardLinks } from '@/components/dashboard/organisms';
 import { getDashboardData } from '../actions';
 
 export default async function LinksPage() {

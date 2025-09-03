@@ -115,6 +115,73 @@ Follow Y Combinator principles: optimize for fast iteration, minimal cognitive o
 
 > **Note:** Before creating a new component, **search the repo for existing atoms/molecules/organisms**. Prefer reuse or extension over duplication. If you must add a new one, document in the PR why existing components don’t fit.
 
+### **Component Naming Standard (Atomic + YC Speed)**
+
+**Purpose:** Consistent naming and file structure for all components, enabling speed, clarity, and easy refactoring at scale.  
+**Philosophy:** Every component name and export should instantly convey its role, scope, and atomic level.
+
+#### 1. **Exports & Files**
+ - **Single export per file**: Every component gets its own file and named export.
+ - **Export name matches file name**: `Button.tsx` exports `Button`, not `DefaultButton`.
+ - **No default exports.** Always use named exports for predictability.
+
+#### 2. **Atoms**
+ - **Naming:** PascalCase, noun describing the primitive (`Button`, `Input`, `Avatar`, `Switch`).
+ - **File location:** `components/atoms/Button.tsx`
+ - **Props:** Only UI, no business logic.
+ - **Suffixes:** Avoid unless disambiguation needed (`TextInput` vs `NumberInput`).
+
+#### 3. **Molecules**
+ - **Naming:** PascalCase, describes the combined function (`AuthActions`, `SearchField`, `ProfileCard`).
+ - **File location:** `components/molecules/AuthActions.tsx`
+ - **Props:** Accept children and handlers for composition.
+ - **No business/domain logic**—keep focused on UI composition.
+
+#### 4. **Organisms**
+ - **Naming:** PascalCase, describes the self-contained system (`HeaderNav`, `ProductFlyout`, `ProfileShell`).
+ - **File location:** `components/organisms/HeaderNav.tsx`
+ - **Props:** Accepts state, business logic, and API hooks.
+ - **May contain:** Atoms, molecules, feature logic, state.
+
+#### 5. **Feature Components**
+ - **Naming:** PascalCase, feature-specific (`ClaimHandleForm`, `FeaturedArtists`, `NewHomeHero`).
+ - **File location:** `components/<feature>/ClaimHandleForm.tsx`
+ - **Hierarchy:** May have local atoms/molecules/organisms if not reused elsewhere.
+
+#### 6. **Props & Handlers**
+ - **Props interface:** Always named `<ComponentName>Props`.
+ - **Event handlers:** Use `on<Event>` naming (`onClick`, `onSubmit`).
+ - **Boolean props:** Use positive names (`disabled`, `loading`), not double negatives.
+ - **Children:** Always typed as `React.ReactNode`.
+
+#### 7. **Icons, Hooks, Utils, Enums**
+ - **Icons:** `Icon<Thing>.tsx` (e.g., `IconArrowRight`).
+ - **Hooks:** `use<Thing>.ts` (e.g., `useProfile`).
+ - **Utils:** `format<Thing>.ts` (e.g., `formatPrice`).
+ - **Enums:** `ThingEnum.ts` (e.g., `UserRoleEnum`).
+
+#### 8. **Accessibility & Test IDs**
+ - **Accessibility:** Add `aria-` attributes where appropriate.
+ - **Test IDs:** Use `data-testid="<component-name>"` (kebab-case) for E2E selectors.
+ - **Organisms:** Must expose stable test IDs for all critical elements.
+
+#### 9. **ForwardRef & DisplayName**
+ - **ForwardRef:** Use `React.forwardRef` for all atoms/molecules that render DOM elements.
+ - **DisplayName:** Always set `Component.displayName = 'Component'` for forwardRef components.
+
+#### 10. **Deprecation & Migration, Lint & CI Enforcement**
+ - **Deprecation:** Mark old components with `/** @deprecated Reason */` in JSDoc.
+ - **Migration:** Leave a comment referencing the replacement.
+ - **Lint/CI:** Enforce:
+   - No default exports in `components/`
+   - Named exports match file name
+   - One component per file
+   - All props interfaces named `<ComponentName>Props`
+   - No business logic in atoms
+   - Test IDs present for organisms
+
+---
+
 ### **Directory Structure**
 
 ```
