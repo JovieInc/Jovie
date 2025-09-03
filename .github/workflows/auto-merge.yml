@@ -184,7 +184,7 @@ jobs:
               prType = 'dependabot';
               // For dependabot, check if it's patch/minor or security update
               eligible = true; // We'll validate update type in next step
-            } else if (labels.has('codegen')) {
+            } else if (labels.has('codegen') || pr.author === 'app/codegen-sh' || pr.author.includes('codegen')) {
               prType = 'codegen';
               eligible = true;
             } else {
