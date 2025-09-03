@@ -120,14 +120,13 @@ export function DashboardLinks({
 
   const convertLinkItemsToDbFormat = useCallback(
     (linkItems: LinkItem[]): APILinkPayload[] => {
-      return linkItems
-        .filter(link => link.isVisible)
-        .map((link, index) => ({
-          platform: link.platform.id,
-          url: link.normalizedUrl,
-          sortOrder: index,
-          isActive: true,
-        }));
+      // Persist ALL links. Visibility is reflected in isActive.
+      return linkItems.map((link, index) => ({
+        platform: link.platform.id,
+        url: link.normalizedUrl,
+        sortOrder: index,
+        isActive: link.isVisible !== false,
+      }));
     },
     []
   );
