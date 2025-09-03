@@ -88,7 +88,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className='min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
+    <div className='min-h-screen bg-base'>
       <Container size='md'>
         <motion.div
           className='py-24 sm:py-32'
@@ -102,10 +102,10 @@ export default function PricingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl max-w-4xl mx-auto leading-tight'>
+            <h1 className='text-5xl font-bold tracking-tight text-primary sm:text-6xl max-w-4xl mx-auto leading-tight'>
               Free forever. Remove branding for $5.
             </h1>
-            <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
+            <p className='mt-6 text-xl leading-8 text-secondary max-w-2xl mx-auto'>
               The link in bio that actually converts. Beautiful, intelligent,
               impossibly fast.
             </p>
@@ -114,26 +114,22 @@ export default function PricingPage() {
           <div className='grid md:grid-cols-2 gap-12 items-start'>
             {/* Free Plan */}
             <motion.div
-              className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden'
+              className='rounded-2xl border border-default bg-surface-1 shadow-lg overflow-hidden'
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
             >
               <div className='p-8'>
-                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
+                <h2 className='text-2xl font-bold text-primary'>
                   Free Forever
                 </h2>
-                <p className='mt-2 text-gray-600 dark:text-gray-400'>
+                <p className='mt-2 text-secondary'>
                   Everything you need to create a beautiful profile.
                 </p>
 
                 <div className='mt-6 flex items-baseline'>
-                  <span className='text-5xl font-bold text-gray-900 dark:text-white'>
-                    $0
-                  </span>
-                  <span className='ml-1 text-xl text-gray-500 dark:text-gray-400'>
-                    /forever
-                  </span>
+                  <span className='text-5xl font-bold text-primary'>$0</span>
+                  <span className='ml-1 text-xl text-secondary'>/forever</span>
                 </div>
 
                 <FeatureList
@@ -142,10 +138,7 @@ export default function PricingPage() {
                 />
 
                 <div className='mt-8'>
-                  <Link
-                    href='/'
-                    className='inline-flex w-full items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 px-6 py-3 text-base font-medium text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200'
-                  >
+                  <Link href='/' className='btn btn-secondary w-full'>
                     Continue with free
                   </Link>
                 </div>
@@ -154,21 +147,19 @@ export default function PricingPage() {
 
             {/* Paid Plan */}
             <motion.div
-              className='rounded-2xl border border-blue-100 dark:border-blue-900 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
+              className='rounded-2xl border border-default bg-surface-1 shadow-xl overflow-hidden relative'
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
               {/* Highlight banner */}
-              <div className='bg-blue-600 text-white text-sm font-medium px-4 py-2 text-center'>
+              <div className='bg-[var(--color-accent)] text-white text-sm font-medium px-4 py-2 text-center'>
                 Designed for professionals
               </div>
 
               <div className='p-8'>
-                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
-                  Pro
-                </h2>
-                <p className='mt-2 text-gray-600 dark:text-gray-400'>
+                <h2 className='text-2xl font-bold text-primary'>Pro</h2>
+                <p className='mt-2 text-secondary'>
                   Your brand. Your story. Nothing else.
                 </p>
 
@@ -177,13 +168,13 @@ export default function PricingPage() {
                 </div>
 
                 <div className='mt-8'>
-                  <p className='text-sm text-gray-500 dark:text-gray-400 mb-4'>
+                  <p className='text-sm text-secondary mb-4'>
                     All free features, plus:
                   </p>
                   <ul className='space-y-3'>
                     <li className='flex items-start'>
                       <svg
-                        className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5'
+                        className='h-5 w-5 flex-shrink-0 text-accent-token mt-0.5'
                         fill='none'
                         viewBox='0 0 24 24'
                         stroke='currentColor'
@@ -195,7 +186,7 @@ export default function PricingPage() {
                           d='M5 13l4 4L19 7'
                         />
                       </svg>
-                      <span className='ml-3 text-base text-gray-700 dark:text-gray-300'>
+                      <span className='ml-3 text-base text-secondary'>
                         <strong>Remove the Jovie branding</strong> for a clean,
                         professional look
                       </span>
@@ -207,7 +198,7 @@ export default function PricingPage() {
                   <motion.button
                     onClick={handleSubscribe}
                     disabled={isLoading}
-                    className='inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200'
+                    className='inline-flex w-full items-center justify-center rounded-lg bg-[var(--color-accent)] px-6 py-3 text-base font-medium text-white hover:opacity-95 focus:outline-none focus:ring-2 ring-accent focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200'
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -231,7 +222,7 @@ export default function PricingPage() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.5 }}
           >
-            <p className='text-sm text-gray-500 dark:text-gray-400'>
+            <p className='text-sm text-secondary'>
               All plans include unlimited updates and our 30-day money-back
               guarantee.
             </p>

@@ -177,6 +177,7 @@ export function identify(userId: string, traits?: Record<string, unknown>) {
 // Feature flag constants for type safety
 export const FEATURE_FLAGS = {
   CLAIM_HANDLE: 'feature_claim_handle',
+  DARK_MODE_APP_SHELL_LOADING: 'feature_dark_mode_app_shell_loading',
 } as const;
 
 export type FeatureFlagName =

@@ -135,7 +135,7 @@ export default function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-white text-gray-900 dark:bg-[#0D0E12] dark:text-white'>
+      <div className='relative min-h-screen bg-base text-primary'>
         {/* 1. Hero Section (above the fold) */}
         <NewHomeHero />
 

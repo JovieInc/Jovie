@@ -1,9 +1,10 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider, useTheme } from 'next-themes';
 import React, { type ComponentProps, useEffect, useState } from 'react';
 import { Analytics } from '@/components/Analytics';
+import { track } from '@/lib/analytics';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
@@ -117,12 +118,20 @@ export function ClientProviders({
     return () => clearTimeout(timer);
   }, []);
 
-  // Show loading state during hydration
+  // Track theme changes (dark mode toggles)
+  const { theme } = useTheme();
+  useEffect(() => {
+    if (!isLoading && isClient && theme) {
+      track('app_shell_loading_darkmode_toggle', { theme });
+    }
+  }, [isClient, isLoading, theme]);
+
+  // Show loading state during hydration using tokens (no hardcoded colors)
   if (!isClient || isLoading) {
     return (
-      <div className='min-h-dvh grid place-items-center bg-[rgb(10,10,11)] text-[rgb(235,235,235)] dark:bg-black dark:text-white'>
+      <div className='min-h-dvh grid place-items-center bg-base text-primary'>
         <div className='flex items-center gap-3'>
-          <span className='size-2 rounded-full animate-ping bg-current' />
+          <span className='size-2 rounded-full bg-current motion-safe:animate-ping' />
           <span className='text-sm tracking-wide'>Loading…</span>
         </div>
       </div>

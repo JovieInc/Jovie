@@ -15,13 +15,13 @@ body {
 
 /* Fallback colors before token CSS finishes loading */
 body {
-  background: #0a0a0b;
-  color: #eaeaea;
+  background: var(--color-bg-base, #0a0a0b);
+  color: var(--color-text-primary-token, #eaeaea);
 }
 
 .dark body {
-  background: #000;
-  color: #fff;
+  background: var(--color-bg-base, #000);
+  color: var(--color-text-primary-token, #fff);
 }
 
 @layer base {
