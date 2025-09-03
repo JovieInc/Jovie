@@ -28,6 +28,7 @@ import React, {
 } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/ToastContainer';
+import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { SortableLinkItem } from '../atoms/SortableLinkItem';
 import { UniversalLinkInput } from '../atoms/UniversalLinkInput';
@@ -216,7 +217,7 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
 
       const willBeVisible =
         detectedLink.platform.category === 'social'
-          ? socialVisibleCount < 6
+          ? socialVisibleCount < MAX_SOCIAL_LINKS
           : true; // dsp (music) and custom are unlimited visibility for now
 
       const newLink: LinkItem = {
@@ -248,12 +249,34 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
   // Update existing link
   const handleUpdateLink = useCallback(
     (id: string, updates: Partial<LinkItem>) => {
+      const target = links.find(l => l.id === id);
+      if (!target) return;
+
+      // Enforce social visible cap on visibility toggle
+      if (
+        typeof updates.isVisible === 'boolean' &&
+        target.platform.category === 'social'
+      ) {
+        const visibleCount = links.filter(
+          l => l.platform.category === 'social' && l.isVisible
+        ).length;
+
+        if (updates.isVisible && visibleCount >= MAX_SOCIAL_LINKS) {
+          showToast({
+            message: `Only ${MAX_SOCIAL_LINKS} social links can be visible. Hide another or reorder to choose which show.`,
+            type: 'warning',
+            duration: 5000,
+          });
+          return; // block making it visible if cap reached
+        }
+      }
+
       const newLinks = links.map(link =>
         link.id === id ? { ...link, ...updates } : link
       );
       updateLinks(newLinks);
     },
-    [links, updateLinks]
+    [links, updateLinks, showToast]
   );
 
   // Delete link with undo functionality
@@ -264,6 +287,21 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
 
       // Remove from active links
       const newLinks = links.filter(link => link.id !== id);
+      // If a visible social link was deleted, auto-promote first hidden social
+      if (
+        linkToDelete.platform.category === 'social' &&
+        linkToDelete.isVisible
+      ) {
+        const firstHiddenIndex = newLinks.findIndex(
+          l => l.platform.category === 'social' && !l.isVisible
+        );
+        if (firstHiddenIndex !== -1) {
+          newLinks[firstHiddenIndex] = {
+            ...newLinks[firstHiddenIndex],
+            isVisible: true,
+          };
+        }
+      }
       updateLinks(newLinks);
 
       // Add to deleted links with 5-second undo timeout
@@ -314,7 +352,7 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
           links.filter(l => l.platform.category === 'social' && l.isVisible)
             .length
         }
-        socialVisibleLimit={6}
+        socialVisibleLimit={MAX_SOCIAL_LINKS}
       />
 
       {/* Links Counter moved next to Add button inside UniversalLinkInput */}
