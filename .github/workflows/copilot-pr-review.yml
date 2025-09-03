@@ -1,22 +1,8 @@
 name: GitHub Copilot PR Review
 
 on:
-  # Temporarily disabled - github/copilot-pr-reviewer@v1 action does not exist
-  # pull_request:
-  #   types: [opened, synchronize]
-  #   branches: [preview, production]
-    # Run on all code changes
-    paths:
-      - "**/*.ts"
-      - "**/*.tsx"
-      - "**/*.js" 
-      - "**/*.jsx"
-      - "**/*.vue"
-      - "**/*.py"
-      - "**/*.go"
-      - "**/*.rs"
-      - "**/*.java"
-      - "**/*.cs"
+  # Disabled - github/copilot-pr-reviewer@v1 action does not exist
+  workflow_dispatch:
 
 permissions:
   contents: read
