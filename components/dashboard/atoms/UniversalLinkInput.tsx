@@ -317,7 +317,7 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
                     {socialVisibleLimit} visible
                   </span>
                 ) : (
-                  <span> No limit </span>
+                  <span>No limit</span>
                 )}
               </div>
             </div>
