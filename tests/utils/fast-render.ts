@@ -86,7 +86,7 @@ export function shallowRender(componentName: string, props: Record<string, any> 
       element.textContent = `${componentName} (shallow)`;
       return element;
     },
-    queryByTestId: (testId: string) => {
+    queryByTestId: function(testId: string) {
       try {
         return this.getByTestId(testId);
       } catch {
@@ -100,15 +100,17 @@ export function shallowRender(componentName: string, props: Record<string, any> 
 /**
  * Create a test double - minimal mock component for complex dependencies
  */
-export function createTestDouble(name: string, defaultProps: Record<string, any> = {}) {
-  return React.forwardRef<HTMLDivElement, any>((props, ref) => {
+export function createTestDouble(name: string, defaultProps: Record<string, unknown> = {}) {
+  const TestDouble = React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
     return React.createElement('div', {
       ref,
       'data-testid': `test-double-${name.toLowerCase()}`,
       'data-props': JSON.stringify({ ...defaultProps, ...props }),
-      children: `${name} Test Double`,
-    });
+    }, `${name} Test Double`);
   });
+  
+  TestDouble.displayName = `TestDouble${name}`;
+  return TestDouble;
 }
 
 /**

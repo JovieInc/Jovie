@@ -145,6 +145,14 @@ class FlakyTestDetector {
         errorLines.push(line.trim());
       }
     }
+
+    // Handle the last test if there are remaining error lines
+    if (currentTest && errorLines.length > 0) {
+      const testResult = results.find(r => r.testName === currentTest);
+      if (testResult) {
+        testResult.error = errorLines.join('\n');
+      }
+    }
   }
 
   private analyzeTestStability(): void {
@@ -291,4 +299,3 @@ if (require.main === module) {
 }
 
 export { FlakyTestDetector, type FlakyTestResult };
-

@@ -51,7 +51,7 @@ export default defineConfig({
     isolate: false, // Disable isolation for speed (use with caution)
     
     // Reduce reporter overhead
-    reporter: ['basic'],
+    reporters: ['basic'],
     
     // Optimize file watching
     watch: false,
@@ -91,4 +91,3 @@ export default defineConfig({
     ],
   },
 });
-
