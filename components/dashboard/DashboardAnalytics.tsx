@@ -1,13 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
-import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardAnalyticsProps {
   initialData: DashboardData;
 }
+
+type Range = '1d' | '7d' | '30d';
+
+type ApiPayload = {
+  total_clicks: number;
+  spotify_clicks: number;
+  social_clicks: number;
+  recent_clicks: number;
+  profile_views: number;
+  top_countries: { country: string; count: number }[];
+  top_referrers: { referrer: string; count: number }[];
+};
 
 export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
   const [artist] = useState<Artist | null>(
@@ -15,328 +26,197 @@ export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
-  // Note: Profile switching functionality will be implemented in the future
 
-  if (!artist) {
-    return null; // This shouldn't happen given the server-side logic
-  }
+  const [range, setRange] = useState<Range>('7d');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<ApiPayload | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`/api/dashboard/analytics?range=${range}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const json: ApiPayload = await res.json();
+        if (active) setData(json);
+      } catch (e) {
+        console.error(e);
+        if (active) setError('Unable to load analytics');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchData();
+    return () => {
+      active = false;
+    };
+  }, [range]);
+
+  const rangeLabel = useMemo(() => {
+    if (range === '1d') return 'Last 24 hours';
+    if (range === '7d') return 'Last 7 days';
+    return 'Last 30 days';
+  }, [range]);
+
+  if (!artist) return null;
 
   return (
-    <div>
-      <div className='mb-8'>
-        <h1 className='text-2xl font-bold text-primary-token'>Analytics</h1>
-        <p className='text-secondary-token mt-1'>
-          Track your performance and audience engagement
-        </p>
+    <div className='space-y-6'>
+      <div className='flex items-start justify-between'>
+        <div className='mb-2'>
+          <h1 className='text-2xl font-bold text-primary-token'>Analytics</h1>
+          <p className='text-secondary-token mt-1'>MVP overview</p>
+        </div>
+        <RangeToggle value={range} onChange={setRange} />
       </div>
 
-      {/* Analytics content */}
-      <div className='space-y-6'>
-        {/* Quick stats */}
-        <div className='mt-8'>
-          <h2 className='text-xl font-semibold text-primary-token mb-4'>
-            Performance Overview
-          </h2>
-          <AnalyticsCards />
+      {/* Main card: Profile Views */}
+      <section className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm hover:shadow-md transition-all'>
+        <div className='flex items-center justify-between'>
+          <div>
+            <h2 className='text-lg font-semibold text-primary-token'>
+              Profile Views
+            </h2>
+            <p className='text-xs text-secondary-token mt-1'>{rangeLabel}</p>
+          </div>
+          {!loading && (
+            <span className='text-4xl font-extrabold tracking-tight text-primary-token'>
+              {Intl.NumberFormat().format(data?.profile_views ?? 0)}
+            </span>
+          )}
         </div>
+        {loading && (
+          <div className='mt-6 h-8 w-40 bg-surface-2 rounded animate-pulse' />
+        )}
+        {error && (
+          <p className='mt-4 text-sm text-orange-600 dark:text-orange-400'>
+            {error}
+          </p>
+        )}
+      </section>
 
-        {/* Conversion Funnel Section */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <div className='flex items-center justify-between mb-6'>
-            <div>
-              <h3 className='text-lg font-medium text-primary-token'>
-                Fan Conversion Funnel
-              </h3>
-              <p className='text-sm text-secondary-token mt-1'>
-                Track how fans discover and engage with your music
-              </p>
-            </div>
-            <div className='text-xs text-secondary-token bg-surface-2 px-2 py-1 rounded-full'>
-              Last 30 days
-            </div>
-          </div>
-
-          <div className='space-y-4'>
-            {/* Profile Views */}
-            <div className='flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950/20 dark:to-blue-900/20 rounded-lg border border-blue-200/20'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>1</span>
-                </div>
-                <div>
-                  <div className='font-semibold text-primary-token'>
-                    Profile Views
-                  </div>
-                  <div className='text-xs text-secondary-token'>
-                    Fans discover your page
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='text-xl font-bold text-primary-token'>
-                  2,847
-                </div>
-                <div className='text-xs text-secondary-token'>
-                  +12% vs last month
-                </div>
-              </div>
-            </div>
-
-            {/* Link Clicks */}
-            <div className='flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-green-100 dark:from-green-950/20 dark:to-green-900/20 rounded-lg border border-green-200/20'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-green-500 rounded-full flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>2</span>
-                </div>
-                <div>
-                  <div className='font-semibold text-primary-token'>
-                    Link Clicks
-                  </div>
-                  <div className='text-xs text-secondary-token'>
-                    Fans engage with your content
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='text-xl font-bold text-primary-token'>
-                  1,924
-                </div>
-                <div className='text-xs text-secondary-token'>
-                  67.6% conversion rate
-                </div>
-              </div>
-            </div>
-
-            {/* Music Streams */}
-            <div className='flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-purple-100 dark:from-purple-950/20 dark:to-purple-900/20 rounded-lg border border-purple-200/20'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>3</span>
-                </div>
-                <div>
-                  <div className='font-semibold text-primary-token'>
-                    Music Streams
-                  </div>
-                  <div className='text-xs text-secondary-token'>
-                    Fans stream your music
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='text-xl font-bold text-primary-token'>
-                  1,247
-                </div>
-                <div className='text-xs text-secondary-token'>
-                  64.8% stream rate
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className='mt-6 p-4 bg-surface-2/50 rounded-lg'>
-            <h4 className='text-sm font-medium text-primary-token mb-2'>
-              Conversion Insights
-            </h4>
-            <div className='grid grid-cols-1 md:grid-cols-3 gap-4 text-xs'>
-              <div className='text-center'>
-                <div className='font-bold text-lg text-green-600 dark:text-green-400'>
-                  67.6%
-                </div>
-                <div className='text-secondary-token'>View → Click Rate</div>
-              </div>
-              <div className='text-center'>
-                <div className='font-bold text-lg text-purple-600 dark:text-purple-400'>
-                  64.8%
-                </div>
-                <div className='text-secondary-token'>Click → Stream Rate</div>
-              </div>
-              <div className='text-center'>
-                <div className='font-bold text-lg text-blue-600 dark:text-blue-400'>
-                  43.8%
-                </div>
-                <div className='text-secondary-token'>Overall Conversion</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Top Performing Links */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Top Performing Links
+      {/* Secondary cards */}
+      <section className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+        <div className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm'>
+          <h3 className='text-sm font-medium text-primary-token mb-4'>
+            Top Countries
           </h3>
-          <div className='space-y-3'>
-            <div className='flex items-center justify-between p-3 bg-surface-2/50 rounded-lg'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>🎵</span>
-                </div>
-                <div>
-                  <div className='font-medium text-primary-token'>Spotify</div>
-                  <div className='text-xs text-secondary-token'>
-                    Music streaming
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='font-bold text-primary-token'>847 clicks</div>
-                <div className='text-xs text-secondary-token'>
-                  +15% this week
-                </div>
-              </div>
-            </div>
-
-            <div className='flex items-center justify-between p-3 bg-surface-2/50 rounded-lg'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-pink-500 rounded-lg flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>📷</span>
-                </div>
-                <div>
-                  <div className='font-medium text-primary-token'>
-                    Instagram
-                  </div>
-                  <div className='text-xs text-secondary-token'>
-                    Social media
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='font-bold text-primary-token'>523 clicks</div>
-                <div className='text-xs text-secondary-token'>
-                  +8% this week
-                </div>
-              </div>
-            </div>
-
-            <div className='flex items-center justify-between p-3 bg-surface-2/50 rounded-lg'>
-              <div className='flex items-center gap-3'>
-                <div className='w-8 h-8 bg-red-500 rounded-lg flex items-center justify-center'>
-                  <span className='text-xs font-bold text-white'>📺</span>
-                </div>
-                <div>
-                  <div className='font-medium text-primary-token'>YouTube</div>
-                  <div className='text-xs text-secondary-token'>
-                    Video content
-                  </div>
-                </div>
-              </div>
-              <div className='text-right'>
-                <div className='font-bold text-primary-token'>392 clicks</div>
-                <div className='text-xs text-secondary-token'>
-                  +22% this week
-                </div>
-              </div>
-            </div>
-          </div>
+          {loading ? (
+            <ul className='space-y-3'>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className='flex items-center justify-between'>
+                  <span className='h-4 w-32 bg-surface-2 rounded animate-pulse' />
+                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className='divide-y divide-subtle/60'>
+              {(data?.top_countries ?? []).map((c, idx) => (
+                <li
+                  key={c.country + idx}
+                  className='flex items-center justify-between py-2'
+                >
+                  <span className='text-sm text-secondary-token'>
+                    {c.country}
+                  </span>
+                  <span className='text-sm font-semibold text-primary-token'>
+                    {c.count}
+                  </span>
+                </li>
+              ))}
+              {(!data || data.top_countries.length === 0) && !error && (
+                <li className='py-2 text-sm text-secondary-token'>
+                  No country data
+                </li>
+              )}
+            </ul>
+          )}
         </div>
 
-        {/* Demographics Section */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Fan Demographics
+        <div className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm'>
+          <h3 className='text-sm font-medium text-primary-token mb-4'>
+            Top Referrers
           </h3>
-          <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
-            <div>
-              <h4 className='text-sm font-medium text-primary-token mb-3'>
-                Age Groups
-              </h4>
-              <div className='space-y-3'>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token'>18-24</span>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-20 h-2 bg-surface-2 rounded-full'>
-                      <div className='w-3/4 h-full bg-gradient-to-r from-blue-400 to-blue-600 rounded-full'></div>
-                    </div>
-                    <span className='text-sm font-medium text-primary-token w-8'>
-                      35%
-                    </span>
-                  </div>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token'>25-34</span>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-20 h-2 bg-surface-2 rounded-full'>
-                      <div className='w-3/5 h-full bg-gradient-to-r from-green-400 to-green-600 rounded-full'></div>
-                    </div>
-                    <span className='text-sm font-medium text-primary-token w-8'>
-                      28%
-                    </span>
-                  </div>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token'>35-44</span>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-20 h-2 bg-surface-2 rounded-full'>
-                      <div className='w-1/4 h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full'></div>
-                    </div>
-                    <span className='text-sm font-medium text-primary-token w-8'>
-                      22%
-                    </span>
-                  </div>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token'>45+</span>
-                  <div className='flex items-center gap-2'>
-                    <div className='w-20 h-2 bg-surface-2 rounded-full'>
-                      <div className='w-1/6 h-full bg-gradient-to-r from-orange-400 to-orange-600 rounded-full'></div>
-                    </div>
-                    <span className='text-sm font-medium text-primary-token w-8'>
-                      15%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h4 className='text-sm font-medium text-primary-token mb-3'>
-                Top Countries
-              </h4>
-              <div className='space-y-3'>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token flex items-center gap-2'>
-                    🇺🇸 United States
+          {loading ? (
+            <ul className='space-y-3'>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className='flex items-center justify-between'>
+                  <span className='h-4 w-36 bg-surface-2 rounded animate-pulse' />
+                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className='divide-y divide-subtle/60'>
+              {(data?.top_referrers ?? []).map((r, idx) => (
+                <li
+                  key={r.referrer + idx}
+                  className='flex items-center justify-between py-2'
+                >
+                  <span className='text-sm text-secondary-token break-all'>
+                    {r.referrer}
                   </span>
-                  <span className='text-sm font-medium text-primary-token'>
-                    45%
+                  <span className='text-sm font-semibold text-primary-token'>
+                    {r.count}
                   </span>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token flex items-center gap-2'>
-                    🇬🇧 United Kingdom
-                  </span>
-                  <span className='text-sm font-medium text-primary-token'>
-                    18%
-                  </span>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token flex items-center gap-2'>
-                    🇨🇦 Canada
-                  </span>
-                  <span className='text-sm font-medium text-primary-token'>
-                    12%
-                  </span>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token flex items-center gap-2'>
-                    🇦🇺 Australia
-                  </span>
-                  <span className='text-sm font-medium text-primary-token'>
-                    8%
-                  </span>
-                </div>
-                <div className='flex justify-between items-center'>
-                  <span className='text-sm text-secondary-token flex items-center gap-2'>
-                    🇩🇪 Germany
-                  </span>
-                  <span className='text-sm font-medium text-primary-token'>
-                    6%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+                </li>
+              ))}
+              {(!data || data.top_referrers.length === 0) && !error && (
+                <li className='py-2 text-sm text-secondary-token'>
+                  No referrer data
+                </li>
+              )}
+            </ul>
+          )}
         </div>
-      </div>
+      </section>
+    </div>
+  );
+}
+
+function RangeToggle({
+  value,
+  onChange,
+}: {
+  value: Range;
+  onChange: (v: Range) => void;
+}) {
+  const options: { label: string; value: Range }[] = [
+    { label: '1d', value: '1d' },
+    { label: '7d', value: '7d' },
+    { label: '30d', value: '30d' },
+  ];
+
+  return (
+    <div
+      role='tablist'
+      aria-label='Select analytics range'
+      className='inline-flex items-center rounded-full border border-border bg-surface-1 p-0.5 shadow-sm'
+    >
+      {options.map(opt => {
+        const active = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            role='tab'
+            aria-selected={active}
+            onClick={() => onChange(opt.value)}
+            className={`relative px-3 py-1.5 text-sm rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+              active
+                ? 'bg-accent text-white'
+                : 'text-secondary-token hover:bg-surface-2'
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
