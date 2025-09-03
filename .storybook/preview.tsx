@@ -1,4 +1,5 @@
 import type { Preview } from '@storybook/react';
+import { ThemeProvider } from 'next-themes';
 import React from 'react';
 import { ToastProvider } from '../components/ui/ToastContainer';
 import '../styles/globals.css';
@@ -33,9 +34,17 @@ const preview: Preview = {
   tags: ['autodocs'],
   decorators: [
     Story => (
-      <ToastProvider>
-        <Story />
-      </ToastProvider>
+      <ThemeProvider
+        attribute='class'
+        defaultTheme='system'
+        enableSystem
+        disableTransitionOnChange
+        storageKey='jovie-theme'
+      >
+        <ToastProvider>
+          <Story />
+        </ToastProvider>
+      </ThemeProvider>
     ),
   ],
 };

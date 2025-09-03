@@ -1,13 +1,14 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, count, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
   type CreatorProfile,
   creatorProfiles,
+  socialLinks,
   userSettings,
   users,
 } from '@/lib/db/schema';
@@ -18,6 +19,7 @@ export interface DashboardData {
   selectedProfile: CreatorProfile | null;
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
+  hasSocialLinks: boolean;
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
@@ -33,6 +35,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       selectedProfile: null,
       needsOnboarding: true,
       sidebarCollapsed: false,
+      hasSocialLinks: false,
     };
   }
 
@@ -53,6 +56,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           selectedProfile: null,
           needsOnboarding: true,
           sidebarCollapsed: false,
+          hasSocialLinks: false,
         };
       }
 
@@ -71,6 +75,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           selectedProfile: null,
           needsOnboarding: true,
           sidebarCollapsed: false,
+          hasSocialLinks: false,
         };
       }
 
@@ -90,13 +95,35 @@ export async function getDashboardData(): Promise<DashboardData> {
         settings = undefined;
       }
 
+      // Compute presence of active social links for the selected profile
+      const selected = creatorData[0];
+      let hasLinks = false;
+      try {
+        const result = await db
+          .select({ c: count() })
+          .from(socialLinks)
+          .where(
+            and(
+              eq(socialLinks.creatorProfileId, selected.id),
+              eq(socialLinks.isActive, true)
+            )
+          );
+        const total = Number(result?.[0]?.c ?? 0);
+        hasLinks = total > 0;
+      } catch {
+        // On query error, default to false without failing dashboard load
+        console.warn('Error counting social links, defaulting to false');
+        hasLinks = false;
+      }
+
       // Return data with first profile selected by default
       return {
         user: userData,
         creatorProfiles: creatorData,
-        selectedProfile: creatorData[0],
+        selectedProfile: selected,
         needsOnboarding: false,
         sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+        hasSocialLinks: hasLinks,
       };
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -107,6 +134,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         selectedProfile: null,
         needsOnboarding: true,
         sidebarCollapsed: false,
+        hasSocialLinks: false,
       };
     }
   });
@@ -184,11 +212,16 @@ export async function updateCreatorProfile(
           ...updates,
           updatedAt: new Date(),
         })
-        .where(eq(creatorProfiles.id, profileId))
+        .where(
+          and(
+            eq(creatorProfiles.id, profileId),
+            eq(creatorProfiles.userId, user.id)
+          )
+        )
         .returning();
 
       if (!updatedProfile) {
-        throw new Error('Profile not found or not updated');
+        throw new Error('Profile not found or unauthorized');
       }
 
       return updatedProfile;

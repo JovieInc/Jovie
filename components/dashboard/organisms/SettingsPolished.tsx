@@ -13,8 +13,10 @@ import {
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
+import { AccountSettingsModal } from '@/components/dashboard/molecules/AccountSettingsModal';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
@@ -30,6 +32,11 @@ const settingsNavigation = [
     name: 'Profile',
     id: 'profile',
     icon: UserIcon,
+  },
+  {
+    name: 'Account',
+    id: 'account',
+    icon: ShieldCheckIcon,
   },
   {
     name: 'Appearance',
@@ -66,6 +73,7 @@ export function SettingsPolished({
 }: SettingsPolishedProps) {
   const [currentSection, setCurrentSection] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const billingStatus = useBillingStatus();
@@ -457,6 +465,50 @@ export function SettingsPolished({
           </button>
         </div>
       </form>
+    </div>
+  );
+
+  const renderAccountSection = () => (
+    <div className='space-y-6'>
+      {/* Clerk Account/Profile management */}
+      {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+        <DashboardCard variant='settings'>
+          <div className='flex items-center justify-between'>
+            <div>
+              <h3 className='text-lg font-medium text-primary'>
+                Account settings
+              </h3>
+              <p className='mt-1 text-sm text-secondary'>
+                Open a focused modal to manage email, password, and connected
+                accounts.
+              </p>
+            </div>
+            <button
+              type='button'
+              onClick={() => {
+                setIsAccountModalOpen(true);
+                track('settings_account_modal_open');
+              }}
+              className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+              style={{ backgroundColor: 'var(--color-accent)' }}
+            >
+              Open
+            </button>
+          </div>
+        </DashboardCard>
+      ) : (
+        <DashboardCard variant='settings'>
+          <div className='text-center py-4'>
+            <h3 className='text-lg font-medium text-primary mb-2'>
+              Account settings unavailable
+            </h3>
+            <p className='text-sm text-secondary'>
+              Clerk is not configured (missing publishable key). Set
+              NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+            </p>
+          </div>
+        </DashboardCard>
+      )}
     </div>
   );
 
@@ -882,6 +934,19 @@ export function SettingsPolished({
             {renderProfileSection()}
           </section>
 
+          {/* Account Section */}
+          <section id='account' className='scroll-mt-4'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+                Account
+              </h1>
+              <p className='mt-1 text-sm text-secondary'>
+                Manage email addresses, password, connected accounts, and more.
+              </p>
+            </div>
+            {renderAccountSection()}
+          </section>
+
           {/* Appearance Section */}
           <section id='appearance' className='scroll-mt-4'>
             <div className='mb-6'>
@@ -960,6 +1025,10 @@ export function SettingsPolished({
           </section>
         </div>
       </div>
+      <AccountSettingsModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+      />
     </div>
   );
 }

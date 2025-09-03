@@ -26,12 +26,12 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     // Listen for new page/tab creation
     const pagePromise = context.waitForEvent('page');
 
-    // Click the "View Profile" button
-    const viewProfileButton = profileLinkCard.locator('button', {
+    // Click the "View Profile" link
+    const viewProfileLink = profileLinkCard.locator('a', {
       hasText: 'View Profile',
     });
-    await expect(viewProfileButton).toBeVisible();
-    await viewProfileButton.click();
+    await expect(viewProfileLink).toBeVisible();
+    await viewProfileLink.click();
 
     // Wait for new page and verify URL
     const newPage = await pagePromise;
@@ -202,11 +202,11 @@ test.describe('ProfileLinkCard E2E Tests', () => {
     // Set up page creation listener before clicking
     const newPagePromise = context.waitForEvent('page');
 
-    // Click View Profile button
-    const viewProfileButton = profileLinkCard.locator('button', {
+    // Click View Profile link
+    const viewProfileLink = profileLinkCard.locator('a', {
       hasText: 'View Profile',
     });
-    await viewProfileButton.click();
+    await viewProfileLink.click();
 
     // Wait for new page creation
     const newPage = await newPagePromise;

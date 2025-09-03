@@ -1,32 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
+import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { Button } from '@/components/ui/Button';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
 
 interface ProfileLinkCardProps {
-  artist: Artist;
+  handle: string;
 }
 
-export function ProfileLinkCard({ artist }: ProfileLinkCardProps) {
-  const [copied, setCopied] = useState(false);
-  const profileUrl = `${getBaseUrl()}/${artist.handle}`;
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(profileUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy:', error);
-    }
-  };
-
-  const handleViewProfile = () => {
-    window.open(profileUrl, '_blank', 'noopener,noreferrer');
-  };
+export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
+  const profileUrl = `${getBaseUrl()}/${handle}`;
 
   return (
     <DashboardCard variant='default' data-testid='profile-link-card'>
@@ -38,10 +23,20 @@ export function ProfileLinkCard({ artist }: ProfileLinkCardProps) {
           </p>
         </div>
         <div className='flex space-x-2'>
-          <Button variant='secondary' size='sm' onClick={handleCopy}>
-            {copied ? 'Copied!' : 'Copy'}
-          </Button>
-          <Button variant='primary' size='sm' onClick={handleViewProfile}>
+          <CopyToClipboardButton
+            relativePath={`/${handle}`}
+            idleLabel='Copy'
+            successLabel='Copied!'
+            errorLabel='Failed to copy'
+          />
+          <Button
+            as={Link}
+            href={`/${handle}`}
+            target='_blank'
+            rel='noopener noreferrer'
+            variant='primary'
+            size='sm'
+          >
             View Profile
           </Button>
         </div>

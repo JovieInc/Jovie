@@ -1,24 +1,28 @@
 'use client';
 
 import { useSession } from '@clerk/nextjs';
-import { CheckIcon, ClipboardIcon } from '@heroicons/react/24/outline';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import React, { useEffect, useMemo, useState } from 'react';
+import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
 
 interface DashboardPreviewProps {
   artist: Artist;
+  socialLinksOverride?: LegacySocialLink[];
 }
 
 export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   artist,
+  socialLinksOverride,
 }) => {
   const { session } = useSession();
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
-  const [copySuccess, setCopySuccess] = useState(false);
 
   // Initialize links from database
   useEffect(() => {
+    if (socialLinksOverride) return; // use override instead of fetching
+
     const fetchLinks = async () => {
       if (!session || !artist.id) return;
 
@@ -37,10 +41,11 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
     };
 
     fetchLinks();
-  }, [session, artist.id]);
+  }, [session, artist.id, socialLinksOverride]);
 
   // Convert social links to LegacySocialLink format for preview
   const previewSocialLinks = useMemo((): LegacySocialLink[] => {
+    if (socialLinksOverride) return socialLinksOverride;
     return socialLinks
       .filter(
         link =>
@@ -60,45 +65,21 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
         clicks: 0,
         created_at: new Date().toISOString(),
       }));
-  }, [socialLinks, artist.id]);
+  }, [socialLinks, socialLinksOverride, artist.id]);
 
-  // Handle copy to clipboard
-  const handleCopyUrl = useCallback(async () => {
-    const profileUrl = `https://jov.ie/${artist.handle || 'username'}`;
-
-    try {
-      await navigator.clipboard.writeText(profileUrl);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy URL:', error);
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = profileUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    }
-  }, [artist.handle]);
+  // Clipboard handled by CopyToClipboardButton atom
 
   return (
-    <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-      <div className='flex items-center justify-between mb-6'>
-        <div>
-          <h3 className='text-lg font-medium text-primary-token'>
-            Profile Preview
-          </h3>
-          <p className='text-sm text-secondary-token mt-1'>
-            See how your profile appears to visitors
-          </p>
-        </div>
+    <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
+      <div className='p-4 border-b border-subtle'>
+        <h3 className='text-lg font-medium text-primary-token'>Live Preview</h3>
+        <p className='text-sm text-secondary-token mt-1'>
+          This is how your profile will appear to visitors
+        </p>
       </div>
 
       {/* Mobile Frame Preview */}
-      <div className='flex justify-center mb-6'>
+      <div className='flex justify-center p-4'>
         <div className='w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
           {/* Top notch */}
           <div className='absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
@@ -158,24 +139,19 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       </div>
 
       {/* Profile URL and Actions */}
-      <div className='text-center space-y-3'>
+      <div className='border-t border-subtle p-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
           <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
             jov.ie/{artist.handle || 'username'}
           </code>
-          <button
-            onClick={handleCopyUrl}
-            className='p-1 rounded hover:bg-surface-2 transition-colors group'
-            title={copySuccess ? 'Copied!' : 'Copy profile URL'}
-          >
-            {copySuccess ? (
-              <CheckIcon className='w-3 h-3 text-green-600 dark:text-green-400' />
-            ) : (
-              <ClipboardIcon className='w-3 h-3 text-secondary-token group-hover:text-primary-token' />
-            )}
-          </button>
+          <CopyToClipboardButton
+            relativePath={`/${artist.handle || 'username'}`}
+            idleLabel='Copy'
+            successLabel='Copied!'
+            errorLabel='Failed to copy'
+          />
         </div>
-        <a
+        <Link
           href={`/${artist.handle}`}
           target='_blank'
           rel='noopener noreferrer'
@@ -195,7 +171,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
               d='M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14'
             />
           </svg>
-        </a>
+        </Link>
       </div>
     </div>
   );

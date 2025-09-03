@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { DashboardSplitView } from '@/components/dashboard/organisms/DashboardSplitView';
+import { DashboardSplitView } from '@/components/dashboard/legacy/organisms/DashboardSplitView';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { mockArtist } from '@/lib/test-utils/mock-data';
 

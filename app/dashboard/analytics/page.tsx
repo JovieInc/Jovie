@@ -8,7 +8,7 @@ export default async function AnalyticsPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/dashboard/analytics');
+    redirect('/signin?redirect_url=/dashboard/analytics');
   }
 
   try {

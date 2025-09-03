@@ -142,39 +142,23 @@ export default function DashboardLayoutClient({
               <div className='flex h-16 shrink-0 items-center justify-center px-4'>
                 <Link
                   href='/dashboard/overview'
-                  className={
-                    'focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md transition-all duration-300 ease-in-out'
-                  }
+                  className='focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md'
                 >
-                  <div className='relative overflow-hidden'>
-                    <div
-                      className={cn(
-                        'transition-all duration-300 ease-in-out',
-                        sidebarCollapsed
-                          ? 'opacity-100 scale-100'
-                          : 'opacity-0 scale-95 absolute inset-0'
-                      )}
-                    >
-                      <Image
-                        src='/brand/jovie-logo.svg'
-                        alt='App icon'
-                        width={24}
-                        height={24}
-                        className='h-6 w-6 text-primary-token'
-                        priority
-                      />
-                    </div>
-                    <div
-                      className={cn(
-                        'transition-all duration-300 ease-in-out',
-                        sidebarCollapsed
-                          ? 'opacity-0 scale-95'
-                          : 'opacity-100 scale-100'
-                      )}
-                    >
-                      <Logo size='md' />
-                    </div>
-                  </div>
+                  {sidebarCollapsed ? (
+                    <Image
+                      src='/brand/Jovie-Logo-Icon.svg'
+                      alt='Jovie Icon'
+                      width={24}
+                      height={24}
+                      className='h-6 w-6 transition-all duration-300 ease-in-out text-black dark:text-white'
+                      priority
+                    />
+                  ) : (
+                    <Logo
+                      size='md'
+                      className='transition-all duration-300 ease-in-out'
+                    />
+                  )}
                 </Link>
               </div>
 
@@ -266,7 +250,7 @@ export default function DashboardLayoutClient({
                   {/* Profile section (collapsed state) */}
                   <div
                     className={cn(
-                      'flex flex-col items-center justify-center gap-3 w-full transition-all duration-200 ease-in-out',
+                      'flex flex-col items-center gap-2 w-full transition-all duration-200 ease-in-out',
                       sidebarCollapsed
                         ? 'opacity-100 scale-100'
                         : 'opacity-0 scale-95 pointer-events-none absolute inset-0'
@@ -276,38 +260,35 @@ export default function DashboardLayoutClient({
                       content={`You're logged in as @${artist?.handle || 'user'}`}
                       placement='right'
                     >
-                      <div className='relative flex justify-center'>
-                        <UserButton artist={artist} showUserInfo={false} />
-                        <span className='absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-surface-0' />
-                      </div>
+                      <UserButton artist={artist} showUserInfo={false} />
                     </Tooltip>
-                    {/* Action buttons group for collapsed state */}
-                    <div className='flex flex-col items-center gap-1.5'>
-                      <Tooltip content='Toggle theme' placement='right'>
-                        <EnhancedThemeToggle variant='compact' />
-                      </Tooltip>
-                      <FeedbackButton collapsed={true} />
-                      <Tooltip content='Expand sidebar' placement='right'>
-                        <button
-                          onClick={handleToggleSidebarCollapsed}
-                          className='hidden lg:flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ease-in-out text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+
+                    <Tooltip content='Toggle theme' placement='right'>
+                      <EnhancedThemeToggle variant='compact' />
+                    </Tooltip>
+
+                    <FeedbackButton collapsed={true} />
+
+                    <Tooltip content='Expand sidebar' placement='right'>
+                      <button
+                        onClick={handleToggleSidebarCollapsed}
+                        className='hidden lg:flex items-center justify-center w-8 h-8 rounded-lg transition-all duration-200 ease-in-out text-tertiary-token hover:text-secondary-token hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                      >
+                        <svg
+                          className='w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0 rotate-180'
+                          fill='none'
+                          viewBox='0 0 24 24'
+                          stroke='currentColor'
+                          strokeWidth={2.5}
                         >
-                          <svg
-                            className='w-3.5 h-3.5 transition-all duration-200 ease-in-out shrink-0 rotate-180'
-                            fill='none'
-                            viewBox='0 0 24 24'
-                            stroke='currentColor'
-                            strokeWidth={2.5}
-                          >
-                            <path
-                              strokeLinecap='round'
-                              strokeLinejoin='round'
-                              d='M15 19l-7-7 7-7'
-                            />
-                          </svg>
-                        </button>
-                      </Tooltip>
-                    </div>
+                          <path
+                            strokeLinecap='round'
+                            strokeLinejoin='round'
+                            d='M15 19l-7-7 7-7'
+                          />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>
