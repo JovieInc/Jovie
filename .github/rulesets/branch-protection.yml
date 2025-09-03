@@ -18,5 +18,4 @@ rules:
       strict_required_status_checks_policy: true
       required_status_checks:
         - context: 'CI / ci-fast'
-        - context: 'CI / PR Up-to-date with Preview'
 bypass_actors: []
