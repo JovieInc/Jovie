@@ -110,7 +110,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                     return (
                       <div className='flex items-center gap-2'>
                         <span className='text-xs text-secondary'>
-                          {visible}/6 visible
+                          {visible}/{MAX_SOCIAL_LINKS} visible
                         </span>
                         {hidden > 0 && (
                           <span className='text-[10px] text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>

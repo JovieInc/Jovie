@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/ui/LoadingSkeleton';
 import { OptimizedAvatar as Avatar } from '@/components/ui/OptimizedAvatar';
+import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import { useCreator } from '@/hooks/useCreator';
 
 export function CreatorProfile({ username }: { username: string }) {
@@ -49,11 +50,11 @@ export function CreatorProfile({ username }: { username: string }) {
           {creator.bio && (
             <p className='mt-2 text-muted-foreground'>{creator.bio}</p>
           )}
-          {/* Social links: respect active state and cap to 6 visible */}
+          {/* Social links: respect active state and cap to MAX_SOCIAL_LINKS visible */}
           <div className='mt-4 flex flex-wrap justify-center gap-2 sm:justify-start'>
             {creator.socialLinks
               ?.filter(link => link.isActive !== false)
-              .slice(0, 6)
+              .slice(0, MAX_SOCIAL_LINKS)
               .map(link => (
                 <Button
                   key={link.id}
