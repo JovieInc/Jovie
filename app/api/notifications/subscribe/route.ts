@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { trackServerEvent } from '@/lib/server-analytics';
+import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 
 // Schema for subscription request validation
 const subscribeSchema = z.object({

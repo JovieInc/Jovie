@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
-import { trackServerEvent } from '@/lib/server-analytics';
 
 // Use Edge runtime for better performance
 export const runtime = 'edge';
