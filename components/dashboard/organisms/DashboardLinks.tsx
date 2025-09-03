@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
+import type { DashboardData } from '@/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/dashboard/actions';
 // flags import removed - pre-launch
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -106,7 +107,6 @@ export function DashboardLinks({
   // Convert LinkItems to database format
   type APILinkPayload = {
     platform: string;
-    platformType?: string;
     url: string;
     sortOrder?: number;
     isActive?: boolean;
@@ -119,7 +119,6 @@ export function DashboardLinks({
         .filter(link => link.isVisible)
         .map((link, index) => ({
           platform: link.platform.id,
-          platformType: link.platform.id,
           url: link.normalizedUrl,
           sortOrder: index,
           isActive: true,
