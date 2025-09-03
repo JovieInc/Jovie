@@ -9,6 +9,8 @@ import { env } from '@/lib/env';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
+export const runtime = 'nodejs';
+
 export async function POST() {
   try {
     // Check authentication
