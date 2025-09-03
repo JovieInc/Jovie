@@ -75,9 +75,19 @@ describe('DashboardOverview', () => {
     expect(screen.getByText(/Add a music link/i)).toBeInTheDocument();
     expect(screen.getByText(/Add social links/i)).toBeInTheDocument();
 
-    // Action links for incomplete items
-    expect(screen.getByText('Complete →')).toBeInTheDocument();
-    expect(screen.getAllByText('Add →')).toHaveLength(2);
+    // CTA buttons for incomplete items
+    expect(
+      screen.getByRole('button', { name: /Claim handle/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Add music link/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Add social links/i })
+    ).toBeInTheDocument();
+
+    // Progress indicator
+    expect(screen.getByText('0/3 setup steps completed')).toBeInTheDocument();
   });
 
   it('marks tasks complete based on data', () => {
@@ -99,6 +109,9 @@ describe('DashboardOverview', () => {
     expect(
       screen.getByText('Connect Instagram, TikTok, Twitter, etc.')
     ).toBeInTheDocument();
+
+    // Progress indicator reflects 2/3
+    expect(screen.getByText('2/3 setup steps completed')).toBeInTheDocument();
   });
 
   it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {

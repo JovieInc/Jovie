@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardLinks } from '@/components/dashboard/organisms';
-import { getDashboardData } from '../actions';
+import { getDashboardData, getProfileSocialLinks } from '../actions';
 
 export default async function LinksPage() {
   const { userId } = await auth();
@@ -20,8 +20,16 @@ export default async function LinksPage() {
       redirect('/onboarding');
     }
 
+    // Fetch initial links for the selected profile on the server
+    const profileId = dashboardData.selectedProfile?.id;
+    const initialLinks = profileId
+      ? await getProfileSocialLinks(profileId)
+      : [];
+
     // Pass server-fetched data to client component
-    return <DashboardLinks initialData={dashboardData} />;
+    return (
+      <DashboardLinks initialData={dashboardData} initialLinks={initialLinks} />
+    );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

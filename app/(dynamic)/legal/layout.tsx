@@ -14,9 +14,7 @@ export default function LegalLayout({
     <div className='flex min-h-screen flex-col bg-[#0D0E12]'>
       <Header />
       <main className='flex-1 py-12'>
-        <Container>
-          <div className='mx-auto max-w-3xl'>{children}</div>
-        </Container>
+        <Container size='xl'>{children}</Container>
       </main>
       <Footer />
     </div>
