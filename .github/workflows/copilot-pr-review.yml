@@ -1,9 +1,10 @@
 name: GitHub Copilot PR Review
 
 on:
-  pull_request:
-    types: [opened, synchronize]
-    branches: [preview, production]
+  # Temporarily disabled - github/copilot-pr-reviewer@v1 action does not exist
+  # pull_request:
+  #   types: [opened, synchronize]
+  #   branches: [preview, production]
     # Run on all code changes
     paths:
       - "**/*.ts"
