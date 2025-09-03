@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { 
-  CreditCardIcon, 
   CheckCircleIcon, 
   ExclamationTriangleIcon 
 } from '@heroicons/react/24/outline';
@@ -19,7 +18,7 @@ interface BillingInfo {
 export function BillingDashboard() {
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
 
   useEffect(() => {
     const fetchBillingInfo = async () => {

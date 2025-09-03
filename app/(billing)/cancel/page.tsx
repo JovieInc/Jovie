@@ -32,7 +32,7 @@ export default function CheckoutCancelPage() {
       </h1>
       
       <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
-        No worries! Your subscription wasn't charged.
+        No worries! Your subscription wasn&apos;t charged.
       </p>
       
       <p className="mt-2 text-sm text-gray-500 dark:text-gray-500">

@@ -51,7 +51,7 @@ export default function CheckoutSuccessPage() {
 
       <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
         <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
-          What's Next?
+          What&apos;s Next?
         </h3>
         <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
           <li>• Explore advanced analytics in your dashboard</li>

@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { RocketLaunchIcon } from '@heroicons/react/24/outline';
-import { useFeatureFlag, track } from '@/lib/analytics';
-import { FEATURE_FLAGS } from '@/lib/analytics';
+import { useFeatureFlag, track, FEATURE_FLAGS } from '@/lib/analytics';
 
 interface UpgradeButtonProps {
   className?: string;
