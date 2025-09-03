@@ -174,6 +174,21 @@ export default async function RootLayout({
       className={initialThemeMode === 'dark' ? 'dark' : undefined}
     >
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var ls = localStorage.getItem('jovie-theme');
+    var mql = window.matchMedia('(prefers-color-scheme: dark)');
+    var pref = ls && ls !== 'system' ? ls : (mql.matches ? 'dark' : 'light');
+    var root = document.documentElement;
+    if (pref === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+  } catch (e) {}
+})();
+`,
+          }}
+        />
         {/* Favicon and Icons */}
         <link rel='icon' href='/favicon.ico' type='image/x-icon' />
         <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
