@@ -125,7 +125,7 @@ export function DashboardLinks({
         platform: link.platform.id,
         url: link.normalizedUrl,
         sortOrder: index,
-        isActive: link.isVisible !== false,
+        isActive: link.isVisible === true,
       }));
     },
     []
