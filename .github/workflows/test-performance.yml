@@ -1,0 +1,201 @@
+name: Test Performance Monitoring
+
+on:
+  push:
+    branches: [develop, preview, main]
+  pull_request:
+    branches: [develop, preview, main]
+
+jobs:
+  performance-guard:
+    name: Performance Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Performance Guard
+        id: performance-guard
+        run: |
+          echo "Running performance guard..."
+          pnpm test:guard
+        continue-on-error: true
+
+      - name: Performance Guard Results
+        if: steps.performance-guard.outcome == 'failure'
+        run: |
+          echo "❌ Performance guard failed - tests are too slow!"
+          echo "Run 'pnpm test:profile' locally for detailed analysis"
+          exit 1
+
+      - name: Success Message
+        if: steps.performance-guard.outcome == 'success'
+        run: |
+          echo "✅ All performance thresholds met!"
+          echo "🚀 Test suite is optimized for fast feedback"
+
+  fast-tests:
+    name: Fast Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Fast Test Suite
+        run: |
+          echo "Running optimized test suite..."
+          pnpm test:fast
+
+      - name: Test Results Summary
+        run: |
+          echo "🎯 Fast test suite completed successfully!"
+          echo "Target: All tests <200ms p95"
+
+  flaky-test-detection:
+    name: Flaky Test Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Only run on main branch to avoid excessive CI time
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Detect Flaky Tests
+        run: |
+          echo "Running flaky test detection (5 runs)..."
+          pnpm test:flaky "" 5
+        continue-on-error: true
+
+      - name: Upload Quarantine Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: flaky-test-results
+          path: tests/quarantine/
+          retention-days: 30
+
+  performance-report:
+    name: Performance Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    # Only run on main branch for performance tracking
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Performance Report
+        run: |
+          echo "Generating detailed performance report..."
+          pnpm test:profile
+
+      - name: Upload Performance Baseline
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-baseline
+          path: test-performance-baseline.json
+          retention-days: 90
+
+      - name: Comment Performance Results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            try {
+              const baseline = JSON.parse(fs.readFileSync('test-performance-baseline.json', 'utf8'));
+              const metrics = baseline.metrics;
+              
+              const comment = `## 📊 Test Performance Report
+              
+              | Metric | Value | Target | Status |
+              |--------|-------|--------|--------|
+              | Total Duration | ${(metrics.totalDuration/1000).toFixed(1)}s | <60s | ${metrics.totalDuration < 60000 ? '✅' : '❌'} |
+              | Setup Time | ${(metrics.setupTime/1000).toFixed(1)}s | <10s | ${metrics.setupTime < 10000 ? '✅' : '❌'} |
+              | P95 | ${metrics.performanceStats.p95}ms | <200ms | ${metrics.performanceStats.p95 < 200 ? '✅' : '❌'} |
+              | Slow Tests | ${metrics.slowTests.length} | <5 | ${metrics.slowTests.length < 5 ? '✅' : '❌'} |
+              
+              ${metrics.slowTests.length > 0 ? `
+              ### 🐌 Slowest Tests
+              ${metrics.slowTests.slice(0, 5).map((test, i) => 
+                `${i+1}. ${test.name}: ${test.duration}ms`
+              ).join('\n')}
+              ` : ''}
+              
+              Run \`pnpm test:profile\` locally for detailed analysis.
+              `;
+              
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: comment
+              });
+            } catch (error) {
+              console.log('Could not create performance comment:', error.message);
+            }
+
