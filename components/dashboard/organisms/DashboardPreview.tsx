@@ -70,8 +70,8 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   // Clipboard handled by CopyToClipboardButton atom
 
   return (
-    <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-      <div className='p-4 border-b border-subtle'>
+    <>
+      <div className='mb-4'>
         <h3 className='text-lg font-medium text-primary-token'>Live Preview</h3>
         <p className='text-sm text-secondary-token mt-1'>
           This is how your profile will appear to visitors
@@ -79,8 +79,8 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       </div>
 
       {/* Mobile Frame Preview */}
-      <div className='flex justify-center p-4'>
-        <div className='w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
+      <div className='flex justify-center'>
+        <div className='relative w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
           {/* Top notch */}
           <div className='absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
 
@@ -139,7 +139,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       </div>
 
       {/* Profile URL and Actions */}
-      <div className='border-t border-subtle p-4 text-center space-y-3'>
+      <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
           <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
             jov.ie/{artist.handle || 'username'}
@@ -173,6 +173,6 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
           </svg>
         </Link>
       </div>
-    </div>
+    </>
   );
 };

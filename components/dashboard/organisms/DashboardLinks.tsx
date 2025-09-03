@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
-import type { ProfileSocialLink } from '@/app/dashboard/actions';
+import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
 // flags import removed - pre-launch
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import {
   type Artist,
   convertDrizzleCreatorProfileToArtist,
@@ -64,12 +64,17 @@ export function DashboardLinks({
         ? 'dsp'
         : 'social';
 
+      // Properly capitalized display label for the platform
+      const displayName = getSocialPlatformLabel(
+        link.platform as SocialPlatform
+      );
+
       return {
         id: link.id,
-        title: link.platform,
+        title: displayName,
         platform: {
           id: link.platform,
-          name: link.platform,
+          name: displayName,
           category: platformCategory,
           icon: link.platform,
           color: '#000000',
@@ -77,7 +82,7 @@ export function DashboardLinks({
         },
         normalizedUrl: link.url,
         originalUrl: link.url,
-        suggestedTitle: link.platform,
+        suggestedTitle: displayName,
         isValid: true,
         isVisible: link.isActive ?? true,
         order: typeof link.sortOrder === 'number' ? link.sortOrder : index,

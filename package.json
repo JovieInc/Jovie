@@ -16,7 +16,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint --max-warnings=0 --cache --cache-location .eslintcache",
+    "lint": "next lint --max-warnings=0",
     "lint:fix": "next lint --fix",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "pre-push": "run-s typecheck lint",
