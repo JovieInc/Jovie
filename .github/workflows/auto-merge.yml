@@ -7,8 +7,6 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize, labeled, unlabeled, ready_for_review]
     branches: [preview, production]
-  check_suite:
-    types: [completed]
   workflow_run:
     workflows: ['CI']
     types: [completed]
@@ -27,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Run for preview and production PRs; for other events we'll resolve PR and skip if needed
+    # Run for preview and production PRs; for workflow_run events we'll resolve PR and skip if needed
     if: >
       (github.event_name == 'pull_request_target' && (github.event.pull_request.base.ref == 'preview' || github.event.pull_request.base.ref == 'production'))
-      || (github.event_name != 'pull_request_target')
+      || (github.event_name == 'workflow_run')
 
     steps:
       - name: Get PR details
@@ -52,29 +50,6 @@ jobs:
                 per_page: 100
               });
               pr = prs.data.find(p => p.head.sha === context.payload.workflow_run.head_sha);
-            } else {
-              // check_suite event - find PR by head SHA
-              try {
-                core.info(`Event name: ${github.event_name}`);
-                core.info(`Payload keys: ${Object.keys(context.payload).join(', ')}`);
-                
-                const headSha = context.payload.check_suite?.head_sha;
-                if (!headSha) {
-                  core.warning('No head_sha found in check_suite payload');
-                  return { skip: true };
-                }
-                
-                const prs = await github.rest.pulls.list({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  state: 'open',
-                  per_page: 100
-                });
-                pr = prs.data.find(p => p.head.sha === headSha);
-              } catch (error) {
-                core.warning(`Error processing check_suite event: ${error.message}`);
-                return { skip: true };
-              }
             }
 
             if (!pr) {
