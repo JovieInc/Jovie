@@ -36,6 +36,13 @@ jobs:
           - preview
 
     steps:
+      - name: Safety check - only run on schedule or manual dispatch
+        if: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
+        run: |
+          echo "❌ Synthetic monitoring should only run on schedule or manual dispatch, not on '${{ github.event_name }}'"
+          echo "This workflow was incorrectly triggered. Exiting to prevent unnecessary resource usage."
+          exit 1
+
       - name: Skip non-selected environment on manual run
         if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment != matrix.environment }}
         run: |
