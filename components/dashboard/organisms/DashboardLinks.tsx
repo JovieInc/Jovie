@@ -125,7 +125,11 @@ export function DashboardLinks({
         platform: link.platform.id,
         url: link.normalizedUrl,
         sortOrder: index,
+<<<<<<< HEAD
         isActive: link.isVisible !== false,
+=======
+        isActive: link.isVisible === true,
+>>>>>>> 6063dc2 (feat: standardize dashboard section headers (#735))
       }));
     },
     []
