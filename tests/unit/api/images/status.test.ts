@@ -1,0 +1,150 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
+import { GET } from '@/app/api/images/status/[id]/route';
+
+// Mock dependencies
+vi.mock('@clerk/nextjs/server', () => ({
+  auth: vi.fn(),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn(),
+  },
+  profilePhotos: {},
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  and: vi.fn(),
+}));
+
+const { auth } = vi.hoisted(() => ({
+  auth: vi.fn(),
+}));
+
+const { db } = vi.hoisted(() => ({
+  db: {
+    select: vi.fn().mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn(),
+        }),
+      }),
+    }),
+  },
+}));
+
+describe('/api/images/status/[id]', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should reject requests without authentication', async () => {
+    auth.mockResolvedValue({ userId: null });
+
+    const request = new NextRequest('http://localhost:3000/api/images/status/test-id');
+    const response = await GET(request, { params: { id: 'test-id' } });
+    
+    expect(response.status).toBe(401);
+    const data = await response.json();
+    expect(data.error).toBe('Unauthorized');
+  });
+
+  it('should return 404 for non-existent photo', async () => {
+    auth.mockResolvedValue({ userId: 'test-user-id' });
+    
+    // Mock empty result
+    db.select().from().where().limit.mockResolvedValue([]);
+
+    const request = new NextRequest('http://localhost:3000/api/images/status/non-existent');
+    const response = await GET(request, { params: { id: 'non-existent' } });
+    
+    expect(response.status).toBe(404);
+    const data = await response.json();
+    expect(data.error).toBe('Photo not found');
+  });
+
+  it('should return photo status for valid request', async () => {
+    auth.mockResolvedValue({ userId: 'test-user-id' });
+    
+    const mockPhoto = {
+      id: 'test-photo-id',
+      status: 'completed',
+      blobUrl: 'https://blob.vercel-storage.com/test.jpg',
+      smallUrl: 'https://blob.vercel-storage.com/test-small.jpg',
+      mediumUrl: 'https://blob.vercel-storage.com/test-medium.jpg',
+      largeUrl: 'https://blob.vercel-storage.com/test-large.jpg',
+      processedAt: new Date(),
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+
+    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.id).toBe('test-photo-id');
+    expect(data.status).toBe('completed');
+    expect(data.blobUrl).toBe(mockPhoto.blobUrl);
+    expect(data.mediumUrl).toBe(mockPhoto.mediumUrl);
+  });
+
+  it('should handle processing status', async () => {
+    auth.mockResolvedValue({ userId: 'test-user-id' });
+    
+    const mockPhoto = {
+      id: 'test-photo-id',
+      status: 'processing',
+      blobUrl: 'https://blob.vercel-storage.com/test.jpg',
+      smallUrl: null,
+      mediumUrl: null,
+      largeUrl: null,
+      processedAt: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+
+    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.status).toBe('processing');
+    expect(data.processedAt).toBeNull();
+  });
+
+  it('should handle failed status with error message', async () => {
+    auth.mockResolvedValue({ userId: 'test-user-id' });
+    
+    const mockPhoto = {
+      id: 'test-photo-id',
+      status: 'failed',
+      blobUrl: 'https://blob.vercel-storage.com/test.jpg',
+      smallUrl: null,
+      mediumUrl: null,
+      largeUrl: null,
+      processedAt: null,
+      errorMessage: 'Processing failed due to invalid image format',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+
+    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.status).toBe('failed');
+    expect(data.errorMessage).toBe('Processing failed due to invalid image format');
+  });
+});

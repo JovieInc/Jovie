@@ -186,10 +186,11 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
             <div className='flex-1'>
               <AvatarUploader
                 onUploaded={res => {
-                  // For now, persist the secure_url into avatar_url
-                  setFormData(f => ({ ...f, image_url: res.secure_url }));
+                  // Use mediumUrl for profile display, fallback to blobUrl
+                  const imageUrl = res.mediumUrl || res.blobUrl || '';
+                  setFormData(f => ({ ...f, image_url: imageUrl }));
                 }}
-                folder='avatars'
+                initialUrl={formData.image_url}
               />
             </div>
           </div>
