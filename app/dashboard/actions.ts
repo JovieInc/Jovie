@@ -22,6 +22,17 @@ export interface DashboardData {
   hasSocialLinks: boolean;
 }
 
+// Minimal link shape for initializing DashboardLinks client from the server
+export interface ProfileSocialLink {
+  id: string;
+  platform: string;
+  platformType?: string | null;
+  url: string;
+  sortOrder: number | null;
+  isActive: boolean | null;
+  displayText?: string | null;
+}
+
 export async function getDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
@@ -137,6 +148,60 @@ export async function getDashboardData(): Promise<DashboardData> {
         hasSocialLinks: false,
       };
     }
+  });
+}
+
+// Fetch social links for a given profile owned by the current user
+export async function getProfileSocialLinks(
+  profileId: string
+): Promise<ProfileSocialLink[]> {
+  // Prevent caching of user-specific data
+  noStore();
+
+  const { userId } = await auth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  return await withDbSession(async clerkUserId => {
+    // Query against creatorProfiles with ownership check and left-join links
+    const rows = await db
+      .select({
+        profileId: creatorProfiles.id,
+        linkId: socialLinks.id,
+        platform: socialLinks.platform,
+        platformType: socialLinks.platformType,
+        url: socialLinks.url,
+        sortOrder: socialLinks.sortOrder,
+        isActive: socialLinks.isActive,
+        displayText: socialLinks.displayText,
+      })
+      .from(creatorProfiles)
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
+      .leftJoin(
+        socialLinks,
+        eq(socialLinks.creatorProfileId, creatorProfiles.id)
+      )
+      .where(
+        and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+      )
+      .orderBy(socialLinks.sortOrder);
+
+    // If the profile does not belong to the user, rows will be empty
+    // Map only existing link rows (filter out null linkId from left join)
+    const links: ProfileSocialLink[] = rows
+      .filter(r => r.linkId !== null)
+      .map(r => ({
+        id: r.linkId!,
+        platform: r.platform!,
+        platformType: r.platformType ?? null,
+        url: r.url!,
+        sortOrder: r.sortOrder ?? 0,
+        isActive: r.isActive ?? true,
+        displayText: r.displayText ?? null,
+      }));
+
+    return links;
   });
 }
 

@@ -75,9 +75,9 @@ describe('DashboardOverview', () => {
     expect(screen.getByText(/Add a music link/i)).toBeInTheDocument();
     expect(screen.getByText(/Add social links/i)).toBeInTheDocument();
 
-    // Action links for incomplete items
+    // CTA links for incomplete items - these are Link components, not buttons
     expect(screen.getByText('Complete →')).toBeInTheDocument();
-    expect(screen.getAllByText('Add →')).toHaveLength(2);
+    expect(screen.getAllByText('Add →')).toHaveLength(2); // Two "Add →" links for music and social
   });
 
   it('marks tasks complete based on data', () => {
@@ -99,6 +99,9 @@ describe('DashboardOverview', () => {
     expect(
       screen.getByText('Connect Instagram, TikTok, Twitter, etc.')
     ).toBeInTheDocument();
+
+    // One remaining "Add →" link for social links
+    expect(screen.getByText('Add →')).toBeInTheDocument();
   });
 
   it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {

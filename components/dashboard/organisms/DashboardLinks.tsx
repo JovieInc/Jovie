@@ -1,8 +1,8 @@
 'use client';
 
-import { useSession } from '@clerk/nextjs';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/dashboard/actions';
 // flags import removed - pre-launch
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -10,8 +10,6 @@ import {
   type Artist,
   convertDrizzleCreatorProfileToArtist,
   type LegacySocialLink,
-  type SocialLink,
-  type SocialPlatform,
 } from '@/types/db';
 import { UnifiedLinkManager } from '../molecules/UnifiedLinkManager';
 import { DashboardPreview } from './DashboardPreview';
@@ -25,6 +23,7 @@ interface LinkItem extends DetectedLink {
 
 interface DashboardLinksProps {
   initialData: DashboardData;
+  initialLinks: ProfileSocialLink[];
 }
 
 interface SaveStatus {
@@ -34,30 +33,22 @@ interface SaveStatus {
   lastSaved: Date | null;
 }
 
-export function DashboardLinks({ initialData }: DashboardLinksProps) {
-  const { session } = useSession();
+export function DashboardLinks({
+  initialData,
+  initialLinks,
+}: DashboardLinksProps) {
   const [artist] = useState<Artist | null>(
     initialData.selectedProfile
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
-  const [socialLinks, setSocialLinks] = useState<LinkItem[]>([]);
-  const [dspLinks, setDSPLinks] = useState<LinkItem[]>([]);
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>({
-    saving: false,
-    success: null,
-    error: null,
-    lastSaved: null,
-  });
-  const updateIndicatorRef = useRef<HTMLDivElement>(null);
-
   // Convert database social links to LinkItem format
   const convertDbLinksToLinkItems = (
-    dbLinks: SocialLink[] | LegacySocialLink[] = []
+    dbLinks: ProfileSocialLink[] = []
   ): LinkItem[] => {
     return dbLinks.map((link, index) => {
       // Determine platform category based on platform name
-      const platformCategory = [
+      const dspPlatforms = new Set([
         'spotify',
         'apple_music',
         'youtube_music',
@@ -65,7 +56,11 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
         'bandcamp',
         'tidal',
         'deezer',
-      ].includes(link.platform)
+        'amazon_music',
+        'pandora',
+      ]);
+
+      const platformCategory = dspPlatforms.has(link.platform)
         ? 'dsp'
         : 'social';
 
@@ -84,80 +79,55 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
         originalUrl: link.url,
         suggestedTitle: link.platform,
         isValid: true,
-        isVisible: true,
-        order: index,
+        isVisible: link.isActive ?? true,
+        order: typeof link.sortOrder === 'number' ? link.sortOrder : index,
       };
     });
   };
 
+  // Initialize from server-provided props to avoid client fetch
+  const initialLinkItems = useMemo(
+    () => convertDbLinksToLinkItems(initialLinks || []),
+    [initialLinks]
+  );
+  const [socialLinks, setSocialLinks] = useState<LinkItem[]>(() =>
+    initialLinkItems.filter(link => link.platform.category === 'social')
+  );
+  const [dspLinks, setDSPLinks] = useState<LinkItem[]>(() =>
+    initialLinkItems.filter(link => link.platform.category === 'dsp')
+  );
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>({
+    saving: false,
+    success: null,
+    error: null,
+    lastSaved: null,
+  });
+  const updateIndicatorRef = useRef<HTMLDivElement>(null);
+
   // Convert LinkItems to database format
-  const convertLinkItemsToDbFormat = (
-    linkItems: LinkItem[],
-    creatorProfileId: string
-  ) => {
-    return linkItems
-      .filter(link => link.isVisible)
-      .map((link, index) => ({
-        creatorProfileId: creatorProfileId,
-        platform: link.platform.id,
-        platformType: link.platform.id as SocialPlatform,
-        url: link.normalizedUrl,
-        sortOrder: index,
-        isActive: true,
-      }));
+  type APILinkPayload = {
+    platform: string;
+    url: string;
+    sortOrder?: number;
+    isActive?: boolean;
+    displayText?: string;
   };
 
-  // Initialize links from database
-  useEffect(() => {
-    const fetchLinks = async () => {
-      if (!session || !artist?.id) {
-        // Initialize with empty arrays if no session or artist
-        setSocialLinks([]);
-        setDSPLinks([]);
-        return;
-      }
+  const convertLinkItemsToDbFormat = useCallback(
+    (linkItems: LinkItem[]): APILinkPayload[] => {
+      return linkItems
+        .filter(link => link.isVisible)
+        .map((link, index) => ({
+          platform: link.platform.id,
+          url: link.normalizedUrl,
+          sortOrder: index,
+          isActive: true,
+        }));
+    },
+    []
+  );
 
-      try {
-        const res = await fetch(
-          `/api/dashboard/social-links?profileId=${encodeURIComponent(artist.id)}`,
-          { cache: 'no-store' }
-        );
-        if (!res.ok) {
-          const errorText = await res.text().catch(() => 'Unknown error');
-          console.error(`API Error: ${res.status} - ${errorText}`);
-          // Instead of throwing, just initialize with empty arrays for now
-          setSocialLinks([]);
-          setDSPLinks([]);
-          return;
-        }
-        const json: { links: SocialLink[] } = await res.json();
-
-        // Split links into social and DSP categories
-        const socialLinksItems: LinkItem[] = [];
-        const dspLinksItems: LinkItem[] = [];
-
-        const allLinks = convertDbLinksToLinkItems(json.links || []);
-
-        allLinks.forEach(link => {
-          if (link.platform.category === 'dsp') {
-            dspLinksItems.push(link);
-          } else {
-            socialLinksItems.push(link);
-          }
-        });
-
-        setSocialLinks(socialLinksItems);
-        setDSPLinks(dspLinksItems);
-      } catch (error) {
-        console.error('Error initializing links:', error);
-        // Gracefully handle errors by setting empty arrays
-        setSocialLinks([]);
-        setDSPLinks([]);
-      }
-    };
-
-    fetchLinks();
-  }, [session, artist?.id]);
+  // No client fetch; initial links are provided by the server via props
 
   // Convert current links to unified LinkItem format
   const initialAllLinks = useMemo(() => {
@@ -217,7 +187,7 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
   // Save links to database
   const saveLinks = useCallback(
     async (socialLinksToSave: LinkItem[], dspLinksToSave: LinkItem[]) => {
-      if (!session || !artist?.id) return;
+      if (!artist?.id) return;
 
       setSaveStatus(prev => ({
         ...prev,
@@ -229,8 +199,8 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
       try {
         // Convert links to database format for API payload
         const allLinks = [
-          ...convertLinkItemsToDbFormat(socialLinksToSave, artist.id),
-          ...convertLinkItemsToDbFormat(dspLinksToSave, artist.id),
+          ...convertLinkItemsToDbFormat(socialLinksToSave),
+          ...convertLinkItemsToDbFormat(dspLinksToSave),
         ];
 
         const res = await fetch('/api/dashboard/social-links', {
@@ -265,7 +235,7 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
         showUpdateIndicator(false);
       }
     },
-    [session, artist, showUpdateIndicator]
+    [artist, showUpdateIndicator, convertLinkItemsToDbFormat]
   );
 
   // Debounced save function
