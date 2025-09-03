@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
 
     // Create URLs for success and cancel
     const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const successUrl = `${baseUrl}/dashboard?checkout=success`;
-    const cancelUrl = `${baseUrl}/dashboard?checkout=cancel`;
+    const successUrl = `${baseUrl}/billing/success`;
+    const cancelUrl = `${baseUrl}/billing/cancel`;
 
     // Create checkout session
     const session = await createCheckoutSession({
