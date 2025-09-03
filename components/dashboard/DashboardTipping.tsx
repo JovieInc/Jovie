@@ -3,6 +3,7 @@
 import { WalletIcon } from '@heroicons/react/24/outline';
 import { useCallback, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -82,19 +83,20 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
             : 'border-accent/30 shadow-lg'
         )}
       >
-        <div className='flex items-start justify-between mb-4'>
-          <div>
-            <h3 className='text-lg font-medium text-primary-token'>
-              Venmo Handle
-            </h3>
-            <p className='text-sm text-secondary-token mt-1'>
-              {hasVenmoHandle
-                ? 'Your Venmo handle for receiving tips'
-                : 'Add your Venmo handle to start receiving tips'}
-            </p>
-          </div>
-          {!hasVenmoHandle && <WalletIcon className='h-6 w-6 text-accent' />}
-        </div>
+        <SectionHeader
+          className='mb-4 px-0 py-0 border-0'
+          title='Venmo Handle'
+          description={
+            hasVenmoHandle
+              ? 'Your Venmo handle for receiving tips'
+              : 'Add your Venmo handle to start receiving tips'
+          }
+          right={
+            !hasVenmoHandle ? (
+              <WalletIcon className='h-6 w-6 text-accent' />
+            ) : null
+          }
+        />
 
         {isEditing ? (
           <div className='space-y-4'>
@@ -170,9 +172,10 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       >
         {/* Tipping Stats */}
         <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Tipping Stats
-          </h3>
+          <SectionHeader
+            className='mb-4 px-0 py-0 border-0'
+            title='Tipping Stats'
+          />
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
             <div className='bg-surface-2/50 rounded-lg p-4'>
               <p className='text-sm text-secondary-token'>
@@ -193,9 +196,10 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
 
         {/* Recent Tips */}
         <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
-          <h3 className='text-lg font-medium text-primary-token mb-4'>
-            Recent Tips
-          </h3>
+          <SectionHeader
+            className='mb-4 px-0 py-0 border-0'
+            title='Recent Tips'
+          />
           <div className='space-y-4'>
             <p className='text-secondary-token'>
               No tips received yet. When you receive tips, they&apos;ll appear

@@ -3,6 +3,8 @@
 import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
+import { Button } from '@/components/ui/Button';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardAudienceProps {
@@ -35,21 +37,19 @@ export function DashboardAudience({ initialData }: DashboardAudienceProps) {
         {/* Blurred placeholder table */}
         <div className='filter blur-sm pointer-events-none select-none'>
           <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle overflow-hidden'>
-            <div className='px-6 py-4 border-b border-subtle'>
-              <div className='flex items-center justify-between'>
-                <h3 className='text-lg font-medium text-primary-token'>
-                  Fan Contacts
-                </h3>
+            <SectionHeader
+              title='Fan Contacts'
+              right={
                 <div className='flex items-center gap-2'>
-                  <button className='px-3 py-1.5 text-sm bg-surface-2 text-secondary-token rounded-lg'>
+                  <Button variant='outline' size='sm'>
                     Export
-                  </button>
-                  <button className='px-3 py-1.5 text-sm bg-accent text-white rounded-lg'>
+                  </Button>
+                  <Button variant='primary' size='sm'>
                     Add Contact
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              }
+            />
 
             <table className='w-full'>
               <thead className='bg-surface-2/50'>

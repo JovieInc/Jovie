@@ -1,8 +1,8 @@
-import { and, count, sql as drizzleSql, eq, gte } from 'drizzle-orm';
+import { and, count, sql as drizzleSql, eq, gte, isNotNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { clickEvents, users } from '@/lib/db/schema';
 
-type TimeRange = '7d' | '30d' | '90d' | 'all';
+type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
 
 interface AnalyticsData {
   totalClicks: number;
@@ -11,6 +11,10 @@ interface AnalyticsData {
   recentClicks: number;
   clicksByDay: { date: string; count: number }[];
   topLinks: { id: string; url: string; clicks: number }[];
+  // New for MVP simplified analytics
+  profileViewsInRange: number;
+  topCountries: { country: string; count: number }[];
+  topReferrers: { referrer: string; count: number }[];
 }
 
 export async function getAnalyticsData(
@@ -21,6 +25,9 @@ export async function getAnalyticsData(
   let startDate = new Date();
 
   switch (range) {
+    case '1d':
+      startDate.setDate(now.getDate() - 1);
+      break;
     case '7d':
       startDate.setDate(now.getDate() - 7);
       break;
@@ -106,6 +113,48 @@ export async function getAnalyticsData(
     .orderBy(drizzleSql`count DESC`)
     .limit(5);
 
+  // New: profile views in selected range (proxy via total clicks in range)
+  const profileViewsInRange = await db
+    .select({ count: count() })
+    .from(clickEvents)
+    .where(
+      and(
+        eq(clickEvents.creatorProfileId, creatorProfileId),
+        gte(clickEvents.createdAt, startDate)
+      )
+    )
+    .then(res => res[0]?.count ?? 0);
+
+  // New: top countries within selected range
+  const countries = await db
+    .select({ country: clickEvents.country, count: count() })
+    .from(clickEvents)
+    .where(
+      and(
+        eq(clickEvents.creatorProfileId, creatorProfileId),
+        gte(clickEvents.createdAt, startDate),
+        isNotNull(clickEvents.country)
+      )
+    )
+    .groupBy(clickEvents.country)
+    .orderBy(drizzleSql`count DESC`)
+    .limit(5);
+
+  // New: top referrers within selected range
+  const referrers = await db
+    .select({ referrer: clickEvents.referrer, count: count() })
+    .from(clickEvents)
+    .where(
+      and(
+        eq(clickEvents.creatorProfileId, creatorProfileId),
+        gte(clickEvents.createdAt, startDate),
+        isNotNull(clickEvents.referrer)
+      )
+    )
+    .groupBy(clickEvents.referrer)
+    .orderBy(drizzleSql`count DESC`)
+    .limit(5);
+
   return {
     totalClicks: totalClicks[0]?.count ?? 0,
     spotifyClicks: spotifyClicks[0]?.count ?? 0,
@@ -120,6 +169,19 @@ export async function getAnalyticsData(
       url: row.url,
       clicks: Number(row.count),
     })),
+    profileViewsInRange,
+    topCountries: countries
+      .filter(row => Boolean(row.country))
+      .map(row => ({
+        country: row.country as string,
+        count: Number(row.count),
+      })),
+    topReferrers: referrers
+      .filter(row => Boolean(row.referrer))
+      .map(row => ({
+        referrer: row.referrer as string,
+        count: Number(row.count),
+      })),
   };
 }
 

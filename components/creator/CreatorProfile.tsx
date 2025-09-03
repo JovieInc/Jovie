@@ -49,22 +49,26 @@ export function CreatorProfile({ username }: { username: string }) {
           {creator.bio && (
             <p className='mt-2 text-muted-foreground'>{creator.bio}</p>
           )}
+          {/* Social links: respect active state and cap to 6 visible */}
           <div className='mt-4 flex flex-wrap justify-center gap-2 sm:justify-start'>
-            {creator.socialLinks?.map(link => (
-              <Button
-                key={link.id}
-                variant='outline'
-                size='sm'
-                className='gap-2'
-                as='a'
-                href={link.url}
-                target='_blank'
-                rel='noopener noreferrer'
-              >
-                <ExternalLink className='h-4 w-4' />
-                {link.displayText || link.platform}
-              </Button>
-            ))}
+            {creator.socialLinks
+              ?.filter(link => link.isActive !== false)
+              .slice(0, 6)
+              .map(link => (
+                <Button
+                  key={link.id}
+                  variant='outline'
+                  size='sm'
+                  className='gap-2'
+                  as='a'
+                  href={link.url}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  <ExternalLink className='h-4 w-4' />
+                  {link.displayText || link.platform}
+                </Button>
+              ))}
           </div>
         </div>
       </div>
