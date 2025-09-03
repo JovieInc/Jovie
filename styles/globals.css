@@ -7,6 +7,23 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Base document sizing and immediate dark-aware fallback colors */
+html,
+body {
+  height: 100%;
+}
+
+/* Fallback colors before token CSS finishes loading */
+body {
+  background: #0a0a0b;
+  color: #eaeaea;
+}
+
+.dark body {
+  background: #000;
+  color: #fff;
+}
+
 @layer base {
   :root {
     --font-inter: "Inter";

@@ -26,6 +26,10 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   );
   const hasSocialLinks = initialData.hasSocialLinks;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
+  const totalSteps = 3;
+  const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
+    Boolean
+  ).length;
 
   return (
     <div>
@@ -58,55 +62,69 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
             </div>
           </div>
         ) : (
-          <ul role='list' className='space-y-3'>
-            <SetupTaskItem
-              index={1}
-              title='Claim your handle'
-              complete={isHandleClaimed}
-              completeLabel='Handle claimed'
-              incompleteLabel='Secure your unique profile URL'
-              action={
-                <Link
-                  href='/dashboard/settings'
-                  className='text-sm text-accent hover:text-accent/80 font-medium'
-                >
-                  Complete →
-                </Link>
-              }
-            />
+          <div>
+            {/* Progress indicator */}
+            <p className='text-sm text-secondary-token mb-3'>{`${completedCount}/${totalSteps} setup steps completed`}</p>
 
-            <SetupTaskItem
-              index={2}
-              title='Add a music link'
-              complete={hasMusicLink}
-              completeLabel='Music link added'
-              incompleteLabel='Connect Spotify, Apple Music, or YouTube'
-              action={
-                <Link
-                  href='/dashboard/links'
-                  className='text-sm text-accent hover:text-accent/80 font-medium'
-                >
-                  Add →
-                </Link>
-              }
-            />
+            <ul role='list' className='space-y-3'>
+              <SetupTaskItem
+                index={1}
+                title='Claim your handle'
+                complete={isHandleClaimed}
+                completeLabel='Handle claimed'
+                incompleteLabel='Secure your unique profile URL'
+                action={
+                  <Button
+                    as={Link}
+                    href='/dashboard/settings'
+                    size='sm'
+                    variant='primary'
+                    color='blue'
+                  >
+                    Claim handle
+                  </Button>
+                }
+              />
 
-            <SetupTaskItem
-              index={3}
-              title='Add social links'
-              complete={hasSocialLinks}
-              completeLabel='Social links added'
-              incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
-              action={
-                <Link
-                  href='/dashboard/links'
-                  className='text-sm text-accent hover:text-accent/80 font-medium'
-                >
-                  Add →
-                </Link>
-              }
-            />
-          </ul>
+              <SetupTaskItem
+                index={2}
+                title='Add a music link'
+                complete={hasMusicLink}
+                completeLabel='Music link added'
+                incompleteLabel='Connect Spotify, Apple Music, or YouTube'
+                action={
+                  <Button
+                    as={Link}
+                    href='/dashboard/links'
+                    size='sm'
+                    variant='primary'
+                    color='blue'
+                  >
+                    Add music link
+                  </Button>
+                }
+              />
+
+              <SetupTaskItem
+                index={3}
+                title='Add social links'
+                complete={hasSocialLinks}
+                completeLabel='Social links added'
+                incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
+                action={
+                  <Button
+                    as={Link}
+                    href='/dashboard/links'
+                    size='sm'
+                    variant='primary'
+                    color='blue'
+                  >
+                    Add social links
+                  </Button>
+                }
+              />
+            </ul>
+          </div>
         )}
       </DashboardCard>
     </div>
