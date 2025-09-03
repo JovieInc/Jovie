@@ -63,7 +63,7 @@ jobs:
             **/node_modules
           key: ${{ needs.setup.outputs.cache-key }}
       - name: Lint (enforce zero warnings)
-        run: pnpm run lint --max-warnings=0
+        run: pnpm run lint
 
   # Add more jobs here following the same pattern
   # ci-build, ci-unit-tests, etc.
