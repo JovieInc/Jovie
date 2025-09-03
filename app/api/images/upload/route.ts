@@ -5,16 +5,18 @@ import { db, profilePhotos } from '@/lib/db';
 import { eq } from 'drizzle-orm';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
 
-// Dynamic import for Vercel Blob - only import if available
-let put: any = null;
-try {
-  const blobModule = await import('@vercel/blob');
-  put = blobModule.put;
-} catch (error) {
-  console.warn('@vercel/blob not available, using mock implementation');
-}
-
 export const runtime = 'nodejs'; // Required for file upload processing
+
+// Dynamically import Vercel Blob when needed
+async function getVercelBlobUploader() {
+  try {
+    const blobModule = await import('@vercel/blob');
+    return blobModule.put;
+  } catch {
+    console.warn('@vercel/blob not available, using mock implementation');
+    return null;
+  }
+}
 
 const uploadSchema = z.object({
   filename: z.string().min(1),
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ 
         error: 'Invalid file', 
-        details: validation.error.errors 
+        details: validation.error.issues 
       }, { status: 400 });
     }
 
@@ -92,6 +94,8 @@ export async function POST(request: NextRequest) {
 
     try {
       let blobUrl: string;
+      
+      const put = await getVercelBlobUploader();
       
       if (put && process.env.BLOB_READ_WRITE_TOKEN) {
         // Production: Use Vercel Blob

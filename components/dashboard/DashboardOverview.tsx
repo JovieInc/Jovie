@@ -16,6 +16,10 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
+  
+  // State for completion tracking
+  const [hasSocialLinks, setHasSocialLinks] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Fetch social links to determine completion status
   useEffect(() => {
@@ -46,8 +50,6 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const [hasSocialLinks, setHasSocialLinks] = useState(false);
-  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
 
