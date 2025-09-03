@@ -70,14 +70,25 @@ describe('DashboardOverview', () => {
 
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
-    // Task titles (use regex to ignore numeric prefixes like "1. ")
+    // Task titles (use regex to ignore numeric prefixes like "1. ").
+    // Some labels may appear both as list text and as button text; allow multiple.
     expect(screen.getByText(/Claim your handle/i)).toBeInTheDocument();
     expect(screen.getByText(/Add a music link/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add social links/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Add social links/i).length).toBeGreaterThan(0);
 
-    // CTA links for incomplete items - these are Link components, not buttons
-    expect(screen.getByText('Complete →')).toBeInTheDocument();
-    expect(screen.getAllByText('Add →')).toHaveLength(2); // Two "Add →" links for music and social
+    // CTA links (styled buttons) for incomplete items
+    expect(
+      screen.getByRole('link', { name: /Claim handle/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Add music link/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Add social links/i })
+    ).toBeInTheDocument();
+
+    // Progress indicator
+    expect(screen.getByText('0/3 setup steps completed')).toBeInTheDocument();
   });
 
   it('marks tasks complete based on data', () => {
@@ -100,8 +111,13 @@ describe('DashboardOverview', () => {
       screen.getByText('Connect Instagram, TikTok, Twitter, etc.')
     ).toBeInTheDocument();
 
-    // One remaining "Add →" link for social links
-    expect(screen.getByText('Add →')).toBeInTheDocument();
+    // CTA link for remaining social links
+    expect(
+      screen.getByRole('link', { name: /Add social links/i })
+    ).toBeInTheDocument();
+
+    // Progress indicator reflects 2/3
+    expect(screen.getByText('2/3 setup steps completed')).toBeInTheDocument();
   });
 
   it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {
