@@ -56,6 +56,14 @@ export const currencyCodeEnum = pgEnum('currency_code', [
   'DKK',
 ]);
 
+// Profile photos enum for upload status
+export const photoStatusEnum = pgEnum('photo_status', [
+  'uploading',
+  'processing',
+  'completed',
+  'failed',
+]);
+
 // Tables
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -188,6 +196,36 @@ export const wrappedLinks = pgTable('wrapped_links', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// Profile photos table for avatar uploads with Vercel Blob
+export const profilePhotos = pgTable('profile_photos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  creatorProfileId: uuid('creator_profile_id').references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  status: photoStatusEnum('status').notNull().default('uploading'),
+  
+  // Vercel Blob URLs for different sizes
+  blobUrl: text('blob_url'), // Original uploaded image
+  smallUrl: text('small_url'), // 128x128 for thumbnails
+  mediumUrl: text('medium_url'), // 256x256 for profile displays
+  largeUrl: text('large_url'), // 512x512 for high-res displays
+  
+  // Image metadata
+  originalFilename: text('original_filename'),
+  mimeType: text('mime_type'),
+  fileSize: integer('file_size'), // in bytes
+  width: integer('width'),
+  height: integer('height'),
+  
+  // Processing metadata
+  processedAt: timestamp('processed_at'),
+  errorMessage: text('error_message'),
+  
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -215,6 +253,9 @@ export const selectSignedLinkAccessSchema =
 export const insertWrappedLinkSchema = createInsertSchema(wrappedLinks);
 export const selectWrappedLinkSchema = createSelectSchema(wrappedLinks);
 
+export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
+export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -239,3 +280,6 @@ export type NewWrappedLink = typeof wrappedLinks.$inferInsert;
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;
+
+export type ProfilePhoto = typeof profilePhotos.$inferSelect;
+export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
