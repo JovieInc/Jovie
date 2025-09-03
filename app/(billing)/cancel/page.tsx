@@ -1,9 +1,26 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { XCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { page, track } from '@/lib/analytics';
 
 export default function CheckoutCancelPage() {
+  useEffect(() => {
+    // Track checkout cancellation
+    track('checkout_cancelled', {
+      flow_type: 'checkout',
+      page: 'cancel',
+    });
+    
+    page('checkout_cancel', {
+      page_type: 'billing',
+      section: 'cancel',
+      conversion: false,
+    });
+  }, []);
   return (
     <div className="text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900">

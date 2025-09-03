@@ -1,8 +1,25 @@
+'use client';
+
+import { useEffect } from 'react';
 import Link from 'next/link';
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/components/ui/Button';
+import { page, track } from '@/lib/analytics';
 
 export default function CheckoutSuccessPage() {
+  useEffect(() => {
+    // Track successful subscription
+    track('subscription_success', {
+      flow_type: 'checkout',
+      page: 'success',
+    });
+    
+    page('checkout_success', {
+      page_type: 'billing',
+      section: 'success',
+      conversion: true,
+    });
+  }, []);
   return (
     <div className="text-center">
       <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">

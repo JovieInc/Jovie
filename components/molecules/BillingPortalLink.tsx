@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { CreditCardIcon } from '@heroicons/react/24/outline';
+import { track } from '@/lib/analytics';
 
 interface BillingPortalLinkProps {
   className?: string;
@@ -25,6 +26,11 @@ export function BillingPortalLink({
     setError(null);
 
     try {
+      // Track billing portal access attempt
+      track('billing_portal_clicked', {
+        source: 'billing_dashboard',
+      });
+
       const response = await fetch('/api/stripe/portal', {
         method: 'POST',
         headers: {
@@ -34,16 +40,33 @@ export function BillingPortalLink({
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create billing portal session');
+        const errorMessage = errorData.error || 'Failed to create billing portal session';
+        
+        track('billing_portal_failed', {
+          error: errorMessage,
+          source: 'billing_dashboard',
+        });
+        
+        throw new Error(errorMessage);
       }
 
       const { url } = await response.json();
+      
+      track('billing_portal_redirect', {
+        source: 'billing_dashboard',
+      });
       
       // Redirect to Stripe billing portal
       window.location.href = url;
     } catch (err) {
       console.error('Error accessing billing portal:', err);
-      setError(err instanceof Error ? err.message : 'Failed to access billing portal');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to access billing portal';
+      setError(errorMessage);
+      
+      track('billing_portal_error', {
+        error: errorMessage,
+        source: 'billing_dashboard',
+      });
     } finally {
       setLoading(false);
     }

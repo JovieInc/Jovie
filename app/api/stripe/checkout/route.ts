@@ -10,6 +10,8 @@ import { createCheckoutSession } from '@/lib/stripe/client';
 import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 
+export const runtime = 'nodejs';
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
