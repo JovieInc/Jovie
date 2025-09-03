@@ -130,20 +130,22 @@ export function ClientProviders({
   }
 
   return (
-    <ClerkWrapper>
-      <ThemeProvider
-        attribute='class'
-        defaultTheme={initialThemeMode}
-        enableSystem={true}
-        disableTransitionOnChange
-        storageKey='jovie-theme'
-      >
-        <ToastProvider>
-          {children}
-          <Analytics />
-          {/* <Toolbar /> */}
-        </ToastProvider>
-      </ThemeProvider>
-    </ClerkWrapper>
+    <React.StrictMode>
+      <ClerkWrapper>
+        <ThemeProvider
+          attribute='class'
+          defaultTheme={initialThemeMode}
+          enableSystem={true}
+          disableTransitionOnChange
+          storageKey='jovie-theme'
+        >
+          <ToastProvider>
+            {children}
+            <Analytics />
+            {/* <Toolbar /> */}
+          </ToastProvider>
+        </ThemeProvider>
+      </ClerkWrapper>
+    </React.StrictMode>
   );
 }
