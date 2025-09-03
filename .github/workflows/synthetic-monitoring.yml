@@ -20,8 +20,6 @@ on:
           - production
           - preview
 
-env:
-
 jobs:
   synthetic-test:
     name: Golden Path Synthetic Test
