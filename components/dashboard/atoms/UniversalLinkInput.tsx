@@ -14,6 +14,9 @@ interface UniversalLinkInputProps {
   placeholder?: string;
   disabled?: boolean;
   existingPlatforms?: string[]; // Array of existing platform IDs to check for duplicates
+  // Quota indicators (optional)
+  socialVisibleCount?: number;
+  socialVisibleLimit?: number; // default 6
 }
 
 export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
@@ -21,6 +24,8 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
   placeholder = 'Paste any link (Spotify, Instagram, TikTok, etc.)',
   disabled = false,
   existingPlatforms = [],
+  socialVisibleCount = 0,
+  socialVisibleLimit = 6,
 }) => {
   const [url, setUrl] = useState('');
   const [customTitle, setCustomTitle] = useState('');
@@ -273,33 +278,49 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
               )}
             </div>
 
-            {/* Add button */}
-            <Button
-              onClick={handleAdd}
-              disabled={
-                disabled ||
-                !detectedLink.isValid ||
-                !displayTitle.trim() ||
-                isPlatformDuplicate
-              }
-              size='sm'
-              style={{
-                backgroundColor:
-                  detectedLink.isValid && !isPlatformDuplicate
-                    ? brandColor
-                    : undefined,
-              }}
-              className={
-                !detectedLink.isValid || isPlatformDuplicate ? 'opacity-50' : ''
-              }
-              aria-label={
-                isPlatformDuplicate
-                  ? `Cannot add duplicate ${detectedLink.platform.name} link`
-                  : `Add ${displayTitle || 'link'}`
-              }
-            >
-              Add
-            </Button>
+            {/* Add button + quota */}
+            <div className='flex flex-col items-end gap-1'>
+              <Button
+                onClick={handleAdd}
+                disabled={
+                  disabled ||
+                  !detectedLink.isValid ||
+                  !displayTitle.trim() ||
+                  isPlatformDuplicate
+                }
+                size='sm'
+                style={{
+                  backgroundColor:
+                    detectedLink.isValid && !isPlatformDuplicate
+                      ? brandColor
+                      : undefined,
+                }}
+                className={
+                  !detectedLink.isValid || isPlatformDuplicate
+                    ? 'opacity-50'
+                    : ''
+                }
+                aria-label={
+                  isPlatformDuplicate
+                    ? `Cannot add duplicate ${detectedLink.platform.name} link`
+                    : `Add ${detectedLink.platform.name}`
+                }
+              >
+                {`Add ${detectedLink.platform.name}`}
+              </Button>
+
+              {/* Quota badge (muted) */}
+              <div className='text-[11px] text-secondary-token'>
+                {detectedLink.platform.category === 'social' ? (
+                  <span>
+                    {Math.min(socialVisibleCount, socialVisibleLimit)}/
+                    {socialVisibleLimit} visible
+                  </span>
+                ) : (
+                  <span> No limit </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
