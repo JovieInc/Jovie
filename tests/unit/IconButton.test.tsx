@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -212,6 +213,48 @@ describe('IconButton', () => {
       );
 
       expect(screen.getByRole('button')).toHaveAttribute('title', 'Custom title');
+    });
+  });
+
+  describe('data-state attribute', () => {
+    it('has data-state="idle" by default for button', () => {
+      render(
+        <IconButton ariaLabel="Idle button">
+          <TestIcon />
+        </IconButton>
+      );
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'idle');
+    });
+
+    it('has data-state="disabled" when disabled for button', () => {
+      render(
+        <IconButton ariaLabel="Disabled button" disabled>
+          <TestIcon />
+        </IconButton>
+      );
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'disabled');
+    });
+
+    it('has data-state="idle" for link by default', () => {
+      render(
+        <IconButton ariaLabel="Link button" href="/test">
+          <TestIcon />
+        </IconButton>
+      );
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('data-state', 'idle');
+    });
+
+    it('has data-state="disabled" for link when disabled', () => {
+      render(
+        <IconButton ariaLabel="Disabled link" href="/test" disabled>
+          <TestIcon />
+        </IconButton>
+      );
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('data-state', 'disabled');
     });
   });
 });

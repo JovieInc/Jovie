@@ -133,11 +133,15 @@ export const Button = forwardRef<
       additionalProps['aria-busy'] = 'true';
     }
 
+    // Determine data-state based on current state
+    const dataState = loading ? 'loading' : isDisabled ? 'disabled' : 'idle';
+
     return (
       <Component
         ref={ref as React.Ref<HTMLElement>}
         className={classes}
         onClick={handleClick}
+        data-state={dataState}
         {...additionalProps}
         {...props}
       >
