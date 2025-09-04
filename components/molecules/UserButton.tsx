@@ -35,7 +35,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const billingStatus = useBillingStatus();
 
-  const { refs, floatingStyles, context, x, y } = useFloating({
+  const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
     middleware: [
