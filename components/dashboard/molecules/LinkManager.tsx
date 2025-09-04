@@ -30,15 +30,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/ui/ToastContainer';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { LinkItem } from '@/types/links';
 import { SortableLinkItem } from '../atoms/SortableLinkItem';
 import { UniversalLinkInput } from '../atoms/UniversalLinkInput';
-
-interface LinkItem extends DetectedLink {
-  id: string;
-  title: string;
-  isVisible: boolean;
-  order: number;
-}
 
 interface LinkManagerProps {
   initialLinks?: LinkItem[];

@@ -74,13 +74,10 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         </p>
       </div>
 
-      {/* Venmo Handle Setup - Always Visible */}
+      {/* Venmo Handle Setup - Always Visible — border tokens normalized to border-subtle for consistency with dashboard */}
       <div
         className={cn(
-          'mb-6 bg-surface-1 backdrop-blur-sm rounded-lg border p-6 transition-all duration-300 relative z-20',
-          hasVenmoHandle
-            ? 'border-subtle hover:border-accent/10'
-            : 'border-accent/30 shadow-lg'
+          'mb-6 bg-surface-1 backdrop-blur-sm rounded-lg border p-6 transition-all duration-300 relative z-20 border-subtle hover:shadow-md'
         )}
       >
         <SectionHeader
@@ -155,7 +152,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         ) : (
           <button
             onClick={() => setIsEditing(true)}
-            className='w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-accent/50 rounded-lg text-accent hover:border-accent hover:bg-accent/5 transition-all duration-200'
+            className='w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-subtle rounded-lg text-accent hover:bg-surface-2/50 transition-all duration-200'
           >
             <WalletIcon className='h-5 w-5' />
             <span className='font-medium'>Add Venmo Handle</span>
@@ -171,7 +168,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         )}
       >
         {/* Tipping Stats */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
+        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-md transition-all duration-300 relative z-10'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Tipping Stats'
@@ -212,7 +209,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       {/* Overlay CTA when no Venmo handle */}
       {!hasVenmoHandle && !isEditing && (
         <div className='absolute inset-x-0 top-32 flex justify-center z-30'>
-          <div className='bg-surface-0/90 backdrop-blur-xl rounded-2xl p-6 max-w-sm text-center shadow-xl border border-subtle/50 ring-1 ring-black/5 dark:ring-white/5'>
+          <div className='bg-surface-0/90 backdrop-blur-xl rounded-2xl p-6 max-w-sm text-center shadow-xl border border-subtle ring-1 ring-black/5 dark:ring-white/5'>
             <div className='inline-flex items-center justify-center w-12 h-12 bg-accent/10 rounded-full mb-3'>
               <WalletIcon className='h-6 w-6 text-accent' />
             </div>

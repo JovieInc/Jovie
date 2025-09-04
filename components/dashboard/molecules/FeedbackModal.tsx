@@ -2,8 +2,8 @@
 
 import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { posthog } from 'posthog-js';
 import { Fragment, useCallback, useState } from 'react';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
 interface FeedbackModalProps {
@@ -23,7 +23,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
     try {
       // Track feedback submission with PostHog
-      posthog.capture('feedback_submitted', {
+      track('feedback_submitted', {
         feedback: feedback.trim(),
         source: 'dashboard_sidebar',
         method: 'custom_modal',

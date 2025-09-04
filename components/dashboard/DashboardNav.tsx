@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Divider } from '@/components/atoms/Divider';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { cn } from '@/lib/utils';
 
@@ -164,13 +165,8 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       {/* Primary Navigation Block */}
       <div className='mb-6'>{renderNavSection(primaryNavigation, true)}</div>
 
-      {/* Subtle divider */}
-      <div
-        className={cn(
-          'border-t border-subtle/30 mb-6',
-          collapsed ? 'mx-2' : 'mx-3'
-        )}
-      />
+      {/* Divider */}
+      <Divider className='mb-6' inset={!collapsed} />
 
       {/* Secondary Navigation Block */}
       <div className='mb-4'>{renderNavSection(secondaryNavigation, false)}</div>
