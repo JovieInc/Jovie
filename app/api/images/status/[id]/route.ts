@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
-import { eq, and } from 'drizzle-orm';
 
 export const runtime = 'edge';
 
@@ -11,10 +11,7 @@ interface RouteParams {
   };
 }
 
-export async function GET(
-  request: NextRequest,
-  { params }: RouteParams
-) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
     const { userId } = await auth();
     if (!userId) {
@@ -30,10 +27,9 @@ export async function GET(
     const [photo] = await db
       .select()
       .from(profilePhotos)
-      .where(and(
-        eq(profilePhotos.id, photoId),
-        eq(profilePhotos.userId, userId)
-      ))
+      .where(
+        and(eq(profilePhotos.id, photoId), eq(profilePhotos.userId, userId))
+      )
       .limit(1);
 
     if (!photo) {
@@ -52,7 +48,6 @@ export async function GET(
       createdAt: photo.createdAt,
       updatedAt: photo.updatedAt,
     });
-
   } catch (error) {
     console.error('Photo status check error:', error);
     return NextResponse.json(

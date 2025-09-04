@@ -5,14 +5,7 @@ import { CSS } from '@dnd-kit/utilities';
 import React, { forwardRef, KeyboardEvent, useCallback, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Input } from '@/components/ui/Input';
-import type { DetectedLink } from '@/lib/utils/platform-detection';
-
-interface LinkItem extends DetectedLink {
-  id: string;
-  title: string;
-  isVisible: boolean;
-  order: number;
-}
+import type { LinkItem } from '@/types/links';
 
 interface SortableLinkItemProps {
   link: LinkItem;

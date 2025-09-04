@@ -65,7 +65,7 @@ const steps = [
 
 export function NewHowItWorks() {
   return (
-    <section className='py-16 bg-gray-50 dark:bg-gray-900'>
+    <section className='py-16 bg-white dark:bg-gray-900'>
       <Container>
         <div className='text-center mb-12'>
           <h2 className='text-3xl font-bold text-gray-900 dark:text-white'>
@@ -86,7 +86,7 @@ export function NewHowItWorks() {
                   className='relative flex items-start md:items-center'
                 >
                   {/* Step number with icon */}
-                  <div className='flex-shrink-0 flex items-center justify-center w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 z-10'>
+                  <div className='flex-shrink-0 flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white z-10'>
                     {step.icon}
                   </div>
 

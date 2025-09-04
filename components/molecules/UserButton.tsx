@@ -202,39 +202,63 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
       <button
         ref={refs.setReference}
         {...getReferenceProps()}
-        className={`flex items-center gap-3 transition-all duration-300 ease-in-out focus-ring-themed ${showUserInfo ? 'w-full rounded-lg p-2 text-left interactive-hover' : 'justify-center w-8 h-8 rounded-lg surface-hover hover:surface-pressed'}`}
+        className={`flex items-center transition-all duration-300 ease-in-out focus-ring-themed ${
+          showUserInfo
+            ? 'gap-3 w-full rounded-md border border-subtle bg-surface-1 px-2.5 py-2 text-left hover:bg-surface-2'
+            : 'items-center justify-center gap-0 w-8 h-8 p-0 rounded-md border border-subtle bg-surface-0 hover:bg-surface-2'
+        }`}
+        aria-haspopup='menu'
+        aria-expanded={isOpen}
       >
         {userImageUrl ? (
           <Image
             src={userImageUrl}
             alt={displayName || 'User avatar'}
-            width={32}
-            height={32}
-            className='w-8 h-8 rounded-full object-cover flex-shrink-0'
+            width={showUserInfo ? 32 : 20}
+            height={showUserInfo ? 32 : 20}
+            className={`${showUserInfo ? 'w-8 h-8' : 'w-5 h-5'} rounded-full object-cover flex-shrink-0 block`}
           />
         ) : (
-          <div className='w-8 h-8 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center flex-shrink-0'>
-            <span className='text-xs font-medium text-gray-700 dark:text-gray-200'>
-              {userInitials}
-            </span>
+          <div
+            className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-[10px]'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-semibold`}
+          >
+            {userInitials}
           </div>
         )}
         <div
           className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${
-            showUserInfo && artist
+            showUserInfo
               ? 'opacity-100 w-auto overflow-visible'
               : 'opacity-0 w-0 overflow-hidden'
           }`}
         >
-          {artist && (
+          {showUserInfo && (
             <>
               <p className='text-sm font-medium text-primary truncate'>
-                {artist.name || artist.handle}
+                {displayName}
               </p>
-              <p className='text-xs text-tertiary truncate'>@{artist.handle}</p>
+              <p className='text-xs text-tertiary truncate'>
+                {user.primaryEmailAddress?.emailAddress}
+              </p>
             </>
           )}
         </div>
+        {showUserInfo && (
+          <svg
+            className={`w-4 h-4 text-tertiary-token transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+            fill='none'
+            viewBox='0 0 24 24'
+            stroke='currentColor'
+            strokeWidth={2}
+            aria-hidden='true'
+          >
+            <path
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              d='M19 9l-7 7-7-7'
+            />
+          </svg>
+        )}
       </button>
 
       {isOpen && (
@@ -243,13 +267,65 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             <div
               ref={refs.setFloating}
               {...getFloatingProps()}
-              className='z-50 w-64 rounded-lg border border-border bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
+              className='z-50 w-64 rounded-lg border border-subtle bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
               style={{
                 ...floatingStyles,
                 animation: 'user-menu-enter 150ms ease-out',
               }}
             >
-              <div className='p-4 border-b border-border'>
+              {/* Creator section */}
+              <div className='p-3 border-b border-subtle'>
+                <p className='px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
+                  Creator
+                </p>
+                <button
+                  disabled
+                  className='w-full flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-surface-1 text-primary-token border border-subtle'
+                  title='Creator switching coming soon'
+                >
+                  <span className='flex items-center gap-2'>
+                    <svg
+                      className='w-4 h-4 text-secondary-token'
+                      viewBox='0 0 24 24'
+                      fill='none'
+                      stroke='currentColor'
+                      strokeWidth='2'
+                    >
+                      <path d='M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5z' />
+                      <path d='M3 22c0-4.971 4.029-9 9-9s9 4.029 9 9' />
+                    </svg>
+                    @{artist?.handle ?? 'creator'}
+                  </span>
+                  <svg
+                    className='w-4 h-4 text-tertiary-token'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M20 6L9 17l-5-5' />
+                  </svg>
+                </button>
+                <button
+                  disabled
+                  className='mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-md text-secondary-token hover:text-secondary-token border border-dashed border-subtle'
+                  title='Add creator coming soon'
+                >
+                  <svg
+                    className='w-4 h-4'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M12 5v14M5 12h14' />
+                  </svg>
+                  Add creator (soon)
+                </button>
+              </div>
+
+              {/* Profile summary */}
+              <div className='p-4 border-b border-subtle'>
                 <div className='flex items-center gap-3'>
                   {userImageUrl ? (
                     <Image
@@ -357,45 +433,31 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                       <path
                         className='opacity-75'
                         fill='currentColor'
-                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                      ></path>
+                        d='M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z'
+                      />
                     </svg>
                   ) : (
                     <svg
                       className='w-4 h-4'
+                      viewBox='0 0 24 24'
                       fill='none'
                       stroke='currentColor'
-                      viewBox='0 0 24 24'
+                      strokeWidth='2'
                     >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z'
-                      />
+                      <path d='M3 10h18M7 15h1m4 0h5M6 19h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z' />
                     </svg>
                   )}
-                  {isBillingLoading
-                    ? 'Loading...'
-                    : billingStatus.loading
-                      ? 'Billing'
-                      : billingStatus.isPro
-                        ? 'Manage Billing'
-                        : 'Upgrade to Pro'}
+                  {billingStatus.isPro ? 'Manage Billing' : 'Upgrade to Pro'}
                 </button>
-
                 <button
-                  onClick={() => {
-                    router.push('/support');
-                    setIsOpen(false);
-                  }}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                  onClick={() => router.push('/support')}
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
                 >
                   <svg
                     className='w-4 h-4'
                     fill='none'
-                    stroke='currentColor'
                     viewBox='0 0 24 24'
+                    stroke='currentColor'
                   >
                     <path
                       strokeLinecap='round'
@@ -408,14 +470,32 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                 </button>
               </div>
 
-              <div className='py-1 border-t border-border'>
+              {/* Settings + Sign out at bottom */}
+              <div className='py-1 border-t border-subtle'>
+                <button
+                  onClick={handleProfile}
+                  disabled={isLoading}
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                >
+                  <svg
+                    className='w-4 h-4'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    strokeWidth='2'
+                  >
+                    <path d='M12 15c2.761 0 5-2.239 5-5S14.761 5 12 5 7 7.239 7 10s2.239 5 5 5z' />
+                    <path d='M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009.09 5H9a2 2 0 114 0h.09a1.65 1.65 0 001-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82 1.65 1.65 0 001 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z' />
+                  </svg>
+                  Personal Settings
+                </button>
                 <button
                   onClick={() => {
                     handleSignOut();
                     setIsOpen(false);
                   }}
                   disabled={isLoading}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
+                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
                 >
                   <svg
                     className='w-4 h-4'

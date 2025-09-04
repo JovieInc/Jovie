@@ -40,29 +40,31 @@ test.describe('Billing Smoke Tests', () => {
 
     // Check if we're on sign-in page (expected for unauthenticated user)
     const currentUrl = page.url();
-    const isOnSignIn = currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
+    const isOnSignIn =
+      currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
     const isOnBilling = currentUrl.includes('/billing');
 
     // Either should be on sign-in (redirect) or billing page (if authenticated)
     expect(isOnSignIn || isOnBilling).toBe(true);
 
     // Verify no critical console errors
-    const criticalErrors = errors.filter(error => 
-      !error.includes('Warning:') && 
-      !error.includes('PostHog') &&
-      !error.includes('analytics')
+    const criticalErrors = errors.filter(
+      error =>
+        !error.includes('Warning:') &&
+        !error.includes('PostHog') &&
+        !error.includes('analytics')
     );
-    
+
     if (criticalErrors.length > 0) {
       console.log('Critical errors found:', criticalErrors);
     }
     expect(criticalErrors.length).toBe(0);
 
     // Verify no failed API responses (except auth-related 401s which are expected)
-    const criticalFailures = failedResponses.filter(res => 
-      res.status !== 401 && res.status !== 403
+    const criticalFailures = failedResponses.filter(
+      res => res.status !== 401 && res.status !== 403
     );
-    
+
     if (criticalFailures.length > 0) {
       console.log('Critical API failures:', criticalFailures);
     }
@@ -103,29 +105,31 @@ test.describe('Billing Smoke Tests', () => {
 
     // Check if we're on sign-in page (expected for unauthenticated user)
     const currentUrl = page.url();
-    const isOnSignIn = currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
+    const isOnSignIn =
+      currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
     const isOnAccount = currentUrl.includes('/account');
 
     // Either should be on sign-in (redirect) or account page (if authenticated)
     expect(isOnSignIn || isOnAccount).toBe(true);
 
     // Verify no critical console errors
-    const criticalErrors = errors.filter(error => 
-      !error.includes('Warning:') && 
-      !error.includes('PostHog') &&
-      !error.includes('analytics')
+    const criticalErrors = errors.filter(
+      error =>
+        !error.includes('Warning:') &&
+        !error.includes('PostHog') &&
+        !error.includes('analytics')
     );
-    
+
     if (criticalErrors.length > 0) {
       console.log('Critical errors found:', criticalErrors);
     }
     expect(criticalErrors.length).toBe(0);
 
     // Verify no failed API responses (except auth-related 401s which are expected)
-    const criticalFailures = failedResponses.filter(res => 
-      res.status !== 401 && res.status !== 403
+    const criticalFailures = failedResponses.filter(
+      res => res.status !== 401 && res.status !== 403
     );
-    
+
     if (criticalFailures.length > 0) {
       console.log('Critical API failures:', criticalFailures);
     }
@@ -150,7 +154,8 @@ test.describe('Billing Smoke Tests', () => {
 
     // Should be on success page or redirected to sign-in
     const currentUrl = page.url();
-    const isOnSignIn = currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
+    const isOnSignIn =
+      currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
     const isOnSuccess = currentUrl.includes('/billing/success');
 
     expect(isOnSignIn || isOnSuccess).toBe(true);
@@ -158,18 +163,20 @@ test.describe('Billing Smoke Tests', () => {
     // If on success page, verify content loads
     if (isOnSuccess) {
       // Should have success messaging
-      const hasSuccessContent = await page.locator('text=Welcome to Pro').isVisible() ||
-                               await page.locator('text=subscription').isVisible();
+      const hasSuccessContent =
+        (await page.locator('text=Welcome to Pro').isVisible()) ||
+        (await page.locator('text=subscription').isVisible());
       expect(hasSuccessContent).toBe(true);
     }
 
     // Verify no critical console errors
-    const criticalErrors = errors.filter(error => 
-      !error.includes('Warning:') && 
-      !error.includes('PostHog') &&
-      !error.includes('analytics')
+    const criticalErrors = errors.filter(
+      error =>
+        !error.includes('Warning:') &&
+        !error.includes('PostHog') &&
+        !error.includes('analytics')
     );
-    
+
     expect(criticalErrors.length).toBe(0);
   });
 
@@ -191,7 +198,8 @@ test.describe('Billing Smoke Tests', () => {
 
     // Should be on cancel page or redirected to sign-in
     const currentUrl = page.url();
-    const isOnSignIn = currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
+    const isOnSignIn =
+      currentUrl.includes('/sign-in') || currentUrl.includes('/sign-up');
     const isOnCancel = currentUrl.includes('/billing/cancel');
 
     expect(isOnSignIn || isOnCancel).toBe(true);
@@ -199,18 +207,20 @@ test.describe('Billing Smoke Tests', () => {
     // If on cancel page, verify content loads
     if (isOnCancel) {
       // Should have cancel messaging
-      const hasCancelContent = await page.locator('text=Checkout Cancelled').isVisible() ||
-                              await page.locator('text=cancelled').isVisible();
+      const hasCancelContent =
+        (await page.locator('text=Checkout Cancelled').isVisible()) ||
+        (await page.locator('text=cancelled').isVisible());
       expect(hasCancelContent).toBe(true);
     }
 
     // Verify no critical console errors
-    const criticalErrors = errors.filter(error => 
-      !error.includes('Warning:') && 
-      !error.includes('PostHog') &&
-      !error.includes('analytics')
+    const criticalErrors = errors.filter(
+      error =>
+        !error.includes('Warning:') &&
+        !error.includes('PostHog') &&
+        !error.includes('analytics')
     );
-    
+
     expect(criticalErrors.length).toBe(0);
   });
 });

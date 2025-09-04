@@ -1,5 +1,6 @@
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
+import { Button } from '@/components/ui/Button';
 
 export function AuthActions() {
   const { isSignedIn } = useUser();
@@ -24,12 +25,9 @@ export function AuthActions() {
       >
         Sign in
       </Link>
-      <Link
-        href='/signup'
-        className='inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors'
-      >
+      <Button as={Link} href='/signup' variant='primary' size='md'>
         Sign up
-      </Link>
+      </Button>
     </div>
   );
 }

@@ -2,15 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
-import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { LinkItem } from '@/types/links';
 import { LinkManager } from './LinkManager';
-
-interface LinkItem extends DetectedLink {
-  id: string;
-  title: string;
-  isVisible: boolean;
-  order: number;
-}
 
 interface UnifiedLinkManagerProps {
   initialLinks?: LinkItem[];

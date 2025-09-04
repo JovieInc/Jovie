@@ -10,7 +10,7 @@ interface PricingCTAProps {
 export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
   return (
     <motion.div
-      className='mt-16 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 p-1 shadow-xl'
+      className='mt-16 rounded-xl border border-subtle p-1 shadow-xl bg-surface-1'
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.4 }}
@@ -29,7 +29,7 @@ export function PricingCTA({ onUpgrade, isLoading }: PricingCTAProps) {
             <motion.button
               onClick={onUpgrade}
               disabled={isLoading}
-              className='inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200'
+              className='inline-flex items-center justify-center rounded-lg px-6 py-3 text-base font-medium transition-all duration-200 cursor-pointer bg-black text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed'
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >

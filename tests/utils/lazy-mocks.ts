@@ -1,6 +1,6 @@
 /**
  * Lazy Mock Loading System
- * 
+ *
  * Provides on-demand loading of mocks to reduce setup time.
  * Only loads mocks when they're actually needed by tests.
  */
@@ -16,7 +16,7 @@ const loadedMocks = new Set<string>();
  */
 export function loadClerkMocks() {
   if (loadedMocks.has('clerk')) return;
-  
+
   vi.mock('@clerk/nextjs', () => ({
     useUser: () => ({
       isSignedIn: false,
@@ -36,9 +36,13 @@ export function loadClerkMocks() {
     SignInButton: ({ children }: { children: React.ReactNode }) => children,
     SignUpButton: ({ children }: { children: React.ReactNode }) => children,
     UserButton: () =>
-      React.createElement('div', { 'data-testid': 'user-button' }, 'User Button'),
+      React.createElement(
+        'div',
+        { 'data-testid': 'user-button' },
+        'User Button'
+      ),
   }));
-  
+
   loadedMocks.add('clerk');
 }
 
@@ -47,7 +51,7 @@ export function loadClerkMocks() {
  */
 export function loadFeatureFlagMocks() {
   if (loadedMocks.has('feature-flags')) return;
-  
+
   vi.mock('@/components/providers/FeatureFlagsProvider', () => ({
     useFeatureFlags: () => ({
       flags: {
@@ -59,7 +63,7 @@ export function loadFeatureFlagMocks() {
       },
     }),
   }));
-  
+
   loadedMocks.add('feature-flags');
 }
 
@@ -68,7 +72,7 @@ export function loadFeatureFlagMocks() {
  */
 export function loadNextJsMocks() {
   if (loadedMocks.has('nextjs')) return;
-  
+
   // Mock Next.js Image component
   vi.mock('next/image', () => ({
     default: ({
@@ -90,7 +94,7 @@ export function loadNextJsMocks() {
       });
     },
   }));
-  
+
   loadedMocks.add('nextjs');
 }
 
@@ -99,7 +103,7 @@ export function loadNextJsMocks() {
  */
 export function loadBrowserApiMocks() {
   if (loadedMocks.has('browser-apis')) return;
-  
+
   // Mock ResizeObserver
   if (typeof global.ResizeObserver === 'undefined') {
     global.ResizeObserver = vi.fn().mockImplementation(() => ({
@@ -142,7 +146,7 @@ export function loadBrowserApiMocks() {
       value: vi.fn(),
     });
   }
-  
+
   loadedMocks.add('browser-apis');
 }
 
@@ -151,7 +155,7 @@ export function loadBrowserApiMocks() {
  */
 export function loadHeadlessUiMocks() {
   if (loadedMocks.has('headless-ui')) return;
-  
+
   const MockedComponents = {
     // Dialog components
     Dialog: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
@@ -164,11 +168,12 @@ export function loadHeadlessUiMocks() {
         return React.createElement('div', { ...props, ref });
       }
     ),
-    DialogTitle: React.forwardRef<HTMLHeadingElement, React.ComponentProps<'h2'>>(
-      (props, ref) => {
-        return React.createElement('h2', { ...props, ref });
-      }
-    ),
+    DialogTitle: React.forwardRef<
+      HTMLHeadingElement,
+      React.ComponentProps<'h2'>
+    >((props, ref) => {
+      return React.createElement('h2', { ...props, ref });
+    }),
     // Add other components as needed...
     Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
       (props, ref) => {
@@ -184,7 +189,7 @@ export function loadHeadlessUiMocks() {
   MockedComponents.Input.displayName = 'MockedInput';
 
   vi.mock('@headlessui/react', () => MockedComponents);
-  
+
   loadedMocks.add('headless-ui');
 }
 
@@ -193,7 +198,7 @@ export function loadHeadlessUiMocks() {
  */
 export function loadEssentialMocks() {
   loadBrowserApiMocks();
-  
+
   // Mock server-only modules
   vi.mock('server-only', () => ({
     default: vi.fn(),

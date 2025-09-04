@@ -154,13 +154,13 @@ export default function PricingPage() {
 
             {/* Paid Plan */}
             <motion.div
-              className='rounded-2xl border border-blue-100 dark:border-blue-900 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
+              className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.3 }}
             >
               {/* Highlight banner */}
-              <div className='bg-blue-600 text-white text-sm font-medium px-4 py-2 text-center'>
+              <div className='bg-black text-white dark:bg-white dark:text-black text-sm font-medium px-4 py-2 text-center'>
                 Designed for professionals
               </div>
 
@@ -183,7 +183,7 @@ export default function PricingPage() {
                   <ul className='space-y-3'>
                     <li className='flex items-start'>
                       <svg
-                        className='h-5 w-5 flex-shrink-0 text-blue-500 mt-0.5'
+                        className='h-5 w-5 flex-shrink-0 text-gray-900 dark:text-white mt-0.5'
                         fill='none'
                         viewBox='0 0 24 24'
                         stroke='currentColor'
@@ -207,7 +207,7 @@ export default function PricingPage() {
                   <motion.button
                     onClick={handleSubscribe}
                     disabled={isLoading}
-                    className='inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white hover:bg-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-200'
+                    className='inline-flex w-full items-center justify-center rounded-lg px-6 py-3 text-base font-medium transition-all duration-200 cursor-pointer bg-black text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed'
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >

@@ -252,10 +252,7 @@ async function getPostHogServerFlags(
         POSTHOG_FLAGS.PROFILE_SETTINGS_ENABLED,
         distinctId
       ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.AVATAR_UPLOAD_ENABLED,
-        distinctId
-      ),
+      client.isFeatureEnabled(POSTHOG_FLAGS.AVATAR_UPLOAD_ENABLED, distinctId),
     ]);
 
     await client.shutdown();

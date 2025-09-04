@@ -1,9 +1,9 @@
 'use client';
 
+import { RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
-import { RocketLaunchIcon } from '@heroicons/react/24/outline';
-import { useFeatureFlag, track, FEATURE_FLAGS } from '@/lib/analytics';
+import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
 
 interface UpgradeButtonProps {
   className?: string;
@@ -22,9 +22,12 @@ export function UpgradeButton({
 }: UpgradeButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Check if direct upgrade is enabled
-  const directUpgradeEnabled = useFeatureFlag(FEATURE_FLAGS.BILLING_UPGRADE_DIRECT, false);
+  const directUpgradeEnabled = useFeatureFlag(
+    FEATURE_FLAGS.BILLING_UPGRADE_DIRECT,
+    false
+  );
 
   const handleClick = async () => {
     setLoading(true);
@@ -40,7 +43,8 @@ export function UpgradeButton({
     try {
       // Track upgrade button click
       track('upgrade_button_clicked', {
-        flow_type: directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
+        flow_type:
+          directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
         price_id: priceId || null,
         feature_flag_enabled: directUpgradeEnabled,
       });
@@ -67,16 +71,18 @@ export function UpgradeButton({
             price_id: priceId,
             error: errorData.error || 'Unknown error',
           });
-          throw new Error(errorData.error || 'Failed to create checkout session');
+          throw new Error(
+            errorData.error || 'Failed to create checkout session'
+          );
         }
 
         const { url } = await response.json();
-        
+
         track('checkout_redirect', {
           flow_type: 'direct',
           price_id: priceId,
         });
-        
+
         // Redirect to Stripe checkout
         window.location.href = url;
       } else {
@@ -88,11 +94,13 @@ export function UpgradeButton({
       }
     } catch (err) {
       console.error('Error starting upgrade flow:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start upgrade';
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to start upgrade';
       setError(errorMessage);
-      
+
       track('upgrade_flow_error', {
-        flow_type: directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
+        flow_type:
+          directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
         error: errorMessage,
         price_id: priceId || null,
       });
@@ -108,15 +116,13 @@ export function UpgradeButton({
         disabled={loading}
         variant={variant}
         size={size}
-        className="inline-flex items-center gap-2"
+        className='inline-flex items-center gap-2'
       >
-        <RocketLaunchIcon className="h-4 w-4" />
+        <RocketLaunchIcon className='h-4 w-4' />
         {loading ? 'Loading...' : children}
       </Button>
       {error && (
-        <p className="mt-2 text-sm text-red-600 dark:text-red-400">
-          {error}
-        </p>
+        <p className='mt-2 text-sm text-red-600 dark:text-red-400'>{error}</p>
       )}
     </div>
   );

@@ -202,26 +202,29 @@ export const profilePhotos = pgTable('profile_photos', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  creatorProfileId: uuid('creator_profile_id').references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  creatorProfileId: uuid('creator_profile_id').references(
+    () => creatorProfiles.id,
+    { onDelete: 'cascade' }
+  ),
   status: photoStatusEnum('status').notNull().default('uploading'),
-  
+
   // Vercel Blob URLs for different sizes
   blobUrl: text('blob_url'), // Original uploaded image
   smallUrl: text('small_url'), // 128x128 for thumbnails
   mediumUrl: text('medium_url'), // 256x256 for profile displays
   largeUrl: text('large_url'), // 512x512 for high-res displays
-  
+
   // Image metadata
   originalFilename: text('original_filename'),
   mimeType: text('mime_type'),
   fileSize: integer('file_size'), // in bytes
   width: integer('width'),
   height: integer('height'),
-  
+
   // Processing metadata
   processedAt: timestamp('processed_at'),
   errorMessage: text('error_message'),
-  
+
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

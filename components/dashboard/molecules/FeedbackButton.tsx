@@ -1,9 +1,10 @@
 'use client';
 
 import { ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
-import { posthog } from 'posthog-js';
 import { useCallback, useState } from 'react';
+import { controlClasses } from '@/components/atoms/ControlStyles';
 import { Tooltip } from '@/components/atoms/Tooltip';
+import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { cn } from '@/lib/utils';
 import { FeedbackModal } from './FeedbackModal';
 
@@ -15,13 +16,12 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleFeedbackClick = useCallback(() => {
-    // Track the feedback button click
-    posthog.capture('feedback_button_clicked', {
+    // Track via analytics wrapper (no direct posthog-js import)
+    void trackEvent('feedback_button_clicked', {
       sidebar_collapsed: collapsed,
       source: 'dashboard_sidebar',
     });
 
-    // Open the custom modal
     setIsModalOpen(true);
   }, [collapsed]);
 
@@ -33,20 +33,27 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
     <button
       onClick={handleFeedbackClick}
       className={cn(
-        'flex items-center gap-2 transition-all duration-200 ease-in-out group',
-        'text-secondary-token hover:text-primary-token',
-        'rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-        'bg-surface-1 hover:bg-surface-2 border border-default/30 hover:border-default/50',
-        'hover:shadow-sm hover:scale-105 active:scale-95',
-        collapsed ? 'justify-center h-8 w-8' : 'w-full px-3 py-2 h-8'
+        'group flex transition-all duration-200 ease-in-out',
+        controlClasses({ variant: 'neutral', size: 'sm' }),
+        collapsed
+          ? 'items-center justify-center w-8 h-8 p-0 gap-0'
+          : 'items-center w-full px-3 gap-2',
+        'hover:scale-105 active:scale-95'
       )}
       aria-label={collapsed ? 'Send feedback' : undefined}
     >
-      <ChatBubbleBottomCenterTextIcon className='h-4 w-4 shrink-0 text-emerald-500 group-hover:text-emerald-400 transition-colors duration-200' />
+      <ChatBubbleBottomCenterTextIcon
+        className={cn(
+          'h-4 w-4 shrink-0 text-emerald-500 group-hover:text-emerald-400 transition-colors duration-200',
+          collapsed ? 'mx-auto my-auto' : ''
+        )}
+      />
       <span
         className={cn(
           'text-xs font-medium transition-all duration-200 ease-in-out',
-          collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100 w-auto'
+          collapsed
+            ? 'opacity-0 w-0 overflow-hidden'
+            : 'opacity-100 w-auto leading-none'
         )}
       >
         Feedback

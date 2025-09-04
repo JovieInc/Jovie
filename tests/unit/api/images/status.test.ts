@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/images/status/[id]/route';
 
 // Mock dependencies
@@ -43,9 +43,11 @@ describe('/api/images/status/[id]', () => {
   it('should reject requests without authentication', async () => {
     auth.mockResolvedValue({ userId: null });
 
-    const request = new NextRequest('http://localhost:3000/api/images/status/test-id');
+    const request = new NextRequest(
+      'http://localhost:3000/api/images/status/test-id'
+    );
     const response = await GET(request, { params: { id: 'test-id' } });
-    
+
     expect(response.status).toBe(401);
     const data = await response.json();
     expect(data.error).toBe('Unauthorized');
@@ -53,13 +55,15 @@ describe('/api/images/status/[id]', () => {
 
   it('should return 404 for non-existent photo', async () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
-    
+
     // Mock empty result
     db.select().from().where().limit.mockResolvedValue([]);
 
-    const request = new NextRequest('http://localhost:3000/api/images/status/non-existent');
+    const request = new NextRequest(
+      'http://localhost:3000/api/images/status/non-existent'
+    );
     const response = await GET(request, { params: { id: 'non-existent' } });
-    
+
     expect(response.status).toBe(404);
     const data = await response.json();
     expect(data.error).toBe('Photo not found');
@@ -67,7 +71,7 @@ describe('/api/images/status/[id]', () => {
 
   it('should return photo status for valid request', async () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
-    
+
     const mockPhoto = {
       id: 'test-photo-id',
       status: 'completed',
@@ -83,9 +87,11 @@ describe('/api/images/status/[id]', () => {
 
     db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
-    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const request = new NextRequest(
+      'http://localhost:3000/api/images/status/test-photo-id'
+    );
     const response = await GET(request, { params: { id: 'test-photo-id' } });
-    
+
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.id).toBe('test-photo-id');
@@ -96,7 +102,7 @@ describe('/api/images/status/[id]', () => {
 
   it('should handle processing status', async () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
-    
+
     const mockPhoto = {
       id: 'test-photo-id',
       status: 'processing',
@@ -112,9 +118,11 @@ describe('/api/images/status/[id]', () => {
 
     db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
-    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const request = new NextRequest(
+      'http://localhost:3000/api/images/status/test-photo-id'
+    );
     const response = await GET(request, { params: { id: 'test-photo-id' } });
-    
+
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.status).toBe('processing');
@@ -123,7 +131,7 @@ describe('/api/images/status/[id]', () => {
 
   it('should handle failed status with error message', async () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
-    
+
     const mockPhoto = {
       id: 'test-photo-id',
       status: 'failed',
@@ -139,12 +147,16 @@ describe('/api/images/status/[id]', () => {
 
     db.select().from().where().limit.mockResolvedValue([mockPhoto]);
 
-    const request = new NextRequest('http://localhost:3000/api/images/status/test-photo-id');
+    const request = new NextRequest(
+      'http://localhost:3000/api/images/status/test-photo-id'
+    );
     const response = await GET(request, { params: { id: 'test-photo-id' } });
-    
+
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.status).toBe('failed');
-    expect(data.errorMessage).toBe('Processing failed due to invalid image format');
+    expect(data.errorMessage).toBe(
+      'Processing failed due to invalid image format'
+    );
   });
 });

@@ -197,7 +197,7 @@ function RangeToggle({
     <div
       role='tablist'
       aria-label='Select analytics range'
-      className='inline-flex items-center rounded-full border border-border bg-surface-1 p-0.5 shadow-sm'
+      className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5 shadow-sm'
     >
       {options.map(opt => {
         const active = opt.value === value;
