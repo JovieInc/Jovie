@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/clerk/webhook/route';
 
 // Mock dependencies
@@ -26,21 +26,24 @@ const { headers } = await import('next/headers');
 const { Webhook } = await import('svix');
 
 describe('/api/clerk/webhook', () => {
+  const mockWebhook = {
+    verify: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock headers
-    vi.mocked(headers).mockResolvedValue(new Map([
-      ['svix-id', 'svix_123'],
-      ['svix-timestamp', '1234567890'],
-      ['svix-signature', 'signature_123']
-    ]) as any);
+    vi.mocked(headers).mockResolvedValue(
+      new Map([
+        ['svix-id', 'svix_123'],
+        ['svix-timestamp', '1234567890'],
+        ['svix-signature', 'signature_123'],
+      ]) as any
+    );
 
     // Mock webhook verification
-    const mockWebhook = {
-      verify: vi.fn(),
-    };
-    vi.mocked(Webhook).mockReturnValue(mockWebhook as any);
+    vi.mocked(Webhook).mockImplementation(() => mockWebhook as any);
   });
 
   describe('user.created event', () => {
@@ -51,8 +54,8 @@ describe('/api/clerk/webhook', () => {
           email_addresses: [
             {
               email_address: 'test@example.com',
-              verification: { status: 'verified' }
-            }
+              verification: { status: 'verified' },
+            },
           ],
           first_name: 'John',
           last_name: 'Doe',
@@ -63,17 +66,19 @@ describe('/api/clerk/webhook', () => {
         type: 'user.created' as const,
       };
 
-      // Mock webhook verification
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
       // Mock Clerk client
       mockUpdateUser.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -98,8 +103,8 @@ describe('/api/clerk/webhook', () => {
           email_addresses: [
             {
               email_address: 'test@example.com',
-              verification: { status: 'verified' }
-            }
+              verification: { status: 'verified' },
+            },
           ],
           first_name: 'John',
           last_name: null,
@@ -110,15 +115,18 @@ describe('/api/clerk/webhook', () => {
         type: 'user.created' as const,
       };
 
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -136,8 +144,8 @@ describe('/api/clerk/webhook', () => {
           email_addresses: [
             {
               email_address: 'johndoe@example.com',
-              verification: { status: 'verified' }
-            }
+              verification: { status: 'verified' },
+            },
           ],
           first_name: null,
           last_name: null,
@@ -148,15 +156,18 @@ describe('/api/clerk/webhook', () => {
         type: 'user.created' as const,
       };
 
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -174,8 +185,8 @@ describe('/api/clerk/webhook', () => {
           email_addresses: [
             {
               email_address: 'a@example.com',
-              verification: { status: 'verified' }
-            }
+              verification: { status: 'verified' },
+            },
           ],
           first_name: 'Al',
           last_name: null,
@@ -186,15 +197,18 @@ describe('/api/clerk/webhook', () => {
         type: 'user.created' as const,
       };
 
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
       mockUpdateUser.mockResolvedValue({} as any);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -202,8 +216,8 @@ describe('/api/clerk/webhook', () => {
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
       expect(result.fullName).toBe('Al');
-      expect(result.suggestedUsername).toBe('al');
-      // Note: In real implementation, short names get random suffix, but we can't test exact value due to randomness
+      expect(result.suggestedUsername).toMatch(/^al[a-z0-9]{3}$/); // 'al' + 3 random chars
+      // Short names get random suffix to ensure minimum length of 3 characters
     });
   });
 
@@ -211,10 +225,13 @@ describe('/api/clerk/webhook', () => {
     it('should reject requests with missing headers', async () => {
       vi.mocked(headers).mockResolvedValue(new Map() as any);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: 'test',
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: 'test',
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -224,15 +241,18 @@ describe('/api/clerk/webhook', () => {
     });
 
     it('should reject requests with invalid signature', async () => {
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Use the shared mockWebhook instance
       mockWebhook.verify.mockImplementation(() => {
         throw new Error('Invalid signature');
       });
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: 'test',
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: 'test',
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -246,10 +266,13 @@ describe('/api/clerk/webhook', () => {
       const originalEnv = process.env.CLERK_WEBHOOK_SECRET;
       delete process.env.CLERK_WEBHOOK_SECRET;
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: 'test',
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: 'test',
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -272,13 +295,16 @@ describe('/api/clerk/webhook', () => {
         type: 'user.updated' as const,
       };
 
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
@@ -297,8 +323,8 @@ describe('/api/clerk/webhook', () => {
           email_addresses: [
             {
               email_address: 'test@example.com',
-              verification: { status: 'verified' }
-            }
+              verification: { status: 'verified' },
+            },
           ],
           first_name: 'John',
           last_name: 'Doe',
@@ -309,18 +335,19 @@ describe('/api/clerk/webhook', () => {
         type: 'user.created' as const,
       };
 
-      const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
+      // Mock webhook verification to return the event data
       mockWebhook.verify.mockReturnValue(eventData);
 
       // Mock Clerk API error
-      mockUpdateUser.mockRejectedValue(
-        new Error('Clerk API error')
-      );
+      mockUpdateUser.mockRejectedValue(new Error('Clerk API error'));
 
-      const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
-        method: 'POST',
-        body: JSON.stringify(eventData),
-      });
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
 
       const response = await POST(request);
       const result = await response.json();
