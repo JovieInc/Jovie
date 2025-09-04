@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 // Lazy import deep links to avoid loading heavy code upfront
 import { LISTEN_COOKIE } from '@/constants/app';
+import { track } from '@/lib/analytics';
 import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
 import { Artist } from '@/types/db';
 
@@ -86,12 +87,13 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       } catch {}
 
       // Track click (non-blocking)
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ handle, linkType: 'listen', target: dsp.key }),
-        keepalive: true,
-      }).catch(() => {});
+      try {
+        track('listen_button_click', {
+          handle,
+          linkType: 'listen',
+          target: dsp.key,
+        });
+      } catch {};
 
       // Try deep linking with lazy import
       try {
