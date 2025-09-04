@@ -7,6 +7,7 @@ import { Analytics } from '@/components/Analytics';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
+import { getClerkAppearance } from '@/lib/auth/clerk-theme';
 import { ToastProvider } from './ToastProvider';
 
 // import { Toolbar } from '@vercel/toolbar/next';
@@ -48,22 +49,7 @@ function ClerkWrapper({ children }: { children: React.ReactNode }) {
     <ClerkProvider
       clerkJSVersion='latest'
       publishableKey={publishableKey}
-      appearance={
-        {
-          elements: {
-            rootBox: 'bg-base text-primary',
-            card: 'bg-surface-1 border border-subtle dark:border-default',
-            headerTitle: 'text-primary',
-            headerSubtitle: 'text-secondary',
-            formFieldInput:
-              'bg-surface-0 border border-default focus-ring-themed',
-            formButtonPrimary: 'btn btn-primary btn-md',
-            socialButtonsBlockButton: 'btn btn-secondary btn-md',
-            footerActionText: 'text-secondary',
-            footerActionLink: 'text-accent-token',
-          },
-        } as ComponentProps<typeof ClerkProvider>['appearance']
-      }
+      appearance={getClerkAppearance()}
     >
       {children}
     </ClerkProvider>
