@@ -3,12 +3,15 @@ import { NextRequest } from 'next/server';
 import { POST } from '@/app/api/clerk/webhook/route';
 
 // Mock dependencies
-vi.mock('@clerk/nextjs/server', () => ({
-  clerkClient: {
-    users: {
-      updateUser: vi.fn(),
-    },
+const mockUpdateUser = vi.fn();
+const mockClerkClient = {
+  users: {
+    updateUser: mockUpdateUser,
   },
+};
+
+vi.mock('@clerk/nextjs/server', () => ({
+  clerkClient: vi.fn(() => Promise.resolve(mockClerkClient)),
 }));
 
 vi.mock('next/headers', () => ({
@@ -19,7 +22,6 @@ vi.mock('svix', () => ({
   Webhook: vi.fn(),
 }));
 
-const { clerkClient } = await import('@clerk/nextjs/server');
 const { headers } = await import('next/headers');
 const { Webhook } = await import('svix');
 
@@ -66,7 +68,7 @@ describe('/api/clerk/webhook', () => {
       mockWebhook.verify.mockReturnValue(eventData);
 
       // Mock Clerk client
-      vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as any);
+      mockUpdateUser.mockResolvedValue({} as any);
 
       const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
         method: 'POST',
@@ -81,7 +83,7 @@ describe('/api/clerk/webhook', () => {
       expect(result.fullName).toBe('John Doe');
       expect(result.suggestedUsername).toBe('john');
 
-      expect(clerkClient.users.updateUser).toHaveBeenCalledWith('user_123', {
+      expect(mockUpdateUser).toHaveBeenCalledWith('user_123', {
         privateMetadata: {
           fullName: 'John Doe',
           suggestedUsername: 'john',
@@ -111,7 +113,7 @@ describe('/api/clerk/webhook', () => {
       const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
       mockWebhook.verify.mockReturnValue(eventData);
 
-      vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as any);
+      mockUpdateUser.mockResolvedValue({} as any);
 
       const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
         method: 'POST',
@@ -149,7 +151,7 @@ describe('/api/clerk/webhook', () => {
       const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
       mockWebhook.verify.mockReturnValue(eventData);
 
-      vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as any);
+      mockUpdateUser.mockResolvedValue({} as any);
 
       const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
         method: 'POST',
@@ -187,7 +189,7 @@ describe('/api/clerk/webhook', () => {
       const mockWebhook = vi.mocked(Webhook).mock.results[0]?.value;
       mockWebhook.verify.mockReturnValue(eventData);
 
-      vi.mocked(clerkClient.users.updateUser).mockResolvedValue({} as any);
+      mockUpdateUser.mockResolvedValue({} as any);
 
       const request = new NextRequest('http://localhost:3000/api/clerk/webhook', {
         method: 'POST',
@@ -311,7 +313,7 @@ describe('/api/clerk/webhook', () => {
       mockWebhook.verify.mockReturnValue(eventData);
 
       // Mock Clerk API error
-      vi.mocked(clerkClient.users.updateUser).mockRejectedValue(
+      mockUpdateUser.mockRejectedValue(
         new Error('Clerk API error')
       );
 

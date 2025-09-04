@@ -1,5 +1,3 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'svix';
@@ -117,7 +115,8 @@ export async function POST(request: NextRequest) {
           .trim();
 
         // Update user's private metadata with full name and suggested username
-        await clerkClient.users.updateUser(user.id, {
+        const client = await clerkClient();
+        await client.users.updateUser(user.id, {
           privateMetadata: {
             ...user.private_metadata,
             fullName: fullName || undefined,
