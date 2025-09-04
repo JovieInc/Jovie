@@ -9,9 +9,10 @@ import { cn } from '@/lib/utils';
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
+  id?: string;
 }
 
-export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
+export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: FeedbackModalProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -80,7 +81,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
   return (
     <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as='div' className='relative z-50' onClose={handleClose}>
+      <Dialog as='div' className='relative z-50' onClose={handleClose} id={id}>
         <Transition.Child
           as={Fragment}
           enter='ease-out duration-300'
