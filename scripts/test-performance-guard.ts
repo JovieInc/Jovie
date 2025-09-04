@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * Test Performance Guard
- * 
+ *
  * CI script that enforces performance thresholds and fails builds if tests are too slow.
  * Implements YC-style fast feedback by catching performance regressions early.
  */
 
 import { execSync } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 interface PerformanceThresholds {
@@ -49,15 +49,18 @@ class TestPerformanceGuard {
     console.log('🛡️  Running test performance guard...\n');
 
     try {
+      // Load custom thresholds if available
+      this.loadCustomThresholds();
+
       // Run tests and capture metrics
       await this.runTestsAndCaptureMetrics();
-      
+
       // Check against thresholds
       const violations = this.checkThresholds();
-      
+
       // Report results
       this.reportResults(violations);
-      
+
       // Return success/failure
       return violations.length === 0;
     } catch (error) {
@@ -68,18 +71,23 @@ class TestPerformanceGuard {
 
   private async runTestsAndCaptureMetrics(): Promise<void> {
     console.log('⏱️  Running test suite with performance monitoring...');
-    
+
     try {
-      const output = execSync('pnpm test --reporter=verbose', {
+      const output = execSync('pnpm test', {
         encoding: 'utf8',
         stdio: 'pipe',
         timeout: 120000,
       });
-      
+
       this.parseTestOutput(output);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Parse output even if tests fail
-      if (error.stdout) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'stdout' in error &&
+        typeof error.stdout === 'string'
+      ) {
         this.parseTestOutput(error.stdout);
       } else {
         throw new Error('Failed to run tests or capture output');
@@ -116,12 +124,12 @@ class TestPerformanceGuard {
     const testResults: number[] = [];
     const testResultRegex = /✓\s+(.+?)\s+\((\d+)\s+tests?\)\s+(\d+)ms/g;
     let match;
-    
+
     while ((match = testResultRegex.exec(output)) !== null) {
       const [, name, , duration] = match;
       const durationMs = parseInt(duration);
       testResults.push(durationMs);
-      
+
       if (durationMs > this.thresholds.individualTest) {
         this.metrics.slowTests.push({
           name: name.trim(),
@@ -178,10 +186,18 @@ class TestPerformanceGuard {
 
     // Current metrics
     console.log('📈 CURRENT METRICS:');
-    console.log(`   Total Duration: ${this.metrics.totalDuration}ms (threshold: ${this.thresholds.totalDuration}ms)`);
-    console.log(`   Setup Time: ${this.metrics.setupTime}ms (threshold: ${this.thresholds.setupTime}ms)`);
-    console.log(`   P95: ${this.metrics.p95}ms (threshold: ${this.thresholds.p95}ms)`);
-    console.log(`   Slow Tests: ${this.metrics.slowTests.length} (threshold: ${this.thresholds.slowTestCount})`);
+    console.log(
+      `   Total Duration: ${this.metrics.totalDuration}ms (threshold: ${this.thresholds.totalDuration}ms)`
+    );
+    console.log(
+      `   Setup Time: ${this.metrics.setupTime}ms (threshold: ${this.thresholds.setupTime}ms)`
+    );
+    console.log(
+      `   P95: ${this.metrics.p95}ms (threshold: ${this.thresholds.p95}ms)`
+    );
+    console.log(
+      `   Slow Tests: ${this.metrics.slowTests.length} (threshold: ${this.thresholds.slowTestCount})`
+    );
     console.log('');
 
     // Violations
@@ -205,7 +221,9 @@ class TestPerformanceGuard {
       }
 
       console.log('❌ Performance guard FAILED - build should be rejected');
-      console.log('💡 Run `pnpm tsx scripts/test-performance-profiler.ts` for detailed analysis');
+      console.log(
+        '💡 Run `pnpm tsx scripts/test-performance-profiler.ts` for detailed analysis'
+      );
     } else {
       console.log('✅ All performance thresholds met!');
       console.log('🚀 Performance guard PASSED');
@@ -220,7 +238,7 @@ class TestPerformanceGuard {
         const config = JSON.parse(readFileSync(configPath, 'utf8'));
         this.thresholds = { ...this.thresholds, ...config.thresholds };
         console.log('📋 Loaded custom performance thresholds');
-      } catch (error) {
+      } catch {
         console.warn('⚠️  Failed to load custom thresholds, using defaults');
       }
     }
@@ -230,13 +248,15 @@ class TestPerformanceGuard {
 // Run the guard if called directly
 if (require.main === module) {
   const guard = new TestPerformanceGuard();
-  guard.runPerformanceGuard().then(success => {
-    process.exit(success ? 0 : 1);
-  }).catch(error => {
-    console.error('💥 Performance guard crashed:', error);
-    process.exit(1);
-  });
+  guard
+    .runPerformanceGuard()
+    .then(success => {
+      process.exit(success ? 0 : 1);
+    })
+    .catch(() => {
+      console.error('💥 Performance guard crashed');
+      process.exit(1);
+    });
 }
 
 export { TestPerformanceGuard };
-
