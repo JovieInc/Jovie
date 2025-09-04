@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
@@ -66,19 +68,21 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
             {/* Progress indicator */}
             <div className='mb-4'>
               <div className='flex justify-between items-center mb-2'>
-                <span className='text-sm text-secondary-token'>Setup Progress</span>
+                <span className='text-sm text-secondary-token'>
+                  Setup Progress
+                </span>
                 <span className='text-sm text-secondary-token'>{`${completedCount}/${totalSteps}`}</span>
               </div>
-              <div 
-                role='progressbar' 
-                aria-valuenow={completedCount} 
-                aria-valuemin={0} 
+              <div
+                role='progressbar'
+                aria-valuenow={completedCount}
+                aria-valuemin={0}
                 aria-valuemax={totalSteps}
                 aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
                 className='w-full bg-surface-2 rounded-full h-2'
               >
-                <div 
-                  className='bg-accent h-2 rounded-full transition-all duration-300 ease-in-out' 
+                <div
+                  className='bg-accent h-2 rounded-full transition-all duration-300 ease-in-out'
                   style={{ width: `${(completedCount / totalSteps) * 100}%` }}
                 />
               </div>
