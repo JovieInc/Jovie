@@ -30,6 +30,7 @@ export function SetupTaskItem({
               className='w-3 h-3 text-white'
               fill='currentColor'
               viewBox='0 0 20 20'
+              aria-hidden='true'
             >
               <path
                 fillRule='evenodd'
