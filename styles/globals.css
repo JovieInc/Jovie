@@ -199,6 +199,19 @@ body {
   color: var(--color-text-tertiary-token);
 }
 
+/* Dashboard token utilities for consistency */
+@utility text-primary-token {
+  color: var(--color-text-primary-token);
+}
+
+@utility text-secondary-token {
+  color: var(--color-text-secondary-token);
+}
+
+@utility text-tertiary-token {
+  color: var(--color-text-tertiary-token);
+}
+
 @utility text-destructive {
   color: #dc2626; /* red-600 */
 
