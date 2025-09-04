@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
-import { Webhook } from 'svix';
 import { clerkClient } from '@clerk/nextjs/server';
+import { headers } from 'next/headers';
+import { NextRequest, NextResponse } from 'next/server';
+import { Webhook } from 'svix';
 
 type WebhookEvent = {
   data: {
@@ -12,8 +12,8 @@ type WebhookEvent = {
     }>;
     first_name: string | null;
     last_name: string | null;
-    private_metadata: Record<string, any>;
-    public_metadata: Record<string, any>;
+    private_metadata: Record<string, unknown>;
+    public_metadata: Record<string, unknown>;
   };
   object: 'event';
   type: 'user.created' | 'user.updated' | string;
@@ -21,15 +21,15 @@ type WebhookEvent = {
 
 function generateUsernameFromName(firstName: string | null): string {
   if (!firstName) return '';
-  
+
   // Convert to lowercase and remove special characters
   const cleaned = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
+
   // Ensure minimum length of 3 characters
   if (cleaned.length < 3) {
     return cleaned + Math.random().toString(36).substring(2, 5);
   }
-  
+
   // Truncate to max 20 characters to leave room for potential suffixes
   return cleaned.substring(0, 20);
 }
@@ -37,11 +37,11 @@ function generateUsernameFromName(firstName: string | null): string {
 function generateUsernameFromEmail(email: string): string {
   const localPart = email.split('@')[0];
   const cleaned = localPart.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
+
   if (cleaned.length < 3) {
     return 'user' + Math.random().toString(36).substring(2, 5);
   }
-  
+
   return cleaned.substring(0, 20);
 }
 
@@ -73,9 +73,9 @@ export async function POST(request: NextRequest) {
 
     // Create Svix webhook instance
     const wh = new Webhook(webhook_secret);
-    
+
     let evt: WebhookEvent;
-    
+
     try {
       evt = wh.verify(body, {
         'svix-id': svix_id,
@@ -84,20 +84,17 @@ export async function POST(request: NextRequest) {
       }) as WebhookEvent;
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
     // Handle user.created event
     if (evt.type === 'user.created') {
       const { data: user } = evt;
-      
+
       try {
         // Generate suggested username
         let suggestedUsername = '';
-        
+
         if (user.first_name) {
           suggestedUsername = generateUsernameFromName(user.first_name);
         } else if (user.email_addresses?.[0]?.email_address) {
@@ -105,7 +102,8 @@ export async function POST(request: NextRequest) {
             user.email_addresses[0].email_address
           );
         } else {
-          suggestedUsername = 'user' + Math.random().toString(36).substring(2, 8);
+          suggestedUsername =
+            'user' + Math.random().toString(36).substring(2, 8);
         }
 
         // Create full name from first + last name
@@ -125,23 +123,25 @@ export async function POST(request: NextRequest) {
         });
 
         console.log(`Post-signup processing completed for user ${user.id}`);
-        
-        return NextResponse.json({ 
+
+        return NextResponse.json({
           success: true,
           message: 'User post-signup processing completed',
           fullName,
           suggestedUsername,
         });
-        
       } catch (error) {
-        console.error(`Failed to process user.created event for ${user.id}:`, error);
-        
+        console.error(
+          `Failed to process user.created event for ${user.id}:`,
+          error
+        );
+
         // Return 200 to prevent Clerk from retrying, but log the error
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             error: 'Failed to process user data',
-            message: error instanceof Error ? error.message : 'Unknown error'
+            message: error instanceof Error ? error.message : 'Unknown error',
           },
           { status: 200 } // Return 200 to prevent retries for non-critical errors
         );
@@ -150,13 +150,12 @@ export async function POST(request: NextRequest) {
 
     // For other event types, just acknowledge
     return NextResponse.json({ success: true, type: evt.type });
-
   } catch (error) {
     console.error('Webhook processing error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
+        message: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

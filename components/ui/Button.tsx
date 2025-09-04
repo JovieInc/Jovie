@@ -46,7 +46,7 @@ export const Button = forwardRef<
         return;
       }
       if (onClick) {
-        onClick(event as any);
+        onClick(event as React.MouseEvent<HTMLElement>);
       }
     };
 
@@ -118,8 +118,8 @@ export const Button = forwardRef<
       `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
 
     // Prepare additional props based on component type and state
-    const additionalProps: Record<string, any> = {};
-    
+    const additionalProps: Record<string, unknown> = {};
+
     if (Component === 'button') {
       additionalProps.type = props.type || 'button';
       additionalProps.disabled = isDisabled;
@@ -127,7 +127,7 @@ export const Button = forwardRef<
       additionalProps['aria-disabled'] = 'true';
       additionalProps.tabIndex = -1;
     }
-    
+
     if (loading) {
       additionalProps['aria-busy'] = 'true';
     }

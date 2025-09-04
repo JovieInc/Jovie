@@ -25,7 +25,7 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'name',
     title: "What's your name?",
-    prompt: "This will be displayed on your Jovie profile.",
+    prompt: 'This will be displayed on your Jovie profile.',
   },
   {
     id: 'handle',
@@ -112,7 +112,8 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      const privateFullName = (user as any).privateMetadata?.fullName as string | undefined;
+      const privateFullName = (user.privateMetadata as Record<string, unknown>)
+        ?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -138,8 +139,11 @@ export function AppleStyleOnboardingForm() {
     if (urlHandle) {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
-    } else if ((user as any)?.privateMetadata?.suggestedUsername) {
-      const suggested = (user as any).privateMetadata.suggestedUsername as string;
+    } else if (
+      (user.privateMetadata as Record<string, unknown>)?.suggestedUsername
+    ) {
+      const suggested = (user.privateMetadata as Record<string, unknown>)
+        .suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
