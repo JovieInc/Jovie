@@ -151,7 +151,7 @@ jobs:
             let eligible = false;
 
             // Promotion PR: preview -> production
-            if (pr.base.ref === 'production' && pr.head.ref === 'preview') {
+            if (pr.base_ref === 'production' && pr.head_ref === 'preview') {
               prType = 'promotion';
               // Manual promotion only — do not auto-merge production promotion PRs
               eligible = false;
@@ -159,7 +159,7 @@ jobs:
               prType = 'dependabot';
               // For dependabot, check if it's patch/minor or security update
               eligible = true; // We'll validate update type in next step
-            } else if (labels.has('codegen') || pr.author === 'app/codegen-sh' || pr.author.includes('codegen')) {
+            } else if (labels.has('codegen') || pr.author === 'app/codegen-sh' || pr.author === 'codegen-sh[bot]' || pr.author.includes('codegen')) {
               prType = 'codegen';
               eligible = true;
             } else {
