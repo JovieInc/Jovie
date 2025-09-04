@@ -1,0 +1,288 @@
+
+> jovie@0.1.0 test /tmp/JovieInc/Jovie
+> NODE_OPTIONS=--max-old-space-size=4096 vitest run
+
+[dotenv@17.2.1] injecting env (0) from .env.test -- tip: ⚙️  override existing env vars with { override: true }
+
+ RUN  v3.2.4 /tmp/JovieInc/Jovie
+
+stderr | tests/lib/anti-cloaking.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/lib/database-performance.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+stdout | tests/lib/anti-cloaking.test.ts > Rate Limiting > should implement rate limiting correctly
+Rate limit check: 127.0.0.1 - /api/test (disabled)
+
+ ✓ tests/lib/anti-cloaking.test.ts (23 tests) 20ms
+ ✓ tests/lib/database-performance.test.ts (15 tests) 876ms
+   ✓ Database Performance Monitoring > Query Tracking > should identify slow queries  601ms
+stderr | tests/lib/deep-links.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/deep-links.test.ts (25 tests) 8ms
+stderr | tests/lib/rls-policies.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/rls-policies.test.ts (14 tests) 7ms
+stderr | tests/lib/environment-validation.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/environment-validation.test.ts (15 tests) 12ms
+stderr | tests/lib/health-checks.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/health-checks.test.ts (10 tests) 7ms
+stderr | tests/unit/InfoBox.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/InfoBox.test.tsx (15 tests) 94ms
+stderr | tests/unit/FeaturedCreators.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/FeaturedCreators.test.tsx (11 tests) 115ms
+stderr | __tests__/components/dashboard/DashboardOverview.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ __tests__/components/dashboard/DashboardOverview.test.tsx (3 tests) 468ms
+stderr | tests/unit/useFormState.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/useFormState.test.tsx (12 tests) 37ms
+stderr | tests/unit/DataCard.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/lib/database-url-validation.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/database-url-validation.test.ts (23 tests) 12ms
+ ✓ tests/unit/DataCard.test.tsx (16 tests) 187ms
+stderr | tests/lib/integrations.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Environment Configuration > should detect missing environment variables appropriately
+✓ Clerk key is undefined (expected in test environment)
+✓ Database URL is undefined (expected in test environment)
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Environment Configuration > should validate environment schema properly
+✓ Environment schema validation passes
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Clerk Integration Health > should have the necessary Clerk configuration
+⏭ Skipping Clerk integration test - no publishable key
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Database Integration Health > should have the necessary database configuration
+⏭ Skipping database integration test - no DATABASE_URL
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Stripe Integration Health > should have the necessary Stripe configuration
+⏭ Skipping Stripe integration test - missing keys
+
+stdout | tests/lib/integrations.test.ts > Integration Health Diagnostics > Integration Summary > should provide a comprehensive health report
+🔍 Integration Health Summary:
+  Clerk Auth: ❌
+  Database: ❌
+  Stripe Billing: ❌
+  CI/Test Mode: No integrations (expected in CI)
+
+ ✓ tests/lib/integrations.test.ts (6 tests) 6ms
+stderr | __tests__/components/dashboard/DashboardSplitView.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ __tests__/components/dashboard/DashboardSplitView.test.tsx (5 tests) 260ms
+stderr | tests/unit/OptimizedImage.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/OptimizedImage.test.tsx (9 tests) 169ms
+stderr | tests/unit/Select.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Select.test.tsx (16 tests) 339ms
+stderr | tests/unit/CTAButton.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | lib/validation/__tests__/client-username.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ lib/validation/__tests__/client-username.test.ts (15 tests) 11ms
+ ✓ tests/unit/CTAButton.test.tsx (14 tests) 427ms
+stderr | tests/unit/ladygaga-seed.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/ladygaga-seed.test.ts (4 tests) 5ms
+stderr | tests/unit/ClaimHandleForm.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/ClaimHandleForm.test.tsx (5 tests) 326ms
+stderr | tests/unit/Form.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Form.test.tsx (12 tests) 238ms
+stderr | components/dashboard/molecules/LinkManager.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ components/dashboard/molecules/LinkManager.test.tsx (4 tests) 160ms
+stderr | tests/unit/Button.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Button.test.tsx (14 tests) 379ms
+stderr | tests/lib/dsp.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/dsp.test.ts (6 tests) 6ms
+stderr | tests/unit/TipPromo.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/unit/ProblemSolutionSection.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/TipPromo.test.tsx (6 tests) 319ms
+stderr | tests/unit/ProblemSolutionSection.test.tsx
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at navigateFetch (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+    at exports.navigate (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+    at Timeout._onTimeout (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/nodes/HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:594:17)
+    at processTimers (node:internal/timers:529:7) [90mundefined[39m
+
+ ✓ tests/unit/ProblemSolutionSection.test.tsx (6 tests) 389ms
+stderr | tests/unit/utils.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/lib/drizzle-config.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/utils.test.ts (7 tests) 26ms
+ ✓ tests/lib/drizzle-config.test.ts (8 tests) 185ms
+stderr | tests/unit/Input.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/unit/FormStatus.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Input.test.tsx (10 tests) 70ms
+ ✓ tests/unit/FormStatus.test.tsx (11 tests) 174ms
+stderr | components/organisms/TipSection.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/integration/handle-consistency.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/integration/handle-consistency.test.ts (3 tests) 4ms
+ ✓ components/organisms/TipSection.test.tsx (3 tests) 78ms
+stderr | tests/unit/FormField.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/unit/PreFooterCTA.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/FormField.test.tsx (8 tests) 69ms
+ ✓ tests/unit/PreFooterCTA.test.tsx (5 tests) 248ms
+stderr | tests/unit/SupportPage.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/unit/SupportPage.test.tsx
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at navigateFetch (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+    at exports.navigate (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+    at Timeout._onTimeout (/tmp/JovieInc/Jovie/node_modules/.pnpm/jsdom@23.2.0/node_modules/jsdom/lib/jsdom/living/nodes/HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:594:17)
+    at processTimers (node:internal/timers:529:7) [90mundefined[39m
+
+ ✓ tests/unit/SupportPage.test.tsx (7 tests) 252ms
+stderr | lib/hooks/__tests__/useReducedMotion.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ lib/hooks/__tests__/useReducedMotion.test.ts (4 tests) 25ms
+stderr | tests/unit/ProductFlyout.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | components/ui/Toast.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ components/ui/Toast.test.tsx (5 tests) 161ms
+ ✓ tests/unit/ProductFlyout.test.tsx (5 tests) 236ms
+stderr | __tests__/lib/platform-detection.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | components/tipping/EmptyStates.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ __tests__/lib/platform-detection.test.ts (5 tests) 12ms
+ ✓ components/tipping/EmptyStates.test.tsx (6 tests) 78ms
+stderr | tests/lib/footer.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/lib/footer.test.ts (6 tests) 4ms
+stderr | tests/unit/Header.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Header.test.tsx (4 tests) 274ms
+stderr | tests/unit/SocialBar.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/SocialBar.test.tsx (3 tests) 216ms
+stderr | tests/unit/TipJar.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/TipJar.test.tsx (2 tests) 95ms
+stderr | __tests__/components/dashboard/DashboardNav.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+stderr | tests/unit/BrandingBadge.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/BrandingBadge.test.tsx (5 tests) 38ms
+ ✓ __tests__/components/dashboard/DashboardNav.test.tsx (5 tests) 834ms
+   ✓ DashboardNav > applies active state to current page  381ms
+stderr | tests/unit/AuthActions.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/AuthActions.test.tsx (2 tests) 200ms
+stderr | tests/components/forms.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/components/forms.test.tsx (2 tests) 53ms
+stderr | tests/unit/Spinner.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/Spinner.test.tsx (4 tests) 149ms
+stderr | tests/unit/FlyoutItem.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/FlyoutItem.test.tsx (3 tests) 154ms
+stderr | tests/unit/NavLink.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/NavLink.test.tsx (4 tests) 179ms
+stderr | tests/unit/DesktopQrOverlay.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/DesktopQrOverlay.test.tsx (2 tests) 77ms
+stderr | tests/unit/LogoLink.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/LogoLink.test.tsx (4 tests) 202ms
+stderr | tests/unit/HeaderNavFlyout.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/HeaderNavFlyout.test.tsx (1 test) 24ms
+stderr | tests/unit/IconBadge.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/IconBadge.test.tsx (2 tests) 29ms
+stderr | tests/database.test.ts
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/database.test.ts (1 test) 3ms
+stderr | tests/unit/cookie-banner.test.tsx
+DATABASE_URL is not set. Database tests will be skipped.
+
+ ✓ tests/unit/cookie-banner.test.tsx (1 test) 143ms
+
+ Test Files  57 passed (57)
+      Tests  442 passed (442)
+   Start at  22:55:41
+   Duration  56.35s (transform 1.41s, setup 42.20s, collect 4.50s, tests 9.17s, environment 34.00s, prepare 4.98s)
+

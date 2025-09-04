@@ -1,0 +1,9 @@
+{
+  "thresholds": {
+    "totalDuration": 120000,
+    "p95": 1000,
+    "setupTime": 50000,
+    "individualTest": 1000,
+    "slowTestCount": 25
+  }
+}

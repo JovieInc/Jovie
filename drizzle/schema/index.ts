@@ -12,29 +12,18 @@ import {
   boolean,
   integer,
   jsonb,
-  pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
+import {
+  creatorTypeEnum,
+  photoStatusEnum,
+  themeModeEnum,
+} from '../../lib/db/schema';
 
-// Enums
-export const creatorTypeEnum = pgEnum('creator_type', [
-  'artist',
-  'podcaster',
-  'influencer',
-  'creator',
-]);
-export const linkTypeEnum = pgEnum('link_type', [
-  'listen',
-  'social',
-  'tip',
-  'other',
-]);
-
-// Theme enum for user settings
-export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
+// Enums are imported from main schema to avoid duplication
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -102,10 +91,54 @@ export const socialLinks = pgTable('social_links', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Profile photos enum imported from main schema
+
+// Profile photos table for avatar uploads with Vercel Blob
+export const profilePhotos = pgTable('profile_photos', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  creatorProfileId: uuid('creator_profile_id').references(
+    () => creatorProfiles.id,
+    { onDelete: 'cascade' }
+  ),
+  status: photoStatusEnum('status').notNull().default('uploading'),
+
+  // Vercel Blob URLs for different sizes
+  blobUrl: text('blob_url'), // Original uploaded image
+  smallUrl: text('small_url'), // 128x128 for thumbnails
+  mediumUrl: text('medium_url'), // 256x256 for profile displays
+  largeUrl: text('large_url'), // 512x512 for high-res displays
+
+  // Image metadata
+  originalFilename: text('original_filename'),
+  mimeType: text('mime_type'),
+  fileSize: integer('file_size'), // in bytes
+  width: integer('width'),
+  height: integer('height'),
+
+  // Processing metadata
+  processedAt: timestamp('processed_at'),
+  errorMessage: text('error_message'),
+
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Re-export enums from main schema
+export {
+  creatorTypeEnum,
+  linkTypeEnum,
+  photoStatusEnum,
+  themeModeEnum,
+} from '../../lib/db/schema';
+
 // Export all schemas
 export const schemas = {
   users,
   creatorProfiles,
   socialLinks,
   userSettings,
+  profilePhotos,
 };

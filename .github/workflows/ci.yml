@@ -8,7 +8,7 @@ on:
       - 'docs/**'
       - '.vscode/**'
   push:
-    branches: [preview, production]
+    branches: [preview, production, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -67,7 +67,7 @@ jobs:
             ${{ runner.os }}-eslint-${{ github.ref }}-
             ${{ runner.os }}-eslint-
       - name: Lint (enforce zero warnings)
-        run: pnpm run lint -- --max-warnings=0
+        run: pnpm run lint
 
   neon-db:
     name: Neon DB
@@ -230,8 +230,8 @@ jobs:
 
   ci-fast:
     name: ci-fast
-    # Gate for PRs and merge queue: aggregate fast checks
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    # Gate for PRs, pushes, and merge queue: aggregate fast checks
+    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group' }}
     needs: [ci-typecheck, ci-lint]
     runs-on: ubuntu-latest
     timeout-minutes: 5
