@@ -8,6 +8,13 @@ export const onboardingSchema = z.object({
     .regex(/^[a-z0-9-]+$/, {
       message: 'Only lowercase letters, numbers, and hyphens are allowed',
     }),
+  fullName: z
+    .string()
+    .min(1, { message: 'Please enter your name' })
+    .max(50, { message: 'Name must be 50 characters or less' })
+    .regex(/^[a-zA-Z0-9\s\-'.]+$/, {
+      message: 'Please use only letters, numbers, spaces, hyphens, apostrophes, and periods',
+    }),
 });
 
 export type OnboardingValues = z.infer<typeof onboardingSchema>;

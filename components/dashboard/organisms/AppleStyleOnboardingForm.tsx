@@ -20,7 +20,12 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
     title: "Let's get you live.",
-    prompt: "We'll set up your profile in 2 quick steps.",
+    prompt: "We'll set up your profile in 3 quick steps.",
+  },
+  {
+    id: 'name',
+    title: "What's your name?",
+    prompt: "This will be shown on your profile.",
   },
   {
     id: 'handle',
@@ -55,6 +60,11 @@ interface HandleValidationState {
   suggestions: string[];
 }
 
+interface FullNameValidationState {
+  valid: boolean;
+  error: string | null;
+}
+
 export function AppleStyleOnboardingForm() {
   const { user } = useUser();
   const searchParams = useSearchParams();
@@ -83,6 +93,8 @@ export function AppleStyleOnboardingForm() {
   // Form state
   const [handle, setHandle] = useState('');
   const [handleInput, setHandleInput] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [fullNameInput, setFullNameInput] = useState('');
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
       available: false,
@@ -90,6 +102,11 @@ export function AppleStyleOnboardingForm() {
       error: null,
       clientValid: false,
       suggestions: [],
+    });
+  const [fullNameValidation, setFullNameValidation] =
+    useState<FullNameValidationState>({
+      valid: false,
+      error: null,
     });
 
   // Process state
@@ -101,8 +118,44 @@ export function AppleStyleOnboardingForm() {
     isSubmitting: false,
   });
 
-  // Prefill handle and selected artist data
+  // Prefill handle and full name data
   useEffect(() => {
+    // Prefill full name from Clerk user data with priority:
+    // 1. Private metadata (set by webhook)
+    // 2. firstName + lastName from Clerk
+    // 3. Email-based fallback
+    if (user) {
+      const webhookFullName = user.privateMetadata?.fullName as string;
+      if (webhookFullName) {
+        setFullName(webhookFullName);
+        setFullNameInput(webhookFullName);
+      } else if (user.firstName || user.lastName) {
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        if (name) {
+          setFullName(name);
+          setFullNameInput(name);
+        }
+      } else if (user.emailAddresses?.[0]?.emailAddress) {
+        // Extract readable name from email as fallback
+        const email = user.emailAddresses[0].emailAddress;
+        const emailBase = email.split('@')[0];
+        const readable = emailBase
+          .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase
+          .replace(/[_.-]/g, ' ') // separators
+          .replace(/\s+/g, ' ') // multiple spaces
+          .trim();
+        
+        if (readable.length > 0) {
+          const formatted = readable
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+          setFullName(formatted);
+          setFullNameInput(formatted);
+        }
+      }
+    }
+
     // Prefill handle from URL
     const urlHandle = searchParams?.get('handle');
     if (urlHandle) {
@@ -123,7 +176,7 @@ export function AppleStyleOnboardingForm() {
 
     // Remove any selected artist from sessionStorage since we removed the search step
     sessionStorage.removeItem('selectedArtist');
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   // Navigation handlers with smooth transitions
   const goToNextStep = useCallback(() => {
@@ -180,6 +233,50 @@ export function AppleStyleOnboardingForm() {
       }, 300);
     }
   }, [currentStepIndex]);
+
+  // Full name validation
+  const validateFullName = useCallback((name: string) => {
+    if (!name || name.trim().length === 0) {
+      setFullNameValidation({
+        valid: false,
+        error: 'Please enter your name.',
+      });
+      return;
+    }
+
+    const trimmedName = name.trim();
+    
+    if (trimmedName.length < 1) {
+      setFullNameValidation({
+        valid: false,
+        error: 'Please enter your name.',
+      });
+      return;
+    }
+
+    if (trimmedName.length > 50) {
+      setFullNameValidation({
+        valid: false,
+        error: 'Name must be 50 characters or less.',
+      });
+      return;
+    }
+
+    // Allow letters, numbers, spaces, hyphens, apostrophes, and periods
+    if (!/^[a-zA-Z0-9\s\-'.]+$/.test(trimmedName)) {
+      setFullNameValidation({
+        valid: false,
+        error: 'Please use only letters, numbers, spaces, hyphens, apostrophes, and periods.',
+      });
+      return;
+    }
+
+    setFullNameValidation({
+      valid: true,
+      error: null,
+    });
+    setFullName(trimmedName);
+  }, []);
 
   // Handle validation
   const validateHandle = useCallback((input: string) => {
@@ -259,6 +356,22 @@ export function AppleStyleOnboardingForm() {
     return () => clearTimeout(timer);
   }, [handleInput, validateHandle]);
 
+  // Full name validation with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (fullNameInput) {
+        validateFullName(fullNameInput);
+      } else {
+        setFullNameValidation({
+          valid: false,
+          error: null,
+        });
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [fullNameInput, validateFullName]);
+
   // Form submission
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -298,7 +411,7 @@ export function AppleStyleOnboardingForm() {
       try {
         await completeOnboarding({
           username: handle.toLowerCase(),
-          displayName: handle,
+          displayName: fullName,
         });
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
@@ -376,6 +489,7 @@ export function AppleStyleOnboardingForm() {
       handleValidation.available,
       handleValidation.clientValid,
       handle,
+      fullName,
       goToNextStep,
     ]
   );
@@ -433,7 +547,7 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 2: Handle Selection
+      // Step 2: Name Entry
       case 1:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
@@ -443,6 +557,88 @@ export function AppleStyleOnboardingForm() {
               </h1>
               <p className='text-[var(--muted)] text-xl'>
                 {ONBOARDING_STEPS[1].prompt}
+              </p>
+            </div>
+
+            <div className='w-full max-w-md space-y-6'>
+              <div className='space-y-4'>
+                <div className='relative'>
+                  <input
+                    type='text'
+                    value={fullNameInput}
+                    onChange={e => setFullNameInput(e.target.value)}
+                    placeholder='Your full name'
+                    className={`w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 rounded-xl transition-all ${
+                      fullNameValidation.error
+                        ? 'border-red-500'
+                        : fullNameValidation.valid && fullNameInput
+                          ? 'border-green-500'
+                          : 'border-[var(--border)]'
+                    } focus-ring text-[var(--fg)]`}
+                    autoComplete='name'
+                  />
+                </div>
+
+                {/* Validation feedback */}
+                <div className='min-h-[24px] flex items-center px-1'>
+                  {fullNameValidation.error && (
+                    <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
+                      {fullNameValidation.error}
+                    </div>
+                  )}
+                  {fullNameValidation.valid && (
+                    <div className='flex items-center gap-2 text-green-600 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                      <svg
+                        className='w-4 h-4'
+                        fill='currentColor'
+                        viewBox='0 0 20 20'
+                        xmlns='http://www.w3.org/2000/svg'
+                      >
+                        <path
+                          fillRule='evenodd'
+                          d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
+                          clipRule='evenodd'
+                        />
+                      </svg>
+                      <span className='font-medium'>Looking good</span>
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  onClick={goToNextStep}
+                  disabled={!fullNameValidation.valid}
+                  className={`w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out ${
+                    fullNameValidation.valid
+                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
+                  }`}
+                >
+                  Continue
+                </Button>
+              </div>
+
+              {/* Back button */}
+              <button
+                onClick={goToPreviousStep}
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        );
+
+      // Step 3: Handle Selection
+      case 2:
+        return (
+          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+            <div className='text-center space-y-3'>
+              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+                {ONBOARDING_STEPS[2].title}
+              </h1>
+              <p className='text-[var(--muted)] text-xl'>
+                {ONBOARDING_STEPS[2].prompt}
               </p>
             </div>
 
@@ -599,16 +795,16 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 3: Done
-      case 2:
+      // Step 4: Done
+      case 3:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
               <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-                {ONBOARDING_STEPS[2].title}
+                {ONBOARDING_STEPS[3].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
-                {ONBOARDING_STEPS[2].prompt}
+                {ONBOARDING_STEPS[3].prompt}
               </p>
             </div>
 
