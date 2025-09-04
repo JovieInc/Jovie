@@ -10,19 +10,25 @@ import { Container } from '@/components/site/Container';
 export function HeaderNav() {
   const [isProductFlyoutOpen, setIsProductFlyoutOpen] = useState(false);
   const productTriggerRef = useRef<HTMLButtonElement>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout>();
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Stable hover handlers on container
   const handleHoverEnter = () => {
     if (window.matchMedia('(min-width: 768px)').matches) {
-      clearTimeout(hoverTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
       setIsProductFlyoutOpen(true);
     }
   };
 
   const handleHoverLeave = () => {
     if (window.matchMedia('(min-width: 768px)').matches) {
-      clearTimeout(hoverTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
       hoverTimeoutRef.current = setTimeout(() => {
         setIsProductFlyoutOpen(false);
       }, 100);
@@ -75,7 +81,10 @@ export function HeaderNav() {
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      clearTimeout(hoverTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
     };
   }, []);
 
