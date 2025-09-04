@@ -4,7 +4,7 @@
  */
 
 import { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getWrappedLink } from '@/lib/services/link-wrapping';
 import { getCategoryDescription } from '@/lib/utils/domain-categorizer';
 import { InterstitialClient } from './InterstitialClient';
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export async function generateMetadata({
@@ -36,7 +36,7 @@ export async function generateMetadata({
 }
 
 export default async function InterstitialPage({ params }: PageProps) {
-  const { id: shortId } = await params;
+  const { id: shortId } = params;
 
   if (!shortId || shortId.length > 20) {
     notFound();
@@ -52,14 +52,7 @@ export default async function InterstitialPage({ params }: PageProps) {
   // Ensure this is a sensitive link
   if (wrappedLink.kind !== 'sensitive') {
     // Redirect normal links to /go/ route
-    const redirectUrl = `/go/${shortId}`;
-    return (
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `window.location.replace('${redirectUrl}');`,
-        }}
-      />
-    );
+    redirect(`/go/${shortId}`);
   }
 
   // Get generic description for crawlers
