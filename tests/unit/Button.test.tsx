@@ -129,4 +129,96 @@ describe('Button', () => {
     const button = screen.getByRole('button');
     expect(button).toHaveClass('cursor-pointer');
   });
+
+  it('has default type="button" for button elements', () => {
+    render(<Button>Button</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('type', 'button');
+  });
+
+  it('preserves custom type for button elements', () => {
+    render(<Button type='submit'>Submit</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('type', 'submit');
+  });
+
+  it('adds aria-busy when loading', () => {
+    render(<Button loading>Loading Button</Button>);
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+  });
+
+  it('does not have aria-busy when not loading', () => {
+    render(<Button>Normal Button</Button>);
+    const button = screen.getByRole('button');
+    expect(button).not.toHaveAttribute('aria-busy');
+  });
+
+  describe('link button accessibility', () => {
+    it('prevents navigation when disabled as link', () => {
+      const handleClick = vi.fn();
+      render(
+        <Button as='a' href='/test' disabled onClick={handleClick}>
+          Disabled Link
+        </Button>
+      );
+
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('aria-disabled', 'true');
+      expect(link).toHaveAttribute('tabIndex', '-1');
+      expect(link).toHaveClass('pointer-events-none');
+
+      fireEvent.click(link);
+      expect(handleClick).not.toHaveBeenCalled();
+    });
+
+    it('prevents navigation when loading as link', () => {
+      const handleClick = vi.fn();
+      render(
+        <Button as='a' href='/test' loading onClick={handleClick}>
+          Loading Link
+        </Button>
+      );
+
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('aria-disabled', 'true');
+      expect(link).toHaveAttribute('tabIndex', '-1');
+      expect(link).toHaveAttribute('aria-busy', 'true');
+      expect(link).toHaveClass('pointer-events-none');
+
+      fireEvent.click(link);
+      expect(handleClick).not.toHaveBeenCalled();
+    });
+
+    it('allows normal navigation when enabled as link', () => {
+      const handleClick = vi.fn();
+      render(
+        <Button as='a' href='/test' onClick={handleClick}>
+          Normal Link
+        </Button>
+      );
+
+      const link = screen.getByRole('link');
+      expect(link).not.toHaveAttribute('aria-disabled');
+      expect(link).not.toHaveAttribute('tabIndex');
+      expect(link).not.toHaveClass('pointer-events-none');
+
+      fireEvent.click(link);
+      expect(handleClick).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not trigger click when loading', () => {
+    const handleClick = vi.fn();
+    render(
+      <Button loading onClick={handleClick}>
+        Loading
+      </Button>
+    );
+
+    const button = screen.getByRole('button');
+    fireEvent.click(button);
+
+    expect(handleClick).not.toHaveBeenCalled();
+  });
 });
