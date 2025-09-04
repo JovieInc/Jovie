@@ -2,7 +2,7 @@ permissions:
   contents: read
 name: Production Synthetic Monitoring
 
-on:
+"on":
   schedule:
     # Run every 5 minutes during business hours (9 AM - 9 PM PST)
     - cron: '*/5 9-21 * * *'

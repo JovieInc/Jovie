@@ -3,7 +3,7 @@ name: Smart Auto-Merge
 # Consolidated auto-merge workflow for all PR types targeting preview branch
 # Handles: Dependabot, Codegen, and regular PRs with intelligent branch updating
 
-on:
+"on":
   pull_request_target:
     types: [opened, edited, synchronize, labeled, unlabeled, ready_for_review]
     branches: [preview, production]
