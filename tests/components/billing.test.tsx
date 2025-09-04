@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { useFeatureFlag } from '@/lib/analytics';
 
 // Mock the analytics
 vi.mock('@/lib/analytics', () => ({
@@ -51,11 +52,11 @@ describe('Billing Components', () => {
 
       render(<BillingPortalLink />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       expect(button).toHaveTextContent('Loading...');
-      
+
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('/api/stripe/portal', {
           method: 'POST',
@@ -76,9 +77,9 @@ describe('Billing Components', () => {
 
       render(<BillingPortalLink />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
         expect(screen.getByText(errorMessage)).toBeInTheDocument();
       });
@@ -89,9 +90,9 @@ describe('Billing Components', () => {
 
       render(<BillingPortalLink />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Network error')).toBeInTheDocument();
       });
@@ -99,9 +100,7 @@ describe('Billing Components', () => {
   });
 
   describe('UpgradeButton Component', () => {
-    const mockUseFeatureFlag = vi.mocked(
-      require('@/lib/analytics').useFeatureFlag
-    );
+    const mockUseFeatureFlag = vi.mocked(useFeatureFlag);
 
     it('renders with default props', () => {
       mockUseFeatureFlag.mockReturnValue(false);
@@ -118,12 +117,12 @@ describe('Billing Components', () => {
 
     it('redirects to pricing page when feature flag is disabled', async () => {
       mockUseFeatureFlag.mockReturnValue(false);
-      
+
       render(<UpgradeButton />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
         expect(window.location.href).toBe('/pricing');
       });
@@ -131,14 +130,16 @@ describe('Billing Components', () => {
 
     it('validates priceId when direct upgrade is enabled but priceId is missing', async () => {
       mockUseFeatureFlag.mockReturnValue(true);
-      
+
       render(<UpgradeButton />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
-        expect(screen.getByText('Price ID is required for direct checkout')).toBeInTheDocument();
+        expect(
+          screen.getByText('Price ID is required for direct checkout')
+        ).toBeInTheDocument();
       });
     });
 
@@ -146,7 +147,7 @@ describe('Billing Components', () => {
       mockUseFeatureFlag.mockReturnValue(true);
       const mockUrl = 'https://checkout.stripe.com/session/test';
       const priceId = 'price_test123';
-      
+
       (global.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ url: mockUrl }),
@@ -154,11 +155,11 @@ describe('Billing Components', () => {
 
       render(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       expect(button).toHaveTextContent('Loading...');
-      
+
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledWith('/api/stripe/checkout', {
           method: 'POST',
@@ -175,7 +176,7 @@ describe('Billing Components', () => {
       mockUseFeatureFlag.mockReturnValue(true);
       const errorMessage = 'Checkout creation failed';
       const priceId = 'price_test123';
-      
+
       (global.fetch as any).mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: errorMessage }),
@@ -183,9 +184,9 @@ describe('Billing Components', () => {
 
       render(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
         expect(screen.getByText(errorMessage)).toBeInTheDocument();
       });
@@ -194,14 +195,14 @@ describe('Billing Components', () => {
     it('handles network error during checkout', async () => {
       mockUseFeatureFlag.mockReturnValue(true);
       const priceId = 'price_test123';
-      
+
       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
       render(<UpgradeButton priceId={priceId} />);
       const button = screen.getByRole('button');
-      
+
       fireEvent.click(button);
-      
+
       await waitFor(() => {
         expect(screen.getByText('Network error')).toBeInTheDocument();
       });

@@ -1,6 +1,8 @@
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button, ButtonProps } from '@/components/ui/Button';
 
+// Trigger CI run to resolve check suite failures - updated
+
 interface LoadingButtonProps extends ButtonProps {
   isLoading?: boolean;
   loadingText?: string;
