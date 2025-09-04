@@ -8,7 +8,7 @@ on:
       - 'docs/**'
       - '.vscode/**'
   push:
-    branches: [preview, production]
+    branches: [preview, production, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
