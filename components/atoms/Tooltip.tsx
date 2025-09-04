@@ -32,7 +32,7 @@ export function Tooltip({
   const [open, setOpen] = useState(false);
   const arrowRef = useRef<HTMLDivElement | null>(null);
 
-  const { refs, floatingStyles, context } = useFloating({
+  const { refs, floatingStyles, context, middlewareData } = useFloating({
     open,
     onOpenChange: setOpen,
     whileElementsMounted: autoUpdate,
@@ -88,6 +88,10 @@ export function Tooltip({
             <div
               ref={arrowRef}
               className='absolute h-2 w-2 rotate-45 bg-black/90 ring-1 ring-black/40'
+              style={{
+                left: middlewareData.arrow?.x != null ? `${middlewareData.arrow.x}px` : '',
+                top: middlewareData.arrow?.y != null ? `${middlewareData.arrow.y}px` : '',
+              }}
             />
           </div>
         </FloatingPortal>

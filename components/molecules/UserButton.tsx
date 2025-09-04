@@ -261,7 +261,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
         )}
       </button>
 
-      {isOpen && x != null && y != null && (
+      {isOpen && (
         <FloatingPortal>
           <FloatingFocusManager context={context} modal={false}>
             <div
