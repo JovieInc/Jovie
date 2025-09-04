@@ -3,7 +3,7 @@ import React, { forwardRef } from 'react';
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'plain';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'xs' | 'sm' | 'md' | 'lg';
   color?: 'green' | 'indigo' | 'blue' | 'red' | 'gray';
   children: React.ReactNode;
   href?: string;
@@ -68,6 +68,7 @@ export const Button = forwardRef<
     };
 
     const sizeClasses = {
+      xs: 'px-2.5 py-1 text-sm',
       sm: 'px-3 py-1.5 text-sm',
       md: 'px-4 py-2 text-base',
       lg: 'px-6 py-3 text-lg',

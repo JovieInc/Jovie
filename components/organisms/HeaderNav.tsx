@@ -114,7 +114,7 @@ export function HeaderNav() {
                   onBlur={handleProductBlur}
                   aria-expanded={isProductFlyoutOpen}
                   aria-haspopup='menu'
-                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1'
+                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-1.5 py-0.5'
                 >
                   Product
                 </button>
@@ -126,7 +126,7 @@ export function HeaderNav() {
               </div>
               <Link
                 href='/pricing'
-                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
+                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors px-1.5 py-0.5 rounded'
               >
                 Pricing
               </Link>
@@ -143,7 +143,7 @@ export function HeaderNav() {
                   onBlur={handleProductBlur}
                   aria-expanded={isProductFlyoutOpen}
                   aria-haspopup='menu'
-                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1 min-h-[44px] flex items-center'
+                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-1.5 py-0.5 min-h-[44px] flex items-center'
                 >
                   Product
                 </button>
@@ -155,7 +155,7 @@ export function HeaderNav() {
               </div>
               <Link
                 href='/pricing'
-                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[44px] flex items-center px-2'
+                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[44px] flex items-center px-1.5 py-0.5 rounded'
               >
                 Pricing
               </Link>
