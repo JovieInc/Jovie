@@ -35,6 +35,38 @@ export default function AvatarUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const startStatusPolling = useCallback(
+    (photoId: string) => {
+      const pollInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`/api/images/status/${photoId}`);
+          if (!response.ok) return;
+
+          const result = (await response.json()) as UploadResult;
+          setUploadResult(result);
+          onStatusChange?.(result);
+
+          if (result.status === 'completed' || result.status === 'failed') {
+            clearInterval(pollInterval);
+
+            if (result.status === 'completed' && result.mediumUrl) {
+              setPreview(result.mediumUrl);
+            } else if (result.status === 'failed') {
+              setError(result.errorMessage || 'Processing failed');
+              setPreview(initialUrl || null);
+            }
+          }
+        } catch (err) {
+          console.error('Status polling error:', err);
+        }
+      }, POLLING_INTERVAL_MS);
+
+      // Clean up after timeout
+      setTimeout(() => clearInterval(pollInterval), POLLING_TIMEOUT_MS);
+    },
+    [onStatusChange, initialUrl]
+  );
+
   const handleFileSelect = useCallback(
     async (file: File) => {
       if (!file) return;
@@ -117,38 +149,6 @@ export default function AvatarUploader({
     e.preventDefault();
     e.stopPropagation();
   }, []);
-
-  const startStatusPolling = useCallback(
-    (photoId: string) => {
-      const pollInterval = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/images/status/${photoId}`);
-          if (!response.ok) return;
-
-          const result = (await response.json()) as UploadResult;
-          setUploadResult(result);
-          onStatusChange?.(result);
-
-          if (result.status === 'completed' || result.status === 'failed') {
-            clearInterval(pollInterval);
-
-            if (result.status === 'completed' && result.mediumUrl) {
-              setPreview(result.mediumUrl);
-            } else if (result.status === 'failed') {
-              setError(result.errorMessage || 'Processing failed');
-              setPreview(initialUrl || null);
-            }
-          }
-        } catch (err) {
-          console.error('Status polling error:', err);
-        }
-      }, POLLING_INTERVAL_MS);
-
-      // Clean up after timeout
-      setTimeout(() => clearInterval(pollInterval), POLLING_TIMEOUT_MS);
-    },
-    [onStatusChange, initialUrl]
-  );
 
   const [isDragActive, setIsDragActive] = useState(false);
 
