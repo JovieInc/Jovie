@@ -129,20 +129,36 @@ const nextConfig = {
   // Webpack optimizations
   webpack: (config, { dev, isServer }) => {
     if (!dev && !isServer) {
-      // Optimize bundle size
+      // Optimize bundle size with improved cache strategy
       config.optimization = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
+          maxSize: 244000, // Reduce chunk size to improve cache serialization
           cacheGroups: {
             vendor: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendors',
               chunks: 'all',
+              maxSize: 244000,
+            },
+            common: {
+              name: 'common',
+              minChunks: 2,
+              chunks: 'all',
+              maxSize: 244000,
             },
           },
         },
       };
+    }
+
+    // Exclude PostHog Node.js from Edge Runtime bundles
+    if (!isServer) {
+      config.externals = config.externals || [];
+      config.externals.push({
+        'posthog-node': 'commonjs posthog-node',
+      });
     }
 
     // Exclude Storybook files from production builds

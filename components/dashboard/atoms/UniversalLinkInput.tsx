@@ -320,6 +320,14 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
                   <span>No limit</span>
                 )}
               </div>
+              {/* Cap reached helper */}
+              {detectedLink.platform.category === 'social' &&
+                socialVisibleCount >= socialVisibleLimit && (
+                  <div className='text-[11px] text-secondary-token max-w-[220px] text-right'>
+                    Limit reached: new social links will be hidden until you
+                    unhide or hide another.
+                  </div>
+                )}
             </div>
           </div>
         </div>

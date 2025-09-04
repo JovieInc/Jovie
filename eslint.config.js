@@ -96,15 +96,13 @@ module.exports = [
         },
       ],
     },
-  },
-  // Disable specific rules for dashboard components due to architectural complexity
+  }, // Disable specific rules for dashboard components due to architectural complexity
   {
     files: ['**/components/dashboard/**/*'],
     rules: {
       'import/no-cycle': 'off',
     },
-  },
-  // Allow any types in test files for complex mocks
+  }, // Allow any types in test files for complex mocks
   {
     files: ['**/*.test.ts', '**/*.test.tsx'],
     rules: {

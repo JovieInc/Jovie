@@ -125,7 +125,7 @@ export function DashboardLinks({
         platform: link.platform.id,
         url: link.normalizedUrl,
         sortOrder: index,
-        isActive: link.isVisible === true,
+        isActive: link.isVisible !== false,
       }));
     },
     []
@@ -257,13 +257,21 @@ export function DashboardLinks({
       const isSocialLinks = newLinks.some(
         link => link.platform.category === 'social'
       );
+      // Cancel any pending debounced save to avoid racing older payloads
+      // debouncedSave exposes a cancel() method via our debounce helper
+      if (
+        typeof (debouncedSave as unknown as { cancel?: () => void }).cancel ===
+        'function'
+      ) {
+        (debouncedSave as unknown as { cancel: () => void }).cancel();
+      }
       if (isSocialLinks) {
         saveLinks(newLinks, dspLinks);
       } else {
         saveLinks(socialLinks, newLinks);
       }
     },
-    [socialLinks, dspLinks, saveLinks]
+    [socialLinks, dspLinks, saveLinks, debouncedSave]
   );
 
   // Handle unified link changes with automatic categorization
