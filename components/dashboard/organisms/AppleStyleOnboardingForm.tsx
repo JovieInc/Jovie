@@ -20,7 +20,12 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
     title: "Let's get you live.",
-    prompt: "We'll set up your profile in 2 quick steps.",
+    prompt: "We'll set up your profile in 3 quick steps.",
+  },
+  {
+    id: 'name',
+    title: 'What should we call you?',
+    prompt: 'This will be your display name.',
   },
   {
     id: 'handle',
@@ -83,6 +88,7 @@ export function AppleStyleOnboardingForm() {
   // Form state
   const [handle, setHandle] = useState('');
   const [handleInput, setHandleInput] = useState('');
+  const [fullName, setFullName] = useState('');
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
       available: false,
@@ -124,6 +130,35 @@ export function AppleStyleOnboardingForm() {
     // Remove any selected artist from sessionStorage since we removed the search step
     sessionStorage.removeItem('selectedArtist');
   }, [searchParams]);
+
+  // Prefill full name from user data
+  useEffect(() => {
+    if (user) {
+      // Try to get full name from Clerk user metadata first (set by webhook)
+      const webhookFullName = user.privateMetadata?.full_name;
+      if (webhookFullName && typeof webhookFullName === 'string') {
+        setFullName(webhookFullName);
+        return;
+      }
+
+      // Fallback: construct from firstName and lastName
+      const firstName = user.firstName || '';
+      const lastName = user.lastName || '';
+      const constructedName = [firstName, lastName].filter(Boolean).join(' ').trim();
+      
+      if (constructedName) {
+        setFullName(constructedName);
+        return;
+      }
+
+      // Last fallback: use email local part
+      if (user.emailAddresses.length > 0) {
+        const email = user.emailAddresses[0].emailAddress;
+        const emailLocal = email.split('@')[0];
+        setFullName(emailLocal);
+      }
+    }
+  }, [user]);
 
   // Navigation handlers with smooth transitions
   const goToNextStep = useCallback(() => {
@@ -268,7 +303,8 @@ export function AppleStyleOnboardingForm() {
         !user ||
         state.isSubmitting ||
         !handleValidation.available ||
-        !handleValidation.clientValid
+        !handleValidation.clientValid ||
+        !fullName.trim()
       )
         return;
 
@@ -298,7 +334,7 @@ export function AppleStyleOnboardingForm() {
       try {
         await completeOnboarding({
           username: handle.toLowerCase(),
-          displayName: handle,
+          displayName: fullName || handle,
         });
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
@@ -376,6 +412,7 @@ export function AppleStyleOnboardingForm() {
       handleValidation.available,
       handleValidation.clientValid,
       handle,
+      fullName,
       goToNextStep,
     ]
   );
@@ -433,8 +470,58 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 2: Handle Selection
+      // Step 2: Name Entry
       case 1:
+        return (
+          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+            <div className='text-center space-y-3'>
+              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+                {ONBOARDING_STEPS[1].title}
+              </h1>
+              <p className='text-[var(--muted)] text-xl'>
+                {ONBOARDING_STEPS[1].prompt}
+              </p>
+            </div>
+
+            <div className='w-full max-w-md space-y-6'>
+              <div className='space-y-4'>
+                <div className='relative'>
+                  <input
+                    type='text'
+                    value={fullName}
+                    onChange={e => setFullName(e.target.value)}
+                    placeholder='Your full name'
+                    className='w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 border-[var(--border)] rounded-xl transition-all focus-ring text-[var(--fg)]'
+                    maxLength={50}
+                  />
+                </div>
+
+                <Button
+                  onClick={goToNextStep}
+                  disabled={!fullName.trim()}
+                  className={`w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out ${
+                    fullName.trim()
+                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
+                  }`}
+                >
+                  Continue
+                </Button>
+              </div>
+
+              {/* Back button */}
+              <button
+                onClick={goToPreviousStep}
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        );
+
+      // Step 3: Handle Selection
+      case 2:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
@@ -599,16 +686,16 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 3: Done
-      case 2:
+      // Step 4: Done
+      case 3:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
               <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-                {ONBOARDING_STEPS[2].title}
+                {ONBOARDING_STEPS[3].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
-                {ONBOARDING_STEPS[2].prompt}
+                {ONBOARDING_STEPS[3].prompt}
               </p>
             </div>
 
