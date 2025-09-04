@@ -63,7 +63,3 @@ export default function CheckoutSuccessPage() {
   );
 }
 
-export const metadata = {
-  title: 'Subscription Activated | Jovie',
-  description: 'Your Pro subscription has been activated successfully',
-};

@@ -112,7 +112,7 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      const privateFullName = user.privateMetadata?.fullName as string | undefined;
+      const privateFullName = (user as any).privateMetadata?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -138,8 +138,8 @@ export function AppleStyleOnboardingForm() {
     if (urlHandle) {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
-    } else if (user?.privateMetadata?.suggestedUsername) {
-      const suggested = user.privateMetadata.suggestedUsername as string;
+    } else if ((user as any)?.privateMetadata?.suggestedUsername) {
+      const suggested = (user as any).privateMetadata.suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
@@ -410,6 +410,7 @@ export function AppleStyleOnboardingForm() {
       handleValidation.available,
       handleValidation.clientValid,
       handle,
+      fullName,
       goToNextStep,
     ]
   );
