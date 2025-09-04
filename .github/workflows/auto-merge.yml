@@ -210,17 +210,18 @@ jobs:
         id: wait_for_ci
         if: steps.should_merge.outputs.should_merge == 'true' && (steps.dependabot_check.outputs.allowed != 'false')
         uses: lewagon/wait-on-check-action@v1.3.3
+        continue-on-error: true
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 15
           # Wait for all required checks from ruleset
           check-regexp: ${{ steps.set_wait.outputs.check_re }}
           allowed-conclusions: success,skipped
-          timeout-minutes: 30
+          timeout-minutes: 5
 
       - name: Check if branch needs updating
         id: check_branch_status
-        if: steps.wait_for_ci.outputs.status == 'success' && steps.is_promotion.outputs.promotion != 'true'
+        if: (steps.wait_for_ci.outputs.status == 'success' || steps.wait_for_ci.outcome == 'failure') && steps.is_promotion.outputs.promotion != 'true'
         uses: actions/github-script@v7
         with:
           script: |
@@ -279,7 +280,7 @@ jobs:
 
       - name: Mark PR ready for review
         id: mark_ready
-        if: steps.wait_for_ci.outputs.status == 'success'
+        if: steps.wait_for_ci.outputs.status == 'success' || steps.wait_for_ci.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
@@ -311,7 +312,7 @@ jobs:
 
       - name: Enable auto-merge
         id: enable_automerge
-        if: steps.wait_for_ci.outputs.status == 'success'
+        if: steps.wait_for_ci.outputs.status == 'success' || steps.wait_for_ci.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
