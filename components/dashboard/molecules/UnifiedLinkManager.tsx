@@ -50,10 +50,10 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
       {/* Universal Link Input */}
       <div className='bg-surface-1 border border-subtle rounded-xl p-6'>
         <div className='mb-6'>
-          <h3 className='text-lg font-semibold text-primary mb-2'>
+          <h3 className='text-lg font-semibold text-primary-token mb-2'>
             ✨ Add Any Link
           </h3>
-          <p className='text-sm text-secondary'>
+          <p className='text-sm text-secondary-token'>
             Paste a link — we’ll detect and organize it for you.
           </p>
         </div>
@@ -76,8 +76,10 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
         customLinks.length > 0) && (
         <div className='space-y-4'>
           <div className='flex items-center gap-2'>
-            <h3 className='text-lg font-semibold text-primary'>Your Links</h3>
-            <span className='text-xs text-secondary bg-surface-2 px-2 py-1 rounded-full'>
+            <h3 className='text-lg font-semibold text-primary-token'>
+              Your Links
+            </h3>
+            <span className='text-xs text-secondary-token bg-surface-2 px-2 py-1 rounded-full'>
               {initialLinks.length}{' '}
               {initialLinks.length === 1 ? 'link' : 'links'}
             </span>
@@ -90,10 +92,10 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                 <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
                   <div className='flex items-center gap-2'>
                     <div className='w-2 h-2 bg-blue-500 rounded-full'></div>
-                    <span className='text-sm font-medium text-primary'>
+                    <span className='text-sm font-medium text-primary-token'>
                       Social
                     </span>
-                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                    <span className='text-xs text-secondary-token bg-surface-2 px-2 py-0.5 rounded-full'>
                       {socialLinks.length}
                     </span>
                   </div>
@@ -102,11 +104,11 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                     const hidden = socialLinks.length - visible;
                     return (
                       <div className='flex items-center gap-2'>
-                        <span className='text-xs text-secondary'>
+                        <span className='text-xs text-secondary-token'>
                           {visible}/{MAX_SOCIAL_LINKS} visible
                         </span>
                         {hidden > 0 && (
-                          <span className='text-[10px] text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                          <span className='text-[10px] text-secondary-token bg-surface-2 px-2 py-0.5 rounded-full'>
                             {hidden} hidden
                           </span>
                         )}
@@ -118,13 +120,13 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                   {socialLinks.map(link => (
                     <div
                       key={link.id}
-                      className='flex items-center gap-2 text-xs text-secondary'
+                      className='flex items-center gap-2 text-xs text-secondary-token'
                     >
                       <span className='w-1 h-1 bg-blue-500 rounded-full'></span>
                       <span className='truncate'>
                         {link.platform.name}
                         {!link.isVisible && (
-                          <span className='ml-2 text-[10px] text-secondary'>
+                          <span className='ml-2 text-[10px] text-secondary-token'>
                             (hidden)
                           </span>
                         )}
@@ -141,10 +143,10 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                 <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
                   <div className='flex items-center gap-2'>
                     <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                    <span className='text-sm font-medium text-primary'>
+                    <span className='text-sm font-medium text-primary-token'>
                       Music
                     </span>
-                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                    <span className='text-xs text-secondary-token bg-surface-2 px-2 py-0.5 rounded-full'>
                       {musicLinks.length}
                     </span>
                   </div>
@@ -153,7 +155,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                   {musicLinks.map(link => (
                     <div
                       key={link.id}
-                      className='flex items-center gap-2 text-xs text-secondary'
+                      className='flex items-center gap-2 text-xs text-secondary-token'
                     >
                       <span className='w-1 h-1 bg-green-500 rounded-full'></span>
                       <span className='truncate'>{link.platform.name}</span>
@@ -169,10 +171,10 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                 <summary className='flex items-center justify-between p-3 cursor-pointer select-none'>
                   <div className='flex items-center gap-2'>
                     <div className='w-2 h-2 bg-purple-500 rounded-full'></div>
-                    <span className='text-sm font-medium text-primary'>
+                    <span className='text-sm font-medium text-primary-token'>
                       Custom
                     </span>
-                    <span className='text-xs text-secondary bg-surface-2 px-2 py-0.5 rounded-full'>
+                    <span className='text-xs text-secondary-token bg-surface-2 px-2 py-0.5 rounded-full'>
                       {customLinks.length}
                     </span>
                   </div>
@@ -181,7 +183,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
                   {customLinks.map(link => (
                     <div
                       key={link.id}
-                      className='flex items-center gap-2 text-xs text-secondary'
+                      className='flex items-center gap-2 text-xs text-secondary-token'
                     >
                       <span className='w-1 h-1 bg-purple-500 rounded-full'></span>
                       <span className='truncate'>
