@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { track } from '@/lib/analytics';
 
 type CopyStatus = 'idle' | 'success' | 'error';
 
@@ -21,14 +22,71 @@ export function CopyToClipboardButton({
 }: CopyToClipboardButtonProps) {
   const [status, setStatus] = useState<CopyStatus>('idle');
 
-  const onCopy = async () => {
+  const fallbackCopy = (text: string): boolean => {
     try {
-      const url = `${getBaseUrl()}${relativePath}`;
-      await navigator.clipboard.writeText(url);
-      setStatus('success');
-    } catch (e) {
-      console.error('Failed to copy URL:', e);
-      setStatus('error');
+      // Create a temporary textarea element
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-999999px';
+      textarea.style.top = '-999999px';
+      document.body.appendChild(textarea);
+      
+      // Select and copy the text
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      
+      // Clean up
+      document.body.removeChild(textarea);
+      
+      return successful;
+    } catch (error) {
+      console.error('Fallback copy failed:', error);
+      return false;
+    }
+  };
+
+  const onCopy = async () => {
+    const url = `${getBaseUrl()}${relativePath}`;
+    let copySuccess = false;
+    
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        copySuccess = true;
+      } else {
+        // Fall back to textarea selection method
+        copySuccess = fallbackCopy(url);
+      }
+      
+      if (copySuccess) {
+        setStatus('success');
+        track('profile_copy_url_click', { status: 'success' });
+      } else {
+        setStatus('error');
+        track('profile_copy_url_click', { status: 'error' });
+      }
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      
+      // Try fallback method if modern API failed
+      try {
+        copySuccess = fallbackCopy(url);
+        
+        if (copySuccess) {
+          setStatus('success');
+          track('profile_copy_url_click', { status: 'success' });
+        } else {
+          setStatus('error');
+          track('profile_copy_url_click', { status: 'error' });
+        }
+      } catch (fallbackError) {
+        console.error('Both copy methods failed:', fallbackError);
+        setStatus('error');
+        track('profile_copy_url_click', { status: 'error' });
+      }
     } finally {
       setTimeout(() => setStatus('idle'), 2000);
     }
