@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
+import { track } from '@/lib/analytics';
 import type { AvailableDSP } from '@/lib/dsp';
 
 export interface ListenSectionProps {
@@ -67,17 +68,10 @@ export function ListenSection({
       // Fire-and-forget tracking
       if (enableTracking) {
         try {
-          fetch('/api/track', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              handle,
-              linkType: 'listen',
-              target: dspKey,
-            }),
-            keepalive: true,
-          }).catch(() => {
-            // Silent fail for analytics - don't disrupt user experience
+          track('listen_button_click', {
+            handle,
+            linkType: 'listen',
+            target: dspKey,
           });
         } catch {
           // noop

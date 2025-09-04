@@ -74,7 +74,3 @@ export default function CheckoutCancelPage() {
   );
 }
 
-export const metadata = {
-  title: 'Checkout Cancelled | Jovie',
-  description: 'Your checkout was cancelled - no charges were made',
-};

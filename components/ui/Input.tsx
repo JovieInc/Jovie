@@ -95,6 +95,9 @@ export const Input = forwardRef(function Input(
   const inputElement = (
     <span
       data-slot='control'
+      data-invalid={isInvalid || undefined}
+      data-valid={isValid || undefined}
+      data-disabled={props.disabled || undefined}
       className={clsx([
         className,
         // Basic layout
@@ -119,6 +122,7 @@ export const Input = forwardRef(function Input(
         ref={ref}
         id={id}
         aria-invalid={isInvalid ? 'true' : undefined}
+        aria-busy={isPending ? 'true' : undefined}
         aria-describedby={getDescribedByIds()}
         {...props}
         className={clsx([
@@ -139,9 +143,22 @@ export const Input = forwardRef(function Input(
               '[&::-webkit-datetime-edit-meridiem-field]:p-0',
             ],
           // Basic layout
-          'relative block w-full appearance-none rounded-lg px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
-          // Typography
-          'text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:text-white',
+          'relative block w-full appearance-none rounded-lg',
+          // Size variants - padding and typography
+          props.size === 'sm' && [
+            'px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1.5)-1px)] sm:px-[calc(--spacing(2)-1px)] sm:py-[calc(--spacing(1)-1px)]',
+            'text-sm/5 sm:text-xs/5',
+          ],
+          (!props.size || props.size === 'md') && [
+            'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+            'text-base/6 sm:text-sm/6',
+          ],
+          props.size === 'lg' && [
+            'px-[calc(--spacing(4)-1px)] py-[calc(--spacing(3)-1px)] sm:px-[calc(--spacing(3.5)-1px)] sm:py-[calc(--spacing(2.5)-1px)]',
+            'text-lg/7 sm:text-base/6',
+          ],
+          // Typography colors
+          'text-zinc-950 placeholder:text-zinc-500 dark:text-white',
           // Border
           'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-white/10 dark:data-hover:border-white/20',
           // Background color
@@ -160,28 +177,54 @@ export const Input = forwardRef(function Input(
           // Error state for legacy support
           isInvalid &&
             'border-red-500 data-hover:border-red-500 dark:border-red-500 dark:data-hover:border-red-500',
-          // Loading state - add right padding for spinner
-          isPending && 'pr-10 sm:pr-8',
-          // Status icon - add right padding for icon
-          statusIcon && 'pr-10 sm:pr-8',
-          // Trailing slot - add more right padding for action button
-          trailing && 'pr-28 sm:pr-32',
+          // Loading state - add right padding for spinner (size-aware)
+          isPending && [
+            props.size === 'sm' && 'pr-8 sm:pr-6',
+            (!props.size || props.size === 'md') && 'pr-10 sm:pr-8',
+            props.size === 'lg' && 'pr-12 sm:pr-10',
+          ],
+          // Status icon - add right padding for icon (size-aware)
+          statusIcon && [
+            props.size === 'sm' && 'pr-8 sm:pr-6',
+            (!props.size || props.size === 'md') && 'pr-10 sm:pr-8',
+            props.size === 'lg' && 'pr-12 sm:pr-10',
+          ],
+          // Trailing slot - add more right padding for action button (size-aware)
+          trailing && [
+            props.size === 'sm' && 'pr-24 sm:pr-26',
+            (!props.size || props.size === 'md') && 'pr-28 sm:pr-32',
+            props.size === 'lg' && 'pr-32 sm:pr-36',
+          ],
           inputClassName,
         ])}
       />
 
       {/* Status Icon (validation state) */}
       {statusIcon && !isPending && (
-        <div className='absolute right-3 top-1/2 -translate-y-1/2 sm:right-2.5'>
+        <div
+          className={clsx([
+            'absolute top-1/2 -translate-y-1/2',
+            props.size === 'sm' && 'right-2 sm:right-1.5',
+            (!props.size || props.size === 'md') && 'right-3 sm:right-2.5',
+            props.size === 'lg' && 'right-4 sm:right-3',
+          ])}
+        >
           {statusIcon}
         </div>
       )}
 
       {/* Loading Spinner */}
       {isPending && (
-        <div className='absolute right-3 top-1/2 -translate-y-1/2 sm:right-2.5'>
+        <div
+          className={clsx([
+            'absolute top-1/2 -translate-y-1/2',
+            props.size === 'sm' && 'right-2 sm:right-1.5',
+            (!props.size || props.size === 'md') && 'right-3 sm:right-2.5',
+            props.size === 'lg' && 'right-4 sm:right-3',
+          ])}
+        >
           <LoadingSpinner
-            size='sm'
+            size={props.size === 'lg' ? 'md' : 'sm'}
             className='text-zinc-500 dark:text-zinc-400'
           />
         </div>
@@ -189,7 +232,14 @@ export const Input = forwardRef(function Input(
 
       {/* Trailing slot (e.g., action button) */}
       {trailing ? (
-        <div className='absolute right-2 top-1/2 -translate-y-1/2 sm:right-2.5 z-10'>
+        <div
+          className={clsx([
+            'absolute top-1/2 -translate-y-1/2 z-10',
+            props.size === 'sm' && 'right-2 sm:right-1.5',
+            (!props.size || props.size === 'md') && 'right-2 sm:right-2.5',
+            props.size === 'lg' && 'right-3 sm:right-2.5',
+          ])}
+        >
           {trailing}
         </div>
       ) : null}
