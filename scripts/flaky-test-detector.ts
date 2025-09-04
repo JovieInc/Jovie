@@ -82,8 +82,8 @@ class FlakyTestDetector {
       }
 
       // Also capture any failed tests from stderr
-      if (error.stderr) {
-        this.parseFailedTests(error.stderr, results);
+      if (error && typeof error === 'object' && 'stderr' in error) {
+        this.parseFailedTests((error as { stderr: string }).stderr, results);
       }
     }
 
