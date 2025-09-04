@@ -3,6 +3,7 @@
 import { useAuth } from '@clerk/nextjs';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { FeatureList } from '@/components/pricing/FeatureList';
 import { PricingCTA } from '@/components/pricing/PricingCTA';
@@ -11,6 +12,7 @@ import { Container } from '@/components/site/Container';
 
 export default function PricingPage() {
   const { isSignedIn } = useAuth();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
 
@@ -39,7 +41,7 @@ export default function PricingPage() {
   const handleSubscribe = async () => {
     if (!isSignedIn) {
       // Redirect to sign up if not authenticated
-      window.location.href = '/sign-up';
+      router.push('/signup');
       return;
     }
 
