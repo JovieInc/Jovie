@@ -64,9 +64,27 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
         ) : (
           <div>
             {/* Progress indicator */}
-            <p className='text-sm text-secondary-token mb-3'>{`${completedCount}/${totalSteps} setup steps completed`}</p>
+            <div className='mb-4'>
+              <div className='flex justify-between items-center mb-2'>
+                <span className='text-sm text-secondary-token'>Setup Progress</span>
+                <span className='text-sm text-secondary-token'>{`${completedCount}/${totalSteps}`}</span>
+              </div>
+              <div 
+                role='progressbar' 
+                aria-valuenow={completedCount} 
+                aria-valuemin={0} 
+                aria-valuemax={totalSteps}
+                aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
+                className='w-full bg-surface-2 rounded-full h-2'
+              >
+                <div 
+                  className='bg-accent h-2 rounded-full transition-all duration-300 ease-in-out' 
+                  style={{ width: `${(completedCount / totalSteps) * 100}%` }}
+                />
+              </div>
+            </div>
 
-            <ul role='list' className='space-y-3'>
+            <ol className='space-y-3'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'
@@ -123,7 +141,7 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                   </Button>
                 }
               />
-            </ul>
+            </ol>
           </div>
         )}
       </DashboardCard>
