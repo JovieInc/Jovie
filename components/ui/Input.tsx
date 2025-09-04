@@ -60,6 +60,7 @@ export const Input = forwardRef(function Input(
     label,
     error,
     loading,
+    size = 'md',
     inputClassName,
     trailing,
     statusIcon,
@@ -82,6 +83,7 @@ export const Input = forwardRef(function Input(
     validationState === 'invalid' || error || ariaInvalid === 'true';
   const isValid = validationState === 'valid';
   const isPending = validationState === 'pending' || loading;
+  const isDisabled = props.disabled;
 
   // Determine which description elements to connect via aria-describedby
   const getDescribedByIds = () => {
@@ -92,11 +94,42 @@ export const Input = forwardRef(function Input(
     return ids.length > 0 ? ids.join(' ') : undefined;
   };
 
+  // Size-based padding and typography classes
+  const getSizeClasses = () => {
+    switch (size) {
+      case 'sm':
+        return {
+          container: 'text-sm',
+          input: 'px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1.5)-1px)] text-sm/5 sm:px-[calc(--spacing(2)-1px)] sm:py-[calc(--spacing(1)-1px)]',
+          icon: 'size-4 sm:size-3.5'
+        };
+      case 'lg':
+        return {
+          container: 'text-base',
+          input: 'px-[calc(--spacing(4)-1px)] py-[calc(--spacing(3.5)-1px)] text-lg/7 sm:px-[calc(--spacing(3.5)-1px)] sm:py-[calc(--spacing(2.5)-1px)] sm:text-base/6',
+          icon: 'size-6 sm:size-5'
+        };
+      case 'md':
+      default:
+        return {
+          container: 'text-base sm:text-sm',
+          input: 'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] text-base/6 sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
+          icon: 'size-5 sm:size-4'
+        };
+    }
+  };
+
+  const sizeClasses = getSizeClasses();
+
   const inputElement = (
     <span
       data-slot='control'
+      data-invalid={isInvalid || undefined}
+      data-valid={isValid || undefined}
+      data-disabled={isDisabled || undefined}
       className={clsx([
         className,
+        sizeClasses.container,
         // Basic layout
         'relative block w-full',
         // Background color + shadow applied to inset pseudo element, so shadow blends with border in light mode
@@ -119,6 +152,7 @@ export const Input = forwardRef(function Input(
         ref={ref}
         id={id}
         aria-invalid={isInvalid ? 'true' : undefined}
+        aria-busy={isPending ? 'true' : undefined}
         aria-describedby={getDescribedByIds()}
         {...props}
         className={clsx([
@@ -138,10 +172,11 @@ export const Input = forwardRef(function Input(
               '[&::-webkit-datetime-edit-millisecond-field]:p-0',
               '[&::-webkit-datetime-edit-meridiem-field]:p-0',
             ],
-          // Basic layout
-          'relative block w-full appearance-none rounded-lg px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+          // Basic layout with size-based padding
+          'relative block w-full appearance-none rounded-lg',
+          sizeClasses.input,
           // Typography
-          'text-base/6 text-zinc-950 placeholder:text-zinc-500 sm:text-sm/6 dark:text-white',
+          'text-zinc-950 placeholder:text-zinc-500 dark:text-white',
           // Border
           'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-white/10 dark:data-hover:border-white/20',
           // Background color
@@ -160,10 +195,10 @@ export const Input = forwardRef(function Input(
           // Error state for legacy support
           isInvalid &&
             'border-red-500 data-hover:border-red-500 dark:border-red-500 dark:data-hover:border-red-500',
-          // Loading state - add right padding for spinner
-          isPending && 'pr-10 sm:pr-8',
-          // Status icon - add right padding for icon
-          statusIcon && 'pr-10 sm:pr-8',
+          // Loading state - add right padding for spinner (size-based)
+          isPending && (size === 'sm' ? 'pr-8 sm:pr-7' : size === 'lg' ? 'pr-12 sm:pr-10' : 'pr-10 sm:pr-8'),
+          // Status icon - add right padding for icon (size-based)
+          statusIcon && (size === 'sm' ? 'pr-8 sm:pr-7' : size === 'lg' ? 'pr-12 sm:pr-10' : 'pr-10 sm:pr-8'),
           // Trailing slot - add more right padding for action button
           trailing && 'pr-28 sm:pr-32',
           inputClassName,
@@ -172,16 +207,24 @@ export const Input = forwardRef(function Input(
 
       {/* Status Icon (validation state) */}
       {statusIcon && !isPending && (
-        <div className='absolute right-3 top-1/2 -translate-y-1/2 sm:right-2.5'>
-          {statusIcon}
+        <div className={clsx(
+          'absolute top-1/2 -translate-y-1/2',
+          size === 'sm' ? 'right-2 sm:right-1.5' : size === 'lg' ? 'right-4 sm:right-3' : 'right-3 sm:right-2.5'
+        )}>
+          <div className={sizeClasses.icon}>
+            {statusIcon}
+          </div>
         </div>
       )}
 
       {/* Loading Spinner */}
       {isPending && (
-        <div className='absolute right-3 top-1/2 -translate-y-1/2 sm:right-2.5'>
+        <div className={clsx(
+          'absolute top-1/2 -translate-y-1/2',
+          size === 'sm' ? 'right-2 sm:right-1.5' : size === 'lg' ? 'right-4 sm:right-3' : 'right-3 sm:right-2.5'
+        )}>
           <LoadingSpinner
-            size='sm'
+            size={size === 'sm' ? 'xs' : 'sm'}
             className='text-zinc-500 dark:text-zinc-400'
           />
         </div>
