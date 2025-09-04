@@ -221,4 +221,30 @@ describe('Button', () => {
 
     expect(handleClick).not.toHaveBeenCalled();
   });
+
+  describe('data-state attribute', () => {
+    it('has data-state="idle" by default', () => {
+      render(<Button>Idle Button</Button>);
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'idle');
+    });
+
+    it('has data-state="loading" when loading', () => {
+      render(<Button loading>Loading Button</Button>);
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'loading');
+    });
+
+    it('has data-state="disabled" when disabled', () => {
+      render(<Button disabled>Disabled Button</Button>);
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'disabled');
+    });
+
+    it('has data-state="disabled" when loading (loading takes precedence)', () => {
+      render(<Button loading disabled>Loading Disabled Button</Button>);
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-state', 'loading');
+    });
+  });
 });

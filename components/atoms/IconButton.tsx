@@ -44,6 +44,9 @@ export function IconButton({
     className
   );
 
+  // Determine data-state based on current state
+  const dataState = disabled ? 'disabled' : 'idle';
+
   if (href) {
     return (
       <Link
@@ -56,6 +59,7 @@ export function IconButton({
         aria-disabled={disabled ? 'true' : undefined}
         tabIndex={disabled ? -1 : undefined}
         onClick={disabled ? (e: React.MouseEvent) => e.preventDefault() : undefined}
+        data-state={dataState}
       >
         {children}
       </Link>
@@ -70,6 +74,7 @@ export function IconButton({
       title={title}
       disabled={disabled}
       className={base}
+      data-state={dataState}
     >
       {children}
     </button>
