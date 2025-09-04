@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * Flaky Test Detector
- * 
+ *
  * Runs tests multiple times to identify inconsistent/unstable tests.
  * Quarantines flaky tests to prevent them from blocking CI.
  */
 
 import { execSync } from 'child_process';
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 interface TestRun {
@@ -34,7 +34,10 @@ class FlakyTestDetector {
   private readonly FLAKY_THRESHOLD = 0.1; // 10% failure rate = flaky
   private readonly MIN_RUNS = 5;
 
-  async detectFlakyTests(testPattern?: string, runCount = 10): Promise<FlakyTestResult[]> {
+  async detectFlakyTests(
+    testPattern?: string,
+    runCount = 10
+  ): Promise<FlakyTestResult[]> {
     console.log(`🔍 Running flaky test detection (${runCount} runs)...\n`);
 
     // Run tests multiple times
@@ -58,12 +61,12 @@ class FlakyTestDetector {
 
   private async runSingleTestRun(testPattern?: string): Promise<TestRun[]> {
     const results: TestRun[] = [];
-    
+
     try {
-      const command = testPattern 
+      const command = testPattern
         ? `pnpm test ${testPattern} --reporter=verbose`
         : 'pnpm test --reporter=verbose';
-        
+
       const output = execSync(command, {
         encoding: 'utf8',
         stdio: 'pipe',
@@ -72,12 +75,12 @@ class FlakyTestDetector {
 
       // Parse test results
       this.parseTestResults(output, results);
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Tests might fail, but we still want to parse the output
-      if (error.stdout) {
-        this.parseTestResults(error.stdout, results);
+      if (error && typeof error === 'object' && 'stdout' in error) {
+        this.parseTestResults((error as { stdout: string }).stdout, results);
       }
-      
+
       // Also capture any failed tests from stderr
       if (error.stderr) {
         this.parseFailedTests(error.stderr, results);
@@ -91,7 +94,7 @@ class FlakyTestDetector {
     // Parse successful tests
     const successRegex = /✓\s+(.+?)\s+(\d+)ms/g;
     let match;
-    
+
     while ((match = successRegex.exec(output)) !== null) {
       const [, testName, duration] = match;
       results.push({
@@ -158,7 +161,7 @@ class FlakyTestDetector {
   private analyzeTestStability(): void {
     // Group results by test name
     const testGroups = new Map<string, TestRun[]>();
-    
+
     for (const run of this.runs) {
       for (const test of run) {
         if (!testGroups.has(test.testName)) {
@@ -175,19 +178,24 @@ class FlakyTestDetector {
       const passCount = testRuns.filter(r => r.status === 'passed').length;
       const failCount = testRuns.filter(r => r.status === 'failed').length;
       const skipCount = testRuns.filter(r => r.status === 'skipped').length;
-      
+
       // Calculate flaky score (higher = more inconsistent)
       const totalRuns = testRuns.length;
       const flakyScore = failCount / totalRuns;
-      
+
       // Calculate average duration
-      const durations = testRuns.filter(r => r.duration > 0).map(r => r.duration);
-      const averageDuration = durations.length > 0 
-        ? durations.reduce((a, b) => a + b, 0) / durations.length 
-        : 0;
+      const durations = testRuns
+        .filter(r => r.duration > 0)
+        .map(r => r.duration);
+      const averageDuration =
+        durations.length > 0
+          ? durations.reduce((a, b) => a + b, 0) / durations.length
+          : 0;
 
       // Collect unique errors
-      const errors = [...new Set(testRuns.filter(r => r.error).map(r => r.error!))];
+      const errors = [
+        ...new Set(testRuns.filter(r => r.error).map(r => r.error!)),
+      ];
 
       const result: FlakyTestResult = {
         testName,
@@ -201,7 +209,11 @@ class FlakyTestDetector {
       };
 
       // Consider test flaky if it has inconsistent results
-      if (flakyScore > 0 && flakyScore < 1 && flakyScore >= this.FLAKY_THRESHOLD) {
+      if (
+        flakyScore > 0 &&
+        flakyScore < 1 &&
+        flakyScore >= this.FLAKY_THRESHOLD
+      ) {
         this.flakyTests.push(result);
       }
     }
@@ -217,7 +229,9 @@ class FlakyTestDetector {
     console.log(`📊 SUMMARY:`);
     console.log(`   Total test runs: ${this.runs.length}`);
     console.log(`   Flaky tests detected: ${this.flakyTests.length}`);
-    console.log(`   Flaky threshold: ${(this.FLAKY_THRESHOLD * 100).toFixed(1)}%\n`);
+    console.log(
+      `   Flaky threshold: ${(this.FLAKY_THRESHOLD * 100).toFixed(1)}%\n`
+    );
 
     if (this.flakyTests.length === 0) {
       console.log('✅ No flaky tests detected! All tests are stable.\n');
@@ -228,22 +242,29 @@ class FlakyTestDetector {
     this.flakyTests.forEach((test, index) => {
       const flakyPercent = (test.flakyScore * 100).toFixed(1);
       console.log(`\n${index + 1}. ${test.testName}`);
-      console.log(`   Flaky Score: ${flakyPercent}% (${test.failCount}/${test.totalRuns} failures)`);
+      console.log(
+        `   Flaky Score: ${flakyPercent}% (${test.failCount}/${test.totalRuns} failures)`
+      );
       console.log(`   Average Duration: ${test.averageDuration.toFixed(0)}ms`);
-      
+
       if (test.errors.length > 0) {
         console.log(`   Common Errors:`);
         test.errors.slice(0, 2).forEach(error => {
-          const shortError = error.length > 100 ? error.substring(0, 100) + '...' : error;
+          const shortError =
+            error.length > 100 ? error.substring(0, 100) + '...' : error;
           console.log(`     - ${shortError}`);
         });
       }
     });
 
     console.log('\n💡 RECOMMENDATIONS:');
-    console.log('   1. Review flaky tests for timing issues or race conditions');
+    console.log(
+      '   1. Review flaky tests for timing issues or race conditions'
+    );
     console.log('   2. Add proper waits/assertions for async operations');
-    console.log('   3. Consider quarantining highly flaky tests (>50% failure rate)');
+    console.log(
+      '   3. Consider quarantining highly flaky tests (>50% failure rate)'
+    );
     console.log('   4. Check for shared state or resource conflicts\n');
   }
 
@@ -273,7 +294,9 @@ class FlakyTestDetector {
 
     // Create quarantine test configuration
     const quarantineConfig = {
-      testMatch: this.flakyTests.map(test => `**/*${test.testName.replace(/\s+/g, '*')}*`),
+      testMatch: this.flakyTests.map(
+        test => `**/*${test.testName.replace(/\s+/g, '*')}*`
+      ),
       retries: 3,
       timeout: 10000,
     };
@@ -285,7 +308,9 @@ class FlakyTestDetector {
 
     console.log(`🏥 Quarantined ${this.flakyTests.length} flaky tests`);
     console.log(`   Quarantine list: tests/quarantine/flaky-tests.json`);
-    console.log(`   Quarantine config: tests/quarantine/quarantine.config.json\n`);
+    console.log(
+      `   Quarantine config: tests/quarantine/quarantine.config.json\n`
+    );
   }
 }
 
@@ -294,7 +319,7 @@ if (require.main === module) {
   const detector = new FlakyTestDetector();
   const testPattern = process.argv[2];
   const runCount = parseInt(process.argv[3]) || 10;
-  
+
   detector.detectFlakyTests(testPattern, runCount).catch(console.error);
 }
 

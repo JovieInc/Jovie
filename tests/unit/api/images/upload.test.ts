@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/images/upload/route';
 
 // Mock dependencies
@@ -23,15 +23,17 @@ const { auth } = vi.hoisted(() => ({
   auth: vi.fn(),
 }));
 
-const { db } = vi.hoisted(() => ({
+vi.hoisted(() => ({
   db: {
     insert: vi.fn().mockReturnValue({
       values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([{
-          id: 'test-photo-id',
-          userId: 'test-user-id',
-          status: 'uploading',
-        }]),
+        returning: vi.fn().mockResolvedValue([
+          {
+            id: 'test-photo-id',
+            userId: 'test-user-id',
+            status: 'uploading',
+          },
+        ]),
       }),
     }),
     update: vi.fn().mockReturnValue({
@@ -68,7 +70,7 @@ describe('/api/images/upload', () => {
 
     // Create form data without file
     const formData = new FormData();
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -89,7 +91,7 @@ describe('/api/images/upload', () => {
     const formData = new FormData();
     const file = new File(['test'], 'test.txt', { type: 'text/plain' });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -111,7 +113,7 @@ describe('/api/images/upload', () => {
     const formData = new FormData();
     const file = new File([largeContent], 'large.jpg', { type: 'image/jpeg' });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -130,9 +132,11 @@ describe('/api/images/upload', () => {
 
     // Create valid image file
     const formData = new FormData();
-    const file = new File(['fake-image-data'], 'test.jpg', { type: 'image/jpeg' });
+    const file = new File(['fake-image-data'], 'test.jpg', {
+      type: 'image/jpeg',
+    });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -153,7 +157,7 @@ describe('/api/images/upload', () => {
     const formData = new FormData();
     const file = new File(['fake-jpeg'], 'test.jpeg', { type: 'image/jpeg' });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -169,7 +173,7 @@ describe('/api/images/upload', () => {
     const formData = new FormData();
     const file = new File(['fake-png'], 'test.png', { type: 'image/png' });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,
@@ -185,7 +189,7 @@ describe('/api/images/upload', () => {
     const formData = new FormData();
     const file = new File(['fake-webp'], 'test.webp', { type: 'image/webp' });
     formData.append('file', file);
-    
+
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
       body: formData,

@@ -1,13 +1,13 @@
 #!/usr/bin/env tsx
 /**
  * Test Performance Profiler
- * 
+ *
  * Analyzes test suite performance to identify bottlenecks and optimization opportunities.
  * Generates detailed reports on setup time, individual test performance, and overall metrics.
  */
 
 import { execSync } from 'child_process';
-import { writeFileSync, readFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { join } from 'path';
 
 interface TestResult {
@@ -61,45 +61,47 @@ class TestPerformanceProfiler {
 
     // Run tests with verbose output and capture timing data
     const testOutput = this.runTestsWithTiming();
-    
+
     // Parse the output to extract performance metrics
     this.parseTestOutput(testOutput);
-    
+
     // Calculate performance statistics
     this.calculatePerformanceStats();
-    
+
     // Identify slow tests (>200ms)
     this.identifySlowTests();
-    
+
     // Generate performance report
     this.generateReport();
-    
+
     // Save baseline data
     this.saveBaseline();
-    
+
     return this.results;
   }
 
   private runTestsWithTiming(): string {
     console.log('⏱️  Running test suite with timing analysis...');
-    
+
     try {
       const output = execSync('pnpm test --reporter=verbose', {
         encoding: 'utf8',
         stdio: 'pipe',
         timeout: 120000, // 2 minutes timeout
       });
-      
+
       return output;
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Tests might fail but we still want the timing data
-      return error.stdout || error.output?.join('') || '';
+      if (error && typeof error === 'object') {
+        const errorObj = error as { stdout?: string; output?: string[] };
+        return errorObj.stdout || errorObj.output?.join('') || '';
+      }
+      return '';
     }
   }
 
   private parseTestOutput(output: string): void {
-    const lines = output.split('\n');
-    
     // Extract overall timing information
     const durationMatch = output.match(/Duration\s+(\d+\.?\d*)s/);
     if (durationMatch) {
@@ -139,7 +141,7 @@ class TestPerformanceProfiler {
     // Extract individual test results
     const testResultRegex = /✓\s+(.+?)\s+\((\d+)\s+tests?\)\s+(\d+)ms/g;
     let match;
-    
+
     while ((match = testResultRegex.exec(output)) !== null) {
       const [, name, testCount, duration] = match;
       this.results.testResults.push({
@@ -166,15 +168,22 @@ class TestPerformanceProfiler {
   }
 
   private calculatePerformanceStats(): void {
-    const durations = this.results.testResults.map(t => t.duration).sort((a, b) => a - b);
-    
+    const durations = this.results.testResults
+      .map(t => t.duration)
+      .sort((a, b) => a - b);
+
     if (durations.length === 0) return;
 
-    this.results.performanceStats.average = durations.reduce((a, b) => a + b, 0) / durations.length;
-    this.results.performanceStats.median = durations[Math.floor(durations.length / 2)];
-    this.results.performanceStats.p50 = durations[Math.floor(durations.length * 0.5)];
-    this.results.performanceStats.p95 = durations[Math.floor(durations.length * 0.95)];
-    this.results.performanceStats.p99 = durations[Math.floor(durations.length * 0.99)];
+    this.results.performanceStats.average =
+      durations.reduce((a, b) => a + b, 0) / durations.length;
+    this.results.performanceStats.median =
+      durations[Math.floor(durations.length / 2)];
+    this.results.performanceStats.p50 =
+      durations[Math.floor(durations.length * 0.5)];
+    this.results.performanceStats.p95 =
+      durations[Math.floor(durations.length * 0.95)];
+    this.results.performanceStats.p99 =
+      durations[Math.floor(durations.length * 0.99)];
   }
 
   private identifySlowTests(): void {
@@ -189,28 +198,47 @@ class TestPerformanceProfiler {
 
     // Overall metrics
     console.log('🎯 OVERALL METRICS:');
-    console.log(`   Total Duration: ${this.results.totalDuration.toFixed(0)}ms`);
-    console.log(`   Setup Time: ${this.results.setupTime.toFixed(0)}ms (${((this.results.setupTime / this.results.totalDuration) * 100).toFixed(1)}%)`);
-    console.log(`   Test Execution: ${this.results.testExecutionTime.toFixed(0)}ms (${((this.results.testExecutionTime / this.results.totalDuration) * 100).toFixed(1)}%)`);
-    console.log(`   Environment: ${this.results.environmentTime.toFixed(0)}ms (${((this.results.environmentTime / this.results.totalDuration) * 100).toFixed(1)}%)`);
+    console.log(
+      `   Total Duration: ${this.results.totalDuration.toFixed(0)}ms`
+    );
+    console.log(
+      `   Setup Time: ${this.results.setupTime.toFixed(0)}ms (${((this.results.setupTime / this.results.totalDuration) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `   Test Execution: ${this.results.testExecutionTime.toFixed(0)}ms (${((this.results.testExecutionTime / this.results.totalDuration) * 100).toFixed(1)}%)`
+    );
+    console.log(
+      `   Environment: ${this.results.environmentTime.toFixed(0)}ms (${((this.results.environmentTime / this.results.totalDuration) * 100).toFixed(1)}%)`
+    );
     console.log(`   Transform: ${this.results.transformTime.toFixed(0)}ms`);
     console.log(`   Collect: ${this.results.collectTime.toFixed(0)}ms`);
     console.log(`   Prepare: ${this.results.prepareTime.toFixed(0)}ms\n`);
 
     // Performance statistics
     console.log('📈 PERFORMANCE STATISTICS:');
-    console.log(`   Average: ${this.results.performanceStats.average.toFixed(1)}ms`);
+    console.log(
+      `   Average: ${this.results.performanceStats.average.toFixed(1)}ms`
+    );
     console.log(`   Median (P50): ${this.results.performanceStats.p50}ms`);
-    console.log(`   P95: ${this.results.performanceStats.p95}ms ${this.results.performanceStats.p95 > 200 ? '🚨 EXCEEDS TARGET' : '✅'}`);
+    console.log(
+      `   P95: ${this.results.performanceStats.p95}ms ${this.results.performanceStats.p95 > 200 ? '🚨 EXCEEDS TARGET' : '✅'}`
+    );
     console.log(`   P99: ${this.results.performanceStats.p99}ms\n`);
 
     // Slow tests analysis
-    console.log(`🐌 SLOW TESTS (>${200}ms): ${this.results.slowTests.length} tests`);
+    console.log(
+      `🐌 SLOW TESTS (>${200}ms): ${this.results.slowTests.length} tests`
+    );
     if (this.results.slowTests.length > 0) {
       console.log('   Top 10 slowest tests:');
       this.results.slowTests.slice(0, 10).forEach((test, index) => {
-        const avgPerTest = test.tests > 1 ? ` (${(test.duration / test.tests).toFixed(0)}ms/test)` : '';
-        console.log(`   ${index + 1}. ${test.name}: ${test.duration}ms${avgPerTest}`);
+        const avgPerTest =
+          test.tests > 1
+            ? ` (${(test.duration / test.tests).toFixed(0)}ms/test)`
+            : '';
+        console.log(
+          `   ${index + 1}. ${test.name}: ${test.duration}ms${avgPerTest}`
+        );
       });
     }
     console.log('');
@@ -221,17 +249,24 @@ class TestPerformanceProfiler {
 
   private generateRecommendations(): void {
     console.log('💡 OPTIMIZATION RECOMMENDATIONS:');
-    
-    const setupPercentage = (this.results.setupTime / this.results.totalDuration) * 100;
+
+    const setupPercentage =
+      (this.results.setupTime / this.results.totalDuration) * 100;
     if (setupPercentage > 50) {
-      console.log(`   🚨 HIGH PRIORITY: Setup time is ${setupPercentage.toFixed(1)}% of total time`);
+      console.log(
+        `   🚨 HIGH PRIORITY: Setup time is ${setupPercentage.toFixed(1)}% of total time`
+      );
       console.log('      → Implement lazy loading for mocks');
       console.log('      → Reduce upfront initialization in tests/setup.ts');
-      console.log('      → Consider selective mock loading based on test files');
+      console.log(
+        '      → Consider selective mock loading based on test files'
+      );
     }
 
     if (this.results.performanceStats.p95 > 200) {
-      console.log(`   🚨 P95 (${this.results.performanceStats.p95}ms) exceeds 200ms target`);
+      console.log(
+        `   🚨 P95 (${this.results.performanceStats.p95}ms) exceeds 200ms target`
+      );
       console.log('      → Optimize slow individual tests');
       console.log('      → Use shallow rendering for component tests');
       console.log('      → Replace full mocks with test doubles');
@@ -243,9 +278,12 @@ class TestPerformanceProfiler {
       console.log('      → Consider test sharding for complex tests');
     }
 
-    const environmentPercentage = (this.results.environmentTime / this.results.totalDuration) * 100;
+    const environmentPercentage =
+      (this.results.environmentTime / this.results.totalDuration) * 100;
     if (environmentPercentage > 30) {
-      console.log(`   ⚠️  Environment setup is ${environmentPercentage.toFixed(1)}% of total time`);
+      console.log(
+        `   ⚠️  Environment setup is ${environmentPercentage.toFixed(1)}% of total time`
+      );
       console.log('      → Optimize jsdom configuration');
       console.log('      → Consider lighter test environment');
     }
@@ -269,7 +307,9 @@ class TestPerformanceProfiler {
       JSON.stringify(baseline, null, 2)
     );
 
-    console.log('💾 Performance baseline saved to test-performance-baseline.json');
+    console.log(
+      '💾 Performance baseline saved to test-performance-baseline.json'
+    );
   }
 }
 
@@ -280,4 +320,3 @@ if (require.main === module) {
 }
 
 export { TestPerformanceProfiler, type PerformanceMetrics };
-
