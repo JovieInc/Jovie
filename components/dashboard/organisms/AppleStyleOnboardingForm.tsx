@@ -112,7 +112,8 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      const privateFullName = (user.privateMetadata as Record<string, unknown>)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
         ?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
@@ -140,9 +141,11 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      (user.privateMetadata as Record<string, unknown>)?.suggestedUsername
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
     ) {
-      const suggested = (user.privateMetadata as Record<string, unknown>)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
         .suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);

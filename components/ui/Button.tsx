@@ -46,7 +46,8 @@ export const Button = forwardRef<
         return;
       }
       if (onClick) {
-        onClick(event as React.MouseEvent<HTMLElement>);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (onClick as any)(event);
       }
     };
 
