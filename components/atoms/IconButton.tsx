@@ -40,6 +40,7 @@ export function IconButton({
       : 'bg-surface-1 hover:bg-surface-2 text-secondary-token hover:text-primary-token',
     size === 'sm' ? 'h-8 w-8' : 'h-9 w-9',
     disabled && 'opacity-50 cursor-not-allowed',
+    disabled && href && 'pointer-events-none',
     className
   );
 
@@ -52,6 +53,9 @@ export function IconButton({
         aria-label={ariaLabel}
         title={title}
         className={base}
+        aria-disabled={disabled ? 'true' : undefined}
+        tabIndex={disabled ? -1 : undefined}
+        onClick={disabled ? (e: React.MouseEvent) => e.preventDefault() : undefined}
       >
         {children}
       </Link>
