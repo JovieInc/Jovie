@@ -1,36 +1,64 @@
 /**
  * Fast Rendering Utilities
- * 
+ *
  * Lightweight rendering utilities optimized for speed.
  * Provides minimal setup for component testing without heavy mocking overhead.
  */
 
-import { render, type RenderOptions } from '@testing-library/react';
+import { type RenderOptions, render } from '@testing-library/react';
 import React, { type ReactElement } from 'react';
 import { vi } from 'vitest';
-import { loadClerkMocks, loadNextJsMocks, loadHeadlessUiMocks } from './lazy-mocks';
+import {
+  loadClerkMocks,
+  loadHeadlessUiMocks,
+  loadNextJsMocks,
+} from './lazy-mocks';
 
 // Minimal wrapper for most component tests
-const MinimalWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  return React.createElement('div', { 'data-testid': 'test-wrapper' }, children);
+const MinimalWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  return React.createElement(
+    'div',
+    { 'data-testid': 'test-wrapper' },
+    children
+  );
 };
 
 // Wrapper with Clerk context (loads Clerk mocks on demand)
-const ClerkWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ClerkWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   loadClerkMocks();
-  return React.createElement('div', { 'data-testid': 'clerk-wrapper' }, children);
+  return React.createElement(
+    'div',
+    { 'data-testid': 'clerk-wrapper' },
+    children
+  );
 };
 
 // Wrapper with Next.js context (loads Next.js mocks on demand)
-const NextJsWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const NextJsWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   loadNextJsMocks();
-  return React.createElement('div', { 'data-testid': 'nextjs-wrapper' }, children);
+  return React.createElement(
+    'div',
+    { 'data-testid': 'nextjs-wrapper' },
+    children
+  );
 };
 
 // Wrapper with Headless UI context (loads Headless UI mocks on demand)
-const HeadlessUiWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const HeadlessUiWrapper: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   loadHeadlessUiMocks();
-  return React.createElement('div', { 'data-testid': 'headless-ui-wrapper' }, children);
+  return React.createElement(
+    'div',
+    { 'data-testid': 'headless-ui-wrapper' },
+    children
+  );
 };
 
 /**
@@ -66,7 +94,10 @@ export function renderWithNextJs(ui: ReactElement, options?: RenderOptions) {
 /**
  * Render with Headless UI context - use for components using Headless UI
  */
-export function renderWithHeadlessUi(ui: ReactElement, options?: RenderOptions) {
+export function renderWithHeadlessUi(
+  ui: ReactElement,
+  options?: RenderOptions
+) {
   return render(ui, {
     wrapper: HeadlessUiWrapper,
     ...options,
@@ -77,7 +108,10 @@ export function renderWithHeadlessUi(ui: ReactElement, options?: RenderOptions) 
  * Shallow render simulation - creates a simple div with component name
  * Use for tests that only need to verify component existence/props
  */
-export function shallowRender(componentName: string, props: Record<string, any> = {}) {
+export function shallowRender(
+  componentName: string,
+  props: Record<string, unknown> = {}
+) {
   return {
     container: document.createElement('div'),
     getByTestId: (testId: string) => {
@@ -86,7 +120,7 @@ export function shallowRender(componentName: string, props: Record<string, any> 
       element.textContent = `${componentName} (shallow)`;
       return element;
     },
-    queryByTestId: function(testId: string) {
+    queryByTestId: function (testId: string) {
       try {
         return this.getByTestId(testId);
       } catch {
@@ -100,15 +134,24 @@ export function shallowRender(componentName: string, props: Record<string, any> 
 /**
  * Create a test double - minimal mock component for complex dependencies
  */
-export function createTestDouble(name: string, defaultProps: Record<string, unknown> = {}) {
-  const TestDouble = React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
-    return React.createElement('div', {
-      ref,
-      'data-testid': `test-double-${name.toLowerCase()}`,
-      'data-props': JSON.stringify({ ...defaultProps, ...props }),
-    }, `${name} Test Double`);
-  });
-  
+export function createTestDouble(
+  name: string,
+  defaultProps: Record<string, unknown> = {}
+) {
+  const TestDouble = React.forwardRef<HTMLDivElement, Record<string, unknown>>(
+    (props, ref) => {
+      return React.createElement(
+        'div',
+        {
+          ref,
+          'data-testid': `test-double-${name.toLowerCase()}`,
+          'data-props': JSON.stringify({ ...defaultProps, ...props }),
+        },
+        `${name} Test Double`
+      );
+    }
+  );
+
   TestDouble.displayName = `TestDouble${name}`;
   return TestDouble;
 }
@@ -121,11 +164,15 @@ export const formTestUtils = {
    * Create a minimal form wrapper for testing form components
    */
   createFormWrapper: (onSubmit = vi.fn()) => {
-    return ({ children }: { children: React.ReactNode }) => 
-      React.createElement('form', { 
-        onSubmit, 
-        'data-testid': 'test-form' 
-      }, children);
+    return ({ children }: { children: React.ReactNode }) =>
+      React.createElement(
+        'form',
+        {
+          onSubmit,
+          'data-testid': 'test-form',
+        },
+        children
+      );
   },
 
   /**
