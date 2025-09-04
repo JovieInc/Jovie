@@ -20,7 +20,12 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
     title: "Let's get you live.",
-    prompt: "We'll set up your profile in 2 quick steps.",
+    prompt: "We'll set up your profile in 3 quick steps.",
+  },
+  {
+    id: 'name',
+    title: "What's your name?",
+    prompt: "This will be displayed on your Jovie profile.",
   },
   {
     id: 'handle',
@@ -83,6 +88,7 @@ export function AppleStyleOnboardingForm() {
   // Form state
   const [handle, setHandle] = useState('');
   const [handleInput, setHandleInput] = useState('');
+  const [fullName, setFullName] = useState('');
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
       available: false,
@@ -101,13 +107,41 @@ export function AppleStyleOnboardingForm() {
     isSubmitting: false,
   });
 
-  // Prefill handle and selected artist data
+  // Prefill handle and full name data
   useEffect(() => {
-    // Prefill handle from URL
+    // Prefill full name from Clerk metadata or user data
+    if (user) {
+      // Priority: privateMetadata.fullName > firstName + lastName > email fallback
+      const privateFullName = user.privateMetadata?.fullName as string | undefined;
+      if (privateFullName) {
+        setFullName(privateFullName);
+      } else if (user.firstName || user.lastName) {
+        const constructedName = [user.firstName, user.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        if (constructedName) {
+          setFullName(constructedName);
+        }
+      } else if (user.emailAddresses?.[0]?.emailAddress) {
+        // Fallback to email local part as display name
+        const emailLocal = user.emailAddresses[0].emailAddress.split('@')[0];
+        const cleanedName = emailLocal.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+        if (cleanedName) {
+          setFullName(cleanedName);
+        }
+      }
+    }
+
+    // Prefill handle from URL or suggested username
     const urlHandle = searchParams?.get('handle');
     if (urlHandle) {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
+    } else if (user?.privateMetadata?.suggestedUsername) {
+      const suggested = user.privateMetadata.suggestedUsername as string;
+      setHandle(suggested);
+      setHandleInput(suggested);
     } else {
       try {
         const pending = sessionStorage.getItem('pendingClaim');
@@ -123,7 +157,7 @@ export function AppleStyleOnboardingForm() {
 
     // Remove any selected artist from sessionStorage since we removed the search step
     sessionStorage.removeItem('selectedArtist');
-  }, [searchParams]);
+  }, [searchParams, user]);
 
   // Navigation handlers with smooth transitions
   const goToNextStep = useCallback(() => {
@@ -298,7 +332,7 @@ export function AppleStyleOnboardingForm() {
       try {
         await completeOnboarding({
           username: handle.toLowerCase(),
-          displayName: handle,
+          displayName: fullName.trim() || handle,
         });
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
@@ -433,7 +467,7 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 2: Handle Selection
+      // Step 2: Name Entry
       case 1:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
@@ -443,6 +477,54 @@ export function AppleStyleOnboardingForm() {
               </h1>
               <p className='text-[var(--muted)] text-xl'>
                 {ONBOARDING_STEPS[1].prompt}
+              </p>
+            </div>
+
+            <div className='w-full max-w-md space-y-6'>
+              <div className='space-y-4'>
+                <input
+                  type='text'
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder='Your full name'
+                  className='w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 border-[var(--border)] rounded-xl focus-ring text-[var(--fg)] transition-all'
+                  maxLength={50}
+                />
+
+                <Button
+                  onClick={goToNextStep}
+                  disabled={!fullName.trim() || fullName.trim().length < 1}
+                  className={`w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out ${
+                    fullName.trim().length >= 1
+                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
+                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
+                  }`}
+                >
+                  Continue
+                </Button>
+              </div>
+
+              {/* Back button */}
+              <button
+                onClick={goToPreviousStep}
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        );
+
+      // Step 3: Handle Selection
+      case 2:
+        return (
+          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+            <div className='text-center space-y-3'>
+              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+                {ONBOARDING_STEPS[2].title}
+              </h1>
+              <p className='text-[var(--muted)] text-xl'>
+                {ONBOARDING_STEPS[2].prompt}
               </p>
             </div>
 
@@ -599,16 +681,16 @@ export function AppleStyleOnboardingForm() {
           </div>
         );
 
-      // Step 3: Done
-      case 2:
+      // Step 4: Done
+      case 3:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
               <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-                {ONBOARDING_STEPS[2].title}
+                {ONBOARDING_STEPS[3].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
-                {ONBOARDING_STEPS[2].prompt}
+                {ONBOARDING_STEPS[3].prompt}
               </p>
             </div>
 
