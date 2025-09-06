@@ -89,9 +89,8 @@ export function SocialIcon({
   const icon = platformMap[platform.toLowerCase()];
   const iconClass = className || 'h-4 w-4';
   const sizeStyle = size ? { width: size, height: size } : undefined;
-  const accessibilityProps = ariaLabel
-    ? { 'aria-label': ariaLabel }
-    : { 'aria-hidden': 'true' };
+  const accessibilityProps: { 'aria-label'?: string; 'aria-hidden'?: boolean } =
+    ariaLabel ? { 'aria-label': ariaLabel } : { 'aria-hidden': true };
 
   if (icon) {
     return (
