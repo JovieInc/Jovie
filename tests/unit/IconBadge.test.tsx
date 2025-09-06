@@ -7,16 +7,19 @@ describe('IconBadge', () => {
   afterEach(cleanup);
 
   it('renders icon with correct styling', () => {
-    render(<IconBadge Icon={BoltIcon} colorVar='--accent-speed' />);
+    const { container } = render(
+      <IconBadge Icon={BoltIcon} colorVar='--accent-speed' />
+    );
 
-    const iconContainer = screen.getByRole('img', {
-      hidden: true,
-    }).parentElement;
+    const icon = container.querySelector('svg');
+    expect(icon).toHaveAttribute('aria-hidden', 'true');
+    expect(icon).not.toHaveAttribute('role');
+    const iconContainer = icon?.parentElement;
     expect(iconContainer).toHaveClass('h-8', 'w-8', 'rounded-full');
   });
 
   it('applies custom className', () => {
-    render(
+    const { container } = render(
       <IconBadge
         Icon={BoltIcon}
         colorVar='--accent-speed'
@@ -24,9 +27,21 @@ describe('IconBadge', () => {
       />
     );
 
-    const iconContainer = screen.getByRole('img', {
-      hidden: true,
-    }).parentElement;
+    const iconContainer = container.firstChild as HTMLElement;
     expect(iconContainer).toHaveClass('custom-class');
+  });
+
+  it('uses aria-label when provided', () => {
+    render(
+      <IconBadge
+        Icon={BoltIcon}
+        colorVar='--accent-speed'
+        ariaLabel='Bolt icon'
+      />
+    );
+
+    const icon = screen.getByLabelText('Bolt icon');
+    expect(icon).toHaveAttribute('role', 'img');
+    expect(icon).toHaveAttribute('aria-hidden', 'false');
   });
 });

@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { DSPButton } from './DSPButton';
+import { ToastProvider } from '@/components/providers/ToastProvider';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 // Mock DSP configurations for stories
 const spotifyConfig = {
@@ -36,6 +38,13 @@ const meta: Meta<typeof DSPButton> = {
     layout: 'centered',
   },
   tags: ['autodocs'],
+  decorators: [
+    (Story) => (
+      <ToastProvider>
+        <Story />
+      </ToastProvider>
+    ),
+  ],
   argTypes: {
     size: {
       control: { type: 'select' },
@@ -113,13 +122,29 @@ export const AllPlatforms: Story = {
   ),
 };
 
+const InteractiveComponent = () => {
+  const notifications = useNotifications();
+  
+  return (
+    <DSPButton
+      {...spotifyConfig}
+      onClick={(dspKey: string, url: string) => {
+        notifications.info(`Opening ${dspKey}: ${url}`, {
+          action: {
+            label: 'Copy URL',
+            onClick: () => {
+              navigator.clipboard.writeText(url);
+              notifications.success('URL copied to clipboard!');
+            }
+          }
+        });
+      }}
+    />
+  );
+};
+
 export const Interactive: Story = {
-  args: {
-    ...spotifyConfig,
-    onClick: (dspKey: string, url: string) => {
-      alert(`Clicked ${dspKey}: ${url}`);
-    },
-  },
+  render: () => <InteractiveComponent />,
 };
 
 export const DisabledStates: Story = {

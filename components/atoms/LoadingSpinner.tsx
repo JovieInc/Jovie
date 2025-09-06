@@ -2,7 +2,8 @@
 
 import { clsx } from 'clsx';
 import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { sizeClasses, strokeWidth } from './LoadingSpinner.constants';
 
 interface LoadingSpinnerProps {
   size?: 'xs' | 'sm' | 'md' | 'lg';
@@ -31,50 +32,25 @@ export function LoadingSpinner({
     return () => clearTimeout(timer);
   }, [showDebounce]);
 
-  // Size classes for the spinner container
-  const sizeClasses = {
-    xs: 'h-3 w-3',
-    sm: 'h-4 w-4',
-    md: 'h-5 w-5',
-    lg: 'h-6 w-6',
-  };
-
-  // Stroke width based on size
-  const strokeWidth = {
-    xs: 2,
-    sm: 2,
-    md: 2.5,
-    lg: 3,
-  };
-
-  // Determine the effective theme for coloring
-  const getEffectiveTheme = () => {
+  const effectiveTheme = useMemo(() => {
     if (variant === 'light') return 'light';
     if (variant === 'dark') return 'dark';
-
-    // For 'auto', use the current theme
     const currentTheme = theme === 'system' ? systemTheme : theme;
     return currentTheme === 'dark' ? 'dark' : 'light';
-  };
+  }, [variant, theme, systemTheme]);
 
-  const effectiveTheme = getEffectiveTheme();
-
-  // Colors based on effective theme (consistent with ui/Spinner)
-  const getColors = () => {
+  const colors = useMemo(() => {
     if (effectiveTheme === 'light') {
       return {
         primary: 'text-gray-900',
         secondary: 'text-gray-200',
       };
-    } else {
-      return {
-        primary: 'text-white',
-        secondary: 'text-gray-700',
-      };
     }
-  };
-
-  const colors = getColors();
+    return {
+      primary: 'text-white',
+      secondary: 'text-gray-700',
+    };
+  }, [effectiveTheme]);
 
   if (!isVisible) {
     return (
@@ -82,6 +58,7 @@ export function LoadingSpinner({
         className={clsx(sizeClasses[size], className)}
         role='status'
         aria-label='Loading'
+        aria-live='polite'
       >
         {/* Invisible placeholder to prevent layout shift */}
       </div>
@@ -97,6 +74,7 @@ export function LoadingSpinner({
       )}
       role='status'
       aria-label='Loading'
+      aria-live='polite'
     >
       <svg
         className={clsx(

@@ -38,7 +38,8 @@ export const LEGAL = {
 };
 
 export const COPYRIGHT_YEAR = new Date().getFullYear();
-export const getCopyrightText = () => `© ${COPYRIGHT_YEAR} ${APP_NAME}`;
+export const getCopyrightText = (year?: number) =>
+  `© ${year ?? COPYRIGHT_YEAR} ${APP_NAME}`;
 
 export const SOCIAL_PLATFORMS = [
   'instagram',

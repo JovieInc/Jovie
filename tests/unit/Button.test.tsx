@@ -199,7 +199,7 @@ describe('Button', () => {
       );
 
       const link = screen.getByRole('link');
-      expect(link).not.toHaveAttribute('aria-disabled');
+      expect(link).toHaveAttribute('aria-disabled', 'false');
       expect(link).not.toHaveAttribute('tabIndex');
       expect(link).not.toHaveClass('pointer-events-none');
 
@@ -242,7 +242,11 @@ describe('Button', () => {
     });
 
     it('has data-state="disabled" when loading (loading takes precedence)', () => {
-      render(<Button loading disabled>Loading Disabled Button</Button>);
+      render(
+        <Button loading disabled>
+          Loading Disabled Button
+        </Button>
+      );
       const button = screen.getByRole('button');
       expect(button).toHaveAttribute('data-state', 'loading');
     });

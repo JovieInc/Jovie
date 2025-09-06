@@ -70,7 +70,7 @@ export function TippingEmptyState({
 
   const content = (
     <div
-      className={`bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5 text-center ${className}`}
+      className={`bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl shadow-black/5 text-center ${className}`}
     >
       <div className='flex flex-col items-center justify-center space-y-6'>
         {/* Illustration */}
@@ -133,7 +133,7 @@ export function TippingMetricsSkeleton({
 
       {/* Metrics cards skeleton */}
       <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-6 shadow-sm'>
+        <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-2xl p-6 shadow-sm'>
           <LoadingSkeleton
             height='h-6'
             width='w-32'
@@ -148,7 +148,7 @@ export function TippingMetricsSkeleton({
           />
           <LoadingSkeleton height='h-4' width='w-full' rounded='sm' />
         </div>
-        <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-6 shadow-sm'>
+        <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-subtle rounded-2xl p-6 shadow-sm'>
           <LoadingSkeleton
             height='h-6'
             width='w-32'

@@ -7,6 +7,7 @@ import { useTheme } from 'next-themes';
 import React, { forwardRef, useEffect, useState } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { cn } from '@/lib/utils';
 
 /**
  * CTAButton Component
@@ -50,6 +51,68 @@ export interface CTAButtonProps {
   /** Type attribute for button mode */
   type?: 'button' | 'submit' | 'reset';
 }
+
+const BASE_CLASSES =
+  'relative isolate inline-flex items-center justify-center font-medium transition-all duration-200 focus-ring';
+
+const VARIANT_CLASSES = {
+  primary:
+    'bg-neutral-900 text-white hover:opacity-90 active:scale-[0.98] dark:bg-white dark:text-black dark:hover:opacity-90 shadow-sm hover:shadow-md',
+  secondary:
+    'bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98] dark:bg-indigo-500 dark:hover:bg-indigo-600 shadow-md hover:shadow-lg',
+  outline:
+    'border border-current text-current hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.98]',
+  white:
+    'bg-white text-black hover:bg-gray-50 active:scale-[0.98] border border-gray-200 dark:bg-white dark:text-black dark:hover:bg-gray-100 dark:border-gray-300 focus-ring-transparent-offset shadow-sm hover:shadow-md',
+} as const;
+
+const SIZE_CLASSES = {
+  sm: 'px-3 py-1.5 text-sm rounded-lg gap-1.5 min-h-[32px]',
+  md: 'px-4 py-2 text-base rounded-xl gap-2 min-h-[40px]',
+  lg: 'px-8 py-3 text-lg rounded-xl gap-2.5 min-h-[48px]',
+} as const;
+
+const ICON_SIZES = {
+  sm: 'h-4 w-4',
+  md: 'h-5 w-5',
+  lg: 'h-6 w-6',
+} as const;
+
+function getButtonClasses({
+  variant,
+  size,
+  className,
+  disabled,
+}: {
+  variant: keyof typeof VARIANT_CLASSES;
+  size: keyof typeof SIZE_CLASSES;
+  className?: string;
+  disabled?: boolean;
+}) {
+  return cn(
+    BASE_CLASSES,
+    disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+    VARIANT_CLASSES[variant],
+    SIZE_CLASSES[size],
+    className
+  );
+}
+
+const CONTENT_VARIANTS = {
+  hidden: { opacity: 0, y: 5 },
+  visible: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -5 },
+};
+
+const SUCCESS_VARIANTS = {
+  hidden: { scale: 0.5, opacity: 0 },
+  visible: {
+    scale: 1,
+    opacity: 1,
+    transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 },
+  },
+  exit: { scale: 0.5, opacity: 0 },
+};
 
 export const CTAButton = forwardRef<
   HTMLButtonElement | HTMLAnchorElement,
@@ -98,83 +161,13 @@ export const CTAButton = forwardRef<
       }
     }, [isSuccess]);
 
-    // Base classes for all button variants
-    const baseClasses = `
-      relative isolate inline-flex items-center justify-center
-      font-medium transition-all duration-200
-      focus-ring
-      ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
-    `;
-
-    // Variant-specific classes
-    const variantClasses = {
-      primary: `
-        bg-neutral-900 text-white hover:opacity-90 active:scale-[0.98]
-        dark:bg-white dark:text-black dark:hover:opacity-90
-        shadow-sm hover:shadow-md
-      `,
-      secondary: `
-        bg-indigo-600 text-white hover:bg-indigo-700 active:scale-[0.98]
-        dark:bg-indigo-500 dark:hover:bg-indigo-600
-        shadow-md hover:shadow-lg
-      `,
-      outline: `
-        border border-current text-current
-        hover:bg-neutral-100 dark:hover:bg-neutral-800 active:scale-[0.98]
-      `,
-      white: `
-        bg-white text-black hover:bg-gray-50 active:scale-[0.98]
-        border border-gray-200
-        dark:bg-white dark:text-black dark:hover:bg-gray-100 dark:border-gray-300
-        focus-ring-transparent-offset
-        shadow-sm hover:shadow-md
-      `,
-    };
-
-    // Size-specific classes
-    const sizeClasses = {
-      sm: 'px-3 py-1.5 text-sm rounded-lg gap-1.5 min-h-[32px]',
-      md: 'px-4 py-2 text-base rounded-xl gap-2 min-h-[40px]',
-      lg: 'px-8 py-3 text-lg rounded-xl gap-2.5 min-h-[48px]',
-    };
-
-    // Combine all classes
-    const buttonClasses = `
-      ${baseClasses}
-      ${variantClasses[variant]}
-      ${sizeClasses[size]}
-      ${className}
-    `;
-
-    // Animation variants for content
-    const contentVariants = {
-      hidden: { opacity: 0, y: 5 },
-      visible: { opacity: 1, y: 0 },
-      exit: { opacity: 0, y: -5 },
-    };
-
-    // Animation variants for success icon
-    const successVariants = {
-      hidden: { scale: 0.5, opacity: 0 },
-      visible: {
-        scale: 1,
-        opacity: 1,
-        transition: {
-          type: 'spring',
-          stiffness: 500,
-          damping: 15,
-          duration: 0.3,
-        },
-      },
-      exit: { scale: 0.5, opacity: 0 },
-    };
-
-    // Determine icon size based on button size
-    const iconSize = {
-      sm: 'h-4 w-4',
-      md: 'h-5 w-5',
-      lg: 'h-6 w-6',
-    };
+    // Compute button classes
+    const buttonClasses = getButtonClasses({
+      variant,
+      size,
+      className,
+      disabled,
+    });
 
     // Render button content based on state
     const renderContent = () => (
@@ -186,10 +179,10 @@ export const CTAButton = forwardRef<
             initial='hidden'
             animate='visible'
             exit='exit'
-            variants={shouldReduceMotion ? {} : successVariants}
+            variants={shouldReduceMotion ? {} : SUCCESS_VARIANTS}
           >
             <CheckIcon
-              className={`${iconSize[size]} text-current`}
+              className={`${ICON_SIZES[size]} text-current`}
               aria-hidden='true'
             />
           </motion.div>
@@ -200,7 +193,7 @@ export const CTAButton = forwardRef<
             initial='hidden'
             animate='visible'
             exit='exit'
-            variants={shouldReduceMotion ? {} : contentVariants}
+            variants={shouldReduceMotion ? {} : CONTENT_VARIANTS}
           >
             <Spinner
               size={size === 'lg' ? 'md' : size === 'md' ? 'sm' : 'sm'}
@@ -224,7 +217,7 @@ export const CTAButton = forwardRef<
             initial='hidden'
             animate='visible'
             exit='exit'
-            variants={shouldReduceMotion ? {} : contentVariants}
+            variants={shouldReduceMotion ? {} : CONTENT_VARIANTS}
           >
             {icon && <span className='flex-shrink-0'>{icon}</span>}
             <span>{children}</span>

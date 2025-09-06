@@ -2,6 +2,14 @@ import Link from 'next/link';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { cn } from '@/lib/utils';
 
+/**
+ * Renders an artist's name with an optional verification badge.
+ *
+ * Defaults to an `h1` for page-level headings. Use the `as` prop to
+ * render inline elements like `span` when the name appears within other
+ * content blocks.
+ */
+
 interface ArtistNameProps {
   name: string;
   handle: string;
@@ -9,6 +17,7 @@ interface ArtistNameProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showLink?: boolean;
   className?: string;
+  as?: keyof JSX.IntrinsicElements;
 }
 
 const sizeClasses = {
@@ -32,6 +41,7 @@ export function ArtistName({
   size = 'lg',
   showLink = true,
   className,
+  as: Tag = 'h1',
 }: ArtistNameProps) {
   const content = (
     <span className='flex items-center justify-center gap-2'>
@@ -51,17 +61,17 @@ export function ArtistName({
 
   if (showLink) {
     return (
-      <h1 className={cn(sizeClasses[size])} itemProp='name'>
+      <Tag className={cn(sizeClasses[size])} itemProp='name'>
         <Link href={`/${handle}`} className='inline-block'>
           {content}
         </Link>
-      </h1>
+      </Tag>
     );
   }
 
   return (
-    <h1 className={cn(sizeClasses[size])} itemProp='name'>
+    <Tag className={cn(sizeClasses[size])} itemProp='name'>
       {content}
-    </h1>
+    </Tag>
   );
 }

@@ -92,21 +92,32 @@ describe('IconButton', () => {
       expect(screen.getByTestId('test-icon')).toBeInTheDocument();
     });
 
-    it('applies target and rel attributes correctly for link', () => {
+    it('adds security rel when target is _blank', () => {
       render(
-        <IconButton
-          ariaLabel='Test link'
-          href='/test'
-          target='_blank'
-          rel='noopener'
-        >
+        <IconButton ariaLabel='Test link' href='/test' target='_blank'>
           <TestIcon />
         </IconButton>
       );
 
       const link = screen.getByRole('link');
       expect(link).toHaveAttribute('target', '_blank');
-      expect(link).toHaveAttribute('rel', 'noopener');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+
+    it('merges provided rel tokens with security attributes', () => {
+      render(
+        <IconButton
+          ariaLabel='Test link'
+          href='/test'
+          target='_blank'
+          rel='nofollow'
+        >
+          <TestIcon />
+        </IconButton>
+      );
+
+      const link = screen.getByRole('link');
+      expect(link).toHaveAttribute('rel', 'nofollow noopener noreferrer');
     });
 
     it('applies disabled state correctly for link', () => {
@@ -219,6 +230,42 @@ describe('IconButton', () => {
         'title',
         'Custom title'
       );
+    });
+  });
+
+  describe('Keyboard activation', () => {
+    it('activates button with Enter and Space', () => {
+      const handleClick = vi.fn();
+      render(
+        <IconButton ariaLabel='Keyboard button' onClick={handleClick}>
+          <TestIcon />
+        </IconButton>
+      );
+
+      const button = screen.getByRole('button');
+      fireEvent.keyDown(button, { key: 'Enter' });
+      fireEvent.keyDown(button, { key: ' ' });
+      expect(handleClick).toHaveBeenCalledTimes(2);
+    });
+
+    it('activates link with Enter and Space', () => {
+      const handleClick = vi.fn((e: React.MouseEvent<HTMLAnchorElement>) =>
+        e.preventDefault()
+      );
+      render(
+        <IconButton
+          ariaLabel='Keyboard link'
+          href='/test'
+          onClick={handleClick}
+        >
+          <TestIcon />
+        </IconButton>
+      );
+
+      const link = screen.getByRole('link');
+      fireEvent.keyDown(link, { key: 'Enter' });
+      fireEvent.keyDown(link, { key: ' ' });
+      expect(handleClick).toHaveBeenCalledTimes(2);
     });
   });
 

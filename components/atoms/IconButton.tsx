@@ -9,9 +9,10 @@ export type IconButtonProps = {
   title?: string;
   className?: string;
   onClick?: () => void;
-  href?: string; // if provided, renders a Link
+  href?: string; // link destination when rendering as link
   target?: string;
   rel?: string;
+  as?: 'button' | 'link';
   disabled?: boolean;
   size?: 'sm' | 'md';
   variant?: 'subtle' | 'neutral';
@@ -27,11 +28,14 @@ export function IconButton({
   href,
   target,
   rel,
+  as,
   disabled,
   size = 'sm',
   variant = 'subtle',
   children,
 }: IconButtonProps) {
+  const resolvedAs = as ?? (href ? 'link' : 'button');
+
   const base = cn(
     'inline-flex items-center justify-center rounded-md transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
     'border border-subtle',
@@ -40,25 +44,45 @@ export function IconButton({
       : 'bg-surface-1 hover:bg-surface-2 text-secondary-token hover:text-primary-token',
     size === 'sm' ? 'h-8 w-8' : 'h-9 w-9',
     disabled && 'opacity-50 cursor-not-allowed',
-    disabled && href && 'pointer-events-none',
+    disabled && resolvedAs === 'link' && 'pointer-events-none',
     className
   );
 
   // Determine data-state based on current state
   const dataState = disabled ? 'disabled' : 'idle';
 
-  if (href) {
+  // Merge rel tokens and ensure security for new tab links
+  const relTokens = rel?.split(' ').filter(Boolean) ?? [];
+  if (target === '_blank') {
+    if (!relTokens.includes('noopener')) relTokens.push('noopener');
+    if (!relTokens.includes('noreferrer')) relTokens.push('noreferrer');
+  }
+  const computedRel = relTokens.length ? relTokens.join(' ') : undefined;
+
+  if (resolvedAs === 'link' && href) {
     return (
       <Link
         href={href}
         target={target}
-        rel={rel}
+        rel={computedRel}
         aria-label={ariaLabel}
         title={title}
         className={base}
         aria-disabled={disabled ? 'true' : undefined}
         tabIndex={disabled ? -1 : undefined}
-        onClick={disabled ? (e: React.MouseEvent) => e.preventDefault() : undefined}
+        onClick={
+          disabled ? (e: React.MouseEvent) => e.preventDefault() : onClick
+        }
+        onKeyDown={
+          disabled
+            ? undefined
+            : e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  (e.currentTarget as HTMLAnchorElement).click();
+                }
+              }
+        }
         data-state={dataState}
       >
         {children}
@@ -70,6 +94,16 @@ export function IconButton({
     <button
       type='button'
       onClick={onClick}
+      onKeyDown={
+        disabled
+          ? undefined
+          : e => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                (e.currentTarget as HTMLButtonElement).click();
+              }
+            }
+      }
       aria-label={ariaLabel}
       title={title}
       disabled={disabled}

@@ -6,6 +6,12 @@ const meta: Meta<typeof Button> = {
   component: Button,
   parameters: {
     layout: 'centered',
+    docs: {
+      description: {
+        component:
+          'Use for interactive elements. For decorative uses that should not convey button semantics, render a <span> or <div> styled like a button.',
+      },
+    },
   },
   tags: ['autodocs'],
   argTypes: {

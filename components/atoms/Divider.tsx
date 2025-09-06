@@ -4,15 +4,34 @@ import { cn } from '@/lib/utils';
 export type DividerProps = {
   className?: string;
   inset?: boolean; // adds horizontal padding inset for alignment with content
+  orientation?: 'horizontal' | 'vertical';
+  ariaHidden?: boolean; // hide from assistive tech when decorative
 };
 
-// Standard horizontal divider aligning with our border tokens
-export function Divider({ className, inset = false }: DividerProps) {
+// Divider aligning with our border tokens
+export function Divider({
+  className,
+  inset = false,
+  orientation = 'horizontal',
+  ariaHidden,
+}: DividerProps) {
+  const isHorizontal = orientation === 'horizontal';
+  const sizeStyles = isHorizontal
+    ? { width: '100%', height: '1px' }
+    : { width: '1px', height: '100%' };
+
   return (
     <div
-      role='separator'
-      aria-orientation='horizontal'
-      className={cn('border-t border-subtle', inset ? 'mx-3' : '', className)}
+      role={ariaHidden ? undefined : 'separator'}
+      aria-hidden={ariaHidden}
+      aria-orientation={ariaHidden ? undefined : orientation}
+      style={sizeStyles}
+      className={cn(
+        isHorizontal ? 'border-t' : 'border-l',
+        'border-subtle',
+        inset && 'mx-3',
+        className
+      )}
     />
   );
 }
