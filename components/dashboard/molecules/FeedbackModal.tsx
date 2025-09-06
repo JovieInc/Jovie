@@ -15,6 +15,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleSubmit = useCallback(async () => {
     if (!feedback.trim() || isSubmitting) return;
@@ -32,6 +33,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
 
       // Show success state
       setIsSubmitted(true);
+      setSubmitError(null);
 
       // Auto-close after 2 seconds
       setTimeout(() => {
@@ -44,15 +46,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
       }, 2000);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      // Still show success to user, but log the error
-      setIsSubmitted(true);
-      setTimeout(() => {
-        onClose();
-        setTimeout(() => {
-          setFeedback('');
-          setIsSubmitted(false);
-        }, 300);
-      }, 2000);
+      setSubmitError('Unable to send feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -178,6 +172,11 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
                           onKeyDown={handleKeyDown}
                           autoFocus
                         />
+                        {submitError && (
+                          <p className='mt-2 text-sm text-red-500'>
+                            {submitError}
+                          </p>
+                        )}
                         <p className='mt-2 text-xs text-secondary-token'>
                           Press{' '}
                           <kbd className='px-1 py-0.5 text-xs font-semibold bg-surface-2 border border-subtle rounded'>

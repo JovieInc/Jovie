@@ -1,7 +1,7 @@
 'use client';
 
 import { WalletIcon } from '@heroicons/react/24/outline';
-import { useCallback, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -16,7 +16,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
       : null
   );
-  const [venmoHandle, setVenmoHandle] = useState(artist?.venmo_handle || '');
+  const [venmoHandle, setVenmoHandle] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   // Note: Profile switching functionality will be implemented in the future
@@ -33,7 +33,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         },
         body: JSON.stringify({
           updates: {
-            venmo_handle: venmoHandle,
+            venmoHandle,
           },
         }),
       });
@@ -51,6 +51,12 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       setIsSaving(false);
     }
   }, [venmoHandle, artist]);
+
+  React.useEffect(() => {
+    if (artist) {
+      setVenmoHandle(artist.venmo_handle || '');
+    }
+  }, [artist]);
 
   const handleCancel = () => {
     if (!artist) return;

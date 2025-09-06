@@ -123,18 +123,14 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
         const json: { links: SocialLink[] } = await res.json();
 
         // Split links into social and DSP categories
-        const socialLinksItems: LinkItem[] = [];
-        const dspLinksItems: LinkItem[] = [];
-
         const allLinks = convertDbLinksToLinkItems(json.links || []);
 
-        allLinks.forEach(link => {
-          if (link.platform.category === 'dsp') {
-            dspLinksItems.push(link);
-          } else {
-            socialLinksItems.push(link);
-          }
-        });
+        const socialLinksItems = allLinks.filter(
+          link => link.platform.category !== 'dsp'
+        );
+        const dspLinksItems = allLinks.filter(
+          link => link.platform.category === 'dsp'
+        );
 
         setSocialLinks(socialLinksItems);
         setDSPLinks(dspLinksItems);
@@ -183,9 +179,12 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
   const showUpdateIndicator = useCallback((success: boolean) => {
     if (updateIndicatorRef.current) {
       updateIndicatorRef.current.dataset.show = 'true';
-      updateIndicatorRef.current.innerHTML = success
-        ? '<div class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">Updated</div>'
-        : '<div class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">Error</div>';
+      const indicator = document.createElement('div');
+      indicator.className = success
+        ? 'bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium'
+        : 'bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium';
+      indicator.textContent = success ? 'Updated' : 'Error';
+      updateIndicatorRef.current.replaceChildren(indicator);
 
       setTimeout(() => {
         if (updateIndicatorRef.current) {
@@ -347,6 +346,7 @@ export function DashboardLinks({ initialData }: DashboardLinksProps) {
 
           {/* Unified Link Manager with Magic Auto-Detection */}
           <UnifiedLinkManager
+            key={initialAllLinks.map(l => l.id).join('-')}
             initialLinks={initialAllLinks}
             onLinksChange={handleAllLinksChange}
             onLinkAdded={handleLinkAdded}

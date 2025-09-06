@@ -125,6 +125,7 @@ export interface CreatorProfile {
   apple_music_url: string | null;
   youtube_url: string | null;
   spotify_id: string | null;
+  venmo_handle: string | null; // Venmo username without '@'
   // Visibility and metadata
   is_public: boolean;
   is_verified: boolean;
@@ -164,10 +165,16 @@ export interface Artist {
   theme?: Record<string, unknown>;
   settings?: {
     hide_branding?: boolean;
+    marketing_emails?: boolean;
   };
   spotify_url?: string;
   apple_music_url?: string;
   youtube_url?: string;
+  /**
+   * Venmo username used for tipping.
+   * Provide without the leading '@' and ensure it matches Venmo's
+   * username requirements (alphanumeric, hyphens, and underscores).
+   */
   venmo_handle?: string;
   published: boolean; // maps to is_public
   is_verified: boolean;
@@ -335,6 +342,7 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     spotify_url: profile.spotify_url || undefined,
     apple_music_url: profile.apple_music_url || undefined,
     youtube_url: profile.youtube_url || undefined,
+    venmo_handle: profile.venmo_handle || undefined,
     published: profile.is_public,
     is_verified: profile.is_verified,
     is_featured: profile.is_featured,
@@ -357,6 +365,7 @@ export function convertArtistToCreatorProfile(
     apple_music_url: artist.apple_music_url,
     youtube_url: artist.youtube_url,
     spotify_id: artist.spotify_id,
+    venmo_handle: artist.venmo_handle,
     is_public: artist.published,
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
@@ -385,6 +394,7 @@ export function convertDrizzleCreatorProfileToArtist(
     spotify_url: profile.spotifyUrl || undefined,
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
+    venmo_handle: profile.venmoHandle || undefined,
     published: profile.isPublic ?? false,
     is_verified: profile.isVerified ?? false,
     is_featured: profile.isFeatured ?? false,

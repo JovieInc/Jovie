@@ -188,9 +188,12 @@ export const DashboardSplitView: React.FC<DashboardSplitViewProps> = ({
   const showUpdateIndicator = useCallback((success: boolean) => {
     if (updateIndicatorRef.current) {
       updateIndicatorRef.current.dataset.show = 'true';
-      updateIndicatorRef.current.innerHTML = success
-        ? '<div class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium">Updated</div>'
-        : '<div class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">Error</div>';
+      const indicator = document.createElement('div');
+      indicator.className = success
+        ? 'bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium'
+        : 'bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium';
+      indicator.textContent = success ? 'Updated' : 'Error';
+      updateIndicatorRef.current.replaceChildren(indicator);
 
       setTimeout(() => {
         if (updateIndicatorRef.current) {
