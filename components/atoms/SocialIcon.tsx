@@ -30,10 +30,14 @@ import {
   siYoutube,
 } from 'simple-icons';
 
+export const SOCIAL_ICON_DEFAULT_SIZE = 16;
+
 interface SocialIconProps {
   platform: string;
   className?: string;
   size?: number;
+  ariaLabel?: string;
+  title?: string;
 }
 
 // Map platform names to Simple Icons
@@ -75,10 +79,21 @@ export function getPlatformIcon(platform: string): SimpleIcon | undefined {
   return platformMap[platform.toLowerCase()];
 }
 
-export function SocialIcon({ platform, className, size }: SocialIconProps) {
+export function SocialIcon({
+  platform,
+  className,
+  size,
+  ariaLabel,
+  title,
+}: SocialIconProps) {
   const icon = platformMap[platform.toLowerCase()];
-  const iconClass = className || 'h-4 w-4';
-  const sizeStyle = size ? { width: size, height: size } : undefined;
+  const iconClass = className || 'h-4 w-4'; // matches SOCIAL_ICON_DEFAULT_SIZE
+  const sizeStyle = size
+    ? { width: size, height: size }
+    : className
+      ? undefined
+      : { width: SOCIAL_ICON_DEFAULT_SIZE, height: SOCIAL_ICON_DEFAULT_SIZE };
+  const labelled = ariaLabel ?? title;
 
   if (icon) {
     return (
@@ -87,7 +102,10 @@ export function SocialIcon({ platform, className, size }: SocialIconProps) {
         style={sizeStyle}
         fill='currentColor'
         viewBox='0 0 24 24'
-        aria-hidden='true'
+        role={labelled ? 'img' : undefined}
+        aria-label={ariaLabel}
+        title={title}
+        aria-hidden={labelled ? undefined : 'true'}
       >
         <path d={icon.path} />
       </svg>
@@ -102,7 +120,10 @@ export function SocialIcon({ platform, className, size }: SocialIconProps) {
       fill='none'
       stroke='currentColor'
       viewBox='0 0 24 24'
-      aria-hidden='true'
+      role={labelled ? 'img' : undefined}
+      aria-label={ariaLabel}
+      title={title}
+      aria-hidden={labelled ? undefined : 'true'}
     >
       <path
         strokeLinecap='round'
