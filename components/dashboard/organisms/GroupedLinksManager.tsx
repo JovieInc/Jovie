@@ -1,19 +1,35 @@
-import React from 'react';
+'use client';
+import React, { useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
-export interface GroupedLinksManagerProps {
-  initialLinks: DetectedLink[];
+export interface GroupedLinksManagerProps<
+  T extends DetectedLink = DetectedLink,
+> {
+  initialLinks: T[];
   className?: string;
+  onLinksChange?: (links: T[]) => void;
+  onLinkAdded?: (links: T[]) => void;
 }
 
-// Server Component scaffold for a single, grouped Links Manager
-// Phase 1: non-interactive layout + grouping only. Interaction wiring will follow.
-export function GroupedLinksManager({
+// Client Component scaffold for a single, grouped Links Manager
+// Phase 2: wire minimal callbacks for DashboardLinks integration.
+export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
-}: GroupedLinksManagerProps) {
+  onLinksChange,
+  onLinkAdded,
+}: GroupedLinksManagerProps<T>) {
   const groups = groupLinks(initialLinks);
+
+  // Keep DashboardLinks in sync similar to the previous Unified manager
+  useEffect(() => {
+    onLinksChange?.(initialLinks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialLinks]);
+
+  // Placeholder to satisfy lint until we add add/remove controls
+  void onLinkAdded;
 
   return (
     <section className={cn('space-y-6', className)} aria-label='Links Manager'>
@@ -46,16 +62,17 @@ export function GroupedLinksManager({
           </ul>
         </div>
       ))}
+      {/* Placeholder: when we add add/remove controls, we'll call onLinkAdded */}
     </section>
   );
 }
 
-function groupLinks(
-  links: DetectedLink[]
-): Record<'social' | 'dsp' | 'custom', DetectedLink[]> {
-  const social: DetectedLink[] = [];
-  const dsp: DetectedLink[] = [];
-  const custom: DetectedLink[] = [];
+function groupLinks<T extends DetectedLink = DetectedLink>(
+  links: T[]
+): Record<'social' | 'dsp' | 'custom', T[]> {
+  const social: T[] = [];
+  const dsp: T[] = [];
+  const custom: T[] = [];
 
   for (const l of links) {
     // Category comes from platform metadata; fallback to custom
@@ -68,7 +85,7 @@ function groupLinks(
     else custom.push(l);
   }
 
-  const byStable = (a: DetectedLink, b: DetectedLink) =>
+  const byStable = (a: T, b: T) =>
     (a.normalizedUrl || '').localeCompare(b.normalizedUrl || '');
 
   return {
