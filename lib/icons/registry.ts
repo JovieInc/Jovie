@@ -6,8 +6,7 @@ import {
   ChevronDownIcon,
   ArrowRightIcon,
   ArrowLeftIcon,
-  ArrowUpIcon,
-  ArrowDownIcon,
+
   HomeIcon,
   Bars3Icon,
   
@@ -46,29 +45,12 @@ import {
   // Media icons
   PlayIcon,
   PauseIcon,
-  StopIcon,
-  ForwardIcon,
-  BackwardIcon,
   SpeakerWaveIcon,
   SpeakerXMarkIcon,
   
   // Utility icons
-  CalendarIcon,
-  ClockIcon,
-  MapPinIcon,
-  PhoneIcon,
-  LinkIcon,
-  ArrowTopRightOnSquareIcon,
-  QuestionMarkCircleIcon,
-  ExclamationCircleIcon,
   
   // Interface icons
-  EyeIcon,
-  EyeSlashIcon,
-  AdjustmentsHorizontalIcon,
-  FunnelIcon,
-  Squares2X2Icon,
-  ListBulletIcon,
   
 } from '@heroicons/react/24/outline';
 
@@ -558,4 +540,3 @@ export function searchIcons(query: string): IconRegistryEntry[] {
 export function getIconsByCategory(category: string): IconRegistryEntry[] {
   return Object.values(iconRegistry).filter(icon => icon.category === category);
 }
-

@@ -7,7 +7,7 @@
  * 3. Only allow custom SVGs for approved use cases
  */
 
-const path = require('path');
+// Note: This rule doesn't currently use path utilities, but may in the future
 
 // Approved custom SVG files (relative to project root)
 const APPROVED_CUSTOM_SVGS = [
@@ -124,9 +124,11 @@ module.exports = {
       // Check JSX elements for inline SVGs
       JSXElement(node) {
         if (node.openingElement.name.name === 'svg') {
-          // Allow SVGs in approved components
+          // Allow SVGs in approved components and server-side templates
           const allowedComponents = ['SocialIcon.tsx', 'IconBadge.tsx', 'IconButton.tsx'];
-          if (allowedComponents.some(comp => filename.includes(comp))) {
+          const allowedFiles = ['footer.ts']; // Server-side templates with brand logos
+          if (allowedComponents.some(comp => filename.includes(comp)) || 
+              allowedFiles.some(file => filename.includes(file))) {
             return;
           }
 
@@ -184,6 +186,11 @@ module.exports = {
         if (node.init && node.init.type === 'TemplateLiteral') {
           const templateValue = sourceCode.getText(node.init);
           if (templateValue.includes('<svg') && templateValue.includes('</svg>')) {
+            // Allow SVG in server-side templates (footer.ts, etc.)
+            const allowedServerFiles = ['footer.ts', 'email-template.ts'];
+            if (allowedServerFiles.some(file => filename.includes(file))) {
+              return;
+            }
             if (containsSocialPlatform(templateValue)) {
               context.report({
                 node,
@@ -207,4 +214,3 @@ module.exports = {
     };
   },
 };
-

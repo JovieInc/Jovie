@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { getIcon, getIconSizeClasses, getSuggestedIcons } from '@/lib/icons';
-import type { IconProps, HeroIcon } from '@/lib/icons/types';
+import type { IconProps } from '@/lib/icons/types';
 
 /**
  * Universal Icon component that uses the standardized icon registry
@@ -161,4 +161,3 @@ export const SettingsIcon = createIconComponent('settings');
 export const UserIcon = createIconComponent('user');
 export const HomeIcon = createIconComponent('home');
 export const MenuIcon = createIconComponent('menu');
-

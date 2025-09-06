@@ -1,3 +1,4 @@
+import React from 'react';
 import { cn } from '@/lib/utils';
 import type { IconProps, SocialIconProps, IconSize, HeroIcon, SocialPlatform } from './types';
 import { getIconByName, getSocialIconByPlatform } from './registry';
@@ -221,4 +222,3 @@ export {
   searchIcons,
   getIconsByCategory,
 } from './registry';
-
