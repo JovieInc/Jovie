@@ -19,6 +19,10 @@ const meta: Meta<typeof ArtistName> = {
     showLink: {
       control: { type: 'boolean' },
     },
+    as: {
+      control: { type: 'select' },
+      options: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'div'],
+    },
   },
 };
 
@@ -84,6 +88,21 @@ export const WithoutLink: Story = {
     isVerified: true,
     showLink: false,
   },
+};
+
+export const Inline: Story = {
+  args: {
+    name: 'Lorde',
+    handle: 'lorde',
+    isVerified: true,
+    as: 'span',
+    showLink: false,
+  },
+  render: args => (
+    <p>
+      Listen to <ArtistName {...args} /> now.
+    </p>
+  ),
 };
 
 export const LongName: Story = {
