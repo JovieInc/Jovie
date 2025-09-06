@@ -303,6 +303,10 @@ export function DashboardLinks({
     return null; // Artist missing
   }
 
+  // Temporary: avoid unused warnings while Phase 2 wiring replaces Unified manager handlers
+  void handleLinkAdded;
+  void handleAllLinksChange;
+
   return (
     <>
       {/* Main Edit Panel */}
