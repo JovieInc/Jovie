@@ -5,6 +5,7 @@ interface AmountSelectorProps {
   isSelected: boolean;
   onClick: () => void;
   className?: string;
+  disabled?: boolean;
 }
 
 export function AmountSelector({
@@ -12,6 +13,7 @@ export function AmountSelector({
   isSelected,
   onClick,
   className,
+  disabled,
 }: AmountSelectorProps) {
   return (
     <button
@@ -19,8 +21,11 @@ export function AmountSelector({
       onClick={onClick}
       aria-pressed={isSelected}
       aria-label={`Select $${amount} tip amount`}
+      disabled={disabled}
+      aria-disabled={disabled}
       className={cn(
-        'w-full aspect-square rounded-xl border text-lg font-semibold transition-colors flex items-center justify-center cursor-pointer',
+        'w-full aspect-square rounded-xl border text-lg font-semibold transition-colors flex items-center justify-center',
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
         'bg-white text-gray-900 dark:bg-gray-900 dark:text-gray-100',
         isSelected
           ? 'border-purple-500 ring-2 ring-purple-200/60 dark:ring-purple-600/30'
@@ -28,7 +33,7 @@ export function AmountSelector({
         className
       )}
     >
-      ${amount}
+      <span aria-hidden>{'$' + amount}</span>
     </button>
   );
 }
