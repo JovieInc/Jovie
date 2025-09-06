@@ -12,6 +12,7 @@ export * from './FeatureCard';
 export * from './FrostedButton';
 export * from './GradientText';
 export * from './IconBadge';
+export * from './JovieIcon';
 export * from './LoadingSpinner';
 export * from './LogoLink';
 export * from './NavLink';
