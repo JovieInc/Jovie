@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { JovieLogo } from '@/components/atoms/JovieLogo';
+import { cn } from '@/lib/utils';
 
 interface FooterBrandingProps {
   artistHandle?: string;
@@ -20,7 +21,10 @@ export function FooterBranding({
 
   return (
     <div
-      className={`flex flex-col items-center justify-center space-y-1.5 ${className}`}
+      className={cn(
+        'flex flex-col items-center justify-center space-y-1.5',
+        className
+      )}
     >
       <JovieLogo artistHandle={artistHandle} variant={variant} />
 

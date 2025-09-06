@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { APP_NAME } from '@/constants/app';
+import { cn } from '@/lib/utils';
 
 interface JovieLogoProps {
   href?: string;
@@ -7,6 +8,9 @@ interface JovieLogoProps {
   className?: string;
   variant?: 'light' | 'dark';
   showText?: boolean;
+  ariaLabel?: string;
+  target?: React.AnchorHTMLAttributes<HTMLAnchorElement>['target'];
+  title?: string;
 }
 
 export function JovieLogo({
@@ -15,6 +19,9 @@ export function JovieLogo({
   className = '',
   variant = 'light',
   showText = false,
+  ariaLabel,
+  target,
+  title,
 }: JovieLogoProps) {
   const finalHref = artistHandle
     ? `${href}?utm_source=profile&utm_artist=${artistHandle}`
@@ -25,13 +32,15 @@ export function JovieLogo({
       ? 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
       : 'text-white hover:text-white/80';
 
-  const logoElement = (
-    <div className={`flex items-center gap-2 ${className}`}>
+  const wrapperClasses = cn('flex items-center gap-2', className);
+
+  const logoContent = (
+    <>
       <svg
         xmlns='http://www.w3.org/2000/svg'
         xmlnsXlink='http://www.w3.org/1999/xlink'
         viewBox='0 0 136 39'
-        className={`h-6 w-auto transition-colors ${colorClass}`}
+        className={cn('h-6 w-auto transition-colors', colorClass)}
         fill='currentColor'
         aria-label={`${APP_NAME} logo`}
       >
@@ -41,26 +50,39 @@ export function JovieLogo({
         />
       </svg>
       {showText && (
-        <span className={`font-medium ${colorClass}`}>{APP_NAME}</span>
+        <span className={cn('font-medium', colorClass)}>{APP_NAME}</span>
       )}
-    </div>
+    </>
   );
+
+  const computedAriaLabel =
+    ariaLabel ??
+    (artistHandle
+      ? `Create your own profile with ${APP_NAME}`
+      : `${APP_NAME} home`);
 
   if (href) {
     return (
       <Link
         href={finalHref}
-        aria-label={
-          artistHandle
-            ? `Create your own profile with ${APP_NAME}`
-            : `${APP_NAME} home`
-        }
+        aria-label={computedAriaLabel}
+        target={target}
+        rel={target === '_blank' ? 'noopener noreferrer' : undefined}
         className='rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 transition-colors'
+        title={title}
       >
-        {logoElement}
+        <div className={wrapperClasses}>{logoContent}</div>
       </Link>
     );
   }
 
-  return logoElement;
+  return (
+    <div
+      className={wrapperClasses}
+      aria-label={computedAriaLabel}
+      title={title}
+    >
+      {logoContent}
+    </div>
+  );
 }
