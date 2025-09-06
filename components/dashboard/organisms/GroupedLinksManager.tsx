@@ -68,13 +68,13 @@ function groupLinks(
     else custom.push(l);
   }
 
-  const byOrder = (a: DetectedLink, b: DetectedLink) =>
-    (a.order ?? 0) - (b.order ?? 0);
+  const byStable = (a: DetectedLink, b: DetectedLink) =>
+    (a.normalizedUrl || '').localeCompare(b.normalizedUrl || '');
 
   return {
-    social: social.sort(byOrder),
-    dsp: dsp.sort(byOrder),
-    custom: custom.sort(byOrder),
+    social: social.sort(byStable),
+    dsp: dsp.sort(byStable),
+    custom: custom.sort(byStable),
   };
 }
 
