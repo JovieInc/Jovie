@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import Image from 'next/image';
+import React, { useState } from 'react';
+import { cn } from '@/lib/utils';
 
 export interface ArtistAvatarProps {
   src: string;
-  alt: string;
+  alt?: string;
   name: string;
   size?: 'sm' | 'md' | 'lg' | 'xl';
   priority?: boolean;
@@ -22,35 +23,51 @@ const SIZE_MAP = {
 
 export const ArtistAvatar = React.memo(function ArtistAvatar({
   src,
-  alt,
   name,
+  alt = name,
   size = 'md',
   priority = false,
-  className = '',
+  className,
 }: ArtistAvatarProps) {
-  // Use useMemo to ensure stable props for the OptimizedImage component
-  const sizeProps = useMemo(() => SIZE_MAP[size], [size]);
+  const { width, height, className: sizeClass } = SIZE_MAP[size];
+  const [hasError, setHasError] = useState(false);
 
-  const { width, height, className: sizeClass } = sizeProps;
+  const initials = name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (hasError || !src) {
+    return (
+      <div
+        className={cn(
+          sizeClass,
+          'flex items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 ring-1 ring-black/10 dark:ring-white/15 shadow-md group-hover:ring-white/20',
+          className
+        )}
+      >
+        <span className='text-xl font-medium'>{initials}</span>
+      </div>
+    );
+  }
 
   return (
-    <OptimizedImage
+    <Image
       src={src}
       alt={alt}
       width={width}
       height={height}
-      aspectRatio='square'
-      objectFit='cover'
-      objectPosition='center'
       priority={priority}
       quality={85}
-      placeholder='blur'
       sizes={`(max-width: 768px) ${width}px, ${width}px`}
-      className={`${sizeClass} ring-1 ring-black/10 dark:ring-white/15 shadow-md group-hover:ring-white/20 ${className}`}
-      shape='circle'
-      artistName={name}
-      imageType='avatar'
-      enableVersioning={true}
+      className={cn(
+        sizeClass,
+        'rounded-full object-cover object-center ring-1 ring-black/10 dark:ring-white/15 shadow-md group-hover:ring-white/20',
+        className
+      )}
+      onError={() => setHasError(true)}
     />
   );
 });
