@@ -118,7 +118,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   sizes,
   placeholder = 'blur',
   blurDataURL,
-  fallbackSrc = '/android-chrome-192x192.png',
+  fallbackSrc = '/avatars/default-user.png',
   unoptimized = false,
   artistName,
   imageType,
@@ -178,7 +178,10 @@ export const OptimizedImage = React.memo(function OptimizedImage({
         isLoading ? 'opacity-0' : 'opacity-100'
       ),
       onLoad: () => setIsLoading(false),
-      onError: () => setHasError(true),
+      onError: () => {
+        setHasError(true);
+        setIsLoading(false);
+      },
       style: {
         objectFit,
         objectPosition,

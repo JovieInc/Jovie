@@ -4,7 +4,6 @@ import {
   BellIcon,
   CreditCardIcon,
   PaintBrushIcon,
-  PhotoIcon,
   RocketLaunchIcon,
   ShieldCheckIcon,
   SparklesIcon,
@@ -14,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
 import { AccountSettingsModal } from '@/components/dashboard/molecules/AccountSettingsModal';
+import { AvatarUpload } from '@/components/ui/AvatarUpload';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
@@ -376,25 +376,18 @@ export function SettingsPolished({
             <h3 className='text-lg font-medium text-primary'>Profile Photo</h3>
           </div>
 
-          <div className='flex items-start space-x-6'>
-            <div className='flex-shrink-0'>
-              <div className='w-20 h-20 rounded-full bg-surface-2 flex items-center justify-center border-2 border-dashed border-subtle hover:border-accent transition-colors cursor-pointer group'>
-                <PhotoIcon className='w-8 h-8 text-secondary group-hover:text-accent-token transition-colors' />
-              </div>
-            </div>
-            <div className='flex-1 space-y-3'>
-              <button
-                type='button'
-                className='inline-flex items-center px-4 py-2 border border-subtle rounded-lg shadow-sm text-sm font-medium text-secondary bg-surface-1 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors'
-              >
-                <PhotoIcon className='w-4 h-4 mr-2' />
-                Upload photo
-              </button>
-              <p className='text-sm text-secondary'>
-                JPG, GIF or PNG. Max size 2MB. Square images work best.
-              </p>
-            </div>
-          </div>
+          <AvatarUpload
+            currentAvatarUrl={artist.image_url}
+            artistName={artist.name}
+            onUploadSuccess={(imageUrl) => {
+              if (onArtistUpdate) {
+                onArtistUpdate({
+                  ...artist,
+                  image_url: imageUrl,
+                });
+              }
+            }}
+          />
         </DashboardCard>
 
         {/* Basic Info Card */}
