@@ -1,0 +1,202 @@
+# Icon Usage Rules for Jovie Project
+
+## CRITICAL: Icon Library Standards
+
+**Purpose:** Enforce consistent icon usage across the Jovie codebase using standardized libraries.  
+**Scope:** All AI-generated code must follow these icon usage patterns.
+
+---
+
+## **1. Icon Library Hierarchy**
+
+### **Heroicons v2 - General Purpose Icons (FIRST CHOICE)**
+
+Use `@heroicons/react` for ALL general-purpose UI icons:
+
+```typescript
+// ✅ CORRECT: Use Heroicons for general UI icons
+import { ChevronRightIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { HeartIcon, StarIcon } from '@heroicons/react/24/solid';
+
+// Navigation, actions, states, UI elements
+<ChevronRightIcon className="h-5 w-5" />
+<XMarkIcon className="h-4 w-4" />
+<CheckIcon className="h-5 w-5" />
+```
+
+### **SimpleIcons - Social Media, DSP, Brand Icons (SECOND CHOICE)**
+
+Use the existing `SocialIcon` component for social media, DSPs, and brand icons:
+
+```typescript
+// ✅ CORRECT: Use SocialIcon component for social/brand icons
+<SocialIcon platform="spotify" className="h-5 w-5" />
+<SocialIcon platform="instagram" className="h-4 w-4" />
+<SocialIcon platform="twitter" className="h-5 w-5" />
+```
+
+### **Custom SVGs - ONLY When Absolutely Necessary**
+
+Only use custom SVGs for:
+- Jovie brand logos (`/brand/jovie-logo.svg`, `/brand/Jovie-Logo-Icon.svg`)
+- Unique UI elements that don't exist in Heroicons or SimpleIcons
+
+```typescript
+// ✅ ACCEPTABLE: Brand logos only
+<img src="/brand/jovie-logo.svg" alt="Jovie" />
+
+// ❌ NEVER: Custom SVG for general icons
+<svg className="h-5 w-5" viewBox="0 0 24 24">
+  <path d="..." />
+</svg>
+```
+
+---
+
+## **2. MANDATORY PATTERNS**
+
+### **For IconButton Component**
+
+```typescript
+// ✅ CORRECT: Use Heroicons with IconButton
+import { CogIcon } from '@heroicons/react/24/outline';
+
+<IconButton ariaLabel="Settings">
+  <CogIcon className="h-4 w-4" />
+</IconButton>
+```
+
+### **For IconBadge Component**
+
+```typescript
+// ✅ CORRECT: Use Heroicons with IconBadge
+import { BoltIcon } from '@heroicons/react/24/outline';
+
+<IconBadge Icon={BoltIcon} colorVar="--color-yellow-500" />
+```
+
+### **For Social Media Icons**
+
+```typescript
+// ✅ CORRECT: Always use SocialIcon component
+<SocialIcon platform="spotify" className="h-5 w-5" />
+
+// ❌ NEVER: Direct SimpleIcons import
+import { siSpotify } from 'simple-icons';
+```
+
+---
+
+## **3. FORBIDDEN PATTERNS**
+
+### **❌ NEVER DO THE FOLLOWING**
+
+```typescript
+// ❌ DO NOT: Direct SVG imports for general icons
+import CustomIcon from './custom-icon.svg';
+
+// ❌ DO NOT: Inline SVG for general UI icons
+<svg className="h-5 w-5" viewBox="0 0 24 24">
+  <path d="M12 2l3.09 6.26L22 9.27..." />
+</svg>
+
+// ❌ DO NOT: Direct SimpleIcons usage
+import { siSpotify } from 'simple-icons';
+<svg><path d={siSpotify.path} /></svg>
+
+// ❌ DO NOT: Custom icons when Heroicons equivalent exists
+<CustomChevronIcon /> // Use ChevronRightIcon instead
+```
+
+---
+
+## **4. DECISION TREE FOR AI MODELS**
+
+When generating code that needs an icon:
+
+1. **Is it a social media/DSP/brand icon?**
+   - YES → Use `<SocialIcon platform="..." />`
+   - NO → Continue to step 2
+
+2. **Is it a general UI icon (navigation, actions, states)?**
+   - YES → Use Heroicons from `@heroicons/react/24/outline` or `/24/solid`
+   - NO → Continue to step 3
+
+3. **Is it the Jovie brand logo?**
+   - YES → Use `/brand/jovie-logo.svg` or `/brand/Jovie-Logo-Icon.svg`
+   - NO → Continue to step 4
+
+4. **Does an equivalent exist in Heroicons?**
+   - YES → Use Heroicons
+   - NO → Ask user for clarification or approval for custom SVG
+
+---
+
+## **5. COMMON ICON MAPPINGS**
+
+### **Navigation Icons**
+- Chevron/Arrow: `ChevronRightIcon`, `ArrowLeftIcon`
+- Menu: `Bars3Icon`
+- Home: `HomeIcon`
+- Back: `ArrowLeftIcon`
+
+### **Action Icons**
+- Add: `PlusIcon`
+- Delete: `TrashIcon`
+- Edit: `PencilIcon`
+- Share: `ShareIcon`
+- Search: `MagnifyingGlassIcon`
+- Settings: `CogIcon`
+
+### **State Icons**
+- Success: `CheckIcon`, `CheckCircleIcon`
+- Error: `XMarkIcon`, `XCircleIcon`
+- Warning: `ExclamationTriangleIcon`
+- Info: `InformationCircleIcon`
+
+### **Social/Brand Icons**
+- Music: `spotify`, `applemusic`, `soundcloud`, `bandcamp`
+- Social: `instagram`, `twitter`, `tiktok`, `youtube`, `facebook`
+- Other: `discord`, `reddit`, `github`, `patreon`
+
+---
+
+## **6. SIZE STANDARDS**
+
+Use consistent sizing classes:
+- Small: `h-4 w-4`
+- Medium: `h-5 w-5`
+- Large: `h-6 w-6`
+
+```typescript
+// ✅ CORRECT: Consistent sizing
+<ChevronRightIcon className="h-5 w-5" />
+<SocialIcon platform="spotify" className="h-4 w-4" />
+```
+
+---
+
+## **7. AI MODEL VERIFICATION**
+
+Before generating any icon-related code, verify:
+
+1. ✅ Using Heroicons for general UI icons?
+2. ✅ Using SocialIcon component for social/brand icons?
+3. ✅ No direct SVG imports for standard icons?
+4. ✅ No inline SVG for icons that exist in libraries?
+5. ✅ Proper sizing classes applied?
+6. ✅ Accessibility attributes included?
+
+If any check fails, revise the code to comply with these standards.
+
+---
+
+## **8. RESOURCES**
+
+- **Heroicons Browser**: [heroicons.com](https://heroicons.com)
+- **SimpleIcons Browser**: [simpleicons.org](https://simpleicons.org)
+- **SocialIcon Component**: `components/atoms/SocialIcon.tsx`
+- **IconButton Component**: `components/atoms/IconButton.tsx`
+- **IconBadge Component**: `components/atoms/IconBadge.tsx`
+- **Full Documentation**: `docs/ICON_STANDARDS.md`
+

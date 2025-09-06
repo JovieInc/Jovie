@@ -1,5 +1,6 @@
 const { FlatCompat } = require('@eslint/eslintrc');
 const js = require('@eslint/js');
+const iconUsageRule = require('./eslint-rules/icon-usage');
 
 const compat = new FlatCompat({
   baseDirectory: __dirname,
@@ -51,6 +52,13 @@ module.exports = [
     'plugin:import/recommended'
   ),
   {
+    plugins: {
+      '@jovie': {
+        rules: {
+          'icon-usage': iconUsageRule,
+        },
+      },
+    },
     settings: {
       'import/resolver': {
         typescript: {},
@@ -95,6 +103,9 @@ module.exports = [
             "Alias drizzle's sql as drizzleSql to avoid conflicts with Neon client.",
         },
       ],
+
+      // Icon usage standards enforcement
+      '@jovie/icon-usage': 'error',
     },
   }, // Disable specific rules for dashboard components due to architectural complexity
   {

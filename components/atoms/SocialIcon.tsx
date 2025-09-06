@@ -25,6 +25,8 @@ interface SocialIconProps {
   platform: string;
   className?: string;
   size?: number;
+  'aria-hidden'?: boolean;
+  'aria-label'?: string;
 }
 
 // Map platform names to Simple Icons
@@ -57,7 +59,13 @@ export function getPlatformIcon(platform: string): SimpleIcon | undefined {
   return platformMap[platform.toLowerCase()];
 }
 
-export function SocialIcon({ platform, className, size }: SocialIconProps) {
+export function SocialIcon({ 
+  platform, 
+  className, 
+  size,
+  'aria-hidden': ariaHidden = true,
+  'aria-label': ariaLabel,
+}: SocialIconProps) {
   const icon = platformMap[platform.toLowerCase()];
   const iconClass = className || 'h-4 w-4';
   const sizeStyle = size ? { width: size, height: size } : undefined;
@@ -69,7 +77,9 @@ export function SocialIcon({ platform, className, size }: SocialIconProps) {
         style={sizeStyle}
         fill='currentColor'
         viewBox='0 0 24 24'
-        aria-hidden='true'
+        aria-hidden={ariaHidden}
+        aria-label={ariaLabel}
+        role={ariaLabel ? 'img' : undefined}
       >
         <path d={icon.path} />
       </svg>

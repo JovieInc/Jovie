@@ -11,6 +11,7 @@ export * from './DSPButton';
 export * from './FeatureCard';
 export * from './FrostedButton';
 export * from './GradientText';
+export * from './Icon';
 export * from './IconBadge';
 export * from './LoadingSpinner';
 export * from './LogoLink';

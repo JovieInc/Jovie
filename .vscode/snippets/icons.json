@@ -1,0 +1,143 @@
+{
+  "Heroicon Import": {
+    "prefix": "heroicon",
+    "body": [
+      "import { ${1:ChevronRightIcon} } from '@heroicons/react/24/${2|outline,solid|}';"
+    ],
+    "description": "Import a Heroicon component"
+  },
+  "Multiple Heroicons Import": {
+    "prefix": "heroicons",
+    "body": [
+      "import { ${1:ChevronRightIcon}, ${2:XMarkIcon}, ${3:CheckIcon} } from '@heroicons/react/24/${4|outline,solid|}';"
+    ],
+    "description": "Import multiple Heroicon components"
+  },
+  "Heroicon Usage": {
+    "prefix": "heroicon-use",
+    "body": [
+      "<${1:ChevronRightIcon} className=\"${2:h-5 w-5}\" />"
+    ],
+    "description": "Use a Heroicon component"
+  },
+  "SocialIcon Component": {
+    "prefix": "socialicon",
+    "body": [
+      "<SocialIcon platform=\"${1|spotify,instagram,twitter,tiktok,youtube,facebook,soundcloud,discord,github|}\" className=\"${2:h-5 w-5}\" />"
+    ],
+    "description": "Use the SocialIcon component"
+  },
+  "SocialIcon Import": {
+    "prefix": "socialicon-import",
+    "body": [
+      "import { SocialIcon } from '@/components/atoms/SocialIcon';"
+    ],
+    "description": "Import the SocialIcon component"
+  },
+  "Icon Component": {
+    "prefix": "icon",
+    "body": [
+      "<Icon name=\"${1|chevron-right,chevron-left,x-mark,check,plus,search,settings,user,home,menu|}\" size=\"${2|sm,md,lg,xl|}\" />"
+    ],
+    "description": "Use the unified Icon component"
+  },
+  "Icon Import": {
+    "prefix": "icon-import",
+    "body": [
+      "import { Icon } from '@/components/atoms/Icon';"
+    ],
+    "description": "Import the unified Icon component"
+  },
+  "IconButton with Heroicon": {
+    "prefix": "iconbutton",
+    "body": [
+      "<IconButton ariaLabel=\"${1:Button description}\">",
+      "  <${2:ChevronRightIcon} className=\"${3:h-4 w-4}\" />",
+      "</IconButton>"
+    ],
+    "description": "IconButton component with Heroicon"
+  },
+  "IconBadge with Heroicon": {
+    "prefix": "iconbadge",
+    "body": [
+      "<IconBadge Icon={${1:BoltIcon}} colorVar=\"${2:--color-yellow-500}\" />"
+    ],
+    "description": "IconBadge component with Heroicon"
+  },
+  "Icon with Accessibility": {
+    "prefix": "icon-a11y",
+    "body": [
+      "<${1:ChevronRightIcon} ",
+      "  className=\"${2:h-5 w-5}\" ",
+      "  aria-label=\"${3:Icon description}\"",
+      "  aria-hidden={${4|false,true|}}",
+      "/>"
+    ],
+    "description": "Icon with accessibility attributes"
+  },
+  "Social Icon with Accessibility": {
+    "prefix": "socialicon-a11y",
+    "body": [
+      "<SocialIcon ",
+      "  platform=\"${1|spotify,instagram,twitter,tiktok,youtube,facebook|}\"",
+      "  className=\"${2:h-5 w-5}\"",
+      "  aria-label=\"${3:Platform name}\"",
+      "  aria-hidden={${4|false,true|}}",
+      "/>"
+    ],
+    "description": "SocialIcon with accessibility attributes"
+  },
+  "Icon Size Classes": {
+    "prefix": "icon-size",
+    "body": [
+      "className=\"${1|h-4 w-4,h-5 w-5,h-6 w-6,h-8 w-8|}\""
+    ],
+    "description": "Standard icon size classes"
+  },
+  "Common Navigation Icons": {
+    "prefix": "nav-icons",
+    "body": [
+      "// Navigation icons",
+      "import { ",
+      "  ChevronRightIcon,",
+      "  ChevronLeftIcon,",
+      "  ArrowRightIcon,",
+      "  ArrowLeftIcon,",
+      "  HomeIcon,",
+      "  Bars3Icon,",
+      "} from '@heroicons/react/24/outline';"
+    ],
+    "description": "Common navigation icons import"
+  },
+  "Common Action Icons": {
+    "prefix": "action-icons",
+    "body": [
+      "// Action icons",
+      "import { ",
+      "  PlusIcon,",
+      "  XMarkIcon,",
+      "  PencilIcon,",
+      "  TrashIcon,",
+      "  ShareIcon,",
+      "  MagnifyingGlassIcon,",
+      "  CogIcon,",
+      "} from '@heroicons/react/24/outline';"
+    ],
+    "description": "Common action icons import"
+  },
+  "Common State Icons": {
+    "prefix": "state-icons",
+    "body": [
+      "// State icons",
+      "import { ",
+      "  CheckIcon,",
+      "  CheckCircleIcon,",
+      "  XCircleIcon,",
+      "  ExclamationTriangleIcon,",
+      "  InformationCircleIcon,",
+      "} from '@heroicons/react/24/outline';"
+    ],
+    "description": "Common state icons import"
+  }
+}
+
