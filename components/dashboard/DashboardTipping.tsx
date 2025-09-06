@@ -20,6 +20,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
   const [venmoHandle, setVenmoHandle] = useState(artist?.venmo_handle || '');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   // Note: Profile switching functionality will be implemented in the future
 
   const handleSaveVenmo = useCallback(async () => {
@@ -46,6 +47,9 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       const updatedArtist = { ...artist, venmo_handle: venmoHandle };
       setArtist(updatedArtist);
       setIsEditing(false);
+      setSaveSuccess(`Connected to @${venmoHandle}`);
+      // Clear success after a short delay
+      setTimeout(() => setSaveSuccess(null), 2500);
     } catch (error) {
       console.error('Failed to update Venmo handle:', error);
     } finally {
@@ -68,9 +72,9 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
   return (
     <div className='relative'>
       <div className='mb-8'>
-        <h1 className='text-2xl font-bold text-primary-token'>Tipping</h1>
+        <h1 className='text-2xl font-bold text-primary-token'>Earnings</h1>
         <p className='text-secondary-token mt-1'>
-          Manage your tipping settings and view your tipping history
+          Connect your payout handle and view your earnings history
         </p>
       </div>
 
@@ -86,7 +90,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
           description={
             hasVenmoHandle
               ? 'Your Venmo handle for receiving tips'
-              : 'Add your Venmo handle to start receiving tips'
+              : 'Your handle will appear on your profile so fans can tip you directly.'
           }
           right={
             !hasVenmoHandle ? (
@@ -95,7 +99,8 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
           }
         />
 
-        {isEditing ? (
+        {/* Wizard block: when editing OR not set, show inline setup */}
+        {isEditing || !hasVenmoHandle ? (
           <div className='space-y-4'>
             <div>
               <label
@@ -116,6 +121,10 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
                   autoFocus
                 />
               </div>
+              <p className='text-xs text-secondary-token mt-2'>
+                Your handle will be shown on your public profile and fans can
+                tip you directly via Venmo.
+              </p>
             </div>
             <div className='flex gap-3'>
               <button
@@ -123,16 +132,27 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
                 disabled={isSaving || !venmoHandle.trim()}
                 className='px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
               >
-                {isSaving ? 'Saving...' : 'Save'}
+                {isSaving ? 'Saving...' : hasVenmoHandle ? 'Update' : 'Connect'}
               </button>
-              <button
-                onClick={handleCancel}
-                disabled={isSaving}
-                className='px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
-              >
-                Cancel
-              </button>
+              {hasVenmoHandle ? (
+                <button
+                  onClick={handleCancel}
+                  disabled={isSaving}
+                  className='px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
+                >
+                  Cancel
+                </button>
+              ) : null}
             </div>
+            {saveSuccess && (
+              <div
+                className='text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md px-3 py-2'
+                role='status'
+                aria-live='polite'
+              >
+                ✓ {saveSuccess}
+              </div>
+            )}
           </div>
         ) : hasVenmoHandle ? (
           <div className='flex items-center justify-between'>
@@ -140,7 +160,9 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               <span className='text-sm font-mono bg-surface-2 px-3 py-1 rounded-md text-primary-token'>
                 @{artist.venmo_handle}
               </span>
-              <span className='text-xs text-secondary-token'>✓ Active</span>
+              <span className='text-xs text-green-700 dark:text-green-400'>
+                ✓ Connected
+              </span>
             </div>
             <button
               onClick={() => setIsEditing(true)}
@@ -149,15 +171,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               Edit
             </button>
           </div>
-        ) : (
-          <button
-            onClick={() => setIsEditing(true)}
-            className='w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-subtle rounded-lg text-accent hover:bg-surface-2/50 transition-all duration-200'
-          >
-            <WalletIcon className='h-5 w-5' />
-            <span className='font-medium'>Add Venmo Handle</span>
-          </button>
-        )}
+        ) : null}
       </div>
 
       {/* Tipping content - Blurred when no Venmo handle */}
@@ -167,17 +181,15 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
           !hasVenmoHandle && 'filter blur-sm pointer-events-none select-none'
         )}
       >
-        {/* Tipping Stats */}
+        {/* Earnings Summary */}
         <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-md transition-all duration-300 relative z-10'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
-            title='Tipping Stats'
+            title='Earnings Summary'
           />
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
             <div className='bg-surface-2/50 rounded-lg p-4'>
-              <p className='text-sm text-secondary-token'>
-                Total Tips Received
-              </p>
+              <p className='text-sm text-secondary-token'>Total Received</p>
               <p className='text-2xl font-bold text-primary-token'>$0.00</p>
             </div>
             <div className='bg-surface-2/50 rounded-lg p-4'>
@@ -191,43 +203,20 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
           </div>
         </div>
 
-        {/* Recent Tips */}
+        {/* Recent Earnings */}
         <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
-            title='Recent Tips'
+            title='Recent Earnings'
           />
           <div className='space-y-4'>
             <p className='text-secondary-token'>
-              No tips received yet. When you receive tips, they&apos;ll appear
-              here.
+              No earnings yet. When you receive tips, they&apos;ll appear here.
             </p>
           </div>
         </div>
       </div>
-
-      {/* Overlay CTA when no Venmo handle */}
-      {!hasVenmoHandle && !isEditing && (
-        <div className='absolute inset-x-0 top-32 flex justify-center z-30'>
-          <div className='bg-surface-0/90 backdrop-blur-xl rounded-2xl p-6 max-w-sm text-center shadow-xl border border-subtle ring-1 ring-black/5 dark:ring-white/5'>
-            <div className='inline-flex items-center justify-center w-12 h-12 bg-accent/10 rounded-full mb-3'>
-              <WalletIcon className='h-6 w-6 text-accent' />
-            </div>
-            <h3 className='text-lg font-semibold text-primary-token mb-2'>
-              Add Your Venmo Handle
-            </h3>
-            <p className='text-sm text-secondary-token mb-4'>
-              Connect your Venmo to start receiving tips from your fans.
-            </p>
-            <button
-              onClick={() => setIsEditing(true)}
-              className='px-6 py-2.5 bg-accent/90 text-white rounded-lg hover:bg-accent transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2 font-medium shadow-sm'
-            >
-              Get Started
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Removed overlay CTA; wizard handles setup inline */}
     </div>
   );
 }

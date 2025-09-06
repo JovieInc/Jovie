@@ -46,6 +46,17 @@ const primaryNavigation = [
   },
 ];
 
+// Keyboard shortcut hints shown in tooltips (collapsed sidebar)
+// Display-only for now; actual hotkeys can be wired separately.
+const navShortcuts: Record<string, string> = {
+  overview: '1',
+  links: '2',
+  analytics: '3',
+  audience: '4',
+  tipping: '5',
+  settings: '6',
+};
+
 // Secondary Navigation - Additional features
 const secondaryNavigation = [
   {
@@ -146,7 +157,8 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
           <li key={item.name}>
             {collapsed ? (
               <Tooltip
-                content={`${item.name} - ${item.description}`}
+                content={item.name}
+                shortcut={navShortcuts[item.id]}
                 placement='right'
               >
                 {linkContent}
