@@ -1,16 +1,28 @@
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 
+// Cache with size limit to prevent memory leaks
 const qrCache = new Map<string, string>();
+const MAX_CACHE_SIZE = 100;
 
 function getQrUrl(data: string, size: number) {
   const key = `${data}-${size}`;
-  if (!qrCache.has(key)) {
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+  
+  let url = qrCache.get(key);
+  if (!url) {
+    url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`;
+    
+    // Implement simple LRU eviction when cache is full
+    if (qrCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = qrCache.keys().next().value;
+      qrCache.delete(firstKey);
+    }
+    
     qrCache.set(key, url);
   }
-  return qrCache.get(key)!;
+  
+  return url;
 }
 
 interface QRCodeProps {
@@ -29,9 +41,15 @@ export function QRCode({
   const [hasError, setHasError] = useState(false);
   const qrUrl = useMemo(() => getQrUrl(data, size), [data, size]);
 
+  // Reset error state when props change
+  useEffect(() => {
+    setHasError(false);
+  }, [data, size]);
+
   if (hasError) {
     return (
       <div
+        role="img"
         aria-label={`${label} unavailable`}
         className={cn(
           'flex items-center justify-center rounded bg-gray-100 text-gray-500',

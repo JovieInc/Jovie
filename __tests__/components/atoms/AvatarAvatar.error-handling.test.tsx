@@ -6,10 +6,10 @@ describe('ArtistAvatar - Basic Functionality', () => {
   it('should render with required props', () => {
     render(
       <ArtistAvatar
-        src='test-image.jpg'
-        alt='Test Artist'
-        name='Test Artist'
-        size='md'
+        src="test-image.jpg"
+        alt="Test Artist"
+        name="Test Artist"
+        size="md"
       />
     );
 
@@ -21,10 +21,10 @@ describe('ArtistAvatar - Basic Functionality', () => {
   it('should have proper accessibility attributes', () => {
     render(
       <ArtistAvatar
-        src='test-image.jpg'
-        alt='Test Artist Avatar'
-        name='Test Artist'
-        size='md'
+        src="test-image.jpg"
+        alt="Test Artist Avatar"
+        name="Test Artist"
+        size="md"
       />
     );
 
@@ -35,10 +35,10 @@ describe('ArtistAvatar - Basic Functionality', () => {
   it('should pass through size prop correctly', () => {
     render(
       <ArtistAvatar
-        src='test-image.jpg'
-        alt='Test Artist'
-        name='Test Artist'
-        size='lg'
+        src="test-image.jpg"
+        alt="Test Artist"
+        name="Test Artist"
+        size="lg"
       />
     );
 
