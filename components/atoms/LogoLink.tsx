@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Logo } from '@/components/ui/Logo';
+import { cn } from '@/lib/utils';
 
 interface LogoLinkProps {
   href?: string;
@@ -15,7 +16,7 @@ export function LogoLink({
   return (
     <Link
       href={href}
-      className={`flex items-center space-x-2 ${className || ''}`}
+      className={cn('flex items-center space-x-2', className)}
       aria-label='Jovie'
     >
       <Logo size={logoSize} />
