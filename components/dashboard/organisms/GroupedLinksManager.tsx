@@ -1,4 +1,5 @@
 'use client';
+
 import {
   DndContext,
   type DragEndEvent,
@@ -36,7 +37,6 @@ export const CROSS_CATEGORY: Record<
   youtube: ['social', 'dsp'],
   // soundcloud: ['social', 'dsp'],
 };
-
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
@@ -257,6 +257,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     setLinks(next);
     onLinksChange?.(next);
   }
+
+  // Keep DashboardLinks in sync similar to the previous Unified manager
+  useEffect(() => {
+    onLinksChange?.(links);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [links]);
 
   return (
     <section className={cn('space-y-6', className)} aria-label='Links Manager'>

@@ -14,13 +14,30 @@ import React, { forwardRef } from 'react';
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'plain';
+  /**
+   * Variant naming aligned with shadcn/ui while preserving backward-compatible aliases.
+   * default ≈ primary, destructive ≈ red, outline, secondary, ghost, link, plain (alias of ghost)
+   */
+  variant?:
+    | 'default'
+    | 'destructive'
+    | 'secondary'
+    | 'outline'
+    | 'ghost'
+    | 'link'
+    | 'primary' // alias of default
+    | 'plain'; // alias of ghost
   size?: 'sm' | 'md' | 'lg' | 'icon';
+  /**
+   * Legacy color override used by some callsites; if provided with variant=primary/default,
+   * the background will adopt the mapped tone. Prefer variants for consistency.
+   */
   color?: 'green' | 'indigo' | 'blue' | 'red' | 'gray';
   children: React.ReactNode;
   href?: string;
   className?: string;
   as?: React.ElementType;
+  /** Back-compat flags; prefer using the string variants above. */
   outline?: boolean;
   plain?: boolean;
   target?: string;
@@ -64,27 +81,36 @@ export const Button = forwardRef<
     };
 
     const baseClasses =
-      'relative isolate inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900';
+      'relative isolate inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
 
-    const variantClasses = {
+    // shadcn-style variant tokens with Jovie theming
+    const variantClasses: Record<string, string> = {
+      // default (primary)
+      default:
+        'bg-black text-white hover:bg-neutral-900 focus-visible:ring-blue-500 dark:bg-white dark:text-black dark:hover:bg-neutral-100 dark:focus-visible:ring-blue-400',
+      // alias for compatibility
       primary:
-        'bg-black text-white hover:bg-gray-800 focus-visible:ring-blue-500 dark:bg-white dark:text-black dark:hover:bg-gray-100 dark:focus-visible:ring-blue-400',
+        'bg-black text-white hover:bg-neutral-900 focus-visible:ring-blue-500 dark:bg-white dark:text-black dark:hover:bg-neutral-100 dark:focus-visible:ring-blue-400',
       secondary:
-        'bg-gray-100 text-black hover:bg-gray-200 focus-visible:ring-blue-500 dark:bg-gray-800 dark:text-white dark:hover:bg-gray-700 dark:focus-visible:ring-blue-400',
-      ghost:
-        'bg-transparent text-black hover:bg-gray-50 focus-visible:ring-blue-500 dark:text-white dark:hover:bg-gray-900 dark:focus-visible:ring-blue-400',
+        'bg-neutral-100 text-neutral-900 hover:bg-neutral-200 focus-visible:ring-blue-500 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700 dark:focus-visible:ring-blue-400',
       outline:
-        'border border-subtle bg-transparent text-primary hover:bg-surface-1 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400',
+        'border border-subtle bg-transparent text-primary-token hover:bg-surface-1 focus-visible:ring-blue-500 dark:focus-visible:ring-blue-400',
+      ghost:
+        'bg-transparent text-primary-token hover:bg-surface-1 focus-visible:ring-blue-500 dark:hover:bg-neutral-900 dark:focus-visible:ring-blue-400',
+      // alias for compatibility
       plain:
-        'bg-transparent text-black hover:bg-gray-50 focus-visible:ring-blue-500 dark:text-white dark:hover:bg-gray-900 dark:focus-visible:ring-blue-400',
+        'bg-transparent text-primary-token hover:bg-surface-1 focus-visible:ring-blue-500 dark:hover:bg-neutral-900 dark:focus-visible:ring-blue-400',
+      link: 'bg-transparent underline-offset-4 hover:underline text-primary-token',
+      destructive:
+        'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600',
     };
 
     const sizeClasses = {
-      sm: 'h-8 px-3 text-xs',
+      sm: 'h-9 px-3 text-xs',
       md: 'h-10 px-4 text-sm',
-      lg: 'h-12 px-6 text-base',
-      icon: 'h-10 w-10 p-0 flex items-center justify-center',
-    };
+      lg: 'h-11 px-6 text-base',
+      icon: 'h-10 w-10 p-0',
+    } as const;
 
     const colorClasses = {
       green:
@@ -97,39 +123,29 @@ export const Button = forwardRef<
     };
 
     // Determine which classes to use based on props
-    let variantClass = variantClasses[variant];
-    if (color && variant === 'primary') {
+    const resolvedVariant: keyof typeof variantClasses = ((): any => {
+      if (outline) return 'outline';
+      if (plain) return 'plain';
+      // default alias resolution
+      if (!variant || variant === 'primary') return 'default';
+      return variant;
+    })();
+
+    let variantClass = variantClasses[resolvedVariant] ?? variantClasses.default;
+
+    if (color && (resolvedVariant === 'default' || resolvedVariant === 'primary')) {
       variantClass = colorClasses[color];
     }
-    if (outline) variantClass = variantClasses.outline;
-    if (plain) variantClass = variantClasses.plain;
 
     // Apply disabled/loading states
     if (isDisabled) {
-      const cursorClass = 'cursor-not-allowed';
-      const opacityClass = 'opacity-50';
-      const hoverDisabled = 'hover:bg-current hover:text-current';
       const pointerEventsClass = Component === 'a' ? 'pointer-events-none' : '';
-
-      variantClass = `${opacityClass} ${hoverDisabled} ${pointerEventsClass}`;
-
-      if (variant === 'primary') {
-        variantClass +=
-          ' bg-gray-400 text-white dark:bg-gray-600 dark:text-gray-300';
-      } else if (variant === 'secondary') {
-        variantClass +=
-          ' bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500';
-      } else {
-        variantClass += ' text-gray-400 dark:text-gray-500';
-      }
-
-      variantClass = `${cursorClass} ${variantClass}`;
+      variantClass = `${variantClass} ${pointerEventsClass}`;
     } else {
       variantClass = `cursor-pointer ${variantClass}`;
     }
 
-    const classes =
-      `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
+    const classes = `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
 
     // Prepare additional props based on component type and state
     const additionalProps: Record<string, unknown> = {};
@@ -164,7 +180,7 @@ export const Button = forwardRef<
             <div className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin' />
           </div>
         )}
-        <span className={loading ? 'opacity-0' : 'opacity-100'}>
+        <span className={`${loading ? 'opacity-0' : 'opacity-100'} inline-flex items-center whitespace-nowrap`}>
           {children}
         </span>
       </Component>
