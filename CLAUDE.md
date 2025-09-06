@@ -155,7 +155,7 @@ Follow Y Combinator principles: optimize for fast iteration, minimal cognitive o
  - **Children:** Always typed as `React.ReactNode`.
 
 #### 7. **Icons, Hooks, Utils, Enums**
- - **Icons:** `Icon<Thing>.tsx` (e.g., `IconArrowRight`).
+ - **Icons:** Use **Heroicons v2** for general UI glyphs and **SimpleIcons** for social/DSP/brand marks. Only use custom SVGs when no equivalent exists; wrap customs as `Icon<Thing>.tsx` and document the fallback choice in the PR. Name icons `Icon<Thing>.tsx` (e.g., `IconArrowRight`).
  - **Hooks:** `use<Thing>.ts` (e.g., `useProfile`).
  - **Utils:** `format<Thing>.ts` (e.g., `formatPrice`).
  - **Enums:** `ThingEnum.ts` (e.g., `UserRoleEnum`).
@@ -871,6 +871,38 @@ POSTHOG_HOST=https://us.i.posthog.com # or EU/self-host
   - Avoid custom focus traps/ARIA unless Headless UI cannot cover the case.
   - Avoid heavyweight UI kits; keep components headless and brand-agnostic.
 - **Testing:** add a simple keyboard-nav test (Tab/Shift+Tab/Escape) for dialogs/menus.  
+
+## Notifications & Keyboard Shortcuts (Unified)
+
+### Toaster Notifications (Single System)
+- **One wrapper API**: All notifications must use a single wrapper (e.g., `notify`) around the chosen toaster (Sonner or equivalent). No direct imports of third‑party toast APIs outside the wrapper.
+- **When to use a toast**: Non-blocking status (save success, copy, queued job, background errors). Use `toast.promise`-style flows for async actions (upload, publish, connect account).
+- **When NOT to use a toast**: Form validation (keep inline near fields), destructive confirms or choices (keep dialog), permission requests, and multi-step decisions.
+- **Standards**: Success 2–3s, Info 3–4s, Error 5–8s. One-line titles; optional description ≤120 chars. Deduplicate by `id` to prevent spam. Respect dark/light, reduced motion, and ARIA (`status`/`alert`).
+- **A11y & Telemetry**: Verify live-region roles; capture `toast_shown` with level and key in PostHog. If Sentry returns an event id, attach it in error toasts.
+- **Governance**: ESLint rule forbids `alert/confirm/prompt` (except curated destructive dialogs) and any non-wrapper toast imports. Storybook stories cover success/error/info/promise variants.
+
+### Dialogs vs Toasts Policy
+- **Keep dialogs** for destructive actions, unsaved-changes, permission prompts, or multi-option decisions.
+- **Convert to toasts** any passive “FYI” dialogs or banners where non-blocking UX is superior.
+
+### Keyboard Shortcuts (Centralized)
+- **One registry + provider**: All shortcuts registered through a shared registry; no ad‑hoc `keydown` listeners.
+- **Discoverability**: A “Keyboard Shortcuts” help modal is accessible from the user menu and via `?`. Show platform-aware combos (⌘ vs Ctrl) and group by scope (`global`, `editor`, `modal`).
+- **Conventions**: `Cmd/Ctrl+K` opens the command menu; navigation sequences (e.g., `g` then `h`) are documented if used.
+- **Governance**: ESLint rule forbids raw `window.addEventListener('keydown', …)` outside the provider. Track usage with PostHog to prune unused combos.
+
+### Icon System Standardization
+- **Libraries**: Use **Heroicons v2** for general UI glyphs and **SimpleIcons** for social media, DSP, and brand marks.
+- **Customs**: Only when no equivalent exists; wrap as `Icon<Thing>.tsx`, keep size/stroke consistent with tokens, and document the reason in the PR.
+- **Enforcement**: Lint rule or static check flags imports from other icon packs in `components/` (exceptions must be annotated with `@allowed-icon` JSDoc).
+  
+### Definition of Done (UX Polish)
+- No direct third‑party toast imports; all toasts go through the wrapper.
+- No stray `alert/confirm/prompt` or ad‑hoc keydown listeners.
+- All eligible dialogs/banners converted per policy.
+- Keyboard help modal lists every active shortcut; combos work cross‑platform.
+- Icon usage adheres to Heroicons v2 / SimpleIcons; customs documented.
 
 ---
 
