@@ -135,6 +135,95 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: '6B7280',
     placeholder: 'https://your-website.com',
   },
+  // Additional social platforms
+  telegram: {
+    id: 'telegram',
+    name: 'Telegram',
+    category: 'social',
+    icon: 'telegram',
+    color: '26A5E4',
+    placeholder: 'https://t.me/username',
+  },
+  snapchat: {
+    id: 'snapchat',
+    name: 'Snapchat',
+    category: 'social',
+    icon: 'snapchat',
+    color: 'FFFC00',
+    placeholder: 'https://www.snapchat.com/add/username',
+  },
+  reddit: {
+    id: 'reddit',
+    name: 'Reddit',
+    category: 'social',
+    icon: 'reddit',
+    color: 'FF4500',
+    placeholder: 'https://www.reddit.com/user/username',
+  },
+  pinterest: {
+    id: 'pinterest',
+    name: 'Pinterest',
+    category: 'social',
+    icon: 'pinterest',
+    color: 'E60023',
+    placeholder: 'https://www.pinterest.com/username',
+  },
+  onlyfans: {
+    id: 'onlyfans',
+    name: 'OnlyFans',
+    category: 'social',
+    icon: 'onlyfans',
+    color: '00AFF0',
+    placeholder: 'https://onlyfans.com/username',
+  },
+  quora: {
+    id: 'quora',
+    name: 'Quora',
+    category: 'social',
+    icon: 'quora',
+    color: 'B92B27',
+    placeholder: 'https://www.quora.com/profile/Name',
+  },
+  threads: {
+    id: 'threads',
+    name: 'Threads',
+    category: 'social',
+    icon: 'threads',
+    color: '000000',
+    placeholder: 'https://www.threads.net/@username',
+  },
+  discord: {
+    id: 'discord',
+    name: 'Discord',
+    category: 'social',
+    icon: 'discord',
+    color: '5865F2',
+    placeholder: 'https://discord.gg/inviteCode',
+  },
+  line: {
+    id: 'line',
+    name: 'LINE',
+    category: 'social',
+    icon: 'line',
+    color: '00C300',
+    placeholder: 'https://line.me/R/ti/p/@username',
+  },
+  viber: {
+    id: 'viber',
+    name: 'Viber',
+    category: 'social',
+    icon: 'viber',
+    color: '7360F2',
+    placeholder: 'https://www.viber.com/username',
+  },
+  rumble: {
+    id: 'rumble',
+    name: 'Rumble',
+    category: 'social',
+    icon: 'rumble',
+    color: '85C742',
+    placeholder: 'https://rumble.com/c/ChannelName',
+  },
 };
 
 // Domain pattern matching for platform detection
@@ -155,6 +244,17 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?twitch\.tv/i, platformId: 'twitch' },
   { pattern: /(?:www\.)?linkedin\.com/i, platformId: 'linkedin' },
   { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
+  { pattern: /(?:www\.)?reddit\.com/i, platformId: 'reddit' },
+  { pattern: /(?:www\.)?pinterest\.com/i, platformId: 'pinterest' },
+  { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
+  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
+  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
+  { pattern: /(?:discord\.gg|(?:www\.)?discord\.com)/i, platformId: 'discord' },
+  { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
+  { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
+  { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
+  { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
+  { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
 ];
 
 /**
@@ -162,6 +262,10 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
  */
 export function normalizeUrl(url: string): string {
   try {
+    // Support bare X (Twitter) handles like @username
+    if (/^@[a-zA-Z0-9._]+$/.test(url)) {
+      return `https://x.com/${url.slice(1)}`;
+    }
     // Add protocol if missing
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       url = 'https://' + url;
@@ -171,6 +275,36 @@ export function normalizeUrl(url: string): string {
 
     // Force HTTPS for known platforms
     parsedUrl.protocol = 'https:';
+
+    // Canonicalize Twitter domain to x.com
+    if (/^(?:www\.)?twitter\.com$/i.test(parsedUrl.hostname)) {
+      parsedUrl.hostname = 'x.com';
+    }
+
+    // Normalize YouTube legacy custom channel URLs (accept single segment like /timwhite)
+    if (/(?:www\.)?youtube\.com/i.test(parsedUrl.hostname)) {
+      const path = parsedUrl.pathname;
+      const parts = path.split('/').filter(Boolean);
+      const reserved = [
+        'watch',
+        'results',
+        'shorts',
+        'live',
+        'playlist',
+        'feed',
+        'gaming',
+        'music',
+        'premium',
+        'c',
+        'channel',
+        'user',
+        'embed',
+      ];
+      // If a single-segment legacy custom URL and not reserved, keep as-is
+      if (parts.length === 1 && !reserved.includes(parts[0].toLowerCase())) {
+        // no-op; just ensuring we don't reject/transform it unnecessarily
+      }
+    }
 
     // Platform-specific URL normalization
     if (/(?:www\.)?tiktok\.com/i.test(parsedUrl.hostname)) {
@@ -333,11 +467,41 @@ function validateUrl(url: string, platform: PlatformInfo): boolean {
         return /(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/.test(url);
       case 'tiktok':
         return /tiktok\.com\/@[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'youtube':
-        return (
-          /youtube\.com\/(c\/|channel\/|@)[a-zA-Z0-9_-]+/.test(url) ||
-          /youtu\.be\/[a-zA-Z0-9_-]+/.test(url)
-        );
+      case 'youtube': {
+        const u = new URL(url);
+        const host = u.hostname.replace(/^www\./, '');
+        const path = u.pathname;
+        const parts = path.split('/').filter(Boolean);
+        const reserved = new Set([
+          'watch',
+          'results',
+          'shorts',
+          'live',
+          'playlist',
+          'feed',
+          'gaming',
+          'music',
+          'premium',
+          'embed',
+          'c',
+          'channel',
+          'user',
+        ]);
+
+        if (host === 'youtu.be') {
+          return /^\/[A-Za-z0-9_-]{6,}/.test(path);
+        }
+        if (host === 'youtube.com') {
+          if (/^\/(c|channel|user)\/[A-Za-z0-9_-]+/.test(path)) return true;
+          if (/^\/@[A-Za-z0-9._-]+/.test(path)) return true;
+          if (/^\/shorts\/[A-Za-z0-9_-]+/.test(path)) return true;
+          if (u.searchParams.get('v')) return true; // watch?v=
+          if (parts.length === 1 && !reserved.has(parts[0].toLowerCase())) {
+            return true; // legacy custom URL like /timwhite
+          }
+        }
+        return false;
+      }
       default:
         return true; // Basic URL validation passed
     }

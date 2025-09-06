@@ -74,7 +74,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
 
   const click = useClick(context);
   const dismiss = useDismiss(context);
-  const role = useRole(context);
+  const role = useRole(context, { role: 'menu' });
 
   const { getReferenceProps, getFloatingProps } = useInteractions([
     click,
@@ -267,7 +267,8 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             <div
               ref={refs.setFloating}
               {...getFloatingProps()}
-              className='z-50 w-64 rounded-lg border border-subtle bg-surface-0 shadow-xl backdrop-blur-sm focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
+              className='z-50 w-64 rounded-2xl border border-subtle bg-surface-0 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.6)] backdrop-blur-md focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
+              aria-label='User menu'
               style={{
                 ...floatingStyles,
                 animation: 'user-menu-enter 150ms ease-out',
@@ -280,7 +281,9 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                 </p>
                 <button
                   disabled
-                  className='w-full flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-surface-1 text-primary-token border border-subtle'
+                  role='menuitem'
+                  aria-disabled='true'
+                  className='w-full h-10 flex items-center justify-between gap-3 px-2.5 rounded-lg bg-surface-1 text-primary-token border border-subtle disabled:cursor-not-allowed disabled:opacity-80'
                   title='Creator switching coming soon'
                 >
                   <span className='flex items-center gap-2'>
@@ -308,7 +311,9 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                 </button>
                 <button
                   disabled
-                  className='mt-2 w-full flex items-center gap-2 px-3 py-2 rounded-md text-secondary-token hover:text-secondary-token border border-dashed border-subtle'
+                  role='menuitem'
+                  aria-disabled='true'
+                  className='mt-2 w-full h-10 flex items-center gap-2 px-2.5 rounded-lg text-secondary-token border border-dashed border-subtle disabled:cursor-not-allowed disabled:opacity-60'
                   title='Add creator coming soon'
                 >
                   <svg
@@ -356,11 +361,12 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
               <div className='py-1'>
                 {artist?.handle && (
                   <button
+                    role='menuitem'
                     onClick={() => {
                       router.push(`/${artist.handle}`);
                       setIsOpen(false);
                     }}
-                    className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                    className='w-full h-10 flex items-center gap-3 px-2.5 text-sm font-medium rounded-lg transition-colors duration-150 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
                   >
                     <svg
                       className='w-4 h-4'
@@ -386,35 +392,13 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                 )}
 
                 <button
-                  onClick={() => {
-                    handleProfile();
-                    setIsOpen(false);
-                  }}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-                    />
-                  </svg>
-                  Account Settings
-                </button>
-
-                <button
+                  role='menuitem'
                   onClick={() => {
                     handleBilling();
                     setIsOpen(false);
                   }}
                   disabled={isBillingLoading || billingStatus.loading}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
+                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm font-medium rounded-lg transition-colors duration-150 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset disabled:opacity-50 disabled:cursor-not-allowed'
                 >
                   {isBillingLoading ? (
                     <svg
@@ -450,8 +434,9 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                   {billingStatus.isPro ? 'Manage Billing' : 'Upgrade to Pro'}
                 </button>
                 <button
+                  role='menuitem'
                   onClick={() => router.push('/support')}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-surface-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
                 >
                   <svg
                     className='w-4 h-4'
@@ -473,9 +458,10 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
               {/* Settings + Sign out at bottom */}
               <div className='py-1 border-t border-subtle'>
                 <button
+                  role='menuitem'
                   onClick={handleProfile}
                   disabled={isLoading}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-surface-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
                 >
                   <svg
                     className='w-4 h-4'
@@ -487,15 +473,16 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
                     <path d='M12 15c2.761 0 5-2.239 5-5S14.761 5 12 5 7 7.239 7 10s2.239 5 5 5z' />
                     <path d='M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009.09 5H9a2 2 0 114 0h.09a1.65 1.65 0 001-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82 1.65 1.65 0 001 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z' />
                   </svg>
-                  Personal Settings
+                  Account Settings
                 </button>
                 <button
+                  role='menuitem'
                   onClick={() => {
                     handleSignOut();
                     setIsOpen(false);
                   }}
                   disabled={isLoading}
-                  className='w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed'
+                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500/70 focus-visible:ring-offset-0 ring-inset disabled:opacity-50 disabled:cursor-not-allowed'
                 >
                   <svg
                     className='w-4 h-4'

@@ -169,14 +169,22 @@ export function DashboardLinks({
   // Show update indicator
   const showUpdateIndicator = useCallback((success: boolean) => {
     if (updateIndicatorRef.current) {
-      updateIndicatorRef.current.dataset.show = 'true';
+      const el = updateIndicatorRef.current;
+      el.dataset.show = 'true';
       // Safe alternative to innerHTML - use textContent to prevent XSS
-      updateIndicatorRef.current.textContent = success
-        ? '✅ Updated'
-        : '❌ Error';
-      updateIndicatorRef.current.className = success
-        ? 'bg-green-500 text-white px-3 py-1 rounded-full text-xs font-medium'
-        : 'bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium';
+      el.textContent = success ? '✅ Updated' : '❌ Error';
+      // IMPORTANT: Don't overwrite base positioning/transition classes.
+      // Only toggle variant styles to prevent layout shift.
+      el.classList.remove('bg-green-500', 'bg-red-500');
+      el.classList.add(
+        success ? 'bg-green-500' : 'bg-red-500',
+        'text-white',
+        'px-3',
+        'py-1',
+        'rounded-full',
+        'text-xs',
+        'font-medium'
+      );
 
       setTimeout(() => {
         if (updateIndicatorRef.current) {
@@ -327,7 +335,7 @@ export function DashboardLinks({
             initialLinks={initialAllLinks}
             onLinksChange={handleAllLinksChange}
             onLinkAdded={handleLinkAdded}
-            disabled={saveStatus.saving}
+            disabled={false}
           />
         </div>
       </div>
