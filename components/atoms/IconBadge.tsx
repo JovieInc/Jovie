@@ -1,15 +1,25 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface IconBadgeProps {
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   colorVar: string;
   className?: string;
+  ariaLabel?: string;
 }
 
-export function IconBadge({ Icon, colorVar, className = '' }: IconBadgeProps) {
+export function IconBadge({
+  Icon,
+  colorVar,
+  className,
+  ariaLabel,
+}: IconBadgeProps) {
   return (
     <div
-      className={`relative flex h-8 w-8 items-center justify-center rounded-full ${className}`}
+      className={cn(
+        'relative flex h-8 w-8 items-center justify-center rounded-full',
+        className
+      )}
       style={{
         backgroundColor: `color-mix(in srgb, var(${colorVar}) 12%, transparent)`,
       }}
@@ -19,8 +29,9 @@ export function IconBadge({ Icon, colorVar, className = '' }: IconBadgeProps) {
         style={{
           color: `var(${colorVar})`,
         }}
-        role='img'
-        aria-hidden='true'
+        aria-hidden={ariaLabel ? false : true}
+        role={ariaLabel ? 'img' : undefined}
+        aria-label={ariaLabel}
       />
     </div>
   );
