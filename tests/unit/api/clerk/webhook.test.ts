@@ -33,6 +33,9 @@ describe('/api/clerk/webhook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // Set required environment variable
+    process.env.CLERK_WEBHOOK_SECRET = 'test_webhook_secret';
+
     // Mock headers
     vi.mocked(headers).mockResolvedValue(
       new Map([

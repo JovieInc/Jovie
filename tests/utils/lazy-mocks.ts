@@ -198,6 +198,8 @@ export function loadHeadlessUiMocks() {
  */
 export function loadEssentialMocks() {
   loadBrowserApiMocks();
+  loadNextJsMocks(); // Add Next.js mocks to essential mocks
+  loadClerkMocks(); // Add Clerk mocks to essential mocks
 
   // Mock server-only modules
   vi.mock('server-only', () => ({

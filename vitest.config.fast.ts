@@ -51,7 +51,14 @@ export default defineConfig({
     isolate: false, // Disable isolation for speed (use with caution)
 
     // Reduce reporter overhead
-    reporters: ['basic'],
+    reporters: [
+      [
+        'default',
+        {
+          summary: false,
+        },
+      ],
+    ],
 
     // Optimize file watching
     watch: false,
@@ -60,9 +67,11 @@ export default defineConfig({
     globals: false,
 
     // Optimize dependency handling
-    deps: {
-      // Inline dependencies for faster loading
-      inline: ['@testing-library/react', '@testing-library/jest-dom'],
+    server: {
+      deps: {
+        // Inline dependencies for faster loading
+        inline: ['@testing-library/react', '@testing-library/jest-dom'],
+      },
     },
   },
 
