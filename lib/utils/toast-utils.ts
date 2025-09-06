@@ -7,7 +7,8 @@ import type { ToastOptions } from '@/components/ui/ToastContainer';
  * Provides consistent messaging and styling across the application
  */
 
-export interface ToastUtilOptions extends Omit<ToastOptions, 'type'> {
+export interface ToastUtilOptions
+  extends Omit<ToastOptions, 'type' | 'message'> {
   /** Override the default duration for this toast */
   duration?: number;
   /** Add an action button to the toast */
@@ -78,26 +79,26 @@ export const TOAST_MESSAGES = {
   UPLOAD_SUCCESS: 'Upload completed successfully',
   DELETE_SUCCESS: 'Item deleted successfully',
   COPY_SUCCESS: 'Copied to clipboard',
-  
+
   // Error messages
   SAVE_ERROR: 'Failed to save changes. Please try again.',
   UPLOAD_ERROR: 'Upload failed. Please try again.',
   DELETE_ERROR: 'Failed to delete item. Please try again.',
   NETWORK_ERROR: 'Network error. Please check your connection.',
   GENERIC_ERROR: 'Something went wrong. Please try again.',
-  
+
   // Validation errors
   REQUIRED_FIELD: 'Please fill in all required fields',
   INVALID_EMAIL: 'Please enter a valid email address',
   INVALID_URL: 'Please enter a valid URL',
   FILE_TOO_LARGE: 'File size is too large',
   INVALID_FILE_TYPE: 'Invalid file type',
-  
+
   // Info messages
   LOADING: 'Loading...',
   PROCESSING: 'Processing your request...',
   CHANGES_PENDING: 'You have unsaved changes',
-  
+
   // Warning messages
   UNSAVED_CHANGES: 'You have unsaved changes that will be lost',
   RATE_LIMIT: 'Too many requests. Please wait a moment.',
@@ -168,7 +169,7 @@ export const isUserFacingError = (error: unknown): boolean => {
   if (typeof error === 'string') {
     return true;
   }
-  
+
   if (error instanceof Error) {
     // Don't show technical errors to users
     const technicalErrors = [
@@ -177,12 +178,12 @@ export const isUserFacingError = (error: unknown): boolean => {
       'ReferenceError',
       'SyntaxError',
     ];
-    
-    return !technicalErrors.some(techError => 
+
+    return !technicalErrors.some(techError =>
       error.message.includes(techError)
     );
   }
-  
+
   return false;
 };
 
@@ -193,22 +194,22 @@ export const getUserFriendlyErrorMessage = (error: unknown): string => {
   if (typeof error === 'string') {
     return error;
   }
-  
+
   if (error instanceof Error) {
     // Map common error patterns to user-friendly messages
     if (error.message.includes('fetch')) {
       return TOAST_MESSAGES.NETWORK_ERROR;
     }
-    
+
     if (error.message.includes('rate limit')) {
       return TOAST_MESSAGES.RATE_LIMIT;
     }
-    
+
     // Return the error message if it seems user-friendly
     if (error.message.length < 100 && !error.message.includes('at ')) {
       return error.message;
     }
   }
-  
+
   return TOAST_MESSAGES.GENERIC_ERROR;
 };

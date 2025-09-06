@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { Toast } from './Toast';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { Toast } from './Toast';
 
 const meta: Meta<typeof Toast> = {
   title: 'UI/Toast',
@@ -10,15 +10,16 @@ const meta: Meta<typeof Toast> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Toast notifications for user feedback. Use the useNotifications hook for easier integration.',
+        component:
+          'Toast notifications for user feedback. Use the useNotifications hook for easier integration.',
       },
     },
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <ToastProvider>
-        <div className="min-h-[200px] flex items-center justify-center">
+        <div className='min-h-[200px] flex items-center justify-center'>
           <Story />
         </div>
       </ToastProvider>
@@ -32,7 +33,8 @@ const meta: Meta<typeof Toast> = {
     },
     duration: {
       control: { type: 'number' },
-      description: 'Auto-dismiss duration in milliseconds (0 = no auto-dismiss)',
+      description:
+        'Auto-dismiss duration in milliseconds (0 = no auto-dismiss)',
     },
     message: {
       control: { type: 'text' },
@@ -100,79 +102,83 @@ const InteractiveExample = () => {
   const notifications = useNotifications();
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <h3 className="text-lg font-semibold mb-4">Interactive Toast Examples</h3>
-      
-      <div className="grid grid-cols-2 gap-4">
+    <div className='flex flex-col gap-4 p-6'>
+      <h3 className='text-lg font-semibold mb-4'>Interactive Toast Examples</h3>
+
+      <div className='grid grid-cols-2 gap-4'>
         <button
           onClick={() => notifications.success('Success! Operation completed.')}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          className='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
         >
           Show Success
         </button>
-        
+
         <button
           onClick={() => notifications.error('Error! Something went wrong.')}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
           Show Error
         </button>
-        
+
         <button
           onClick={() => notifications.warning('Warning! Please be careful.')}
-          className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+          className='px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700'
         >
           Show Warning
         </button>
-        
+
         <button
-          onClick={() => notifications.info('Info: Here\'s some information.')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          onClick={() => notifications.info("Info: Here's some information.")}
+          className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
         >
           Show Info
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className='grid grid-cols-2 gap-4 mt-4'>
         <button
-          onClick={() => notifications.undo('Item deleted', () => {
-            notifications.success('Item restored!');
-          })}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          onClick={() =>
+            notifications.undo('Item deleted', () => {
+              notifications.success('Item restored!');
+            })
+          }
+          className='px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
         >
           Show Undo Toast
         </button>
-        
+
         <button
-          onClick={() => notifications.retry('Upload failed', () => {
-            notifications.info('Retrying upload...');
-          })}
-          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+          onClick={() =>
+            notifications.retry('Upload failed', () => {
+              notifications.info('Retrying upload...');
+            })
+          }
+          className='px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700'
         >
           Show Retry Toast
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mt-4">
+      <div className='grid grid-cols-2 gap-4 mt-4'>
         <button
           onClick={() => {
-            const promise = new Promise((resolve) => {
+            const promise = new Promise(resolve => {
               setTimeout(resolve, 2000);
             });
-            
+
             notifications.withLoadingToast(promise, {
               loadingMessage: 'Processing...',
               successMessage: 'Done!',
             });
           }}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          className='px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700'
         >
           Show Loading Toast
         </button>
-        
+
         <button
           onClick={() => notifications.clearToasts()}
-          className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900"
+          className='px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900'
         >
           Clear All Toasts
         </button>
@@ -190,34 +196,36 @@ const PredefinedExample = () => {
   const notifications = useNotifications();
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <h3 className="text-lg font-semibold mb-4">Predefined Message Examples</h3>
-      
-      <div className="grid grid-cols-2 gap-4">
+    <div className='flex flex-col gap-4 p-6'>
+      <h3 className='text-lg font-semibold mb-4'>
+        Predefined Message Examples
+      </h3>
+
+      <div className='grid grid-cols-2 gap-4'>
         <button
           onClick={() => notifications.saveSuccess()}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          className='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
         >
           Save Success
         </button>
-        
+
         <button
           onClick={() => notifications.saveError()}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
           Save Error
         </button>
-        
+
         <button
           onClick={() => notifications.uploadSuccess()}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
         >
           Upload Success
         </button>
-        
+
         <button
           onClick={() => notifications.networkError()}
-          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+          className='px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700'
         >
           Network Error
         </button>
@@ -236,61 +244,63 @@ const ErrorHandlingExample = () => {
 
   const simulateError = (errorType: string) => {
     let error: Error;
-    
+
     switch (errorType) {
       case 'network':
-        error = new Error('fetch failed');
+        error = globalThis.Error('fetch failed');
         break;
       case 'validation':
-        error = new Error('Invalid email address');
+        error = globalThis.Error('Invalid email address');
         break;
       case 'technical':
-        error = new Error('TypeError: Cannot read property of undefined');
+        error = globalThis.Error(
+          'TypeError: Cannot read property of undefined'
+        );
         break;
       default:
-        error = new Error('Something went wrong');
+        error = globalThis.Error('Something went wrong');
     }
-    
+
     notifications.handleError(error, 'Operation failed');
   };
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <h3 className="text-lg font-semibold mb-4">Error Handling Examples</h3>
-      
-      <div className="grid grid-cols-2 gap-4">
+    <div className='flex flex-col gap-4 p-6'>
+      <h3 className='text-lg font-semibold mb-4'>Error Handling Examples</h3>
+
+      <div className='grid grid-cols-2 gap-4'>
         <button
           onClick={() => simulateError('network')}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
           Network Error
         </button>
-        
+
         <button
           onClick={() => simulateError('validation')}
-          className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+          className='px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700'
         >
           Validation Error
         </button>
-        
+
         <button
           onClick={() => simulateError('technical')}
-          className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+          className='px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
         >
           Technical Error (Console Only)
         </button>
-        
+
         <button
           onClick={() => simulateError('generic')}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+          className='px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700'
         >
           Generic Error
         </button>
       </div>
-      
-      <p className="text-sm text-gray-600 dark:text-gray-400 mt-4">
-        Technical errors are logged to console but not shown to users. 
-        Check the browser console when clicking "Technical Error".
+
+      <p className='text-sm text-gray-600 dark:text-gray-400 mt-4'>
+        Technical errors are logged to console but not shown to users. Check the
+        browser console when clicking &quot;Technical Error&quot;.
       </p>
     </div>
   );
