@@ -177,8 +177,23 @@ export function normalizeUrl(url: string): string {
       // Auto-add @ for TikTok handles if missing
       const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
       if (pathParts.length > 0 && !pathParts[0].startsWith('@')) {
-        pathParts[0] = '@' + pathParts[0];
-        parsedUrl.pathname = '/' + pathParts.join('/');
+        const firstSegment = pathParts[0];
+        const reservedSegments = new Set([
+          'foryou',
+          'for',
+          'discover',
+          'music',
+          'tag',
+          'sound',
+          'trending',
+        ]);
+        if (
+          /^[A-Za-z0-9._]+$/.test(firstSegment) &&
+          !reservedSegments.has(firstSegment.toLowerCase())
+        ) {
+          pathParts[0] = '@' + firstSegment;
+          parsedUrl.pathname = '/' + pathParts.join('/');
+        }
       }
     }
 

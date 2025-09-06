@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -10,10 +11,12 @@ interface DashboardOverviewProps {
 }
 
 export function DashboardOverview({ initialData }: DashboardOverviewProps) {
-  const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
-      : null
+  const artist: Artist | null = initialData.selectedProfile
+    ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    : null;
+
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'error'>(
+    'idle'
   );
 
   if (!artist) {
@@ -21,12 +24,29 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   }
 
   // Check setup completion status
-  const isHandleClaimed = Boolean(artist.owner_user_id);
+  const isHandleClaimed = Boolean(artist.handle && artist.handle !== artist.id);
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const hasSocialLinks = false; // We'll need to fetch this from social links
+  const hasSocialLinks = Boolean(
+    artist.instagram_url ||
+      artist.twitter_url ||
+      artist.tiktok_url ||
+      artist.facebook_url ||
+      artist.soundcloud_url
+  );
 
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(`${getBaseUrl()}/${artist.handle}`);
+      setCopyStatus('success');
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      setCopyStatus('error');
+    } finally {
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    }
+  };
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
 
   return (
@@ -71,14 +91,14 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                 View Profile
               </Link>
               <button
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    `https://jov.ie/${artist.handle}`
-                  );
-                }}
+                onClick={handleCopyUrl}
                 className='flex-1 px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors text-center text-sm font-medium'
               >
-                Copy URL
+                {copyStatus === 'success'
+                  ? 'Copied!'
+                  : copyStatus === 'error'
+                    ? 'Copy failed'
+                    : 'Copy URL'}
               </button>
             </div>
           </div>

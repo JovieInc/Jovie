@@ -168,6 +168,11 @@ export interface Artist {
   spotify_url?: string;
   apple_music_url?: string;
   youtube_url?: string;
+  instagram_url?: string;
+  twitter_url?: string;
+  tiktok_url?: string;
+  facebook_url?: string;
+  soundcloud_url?: string;
   venmo_handle?: string;
   published: boolean; // maps to is_public
   is_verified: boolean;

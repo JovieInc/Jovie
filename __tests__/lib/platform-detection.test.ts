@@ -40,6 +40,19 @@ describe('Platform Detection', () => {
       });
     });
 
+    it('should not modify non-user TikTok paths', () => {
+      const urls = [
+        'https://tiktok.com/',
+        'https://tiktok.com/for/you',
+        'https://tiktok.com/discover',
+      ];
+
+      urls.forEach(url => {
+        const result = normalizeUrl(url);
+        expect(result).toBe(url);
+      });
+    });
+
     it('should detect TikTok platform correctly', () => {
       const testUrls = [
         'tiktok.com/username',
