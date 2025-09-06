@@ -29,11 +29,13 @@ import {
   siX,
   siYoutube,
 } from 'simple-icons';
+import { cn } from '@/lib/utils';
 
 interface SocialIconProps {
   platform: string;
   className?: string;
   size?: number;
+  ariaLabel?: string;
 }
 
 // Map platform names to Simple Icons
@@ -75,10 +77,18 @@ export function getPlatformIcon(platform: string): SimpleIcon | undefined {
   return platformMap[platform.toLowerCase()];
 }
 
-export function SocialIcon({ platform, className, size }: SocialIconProps) {
-  const icon = platformMap[platform.toLowerCase()];
-  const iconClass = className || 'h-4 w-4';
+export function SocialIcon({
+  platform,
+  className,
+  size,
+  ariaLabel,
+}: SocialIconProps) {
+  const icon = getPlatformIcon(platform);
+  const iconClass = cn('h-4 w-4', className);
   const sizeStyle = size ? { width: size, height: size } : undefined;
+  const accessibilityProps = ariaLabel
+    ? { 'aria-label': ariaLabel }
+    : { 'aria-hidden': 'true' };
 
   if (icon) {
     return (
@@ -87,7 +97,7 @@ export function SocialIcon({ platform, className, size }: SocialIconProps) {
         style={sizeStyle}
         fill='currentColor'
         viewBox='0 0 24 24'
-        aria-hidden='true'
+        {...accessibilityProps}
       >
         <path d={icon.path} />
       </svg>
@@ -102,7 +112,7 @@ export function SocialIcon({ platform, className, size }: SocialIconProps) {
       fill='none'
       stroke='currentColor'
       viewBox='0 0 24 24'
-      aria-hidden='true'
+      {...accessibilityProps}
     >
       <path
         strokeLinecap='round'
