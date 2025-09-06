@@ -31,6 +31,7 @@ export default defineConfig({
     // Test timeout - increased for database operations
     testTimeout: 30000,
     hookTimeout: 30000,
+    globals: true,
   },
   resolve: {
     alias: {

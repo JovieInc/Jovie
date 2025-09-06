@@ -17,7 +17,12 @@ import {
 import { type ReactNode, useRef, useState } from 'react';
 
 export interface TooltipProps {
-  content: string;
+  /**
+   * Content displayed inside the tooltip. Provide plain text or
+   * accessible markup so screen readers can communicate the message
+   * effectively.
+   */
+  content: ReactNode;
   placement?: 'top' | 'bottom' | 'left' | 'right';
   shortcut?: string;
   children: ReactNode;
@@ -78,7 +83,7 @@ export function Tooltip({
             className='z-[60] select-none rounded-xl bg-black/90 px-2.5 py-1.5 text-[11px] font-medium text-white shadow-lg ring-1 ring-black/40 backdrop-blur will-change-transform'
           >
             <div className='flex items-center gap-2 whitespace-nowrap'>
-              <span>{content}</span>
+              {typeof content === 'string' ? <span>{content}</span> : content}
               {shortcut ? (
                 <kbd className='ml-1 inline-flex items-center rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white ring-1 ring-white/20'>
                   {shortcut}
@@ -89,8 +94,14 @@ export function Tooltip({
               ref={arrowRef}
               className='absolute h-2 w-2 rotate-45 bg-black/90 ring-1 ring-black/40'
               style={{
-                left: middlewareData.arrow?.x != null ? `${middlewareData.arrow.x}px` : '',
-                top: middlewareData.arrow?.y != null ? `${middlewareData.arrow.y}px` : '',
+                left:
+                  middlewareData.arrow?.x != null
+                    ? `${middlewareData.arrow.x}px`
+                    : '',
+                top:
+                  middlewareData.arrow?.y != null
+                    ? `${middlewareData.arrow.y}px`
+                    : '',
               }}
             />
           </div>
