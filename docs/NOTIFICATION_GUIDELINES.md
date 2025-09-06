@@ -6,6 +6,8 @@ This document outlines when and how to use different types of notifications in t
 
 Jovie uses a unified toast notification system that provides consistent user feedback across the application. This system is built on top of a custom React context and provides both basic toast functionality and enhanced convenience methods.
 
+> **Note**: This notification system was designed to replace direct calls to external toast libraries and provide a consistent user experience throughout the application.
+
 ## When to Use Toasts vs Console Logging
 
 ### ✅ Use Toasts For:
