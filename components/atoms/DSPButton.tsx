@@ -1,6 +1,17 @@
 'use client';
 
+import DOMPurify from 'isomorphic-dompurify';
 import React from 'react';
+import { cn } from '@/lib/utils';
+
+const sizeClasses = {
+  sm: 'px-4 py-2 text-sm',
+  md: 'px-6 py-3 text-base',
+  lg: 'px-8 py-4 text-lg',
+} as const;
+
+const baseClasses =
+  'w-full max-w-md rounded-lg font-semibold transition-all duration-200 ease-out shadow-sm hover:-translate-y-1 hover:shadow-md active:translate-y-0 active:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:hover:shadow-sm';
 
 export interface DSPButtonProps {
   /** DSP platform name (e.g., 'Spotify', 'Apple Music') */
@@ -38,31 +49,29 @@ export function DSPButton({
   disabled = false,
 }: DSPButtonProps) {
   const handleClick = () => {
-    if (!disabled && onClick) {
+    if (disabled) return;
+    if (onClick) {
       onClick(dspKey, url);
+    } else {
+      const isExternal = /^https?:\/\//i.test(url);
+      if (isExternal) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        window.location.href = url;
+      }
     }
   };
 
-  const sizeClasses = {
-    sm: 'px-4 py-2 text-sm',
-    md: 'px-6 py-3 text-base',
-    lg: 'px-8 py-4 text-lg',
-  };
+  const sanitizedLogo = DOMPurify.sanitize(logoSvg, {
+    USE_PROFILES: { svg: true },
+  });
 
   return (
     <button
+      type='button'
       onClick={handleClick}
       disabled={disabled}
-      className={`
-        w-full max-w-md rounded-lg font-semibold transition-all duration-200 ease-out 
-        shadow-sm hover:-translate-y-1 hover:shadow-md active:translate-y-0 active:shadow-sm 
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 
-        focus-visible:ring-white/50 cursor-pointer
-        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 
-        disabled:hover:shadow-sm
-        ${sizeClasses[size]}
-        ${className}
-      `}
+      className={cn(baseClasses, sizeClasses[size], className)}
       style={{
         backgroundColor: disabled ? '#9CA3AF' : backgroundColor,
         color: disabled ? '#FFFFFF' : textColor,
@@ -71,8 +80,8 @@ export function DSPButton({
     >
       <span className='inline-flex items-center gap-2'>
         <span
-          dangerouslySetInnerHTML={{ __html: logoSvg }}
           className='flex-shrink-0'
+          dangerouslySetInnerHTML={{ __html: sanitizedLogo }}
         />
         <span>Open in {name}</span>
       </span>
