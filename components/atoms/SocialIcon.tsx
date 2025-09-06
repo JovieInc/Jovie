@@ -86,9 +86,8 @@ export function SocialIcon({
   const icon = getPlatformIcon(platform);
   const iconClass = cn('h-4 w-4', className);
   const sizeStyle = size ? { width: size, height: size } : undefined;
-  const accessibilityProps = ariaLabel
-    ? { 'aria-label': ariaLabel }
-    : { 'aria-hidden': 'true' };
+  const accessibilityProps: { 'aria-label'?: string; 'aria-hidden'?: boolean } =
+    ariaLabel ? { 'aria-label': ariaLabel } : { 'aria-hidden': true };
 
   if (icon) {
     return (
