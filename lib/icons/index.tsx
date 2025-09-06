@@ -1,8 +1,14 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
-import type { IconProps, SocialIconProps, IconSize, HeroIcon, SocialPlatform } from './types';
-import { getIconByName, getSocialIconByPlatform } from './registry';
 import { SocialIcon as SocialIconComponent } from '@/components/atoms/SocialIcon';
+import { cn } from '@/lib/utils';
+import { getIconByName, getSocialIconByPlatform } from './registry';
+import type {
+  HeroIcon,
+  IconProps,
+  IconSize,
+  SocialIconProps,
+  SocialPlatform,
+} from './types';
 
 // Size mappings for consistent icon sizing
 const sizeMap: Record<IconSize, string> = {
@@ -24,10 +30,10 @@ export function getIconSizeClasses(size?: IconSize | number): string {
 
 /**
  * Get a Heroicon component by name
- * 
+ *
  * @param name - The icon name from the registry
  * @returns The icon component or undefined if not found
- * 
+ *
  * @example
  * ```tsx
  * const ChevronRight = getIcon('chevron-right');
@@ -43,27 +49,26 @@ export function getIcon(name: string): HeroIcon | undefined {
 
 /**
  * Unified Icon component that automatically selects the correct icon library
- * 
+ *
  * @example
  * ```tsx
  * // For UI icons (uses Heroicons)
  * <Icon name="chevron-right" size="md" />
- * 
+ *
  * // For social icons (uses SocialIcon component)
  * <Icon social platform="spotify" size="lg" />
  * ```
  */
-export function Icon({ 
-  name, 
-  size = 'md', 
-  className, 
+export function Icon({
+  name,
+  size = 'md',
+  className,
   'aria-hidden': ariaHidden = true,
   'aria-label': ariaLabel,
-  ...props 
+  ...props
 }: IconProps & { social?: boolean; platform?: SocialPlatform }) {
-  const sizeClasses = typeof size === 'number' 
-    ? `h-[${size}px] w-[${size}px]` 
-    : sizeMap[size];
+  const sizeClasses =
+    typeof size === 'number' ? `h-[${size}px] w-[${size}px]` : sizeMap[size];
 
   // Handle social icons
   if (props.social && props.platform) {
@@ -100,23 +105,22 @@ export function Icon({
 
 /**
  * Enhanced SocialIcon wrapper with better TypeScript support
- * 
+ *
  * @example
  * ```tsx
  * <SocialIcon platform="spotify" size="lg" />
  * <SocialIcon platform="instagram" className="text-pink-500" />
  * ```
  */
-export function SocialIcon({ 
-  platform, 
-  size = 'md', 
+export function SocialIcon({
+  platform,
+  size = 'md',
   className,
   'aria-hidden': ariaHidden = true,
   'aria-label': ariaLabel,
 }: SocialIconProps) {
-  const sizeClasses = typeof size === 'number' 
-    ? `h-[${size}px] w-[${size}px]` 
-    : sizeMap[size];
+  const sizeClasses =
+    typeof size === 'number' ? `h-[${size}px] w-[${size}px]` : sizeMap[size];
 
   return (
     <SocialIconComponent
@@ -138,10 +142,10 @@ export function isSocialPlatform(platform: string): platform is SocialPlatform {
 
 /**
  * Get suggested icon name based on context or keywords
- * 
+ *
  * @param context - Description of what the icon is for
  * @returns Array of suggested icon names
- * 
+ *
  * @example
  * ```tsx
  * const suggestions = getSuggestedIcons('close button');
@@ -154,41 +158,41 @@ export function getSuggestedIcons(context: string): string[] {
 
   // Common mappings
   const mappings: Record<string, string[]> = {
-    'close': ['x-mark', 'x-circle'],
-    'cancel': ['x-mark', 'x-circle'],
-    'dismiss': ['x-mark'],
-    'back': ['arrow-left', 'chevron-left'],
-    'next': ['arrow-right', 'chevron-right'],
-    'forward': ['arrow-right', 'chevron-right'],
-    'previous': ['arrow-left', 'chevron-left'],
-    'up': ['chevron-up', 'arrow-up'],
-    'down': ['chevron-down', 'arrow-down'],
-    'add': ['plus'],
-    'create': ['plus'],
-    'new': ['plus'],
-    'delete': ['trash', 'x-mark'],
-    'remove': ['trash', 'minus'],
-    'edit': ['pencil'],
-    'modify': ['pencil'],
-    'search': ['search'],
-    'find': ['search'],
-    'settings': ['settings'],
-    'config': ['settings'],
-    'user': ['user', 'user-circle'],
-    'profile': ['user', 'user-circle'],
-    'account': ['user', 'user-circle'],
-    'success': ['check', 'check-circle'],
-    'error': ['x-circle', 'warning'],
-    'warning': ['warning'],
-    'info': ['info'],
-    'help': ['info', 'question-mark-circle'],
-    'play': ['play', 'play-solid'],
-    'pause': ['pause', 'pause-solid'],
-    'favorite': ['star', 'heart'],
-    'like': ['heart', 'heart-solid'],
-    'share': ['share'],
-    'menu': ['menu'],
-    'home': ['home'],
+    close: ['x-mark', 'x-circle'],
+    cancel: ['x-mark', 'x-circle'],
+    dismiss: ['x-mark'],
+    back: ['arrow-left', 'chevron-left'],
+    next: ['arrow-right', 'chevron-right'],
+    forward: ['arrow-right', 'chevron-right'],
+    previous: ['arrow-left', 'chevron-left'],
+    up: ['chevron-up', 'arrow-up'],
+    down: ['chevron-down', 'arrow-down'],
+    add: ['plus'],
+    create: ['plus'],
+    new: ['plus'],
+    delete: ['trash', 'x-mark'],
+    remove: ['trash', 'minus'],
+    edit: ['pencil'],
+    modify: ['pencil'],
+    search: ['search'],
+    find: ['search'],
+    settings: ['settings'],
+    config: ['settings'],
+    user: ['user', 'user-circle'],
+    profile: ['user', 'user-circle'],
+    account: ['user', 'user-circle'],
+    success: ['check', 'check-circle'],
+    error: ['x-circle', 'warning'],
+    warning: ['warning'],
+    info: ['info'],
+    help: ['info', 'question-mark-circle'],
+    play: ['play', 'play-solid'],
+    pause: ['pause', 'pause-solid'],
+    favorite: ['star', 'heart'],
+    like: ['heart', 'heart-solid'],
+    share: ['share'],
+    menu: ['menu'],
+    home: ['home'],
   };
 
   // Find matching suggestions
@@ -202,23 +206,22 @@ export function getSuggestedIcons(context: string): string[] {
   return [...new Set(suggestions)];
 }
 
-// Re-export types and utilities
-export type { 
-  IconProps, 
-  SocialIconProps, 
-  IconSize, 
-  HeroIcon, 
-  SocialPlatform,
-  IconCategory,
-  IconRegistryEntry,
-  SocialIconRegistryEntry,
-} from './types';
-
-export { 
-  iconRegistry, 
-  socialIconRegistry, 
-  getIconByName, 
-  getSocialIconByPlatform,
-  searchIcons,
+export {
+  getIconByName,
   getIconsByCategory,
+  getSocialIconByPlatform,
+  iconRegistry,
+  searchIcons,
+  socialIconRegistry,
 } from './registry';
+// Re-export types and utilities
+export type {
+  HeroIcon,
+  IconCategory,
+  IconProps,
+  IconRegistryEntry,
+  IconSize,
+  SocialIconProps,
+  SocialIconRegistryEntry,
+  SocialPlatform,
+} from './types';

@@ -4,32 +4,38 @@ import type { ComponentType, SVGProps } from 'react';
 export type HeroIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 // Social platform types supported by SocialIcon component
-export type SocialPlatform = 
-  | 'instagram' 
-  | 'twitter' 
-  | 'x' 
-  | 'tiktok' 
-  | 'youtube' 
+export type SocialPlatform =
+  | 'instagram'
+  | 'twitter'
+  | 'x'
+  | 'tiktok'
+  | 'youtube'
   | 'facebook'
-  | 'spotify' 
-  | 'apple' 
-  | 'applemusic' 
-  | 'apple_music' 
+  | 'spotify'
+  | 'apple'
+  | 'applemusic'
+  | 'apple_music'
   | 'soundcloud'
-  | 'bandcamp' 
-  | 'discord' 
-  | 'reddit' 
-  | 'pinterest' 
-  | 'tumblr' 
+  | 'bandcamp'
+  | 'discord'
+  | 'reddit'
+  | 'pinterest'
+  | 'tumblr'
   | 'vimeo'
-  | 'github' 
-  | 'medium' 
-  | 'patreon' 
-  | 'venmo' 
+  | 'github'
+  | 'medium'
+  | 'patreon'
+  | 'venmo'
   | 'website';
 
 // Icon categories for better organization
-export type IconCategory = 'navigation' | 'action' | 'state' | 'social' | 'brand' | 'custom';
+export type IconCategory =
+  | 'navigation'
+  | 'action'
+  | 'state'
+  | 'social'
+  | 'brand'
+  | 'custom';
 
 // Icon size presets
 export type IconSize = 'sm' | 'md' | 'lg' | 'xl';
@@ -52,7 +58,8 @@ export interface SocialIconRegistryEntry {
 }
 
 // Icon props for unified icon component
-export interface IconProps {
+export interface IconProps
+  extends Omit<SVGProps<SVGSVGElement>, 'size' | 'className'> {
   name?: string;
   size?: IconSize | number;
   className?: string;
@@ -68,4 +75,3 @@ export interface SocialIconProps {
   'aria-hidden'?: boolean;
   'aria-label'?: string;
 }
-
