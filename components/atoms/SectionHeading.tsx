@@ -1,3 +1,5 @@
+import { cn } from '@/lib/utils';
+
 export interface SectionHeadingProps {
   level?: 1 | 2 | 3 | 4 | 5 | 6;
   children: React.ReactNode;
@@ -34,7 +36,12 @@ export function SectionHeading({
   return (
     <Tag
       id={id}
-      className={`font-bold tracking-tight text-gray-900 dark:text-white ${sizeClasses[size]} ${alignClasses[align]} ${className}`}
+      className={cn(
+        'font-bold tracking-tight text-gray-900 dark:text-white',
+        sizeClasses[size],
+        alignClasses[align],
+        className
+      )}
       style={{ letterSpacing: '-0.02em' }}
     >
       {children}
