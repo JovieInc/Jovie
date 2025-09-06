@@ -1,6 +1,6 @@
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
-// import { Inter } from 'next/font/google'; // Temporarily disabled for build testing
+import { Inter } from 'next/font/google';
 import React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -18,13 +18,13 @@ import type { ThemeMode } from '@/types';
 // Import performance monitoring
 // import { initWebVitals } from '@/lib/monitoring/web-vitals'; // Currently unused
 
-// Configure Inter font - temporarily disabled for build testing
-// const inter = Inter({
-//   subsets: ['latin'],
-//   weight: ['400', '500', '600', '700'],
-//   display: 'swap',
-//   variable: '--font-inter',
-// });
+// Configure Inter font
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 // Bypass static rendering for now to fix build issues
 export const dynamic = 'force-dynamic';
@@ -232,7 +232,9 @@ export default async function RootLayout({
           }}
         />
       </head>
-      <body className='font-sans bg-base text-primary-token'>
+      <body
+        className={`${inter.variable} font-sans bg-base text-primary-token`}
+      >
         <ClientProviders initialThemeMode={initialThemeMode}>
           {children}
         </ClientProviders>

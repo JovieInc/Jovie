@@ -41,7 +41,6 @@ export function WrappedSocialLink({
 }: WrappedSocialLinkProps) {
   const [wrappedData, setWrappedData] = useState<WrappedLinkData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [_error, setError] = useState<string | null>(null); // eslint-disable-line @typescript-eslint/no-unused-vars
 
   // Generate crawler-safe label
   const domain = extractDomain(href);
@@ -58,9 +57,10 @@ export function WrappedSocialLink({
       return;
     }
 
+    const controller = new AbortController();
+
     const wrapLink = async () => {
       setIsLoading(true);
-      setError(null);
 
       try {
         const response = await fetch('/api/wrap-link', {
@@ -72,6 +72,7 @@ export function WrappedSocialLink({
             url: href,
             platform,
           }),
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -88,8 +89,10 @@ export function WrappedSocialLink({
           alias: data.titleAlias || crawlerSafeLabel,
         });
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          return;
+        }
         console.error('Link wrapping failed:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
         // Fallback to original URL
         setWrappedData({
           wrappedUrl: href,
@@ -97,11 +100,17 @@ export function WrappedSocialLink({
           alias: crawlerSafeLabel,
         });
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     wrapLink();
+
+    return () => {
+      controller.abort();
+    };
   }, [href, platform, crawlerSafeLabel]);
 
   // Default security attributes

@@ -18,7 +18,6 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
     () => getPlatformIcon(link.platform)?.hex,
     [link.platform]
   );
-
   const hexToRgba = (hex: string, alpha: number) => {
     const h = hex.replace('#', '');
     const bigint = parseInt(h, 16);
@@ -82,12 +81,15 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
       onClick={e => handleClick(e)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      className='group flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-gray-700 transition-all duration-150 hover:scale-105 active:scale-95 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ring-1 ring-black/5 dark:ring-white/10'
+      className='group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ring-1 ring-black/5 dark:ring-white/10'
       style={
-        hover && brandHex
+        brandHex
           ? {
               color: `#${brandHex}`,
-              boxShadow: `0 0 0 0.5px ${hexToRgba(brandHex, 0.6)}, 0 10px 24px -12px ${hexToRgba(brandHex, 0.6)}`,
+              backgroundColor: hexToRgba(brandHex, 0.12),
+              boxShadow: hover
+                ? `0 0 0 0.5px ${hexToRgba(brandHex, 0.6)}, 0 10px 24px -12px ${hexToRgba(brandHex, 0.6)}`
+                : undefined,
             }
           : undefined
       }

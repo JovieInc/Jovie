@@ -1,6 +1,8 @@
 import { ArrowRightIcon } from '@heroicons/react/24/solid';
 import type { Meta, StoryObj } from '@storybook/react';
 import { CTAButton } from './CTAButton';
+import { ToastProvider } from '@/components/providers/ToastProvider';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 
 const meta: Meta<typeof CTAButton> = {
   title: 'Atoms/CTAButton',
@@ -15,6 +17,13 @@ const meta: Meta<typeof CTAButton> = {
     },
   },
   tags: ['autodocs'],
+  decorators: [
+    (Story) => (
+      <ToastProvider>
+        <Story />
+      </ToastProvider>
+    ),
+  ],
   argTypes: {
     variant: {
       control: { type: 'select' },
@@ -305,13 +314,22 @@ export const ThemeComparison: Story = {
 };
 
 // Button with onClick handler
+const WithOnClickComponent = () => {
+  const notifications = useNotifications();
+  
+  return (
+    <CTAButton
+      variant="primary"
+      size="md"
+      onClick={() => notifications.success('Button clicked! 🎉')}
+    >
+      Click Me
+    </CTAButton>
+  );
+};
+
 export const WithOnClick: Story = {
-  args: {
-    children: 'Click Me',
-    variant: 'primary',
-    size: 'md',
-    onClick: () => alert('Button clicked!'),
-  },
+  render: () => <WithOnClickComponent />,
 };
 
 // Accessibility examples

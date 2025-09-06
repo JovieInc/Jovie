@@ -16,6 +16,9 @@ const meta: Meta<typeof AmountSelector> = {
     isSelected: {
       control: { type: 'boolean' },
     },
+    disabled: {
+      control: { type: 'boolean' },
+    },
   },
 };
 
@@ -27,6 +30,7 @@ export const Default: Story = {
     amount: 5,
     isSelected: false,
     onClick: () => {},
+    disabled: false,
   },
 };
 
@@ -35,6 +39,7 @@ export const Selected: Story = {
     amount: 10,
     isSelected: true,
     onClick: () => {},
+    disabled: false,
   },
 };
 
@@ -43,6 +48,7 @@ export const SmallAmount: Story = {
     amount: 3,
     isSelected: false,
     onClick: () => {},
+    disabled: false,
   },
 };
 
@@ -51,6 +57,7 @@ export const LargeAmount: Story = {
     amount: 25,
     isSelected: false,
     onClick: () => {},
+    disabled: false,
   },
 };
 
@@ -79,8 +86,18 @@ export const InDarkMode: Story = {
     amount: 7,
     isSelected: true,
     onClick: () => {},
+    disabled: false,
   },
   parameters: {
     backgrounds: { default: 'dark' },
+  },
+};
+
+export const Disabled: Story = {
+  args: {
+    amount: 5,
+    isSelected: false,
+    onClick: () => {},
+    disabled: true,
   },
 };

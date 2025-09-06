@@ -88,7 +88,9 @@ describe('DashboardOverview', () => {
     ).toBeInTheDocument();
 
     // Progress indicator
-    expect(screen.getByText('0/3 setup steps completed')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Setup progress: 0 of 3 steps completed')
+    ).toBeInTheDocument();
   });
 
   it('marks tasks complete based on data', () => {
@@ -117,7 +119,9 @@ describe('DashboardOverview', () => {
     ).toBeInTheDocument();
 
     // Progress indicator reflects 2/3
-    expect(screen.getByText('2/3 setup steps completed')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText('Setup progress: 2 of 3 steps completed')
+    ).toBeInTheDocument();
   });
 
   it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {

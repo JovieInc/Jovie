@@ -9,14 +9,108 @@
 
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
-import { afterEach, expect } from 'vitest';
-import { loadEssentialMocks } from './utils/lazy-mocks';
+import React from 'react';
+import { afterEach, expect, vi } from 'vitest';
 
 // Extend expect with jest-dom matchers
 expect.extend(matchers);
 
-// Load only essential mocks upfront
-loadEssentialMocks();
+// Load essential browser API mocks immediately
+if (typeof global.ResizeObserver === 'undefined') {
+  global.ResizeObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+}
+
+if (typeof global.IntersectionObserver === 'undefined') {
+  global.IntersectionObserver = vi.fn().mockImplementation(() => ({
+    observe: vi.fn(),
+    unobserve: vi.fn(),
+    disconnect: vi.fn(),
+  }));
+}
+
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
+if (typeof window !== 'undefined' && !window.scrollTo) {
+  Object.defineProperty(window, 'scrollTo', {
+    writable: true,
+    value: vi.fn(),
+  });
+}
+
+// Mock Next.js Image component
+vi.mock('next/image', () => ({
+  default: ({
+    src,
+    alt,
+    width,
+    height,
+    className,
+    ...props
+  }: React.ComponentProps<'img'>) => {
+    return React.createElement('img', {
+      src,
+      alt,
+      width,
+      height,
+      className,
+      'data-testid': 'next-image',
+      ...props,
+    });
+  },
+}));
+
+// Mock Clerk components
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({
+    isSignedIn: false,
+    user: null,
+    isLoaded: true,
+  }),
+  useAuth: () => ({
+    has: vi.fn(() => false),
+  }),
+  useSession: () => ({
+    session: null,
+    isLoaded: true,
+  }),
+  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  SignIn: ({ children }: { children: React.ReactNode }) => children,
+  SignUp: ({ children }: { children: React.ReactNode }) => children,
+  SignInButton: ({ children }: { children: React.ReactNode }) => children,
+  SignUpButton: ({ children }: { children: React.ReactNode }) => children,
+  UserButton: () =>
+    React.createElement('div', { 'data-testid': 'user-button' }, 'User Button'),
+}));
+
+// Mock server-only modules
+vi.mock('server-only', () => ({
+  default: vi.fn(),
+}));
+
+// Mock console methods to reduce noise
+global.console = {
+  ...console,
+  warn: vi.fn(),
+  error: vi.fn(),
+};
 
 // Clean up DOM between tests
 afterEach(() => {

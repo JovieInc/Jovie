@@ -1,5 +1,17 @@
 import React, { forwardRef } from 'react';
 
+/**
+ * Accessible button component.
+ *
+ * Defaults to `type="button"` unless overridden and mirrors the `disabled`
+ * prop with `aria-disabled` for assistive technologies.
+ *
+ * **Usage**
+ * - **Interactive:** Trigger actions or navigation.
+ * - **Decorative:** For non-interactive visuals, use a `<span>` or `<div>`
+ *   styled like a button to avoid conveying button semantics.
+ */
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline' | 'plain';
@@ -125,9 +137,10 @@ export const Button = forwardRef<
       additionalProps.type = props.type || 'button';
       additionalProps.disabled = isDisabled;
     } else if (Component === 'a' && isDisabled) {
-      additionalProps['aria-disabled'] = 'true';
       additionalProps.tabIndex = -1;
     }
+
+    additionalProps['aria-disabled'] = isDisabled;
 
     if (loading) {
       additionalProps['aria-busy'] = 'true';

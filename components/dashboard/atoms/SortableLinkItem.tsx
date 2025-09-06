@@ -52,6 +52,26 @@ export const SortableLinkItem = forwardRef<
     };
 
     const brandColor = `#${link.platform.color}`;
+    const hexToRgb = (hex: string) => {
+      const h = hex.replace('#', '');
+      const bigint = parseInt(h, 16);
+      return {
+        r: (bigint >> 16) & 255,
+        g: (bigint >> 8) & 255,
+        b: bigint & 255,
+      };
+    };
+    const relativeLuminance = (hex: string) => {
+      const { r, g, b } = hexToRgb(hex);
+      const [R, G, B] = [r, g, b].map(v => {
+        const c = v / 255;
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      });
+      return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+    };
+    const isDarkBrand = relativeLuminance(brandColor) < 0.35;
+    const iconColor = isDarkBrand ? '#ffffff' : brandColor;
+    const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
 
     // Handle title editing
     const handleTitleClick = useCallback(() => {
@@ -207,8 +227,8 @@ export const SortableLinkItem = forwardRef<
           <div
             className='flex items-center justify-center w-8 h-8 rounded-lg shrink-0'
             style={{
-              backgroundColor: `${brandColor}15`,
-              color: brandColor,
+              backgroundColor: iconBg,
+              color: iconColor,
             }}
             aria-hidden='true'
           >
