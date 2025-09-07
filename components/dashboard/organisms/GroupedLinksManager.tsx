@@ -28,6 +28,15 @@ export interface GroupedLinksManagerProps<
 
 // Client Component scaffold for a single, grouped Links Manager
 // Phase 2: wire minimal callbacks for DashboardLinks integration.
+// Configurable cross-category policy (extend here to allow more platforms to span sections)
+export const CROSS_CATEGORY: Record<
+  string,
+  Array<'social' | 'dsp' | 'custom'>
+> = {
+  youtube: ['social', 'dsp'],
+  // soundcloud: ['social', 'dsp'],
+};
+
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
@@ -103,11 +112,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       | 'earnings'
       | 'custom';
 
-  // Cross-category policy (platforms that can live in multiple sections)
-  const CROSS_CATEGORY: Record<string, Array<'social' | 'dsp' | 'custom'>> = {
-    youtube: ['social', 'dsp'],
-    // soundcloud: ['social', 'dsp'], // enable if desired
-  };
+  // Cross-category policy is defined at module level via CROSS_CATEGORY
 
   const canMoveTo = (
     l: T,
@@ -267,8 +272,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       {ytPrompt && (
         <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
           <div className='text-primary-token'>
-            You already added YouTube in this section. Do you also want to add
-            it as a music service?
+            You already added{' '}
+            {ytPrompt.candidate.platform.name || ytPrompt.candidate.platform.id}{' '}
+            in this section. Do you also want to add it under{' '}
+            {labelFor(ytPrompt.target)}?
           </div>
           <div className='shrink-0 flex items-center gap-2'>
             <Button
@@ -290,7 +297,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 onLinksChange?.(next);
               }}
             >
-              Add as {ytPrompt.target === 'dsp' ? 'Music' : 'Social'}
+              Add as {labelFor(ytPrompt.target)}
             </Button>
             <Button
               size='sm'
