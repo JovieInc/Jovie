@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
@@ -38,6 +38,13 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     prompt: "Here's your link.",
   },
 ];
+
+const NUDGE_MESSAGES: Record<string, string> = {
+  welcome: 'Ready when you are.',
+  name: 'Your name helps fans find you.',
+  handle: 'Pick something short and memorable.',
+  done: 'Share your link to start growing.',
+};
 
 interface OnboardingState {
   step:
@@ -107,14 +114,56 @@ export function AppleStyleOnboardingForm() {
     isSubmitting: false,
   });
 
+  const [nudge, setNudge] = useState<string | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetIdleTimer = useCallback(() => {
+    if (idleTimer.current) {
+      clearTimeout(idleTimer.current);
+    }
+    setNudge(null);
+    idleTimer.current = setTimeout(() => {
+      const step = ONBOARDING_STEPS[currentStepIndex];
+      const message = NUDGE_MESSAGES[step.id];
+      setNudge(message);
+      track('onboarding_nudge_shown', {
+        step_id: step.id,
+        step_index: currentStepIndex,
+        step_title: step.title,
+        user_id: user?.id,
+        nudge: message,
+      });
+    }, 10000);
+  }, [currentStepIndex, user?.id]);
+
+  useEffect(() => {
+    resetIdleTimer();
+    const handleActivity = () => resetIdleTimer();
+    window.addEventListener('click', handleActivity);
+    window.addEventListener('keydown', handleActivity);
+    window.addEventListener('mousemove', handleActivity);
+    window.addEventListener('touchstart', handleActivity);
+    return () => {
+      if (idleTimer.current) {
+        clearTimeout(idleTimer.current);
+      }
+      window.removeEventListener('click', handleActivity);
+      window.removeEventListener('keydown', handleActivity);
+      window.removeEventListener('mousemove', handleActivity);
+      window.removeEventListener('touchstart', handleActivity);
+    };
+  }, [resetIdleTimer]);
+
   // Prefill handle and full name data
   useEffect(() => {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const privateFullName = (
+        user as {
+          privateMetadata?: { fullName?: string };
+        }
+      ).privateMetadata?.fullName;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -141,12 +190,17 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
+      (
+        user as {
+          privateMetadata?: { suggestedUsername?: string };
+        }
+      ).privateMetadata?.suggestedUsername
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
+      const suggested = (
+        user as {
+          privateMetadata?: { suggestedUsername?: string };
+        }
+      ).privateMetadata?.suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
@@ -472,6 +526,9 @@ export function AppleStyleOnboardingForm() {
             >
               Start
             </Button>
+            {nudge && (
+              <p className='text-sm text-[var(--muted)] mt-4'>{nudge}</p>
+            )}
           </div>
         );
 
@@ -519,6 +576,11 @@ export function AppleStyleOnboardingForm() {
               >
                 Back
               </button>
+              {nudge && (
+                <p className='text-sm text-center text-[var(--muted)] mt-2'>
+                  {nudge}
+                </p>
+              )}
             </div>
           </div>
         );
@@ -685,6 +747,11 @@ export function AppleStyleOnboardingForm() {
               >
                 Back
               </button>
+              {nudge && (
+                <p className='text-sm text-center text-[var(--muted)] mt-2'>
+                  {nudge}
+                </p>
+              )}
             </div>
           </div>
         );
@@ -731,6 +798,11 @@ export function AppleStyleOnboardingForm() {
                 <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
                   {state.error}
                 </div>
+              )}
+              {nudge && (
+                <p className='text-sm text-center text-[var(--muted)] mt-2'>
+                  {nudge}
+                </p>
               )}
             </div>
           </div>
