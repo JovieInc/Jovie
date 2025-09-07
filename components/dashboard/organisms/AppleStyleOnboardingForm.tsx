@@ -48,6 +48,7 @@ interface OnboardingState {
     | 'complete';
   progress: number;
   error: string | null;
+  notification: string | null;
   retryCount: number;
   isSubmitting: boolean;
 }
@@ -60,7 +61,13 @@ interface HandleValidationState {
   suggestions: string[];
 }
 
-export function AppleStyleOnboardingForm() {
+export function AppleStyleOnboardingForm({
+  initialState,
+  initialStepIndex = 0,
+}: {
+  initialState?: Partial<OnboardingState>;
+  initialStepIndex?: number;
+} = {}) {
   const { user } = useUser();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -82,7 +89,7 @@ export function AppleStyleOnboardingForm() {
       : APP_URL.replace(/^https?:\/\//, '');
 
   // Current step in the onboarding flow
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Form state
@@ -103,8 +110,10 @@ export function AppleStyleOnboardingForm() {
     step: 'validating',
     progress: 0,
     error: null,
+    notification: null,
     retryCount: 0,
     isSubmitting: false,
+    ...initialState,
   });
 
   // Prefill handle and full name data
@@ -112,9 +121,9 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const privateMetadata = (user as Record<string, unknown>)
+        .privateMetadata as Record<string, unknown> | undefined;
+      const privateFullName = privateMetadata?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -141,12 +150,18 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
+      (
+        (user as Record<string, unknown>).privateMetadata as
+          | Record<string, unknown>
+          | undefined
+      )?.suggestedUsername
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
+      const suggested = (
+        (user as Record<string, unknown>).privateMetadata as Record<
+          string,
+          unknown
+        >
+      ).suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
@@ -428,10 +443,13 @@ export function AppleStyleOnboardingForm() {
     navigator.clipboard
       .writeText(link)
       .then(() => {
-        // Show a temporary success message
-        setState(prev => ({ ...prev, error: 'Link copied to clipboard!' }));
+        // Show a temporary success notification
+        setState(prev => ({
+          ...prev,
+          notification: 'Link copied to clipboard!',
+        }));
         setTimeout(() => {
-          setState(prev => ({ ...prev, error: null }));
+          setState(prev => ({ ...prev, notification: null }));
         }, 2000);
       })
       .catch(err => {
@@ -726,10 +744,10 @@ export function AppleStyleOnboardingForm() {
                 </Button>
               </div>
 
-              {/* Success message when link is copied */}
-              {state.error && (
+              {/* Success notification when link is copied */}
+              {state.notification && (
                 <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
-                  {state.error}
+                  {state.notification}
                 </div>
               )}
             </div>
