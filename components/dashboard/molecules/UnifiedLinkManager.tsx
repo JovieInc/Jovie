@@ -24,6 +24,11 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
   const [links, setLinks] = useState<LinkItem[]>(initialLinks);
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
 
+  // Sync local links state with initialLinks prop changes
+  React.useEffect(() => {
+    setLinks(initialLinks);
+  }, [initialLinks]);
+
   // High-value platforms we want to suggest
   const HIGH_VALUE_PLATFORM_IDS = useMemo(
     () => ['spotify', 'apple-music', 'instagram', 'tiktok', 'youtube'],
@@ -56,6 +61,8 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
   };
 
   const handleLinkAdded = (updated: LinkItem[]) => {
+    // Clear prefill URL after successful link addition
+    setPrefillUrl(undefined);
     if (onLinkAdded) {
       onLinkAdded(updated);
     }
