@@ -15,9 +15,11 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
+import { ChevronRight, LogOut, User, CreditCard } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import type { Artist } from '@/types/db';
 
@@ -26,7 +28,7 @@ interface UserButtonProps {
   showUserInfo?: boolean;
 }
 
-export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
+export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const { isLoaded, user } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const router = useRouter();
@@ -35,6 +37,19 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const billingStatus = useBillingStatus();
 
+  // User display info
+  const userImageUrl = user?.imageUrl;
+  const displayName = user?.fullName || user?.firstName || user?.emailAddresses[0]?.emailAddress || '';
+  const userInitials = displayName
+    ? displayName
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2)
+    : 'U';
+
+  // Floating UI setup for dropdown
   const { refs, floatingStyles, context } = useFloating({
     open: isOpen,
     onOpenChange: setIsOpen,
@@ -43,13 +58,7 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
       flip({
         mainAxis: true,
         crossAxis: true,
-        fallbackPlacements: [
-          'bottom-start',
-          'top-end',
-          'top-start',
-          'left',
-          'right',
-        ],
+        fallbackPlacements: ['bottom-start', 'top-end', 'top-start', 'left', 'right'],
         padding: 16,
       }),
       shift({
@@ -82,23 +91,23 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
     role,
   ]);
 
+  // Handle loading state
   if (!isLoaded || !user) {
     if (showUserInfo) {
       return (
         <div className='flex w-full items-center gap-3 p-2'>
-          <div className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none' />
+          <div className='h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
           <div className='flex-1 space-y-1'>
-            <div className='h-4 w-24 rounded-sm skeleton motion-reduce:animate-none' />
-            <div className='h-3 w-16 rounded-sm skeleton motion-reduce:animate-none' />
+            <div className='h-4 w-24 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
+            <div className='h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
           </div>
         </div>
       );
     }
-    return (
-      <div className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none' />
-    );
+    return <div className='h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />;
   }
 
+  // Handle sign out
   const handleSignOut = async () => {
     setIsLoading(true);
     try {
@@ -109,106 +118,73 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
     }
   };
 
+  // Handle profile click
   const handleProfile = () => {
     openUserProfile();
+    setIsOpen(false);
   };
 
+  // Handle billing portal
   const handleBilling = async () => {
     if (isBillingLoading) return;
-
     setIsBillingLoading(true);
 
     try {
       if (billingStatus.isPro && billingStatus.hasStripeCustomer) {
-        // User has a subscription - open billing portal
         const response = await fetch('/api/stripe/portal', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to create billing portal session');
-        }
-
+        if (!response.ok) throw new Error('Failed to create billing portal session');
         const { url } = await response.json();
         window.location.href = url;
       } else {
-        // User doesn't have a subscription - get default Pro plan price ID and redirect to checkout
-        try {
-          const pricingResponse = await fetch('/api/stripe/pricing-options');
-          if (!pricingResponse.ok) {
-            throw new Error('Failed to fetch pricing options');
-          }
+        // Handle subscription flow
+        const pricingResponse = await fetch('/api/stripe/pricing-options');
+        if (!pricingResponse.ok) throw new Error('Failed to fetch pricing options');
+        
+        const { pricingOptions } = await pricingResponse.json();
+        const defaultPlan = pricingOptions.find(
+          (option: { interval: string }) => option.interval === 'month'
+        ) || pricingOptions[0];
 
-          const { pricingOptions } = await pricingResponse.json();
-          // Get the monthly Pro plan (cheapest option for quick upgrade)
-          const defaultPlan =
-            pricingOptions.find(
-              (option: { interval: string }) => option.interval === 'month'
-            ) || pricingOptions[0];
+        if (!defaultPlan?.priceId) throw new Error('No pricing options available');
 
-          if (!defaultPlan?.priceId) {
-            throw new Error('No pricing options available');
-          }
+        const checkoutResponse = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: defaultPlan.priceId }),
+        });
 
-          // Create checkout session for the default Pro plan
-          const checkoutResponse = await fetch('/api/stripe/checkout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              priceId: defaultPlan.priceId,
-            }),
-          });
-
-          if (!checkoutResponse.ok) {
-            throw new Error('Failed to create checkout session');
-          }
-
-          const { url } = await checkoutResponse.json();
-          window.location.href = url;
-        } catch (checkoutError) {
-          console.error('Error creating checkout session:', checkoutError);
-          // Fallback to pricing page
-          router.push('/pricing');
-        }
+        if (!checkoutResponse.ok) throw new Error('Failed to create checkout session');
+        const { url } = await checkoutResponse.json();
+        window.location.href = url;
       }
     } catch (error) {
       console.error('Error handling billing:', error);
-      // Fallback to pricing page
       router.push('/pricing');
     } finally {
       setIsBillingLoading(false);
     }
   };
 
-  const userImageUrl = user.imageUrl;
-  const displayName =
-    user.fullName || user.firstName || user.emailAddresses[0]?.emailAddress;
-  const userInitials = displayName
-    ? displayName
-        .split(' ')
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
-    : 'U';
-
   return (
     <>
       <button
         ref={refs.setReference}
-        {...getReferenceProps()}
-        className={`flex items-center transition-all duration-300 ease-in-out focus-ring-themed ${
-          showUserInfo
-            ? 'gap-3 w-full rounded-md border border-subtle bg-surface-1 px-2.5 py-2 text-left hover:bg-surface-2'
-            : 'items-center justify-center gap-0 w-8 h-8 p-0 rounded-md border border-subtle bg-surface-0 hover:bg-surface-2'
-        }`}
+        className={cn(
+          'flex items-center transition-all duration-150',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+          'rounded-full',
+          showUserInfo 
+            ? 'gap-2.5 w-full px-3 py-1.5 text-left border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+            : 'justify-center w-9 h-9 p-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50',
+          isOpen && 'ring-2 ring-offset-2 ring-primary/50 ring-offset-white dark:ring-offset-gray-900'
+        )}
         aria-haspopup='menu'
         aria-expanded={isOpen}
+        {...getReferenceProps()}
       >
         {userImageUrl ? (
           <Image
@@ -216,289 +192,99 @@ export function UserButton({ artist, showUserInfo = false }: UserButtonProps) {
             alt={displayName || 'User avatar'}
             width={showUserInfo ? 32 : 20}
             height={showUserInfo ? 32 : 20}
-            className={`${showUserInfo ? 'w-8 h-8' : 'w-5 h-5'} rounded-full object-cover flex-shrink-0 block`}
+            className={`${showUserInfo ? 'w-8 h-8' : 'w-5 h-5'} rounded-full object-cover flex-shrink-0`}
           />
         ) : (
-          <div
-            className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-[10px]'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-semibold`}
-          >
+          <div className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-xs'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-medium`}>
             {userInitials}
           </div>
         )}
-        <div
-          className={`flex-1 min-w-0 transition-all duration-300 ease-in-out ${
-            showUserInfo
-              ? 'opacity-100 w-auto overflow-visible'
-              : 'opacity-0 w-0 overflow-hidden'
-          }`}
-        >
-          {showUserInfo && (
-            <>
-              <p className='text-sm font-medium text-primary truncate'>
-                {displayName}
-              </p>
-              <p className='text-xs text-tertiary truncate'>
-                {user.primaryEmailAddress?.emailAddress}
-              </p>
-            </>
-          )}
-        </div>
+        
         {showUserInfo && (
-          <svg
-            className={`w-4 h-4 text-tertiary-token transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-            fill='none'
-            viewBox='0 0 24 24'
-            stroke='currentColor'
-            strokeWidth={2}
-            aria-hidden='true'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M19 9l-7 7-7-7'
-            />
-          </svg>
+          <div className='flex-1 min-w-0'>
+            <p className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate'>
+              {displayName}
+            </p>
+            <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+              {user.primaryEmailAddress?.emailAddress}
+            </p>
+          </div>
+        )}
+
+        {showUserInfo && (
+          <ChevronRight 
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} 
+            aria-hidden='true' 
+          />
         )}
       </button>
 
+      {/* Dropdown menu */}
       {isOpen && (
         <FloatingPortal>
           <FloatingFocusManager context={context} modal={false}>
             <div
               ref={refs.setFloating}
+              style={floatingStyles}
+              className='z-50 min-w-[220px] rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/10 dark:ring-white/10 overflow-hidden backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95'
               {...getFloatingProps()}
-              className='z-50 w-64 rounded-2xl border border-subtle bg-surface-0 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.6)] backdrop-blur-md focus-visible:outline-none ring-1 ring-black/5 dark:ring-white/5'
-              aria-label='User menu'
-              style={{
-                ...floatingStyles,
-                animation: 'user-menu-enter 150ms ease-out',
-              }}
             >
-              {/* Creator section */}
-              <div className='p-3 border-b border-subtle'>
-                <p className='px-1 pb-2 text-[11px] font-semibold uppercase tracking-wide text-tertiary-token'>
-                  Creator
-                </p>
-                <button
-                  disabled
-                  role='menuitem'
-                  aria-disabled='true'
-                  className='w-full h-10 flex items-center justify-between gap-3 px-2.5 rounded-lg bg-surface-1 text-primary-token border border-subtle disabled:cursor-not-allowed disabled:opacity-80'
-                  title='Creator switching coming soon'
-                >
-                  <span className='flex items-center gap-2'>
-                    <svg
-                      className='w-4 h-4 text-secondary-token'
-                      viewBox='0 0 24 24'
-                      fill='none'
-                      stroke='currentColor'
-                      strokeWidth='2'
-                    >
-                      <path d='M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5z' />
-                      <path d='M3 22c0-4.971 4.029-9 9-9s9 4.029 9 9' />
-                    </svg>
-                    @{artist?.handle ?? 'creator'}
-                  </span>
-                  <svg
-                    className='w-4 h-4 text-tertiary-token'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                  >
-                    <path d='M20 6L9 17l-5-5' />
-                  </svg>
-                </button>
-                <button
-                  disabled
-                  role='menuitem'
-                  aria-disabled='true'
-                  className='mt-2 w-full h-10 flex items-center gap-2 px-2.5 rounded-lg text-secondary-token border border-dashed border-subtle disabled:cursor-not-allowed disabled:opacity-60'
-                  title='Add creator coming soon'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
-                  >
-                    <path d='M12 5v14M5 12h14' />
-                  </svg>
-                  Add creator (soon)
-                </button>
-              </div>
-
-              {/* Profile summary */}
-              <div className='p-4 border-b border-subtle'>
-                <div className='flex items-center gap-3'>
+              <div className='p-2'>
+                {/* Profile section */}
+                <div className='flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/30 mb-2'>
                   {userImageUrl ? (
                     <Image
                       src={userImageUrl}
                       alt={displayName || 'User avatar'}
                       width={40}
                       height={40}
-                      className='w-10 h-10 rounded-full object-cover'
+                      className='w-10 h-10 rounded-full object-cover flex-shrink-0'
                     />
                   ) : (
-                    <div className='w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center'>
-                      <span className='text-sm font-medium text-primary-token'>
-                        {userInitials}
-                      </span>
+                    <div className='w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium text-sm'>
+                      {userInitials}
                     </div>
                   )}
-                  <div className='flex-1 min-w-0'>
-                    <p className='text-sm font-medium text-primary-token truncate'>
+                  <div className='min-w-0'>
+                    <p className='text-sm font-medium text-gray-900 dark:text-white truncate'>
                       {displayName}
                     </p>
-                    <p className='text-xs text-secondary-token truncate'>
+                    <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
                       {user.primaryEmailAddress?.emailAddress}
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className='py-1'>
-                {artist?.handle && (
+                {/* Menu items */}
+                <div className='space-y-1'>
                   <button
-                    role='menuitem'
-                    onClick={() => {
-                      router.push(`/${artist.handle}`);
-                      setIsOpen(false);
-                    }}
-                    className='w-full h-10 flex items-center gap-3 px-2.5 text-sm font-medium rounded-lg transition-colors duration-150 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
+                    onClick={handleProfile}
+                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors'
                   >
-                    <svg
-                      className='w-4 h-4'
-                      fill='none'
-                      stroke='currentColor'
-                      viewBox='0 0 24 24'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'
-                      />
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={2}
-                        d='M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z'
-                      />
-                    </svg>
-                    View Profile
+                    <User className='w-4 h-4 text-gray-500 dark:text-gray-400' />
+                    <span>Profile</span>
                   </button>
-                )}
 
-                <button
-                  role='menuitem'
-                  onClick={() => {
-                    handleBilling();
-                    setIsOpen(false);
-                  }}
-                  disabled={isBillingLoading || billingStatus.loading}
-                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm font-medium rounded-lg transition-colors duration-150 text-secondary-token hover:text-primary-token hover:bg-surface-2 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset disabled:opacity-50 disabled:cursor-not-allowed'
-                >
-                  {isBillingLoading ? (
-                    <svg
-                      className='w-4 h-4 animate-spin'
-                      fill='none'
-                      viewBox='0 0 24 24'
-                    >
-                      <circle
-                        className='opacity-25'
-                        cx='12'
-                        cy='12'
-                        r='10'
-                        stroke='currentColor'
-                        strokeWidth='4'
-                      ></circle>
-                      <path
-                        className='opacity-75'
-                        fill='currentColor'
-                        d='M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z'
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      className='w-4 h-4'
-                      viewBox='0 0 24 24'
-                      fill='none'
-                      stroke='currentColor'
-                      strokeWidth='2'
-                    >
-                      <path d='M3 10h18M7 15h1m4 0h5M6 19h12a2 2 0 002-2V7a2 2 0 00-2-2H6a2 2 0 00-2 2v10a2 2 0 002 2z' />
-                    </svg>
-                  )}
-                  {billingStatus.isPro ? 'Manage Billing' : 'Upgrade to Pro'}
-                </button>
-                <button
-                  role='menuitem'
-                  onClick={() => router.push('/support')}
-                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-surface-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
+                  <button
+                    onClick={handleBilling}
+                    disabled={isBillingLoading}
+                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors disabled:opacity-50'
                   >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
-                    />
-                  </svg>
-                  Help & Support
-                </button>
-              </div>
+                    <CreditCard className='w-4 h-4 text-gray-500 dark:text-gray-400' />
+                    <span>{isBillingLoading ? 'Loading...' : 'Billing & Plans'}</span>
+                  </button>
 
-              {/* Settings + Sign out at bottom */}
-              <div className='py-1 border-t border-subtle'>
-                <button
-                  role='menuitem'
-                  onClick={handleProfile}
-                  disabled={isLoading}
-                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-surface-1 focus:outline-none focus-visible:ring-1 focus-visible:ring-accent/70 focus-visible:ring-offset-0 ring-inset'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    viewBox='0 0 24 24'
-                    fill='none'
-                    stroke='currentColor'
-                    strokeWidth='2'
+                  <div className='border-t border-gray-100 dark:border-gray-700 my-1' />
+
+                  <button
+                    onClick={handleSignOut}
+                    disabled={isLoading}
+                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50'
                   >
-                    <path d='M12 15c2.761 0 5-2.239 5-5S14.761 5 12 5 7 7.239 7 10s2.239 5 5 5z' />
-                    <path d='M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009.09 5H9a2 2 0 114 0h.09a1.65 1.65 0 001-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82 1.65 1.65 0 001 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z' />
-                  </svg>
-                  Account Settings
-                </button>
-                <button
-                  role='menuitem'
-                  onClick={() => {
-                    handleSignOut();
-                    setIsOpen(false);
-                  }}
-                  disabled={isLoading}
-                  className='w-full h-10 flex items-center gap-3 px-2.5 text-sm rounded-lg transition-colors duration-150 hover:bg-red-50 dark:hover:bg-red-950/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-red-500/70 focus-visible:ring-offset-0 ring-inset disabled:opacity-50 disabled:cursor-not-allowed'
-                >
-                  <svg
-                    className='w-4 h-4'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1'
-                    />
-                  </svg>
-                  {isLoading ? 'Signing out...' : 'Sign out'}
-                </button>
+                    <LogOut className='w-4 h-4' />
+                    <span>{isLoading ? 'Signing out...' : 'Sign out'}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </FloatingFocusManager>

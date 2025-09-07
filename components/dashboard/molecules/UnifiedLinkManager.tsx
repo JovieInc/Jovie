@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import type { LinkItem } from '@/types/links';
 import { LinkManager } from './LinkManager';
@@ -18,13 +18,21 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
   onLinkAdded,
   disabled = false,
 }) => {
+  // Local state, with sync to incoming props
+  const [links, setLinks] = useState<LinkItem[]>(initialLinks);
+  const [prefillUrl, setPrefillUrl] = useState<string | undefined>(undefined);
+
+  // Keep local links in sync with parent updates
+  useEffect(() => {
+    setLinks(initialLinks);
+  }, [initialLinks]);
   // Separate links by category for display
   const { socialLinks, musicLinks, customLinks } = useMemo(() => {
-    const social = initialLinks.filter(
+    const social = links.filter(
       link => link.platform.category === 'social'
     );
-    const music = initialLinks.filter(link => link.platform.category === 'dsp');
-    const custom = initialLinks.filter(
+    const music = links.filter(link => link.platform.category === 'dsp');
+    const custom = links.filter(
       link => link.platform.category === 'custom'
     );
 
@@ -33,16 +41,21 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
       musicLinks: music.sort((a, b) => a.order - b.order),
       customLinks: custom.sort((a, b) => a.order - b.order),
     };
-  }, [initialLinks]);
+  }, [links]);
 
-  const handleLinksChange = (links: LinkItem[]) => {
-    onLinksChange(links);
+  const handleLinksChange = (updated: LinkItem[]) => {
+    setLinks(updated);
+    onLinksChange(updated);
   };
 
-  const handleLinkAdded = (links: LinkItem[]) => {
-    if (onLinkAdded) {
-      onLinkAdded(links);
-    }
+  const handleLinkAdded = (updated: LinkItem[]) => {
+    setLinks(updated);
+    onLinkAdded?.(updated);
+  };
+
+  // Suggestion click → set prefill URL. Parent UniversalLinkInput will consume then clear.
+  const handleSuggestionClick = (placeholderUrl: string) => {
+    setPrefillUrl(placeholderUrl);
   };
 
   return (

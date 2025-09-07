@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +17,8 @@ interface UniversalLinkInputProps {
   // Quota indicators (optional)
   socialVisibleCount?: number;
   socialVisibleLimit?: number; // default 6
+  prefillUrl?: string; // optional prefill
+  onPrefillConsumed?: () => void; // notify parent once we consume it
 }
 
 export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
@@ -26,11 +28,25 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
   existingPlatforms = [],
   socialVisibleCount = 0,
   socialVisibleLimit = 6,
+  prefillUrl,
+  onPrefillConsumed,
 }) => {
   const [url, setUrl] = useState('');
   const [customTitle, setCustomTitle] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
+
+  // If parent provides a prefill URL and we are empty, consume it once
+  useEffect(() => {
+    if (prefillUrl && !url) {
+      setUrl(prefillUrl);
+      onPrefillConsumed?.();
+      // focus input so user can hit Enter quickly
+      setTimeout(() => urlInputRef.current?.focus(), 0);
+    }
+    // Only react to changes of prefillUrl when url is empty to avoid overriding user typing
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillUrl]);
 
   // Real-time platform detection
   const detectedLink = useMemo(() => {
@@ -241,7 +257,11 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
                     color: effectiveBrandColor,
                   }}
                 >
-                  {detectedLink.platform.category}
+                  {detectedLink.platform.category === 'dsp'
+                    ? 'Music Service'
+                    : detectedLink.platform.category === 'social'
+                      ? 'Social'
+                      : 'Custom'}
                 </span>
               </div>
 
