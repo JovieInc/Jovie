@@ -16,26 +16,26 @@ interface OnboardingStep {
   prompt: string;
 }
 
-const ONBOARDING_STEPS: OnboardingStep[] = [
+export const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: "Let's get you live.",
-    prompt: "We'll set up your profile in 3 quick steps.",
+    title: 'Launch your profile in moments.',
+    prompt: "Three quick steps and you're live.",
   },
   {
     id: 'name',
-    title: "What's your name?",
-    prompt: 'This will be displayed on your Jovie profile.',
+    title: 'Your name, your signature.',
+    prompt: 'Displayed on your Jovie profile.',
   },
   {
     id: 'handle',
-    title: 'Pick your @handle',
-    prompt: 'This will be your link on Jovie.',
+    title: 'Claim your @handle.',
+    prompt: 'This becomes your unique link.',
   },
   {
     id: 'done',
     title: "You're live.",
-    prompt: "Here's your link.",
+    prompt: 'Your link is ready to share.',
   },
 ];
 
@@ -112,9 +112,12 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const userWithMetadata = user as
+        | { privateMetadata?: Record<string, unknown> }
+        | undefined;
+      const privateFullName = userWithMetadata?.privateMetadata?.fullName as
+        | string
+        | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -141,12 +144,11 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
+      (user as { privateMetadata?: Record<string, unknown> } | undefined)
+        ?.privateMetadata?.suggestedUsername
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
+      const suggested = (user as { privateMetadata?: Record<string, unknown> })
+        .privateMetadata?.suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {

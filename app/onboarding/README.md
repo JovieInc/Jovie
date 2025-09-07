@@ -32,3 +32,12 @@ Legacy onboarding components have been moved to `/app/legacy/onboarding/componen
 - `OnboardingForm.stories.tsx` (Storybook stories)
 
 These components are no longer used in the application but are preserved for reference.
+
+## Copy Reference
+
+Current step copy for `AppleStyleOnboardingForm`:
+
+1. **welcome** – Title: "Launch your profile in moments." Prompt: "Three quick steps and you're live."
+2. **name** – Title: "Your name, your signature." Prompt: "Displayed on your Jovie profile."
+3. **handle** – Title: "Claim your @handle." Prompt: "This becomes your unique link."
+4. **done** – Title: "You're live." Prompt: "Your link is ready to share."
