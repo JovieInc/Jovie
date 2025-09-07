@@ -43,6 +43,7 @@ interface LinkManagerProps {
   allowedCategory?: 'dsp' | 'social' | 'custom' | 'all';
   title?: string;
   description?: string;
+  prefillUrl?: string;
 }
 
 export const LinkManager: React.FC<LinkManagerProps> = ({
@@ -55,6 +56,7 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
   title: _title = 'Manage Links', // eslint-disable-line @typescript-eslint/no-unused-vars
   description:
     _description = 'Add and organize your links. Changes save automatically.', // eslint-disable-line @typescript-eslint/no-unused-vars
+  prefillUrl,
 }) => {
   const [links, setLinks] = useState<LinkItem[]>(
     initialLinks.sort((a, b) => a.order - b.order)
@@ -347,6 +349,7 @@ export const LinkManager: React.FC<LinkManagerProps> = ({
             .length
         }
         socialVisibleLimit={MAX_SOCIAL_LINKS}
+        prefillUrl={prefillUrl}
       />
 
       {/* Links Counter moved next to Add button inside UniversalLinkInput */}

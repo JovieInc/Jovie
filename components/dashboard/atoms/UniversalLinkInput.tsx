@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,6 +23,7 @@ interface UniversalLinkInputProps {
   // Quota indicators (optional)
   socialVisibleCount?: number;
   socialVisibleLimit?: number; // default 6
+  prefillUrl?: string;
 }
 
 export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
@@ -26,11 +33,21 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
   existingPlatforms = [],
   socialVisibleCount = 0,
   socialVisibleLimit = 6,
+  prefillUrl,
 }) => {
   const [url, setUrl] = useState('');
   const [customTitle, setCustomTitle] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (prefillUrl) {
+      setUrl(prefillUrl);
+      setCustomTitle('');
+      setIsEditing(false);
+      urlInputRef.current?.focus();
+    }
+  }, [prefillUrl]);
 
   // Real-time platform detection
   const detectedLink = useMemo(() => {

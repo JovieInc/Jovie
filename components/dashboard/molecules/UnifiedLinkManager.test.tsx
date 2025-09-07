@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
+import { act } from 'react-dom/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '@/components/providers/ToastProvider';
-import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { type DetectedLink, getPlatform } from '@/lib/utils/platform-detection';
 import { UnifiedLinkManager } from './UnifiedLinkManager';
 
 // Mock the useToast hook
@@ -22,9 +23,13 @@ vi.mock('@/components/ui/ToastContainer', async importOriginal => {
   };
 });
 
-// Mock the LinkManager component since we're testing token usage, not functionality
+// Mock the LinkManager component and capture props
+let linkManagerProps: Record<string, any> = {};
 vi.mock('./LinkManager', () => ({
-  LinkManager: () => <div data-testid='link-manager'>Mocked LinkManager</div>,
+  LinkManager: (props: Record<string, any>) => {
+    linkManagerProps = props;
+    return <div data-testid='link-manager'>Mocked LinkManager</div>;
+  },
 }));
 
 // Mock platform detection data
@@ -80,6 +85,7 @@ describe('UnifiedLinkManager Token Usage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    linkManagerProps = {};
   });
 
   it('uses text-primary-token for main headings', () => {
@@ -240,5 +246,54 @@ describe('UnifiedLinkManager Token Usage', () => {
         !el.className.includes('text-secondary-token')
     );
     expect(legacySecondary).toHaveLength(0);
+  });
+
+  it('renders suggested platforms when high-value links are missing', () => {
+    const onLinksChangeMock = vi.fn();
+    renderWithToastProvider(
+      <UnifiedLinkManager initialLinks={[]} onLinksChange={onLinksChangeMock} />
+    );
+
+    expect(screen.getByTestId('suggestions-row')).toBeInTheDocument();
+
+    const spotifyButton = screen.getByLabelText('Spotify');
+    fireEvent.click(spotifyButton);
+    expect(linkManagerProps.prefillUrl).toBe(
+      'https://open.spotify.com/artist/...'
+    );
+  });
+
+  it('removes suggestion row after suggested link added', () => {
+    const onLinksChangeMock = vi.fn();
+    const makeLink = (id: string) => {
+      const platform = getPlatform(id)!;
+      return {
+        id,
+        platform,
+        title: platform.name,
+        normalizedUrl: platform.placeholder,
+        originalUrl: platform.placeholder,
+        isVisible: true,
+        order: 0,
+      };
+    };
+    const initialLinks = ['apple-music', 'instagram', 'tiktok', 'youtube'].map(
+      makeLink
+    );
+
+    renderWithToastProvider(
+      <UnifiedLinkManager
+        initialLinks={initialLinks}
+        onLinksChange={onLinksChangeMock}
+      />
+    );
+
+    expect(screen.getByTestId('suggestions-row')).toBeInTheDocument();
+
+    act(() => {
+      linkManagerProps.onLinksChange([...initialLinks, makeLink('spotify')]);
+    });
+
+    expect(screen.queryByTestId('suggestions-row')).not.toBeInTheDocument();
   });
 });

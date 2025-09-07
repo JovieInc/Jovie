@@ -1,7 +1,10 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { IconButton } from '@/components/atoms/IconButton';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
+import { getPlatform, type PlatformInfo } from '@/lib/utils/platform-detection';
 import type { LinkItem } from '@/types/links';
 import { LinkManager } from './LinkManager';
 
@@ -18,31 +21,48 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
   onLinkAdded,
   disabled = false,
 }) => {
+  const [links, setLinks] = useState<LinkItem[]>(initialLinks);
+  const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
+
+  // High-value platforms we want to suggest
+  const HIGH_VALUE_PLATFORM_IDS = useMemo(
+    () => ['spotify', 'apple-music', 'instagram', 'tiktok', 'youtube'],
+    []
+  );
+
+  const suggestedPlatforms = useMemo(() => {
+    const existingIds = links.map(l => l.platform.id);
+    return HIGH_VALUE_PLATFORM_IDS.map(id => getPlatform(id)).filter(
+      (p): p is PlatformInfo => !!p && !existingIds.includes(p.id)
+    );
+  }, [links, HIGH_VALUE_PLATFORM_IDS]);
+
   // Separate links by category for display
   const { socialLinks, musicLinks, customLinks } = useMemo(() => {
-    const social = initialLinks.filter(
-      link => link.platform.category === 'social'
-    );
-    const music = initialLinks.filter(link => link.platform.category === 'dsp');
-    const custom = initialLinks.filter(
-      link => link.platform.category === 'custom'
-    );
+    const social = links.filter(link => link.platform.category === 'social');
+    const music = links.filter(link => link.platform.category === 'dsp');
+    const custom = links.filter(link => link.platform.category === 'custom');
 
     return {
       socialLinks: social.sort((a, b) => a.order - b.order),
       musicLinks: music.sort((a, b) => a.order - b.order),
       customLinks: custom.sort((a, b) => a.order - b.order),
     };
-  }, [initialLinks]);
+  }, [links]);
 
-  const handleLinksChange = (links: LinkItem[]) => {
-    onLinksChange(links);
+  const handleLinksChange = (updated: LinkItem[]) => {
+    setLinks(updated);
+    onLinksChange(updated);
   };
 
-  const handleLinkAdded = (links: LinkItem[]) => {
+  const handleLinkAdded = (updated: LinkItem[]) => {
     if (onLinkAdded) {
-      onLinkAdded(links);
+      onLinkAdded(updated);
     }
+  };
+
+  const handleSuggestionClick = (platform: PlatformInfo) => {
+    setPrefillUrl(platform.placeholder);
   };
 
   return (
@@ -58,8 +78,33 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
           </p>
         </div>
 
+        {suggestedPlatforms.length > 0 && (
+          <div
+            className='flex items-center gap-2 mb-4'
+            data-testid='suggestions-row'
+          >
+            <span className='text-sm text-secondary-token'>Suggested</span>
+            {suggestedPlatforms.map(platform => (
+              <IconButton
+                key={platform.id}
+                ariaLabel={platform.name}
+                onClick={() => handleSuggestionClick(platform)}
+                className='text-secondary-token'
+                title={platform.name}
+              >
+                <SocialIcon
+                  platform={platform.icon}
+                  className='w-4 h-4'
+                  aria-hidden='true'
+                  style={{ color: `#${platform.color}` }}
+                />
+              </IconButton>
+            ))}
+          </div>
+        )}
+
         <LinkManager
-          initialLinks={initialLinks}
+          initialLinks={links}
           onLinksChange={handleLinksChange}
           onLinkAdded={handleLinkAdded}
           disabled={disabled}
@@ -67,6 +112,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
           allowedCategory='all'
           title=''
           description=''
+          prefillUrl={prefillUrl}
         />
       </div>
 
@@ -80,8 +126,7 @@ export const UnifiedLinkManager: React.FC<UnifiedLinkManagerProps> = ({
               Your Links
             </h3>
             <span className='text-xs text-secondary-token bg-surface-2 px-2 py-1 rounded-full'>
-              {initialLinks.length}{' '}
-              {initialLinks.length === 1 ? 'link' : 'links'}
+              {links.length} {links.length === 1 ? 'link' : 'links'}
             </span>
           </div>
 
