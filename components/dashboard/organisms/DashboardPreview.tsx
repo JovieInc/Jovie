@@ -115,23 +115,14 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
               style={{ height: 'calc(100% - 28px)' }}
             >
               <div className='w-full h-full overflow-y-auto'>
-                <div
-                  className='w-full animate-in fade-in duration-300'
-                  style={{
-                    transform: 'scale(0.85)',
-                    transformOrigin: 'top center',
-                    minHeight: '100%',
-                  }}
-                >
-                  <StaticArtistPage
-                    mode='default'
-                    artist={artist}
-                    socialLinks={previewSocialLinks}
-                    subtitle=''
-                    showTipButton={false}
-                    showBackButton={false}
-                  />
-                </div>
+                <StaticArtistPage
+                  mode='default'
+                  artist={artist}
+                  socialLinks={previewSocialLinks}
+                  subtitle=''
+                  showTipButton={false}
+                  showBackButton={false}
+                />
               </div>
             </div>
           </div>

@@ -54,3 +54,30 @@ export const SOCIAL_PLATFORMS = [
 
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 export type DSP = keyof typeof DSPS;
+
+// Global platform popularity ordering (lower index = more popular)
+// Used for initial/default ordering when personalized ranking is unavailable.
+export const GLOBAL_PLATFORM_POPULARITY = [
+  'spotify',
+  'apple_music',
+  'youtube',
+  'instagram',
+  'tiktok',
+  'soundcloud',
+  'bandcamp',
+  'x',
+  'twitter',
+  'facebook',
+  'telegram',
+  'discord',
+  'snapchat',
+  'reddit',
+  'pinterest',
+] as const;
+
+export const popularityIndex = (pid: string): number => {
+  const i = GLOBAL_PLATFORM_POPULARITY.indexOf(
+    pid as (typeof GLOBAL_PLATFORM_POPULARITY)[number]
+  );
+  return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+};

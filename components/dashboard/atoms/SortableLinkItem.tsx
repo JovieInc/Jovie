@@ -4,6 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import React, { forwardRef, KeyboardEvent, useCallback, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { Tooltip } from '@/components/atoms/Tooltip';
 import { Input } from '@/components/ui/Input';
 import type { LinkItem } from '@/types/links';
 
@@ -286,66 +287,71 @@ export const SortableLinkItem = forwardRef<
           `}
           >
             {/* Visibility toggle */}
-            <button
-              onClick={handleVisibilityToggle}
-              disabled={disabled}
-              className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
-              title={link.isVisible ? 'Hide link' : 'Show link'}
-              aria-label={
-                link.isVisible
-                  ? `Hide ${link.title} link`
-                  : `Show ${link.title} link`
-              }
-              aria-pressed={link.isVisible}
+            <Tooltip
+              content={link.isVisible ? 'Hide link' : 'Show link'}
+              placement='top'
             >
-              {link.isVisible ? (
-                <svg
-                  width='16'
-                  height='16'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  aria-hidden='true'
-                >
-                  <path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' />
-                  <circle cx='12' cy='12' r='3' />
-                </svg>
-              ) : (
-                <svg
-                  width='16'
-                  height='16'
-                  viewBox='0 0 24 24'
-                  fill='none'
-                  stroke='currentColor'
-                  aria-hidden='true'
-                >
-                  <path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' />
-                  <line x1='1' y1='1' x2='23' y2='23' />
-                </svg>
-              )}
-            </button>
+              <button
+                onClick={handleVisibilityToggle}
+                disabled={disabled}
+                className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
+                aria-label={
+                  link.isVisible
+                    ? `Hide ${link.title} link`
+                    : `Show ${link.title} link`
+                }
+                aria-pressed={link.isVisible}
+              >
+                {link.isVisible ? (
+                  <svg
+                    width='16'
+                    height='16'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    aria-hidden='true'
+                  >
+                    <path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' />
+                    <circle cx='12' cy='12' r='3' />
+                  </svg>
+                ) : (
+                  <svg
+                    width='16'
+                    height='16'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    aria-hidden='true'
+                  >
+                    <path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' />
+                    <line x1='1' y1='1' x2='23' y2='23' />
+                  </svg>
+                )}
+              </button>
+            </Tooltip>
 
             {/* Delete button */}
-            <button
-              onClick={handleDelete}
-              disabled={disabled}
-              className='p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors'
-              title='Delete link'
-              aria-label={`Delete ${link.title} link`}
-            >
-              <svg
-                width='16'
-                height='16'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                aria-hidden='true'
+            <Tooltip content='Delete link' placement='top'>
+              <button
+                onClick={handleDelete}
+                disabled={disabled}
+                className='p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors'
+                aria-label={`Delete ${link.title} link`}
               >
-                <path d='M3 6h18' />
-                <path d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' />
-                <path d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' />
-              </svg>
-            </button>
+                <svg
+                  width='16'
+                  height='16'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  aria-hidden='true'
+                >
+                  <path d='M3 6h18' />
+                  <path d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' />
+                  <path d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' />
+                </svg>
+              </button>
+            </Tooltip>
           </div>
         </div>
 
