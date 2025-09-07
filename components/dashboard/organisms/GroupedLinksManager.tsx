@@ -9,6 +9,7 @@ import {
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import React, { useEffect, useMemo, useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -329,10 +330,20 @@ function SortableRow<T extends DetectedLink>({
       {...attributes}
       {...listeners}
     >
-      <div className='min-w-0'>
-        <div className='text-primary-token truncate'>{link.suggestedTitle}</div>
-        <div className='text-xs text-tertiary truncate'>
-          {link.normalizedUrl}
+      <div className='min-w-0 flex items-start gap-3'>
+        <div
+          className='flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 shrink-0 mt-0.5'
+          aria-hidden='true'
+        >
+          <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
+        </div>
+        <div className='min-w-0'>
+          <div className='text-primary-token truncate'>
+            {link.suggestedTitle}
+          </div>
+          <div className='text-xs text-tertiary truncate'>
+            {link.normalizedUrl}
+          </div>
         </div>
       </div>
       <div className='shrink-0 flex items-center gap-2'>
