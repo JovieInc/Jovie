@@ -40,6 +40,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   >({ social: false, dsp: false, earnings: false, custom: false });
   const [collapsedInitialized, setCollapsedInitialized] = useState(false);
   const [tippingEnabled, setTippingEnabled] = useState<boolean>(false);
+  const [tippingJustEnabled, setTippingJustEnabled] = useState<boolean>(false);
   const [ytPrompt, setYtPrompt] = useState<{
     candidate: DetectedLink;
     target: 'social' | 'dsp';
@@ -52,7 +53,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const linkIsVisible = (l: T): boolean =>
     ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
 
-  // Initialize collapsed state based on empty sections and set tipping enabled if earnings exist
+  // Initialize and dynamically update collapsed state for empty sections.
+  // Also flash the Earnings badge briefly the first time it becomes enabled.
   useEffect(() => {
     if (!collapsedInitialized) {
       setCollapsed({
@@ -62,9 +64,23 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         custom: groups.custom.length === 0,
       });
       setCollapsedInitialized(true);
+    } else {
+      // Force-collapse any section that becomes empty; preserve manual user state otherwise
+      setCollapsed(prev => ({
+        social: groups.social.length === 0 ? true : prev.social,
+        dsp: groups.dsp.length === 0 ? true : prev.dsp,
+        earnings: groups.earnings.length === 0 ? true : prev.earnings,
+        custom: groups.custom.length === 0 ? true : prev.custom,
+      }));
     }
-    setTippingEnabled(groups.earnings.length > 0);
-  }, [groups, collapsedInitialized]);
+
+    const enabled = groups.earnings.length > 0;
+    if (enabled && !tippingEnabled) {
+      setTippingJustEnabled(true);
+      window.setTimeout(() => setTippingJustEnabled(false), 1500);
+    }
+    setTippingEnabled(enabled);
+  }, [groups, collapsedInitialized, tippingEnabled]);
 
   // DnD sensors
   const sensors = useSensors(
@@ -341,7 +357,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   </svg>
                   {labelFor(section)}
                   {section === 'earnings' && tippingEnabled && (
-                    <span className='ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25'>
+                    <span
+                      className={cn(
+                        'ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25',
+                        tippingJustEnabled && 'animate-pulse'
+                      )}
+                    >
                       Tipping enabled
                     </span>
                   )}
