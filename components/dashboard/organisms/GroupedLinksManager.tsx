@@ -9,7 +9,7 @@ import {
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import React, { useEffect, useMemo, useState } from 'react';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
@@ -61,6 +61,32 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   const sectionOf = (l: T) =>
     (l.platform.category ?? 'custom') as 'social' | 'dsp' | 'custom';
+
+  // Global platform popularity rank (lower index = more popular)
+  const POPULARITY_ORDER = [
+    'spotify',
+    'apple_music',
+    'youtube',
+    'instagram',
+    'tiktok',
+    'soundcloud',
+    'bandcamp',
+    'x',
+    'twitter',
+    'facebook',
+    'telegram',
+    'discord',
+    'snapchat',
+    'reddit',
+    'pinterest',
+  ] as const;
+
+  const popularityIndex = (pid: string): number => {
+    const i = POPULARITY_ORDER.indexOf(
+      pid as (typeof POPULARITY_ORDER)[number]
+    );
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
 
   // Cross-category policy: which platforms can move between categories
   const CROSS_CATEGORY: Record<string, Array<'social' | 'dsp' | 'custom'>> = {
@@ -260,7 +286,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         {(['social', 'dsp', 'custom'] as const).map(section => {
-          const items = groups[section];
+          const items = [...groups[section]].sort(
+            (a, b) =>
+              popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
+          );
           return (
             <div key={section} className='space-y-3'>
               <header className='flex items-center justify-between'>
@@ -271,6 +300,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   {items.length}
                 </span>
               </header>
+              {/* Ordering note */}
+              <p className='text-xs text-secondary-token'>
+                Link order is optimized for conversions. For now, links are
+                displayed by global platform popularity. We’ll personalize
+                ordering for your visitors over time.
+              </p>
               <SortableContext items={items.map(idFor)}>
                 <ul className='divide-y divide-subtle rounded-lg border border-subtle bg-surface-1'>
                   {items.map(link => (
@@ -319,6 +354,30 @@ function SortableRow<T extends DetectedLink>({
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id });
 
+  // Brand color utilities (mirrors UniversalLinkInput heuristics)
+  const hexToRgb = (hex: string) => {
+    const h = hex.replace('#', '');
+    const bigint = parseInt(h, 16);
+    return {
+      r: (bigint >> 16) & 255,
+      g: (bigint >> 8) & 255,
+      b: bigint & 255,
+    };
+  };
+  const relativeLuminance = (hex: string) => {
+    const { r, g, b } = hexToRgb(hex);
+    const [R, G, B] = [r, g, b].map(v => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  };
+  const iconMeta = getPlatformIcon(link.platform.icon);
+  const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+  const isDarkBrand = relativeLuminance(brandHex) < 0.35;
+  const iconColor = isDarkBrand ? '#ffffff' : brandHex;
+  const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandHex}15`;
+
   return (
     <li
       ref={setNodeRef}
@@ -328,11 +387,25 @@ function SortableRow<T extends DetectedLink>({
         transition,
       }}
       {...attributes}
-      {...listeners}
     >
       <div className='min-w-0 flex items-start gap-3'>
+        {/* Drag handle */}
+        <button
+          type='button'
+          className='mt-0.5 h-7 w-4 shrink-0 cursor-grab text-tertiary hover:text-secondary focus-visible:outline-none'
+          aria-label='Drag handle'
+          {...listeners}
+        >
+          <svg viewBox='0 0 20 20' className='h-4 w-4' aria-hidden='true'>
+            <circle cx='6' cy='6' r='1.5' />
+            <circle cx='6' cy='14' r='1.5' />
+            <circle cx='14' cy='6' r='1.5' />
+            <circle cx='14' cy='14' r='1.5' />
+          </svg>
+        </button>
         <div
-          className='flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 shrink-0 mt-0.5'
+          className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5'
+          style={{ backgroundColor: iconBg, color: iconColor }}
           aria-hidden='true'
         >
           <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
