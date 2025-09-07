@@ -60,7 +60,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   // Helper: visibility flag without using `any`
   const linkIsVisible = (l: T): boolean =>
     ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
-
   // Initialize and dynamically update collapsed state for empty sections.
   // Also flash the Earnings badge briefly the first time it becomes enabled.
   useEffect(() => {
@@ -89,7 +88,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
     setTippingEnabled(enabled);
   }, [groups, collapsedInitialized, tippingEnabled]);
-
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
