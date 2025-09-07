@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
@@ -98,6 +98,9 @@ export function AppleStyleOnboardingForm() {
       suggestions: [],
     });
 
+  // Abort controller to cancel in-flight availability checks
+  const handleCheckAbortRef = useRef<AbortController | null>(null);
+
   // Process state
   const [state, setState] = useState<OnboardingState>({
     step: 'validating',
@@ -112,9 +115,10 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const privateMeta = (
+        user as unknown as { privateMetadata?: Record<string, unknown> }
+      ).privateMetadata;
+      const privateFullName = privateMeta?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -140,26 +144,26 @@ export function AppleStyleOnboardingForm() {
     if (urlHandle) {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
-    } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
-    ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
-      setHandle(suggested);
-      setHandleInput(suggested);
     } else {
-      try {
-        const pending = sessionStorage.getItem('pendingClaim');
-        if (pending) {
-          const parsed = JSON.parse(pending) as { handle?: string };
-          if (parsed.handle) {
-            setHandle(parsed.handle);
-            setHandleInput(parsed.handle);
+      const privateMeta = (
+        user as unknown as { privateMetadata?: Record<string, unknown> }
+      ).privateMetadata;
+      const suggested = privateMeta?.suggestedUsername as string | undefined;
+      if (suggested) {
+        setHandle(suggested);
+        setHandleInput(suggested);
+      } else {
+        try {
+          const pending = sessionStorage.getItem('pendingClaim');
+          if (pending) {
+            const parsed = JSON.parse(pending) as { handle?: string };
+            if (parsed.handle) {
+              setHandle(parsed.handle);
+              setHandleInput(parsed.handle);
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
 
     // Remove any selected artist from sessionStorage since we removed the search step
@@ -223,7 +227,7 @@ export function AppleStyleOnboardingForm() {
   }, [currentStepIndex]);
 
   // Handle validation
-  const validateHandle = useCallback((input: string) => {
+  const validateHandle = useCallback(async (input: string) => {
     // Reset validation state
     setHandleValidation({
       available: false,
@@ -232,6 +236,19 @@ export function AppleStyleOnboardingForm() {
       clientValid: false,
       suggestions: [],
     });
+
+    const mapServerError = (message?: string): string => {
+      if (!message) return 'Unable to check availability. Please try again.';
+      const m = message.toLowerCase();
+      if (m.includes('least') && m.includes('3'))
+        return 'Handle must be at least 3 characters.';
+      if (m.includes('less') && m.includes('30'))
+        return 'Keep it under 20 characters.';
+      if (m.includes('letters') || m.includes('numbers'))
+        return 'Letters, numbers, dashes only.';
+      if (m.includes('taken')) return 'Already in use, try another.';
+      return 'Unable to check availability. Please try again.';
+    };
 
     // Basic client-side validation
     if (!input || input.length < 3) {
@@ -268,25 +285,56 @@ export function AppleStyleOnboardingForm() {
       return;
     }
 
-    // Simulate checking availability (in a real app, this would be an API call)
-    setTimeout(() => {
-      // For demo purposes, let's say handles with "taken" are already taken
-      const isTaken = input.toLowerCase().includes('taken');
+    // Cancel any in-flight request
+    if (handleCheckAbortRef.current) {
+      handleCheckAbortRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    handleCheckAbortRef.current = controller;
+
+    try {
+      const res = await fetch(
+        `/api/username/availability?handle=${encodeURIComponent(
+          input.toLowerCase()
+        )}`,
+        { signal: controller.signal }
+      );
+
+      const json = await res
+        .json()
+        .catch(() => ({ available: false, error: 'Parse error' }));
+
+      if (controller.signal.aborted) return;
+
+      const error = res.ok
+        ? json.available
+          ? null
+          : mapServerError(json.error)
+        : mapServerError(json.error);
 
       setHandleValidation({
-        available: !isTaken,
+        available: res.ok && json.available && !error,
         checking: false,
-        error: isTaken ? 'Already in use, try another.' : null,
+        error,
         clientValid: true,
-        suggestions: isTaken
-          ? [`${input}123`, `${input}-music`, `the-${input}`]
-          : [],
+        suggestions: Array.isArray(json.suggestions) ? json.suggestions : [],
       });
 
-      if (!isTaken) {
+      if (!error && json.available) {
         setHandle(input);
       }
-    }, 500);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+
+      setHandleValidation({
+        available: false,
+        checking: false,
+        error: 'Unable to check availability. Please try again.',
+        clientValid: true,
+        suggestions: [],
+      });
+    }
   }, []);
 
   // Handle input change with debounce
@@ -294,8 +342,19 @@ export function AppleStyleOnboardingForm() {
     const timer = setTimeout(() => {
       if (handleInput) {
         validateHandle(handleInput);
+      } else {
+        if (handleCheckAbortRef.current) {
+          handleCheckAbortRef.current.abort();
+        }
+        setHandleValidation({
+          available: false,
+          checking: false,
+          error: null,
+          clientValid: false,
+          suggestions: [],
+        });
       }
-    }, 300);
+    }, 450);
 
     return () => clearTimeout(timer);
   }, [handleInput, validateHandle]);
