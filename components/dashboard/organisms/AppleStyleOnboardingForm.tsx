@@ -9,6 +9,12 @@ import { Button } from '@/components/ui/Button';
 import { APP_URL } from '@/constants/app';
 import { identify, track } from '@/lib/analytics';
 
+const STORAGE_KEYS = {
+  step: 'onboardingStep',
+  fullName: 'onboardingFullName',
+  handle: 'onboardingHandleInput',
+} as const;
+
 // Define the onboarding steps based on the new UX requirements
 interface OnboardingStep {
   id: string;
@@ -107,122 +113,14 @@ export function AppleStyleOnboardingForm() {
     isSubmitting: false,
   });
 
-  // Prefill handle and full name data
-  useEffect(() => {
-    // Prefill full name from Clerk metadata or user data
-    if (user) {
-      // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
-      if (privateFullName) {
-        setFullName(privateFullName);
-      } else if (user.firstName || user.lastName) {
-        const constructedName = [user.firstName, user.lastName]
-          .filter(Boolean)
-          .join(' ')
-          .trim();
-        if (constructedName) {
-          setFullName(constructedName);
-        }
-      } else if (user.emailAddresses?.[0]?.emailAddress) {
-        // Fallback to email local part as display name
-        const emailLocal = user.emailAddresses[0].emailAddress.split('@')[0];
-        const cleanedName = emailLocal.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
-        if (cleanedName) {
-          setFullName(cleanedName);
-        }
-      }
-    }
+  const clearStoredState = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEYS.step);
+      localStorage.removeItem(STORAGE_KEYS.fullName);
+      localStorage.removeItem(STORAGE_KEYS.handle);
+    } catch {}
+  }, []);
 
-    // Prefill handle from URL or suggested username
-    const urlHandle = searchParams?.get('handle');
-    if (urlHandle) {
-      setHandle(urlHandle);
-      setHandleInput(urlHandle);
-    } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
-    ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
-      setHandle(suggested);
-      setHandleInput(suggested);
-    } else {
-      try {
-        const pending = sessionStorage.getItem('pendingClaim');
-        if (pending) {
-          const parsed = JSON.parse(pending) as { handle?: string };
-          if (parsed.handle) {
-            setHandle(parsed.handle);
-            setHandleInput(parsed.handle);
-          }
-        }
-      } catch {}
-    }
-
-    // Remove any selected artist from sessionStorage since we removed the search step
-    sessionStorage.removeItem('selectedArtist');
-  }, [searchParams, user]);
-
-  // Navigation handlers with smooth transitions
-  const goToNextStep = useCallback(() => {
-    if (currentStepIndex < ONBOARDING_STEPS.length - 1) {
-      const currentStep = ONBOARDING_STEPS[currentStepIndex];
-      const nextStep = ONBOARDING_STEPS[currentStepIndex + 1];
-
-      // Track step progression
-      track('onboarding_step_completed', {
-        step_id: currentStep.id,
-        step_index: currentStepIndex,
-        step_title: currentStep.title,
-        next_step_id: nextStep.id,
-        user_id: user?.id,
-      });
-
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex + 1);
-        setIsTransitioning(false);
-
-        // Track step viewed
-        track('onboarding_step_viewed', {
-          step_id: nextStep.id,
-          step_index: currentStepIndex + 1,
-          step_title: nextStep.title,
-          user_id: user?.id,
-        });
-
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 300);
-    }
-  }, [currentStepIndex, user?.id]);
-
-  const goToPreviousStep = useCallback(() => {
-    if (currentStepIndex > 0) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex - 1);
-        setIsTransitioning(false);
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 300);
-    }
-  }, [currentStepIndex]);
-
-  // Handle validation
   const validateHandle = useCallback((input: string) => {
     // Reset validation state
     setHandleValidation({
@@ -289,6 +187,186 @@ export function AppleStyleOnboardingForm() {
     }, 500);
   }, []);
 
+  const [hydrated, setHydrated] = useState(false);
+
+  // Hydrate state from localStorage on mount
+  useEffect(() => {
+    try {
+      const storedStep = localStorage.getItem(STORAGE_KEYS.step);
+      const storedName = localStorage.getItem(STORAGE_KEYS.fullName);
+      const storedHandleInput = localStorage.getItem(STORAGE_KEYS.handle);
+
+      if (storedStep !== null) {
+        const index = Number.parseInt(storedStep, 10);
+        if (
+          !Number.isNaN(index) &&
+          index >= 0 &&
+          index < ONBOARDING_STEPS.length
+        ) {
+          setCurrentStepIndex(index);
+        }
+      }
+      if (storedName) setFullName(storedName);
+      if (storedHandleInput) {
+        setHandleInput(storedHandleInput);
+        validateHandle(storedHandleInput);
+      }
+    } catch {}
+    setHydrated(true);
+  }, [validateHandle]);
+
+  // Persist state to localStorage
+  useEffect(() => {
+    if (!hydrated) return;
+    if (currentStepIndex === 0 && !fullName && !handleInput) {
+      localStorage.removeItem(STORAGE_KEYS.step);
+    } else if (currentStepIndex >= ONBOARDING_STEPS.length - 1) {
+      localStorage.removeItem(STORAGE_KEYS.step);
+    } else {
+      localStorage.setItem(STORAGE_KEYS.step, String(currentStepIndex));
+    }
+  }, [currentStepIndex, fullName, handleInput, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (fullName) {
+      localStorage.setItem(STORAGE_KEYS.fullName, fullName);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.fullName);
+    }
+  }, [fullName, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (handleInput) {
+      localStorage.setItem(STORAGE_KEYS.handle, handleInput);
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.handle);
+    }
+  }, [handleInput, hydrated]);
+
+  // Prefill handle and full name data
+  useEffect(() => {
+    if (!hydrated) return;
+    const metadataUser = user as unknown as {
+      privateMetadata?: Record<string, unknown>;
+    };
+    // Prefill full name from Clerk metadata or user data
+    if (user && !fullName) {
+      // Priority: privateMetadata.fullName > firstName + lastName > email fallback
+      const privateFullName = metadataUser.privateMetadata?.fullName as
+        | string
+        | undefined;
+      if (privateFullName) {
+        setFullName(privateFullName);
+      } else if (user.firstName || user.lastName) {
+        const constructedName = [user.firstName, user.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        if (constructedName) {
+          setFullName(constructedName);
+        }
+      } else if (user.emailAddresses?.[0]?.emailAddress) {
+        // Fallback to email local part as display name
+        const emailLocal = user.emailAddresses[0].emailAddress.split('@')[0];
+        const cleanedName = emailLocal.replace(/[^a-zA-Z0-9\s]/g, ' ').trim();
+        if (cleanedName) {
+          setFullName(cleanedName);
+        }
+      }
+    }
+
+    // Prefill handle from URL or suggested username
+    const urlHandle = searchParams?.get('handle');
+    if (!handleInput) {
+      if (urlHandle) {
+        setHandle(urlHandle);
+        setHandleInput(urlHandle);
+      } else if (metadataUser.privateMetadata?.suggestedUsername) {
+        const suggested = metadataUser.privateMetadata
+          .suggestedUsername as string;
+        setHandle(suggested);
+        setHandleInput(suggested);
+      } else {
+        try {
+          const pending = sessionStorage.getItem('pendingClaim');
+          if (pending) {
+            const parsed = JSON.parse(pending) as { handle?: string };
+            if (parsed.handle) {
+              setHandle(parsed.handle);
+              setHandleInput(parsed.handle);
+            }
+          }
+        } catch {}
+      }
+    }
+
+    // Remove any selected artist from sessionStorage since we removed the search step
+    sessionStorage.removeItem('selectedArtist');
+  }, [searchParams, user, fullName, handleInput, hydrated]);
+
+  // Navigation handlers with smooth transitions
+  const goToNextStep = useCallback(() => {
+    if (currentStepIndex < ONBOARDING_STEPS.length - 1) {
+      const currentStep = ONBOARDING_STEPS[currentStepIndex];
+      const nextStep = ONBOARDING_STEPS[currentStepIndex + 1];
+
+      // Track step progression
+      track('onboarding_step_completed', {
+        step_id: currentStep.id,
+        step_index: currentStepIndex,
+        step_title: currentStep.title,
+        next_step_id: nextStep.id,
+        user_id: user?.id,
+      });
+
+      setIsTransitioning(true);
+      setTimeout(() => {
+        const newIndex = currentStepIndex + 1;
+        setCurrentStepIndex(newIndex);
+        setIsTransitioning(false);
+
+        // Track step viewed
+        track('onboarding_step_viewed', {
+          step_id: nextStep.id,
+          step_index: newIndex,
+          step_title: nextStep.title,
+          user_id: user?.id,
+        });
+
+        if (newIndex === ONBOARDING_STEPS.length - 1) {
+          clearStoredState();
+        }
+
+        // Focus management for accessibility
+        setTimeout(() => {
+          const heading = document.querySelector('h1');
+          if (heading) {
+            heading.focus();
+          }
+        }, 100);
+      }, 300);
+    }
+  }, [currentStepIndex, user?.id, clearStoredState]);
+
+  const goToPreviousStep = useCallback(() => {
+    if (currentStepIndex > 0) {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentStepIndex(currentStepIndex - 1);
+        setIsTransitioning(false);
+        // Focus management for accessibility
+        setTimeout(() => {
+          const heading = document.querySelector('h1');
+          if (heading) {
+            heading.focus();
+          }
+        }, 100);
+      }, 300);
+    }
+  }, [currentStepIndex]);
+
   // Handle input change with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -353,6 +431,9 @@ export function AppleStyleOnboardingForm() {
 
         // Clear session data
         sessionStorage.removeItem('pendingClaim');
+        clearStoredState();
+        setFullName('');
+        setHandleInput('');
 
         // Go to final step
         goToNextStep();
@@ -419,6 +500,7 @@ export function AppleStyleOnboardingForm() {
       handle,
       fullName,
       goToNextStep,
+      clearStoredState,
     ]
   );
 
@@ -452,6 +534,28 @@ export function AppleStyleOnboardingForm() {
       error: null,
     }));
   }, []);
+
+  const restartOnboarding = useCallback(() => {
+    clearStoredState();
+    setCurrentStepIndex(0);
+    setFullName('');
+    setHandle('');
+    setHandleInput('');
+    setHandleValidation({
+      available: false,
+      checking: false,
+      error: null,
+      clientValid: false,
+      suggestions: [],
+    });
+    setState({
+      step: 'validating',
+      progress: 0,
+      error: null,
+      retryCount: 0,
+      isSubmitting: false,
+    });
+  }, [clearStoredState]);
 
   // Render step content based on current step
   const renderStepContent = () => {
@@ -518,6 +622,12 @@ export function AppleStyleOnboardingForm() {
                 className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
               >
                 Back
+              </button>
+              <button
+                onClick={restartOnboarding}
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+              >
+                Start over
               </button>
             </div>
           </div>
@@ -685,6 +795,12 @@ export function AppleStyleOnboardingForm() {
               >
                 Back
               </button>
+              <button
+                onClick={restartOnboarding}
+                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+              >
+                Start over
+              </button>
             </div>
           </div>
         );
@@ -756,6 +872,10 @@ export function AppleStyleOnboardingForm() {
       </div>
     );
   };
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <div className='min-h-screen flex flex-col'>
