@@ -2,7 +2,7 @@
 
 import { useUser } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
@@ -84,6 +84,7 @@ export function AppleStyleOnboardingForm() {
   // Current step in the onboarding flow
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
 
   // Form state
   const [handle, setHandle] = useState('');
@@ -107,14 +108,19 @@ export function AppleStyleOnboardingForm() {
     isSubmitting: false,
   });
 
+  useEffect(() => {
+    stepHeadingRef.current?.focus();
+  }, [currentStepIndex]);
+
   // Prefill handle and full name data
   useEffect(() => {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const privateMetadata = (
+        user as unknown as { privateMetadata?: Record<string, unknown> }
+      ).privateMetadata;
+      const privateFullName = privateMetadata?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -141,12 +147,12 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
+      (user as unknown as { privateMetadata?: Record<string, unknown> })
+        .privateMetadata?.suggestedUsername
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
+      const suggested = (
+        user as unknown as { privateMetadata?: Record<string, unknown> }
+      ).privateMetadata?.suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
@@ -193,14 +199,6 @@ export function AppleStyleOnboardingForm() {
           step_title: nextStep.title,
           user_id: user?.id,
         });
-
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
       }, 300);
     }
   }, [currentStepIndex, user?.id]);
@@ -211,13 +209,6 @@ export function AppleStyleOnboardingForm() {
       setTimeout(() => {
         setCurrentStepIndex(currentStepIndex - 1);
         setIsTransitioning(false);
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
       }, 300);
     }
   }, [currentStepIndex]);
@@ -460,7 +451,11 @@ export function AppleStyleOnboardingForm() {
       case 0:
         return (
           <div className='flex flex-col items-center justify-center h-full text-center space-y-8'>
-            <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+            <h1
+              ref={stepHeadingRef}
+              tabIndex={-1}
+              className='text-4xl font-bold text-[var(--fg)] transition-colors'
+            >
               {ONBOARDING_STEPS[0].title}
             </h1>
             <p className='text-[var(--muted)] text-xl'>
@@ -480,7 +475,11 @@ export function AppleStyleOnboardingForm() {
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+              <h1
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className='text-4xl font-bold text-[var(--fg)] transition-colors'
+              >
                 {ONBOARDING_STEPS[1].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
@@ -528,7 +527,11 @@ export function AppleStyleOnboardingForm() {
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+              <h1
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className='text-4xl font-bold text-[var(--fg)] transition-colors'
+              >
                 {ONBOARDING_STEPS[2].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
@@ -694,7 +697,11 @@ export function AppleStyleOnboardingForm() {
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
+              <h1
+                ref={stepHeadingRef}
+                tabIndex={-1}
+                className='text-4xl font-bold text-[var(--fg)] transition-colors'
+              >
                 {ONBOARDING_STEPS[3].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
