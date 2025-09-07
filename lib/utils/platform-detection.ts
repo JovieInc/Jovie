@@ -262,6 +262,30 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
  */
 export function normalizeUrl(url: string): string {
   try {
+    // Quick typo fixes: insert missing dots before TLD for common platforms
+    // e.g., youtubecom → youtube.com, instagramcom → instagram.com
+    const dotFixes: Array<[RegExp, string]> = [
+      [/\b(youtube)com\b/i, '$1.com'],
+      [/\b(instagram)com\b/i, '$1.com'],
+      [/\b(tiktok)com\b/i, '$1.com'],
+      [/\b(twitter)com\b/i, '$1.com'],
+      [/\b(facebook)com\b/i, '$1.com'],
+      [/\b(soundcloud)com\b/i, '$1.com'],
+      [/\b(bandcamp)com\b/i, '$1.com'],
+      [/\b(spotify)com\b/i, '$1.com'],
+      [/\b(venmo)com\b/i, '$1.com'],
+      [/\b(linkedin)com\b/i, '$1.com'],
+      [/\b(pinterest)com\b/i, '$1.com'],
+      [/\b(reddit)com\b/i, '$1.com'],
+      [/\b(onlyfans)com\b/i, '$1.com'],
+      [/\b(quora)com\b/i, '$1.com'],
+      [/\b(threads)net\b/i, '$1.net'],
+      [/\b(twitch)tv\b/i, '$1.tv'],
+    ];
+    for (const [pattern, replacement] of dotFixes) {
+      url = url.replace(pattern, replacement);
+    }
+
     // Support bare X (Twitter) handles like @username
     if (/^@[a-zA-Z0-9._]+$/.test(url)) {
       return `https://x.com/${url.slice(1)}`;

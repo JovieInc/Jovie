@@ -2,6 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
+  describe('Domain dot-fix normalization', () => {
+    it('auto-inserts missing dot for common platforms', () => {
+      const cases: Array<{ input: string; expectedPrefix: string }> = [
+        {
+          input: 'youtubecom/@username',
+          expectedPrefix: 'https://youtube.com/',
+        },
+        {
+          input: 'instagramcom/username',
+          expectedPrefix: 'https://instagram.com/',
+        },
+        { input: 'tiktokcom/username', expectedPrefix: 'https://tiktok.com/' },
+        { input: 'twitchtv/channel', expectedPrefix: 'https://twitch.tv/' },
+        { input: 'venmocom/username', expectedPrefix: 'https://venmo.com/' },
+      ];
+
+      cases.forEach(({ input, expectedPrefix }) => {
+        const result = normalizeUrl(input);
+        expect(result.startsWith(expectedPrefix)).toBe(true);
+      });
+    });
+  });
   describe('TikTok URL normalization', () => {
     it('should add @ symbol to TikTok handles when missing', () => {
       const testCases = [

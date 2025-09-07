@@ -133,7 +133,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
           <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
-            jov.ie/{artist.handle || 'username'}
+            https://jov.ie/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton
             relativePath={`/${artist.handle || 'username'}`}
