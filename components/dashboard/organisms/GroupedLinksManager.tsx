@@ -88,6 +88,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
     setTippingEnabled(enabled);
   }, [groups, collapsedInitialized, tippingEnabled]);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -110,6 +111,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       | 'custom';
 
   // Cross-category policy is defined at module level via CROSS_CATEGORY
+
 
   const canMoveTo = (
     l: T,
@@ -395,12 +397,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   </span>
                 </div>
               </header>
-              {/* Ordering note */}
-              <p className='text-xs text-secondary-token'>
-                Link order is optimized for conversions. For now, links are
-                displayed by global platform popularity. We’ll personalize
-                ordering for your visitors over time.
-              </p>
               <SortableContext items={items.map(idFor)}>
                 <ul
                   id={`links-section-${section}`}
