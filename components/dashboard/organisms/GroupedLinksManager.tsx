@@ -36,6 +36,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     candidate: DetectedLink;
     target: 'social' | 'dsp';
   } | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -169,7 +170,17 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
 
     // Cross-section move: only if platform supports target section
-    if (!canMoveTo(from, toSection)) return;
+    if (!canMoveTo(from, toSection)) {
+      // Gentle hint: Only some platforms can move across sections
+      const platformName = from.platform.name || from.platform.id;
+      const targetLabel = labelFor(toSection);
+      setHint(
+        `${platformName} can’t be moved to ${targetLabel}. Only certain platforms (e.g., YouTube) can live in multiple sections.`
+      );
+      // Auto-hide after 2.4s
+      window.setTimeout(() => setHint(null), 2400);
+      return;
+    }
 
     const next = [...links];
     const updated = {
@@ -184,6 +195,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   return (
     <section className={cn('space-y-6', className)} aria-label='Links Manager'>
+      {hint && (
+        <div
+          className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
+          role='status'
+          aria-live='polite'
+        >
+          {hint}
+        </div>
+      )}
       {ytPrompt && (
         <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
           <div className='text-primary-token'>
