@@ -1,11 +1,22 @@
 import type { Metadata } from 'next';
-import { NewFeaturedArtists } from '@/components/home/NewFeaturedArtists';
-import { NewFeaturesSection } from '@/components/home/NewFeaturesSection';
+import dynamic from 'next/dynamic';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
-import { NewHowItWorks } from '@/components/home/NewHowItWorks';
-import { NewPreFooterCTA } from '@/components/home/NewPreFooterCTA';
-import { NewUpgradeTeaser } from '@/components/home/NewUpgradeTeaser';
 import { APP_NAME, APP_URL } from '@/constants/app';
+
+const NewFeaturedArtists = dynamic(
+  () => import('@/components/home/NewFeaturedArtists'),
+  { ssr: false }
+);
+const NewFeaturesSection = dynamic(
+  () => import('@/components/home/NewFeaturesSection')
+);
+const NewUpgradeTeaser = dynamic(
+  () => import('@/components/home/NewUpgradeTeaser')
+);
+const NewHowItWorks = dynamic(() => import('@/components/home/NewHowItWorks'));
+const NewPreFooterCTA = dynamic(
+  () => import('@/components/home/NewPreFooterCTA')
+);
 
 // Root layout handles dynamic rendering
 export const revalidate = 3600; // Revalidate every hour
