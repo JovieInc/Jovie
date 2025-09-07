@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { track } from '@/lib/analytics';
+import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';
 
 interface SocialLink {
@@ -24,6 +25,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
   const [error, setError] = useState<string | undefined>();
   const [success, setSuccess] = useState(false);
   const [socialLinks, setSocialLinks] = useState<SocialLink[]>([]);
+  const timers = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const fetchSocialLinks = async () => {
@@ -104,6 +106,38 @@ export function SocialsForm({ artist }: SocialsFormProps) {
     setSocialLinks(updatedLinks);
   };
 
+  const scheduleNormalize = (index: number, raw: string) => {
+    const key = `${index}-url`;
+    if (timers.current[key]) {
+      window.clearTimeout(timers.current[key]);
+    }
+    timers.current[key] = window.setTimeout(() => {
+      try {
+        const norm = normalizeUrl(raw.trim());
+        setSocialLinks(prev => {
+          const next = [...prev];
+          if (!next[index]) return prev;
+          if (next[index].url === norm) return prev;
+          next[index] = { ...next[index], url: norm };
+          return next;
+        });
+      } catch {
+        // ignore
+      }
+    }, 500);
+  };
+
+  const handleUrlBlur = (index: number) => {
+    setSocialLinks(prev => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      const norm = normalizeUrl((next[index].url || '').trim());
+      if (next[index].url === norm) return prev;
+      next[index] = { ...next[index], url: norm };
+      return next;
+    });
+  };
+
   if (loading) {
     return (
       <div className='space-y-4'>
@@ -176,7 +210,12 @@ export function SocialsForm({ artist }: SocialsFormProps) {
               <Input
                 type='url'
                 value={link.url}
-                onChange={e => updateSocialLink(index, 'url', e.target.value)}
+                onChange={e => {
+                  const v = e.target.value;
+                  updateSocialLink(index, 'url', v);
+                  scheduleNormalize(index, v);
+                }}
+                onBlur={() => handleUrlBlur(index)}
                 placeholder='https://...'
                 inputMode='url'
                 autoCapitalize='none'

@@ -11,8 +11,8 @@ import {
   convertDrizzleCreatorProfileToArtist,
   type LegacySocialLink,
 } from '@/types/db';
-import { UnifiedLinkManager } from '../molecules/UnifiedLinkManager';
 import { DashboardPreview } from './DashboardPreview';
+import { GroupedLinksManager } from './GroupedLinksManager';
 
 interface LinkItem extends DetectedLink {
   id: string;
@@ -330,12 +330,11 @@ export function DashboardLinks({
             className='fixed top-4 right-4 opacity-0 transition-all duration-500 data-[show=true]:opacity-100 data-[show=true]:translate-y-0 translate-y-2 z-50'
           />
 
-          {/* Unified Link Manager with Magic Auto-Detection */}
-          <UnifiedLinkManager
+          {/* Grouped Links Manager (Immediate replacement of previous layout) */}
+          <GroupedLinksManager
             initialLinks={initialAllLinks}
             onLinksChange={handleAllLinksChange}
             onLinkAdded={handleLinkAdded}
-            disabled={false}
           />
         </div>
       </div>

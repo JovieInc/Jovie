@@ -99,7 +99,7 @@ export function Tooltip({
             </div>
             <div
               ref={arrowRef}
-              className='absolute h-2 w-2 rotate-45 bg-white ring-1 ring-black/10 dark:bg-black/90 dark:ring-white/20 pointer-events-none'
+              className='absolute h-2 w-2 rotate-45 bg-white border border-black/10 dark:bg-black/90 dark:border-white/20 pointer-events-none'
               style={{
                 left:
                   middlewareData.arrow?.x != null
@@ -110,15 +110,15 @@ export function Tooltip({
                     ? `${middlewareData.arrow.y}px`
                     : '',
                 // Anchor the arrow to the static side (edge closest to the reference)
-                // Overlap by 1px to visually merge the arrow's ring with the bubble ring
+                // Overlap slightly to visually merge borders
                 ...(placement.startsWith('top')
-                  ? { bottom: '-5px' }
+                  ? { bottom: '-6px' }
                   : placement.startsWith('right')
-                    ? { left: '-5px' }
+                    ? { left: '-6px' }
                     : placement.startsWith('bottom')
-                      ? { top: '-5px' }
+                      ? { top: '-6px' }
                       : placement.startsWith('left')
-                        ? { right: '-5px' }
+                        ? { right: '-6px' }
                         : {}),
               }}
             />

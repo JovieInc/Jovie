@@ -82,28 +82,12 @@ function renderContent(
       if (!hasStreamingPlatforms) {
         return (
           <div className='space-y-4'>
-            <div className='text-center p-6 bg-white/20 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-xl'>
-              <div className='w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center'>
-                <svg
-                  className='w-6 h-6 text-gray-400 dark:text-gray-500'
-                  fill='none'
-                  stroke='currentColor'
-                  viewBox='0 0 24 24'
-                >
-                  <path
-                    strokeLinecap='round'
-                    strokeLinejoin='round'
-                    strokeWidth={2}
-                    d='M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3'
-                  />
-                </svg>
-              </div>
-              <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
-                Music Coming Soon
-              </h3>
-              <p className='text-xs text-gray-600 dark:text-gray-400'>
-                Streaming links will be available here once added
-              </p>
+            {/* Subtle placeholder matching the Listen Now button dimensions to avoid layout shift */}
+            <div
+              aria-hidden='true'
+              className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl border border-subtle bg-surface-1/30 text-secondary-token/60 select-none'
+            >
+              Listen
             </div>
           </div>
         );

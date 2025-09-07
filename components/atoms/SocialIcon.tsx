@@ -29,14 +29,15 @@ import {
   siX,
   siYoutube,
 } from 'simple-icons';
-import { cn } from '@/lib/utils';
+
+// no-op
 
 interface SocialIconProps {
   platform: string;
   className?: string;
   size?: number;
-  aria-hidden?: boolean;
-  aria-label?: string;
+  'aria-hidden'?: boolean;
+  'aria-label'?: string;
 }
 
 // Map platform names to Simple Icons
@@ -78,10 +79,9 @@ export function getPlatformIcon(platform: string): SimpleIcon | undefined {
   return platformMap[platform.toLowerCase()];
 }
 
-
-export function SocialIcon({ 
-  platform, 
-  className, 
+export function SocialIcon({
+  platform,
+  className,
   size,
   'aria-hidden': ariaHidden = true,
   'aria-label': ariaLabel,

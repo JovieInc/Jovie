@@ -234,7 +234,7 @@ export default function DashboardLayoutClient({
                       <p className='text-xs text-tertiary-token truncate'>
                         Jovie Profile
                       </p>
-                      <p className='text-sm font-medium text-primary-token truncate'>{`https://jov.ie/${artist.handle}`}</p>
+                      <p className='text-sm font-medium text-primary-token truncate'>{`@${artist.handle}`}</p>
                     </div>
                     <div className='ml-2 flex items-center gap-1.5'>
                       <Tooltip content='Copy profile URL' placement='top'>

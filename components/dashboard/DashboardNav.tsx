@@ -60,7 +60,7 @@ const navShortcuts: Record<string, string> = {
 // Secondary Navigation - Additional features
 const secondaryNavigation = [
   {
-    name: 'Tipping',
+    name: 'Earnings',
     href: '/dashboard/tipping',
     id: 'tipping',
     icon: BanknotesIcon,

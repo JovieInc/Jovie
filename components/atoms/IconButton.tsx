@@ -8,7 +8,7 @@ export type IconButtonProps = {
   ariaLabel: string;
   title?: string;
   className?: string;
-  onClick?: () => void;
+  onClick?: React.MouseEventHandler<HTMLButtonElement | HTMLAnchorElement>;
   href?: string; // link destination when rendering as link
   target?: string;
   rel?: string;
