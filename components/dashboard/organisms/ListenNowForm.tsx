@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
+import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
   Artist,
   CreatorProfile,
@@ -24,6 +25,32 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     apple_music_url: artist.apple_music_url || '',
     youtube_url: artist.youtube_url || '',
   });
+  // Debounce timers per field
+  const timers = useRef<Record<string, number>>({});
+
+  const scheduleNormalize = (key: keyof typeof formData, value: string) => {
+    // clear previous timer
+    if (timers.current[key]) {
+      window.clearTimeout(timers.current[key]);
+    }
+    timers.current[key] = window.setTimeout(() => {
+      try {
+        const norm = normalizeUrl(value.trim());
+        setFormData(prev =>
+          prev[key] === norm ? prev : { ...prev, [key]: norm }
+        );
+      } catch {
+        // ignore
+      }
+    }, 500);
+  };
+
+  const handleBlur = (key: keyof typeof formData) => {
+    setFormData(prev => {
+      const norm = normalizeUrl((prev[key] || '').trim());
+      return prev[key] === norm ? prev : { ...prev, [key]: norm };
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,9 +98,12 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
         <Input
           type='url'
           value={formData.spotify_url}
-          onChange={e =>
-            setFormData({ ...formData, spotify_url: e.target.value })
-          }
+          onChange={e => {
+            const v = e.target.value;
+            setFormData({ ...formData, spotify_url: v });
+            scheduleNormalize('spotify_url', v);
+          }}
+          onBlur={() => handleBlur('spotify_url')}
           placeholder='https://open.spotify.com/artist/...'
           inputMode='url'
           autoCapitalize='none'
@@ -86,9 +116,12 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
         <Input
           type='url'
           value={formData.apple_music_url}
-          onChange={e =>
-            setFormData({ ...formData, apple_music_url: e.target.value })
-          }
+          onChange={e => {
+            const v = e.target.value;
+            setFormData({ ...formData, apple_music_url: v });
+            scheduleNormalize('apple_music_url', v);
+          }}
+          onBlur={() => handleBlur('apple_music_url')}
           placeholder='https://music.apple.com/...'
           inputMode='url'
           autoCapitalize='none'
@@ -101,9 +134,12 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
         <Input
           type='url'
           value={formData.youtube_url}
-          onChange={e =>
-            setFormData({ ...formData, youtube_url: e.target.value })
-          }
+          onChange={e => {
+            const v = e.target.value;
+            setFormData({ ...formData, youtube_url: v });
+            scheduleNormalize('youtube_url', v);
+          }}
+          onBlur={() => handleBlur('youtube_url')}
           placeholder='https://youtube.com/...'
           inputMode='url'
           autoCapitalize='none'
