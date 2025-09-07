@@ -112,7 +112,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   // Cross-category policy is defined at module level via CROSS_CATEGORY
 
-
   const canMoveTo = (
     l: T,
     target: 'social' | 'dsp' | 'custom' | 'earnings'
