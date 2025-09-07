@@ -1,6 +1,7 @@
 'use client';
 
 import { useSession, useUser } from '@clerk/nextjs';
+import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,7 @@ import {
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
 import { useArtistSearch } from '@/lib/hooks/useArtistSearch';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 // Progressive form steps
 interface OnboardingStep {
@@ -91,7 +93,7 @@ export function ProgressiveOnboardingForm() {
 
   // Current step in the progressive form
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   // Form state
   const [handle, setHandle] = useState('');
@@ -193,35 +195,13 @@ export function ProgressiveOnboardingForm() {
   // Navigation handlers with keyboard support and focus management
   const goToNextStep = useCallback(() => {
     if (currentStepIndex < ONBOARDING_STEPS.length - 1) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex + 1);
-        setIsTransitioning(false);
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h2');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 150);
+      setCurrentStepIndex(currentStepIndex + 1);
     }
   }, [currentStepIndex]);
 
   const goToPreviousStep = useCallback(() => {
     if (currentStepIndex > 0) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex - 1);
-        setIsTransitioning(false);
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h2');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 150);
+      setCurrentStepIndex(currentStepIndex - 1);
     }
   }, [currentStepIndex]);
 
@@ -885,11 +865,10 @@ export function ProgressiveOnboardingForm() {
         aria-atomic='true'
         id='step-announcement'
       >
-        {isTransitioning
-          ? `Moving to ${ONBOARDING_STEPS[currentStepIndex]?.title} step`
-          : ''}
-        {state.error ? `Error: ${state.error}` : ''}
-        {state.isSubmitting ? 'Creating your profile. Please wait...' : ''}
+        Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}
+        {ONBOARDING_STEPS[currentStepIndex]?.title}
+        {state.error ? ` Error: ${state.error}` : ''}
+        {state.isSubmitting ? ' Creating your profile. Please wait...' : ''}
       </div>
 
       {/* Error summary for screen readers - exclude session errors shown above */}
@@ -923,13 +902,26 @@ export function ProgressiveOnboardingForm() {
           <div id='step-heading' className='sr-only'>
             {ONBOARDING_STEPS[currentStepIndex]?.title} step content
           </div>
-          <div
-            className={`transform transition-all duration-300 ease-in-out ${
-              isTransitioning ? 'opacity-50 scale-95' : 'opacity-100 scale-100'
-            }`}
-          >
-            {renderStepContent()}
-          </div>
+          <AnimatePresence mode='wait'>
+            <motion.div
+              key={ONBOARDING_STEPS[currentStepIndex].id}
+              initial={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: prefersReducedMotion ? 1 : 0.95 }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.2,
+                ease: 'easeInOut',
+              }}
+              onAnimationComplete={definition => {
+                if (definition === 'animate') {
+                  const heading = document.querySelector('h2');
+                  heading?.focus();
+                }
+              }}
+            >
+              {renderStepContent()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 

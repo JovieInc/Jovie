@@ -1,6 +1,7 @@
 'use client';
 
 import { useUser } from '@clerk/nextjs';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
@@ -8,6 +9,7 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button } from '@/components/ui/Button';
 import { APP_URL } from '@/constants/app';
 import { identify, track } from '@/lib/analytics';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 // Define the onboarding steps based on the new UX requirements
 interface OnboardingStep {
@@ -83,7 +85,7 @@ export function AppleStyleOnboardingForm() {
 
   // Current step in the onboarding flow
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   // Form state
   const [handle, setHandle] = useState('');
@@ -112,9 +114,9 @@ export function AppleStyleOnboardingForm() {
     // Prefill full name from Clerk metadata or user data
     if (user) {
       // Priority: privateMetadata.fullName > firstName + lastName > email fallback
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const privateFullName = ((user as any).privateMetadata as Record<string, unknown> | undefined)
-        ?.fullName as string | undefined;
+      const privateFullName = (
+        user as { privateMetadata?: Record<string, unknown> }
+      ).privateMetadata?.fullName as string | undefined;
       if (privateFullName) {
         setFullName(privateFullName);
       } else if (user.firstName || user.lastName) {
@@ -141,12 +143,11 @@ export function AppleStyleOnboardingForm() {
       setHandle(urlHandle);
       setHandleInput(urlHandle);
     } else if (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((user as any).privateMetadata as Record<string, unknown> | undefined)?.suggestedUsername
+      (user as { privateMetadata?: Record<string, unknown> }).privateMetadata
+        ?.suggestedUsername
     ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const suggested = ((user as any).privateMetadata as Record<string, unknown>)
-        .suggestedUsername as string;
+      const suggested = (user as { privateMetadata?: Record<string, unknown> })
+        .privateMetadata?.suggestedUsername as string;
       setHandle(suggested);
       setHandleInput(suggested);
     } else {
@@ -181,44 +182,21 @@ export function AppleStyleOnboardingForm() {
         user_id: user?.id,
       });
 
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex + 1);
-        setIsTransitioning(false);
+      setCurrentStepIndex(currentStepIndex + 1);
 
-        // Track step viewed
-        track('onboarding_step_viewed', {
-          step_id: nextStep.id,
-          step_index: currentStepIndex + 1,
-          step_title: nextStep.title,
-          user_id: user?.id,
-        });
-
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 300);
+      // Track step viewed
+      track('onboarding_step_viewed', {
+        step_id: nextStep.id,
+        step_index: currentStepIndex + 1,
+        step_title: nextStep.title,
+        user_id: user?.id,
+      });
     }
   }, [currentStepIndex, user?.id]);
 
   const goToPreviousStep = useCallback(() => {
     if (currentStepIndex > 0) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentStepIndex(currentStepIndex - 1);
-        setIsTransitioning(false);
-        // Focus management for accessibility
-        setTimeout(() => {
-          const heading = document.querySelector('h1');
-          if (heading) {
-            heading.focus();
-          }
-        }, 100);
-      }, 300);
+      setCurrentStepIndex(currentStepIndex - 1);
     }
   }, [currentStepIndex]);
 
@@ -786,14 +764,27 @@ export function AppleStyleOnboardingForm() {
         <div id='step-heading' className='sr-only'>
           {ONBOARDING_STEPS[currentStepIndex]?.title} step content
         </div>
-        <div
-          className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
-            isTransitioning
-              ? 'opacity-0 translate-y-4'
-              : 'opacity-100 translate-y-0'
-          }`}
-        >
-          {renderStepContent()}
+        <div className='w-full max-w-2xl'>
+          <AnimatePresence mode='wait'>
+            <motion.div
+              key={ONBOARDING_STEPS[currentStepIndex].id}
+              initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: prefersReducedMotion ? 0 : -16 }}
+              transition={{
+                duration: prefersReducedMotion ? 0 : 0.3,
+                ease: 'easeInOut',
+              }}
+              onAnimationComplete={definition => {
+                if (definition === 'animate') {
+                  const heading = document.querySelector('h1');
+                  heading?.focus();
+                }
+              }}
+            >
+              {renderStepContent()}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

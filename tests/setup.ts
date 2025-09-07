@@ -39,6 +39,34 @@ afterEach(() => {
   cleanup();
 });
 
+// Mock framer-motion to simplify animation testing
+vi.mock('framer-motion', () => {
+  return {
+    __esModule: true,
+    AnimatePresence: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, null, children),
+    motion: new Proxy(
+      {},
+      {
+        get: (_target, element) => {
+          const Component = React.forwardRef(
+            (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              { children, ...rest }: any,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ref: any
+            ) =>
+              React.createElement(element as string, { ref, ...rest }, children)
+          );
+          Component.displayName = `motion.${String(element)}`;
+          return Component;
+        },
+      }
+    ),
+    useReducedMotion: () => true,
+  };
+});
+
 // Mock Clerk components and hooks
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({
