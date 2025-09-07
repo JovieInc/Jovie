@@ -395,6 +395,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   </span>
                 </div>
               </header>
+              {/* Ordering note */}
+              <p className='text-xs text-secondary-token'>
+                Link order is optimized for conversions. For now, links are
+                displayed by global platform popularity. We’ll personalize
+                ordering for your visitors over time.
+              </p>
               <SortableContext items={items.map(idFor)}>
                 <ul
                   id={`links-section-${section}`}
@@ -490,6 +496,8 @@ function SortableRow<T extends DetectedLink>({
       : `${brandHex}20`
     : `${brandHex}15`;
 
+  // (deduped) keep single set of brand color utilities above
+
   return (
     <li
       ref={setNodeRef}
@@ -501,7 +509,6 @@ function SortableRow<T extends DetectedLink>({
       {...attributes}
     >
       <div className='min-w-0 flex items-start gap-3'>
-<<<<<<< HEAD
         {/* Drag handle */}
         {draggable && (
           <button
@@ -521,10 +528,6 @@ function SortableRow<T extends DetectedLink>({
         <div
           className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all hover:scale-[1.04] hover:ring-1 hover:ring-subtle'
           style={{ backgroundColor: iconBg, color: iconColor }}
-=======
-        <div
-          className='flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 shrink-0 mt-0.5'
->>>>>>> 2dfb2c2 (feat(links): restore platform icons in grouped list rows)
           aria-hidden='true'
         >
           <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
