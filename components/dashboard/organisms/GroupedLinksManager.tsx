@@ -501,6 +501,7 @@ function SortableRow<T extends DetectedLink>({
       {...attributes}
     >
       <div className='min-w-0 flex items-start gap-3'>
+<<<<<<< HEAD
         {/* Drag handle */}
         {draggable && (
           <button
@@ -520,6 +521,10 @@ function SortableRow<T extends DetectedLink>({
         <div
           className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all hover:scale-[1.04] hover:ring-1 hover:ring-subtle'
           style={{ backgroundColor: iconBg, color: iconColor }}
+=======
+        <div
+          className='flex items-center justify-center w-7 h-7 rounded-lg bg-surface-2 shrink-0 mt-0.5'
+>>>>>>> 2dfb2c2 (feat(links): restore platform icons in grouped list rows)
           aria-hidden='true'
         >
           <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
