@@ -177,6 +177,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     onLinkAdded?.([enriched as T]);
     onLinksChange?.(next);
 
+    // If this section was previously empty (and likely collapsed), auto-expand it
+    const sec = sectionOf(enriched as T);
+    setCollapsed(prev => ({ ...prev, [sec]: false }));
+
     // Best-effort server notification: enable tipping when Venmo is added
     try {
       if ((enriched as DetectedLink).platform.id === 'venmo') {
@@ -253,6 +257,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     next.splice(toIdx, 0, updated);
     setLinks(next);
     onLinksChange?.(next);
+    // Auto-expand target section when first item is moved into it
+    setCollapsed(prev => ({ ...prev, [toSection]: false }));
   }
 
   return (
@@ -400,7 +406,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 <ul
                   id={`links-section-${section}`}
                   className={cn(
-                    'divide-y divide-subtle rounded-lg border border-subtle bg-surface-1',
+                    'divide-y divide-subtle dark:divide-white/10 rounded-lg border border-subtle dark:border-white/10 bg-surface-1',
                     collapsed[section] && 'hidden'
                   )}
                 >
