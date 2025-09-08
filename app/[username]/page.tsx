@@ -1,8 +1,7 @@
+import dynamic from 'next/dynamic';
 import { notFound } from 'next/navigation';
-import { cache, Suspense } from 'react';
-import { DesktopQrOverlay } from '@/components/profile/DesktopQrOverlay';
-import { ProfileSkeleton } from '@/components/profile/ProfileSkeleton';
-import { ProgressiveArtistPage } from '@/components/profile/ProgressiveArtistPage';
+import { cache } from 'react';
+import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 import {
@@ -10,6 +9,11 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+
+const DesktopQrOverlay = dynamic(
+  () => import('@/components/profile/DesktopQrOverlay'),
+  { ssr: false, loading: () => null }
+);
 
 // Use centralized server helper for public data access
 
@@ -137,19 +141,15 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <Suspense fallback={<ProfileSkeleton />}>
-        <ProgressiveArtistPage
-          mode={mode}
-          artist={artist}
-          socialLinks={socialLinks}
-          subtitle={getSubtitle(mode)}
-          showTipButton={showTipButton}
-          showBackButton={showBackButton}
-        />
-      </Suspense>
-      <Suspense fallback={null}>
-        <DesktopQrOverlay handle={artist.handle} />
-      </Suspense>
+      <StaticArtistPage
+        mode={mode}
+        artist={artist}
+        socialLinks={socialLinks}
+        subtitle={getSubtitle(mode)}
+        showTipButton={showTipButton}
+        showBackButton={showBackButton}
+      />
+      <DesktopQrOverlay handle={artist.handle} />
     </>
   );
 }
