@@ -4,18 +4,20 @@ import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 const NewFeaturedArtists = dynamic(
-  () => import('@/components/home/NewFeaturedArtists'),
+  () => import('@/components/home/NewFeaturedArtists').then(m => m.NewFeaturedArtists),
   { ssr: false }
 );
 const NewFeaturesSection = dynamic(
-  () => import('@/components/home/NewFeaturesSection')
+  () => import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
 );
 const NewUpgradeTeaser = dynamic(
-  () => import('@/components/home/NewUpgradeTeaser')
+  () => import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
 );
-const NewHowItWorks = dynamic(() => import('@/components/home/NewHowItWorks'));
+const NewHowItWorks = dynamic(
+  () => import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
+);
 const NewPreFooterCTA = dynamic(
-  () => import('@/components/home/NewPreFooterCTA')
+  () => import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
 );
 
 // Root layout handles dynamic rendering

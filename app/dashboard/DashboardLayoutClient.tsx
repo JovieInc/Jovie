@@ -16,6 +16,7 @@ import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton'
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { UserButton } from '@/components/molecules/UserButton';
 import { Logo } from '@/components/ui/Logo';
+import { Sidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/Sidebar';
 // Live preview is rendered only on the Links page
 
 import type { DashboardData } from './actions';
@@ -131,17 +132,10 @@ export default function DashboardLayoutClient({
 
         <div className='flex h-screen overflow-y-hidden overflow-x-visible'>
           {/* Sidebar */}
-          <div
-            id='sidebar'
-            className={`${
-              sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-            } ${
-              sidebarCollapsed ? 'lg:w-16' : 'lg:w-64'
-            } fixed lg:relative inset-y-0 left-0 z-50 flex flex-col transition-all duration-300 ease-in-out lg:translate-x-0`}
-          >
-            <div className='flex grow flex-col gap-y-5 overflow-y-auto overflow-x-visible bg-surface-0 backdrop-blur-sm border-r border-subtle rounded-r-2xl shadow-md lg:shadow-lg pt-4 pb-3 ring-1 ring-black/5 dark:ring-white/5'>
+          <Sidebar id='sidebar' open={sidebarOpen} collapsed={sidebarCollapsed}>
+            <SidebarContent>
               {/* Header with logo and top toggle */}
-              <div className='relative flex h-16 shrink-0 items-center px-4 overflow-visible w-full'>
+              <SidebarHeader>
                 <Link
                   href='/dashboard/overview'
                   className='focus-visible:outline-none focus-visible:ring-2 ring-accent focus-visible:ring-offset-2 rounded-md'
@@ -196,7 +190,7 @@ export default function DashboardLayoutClient({
                     </div>
                   </Tooltip>
                 )}
-              </div>
+              </SidebarHeader>
 
               {/* Navigation */}
               <DashboardNav collapsed={sidebarCollapsed} />
@@ -221,7 +215,7 @@ export default function DashboardLayoutClient({
               </div>
 
               {/* Persistent footer: user menu anchored at absolute bottom */}
-              <div className='mt-3 px-2 pt-3 pb-4 border-t border-subtle'>
+              <SidebarFooter>
                 <div className='flex items-center justify-center'>
                   <Tooltip content='Account' placement='right'>
                     <div className='w-full'>
@@ -229,9 +223,9 @@ export default function DashboardLayoutClient({
                     </div>
                   </Tooltip>
                 </div>
-              </div>
-            </div>
-          </div>
+              </SidebarFooter>
+            </SidebarContent>
+          </Sidebar>
 
           {/* Mobile sidebar overlay */}
           {sidebarOpen && (

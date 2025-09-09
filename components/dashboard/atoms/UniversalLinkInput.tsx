@@ -58,8 +58,8 @@ export const UniversalLinkInput = forwardRef<UniversalLinkInputRef, UniversalLin
   // Real-time platform detection
   const detectedLink = useMemo(() => {
     if (!url.trim()) return null;
-    return detectPlatform(url.trim(), creatorName);
-  }, [url, creatorName]);
+    return detectPlatform(url.trim());
+  }, [url]);
 
   // Handle URL input changes
   const handleUrlChange = useCallback(

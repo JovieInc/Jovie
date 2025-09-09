@@ -31,5 +31,11 @@
     ".next/types/**/*.ts",
     "tests/types/**/*.d.ts"
   ],
-  "exclude": ["node_modules", "supabase/functions", ".next/types/**/*"]
+  "exclude": [
+    "node_modules",
+    "supabase/functions",
+    ".next/types/**/*",
+    "vitest.config.ts",
+    "vitest.config.fast.ts"
+  ]
 }
