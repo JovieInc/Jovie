@@ -5,10 +5,10 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ArtistCard } from '@/components/ui/ArtistCard';
 import { Button } from '@/components/ui/Button';
 import { ErrorSummary } from '@/components/ui/ErrorSummary';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { OptimisticProgress } from '@/components/ui/OptimisticProgress';
 import { ProgressIndicator } from '@/components/ui/ProgressIndicator';
 import {

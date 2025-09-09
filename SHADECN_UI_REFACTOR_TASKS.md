@@ -37,9 +37,9 @@ Refactor legacy components to align with the `shadcn/ui` design system. Each tas
 - [ ] Remove legacy size logic once unified
 
 ### LoadingSpinner (`components/atoms/LoadingSpinner.tsx` & `components/ui/Spinner.tsx`)
-- [ ] Consolidate into a single spinner component under `ui`
-- [ ] Standardize size and color props
-- [ ] Drop legacy `Spinner` export
+- [x] Consolidate into a single spinner component under `ui`
+- [x] Standardize size and color props
+- [x] Drop legacy `Spinner` export
 
 ---
 Each task aims for minimal surface area, exceptional clarity, and a measurable path to delight.
