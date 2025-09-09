@@ -488,7 +488,7 @@ jobs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: 20 }
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -551,7 +551,7 @@ jobs:
       url: https://preview.jov.ie
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with: { node-version: 20 }
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -683,7 +683,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Wait for AI reviews
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const owner = context.repo.owner;
@@ -778,7 +778,7 @@ jobs:
       url: https://jov.ie
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
       - name: Install Vercel CLI

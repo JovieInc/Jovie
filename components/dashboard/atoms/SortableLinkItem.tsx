@@ -191,7 +191,7 @@ export const SortableLinkItem = forwardRef<
           remove.
           {isDragging ? ' Currently dragging.' : ''}
         </span>
-        <div className='flex items-center gap-2 p-2'>
+        <div className='flex items-center gap-3 p-3'>
           {/* Drag handle */}
           <button
             {...attributes}
@@ -199,7 +199,7 @@ export const SortableLinkItem = forwardRef<
             disabled={disabled}
             className={`
             cursor-grab active:cursor-grabbing flex items-center justify-center
-            w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+            w-6 h-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
             transition-opacity duration-200
             ${isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
           `}
@@ -280,36 +280,72 @@ export const SortableLinkItem = forwardRef<
           </div>
 
           {/* Controls */}
-          <div className='shrink-0 flex items-center gap-1.5'>
-            <Tooltip content={link.isVisible ? 'Hide link' : 'Show link'} placement='top'>
+          <div
+            className={`
+            flex items-center gap-1 transition-opacity duration-200
+            ${isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+          `}
+          >
+            {/* Visibility toggle */}
+            <Tooltip
+              content={link.isVisible ? 'Hide link' : 'Show link'}
+              placement='top'
+            >
               <button
                 onClick={handleVisibilityToggle}
                 disabled={disabled}
-                className='inline-flex items-center justify-center w-7 h-7 rounded-md border border-subtle bg-surface-0 text-tertiary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                aria-label={link.isVisible ? `Hide ${link.title} link` : `Show ${link.title} link`}
+                className='p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors'
+                aria-label={
+                  link.isVisible
+                    ? `Hide ${link.title} link`
+                    : `Show ${link.title} link`
+                }
                 aria-pressed={link.isVisible}
               >
                 {link.isVisible ? (
-                  <svg className='w-4 h-4' viewBox='0 0 24 24' fill='none' stroke='currentColor' aria-hidden='true'>
+                  <svg
+                    width='16'
+                    height='16'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    aria-hidden='true'
+                  >
                     <path d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z' />
                     <circle cx='12' cy='12' r='3' />
                   </svg>
                 ) : (
-                  <svg className='w-4 h-4' viewBox='0 0 24 24' fill='none' stroke='currentColor' aria-hidden='true'>
-                    <path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 2.16-3.19m6.72 1.07a3 3 0 1 1 4.24 4.24' />
+                  <svg
+                    width='16'
+                    height='16'
+                    viewBox='0 0 24 24'
+                    fill='none'
+                    stroke='currentColor'
+                    aria-hidden='true'
+                  >
+                    <path d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24' />
                     <line x1='1' y1='1' x2='23' y2='23' />
                   </svg>
                 )}
               </button>
             </Tooltip>
-            <Tooltip content='Remove link' placement='top'>
+
+            {/* Delete button */}
+            <Tooltip content='Delete link' placement='top'>
               <button
                 onClick={handleDelete}
                 disabled={disabled}
-                className='inline-flex items-center justify-center w-7 h-7 rounded-md border border-subtle bg-surface-0 text-tertiary-token hover:bg-surface-2 hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                className='p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors'
                 aria-label={`Delete ${link.title} link`}
               >
-                <svg className='w-4 h-4' viewBox='0 0 24 24' fill='none' stroke='currentColor' aria-hidden='true'>
+                <svg
+                  width='16'
+                  height='16'
+                  viewBox='0 0 24 24'
+                  fill='none'
+                  stroke='currentColor'
+                  aria-hidden='true'
+                >
                   <path d='M3 6h18' />
                   <path d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' />
                   <path d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' />
