@@ -7,7 +7,16 @@ export { Card, CardContent, CardHeader, CardTitle } from './Card';
 export { Combobox } from './Combobox';
 // Layout Components
 export { DataCard } from './DataCard';
-export { Dialog } from './Dialog';
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from './dialog';
 // Form Components
 export { Form } from './Form';
 export { FormField } from './FormField';

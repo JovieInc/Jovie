@@ -1,8 +1,15 @@
 'use client';
 
-import { Dialog, Transition } from '@headlessui/react';
 import { XMarkIcon } from '@heroicons/react/24/outline';
-import { Fragment, useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +19,11 @@ interface FeedbackModalProps {
   id?: string;
 }
 
-export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: FeedbackModalProps) {
+export function FeedbackModal({
+  isOpen,
+  onClose,
+  id = 'feedback-modal',
+}: FeedbackModalProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -23,7 +34,6 @@ export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: Feedba
     setIsSubmitting(true);
 
     try {
-      // Track feedback submission with PostHog
       track('feedback_submitted', {
         feedback: feedback.trim(),
         source: 'dashboard_sidebar',
@@ -31,13 +41,10 @@ export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: Feedba
         character_count: feedback.trim().length,
       });
 
-      // Show success state
       setIsSubmitted(true);
 
-      // Auto-close after 2 seconds
       setTimeout(() => {
         onClose();
-        // Reset state after modal closes
         setTimeout(() => {
           setFeedback('');
           setIsSubmitted(false);
@@ -45,7 +52,6 @@ export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: Feedba
       }, 2000);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      // Still show success to user, but log the error
       setIsSubmitted(true);
       setTimeout(() => {
         onClose();
@@ -62,7 +68,6 @@ export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: Feedba
   const handleClose = useCallback(() => {
     if (isSubmitting) return;
     onClose();
-    // Reset state after modal closes
     setTimeout(() => {
       setFeedback('');
       setIsSubmitted(false);
@@ -79,176 +84,125 @@ export function FeedbackModal({ isOpen, onClose, id = 'feedback-modal' }: Feedba
     [handleSubmit]
   );
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) handleClose();
+  };
+
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as='div' className='relative z-50' onClose={handleClose} id={id}>
-        <Transition.Child
-          as={Fragment}
-          enter='ease-out duration-300'
-          enterFrom='opacity-0'
-          enterTo='opacity-100'
-          leave='ease-in duration-200'
-          leaveFrom='opacity-100'
-          leaveTo='opacity-0'
-        >
-          <div className='fixed inset-0 bg-black/25 backdrop-blur-sm' />
-        </Transition.Child>
-
-        <div className='fixed inset-0 overflow-y-auto'>
-          <div className='flex min-h-full items-center justify-center p-4 text-center'>
-            <Transition.Child
-              as={Fragment}
-              enter='ease-out duration-300'
-              enterFrom='opacity-0 scale-95'
-              enterTo='opacity-100 scale-100'
-              leave='ease-in duration-200'
-              leaveFrom='opacity-100 scale-100'
-              leaveTo='opacity-0 scale-95'
-            >
-              <Dialog.Panel className='w-full max-w-md transform overflow-hidden rounded-lg bg-surface-0 border border-subtle shadow-xl transition-all'>
-                {isSubmitted ? (
-                  // Success State
-                  <div className='px-6 py-8 text-center'>
-                    <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20 mb-4'>
-                      <svg
-                        className='h-6 w-6 text-green-600 dark:text-green-400'
-                        fill='none'
-                        viewBox='0 0 24 24'
-                        stroke='currentColor'
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          d='M5 13l4 4L19 7'
-                        />
-                      </svg>
-                    </div>
-                    <Dialog.Title
-                      as='h3'
-                      className='text-lg font-semibold text-primary-token mb-2'
-                    >
-                      Thank you!
-                    </Dialog.Title>
-                    <p className='text-sm text-secondary-token'>
-                      Your feedback has been sent. We appreciate you taking the
-                      time to help us improve Jovie.
-                    </p>
-                  </div>
-                ) : (
-                  // Feedback Form
-                  <>
-                    <div className='flex items-center justify-between px-6 py-4 border-b border-subtle'>
-                      <Dialog.Title
-                        as='h3'
-                        className='text-lg font-semibold text-primary-token'
-                      >
-                        Send Feedback
-                      </Dialog.Title>
-                      <button
-                        type='button'
-                        className='rounded-md p-1 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
-                        onClick={handleClose}
-                      >
-                        <span className='sr-only'>Close</span>
-                        <XMarkIcon className='h-5 w-5' aria-hidden='true' />
-                      </button>
-                    </div>
-
-                    <div className='px-6 py-4'>
-                      <div className='mb-4'>
-                        <label
-                          htmlFor='feedback'
-                          className='block text-sm font-medium text-primary-token mb-2'
-                        >
-                          What can we do to improve Jovie?
-                        </label>
-                        <textarea
-                          id='feedback'
-                          name='feedback'
-                          rows={4}
-                          className={cn(
-                            'block w-full rounded-md border border-subtle bg-surface-0',
-                            'px-3 py-2 text-sm text-primary-token placeholder-secondary-token',
-                            'focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-1',
-                            'resize-none transition-colors'
-                          )}
-                          placeholder="Tell us about your experience, what you'd like to see improved, or any issues you've encountered..."
-                          value={feedback}
-                          onChange={e => setFeedback(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          autoFocus
-                        />
-                        <p className='mt-2 text-xs text-secondary-token'>
-                          Press{' '}
-                          <kbd className='px-1 py-0.5 text-xs font-semibold bg-surface-2 border border-subtle rounded'>
-                            ⌘
-                          </kbd>{' '}
-                          +{' '}
-                          <kbd className='px-1 py-0.5 text-xs font-semibold bg-surface-2 border border-subtle rounded'>
-                            Enter
-                          </kbd>{' '}
-                          to send
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className='flex items-center justify-end gap-3 px-6 py-4 bg-surface-1 border-t border-subtle'>
-                      <button
-                        type='button'
-                        className='px-4 py-2 text-sm font-medium text-secondary-token hover:text-primary-token hover:bg-surface-2 rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
-                        onClick={handleClose}
-                        disabled={isSubmitting}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type='button'
-                        className={cn(
-                          'px-4 py-2 text-sm font-medium text-white rounded-md transition-colors',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
-                          feedback.trim() && !isSubmitting
-                            ? 'bg-accent hover:bg-accent/90'
-                            : 'bg-surface-3 cursor-not-allowed'
-                        )}
-                        onClick={handleSubmit}
-                        disabled={!feedback.trim() || isSubmitting}
-                      >
-                        {isSubmitting ? (
-                          <span className='flex items-center gap-2'>
-                            <svg
-                              className='animate-spin -ml-1 mr-2 h-4 w-4 text-white'
-                              fill='none'
-                              viewBox='0 0 24 24'
-                            >
-                              <circle
-                                className='opacity-25'
-                                cx='12'
-                                cy='12'
-                                r='10'
-                                stroke='currentColor'
-                                strokeWidth='4'
-                              ></circle>
-                              <path
-                                className='opacity-75'
-                                fill='currentColor'
-                                d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'
-                              ></path>
-                            </svg>
-                            Sending...
-                          </span>
-                        ) : (
-                          'Send Feedback'
-                        )}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </Dialog.Panel>
-            </Transition.Child>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent
+        className='w-full max-w-md overflow-hidden rounded-lg bg-surface-0 border border-subtle shadow-xl'
+        id={id}
+      >
+        {isSubmitted ? (
+          <div className='px-6 py-8 text-center'>
+            <div className='mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20'>
+              <svg
+                className='h-6 w-6 text-green-600 dark:text-green-400'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M5 13l4 4L19 7'
+                />
+              </svg>
+            </div>
+            <DialogHeader>
+              <DialogTitle className='mb-2 text-lg font-semibold text-primary-token'>
+                Thank you!
+              </DialogTitle>
+              <DialogDescription>
+                Your feedback has been sent. We appreciate you taking the time
+                to help us improve Jovie.
+              </DialogDescription>
+            </DialogHeader>
           </div>
-        </div>
-      </Dialog>
-    </Transition>
+        ) : (
+          <>
+            <div className='flex items-center justify-between border-b border-subtle px-6 py-4'>
+              <DialogHeader className='p-0'>
+                <DialogTitle className='text-lg font-semibold text-primary-token'>
+                  Send Feedback
+                </DialogTitle>
+              </DialogHeader>
+              <button
+                type='button'
+                className='rounded-md p-1 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1'
+                onClick={handleClose}
+              >
+                <span className='sr-only'>Close</span>
+                <XMarkIcon className='h-5 w-5' aria-hidden='true' />
+              </button>
+            </div>
+
+            <div className='px-6 py-4'>
+              <div className='mb-4'>
+                <label
+                  htmlFor='feedback-textarea'
+                  className='mb-2 block text-sm font-medium text-primary-token'
+                >
+                  Your feedback
+                </label>
+                <textarea
+                  id='feedback-textarea'
+                  value={feedback}
+                  onChange={e => setFeedback(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder='Share your thoughts...'
+                  className='w-full rounded-md border border-subtle bg-transparent p-2 text-sm text-primary-token placeholder:text-secondary-token focus:outline-none focus:ring-2 focus:ring-accent'
+                  rows={4}
+                  maxLength={500}
+                  disabled={isSubmitting}
+                />
+                <p className='mt-1 text-xs text-secondary-token'>
+                  {feedback.length}/500 characters
+                </p>
+                {feedback.length >= 500 && (
+                  <p className='mt-1 text-xs text-red-500'>
+                    Maximum character limit reached
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <DialogFooter className='items-center justify-between border-t border-subtle bg-surface-1 px-6 py-4'>
+              <p className='text-xs text-secondary-token'>
+                Press <kbd className='px-1 text-xs'>⌘</kbd>+
+                <kbd className='px-1 text-xs'>Enter</kbd> to send
+              </p>
+              <div className='flex space-x-2'>
+                <button
+                  type='button'
+                  className={cn(
+                    'btn btn-secondary btn-sm',
+                    isSubmitting && 'cursor-not-allowed opacity-50'
+                  )}
+                  onClick={handleClose}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type='button'
+                  className={cn(
+                    'btn btn-primary btn-sm',
+                    (!feedback.trim() || isSubmitting) &&
+                      'cursor-not-allowed opacity-50'
+                  )}
+                  onClick={handleSubmit}
+                  disabled={!feedback.trim() || isSubmitting}
+                >
+                  {isSubmitting ? 'Sending...' : 'Send'}
+                </button>
+              </div>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
