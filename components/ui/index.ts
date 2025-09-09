@@ -20,6 +20,7 @@ export { Logo } from './Logo';
 export { OptimizedImage } from './OptimizedImage';
 export { PlaceholderImage } from './PlaceholderImage';
 export { ProgressIndicator } from './ProgressIndicator';
+export { Popover, PopoverContent, PopoverTrigger } from './popover';
 export { Section } from './Section';
 export { Select } from './Select';
 export { SmartHandleInput } from './SmartHandleInput';

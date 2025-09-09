@@ -1,93 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
-import { ProductFlyout } from '@/components/organisms/ProductFlyout';
+import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { FEATURES } from '@/lib/features';
 
 export function HeaderNav() {
-  const [isProductFlyoutOpen, setIsProductFlyoutOpen] = useState(false);
-  const productTriggerRef = useRef<HTMLButtonElement>(null);
-  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Stable hover handlers on container
-  const handleHoverEnter = () => {
-    if (window.matchMedia('(min-width: 768px)').matches) {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-      setIsProductFlyoutOpen(true);
-    }
-  };
-
-  const handleHoverLeave = () => {
-    if (window.matchMedia('(min-width: 768px)').matches) {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-      hoverTimeoutRef.current = setTimeout(() => {
-        setIsProductFlyoutOpen(false);
-      }, 100);
-    }
-  };
-
-  // Mobile tap handler
-  const handleProductClick = () => {
-    if (!window.matchMedia('(min-width: 768px)').matches) {
-      setIsProductFlyoutOpen(!isProductFlyoutOpen);
-    }
-  };
-
-  // Simplified focus handlers
-  const handleProductFocus = () => {
-    if (!window.matchMedia('(min-width: 768px)').matches) {
-      setIsProductFlyoutOpen(true);
-    }
-  };
-
-  const handleProductBlur = (e: React.FocusEvent) => {
-    // Only handle blur on mobile
-    if (window.matchMedia('(min-width: 768px)').matches) {
-      return;
-    }
-    // Don't close if focus is moving to the flyout panel
-    const relatedTarget = e.relatedTarget as HTMLElement;
-    if (relatedTarget?.closest('[role="menu"]')) {
-      return;
-    }
-    // Small delay to prevent flickering when tabbing
-    setTimeout(() => {
-      setIsProductFlyoutOpen(false);
-    }, 100);
-  };
-
-  // Close flyout
-  const closeFlyout = () => {
-    setIsProductFlyoutOpen(false);
-  };
-
-  // Dynamic import for ProductFlyout with prefetch on hover
-  useEffect(() => {
-    if (isProductFlyoutOpen) {
-      // Prefetch the flyout component
-      import('@/components/organisms/ProductFlyout');
-    }
-  }, [isProductFlyoutOpen]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimeoutRef.current) {
-        clearTimeout(hoverTimeoutRef.current);
-        hoverTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
   return (
     <header className='sticky top-0 z-50 w-full border-b border-gray-200/10 dark:border-white/10 bg-white/95 dark:bg-[#0D0E12]/95 backdrop-blur-sm supports-backdrop-filter:bg-white/60 dark:supports-backdrop-filter:bg-[#0D0E12]/60'>
       <Container>
@@ -100,30 +25,40 @@ export function HeaderNav() {
           {/* Navigation - Center (hidden on mobile) */}
           <div className='hidden md:flex flex-1 justify-center'>
             <nav className='flex items-center space-x-6'>
-              <div
-                className='relative'
-                onPointerEnter={handleHoverEnter}
-                onPointerLeave={handleHoverLeave}
-                data-testid='product-flyout-wrapper'
-              >
-                <button
-                  ref={productTriggerRef}
-                  id='product-trigger'
-                  onClick={handleProductClick}
-                  onFocus={handleProductFocus}
-                  onBlur={handleProductBlur}
-                  aria-expanded={isProductFlyoutOpen}
-                  aria-haspopup='menu'
-                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1'
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1'>
+                    Product
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align='center'
+                  className='w-[calc(100vw-2rem)] max-w-4xl p-6'
+                  role='menu'
                 >
-                  Product
-                </button>
-                <ProductFlyout
-                  isOpen={isProductFlyoutOpen}
-                  onClose={closeFlyout}
-                  triggerRef={productTriggerRef}
-                />
-              </div>
+                  <div className='grid grid-cols-2 gap-x-8 gap-y-1'>
+                    {FEATURES.map(feature => (
+                      <FlyoutItem
+                        key={feature.slug}
+                        feature={feature}
+                        className='hover:bg-[var(--bg)] focus-visible:bg-[var(--bg)]'
+                      />
+                    ))}
+                  </div>
+                  <div className='mt-4 border-t border-[var(--border)] pt-4'>
+                    <Link
+                      href='/changelog'
+                      className='group flex items-center justify-between rounded-lg p-2 text-sm text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--fg)]'
+                      role='menuitem'
+                    >
+                      <span>View Changelog</span>
+                      <span className='text-xs opacity-75 group-hover:opacity-100'>
+                        →
+                      </span>
+                    </Link>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Link
                 href='/pricing'
                 className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
@@ -136,23 +71,38 @@ export function HeaderNav() {
           {/* Mobile Navigation */}
           <div className='md:hidden flex-1 justify-center flex'>
             <nav className='flex items-center space-x-4'>
-              <div className='relative'>
-                <button
-                  onClick={handleProductClick}
-                  onFocus={handleProductFocus}
-                  onBlur={handleProductBlur}
-                  aria-expanded={isProductFlyoutOpen}
-                  aria-haspopup='menu'
-                  className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1 min-h-[44px] flex items-center'
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1 min-h-[44px] flex items-center'>
+                    Product
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align='start'
+                  className='w-80 p-4 md:hidden'
+                  role='menu'
                 >
-                  Product
-                </button>
-                <ProductFlyout
-                  isOpen={isProductFlyoutOpen}
-                  onClose={closeFlyout}
-                  triggerRef={productTriggerRef}
-                />
-              </div>
+                  <div className='space-y-1'>
+                    {FEATURES.map(feature => (
+                      <FlyoutItem
+                        key={feature.slug}
+                        feature={feature}
+                        className='min-h-[44px] hover:bg-[var(--bg)] focus-visible:bg-[var(--bg)]'
+                      />
+                    ))}
+                  </div>
+                  <div className='mt-4 border-t border-[var(--border)] pt-4'>
+                    <Link
+                      href='/changelog'
+                      className='flex min-h-[44px] items-center justify-between rounded-lg p-3 text-sm text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--fg)]'
+                      role='menuitem'
+                    >
+                      <span>View Changelog</span>
+                      <span className='text-xs opacity-75'>→</span>
+                    </Link>
+                  </div>
+                </PopoverContent>
+              </Popover>
               <Link
                 href='/pricing'
                 className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[44px] flex items-center px-2'
@@ -168,15 +118,6 @@ export function HeaderNav() {
           </div>
         </div>
       </Container>
-
-      {/* Inert background when flyout is open */}
-      {isProductFlyoutOpen && (
-        <div
-          className='fixed inset-0 z-40'
-          aria-hidden='true'
-          onClick={closeFlyout}
-        />
-      )}
     </header>
   );
 }
