@@ -1,5 +1,5 @@
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { Button, ButtonProps } from '@/components/ui/Button';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Trigger CI run to resolve check suite failures - updated
 

@@ -19,7 +19,6 @@ export * from './IconBadge';
 export * from './IconButton';
 export * from './JovieIcon';
 export * from './JovieLogo';
-export * from './LoadingSpinner';
 export * from './LogoLink';
 export * from './NavLink';
 export * from './QRCode';

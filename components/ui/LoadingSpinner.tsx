@@ -4,17 +4,17 @@ import { clsx } from 'clsx';
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
 
-interface SpinnerProps {
+interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
   className?: string;
   variant?: 'auto' | 'light' | 'dark';
 }
 
-export function Spinner({
+export function LoadingSpinner({
   size = 'md',
   className,
   variant = 'auto',
-}: SpinnerProps) {
+}: LoadingSpinnerProps) {
   const { theme, systemTheme } = useTheme();
   const [isVisible, setIsVisible] = useState(false);
 
