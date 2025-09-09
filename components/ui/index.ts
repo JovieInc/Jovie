@@ -2,6 +2,7 @@
 
 export { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 export { ArtistCard } from './ArtistCard';
+export { Badge } from './Badge';
 export { Button } from './Button';
 export { Card, CardContent, CardHeader, CardTitle } from './Card';
 export { Combobox } from './Combobox';

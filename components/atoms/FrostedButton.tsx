@@ -1,69 +1,44 @@
-import { ButtonHTMLAttributes, forwardRef } from 'react';
+import React, { forwardRef } from 'react';
+import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-/**
- * FrostedButton Component
- *
- * A button component with a frosted glass effect.
- * Follows standardized button styling guidelines:
- * - Uses the global focus-ring utility for consistent focus states
- * - Maintains consistent hover/active states across variants
- * - Ensures proper hit target sizes for accessibility
- * - Supports light/dark mode with appropriate contrast
- */
-interface FrostedButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'default' | 'ghost' | 'outline';
-  size?: 'sm' | 'md' | 'lg';
+interface FrostedButtonProps extends ButtonProps {
   shape?: 'default' | 'circle' | 'square';
-  children: React.ReactNode;
+  variant?: 'default' | 'ghost' | 'outline';
 }
 
-const sizeClasses = {
-  sm: 'h-8 w-8 p-1.5',
-  md: 'h-10 w-10 p-2',
-  lg: 'h-12 w-12 p-3',
-};
-
-const variantClasses = {
-  default:
-    'bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20',
-  ghost: 'bg-white/30 dark:bg-white/5 hover:bg-white/50 dark:hover:bg-white/10',
-  outline:
-    'bg-transparent border border-gray-200/30 dark:border-white/10 hover:bg-white/20 dark:hover:bg-white/5',
-};
-
-const shapeClasses = {
-  default: 'rounded-lg',
-  circle: 'rounded-full',
-  square: 'rounded-none',
-};
-
+/**
+ * Button with a frosted glass effect built on the shared Button component.
+ */
 export const FrostedButton = forwardRef<HTMLButtonElement, FrostedButtonProps>(
-  (
-    {
-      className,
-      variant = 'default',
-      size = 'md',
-      shape = 'default',
-      children,
-      ...props
-    },
-    ref
-  ) => {
+  ({ className, shape = 'default', variant = 'default', ...props }, ref) => {
+    const shapeClasses = {
+      default: 'rounded-lg',
+      circle: 'rounded-full',
+      square: 'rounded-none',
+    } as const;
+
+    const variantClasses = {
+      default:
+        'backdrop-blur-sm bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20',
+      ghost:
+        'backdrop-blur-sm bg-white/30 dark:bg-white/5 hover:bg-white/50 dark:hover:bg-white/10',
+      outline:
+        'backdrop-blur-sm bg-transparent border border-gray-200/30 dark:border-white/10 hover:bg-white/20 dark:hover:bg-white/5',
+    } as const;
+
     return (
-      <button
+      <Button
+        ref={ref}
+        variant='ghost'
         className={cn(
-          'backdrop-blur-sm border border-gray-200/30 dark:border-white/10 flex items-center justify-center transition-colors cursor-pointer focus-ring active:scale-[0.98]',
-          sizeClasses[size],
+          'border border-gray-200/30 dark:border-white/10',
           variantClasses[variant],
           shapeClasses[shape],
           className
         )}
-        ref={ref}
         {...props}
-      >
-        {children}
-      </button>
+      />
     );
   }
 );
