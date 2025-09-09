@@ -15,8 +15,17 @@ export interface TooltipProps {
    * effectively.
    */
   content: ReactNode;
+  /** Preferred placement of the tooltip */
   placement?: 'top' | 'bottom' | 'left' | 'right';
+  /** Keyboard shortcut to display */
   shortcut?: string;
+  /** Maximum width of the tooltip in pixels */
+  maxWidth?: number;
+  /** Whether to wrap text in the tooltip */
+  wrapText?: boolean;
+  /** Additional class name for the tooltip */
+  className?: string;
+  /** Child element that triggers the tooltip */
   children: ReactNode;
 }
 
@@ -55,6 +64,9 @@ export function Tooltip({
   content,
   placement = 'right',
   shortcut,
+  maxWidth = 240,
+  wrapText = true,
+  className = '',
   children,
 }: TooltipProps) {
   return (
