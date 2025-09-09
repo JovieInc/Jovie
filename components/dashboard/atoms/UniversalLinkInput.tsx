@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -19,21 +19,28 @@ interface UniversalLinkInputProps {
   socialVisibleLimit?: number; // default 6
   prefillUrl?: string; // optional prefill
   onPrefillConsumed?: () => void; // notify parent once we consume it
+  creatorName?: string; // Creator's name for personalized link titles
 }
 
-export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
+export interface UniversalLinkInputRef {
+  getInputElement: () => HTMLInputElement | null;
+}
+
+export const UniversalLinkInput = forwardRef<UniversalLinkInputRef, UniversalLinkInputProps>(({
   onAdd,
   placeholder = 'Paste any link (Spotify, Instagram, TikTok, etc.)',
   disabled = false,
+  creatorName,
   existingPlatforms = [],
   socialVisibleCount = 0,
   socialVisibleLimit = 6,
   prefillUrl,
   onPrefillConsumed,
-}) => {
+}, forwardedRef) => {
   const [url, setUrl] = useState('');
   const [customTitle, setCustomTitle] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLDivElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   // If parent provides a prefill URL and we are empty, consume it once
@@ -42,7 +49,7 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
       setUrl(prefillUrl);
       onPrefillConsumed?.();
       // focus input so user can hit Enter quickly
-      setTimeout(() => urlInputRef.current?.focus(), 0);
+      setTimeout(() => inputRef.current?.querySelector('input')?.focus(), 0);
     }
     // Only react to changes of prefillUrl when url is empty to avoid overriding user typing
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -51,8 +58,8 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
   // Real-time platform detection
   const detectedLink = useMemo(() => {
     if (!url.trim()) return null;
-    return detectPlatform(url.trim());
-  }, [url]);
+    return detectPlatform(url.trim(), creatorName);
+  }, [url, creatorName]);
 
   // Handle URL input changes
   const handleUrlChange = useCallback(
@@ -93,7 +100,7 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
 
     // Auto-focus the URL input after adding a link
     setTimeout(() => {
-      urlInputRef.current?.focus();
+      inputRef.current?.querySelector('input')?.focus();
     }, 50);
   }, [detectedLink, customTitle, onAdd]);
 
@@ -150,8 +157,12 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
     ? 'rgb(var(--text-accent))'
     : brandColor;
 
+  useImperativeHandle(forwardedRef, () => ({
+    getInputElement: () => urlInputRef.current,
+  }));
+
   return (
-    <div className='space-y-3'>
+    <div className="relative w-full" ref={inputRef}>
       {/* URL Input */}
       <div className='relative'>
         <label htmlFor='link-url-input' className='sr-only'>
@@ -385,4 +396,8 @@ export const UniversalLinkInput: React.FC<UniversalLinkInputProps> = ({
       )}
     </div>
   );
-};
+});
+
+UniversalLinkInput.displayName = 'UniversalLinkInput';
+
+export default UniversalLinkInput;

@@ -166,7 +166,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
               { id: '', platform: 'instagram', url: '' },
             ])
           }
-          className='text-sm'
+          className='text-sm whitespace-nowrap'
         >
           Add Link
         </Button>

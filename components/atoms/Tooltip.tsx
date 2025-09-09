@@ -14,8 +14,11 @@ import {
   useHover,
   useInteractions,
   useRole,
+  size,
+  autoPlacement,
+  hide,
 } from '@floating-ui/react';
-import { type ReactNode, useId, useRef, useState } from 'react';
+import { type CSSProperties, type ReactNode, useId, useRef, useState } from 'react';
 
 export interface TooltipProps {
   /**
@@ -24,8 +27,17 @@ export interface TooltipProps {
    * effectively.
    */
   content: ReactNode;
+  /** Preferred placement of the tooltip */
   placement?: 'top' | 'bottom' | 'left' | 'right';
+  /** Keyboard shortcut to display */
   shortcut?: string;
+  /** Maximum width of the tooltip in pixels */
+  maxWidth?: number;
+  /** Whether to wrap text in the tooltip */
+  wrapText?: boolean;
+  /** Additional class name for the tooltip */
+  className?: string;
+  /** Child element that triggers the tooltip */
   children: ReactNode;
 }
 
@@ -33,6 +45,9 @@ export function Tooltip({
   content,
   placement = 'right',
   shortcut,
+  maxWidth = 240,
+  wrapText = true,
+  className = '',
   children,
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
@@ -46,9 +61,30 @@ export function Tooltip({
     placement,
     middleware: [
       offset(8),
-      flip({ padding: 8 }),
+      flip({
+        padding: 8,
+        fallbackAxisSideDirection: 'start',
+        fallbackStrategy: 'initialPlacement',
+      }),
       shift({ padding: 8 }),
-      arrowMw({ element: arrowRef }),
+      arrowMw({ element: arrowRef, padding: 4 }),
+      size({
+        apply({ availableWidth, availableHeight, elements }) {
+          Object.assign(elements.floating.style, {
+            maxWidth: `${Math.min(availableWidth - 16, maxWidth)}px`,
+            maxHeight: `${availableHeight - 16}px`,
+          });
+        },
+        padding: 8,
+      }),
+      hide({
+        padding: 8,
+        boundary: 'clippingAncestors',
+      }),
+      autoPlacement({
+        allowedPlacements: ['top', 'right', 'bottom', 'left'],
+        padding: 8,
+      }),
     ],
     strategy: 'fixed',
   });
@@ -83,43 +119,43 @@ export function Tooltip({
         <FloatingPortal>
           <div
             ref={refs.setFloating}
-            style={floatingStyles}
             {...getFloatingProps({
               id: tooltipId,
             })}
-            className='z-[60] relative select-none rounded-xl px-2.5 py-1.5 text-[11px] font-medium shadow-xl ring-1 backdrop-blur-sm will-change-transform bg-white text-neutral-900 ring-black/10 dark:bg-black/90 dark:text-white dark:ring-white/20'
+            className={`z-[60] relative select-none rounded-xl px-2.5 py-1.5 text-[11px] font-medium shadow-xl ring-1 backdrop-blur-sm will-change-transform bg-white text-neutral-900 ring-black/10 dark:bg-black/90 dark:text-white dark:ring-white/20 ${className}`}
+            style={{
+              ...floatingStyles,
+              '--max-width': `${maxWidth}px`,
+              maxWidth: 'var(--max-width)',
+              ...(middlewareData.hide?.referenceHidden && {
+                visibility: 'hidden',
+              }),
+            } as CSSProperties}
           >
-            <div className='flex items-center gap-2 whitespace-nowrap'>
+            <div className={`flex items-center gap-2 ${wrapText ? 'whitespace-normal break-words' : 'whitespace-nowrap'}`}>
               {typeof content === 'string' ? <span>{content}</span> : content}
-              {shortcut ? (
-                <kbd className='ml-1 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ring-1 bg-black/5 text-neutral-700 ring-black/10 dark:bg-white/10 dark:text-white dark:ring-white/20'>
+              {shortcut && (
+                <kbd className='shrink-0 ml-1.5 inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-wide ring-1 bg-black/5 text-neutral-700 ring-black/10 dark:bg-white/10 dark:text-white dark:ring-white/20'>
                   {shortcut}
                 </kbd>
-              ) : null}
+              )}
             </div>
             <div
               ref={arrowRef}
-              className='absolute h-2 w-2 rotate-45 bg-white border border-black/10 dark:bg-black/90 dark:border-white/20 pointer-events-none'
+              className='absolute h-3 w-3 -z-10 rotate-45 bg-white dark:bg-black/90 ring-1 ring-black/10 dark:ring-white/20 pointer-events-none'
               style={{
-                left:
-                  middlewareData.arrow?.x != null
-                    ? `${middlewareData.arrow.x}px`
-                    : '',
-                top:
-                  middlewareData.arrow?.y != null
-                    ? `${middlewareData.arrow.y}px`
-                    : '',
-                // Anchor the arrow to the static side (edge closest to the reference)
-                // Overlap slightly to visually merge borders
-                ...(placement.startsWith('top')
-                  ? { bottom: '-6px' }
-                  : placement.startsWith('right')
-                    ? { left: '-6px' }
-                    : placement.startsWith('bottom')
-                      ? { top: '-6px' }
-                      : placement.startsWith('left')
-                        ? { right: '-6px' }
-                        : {}),
+                ...(placement.startsWith('right')
+                  ? { left: '-6px' }
+                  : placement.startsWith('left')
+                    ? { right: '-6px' }
+                    : { left: middlewareData.arrow?.x ? `${middlewareData.arrow.x}px` : '' }),
+                ...(placement.startsWith('bottom') 
+                  ? { top: '-6px' }
+                  : { top: middlewareData.arrow?.y ? `${middlewareData.arrow.y}px` : '' }),
+                [placement === 'top' ? 'bottom' : 'top']: '-4px',
+                [placement === 'left' ? 'right' : 'left']: '0px',
+                opacity: middlewareData.hide?.referenceHidden ? 0 : 1,
+                transition: 'opacity 0.1s ease-out'
               }}
             />
           </div>

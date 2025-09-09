@@ -339,13 +339,7 @@ export function DashboardLinks({
         </div>
       </div>
 
-      {/* Preview Panel - Fixed aside on XL screens - Only show on links page */}
-      <aside className='fixed inset-y-0 right-0 w-96 border-l border-subtle px-4 py-6 sm:px-6 lg:px-8 hidden xl:block bg-surface-0'>
-        <DashboardPreview
-          artist={previewArtist}
-          socialLinksOverride={previewSocialLinks}
-        />
-      </aside>
+      {/* Preview is handled by the EnhancedDashboardLinks component */}
     </>
   );
 }

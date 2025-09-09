@@ -5,6 +5,7 @@ import React from 'react';
 import { cn } from '@/lib/utils';
 
 export type IconButtonProps = {
+  id?: string;
   ariaLabel: string;
   title?: string;
   className?: string;
@@ -21,6 +22,7 @@ export type IconButtonProps = {
 
 // Consistent bordered icon-only button used across sidebar controls
 export function IconButton({
+  id,
   ariaLabel,
   title,
   className,
