@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardLinks } from '@/components/dashboard/organisms';
+import { EnhancedDashboardLinks } from '@/components/dashboard/organisms/EnhancedDashboardLinks';
 import { getDashboardData, getProfileSocialLinks } from '../actions';
 
 export default async function LinksPage() {
@@ -26,9 +26,9 @@ export default async function LinksPage() {
       ? await getProfileSocialLinks(profileId)
       : [];
 
-    // Pass server-fetched data to client component
+    // Pass server-fetched data to enhanced client component
     return (
-      <DashboardLinks initialData={dashboardData} initialLinks={initialLinks} />
+      <EnhancedDashboardLinks initialData={dashboardData} initialLinks={initialLinks} />
     );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)

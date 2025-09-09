@@ -1,0 +1,32 @@
+import { cn } from '@/lib/utils';
+import { forwardRef } from 'react';
+
+export interface LabelProps
+  extends React.LabelHTMLAttributes<HTMLLabelElement> {
+  htmlFor: string;
+  className?: string;
+  children: React.ReactNode;
+  required?: boolean;
+}
+
+export const Label = forwardRef<HTMLLabelElement, LabelProps>(
+  ({ className, children, required = false, ...props }, ref) => {
+    return (
+      <label
+        ref={ref}
+        className={cn(
+          'text-sm font-medium leading-none',
+          'text-gray-700 dark:text-gray-300',
+          'mb-1 block',
+          required && "after:content-['*'] after:ml-0.5 after:text-red-500",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </label>
+    );
+  }
+);
+
+Label.displayName = 'Label';

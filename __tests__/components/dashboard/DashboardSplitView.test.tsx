@@ -101,9 +101,10 @@ describe('DashboardSplitView', () => {
       </ToastProvider>
     );
 
-    // The component should render with the converted links using UnifiedLinkManager
+    // The component should render with the basic UI elements
     expect(screen.getByText('✨ Add Any Link')).toBeInTheDocument();
     expect(screen.getByText('Manage Your Links')).toBeInTheDocument();
+    expect(screen.getByLabelText('live-preview')).toBeInTheDocument();
   });
 
   it('correctly uses creator_profile_id in database queries', async () => {
@@ -148,8 +149,9 @@ describe('DashboardSplitView', () => {
     // Wait for component to initialize
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // The component should use UnifiedLinkManager which handles all platform types
+    // The component should render with the basic UI elements
     expect(screen.getByText('✨ Add Any Link')).toBeInTheDocument();
     expect(screen.getByText('Manage Your Links')).toBeInTheDocument();
+    expect(screen.getByLabelText('live-preview')).toBeInTheDocument();
   });
 });
