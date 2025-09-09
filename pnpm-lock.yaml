@@ -183,7 +183,7 @@ devDependencies:
     version: 4.1.13
   '@tailwindcss/typography':
     specifier: ^0.5.10
-    version: 0.5.16(tailwindcss@4.1.12)
+    version: 0.5.16(tailwindcss@4.1.13)
   '@testing-library/jest-dom':
     specifier: ^6.8.0
     version: 6.8.0
@@ -269,8 +269,8 @@ devDependencies:
     specifier: ^9.1.3
     version: 9.1.3(@testing-library/dom@10.4.1)(vite@7.1.5)
   tailwindcss:
-    specifier: ^4.1.12
-    version: 4.1.12
+    specifier: ^4.1.13
+    version: 4.1.13
   tsx:
     specifier: ^4.20.5
     version: 4.20.5
@@ -3476,7 +3476,7 @@ packages:
       tailwindcss: 4.1.13
     dev: true
 
-  /@tailwindcss/typography@0.5.16(tailwindcss@4.1.12):
+  /@tailwindcss/typography@0.5.16(tailwindcss@4.1.13):
     resolution: {integrity: sha512-0wDLwCVF5V3x3b1SGXPCDcdsbDHMBe+lkFzBRaHeLvNi+nrrnZ1lA18u+OTWO8iSWU2GxUOCvlXtDuqftc1oiA==}
     peerDependencies:
       tailwindcss: '>=3.0.0 || insiders || >=4.0.0-alpha.20 || >=4.0.0-beta.1'
@@ -3485,7 +3485,7 @@ packages:
       lodash.isplainobject: 4.0.6
       lodash.merge: 4.6.2
       postcss-selector-parser: 6.0.10
-      tailwindcss: 4.1.12
+      tailwindcss: 4.1.13
     dev: true
 
   /@tanstack/react-virtual@3.13.12(react-dom@18.3.1)(react@18.3.1):
