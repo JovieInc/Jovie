@@ -1,4 +1,3 @@
-import { BoltIcon } from '@heroicons/react/24/outline';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
@@ -9,7 +8,7 @@ const mockFeature: Feature = {
   title: 'Blazing Fast',
   blurb: 'Sub-100ms loads and 99.99% uptime—fans never wait.',
   href: '/features/performance',
-  Icon: BoltIcon,
+  icon: 'Bolt',
   colorVar: '--accent-speed',
 };
 
