@@ -1,6 +1,6 @@
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import { asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
+import { Icon } from '@/components/atoms/Icon';
 import { Container } from '@/components/site/Container';
 import { OptimizedImage } from '@/components/ui/OptimizedImage';
 import { db } from '@/lib/db';
@@ -96,7 +96,10 @@ export default async function ArtistsPage() {
 
                 <div className='mt-3 inline-flex items-center text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity'>
                   <span>View Profile</span>
-                  <ChevronRightIcon className='ml-1 h-4 w-4 transition-transform group-hover:translate-x-1' />
+                  <Icon
+                    name='ChevronRight'
+                    className='ml-1 h-4 w-4 transition-transform group-hover:translate-x-1'
+                  />
                 </div>
               </Link>
             ))}

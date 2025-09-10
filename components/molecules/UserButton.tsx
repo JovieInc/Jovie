@@ -15,12 +15,12 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { ChevronRight, LogOut, User, CreditCard } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
+import { Icon } from '@/components/atoms/Icon';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface UserButtonProps {
@@ -39,7 +39,11 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
 
   // User display info
   const userImageUrl = user?.imageUrl;
-  const displayName = user?.fullName || user?.firstName || user?.emailAddresses[0]?.emailAddress || '';
+  const displayName =
+    user?.fullName ||
+    user?.firstName ||
+    user?.emailAddresses[0]?.emailAddress ||
+    '';
   const userInitials = displayName
     ? displayName
         .split(' ')
@@ -58,7 +62,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
       flip({
         mainAxis: true,
         crossAxis: true,
-        fallbackPlacements: ['bottom-start', 'top-end', 'top-start', 'left', 'right'],
+        fallbackPlacements: [
+          'bottom-start',
+          'top-end',
+          'top-start',
+          'left',
+          'right',
+        ],
         padding: 16,
       }),
       shift({
@@ -104,7 +114,9 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         </div>
       );
     }
-    return <div className='h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />;
+    return (
+      <div className='h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+    );
   }
 
   // Handle sign out
@@ -136,20 +148,24 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           headers: { 'Content-Type': 'application/json' },
         });
 
-        if (!response.ok) throw new Error('Failed to create billing portal session');
+        if (!response.ok)
+          throw new Error('Failed to create billing portal session');
         const { url } = await response.json();
         window.location.href = url;
       } else {
         // Handle subscription flow
         const pricingResponse = await fetch('/api/stripe/pricing-options');
-        if (!pricingResponse.ok) throw new Error('Failed to fetch pricing options');
-        
-        const { pricingOptions } = await pricingResponse.json();
-        const defaultPlan = pricingOptions.find(
-          (option: { interval: string }) => option.interval === 'month'
-        ) || pricingOptions[0];
+        if (!pricingResponse.ok)
+          throw new Error('Failed to fetch pricing options');
 
-        if (!defaultPlan?.priceId) throw new Error('No pricing options available');
+        const { pricingOptions } = await pricingResponse.json();
+        const defaultPlan =
+          pricingOptions.find(
+            (option: { interval: string }) => option.interval === 'month'
+          ) || pricingOptions[0];
+
+        if (!defaultPlan?.priceId)
+          throw new Error('No pricing options available');
 
         const checkoutResponse = await fetch('/api/stripe/checkout', {
           method: 'POST',
@@ -157,7 +173,8 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           body: JSON.stringify({ priceId: defaultPlan.priceId }),
         });
 
-        if (!checkoutResponse.ok) throw new Error('Failed to create checkout session');
+        if (!checkoutResponse.ok)
+          throw new Error('Failed to create checkout session');
         const { url } = await checkoutResponse.json();
         window.location.href = url;
       }
@@ -177,10 +194,11 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           'flex items-center transition-all duration-150',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
           'rounded-full',
-          showUserInfo 
+          showUserInfo
             ? 'gap-2.5 w-full px-3 py-1.5 text-left border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
             : 'justify-center w-9 h-9 p-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50',
-          isOpen && 'ring-2 ring-offset-2 ring-primary/50 ring-offset-white dark:ring-offset-gray-900'
+          isOpen &&
+            'ring-2 ring-offset-2 ring-primary/50 ring-offset-white dark:ring-offset-gray-900'
         )}
         aria-haspopup='menu'
         aria-expanded={isOpen}
@@ -195,11 +213,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
             className={`${showUserInfo ? 'w-8 h-8' : 'w-5 h-5'} rounded-full object-cover flex-shrink-0`}
           />
         ) : (
-          <div className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-xs'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-medium`}>
+          <div
+            className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-xs'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-medium`}
+          >
             {userInitials}
           </div>
         )}
-        
+
         {showUserInfo && (
           <div className='flex-1 min-w-0'>
             <p className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate'>
@@ -212,9 +232,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         )}
 
         {showUserInfo && (
-          <ChevronRight 
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`} 
-            aria-hidden='true' 
+          <Icon
+            name='ChevronRight'
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
+            aria-hidden='true'
           />
         )}
       </button>
@@ -261,7 +282,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                     onClick={handleProfile}
                     className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors'
                   >
-                    <User className='w-4 h-4 text-gray-500 dark:text-gray-400' />
+                    <Icon
+                      name='User'
+                      className='w-4 h-4 text-gray-500 dark:text-gray-400'
+                    />
                     <span>Profile</span>
                   </button>
 
@@ -270,8 +294,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                     disabled={isBillingLoading}
                     className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors disabled:opacity-50'
                   >
-                    <CreditCard className='w-4 h-4 text-gray-500 dark:text-gray-400' />
-                    <span>{isBillingLoading ? 'Loading...' : 'Billing & Plans'}</span>
+                    <Icon
+                      name='CreditCard'
+                      className='w-4 h-4 text-gray-500 dark:text-gray-400'
+                    />
+                    <span>
+                      {isBillingLoading ? 'Loading...' : 'Billing & Plans'}
+                    </span>
                   </button>
 
                   <div className='border-t border-gray-100 dark:border-gray-700 my-1' />
@@ -281,7 +310,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                     disabled={isLoading}
                     className='w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50'
                   >
-                    <LogOut className='w-4 h-4' />
+                    <Icon name='LogOut' className='w-4 h-4' />
                     <span>{isLoading ? 'Signing out...' : 'Sign out'}</span>
                   </button>
                 </div>
