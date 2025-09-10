@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { IconBadge } from '@/components/atoms/IconBadge';
-import { HeaderNav } from '@/components/organisms/HeaderNav';
+import { Header } from '@/components/site/Header';
 import { FEATURES } from '@/lib/features';
 
 export default function FlyoutDemoPage() {
@@ -15,8 +15,8 @@ export default function FlyoutDemoPage() {
 
   return (
     <div className={`min-h-screen transition-colors ${isDark ? 'dark' : ''}`}>
-      {/* Use the actual HeaderNav component */}
-      <HeaderNav />
+      {/* Use the shared Header component */}
+      <Header />
 
       {/* Demo Content */}
       <main className='mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8'>

@@ -2,9 +2,11 @@
 
 import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
+import { NavLink } from '@/components/atoms/NavLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
+import { Button } from '@/components/ui/Button';
 import {
   Popover,
   PopoverContent,
@@ -27,9 +29,13 @@ export function HeaderNav() {
             <nav className='flex items-center space-x-6'>
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1'>
+                  <Button
+                    variant='plain'
+                    size='sm'
+                    className='font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  >
                     Product
-                  </button>
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent
                   align='center'
@@ -59,12 +65,9 @@ export function HeaderNav() {
                   </div>
                 </PopoverContent>
               </Popover>
-              <Link
-                href='/pricing'
-                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors'
-              >
+              <NavLink href='/pricing' className='font-medium'>
                 Pricing
-              </Link>
+              </NavLink>
             </nav>
           </div>
 
@@ -73,9 +76,13 @@ export function HeaderNav() {
             <nav className='flex items-center space-x-4'>
               <Popover>
                 <PopoverTrigger asChild>
-                  <button className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 rounded px-2 py-1 min-h-[44px] flex items-center'>
+                  <Button
+                    variant='plain'
+                    size='sm'
+                    className='min-h-[44px] px-2 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  >
                     Product
-                  </button>
+                  </Button>
                 </PopoverTrigger>
                 <PopoverContent
                   align='start'
@@ -103,12 +110,12 @@ export function HeaderNav() {
                   </div>
                 </PopoverContent>
               </Popover>
-              <Link
+              <NavLink
                 href='/pricing'
-                className='text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[44px] flex items-center px-2'
+                className='min-h-[44px] px-2 font-medium flex items-center'
               >
                 Pricing
-              </Link>
+              </NavLink>
             </nav>
           </div>
 
