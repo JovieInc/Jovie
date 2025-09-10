@@ -41,6 +41,9 @@ dependencies:
   '@radix-ui/react-popover':
     specifier: ^1.1.15
     version: 1.1.15(@types/react-dom@18.3.7)(@types/react@18.3.24)(react-dom@18.3.1)(react@18.3.1)
+  '@radix-ui/react-slot':
+    specifier: ^1.0.2
+    version: 1.2.3(@types/react@18.3.24)(react@18.3.1)
   '@radix-ui/react-tooltip':
     specifier: ^1.2.8
     version: 1.2.8(@types/react-dom@18.3.7)(@types/react@18.3.24)(react-dom@18.3.1)(react@18.3.1)
@@ -65,6 +68,9 @@ dependencies:
   '@vercel/speed-insights':
     specifier: ^1.2.0
     version: 1.2.0(next@15.5.2)(react@18.3.1)
+  class-variance-authority:
+    specifier: ^0.7.0
+    version: 0.7.1
   clsx:
     specifier: ^2.1.0
     version: 2.1.1
@@ -5884,6 +5890,12 @@ packages:
       '@chromatic-com/playwright':
         optional: true
     dev: true
+
+  /class-variance-authority@0.7.1:
+    resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
+    dependencies:
+      clsx: 2.1.1
+    dev: false
 
   /cli-cursor@3.1.0:
     resolution: {integrity: sha512-I/zHAwsKf9FqGoXM4WWRACob9+SNukZTd94DWF57E4toouRulbCxcUh6RKUEOQlYTHJnzkPMySvPNaaSLNfLZw==}
