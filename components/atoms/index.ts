@@ -20,6 +20,7 @@ export * from './IconButton';
 export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './LogoLink';
+export * from './MenuItem';
 export * from './NavLink';
 export * from './QRCode';
 export * from './SectionHeading';
