@@ -1,8 +1,8 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
+import { Icon } from '@/components/atoms/Icon';
 import { Tooltip } from '@/components/atoms/Tooltip';
-import { Eye, EyeOff, Trash2, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 interface LinkActionsProps {
@@ -33,9 +33,9 @@ export function LinkActions({
           aria-label={isVisible ? 'Hide link' : 'Show link'}
         >
           {isVisible ? (
-            <Eye className='h-3.5 w-3.5' />
+            <Icon name='Eye' className='h-3.5 w-3.5' />
           ) : (
-            <EyeOff className='h-3.5 w-3.5' />
+            <Icon name='EyeOff' className='h-3.5 w-3.5' />
           )}
         </Button>
       </Tooltip>
@@ -48,7 +48,7 @@ export function LinkActions({
           onClick={onRemove}
           aria-label='Remove link'
         >
-          <Trash2 className='h-3.5 w-3.5' />
+          <Icon name='Trash2' className='h-3.5 w-3.5' />
         </Button>
       </Tooltip>
 
@@ -56,10 +56,10 @@ export function LinkActions({
         <button
           type='button'
           className='h-7 w-5 flex items-center justify-center text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none'
-          onPointerDown={onDragHandlePointerDown as any}
+          onPointerDown={onDragHandlePointerDown}
           aria-label='Drag handle'
         >
-          <GripVertical className='h-4 w-4' />
+          <Icon name='GripVertical' className='h-4 w-4' />
         </button>
       )}
     </div>
