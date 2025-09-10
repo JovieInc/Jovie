@@ -21,7 +21,8 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@jovie/ui/*": ["packages/ui/*"]
     }
   },
   "include": [
