@@ -1,15 +1,16 @@
 import React from 'react';
+import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 interface IconBadgeProps {
-  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  name: IconName;
   colorVar: string;
   className?: string;
   ariaLabel?: string;
 }
 
 export function IconBadge({
-  Icon,
+  name,
   colorVar,
   className,
   ariaLabel,
@@ -25,6 +26,7 @@ export function IconBadge({
       }}
     >
       <Icon
+        name={name}
         className='h-[18px] w-[18px]'
         style={{
           color: `var(${colorVar})`,
