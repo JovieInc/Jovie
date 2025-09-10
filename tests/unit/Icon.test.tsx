@@ -23,6 +23,14 @@ describe('Icon', () => {
     expect(icon).toHaveAttribute('height', '32');
   });
 
+  it('normalizes various icon name formats', () => {
+    render(<Icon name='alarm-clock' data-testid='kebab' />);
+    expect(screen.getByTestId('kebab')).toBeInTheDocument();
+
+    render(<Icon name='ActivityIcon' data-testid='suffix' />);
+    expect(screen.getByTestId('suffix')).toBeInTheDocument();
+  });
+
   it('returns null for unknown icon', () => {
     const { container } = render(
       <Icon name={'NotRealIcon' as any} data-testid='icon' />
