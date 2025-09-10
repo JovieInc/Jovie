@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { IconButton } from '@/components/atoms/IconButton';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
@@ -12,6 +11,7 @@ import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedTh
 import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { UserButton } from '@/components/molecules/UserButton';
+import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
 import {
   Sidebar,
@@ -163,15 +163,15 @@ export default function DashboardLayoutClient({
                 {!sidebarCollapsed && (
                   <div className='ml-auto'>
                     <Tooltip content='Collapse sidebar' placement='right'>
-                      <IconButton
+                      <Button
                         id='sidebar-toggle'
                         onClick={handleToggleSidebarCollapsed}
-                        ariaLabel='Collapse sidebar'
+                        aria-label='Collapse sidebar'
                         className='hidden lg:flex shadow'
-                        size='sm'
+                        size='icon'
                       >
                         <Icon name='ChevronLeft' className='w-3.5 h-3.5' />
-                      </IconButton>
+                      </Button>
                     </Tooltip>
                   </div>
                 )}
@@ -180,15 +180,15 @@ export default function DashboardLayoutClient({
                 {sidebarCollapsed && (
                   <Tooltip content='Expand sidebar' placement='right'>
                     <div className='hidden lg:block absolute -right-4 top-6 z-50'>
-                      <IconButton
+                      <Button
                         id='sidebar-toggle'
                         onClick={handleToggleSidebarCollapsed}
-                        ariaLabel='Expand sidebar'
+                        aria-label='Expand sidebar'
                         className='shadow-lg'
-                        size='sm'
+                        size='icon'
                       >
                         <Icon name='ChevronRight' className='w-3.5 h-3.5' />
-                      </IconButton>
+                      </Button>
                     </div>
                   </Tooltip>
                 )}

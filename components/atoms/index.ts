@@ -16,7 +16,6 @@ export * from './FrostedButton';
 export * from './GradientText';
 export * from './Icon';
 export * from './IconBadge';
-export * from './IconButton';
 export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './LogoLink';

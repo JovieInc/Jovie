@@ -17,9 +17,9 @@ Refactor legacy components to align with the `shadcn/ui` design system. Each tas
 - [ ] Delete bespoke shape utilities once migrated
 
 ### IconButton (`components/atoms/IconButton.tsx`)
-- [ ] Replace with `Button` `size="icon"`
-- [ ] Preserve link support via `as` prop
-- [ ] Leverage shared disabled and focus handling
+- [x] Replace with `Button` `size="icon"`
+- [x] Preserve link support via `as` prop
+- [x] Leverage shared disabled and focus handling
 
 ### DSPButton (`components/atoms/DSPButton.tsx`)
 - [ ] Extend `Button` to accept dynamic brand colors and SVG logos
