@@ -26,7 +26,7 @@ export interface UniversalLinkInputRef {
   getInputElement: () => HTMLInputElement | null;
 }
 
-export const UniversalLinkInput = forwardRef<UniversalLinkInputRef, UniversalLinkInputProps>(({
+export const UniversalLinkInput = forwardRef<UniversalLinkInputRef, UniversalLinkInputProps>(({ 
   onAdd,
   placeholder = 'Paste any link (Spotify, Instagram, TikTok, etc.)',
   disabled = false,

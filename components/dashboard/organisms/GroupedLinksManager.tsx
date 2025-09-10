@@ -5,10 +5,12 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  closestCenter,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
@@ -16,6 +18,8 @@ import { Button } from '@/components/ui/Button';
 import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { canonicalIdentity } from '@/lib/utils/platform-detection';
+import { LinkActions } from '../atoms/LinkActions';
 
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
@@ -24,6 +28,7 @@ export interface GroupedLinksManagerProps<
   className?: string;
   onLinksChange?: (links: T[]) => void;
   onLinkAdded?: (links: T[]) => void;
+  creatorName?: string; // For personalized link titles
 }
 
 // Client Component scaffold for a single, grouped Links Manager
@@ -36,17 +41,53 @@ export const CROSS_CATEGORY: Record<
   youtube: ['social', 'dsp'],
   // soundcloud: ['social', 'dsp'],
 };
+// Animation variants for the group container
+const groupVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      when: 'beforeChildren',
+      staggerChildren: 0.05,
+    },
+  },
+};
 
+// Animation variants for individual link items
+const itemVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring',
+      stiffness: 500,
+      damping: 30,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -8,
+    transition: {
+      duration: 0.2,
+    },
+  },
+};
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
   onLinksChange,
   onLinkAdded,
+  creatorName,
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
+  const [animatingLinks, setAnimatingLinks] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState<
     Record<'social' | 'dsp' | 'earnings' | 'custom', boolean>
   >({ social: false, dsp: false, earnings: false, custom: false });
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [collapsedInitialized, setCollapsedInitialized] = useState(false);
   const [tippingEnabled, setTippingEnabled] = useState<boolean>(false);
   const [tippingJustEnabled, setTippingJustEnabled] = useState<boolean>(false);
@@ -61,26 +102,45 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   // Helper: visibility flag without using `any`
   const linkIsVisible = (l: T): boolean =>
     ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
-
-  // Initialize and dynamically update collapsed state for empty sections.
-  // Also flash the Earnings badge briefly the first time it becomes enabled.
+  // Initialize and dynamically update collapsed state for empty sections with animation
   useEffect(() => {
     if (!collapsedInitialized) {
-      setCollapsed({
+      // Initial load - collapse all empty sections with a staggered delay
+      const initialCollapsed = {
         social: groups.social.length === 0,
         dsp: groups.dsp.length === 0,
         earnings: groups.earnings.length === 0,
         custom: groups.custom.length === 0,
-      });
-      setCollapsedInitialized(true);
+      };
+      
+      // Small delay to allow initial render before animating
+      const timer = setTimeout(() => {
+        setCollapsed(initialCollapsed);
+        setCollapsedInitialized(true);
+      }, 50);
+      
+      return () => clearTimeout(timer);
     } else {
-      // Force-collapse any section that becomes empty; preserve manual user state otherwise
-      setCollapsed(prev => ({
-        social: groups.social.length === 0 ? true : prev.social,
-        dsp: groups.dsp.length === 0 ? true : prev.dsp,
-        earnings: groups.earnings.length === 0 ? true : prev.earnings,
-        custom: groups.custom.length === 0 ? true : prev.custom,
-      }));
+      // Smoothly collapse sections that become empty
+      setCollapsed(prev => {
+        const next = { ...prev };
+        
+        // Only update sections that need to be collapsed (not already collapsed)
+        if (groups.social.length === 0 && !prev.social) {
+          next.social = true;
+        }
+        if (groups.dsp.length === 0 && !prev.dsp) {
+          next.dsp = true;
+        }
+        if (groups.earnings.length === 0 && !prev.earnings) {
+          next.earnings = true;
+        }
+        if (groups.custom.length === 0 && !prev.custom) {
+          next.custom = true;
+        }
+        
+        return next;
+      });
     }
 
     const enabled = groups.earnings.length > 0;
@@ -131,6 +191,25 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [links]);
 
+  // Toggle section collapse with animation
+  const toggleSection = (section: keyof typeof collapsed) => {
+    // If section is being expanded, ensure it's scrolled into view after animation
+    if (collapsed[section]) {
+      // Small delay to allow the collapse animation to start first
+      setTimeout(() => {
+        const sectionEl = document.getElementById(`section-${section}`);
+        sectionEl?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }, 50);
+    }
+    setCollapsed(prev => ({
+      ...prev,
+      [section]: !prev[section],
+    }));
+  };
+
   // Controls
   async function handleAdd(link: DetectedLink) {
     // Enrich with visibility if missing
@@ -146,6 +225,27 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       } as DetectedLink['platform'];
     }
     const section = sectionOf(enriched as T);
+
+    // Dedupe by canonical identity across all sections
+    const newId = canonicalIdentity({
+      platform: (enriched as DetectedLink).platform,
+      normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+    });
+    const dupAt = links.findIndex(l =>
+      canonicalIdentity({ platform: (l as DetectedLink).platform, normalizedUrl: (l as DetectedLink).normalizedUrl }) === newId
+    );
+    if (dupAt !== -1) {
+      const merged = {
+        ...links[dupAt],
+        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
+      } as T;
+      const next = links.map((l, i) => (i === dupAt ? merged : l));
+      setLinks(next);
+      onLinkAdded?.([merged]);
+      onLinksChange?.(next);
+      return;
+    }
     const sameSectionHas = links.some(
       l => l.platform.id === enriched.platform.id && sectionOf(l) === section
     );
@@ -174,11 +274,14 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       // For non-YouTube, block duplicate in same section
       if (sameSectionHas) return;
     }
-
     const next = [...links, enriched];
     setLinks(next);
     onLinkAdded?.([enriched as T]);
     onLinksChange?.(next);
+
+    // If this section was previously empty (and likely collapsed), auto-expand it
+    const sec = sectionOf(enriched as T);
+    setCollapsed(prev => ({ ...prev, [sec]: false }));
 
     // Best-effort server notification: enable tipping when Venmo is added
     try {
@@ -256,19 +359,146 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     next.splice(toIdx, 0, updated);
     setLinks(next);
     onLinksChange?.(next);
+    // Auto-expand target section when first item is moved into it
+    setCollapsed(prev => ({ ...prev, [toSection]: false }));
   }
 
-  return (
-    <section className={cn('space-y-6', className)} aria-label='Links Manager'>
-      {hint && (
-        <div
-          className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
-          role='status'
-          aria-live='polite'
+  // Render a group of links with animations
+  const renderLinkGroup = (
+    section: 'social' | 'dsp' | 'earnings' | 'custom',
+    links: T[],
+    label: string,
+    icon: React.ReactNode
+  ) => {
+    const isCollapsed = collapsed[section];
+    const hasLinks = links.length > 0;
+    
+    return (
+      <div 
+        id={`section-${section}`}
+        key={section}
+        className="relative group"
+      >
+        <button
+          type="button"
+          onClick={() => toggleSection(section)}
+          className={cn(
+            'flex items-center w-full text-left py-2 px-3 rounded-lg transition-colors',
+            'hover:bg-surface-2/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+            'mb-1.5',
+            !isCollapsed && 'text-primary-token font-medium'
+          )}
+          aria-expanded={!isCollapsed}
+          aria-controls={`${section}-links`}
         >
-          {hint}
-        </div>
-      )}
+          <div className="flex items-center flex-1">
+            <span className="mr-2 text-muted-foreground">{icon}</span>
+            <span>{label}</span>
+            {hasLinks && (
+              <span className="ml-2 text-xs text-muted-foreground bg-surface-2 px-2 py-0.5 rounded-full">
+                {links.length}
+              </span>
+            )}
+          </div>
+          <motion.span
+            animate={{ rotate: isCollapsed ? 0 : 90 }}
+            transition={{ duration: 0.2 }}
+            className="text-muted-foreground"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </motion.span>
+        </button>
+        
+        <AnimatePresence initial={false}>
+          {!isCollapsed && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              exit="hidden"
+              variants={groupVariants}
+              id={`${section}-links`}
+              className={cn(
+                'space-y-1.5',
+                'pt-1',
+                'overflow-hidden',
+                'transition-all duration-200 ease-in-out'
+              )}
+            >
+              {hasLinks ? (
+                <DndContext
+                  sensors={sensors}
+                  onDragEnd={onDragEnd}
+                  collisionDetection={closestCenter}
+                >
+                  <SortableContext items={links.map(idFor)}>
+                    {links.map((link, idx) => (
+                      <motion.div
+                        key={idFor(link)}
+                        variants={itemVariants}
+                        layoutId={idFor(link)}
+                        className="relative"
+                      >
+                        <SortableRow
+                          id={idFor(link)}
+                          link={link}
+                          index={idx}
+                          onToggle={handleToggle}
+                          onRemove={handleRemove}
+                          visible={linkIsVisible(link)}
+                          draggable={links.length > 1}
+                        />
+                      </motion.div>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <motion.div
+                  variants={itemVariants}
+                  className="py-2 px-3 text-sm text-muted-foreground italic"
+                >
+                  No {label.toLowerCase()} links yet
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
+  return (
+    <section 
+      className={cn('space-y-4', className)} 
+      aria-label='Links Manager'
+      ref={containerRef}
+    >
+      {/* Hint message with animation */}
+      <AnimatePresence>
+        {hint && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="mb-4 rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm"
+            role='status'
+            aria-live='polite'
+          >
+            {hint}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {ytPrompt && (
         <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
           <div className='text-primary-token'>
@@ -322,6 +552,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           ).length
         }
         socialVisibleLimit={6}
+        creatorName={creatorName}
       />
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
@@ -363,6 +594,9 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                     />
                   </svg>
                   {labelFor(section)}
+                  <span className='ml-2 inline-flex items-center rounded-full bg-surface-2 text-secondary-token px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-subtle'>
+                    {items.length}
+                  </span>
                   {section === 'earnings' && tippingEnabled && (
                     <span
                       className={cn(
@@ -394,16 +628,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                       </svg>
                     </span>
                   </Tooltip>
-                  <span className='text-xs text-secondary-token'>
-                    {items.length}
-                  </span>
                 </div>
               </header>
               <SortableContext items={items.map(idFor)}>
                 <ul
                   id={`links-section-${section}`}
                   className={cn(
-                    'divide-y divide-subtle rounded-lg border border-subtle bg-surface-1',
+                    'divide-y divide-subtle dark:divide-white/10 rounded-lg border border-subtle dark:border-white/10 bg-surface-1',
                     collapsed[section] && 'hidden'
                   )}
                 >
@@ -453,8 +684,17 @@ function SortableRow<T extends DetectedLink>({
   visible: boolean;
   draggable?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id, disabled: !draggable });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ 
+    id, 
+    disabled: !draggable 
+  });
+  
+  // Create a properly typed pointer down handler for the drag handle
+  const handleDragHandlePointerDown = React.useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (listeners?.onPointerDown) {
+      listeners.onPointerDown(e);
+    }
+  }, [listeners?.onPointerDown]);
   const [isDarkTheme, setIsDarkTheme] = React.useState(false);
   React.useEffect(() => {
     const root = document.documentElement;
@@ -494,72 +734,44 @@ function SortableRow<T extends DetectedLink>({
       : `${brandHex}20`
     : `${brandHex}15`;
 
+  // (deduped) keep single set of brand color utilities above
+
   return (
     <li
       ref={setNodeRef}
-      className='p-3 text-sm text-secondary-token flex items-center justify-between gap-3'
+      className='group relative p-3 text-sm text-secondary-token flex items-center justify-between gap-3 hover:bg-surface-2/50 rounded-lg transition-colors'
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
       }}
       {...attributes}
     >
-      <div className='min-w-0 flex items-start gap-3'>
-        {/* Drag handle */}
-        {draggable && (
-          <button
-            type='button'
-            className='mt-0.5 h-7 w-4 shrink-0 cursor-grab text-tertiary hover:text-secondary focus-visible:outline-none'
-            aria-label='Drag handle'
-            {...listeners}
-          >
-            <svg viewBox='0 0 20 20' className='h-4 w-4' aria-hidden='true'>
-              <circle cx='6' cy='6' r='1.5' />
-              <circle cx='6' cy='14' r='1.5' />
-              <circle cx='14' cy='6' r='1.5' />
-              <circle cx='14' cy='14' r='1.5' />
-            </svg>
-          </button>
-        )}
+      <div className='min-w-0 flex items-start gap-3 flex-1'>
         <div
-          className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all hover:scale-[1.04] hover:ring-1 hover:ring-subtle'
+          className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all group-hover:scale-[1.04] group-hover:ring-1 group-hover:ring-subtle'
           style={{ backgroundColor: iconBg, color: iconColor }}
           aria-hidden='true'
         >
           <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
         </div>
-        <div className='min-w-0'>
-          <div className='text-primary-token truncate'>
+        <div className='min-w-0 flex-1'>
+          <div className='text-primary-token font-medium truncate'>
             {link.suggestedTitle}
           </div>
-          <div className='text-xs text-tertiary truncate'>
+          <div className='text-xs text-tertiary-token/80 truncate'>
             {link.normalizedUrl}
           </div>
         </div>
       </div>
-      <div className='shrink-0 flex items-center gap-2'>
-        <Tooltip content={visible ? 'Hide link' : 'Show link'} placement='top'>
-          <Button
-            size='sm'
-            variant='ghost'
-            className='px-2 py-1 text-[11px] rounded-md'
-            onClick={() => onToggle(index)}
-            aria-label={visible ? 'Hide link' : 'Show link'}
-          >
-            {visible ? 'Hide' : 'Show'}
-          </Button>
-        </Tooltip>
-        <Tooltip content='Remove link' placement='top'>
-          <Button
-            size='sm'
-            variant='plain'
-            className='px-2 py-1 text-[11px] text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 rounded-md'
-            onClick={() => onRemove(index)}
-            aria-label='Remove link'
-          >
-            Remove
-          </Button>
-        </Tooltip>
+      
+      <div className='flex items-center gap-1'>
+        <LinkActions
+          onToggle={() => onToggle(index)}
+          onRemove={() => onRemove(index)}
+          isVisible={visible}
+          showDragHandle={draggable}
+          onDragHandlePointerDown={handleDragHandlePointerDown}
+        />
       </div>
     </li>
   );
@@ -602,7 +814,7 @@ function labelFor(section: 'social' | 'dsp' | 'earnings' | 'custom'): string {
     case 'social':
       return 'Social';
     case 'dsp':
-      return 'Music';
+      return 'Music Service';
     case 'earnings':
       return 'Earnings';
     default:

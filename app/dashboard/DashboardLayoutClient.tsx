@@ -196,7 +196,6 @@ export default function DashboardLayoutClient({
 
               {/* Navigation */}
               <DashboardNav collapsed={sidebarCollapsed} />
-
               {/* Bottom utilities (theme, feedback) */}
               <div className='mt-auto px-2 space-y-3'>
                 <div className='flex items-center justify-center'>
