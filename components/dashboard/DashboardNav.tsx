@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Divider } from '@/components/atoms/Divider';
 import { Tooltip } from '@/components/atoms/Tooltip';
+import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 // Primary Navigation - Core features
@@ -96,15 +97,17 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
           (pathname === '/dashboard' && item.id === 'overview');
 
         const linkContent = (
-          <Link
+          <Button
+            as={Link}
             href={item.href}
+            variant='ghost'
             className={cn(
               // Apple-style active state - solid pill highlight
               isActive
                 ? 'bg-accent/10 text-primary-token shadow-sm border border-subtle'
                 : 'text-secondary-token hover:text-primary-token hover:bg-surface-2/80',
               // Base styles with perfect alignment
-              'group flex items-center rounded-lg transition-all duration-200 ease-in-out relative',
+              'group w-full justify-start rounded-lg transition-all duration-200 ease-in-out relative',
               // Focus states
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
               // Responsive padding and spacing
@@ -150,7 +153,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
             >
               {item.name}
             </span>
-          </Link>
+          </Button>
         );
 
         return (

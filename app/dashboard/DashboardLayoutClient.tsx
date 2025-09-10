@@ -1,13 +1,9 @@
 'use client';
 
-import { 
-  ChevronLeftIcon, 
-  ChevronRightIcon 
-} from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
-import { IconButton } from '@/components/atoms/IconButton';
+import { Icon } from '@/components/atoms/Icon';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
@@ -15,8 +11,14 @@ import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedTh
 import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { UserButton } from '@/components/molecules/UserButton';
+import { Button } from '@/components/ui/Button';
 import { Logo } from '@/components/ui/Logo';
-import { Sidebar, SidebarHeader, SidebarContent, SidebarFooter } from '@/components/ui/Sidebar';
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+} from '@/components/ui/Sidebar';
 // Live preview is rendered only on the Links page
 
 import type { DashboardData } from './actions';
@@ -161,15 +163,15 @@ export default function DashboardLayoutClient({
                 {!sidebarCollapsed && (
                   <div className='ml-auto'>
                     <Tooltip content='Collapse sidebar' placement='right'>
-                      <IconButton
+                      <Button
                         id='sidebar-toggle'
                         onClick={handleToggleSidebarCollapsed}
-                        ariaLabel='Collapse sidebar'
+                        aria-label='Collapse sidebar'
                         className='hidden lg:flex shadow'
-                        size='sm'
+                        size='icon'
                       >
-                        <ChevronLeftIcon className='w-3.5 h-3.5' />
-                      </IconButton>
+                        <Icon name='ChevronLeft' className='w-3.5 h-3.5' />
+                      </Button>
                     </Tooltip>
                   </div>
                 )}
@@ -178,15 +180,15 @@ export default function DashboardLayoutClient({
                 {sidebarCollapsed && (
                   <Tooltip content='Expand sidebar' placement='right'>
                     <div className='hidden lg:block absolute -right-4 top-6 z-50'>
-                      <IconButton
+                      <Button
                         id='sidebar-toggle'
                         onClick={handleToggleSidebarCollapsed}
-                        ariaLabel='Expand sidebar'
+                        aria-label='Expand sidebar'
                         className='shadow-lg'
-                        size='sm'
+                        size='icon'
                       >
-                        <ChevronRightIcon className='w-3.5 h-3.5' />
-                      </IconButton>
+                        <Icon name='ChevronRight' className='w-3.5 h-3.5' />
+                      </Button>
                     </div>
                   </Tooltip>
                 )}
@@ -239,8 +241,6 @@ export default function DashboardLayoutClient({
               </div>
             </main>
           </div>
-
-          
         </div>
       </div>
     </>

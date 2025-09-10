@@ -25,7 +25,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
         role='menuitem'
       >
         <div className='flex-shrink-0'>
-          <IconBadge Icon={feature.Icon} colorVar={feature.colorVar} />
+          <IconBadge name={feature.icon} colorVar={feature.colorVar} />
         </div>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-2'>

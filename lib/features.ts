@@ -1,19 +1,11 @@
-import {
-  ArrowTrendingUpIcon,
-  BoltIcon,
-  ChartBarIcon,
-  LinkIcon,
-  MagnifyingGlassCircleIcon,
-  RocketLaunchIcon,
-  SparklesIcon,
-} from '@heroicons/react/24/outline';
+import type { IconName } from '@/components/atoms/Icon';
 
 export type Feature = {
   slug: string;
   title: string;
   blurb: string;
   href: string;
-  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  icon: IconName;
   colorVar: string; // e.g., '--accent-conv'
   aiPowered?: boolean; // Flag for AI-powered tag
 };
@@ -24,7 +16,7 @@ export const FEATURES: Feature[] = [
     title: 'Smart Conversions',
     blurb: 'AI-optimized CTAs and layouts that adapt in real time.',
     href: '/link-in-bio#smart-conversions',
-    Icon: ArrowTrendingUpIcon,
+    icon: 'TrendingUp',
     colorVar: '--accent-conv',
     aiPowered: true,
   },
@@ -33,7 +25,7 @@ export const FEATURES: Feature[] = [
     title: 'Real-Time Analytics',
     blurb: 'Instant insights, always aligned with your ad platforms.',
     href: '/link-in-bio#analytics',
-    Icon: ChartBarIcon,
+    icon: 'ChartBar',
     colorVar: '--accent-analytics',
   },
   {
@@ -41,7 +33,7 @@ export const FEATURES: Feature[] = [
     title: 'Blazing Fast',
     blurb: 'Sub-100ms loads. 99.99% uptime. Fans never wait.',
     href: '/link-in-bio#performance',
-    Icon: BoltIcon,
+    icon: 'Bolt',
     colorVar: '--accent-speed',
   },
   {
@@ -49,7 +41,7 @@ export const FEATURES: Feature[] = [
     title: 'Pixel-Perfect by Default',
     blurb: "Profiles auto-polished—you can't make them ugly.",
     href: '/link-in-bio#design',
-    Icon: SparklesIcon,
+    icon: 'Sparkles',
     colorVar: '--accent-beauty',
   },
   {
@@ -57,7 +49,7 @@ export const FEATURES: Feature[] = [
     title: 'SEO Boost',
     blurb: 'Structured, discoverable, and lightning-fast by design.',
     href: '/link-in-bio#seo',
-    Icon: MagnifyingGlassCircleIcon,
+    icon: 'Search',
     colorVar: '--accent-seo',
   },
   {
@@ -65,7 +57,7 @@ export const FEATURES: Feature[] = [
     title: 'Deep Links',
     blurb: 'Send fans straight to /listen, /tip, or /subscribe.',
     href: '/link-in-bio#deep-links',
-    Icon: LinkIcon,
+    icon: 'Link',
     colorVar: '--accent-links',
   },
   {
@@ -73,7 +65,7 @@ export const FEATURES: Feature[] = [
     title: 'Pixels & Remarketing',
     blurb: 'Growth integrations that scale with you.',
     href: '/link-in-bio#pro',
-    Icon: RocketLaunchIcon,
+    icon: 'Rocket',
     colorVar: '--accent-pro',
   },
 ];

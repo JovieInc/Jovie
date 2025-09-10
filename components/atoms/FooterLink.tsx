@@ -1,40 +1,56 @@
 import Link from 'next/link';
+import React from 'react';
+import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-const baseStyles = 'transition-colors';
 const variantStyles = {
   light:
     'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
   dark: 'text-white/60 hover:text-white',
 } as const;
 
-function isExternal(href: string) {
-  return /^https?:\/\//.test(href);
-}
-
-interface FooterLinkProps {
+interface FooterLinkProps extends Omit<ButtonProps, 'children'> {
   href: string;
   children: React.ReactNode;
-  variant?: 'light' | 'dark';
-  className?: string;
+  variant?: keyof typeof variantStyles;
 }
 
 export function FooterLink({
   href,
   children,
   variant = 'dark',
-  className = '',
+  className,
+  ...props
 }: FooterLinkProps) {
-  const external = isExternal(href);
+  const external = /^https?:\/\//.test(href);
+  const common = {
+    variant: 'plain' as const,
+    size: 'sm' as const,
+    className: cn(
+      'h-auto px-0 py-0 transition-colors',
+      variantStyles[variant],
+      className
+    ),
+    ...props,
+  };
+
+  if (external) {
+    return (
+      <Button
+        as='a'
+        href={href}
+        target='_blank'
+        rel='noopener noreferrer'
+        {...common}
+      >
+        {children}
+      </Button>
+    );
+  }
 
   return (
-    <Link
-      href={href}
-      target={external ? '_blank' : undefined}
-      rel={external ? 'noopener noreferrer' : undefined}
-      className={cn(baseStyles, variantStyles[variant], className)}
-    >
+    <Button as={Link} href={href} {...common}>
       {children}
-    </Link>
+    </Button>
   );
 }
