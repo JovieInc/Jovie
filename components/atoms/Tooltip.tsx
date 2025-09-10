@@ -1,11 +1,11 @@
 'use client';
 
 import { type ReactNode } from 'react';
-import { 
-  Tooltip as ShadcnTooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
+import {
+  Tooltip as ShadcnTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from '@/components/ui/tooltip';
 
 export interface TooltipProps {
@@ -34,20 +34,18 @@ export function Tooltip({
   content,
   placement = 'right',
   shortcut,
-  maxWidth = 240,
-  wrapText = true,
-  className = '',
   children,
 }: TooltipProps) {
   return (
     <TooltipProvider delayDuration={120}>
       <ShadcnTooltip>
         <TooltipTrigger asChild>
-          <span className="inline-block">
-            {children}
-          </span>
+          <span className='inline-block'>{children}</span>
         </TooltipTrigger>
-        <TooltipContent side={placement as 'top' | 'bottom' | 'left' | 'right'} sideOffset={8}>
+        <TooltipContent
+          side={placement as 'top' | 'bottom' | 'left' | 'right'}
+          sideOffset={8}
+        >
           <div className='flex items-center gap-2'>
             {typeof content === 'string' ? <span>{content}</span> : content}
             {shortcut ? (
