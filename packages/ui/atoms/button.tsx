@@ -59,6 +59,28 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : href ? 'a' : 'button';
     const isDisabled = disabled || loading;
 
+    // In asChild mode (Radix Slot), React.Children.only requires a single child.
+    // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
+    if (asChild) {
+      return (
+        <Comp
+          ref={ref}
+          className={cn(
+            buttonVariants({ variant, size, className }),
+            isDisabled && 'pointer-events-none'
+          )}
+          data-testid={dataTestId ?? 'button'}
+          aria-disabled={isDisabled || undefined}
+          aria-busy={loading || undefined}
+          data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
+          {...props}
+        >
+          {children}
+        </Comp>
+      );
+    }
+
+    // Normal button/anchor rendering with optional loading spinner and content opacity
     return (
       <Comp
         ref={ref}
@@ -72,7 +94,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading || undefined}
         data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
         {...(Comp === 'button'
-          ? { disabled: isDisabled, type: props.type ?? 'button' }
+          ? { disabled: isDisabled, type: (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ?? 'button' }
           : {})}
         {...props}
       >
