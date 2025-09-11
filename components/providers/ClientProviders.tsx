@@ -8,6 +8,7 @@ import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import { ToastProvider } from './ToastProvider';
+import { TooltipProvider } from '@jovie/ui';
 
 // import { Toolbar } from '@vercel/toolbar/next';
 
@@ -139,11 +140,13 @@ export function ClientProviders({
           disableTransitionOnChange
           storageKey='jovie-theme'
         >
-          <ToastProvider>
-            {children}
-            <Analytics />
-            {/* <Toolbar /> */}
-          </ToastProvider>
+          <TooltipProvider delayDuration={120}>
+            <ToastProvider>
+              {children}
+              <Analytics />
+              {/* <Toolbar /> */}
+            </ToastProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </ClerkWrapper>
     </React.StrictMode>
