@@ -22,6 +22,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
+      "@jovie/ui": ["packages/ui/index.ts"],
       "@jovie/ui/*": ["packages/ui/*"]
     }
   },
