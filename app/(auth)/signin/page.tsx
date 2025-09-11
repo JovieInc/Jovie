@@ -34,51 +34,48 @@ export default function SignInPage() {
           <AuthFormSkeleton />
         </ClerkLoading>
         <ClerkLoaded>
-          <SignIn.Root
+          <SignIn
             routing='hash'
-            redirectUrl={redirectUrl}
             afterSignInUrl={redirectUrl}
             afterSignUpUrl={redirectUrl}
             signUpUrl='/signup'
           >
-            <SignIn.Step name='start'>
-              <div className='space-y-4'>
-                <Field name='identifier'>
-                  <Label>Email</Label>
-                  <ClerkInput asChild>
-                    <Input
-                      type='email'
-                      autoComplete='email'
-                      placeholder='you@example.com'
-                    />
-                  </ClerkInput>
-                  <FieldError />
-                </Field>
+            <div className='space-y-4'>
+              <Field name='identifier'>
+                <Label>Email</Label>
+                <ClerkInput asChild>
+                  <Input
+                    type='email'
+                    autoComplete='email'
+                    placeholder='you@example.com'
+                  />
+                </ClerkInput>
+                <FieldError />
+              </Field>
 
-                <Field name='password'>
-                  <Label>Password</Label>
-                  <ClerkInput asChild>
-                    <Input type='password' placeholder='Your password' />
-                  </ClerkInput>
-                  <FieldError />
-                </Field>
+              <Field name='password'>
+                <Label>Password</Label>
+                <ClerkInput asChild>
+                  <Input type='password' placeholder='Your password' />
+                </ClerkInput>
+                <FieldError />
+              </Field>
 
-                <SignIn.Action submit asChild>
-                  <Button className='w-full'>Sign in</Button>
-                </SignIn.Action>
+              <Button type='submit' className='w-full'>
+                Sign in
+              </Button>
 
-                <p className='text-center text-sm text-gray-600 dark:text-gray-400'>
-                  New to Jovie?{' '}
-                  <Link
-                    href='/signup'
-                    className='text-blue-600 hover:text-blue-500 font-medium'
-                  >
-                    Create an account
-                  </Link>
-                </p>
-              </div>
-            </SignIn.Step>
-          </SignIn.Root>
+              <p className='text-center text-sm text-gray-600 dark:text-gray-400'>
+                New to Jovie?{' '}
+                <Link
+                  href='/signup'
+                  className='text-blue-600 hover:text-blue-500 font-medium'
+                >
+                  Create an account
+                </Link>
+              </p>
+            </div>
+          </SignIn>
         </ClerkLoaded>
       </div>
     </AuthLayout>

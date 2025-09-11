@@ -101,7 +101,6 @@ export async function POST(request: NextRequest) {
             await updateUserBillingStatus({
               clerkUserId: user.clerkId,
               isPro: false,
-              stripeCustomerId: null,
               stripeSubscriptionId: null,
             });
 
