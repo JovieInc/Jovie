@@ -39,8 +39,9 @@ export async function getOrCreateCustomer(
   name?: string
 ): Promise<Stripe.Customer> {
   try {
-    // First, try to find existing customer by searching
-    const existingCustomers = await stripe.customers.list({
+    // First, try to find existing customer by searching via email or metadata
+    const existingCustomers = await stripe.customers.search({
+      query: `email:'${email}' OR metadata['clerk_user_id']:'${userId}'`,
       limit: 1,
     });
 
@@ -196,7 +197,7 @@ export async function getUpcomingInvoice(
   customerId: string
 ): Promise<Stripe.Invoice | null> {
   try {
-    const invoice = await stripe.invoices.createPreview({
+    const invoice = await stripe.invoices.retrieveUpcoming({
       customer: customerId,
     });
     return invoice;
