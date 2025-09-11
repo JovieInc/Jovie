@@ -1,5 +1,7 @@
 import React, { forwardRef } from 'react';
 
+/** @deprecated Use the `Button` atom from `@jovie/ui` instead. */
+
 /**
  * Accessible button component.
  *
@@ -123,6 +125,7 @@ export const Button = forwardRef<
     };
 
     // Determine which classes to use based on props
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resolvedVariant: keyof typeof variantClasses = ((): any => {
       if (outline) return 'outline';
       if (plain) return 'plain';
@@ -131,9 +134,13 @@ export const Button = forwardRef<
       return variant;
     })();
 
-    let variantClass = variantClasses[resolvedVariant] ?? variantClasses.default;
+    let variantClass =
+      variantClasses[resolvedVariant] ?? variantClasses.default;
 
-    if (color && (resolvedVariant === 'default' || resolvedVariant === 'primary')) {
+    if (
+      color &&
+      (resolvedVariant === 'default' || resolvedVariant === 'primary')
+    ) {
       variantClass = colorClasses[color];
     }
 
@@ -145,7 +152,8 @@ export const Button = forwardRef<
       variantClass = `cursor-pointer ${variantClass}`;
     }
 
-    const classes = `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
+    const classes =
+      `${baseClasses} ${variantClass} ${sizeClasses[size]} ${className}`.trim();
 
     // Prepare additional props based on component type and state
     const additionalProps: Record<string, unknown> = {};
@@ -180,7 +188,9 @@ export const Button = forwardRef<
             <div className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin' />
           </div>
         )}
-        <span className={`${loading ? 'opacity-0' : 'opacity-100'} inline-flex items-center whitespace-nowrap`}>
+        <span
+          className={`${loading ? 'opacity-0' : 'opacity-100'} inline-flex items-center whitespace-nowrap`}
+        >
           {children}
         </span>
       </Component>
