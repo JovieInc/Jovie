@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Divider } from '@/components/atoms/Divider';
 import { Tooltip } from '@/components/atoms/Tooltip';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 // Primary Navigation - Core features
@@ -98,8 +98,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
 
         const linkContent = (
           <Button
-            as={Link}
-            href={item.href}
+            asChild
             variant='ghost'
             className={cn(
               // Apple-style active state - solid pill highlight
@@ -118,41 +117,43 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
               'hover:scale-[1.02] active:scale-[0.98]'
             )}
           >
-            {/* Active state glow/halo effect */}
-            {isActive && (
-              <div className='absolute inset-0 bg-accent/5 rounded-lg animate-pulse' />
-            )}
-
-            <item.icon
-              className={cn(
-                isActive
-                  ? 'text-accent'
-                  : isPrimary
-                    ? 'text-secondary-token group-hover:text-primary-token'
-                    : 'text-tertiary-token group-hover:text-secondary-token',
-                'h-5 w-5 shrink-0 transition-all duration-200',
-                // Hover scale animation
-                'group-hover:scale-110 group-active:scale-95'
+            <Link href={item.href}>
+              {/* Active state glow/halo effect */}
+              {isActive && (
+                <div className='absolute inset-0 bg-accent/5 rounded-lg animate-pulse' />
               )}
-              aria-hidden='true'
-            />
 
-            <span
-              className={cn(
-                'transition-all duration-200 ease-in-out truncate',
-                collapsed
-                  ? 'opacity-0 w-0 overflow-hidden'
-                  : 'opacity-100 w-auto',
-                // Typography colors
-                isActive
-                  ? 'text-primary-token'
-                  : isPrimary
+              <item.icon
+                className={cn(
+                  isActive
+                    ? 'text-accent'
+                    : isPrimary
+                      ? 'text-secondary-token group-hover:text-primary-token'
+                      : 'text-tertiary-token group-hover:text-secondary-token',
+                  'h-5 w-5 shrink-0 transition-all duration-200',
+                  // Hover scale animation
+                  'group-hover:scale-110 group-active:scale-95'
+                )}
+                aria-hidden='true'
+              />
+
+              <span
+                className={cn(
+                  'transition-all duration-200 ease-in-out truncate',
+                  collapsed
+                    ? 'opacity-0 w-0 overflow-hidden'
+                    : 'opacity-100 w-auto',
+                  // Typography colors
+                  isActive
                     ? 'text-primary-token'
-                    : 'text-secondary-token'
-              )}
-            >
-              {item.name}
-            </span>
+                    : isPrimary
+                      ? 'text-primary-token'
+                      : 'text-secondary-token'
+                )}
+              >
+                {item.name}
+              </span>
+            </Link>
           </Button>
         );
 
