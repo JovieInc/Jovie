@@ -1,8 +1,8 @@
 import { ArrowRightIcon } from '@heroicons/react/24/solid';
 import type { Meta, StoryObj } from '@storybook/react';
-import { CTAButton } from './CTAButton';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { CTAButton } from './CTAButton';
 
 const meta: Meta<typeof CTAButton> = {
   title: 'Atoms/CTAButton',
@@ -18,7 +18,7 @@ const meta: Meta<typeof CTAButton> = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <ToastProvider>
         <Story />
       </ToastProvider>
@@ -27,7 +27,7 @@ const meta: Meta<typeof CTAButton> = {
   argTypes: {
     variant: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'outline', 'white'],
+      options: ['primary', 'secondary', 'outline'],
       description: 'Visual style variant',
     },
     size: {
@@ -50,10 +50,6 @@ const meta: Meta<typeof CTAButton> = {
     external: {
       control: { type: 'boolean' },
       description: 'Whether the link should open in a new tab',
-    },
-    reducedMotion: {
-      control: { type: 'boolean' },
-      description: 'Whether to use reduced motion for animations',
     },
   },
 };
@@ -99,7 +95,7 @@ export const White: Story = {
   args: {
     ...Default.args,
     children: 'White Button',
-    variant: 'white',
+    variant: 'outline',
   },
   parameters: {
     backgrounds: {
@@ -182,7 +178,6 @@ export const ExternalLink: Story = {
 export const ReducedMotion: Story = {
   args: {
     ...Default.args,
-    reducedMotion: true,
   },
 };
 
@@ -224,13 +219,13 @@ export const StateTransitions: Story = {
         </CTAButton>
       </div>
       <div className='grid grid-cols-3 gap-4'>
-        <CTAButton href='/dashboard' variant='white' size='md'>
+        <CTAButton href='/dashboard' variant='outline' size='md'>
           Idle
         </CTAButton>
-        <CTAButton href='/dashboard' variant='white' size='md' isLoading>
+        <CTAButton href='/dashboard' variant='outline' size='md' isLoading>
           Loading
         </CTAButton>
-        <CTAButton href='/dashboard' variant='white' size='md' isSuccess>
+        <CTAButton href='/dashboard' variant='outline' size='md' isSuccess>
           Success
         </CTAButton>
       </div>
@@ -268,7 +263,7 @@ export const AllVariants: Story = {
       <CTAButton href='/dashboard' variant='outline' size='md'>
         Outline Button
       </CTAButton>
-      <CTAButton href='/dashboard' variant='white' size='md'>
+      <CTAButton href='/dashboard' variant='outline' size='md'>
         White Button
       </CTAButton>
     </div>
@@ -290,7 +285,7 @@ export const ThemeComparison: Story = {
         <CTAButton href='/dashboard' variant='outline' size='md'>
           Outline
         </CTAButton>
-        <CTAButton href='/dashboard' variant='white' size='md'>
+        <CTAButton href='/dashboard' variant='outline' size='md'>
           White
         </CTAButton>
       </div>
@@ -305,7 +300,7 @@ export const ThemeComparison: Story = {
         <CTAButton href='/dashboard' variant='outline' size='md'>
           Outline
         </CTAButton>
-        <CTAButton href='/dashboard' variant='white' size='md'>
+        <CTAButton href='/dashboard' variant='outline' size='md'>
           White
         </CTAButton>
       </div>
@@ -316,11 +311,11 @@ export const ThemeComparison: Story = {
 // Button with onClick handler
 const WithOnClickComponent = () => {
   const notifications = useNotifications();
-  
+
   return (
     <CTAButton
-      variant="primary"
-      size="md"
+      variant='primary'
+      size='md'
       onClick={() => notifications.success('Button clicked! 🎉')}
     >
       Click Me

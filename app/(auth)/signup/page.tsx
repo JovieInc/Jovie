@@ -34,50 +34,47 @@ export default function SignUpPage() {
           <AuthFormSkeleton />
         </ClerkLoading>
         <ClerkLoaded>
-          <SignUp.Root
+          <SignUp
             routing='hash'
-            redirectUrl={redirectUrl}
             afterSignUpUrl={redirectUrl}
             signInUrl='/signin'
           >
-            <SignUp.Step name='start'>
-              <div className='space-y-4'>
-                <Field name='emailAddress'>
-                  <Label>Email</Label>
-                  <ClerkInput asChild>
-                    <Input
-                      type='email'
-                      autoComplete='email'
-                      placeholder='you@example.com'
-                    />
-                  </ClerkInput>
-                  <FieldError />
-                </Field>
+            <div className='space-y-4'>
+              <Field name='emailAddress'>
+                <Label>Email</Label>
+                <ClerkInput asChild>
+                  <Input
+                    type='email'
+                    autoComplete='email'
+                    placeholder='you@example.com'
+                  />
+                </ClerkInput>
+                <FieldError />
+              </Field>
 
-                <Field name='password'>
-                  <Label>Password</Label>
-                  <ClerkInput asChild>
-                    <Input type='password' placeholder='Create a password' />
-                  </ClerkInput>
-                  <FieldError />
-                </Field>
+              <Field name='password'>
+                <Label>Password</Label>
+                <ClerkInput asChild>
+                  <Input type='password' placeholder='Create a password' />
+                </ClerkInput>
+                <FieldError />
+              </Field>
 
-                <SignUp.Action submit asChild>
-                  <Button className='w-full'>Create account</Button>
-                </SignUp.Action>
+              <Button type='submit' className='w-full'>
+                Create account
+              </Button>
 
-                <p className='text-center text-sm text-gray-600 dark:text-gray-400'>
-                  Already have an account?{' '}
-                  <Link
-                    href='/signin'
-                    className='text-purple-600 hover:text-purple-500 font-medium'
-                  >
-                    Sign in
-                  </Link>
-                </p>
-              </div>
-            </SignUp.Step>
-          </SignUp.Root>
+              <p className='text-center text-sm text-gray-600 dark:text-gray-400'>
+                Already have an account?{' '}
+                <Link
+                  href='/signin'
+                  className='text-purple-600 hover:text-purple-500 font-medium'
+                >
+                  Sign in
+                </Link>
+              </p>
+            </div>
+          </SignUp>
         </ClerkLoaded>
       </div>
     </AuthLayout>
