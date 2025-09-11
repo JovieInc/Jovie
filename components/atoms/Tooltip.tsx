@@ -49,7 +49,7 @@ export function Tooltip({
           <div className='flex items-center gap-2'>
             {typeof content === 'string' ? <span>{content}</span> : content}
             {shortcut ? (
-              <kbd className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide bg-black/10 text-neutral-600 dark:bg:white/20 dark:text-neutral-300'>
+              <kbd className='ml-1 inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wide bg-black/10 text-neutral-600 dark:bg-white/20 dark:text-neutral-300'>
                 {shortcut}
               </kbd>
             ) : null}
