@@ -23,9 +23,19 @@ describe('Button', () => {
   });
 
   it('forwards refs', () => {
-    const ref = React.createRef<HTMLButtonElement>();
+    const ref = React.createRef<HTMLButtonElement | HTMLAnchorElement>();
     render(<Button ref={ref}>Hi</Button>);
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it('forwards refs to anchor', () => {
+    const ref = React.createRef<HTMLButtonElement | HTMLAnchorElement>();
+    render(
+      <Button ref={ref} href='https://example.com'>
+        Link
+      </Button>
+    );
+    expect(ref.current).toBeInstanceOf(HTMLAnchorElement);
   });
 
   it('supports asChild', () => {
@@ -54,5 +64,23 @@ describe('Button', () => {
       'href',
       'https://example.com'
     );
+  });
+
+  it('strips href when disabled', () => {
+    render(
+      <Button href='https://example.com' disabled>
+        Go
+      </Button>
+    );
+    expect(screen.getByTestId('button')).not.toHaveAttribute('href');
+  });
+
+  it('strips href when loading', () => {
+    render(
+      <Button href='https://example.com' loading>
+        Go
+      </Button>
+    );
+    expect(screen.getByTestId('button')).not.toHaveAttribute('href');
   });
 });

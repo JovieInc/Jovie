@@ -31,16 +31,39 @@ const buttonVariants = cva(
   }
 );
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    React.AnchorHTMLAttributes<HTMLAnchorElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+type CommonProps = {
   loading?: boolean;
-  href?: string;
-}
+  disabled?: boolean;
+  'data-testid'?: string;
+} & VariantProps<typeof buttonVariants>;
 
-const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+type ButtonAsButtonProps = {
+  asChild?: false;
+  href?: undefined;
+} & React.ButtonHTMLAttributes<HTMLButtonElement> &
+  CommonProps;
+
+type ButtonAsAnchorProps = {
+  asChild?: false;
+  href: string;
+} & React.AnchorHTMLAttributes<HTMLAnchorElement> &
+  CommonProps;
+
+type ButtonAsChildProps = {
+  asChild: true;
+  href?: string;
+} & React.HTMLAttributes<HTMLElement> &
+  CommonProps;
+
+export type ButtonProps =
+  | ButtonAsButtonProps
+  | ButtonAsAnchorProps
+  | ButtonAsChildProps;
+
+const Button = React.forwardRef<
+  HTMLButtonElement | HTMLAnchorElement,
+  ButtonProps
+>(
   (
     {
       className,
@@ -56,23 +79,28 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : href ? 'a' : 'button';
+    const Comp = (asChild ? Slot : href ? 'a' : 'button') as React.ElementType;
     const isDisabled = disabled || loading;
 
     return (
       <Comp
-        ref={ref}
+        ref={ref as React.Ref<HTMLElement>}
         className={cn(
           buttonVariants({ variant, size, className }),
           isDisabled && 'pointer-events-none'
         )}
         data-testid={dataTestId ?? 'button'}
-        href={Comp === 'a' ? href : undefined}
+        href={Comp === 'a' && !isDisabled ? href : undefined}
         aria-disabled={isDisabled || undefined}
         aria-busy={loading || undefined}
         data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
         {...(Comp === 'button'
-          ? { disabled: isDisabled, type: props.type ?? 'button' }
+          ? {
+              disabled: isDisabled,
+              type:
+                (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
+                'button',
+            }
           : {})}
         {...props}
       >
