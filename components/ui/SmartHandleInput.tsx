@@ -13,8 +13,8 @@ import {
   generateUsernameSuggestions,
   validateUsernameFormat,
 } from '@/lib/validation/client-username';
-import { LoadingSpinner } from '../atoms/LoadingSpinner';
 import { Input } from './Input';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface SmartHandleInputProps {
   value: string;

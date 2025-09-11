@@ -1,21 +1,13 @@
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { Footer } from '@/components/site/Footer';
-import { Logo } from '@/components/ui/Logo';
+import { Header } from '@/components/site/Header';
 
 export default function NotFound() {
   return (
     <div className='min-h-screen bg-white dark:bg-gray-900'>
       {/* Header */}
-      <header className='sticky top-0 z-50 w-full border-b border-gray-200/50 dark:border-white/10 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm supports-backdrop-filter:bg-white/60 dark:supports-backdrop-filter:bg-gray-900/60'>
-        <Container>
-          <div className='flex h-16 items-center justify-between'>
-            <Link href='/' className='flex items-center space-x-2'>
-              <Logo size='sm' />
-            </Link>
-          </div>
-        </Container>
-      </header>
+      <Header />
 
       {/* Main Content */}
       <main className='flex-1'>

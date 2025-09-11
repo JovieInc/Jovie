@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Initial design token map and tailwind v4 config
+- Canonical shadcn Button atom
+- Button atom now supports loading state and token-driven accent styles
+
 - **Pro Subscription System**: Implemented $5/month Pro plan with Stripe Checkout integration
   - Created `/pricing` page with custom pricing UI showing Free and Pro plans
   - Added Stripe Checkout API route (`/api/stripe/redirect`) with user authentication

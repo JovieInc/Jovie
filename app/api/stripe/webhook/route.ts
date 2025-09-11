@@ -1,7 +1,10 @@
 import { createClerkClient } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { db, users } from '@/lib/db';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,6 +63,21 @@ export async function POST(request: NextRequest) {
               }
             );
 
+            await updateUserBillingStatus({
+              clerkUserId: session.metadata.clerk_user_id,
+              isPro: true,
+              stripeCustomerId:
+                typeof session.customer === 'string'
+                  ? session.customer
+                  : session.customer?.id,
+              stripeSubscriptionId:
+                typeof session.subscription === 'string'
+                  ? session.subscription
+                  : typeof session.subscription === 'object'
+                    ? session.subscription?.id
+                    : null,
+            });
+
             console.log(
               `Updated user ${session.metadata.clerk_user_id} to Pro plan`
             );
@@ -72,20 +90,22 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted':
         const subscription = event.data.object as Stripe.Subscription;
 
-        // Find user by subscription ID and downgrade to free
         try {
-          const users = await clerkClient.users.getUserList({
-            limit: 500, // Adjust as needed
-          });
-
-          const user = users.data.find(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (u: any) =>
-              u.publicMetadata?.stripe_subscription_id === subscription.id
-          );
+          const [user] = await db
+            .select({ clerkId: users.clerkId })
+            .from(users)
+            .where(eq(users.stripeSubscriptionId, subscription.id))
+            .limit(1);
 
           if (user) {
-            await clerkClient.users.updateUserMetadata(user.id, {
+            await updateUserBillingStatus({
+              clerkUserId: user.clerkId,
+              isPro: false,
+              stripeCustomerId: null,
+              stripeSubscriptionId: null,
+            });
+
+            await clerkClient.users.updateUserMetadata(user.clerkId, {
               publicMetadata: {
                 plan: 'free',
                 stripe_customer_id: null,
@@ -93,7 +113,9 @@ export async function POST(request: NextRequest) {
               },
             });
 
-            console.log(`Downgraded user ${user.id} to free plan`);
+            console.log(`Downgraded user ${user.clerkId} to free plan`);
+          } else {
+            console.log(`No user found with subscription ${subscription.id}`);
           }
         } catch (error) {
           console.error('Failed to downgrade user:', error);

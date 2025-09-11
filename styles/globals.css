@@ -105,15 +105,15 @@ body {
 }
 
 @utility btn-primary {
-  @apply bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-200;
+  @apply bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90;
 }
 
 @utility btn-secondary {
-  @apply bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-50 dark:hover:bg-gray-700;
+  @apply bg-surface-2 text-primary-token hover:bg-surface-3;
 }
 
 @utility btn-ghost {
-  @apply hover:bg-gray-100 dark:hover:bg-gray-800;
+  @apply hover:bg-surface-2;
 }
 
 @utility btn-sm {
@@ -129,7 +129,7 @@ body {
 }
 
 @utility text-accent {
-  color: rgb(var(--accent));
+  color: var(--color-accent);
 }
 
 /* Menu/Dropdown utilities */
@@ -265,6 +265,9 @@ body {
     --color-text-secondary-token: #6b7280;
     --color-text-tertiary-token: #9ca3af;
     --color-accent: #7c3aed; /* accent */
+    --color-accent-foreground: #fff; /* accent text */
+    --color-btn-primary-bg: #000; /* primary button background */
+    --color-btn-primary-fg: #fff; /* primary button text */
 
     /* Loading/skeleton colors */
     --color-skeleton-base: #f3f4f6;
@@ -285,6 +288,9 @@ body {
     --color-text-secondary-token: #a3a3a3;
     --color-text-tertiary-token: #737373;
     --color-accent: #7c3aed; /* accent */
+    --color-accent-foreground: #fff; /* accent text */
+    --color-btn-primary-bg: #fff; /* primary button background */
+    --color-btn-primary-fg: #000; /* primary button text */
 
     /* Loading/skeleton colors for dark mode */
     --color-skeleton-base: #1a1a1a;

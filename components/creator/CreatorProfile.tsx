@@ -1,6 +1,6 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
+import { Icon } from '@/components/atoms/Icon';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/ui/LoadingSkeleton';
@@ -66,7 +66,7 @@ export function CreatorProfile({ username }: { username: string }) {
                   target='_blank'
                   rel='noopener noreferrer'
                 >
-                  <ExternalLink className='h-4 w-4' />
+                  <Icon name='ExternalLink' className='h-4 w-4' />
                   {link.displayText || link.platform}
                 </Button>
               ))}

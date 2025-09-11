@@ -1,6 +1,6 @@
 /**
  * ESLint rule to enforce icon usage standards in Jovie project
- * 
+ *
  * Rules:
  * 1. Use Heroicons for general-purpose UI icons
  * 2. Use SimpleIcons via SocialIcon component for social/brand icons
@@ -18,41 +18,110 @@ const APPROVED_CUSTOM_SVGS = [
 
 // Social media platforms that should use SocialIcon component
 const SOCIAL_PLATFORMS = [
-  'instagram', 'twitter', 'x', 'tiktok', 'youtube', 'facebook',
-  'spotify', 'apple', 'applemusic', 'apple_music', 'soundcloud',
-  'bandcamp', 'discord', 'reddit', 'pinterest', 'tumblr', 'vimeo',
-  'github', 'medium', 'patreon', 'venmo'
+  'instagram',
+  'twitter',
+  'x',
+  'tiktok',
+  'youtube',
+  'facebook',
+  'spotify',
+  'apple',
+  'applemusic',
+  'apple_music',
+  'soundcloud',
+  'bandcamp',
+  'discord',
+  'reddit',
+  'pinterest',
+  'tumblr',
+  'vimeo',
+  'github',
+  'medium',
+  'patreon',
+  'venmo',
 ];
 
 // Common UI icons that should use Heroicons
 const COMMON_UI_ICONS = [
-  'chevron', 'arrow', 'plus', 'minus', 'x', 'check', 'star', 'heart',
-  'home', 'menu', 'search', 'settings', 'user', 'bell', 'mail',
-  'trash', 'edit', 'share', 'download', 'upload', 'play', 'pause',
-  'stop', 'forward', 'backward', 'volume', 'mute', 'calendar',
-  'clock', 'location', 'phone', 'camera', 'image', 'video',
-  'document', 'folder', 'link', 'external', 'info', 'warning',
-  'error', 'success', 'question', 'help', 'close', 'minimize',
-  'maximize', 'refresh', 'sync', 'filter', 'sort', 'grid', 'list'
+  'chevron',
+  'arrow',
+  'plus',
+  'minus',
+  'x',
+  'check',
+  'star',
+  'heart',
+  'home',
+  'menu',
+  'search',
+  'settings',
+  'user',
+  'bell',
+  'mail',
+  'trash',
+  'edit',
+  'share',
+  'download',
+  'upload',
+  'play',
+  'pause',
+  'stop',
+  'forward',
+  'backward',
+  'volume',
+  'mute',
+  'calendar',
+  'clock',
+  'location',
+  'phone',
+  'camera',
+  'image',
+  'video',
+  'document',
+  'folder',
+  'link',
+  'external',
+  'info',
+  'warning',
+  'error',
+  'success',
+  'question',
+  'help',
+  'close',
+  'minimize',
+  'maximize',
+  'refresh',
+  'sync',
+  'filter',
+  'sort',
+  'grid',
+  'list',
 ];
 
 module.exports = {
   meta: {
     type: 'problem',
     docs: {
-      description: 'Enforce icon usage standards (Heroicons for UI, SimpleIcons for social/brand)',
+      description:
+        'Enforce icon usage standards (Heroicons for UI, SimpleIcons for social/brand)',
       category: 'Best Practices',
       recommended: true,
     },
     fixable: null,
     schema: [],
     messages: {
-      directSvgImport: 'Direct SVG import detected. Use Heroicons for general UI icons or SocialIcon component for social/brand icons.',
-      inlineSvg: 'Inline SVG detected. Use Heroicons for UI icons or SocialIcon component for social/brand icons.',
-      customSvgNotApproved: 'Custom SVG usage requires approval. See docs/ICON_STANDARDS.md for the approval process.',
-      useHeroicons: 'Use Heroicons for general UI icons. Import from @heroicons/react/24/outline or @heroicons/react/24/solid.',
-      useSocialIcon: 'Use SocialIcon component for social media and brand icons: <SocialIcon platform="{{platform}}" />',
-      directSimpleIcons: 'Direct SimpleIcons usage detected. Use SocialIcon component instead: <SocialIcon platform="{{platform}}" />',
+      directSvgImport:
+        'Direct SVG import detected. Use Heroicons for general UI icons or SocialIcon component for social/brand icons.',
+      inlineSvg:
+        'Inline SVG detected. Use Heroicons for UI icons or SocialIcon component for social/brand icons.',
+      customSvgNotApproved:
+        'Custom SVG usage requires approval. See docs/ICON_STANDARDS.md for the approval process.',
+      useHeroicons:
+        'Use Heroicons for general UI icons. Import from @heroicons/react/24/outline or @heroicons/react/24/solid.',
+      useSocialIcon:
+        'Use SocialIcon component for social media and brand icons: <SocialIcon platform="{{platform}}" />',
+      directSimpleIcons:
+        'Direct SimpleIcons usage detected. Use SocialIcon component instead: <SocialIcon platform="{{platform}}" />',
     },
   },
 
@@ -74,7 +143,9 @@ module.exports = {
 
     // Helper function to check if SVG file is approved
     function isApprovedCustomSvg(importPath) {
-      return APPROVED_CUSTOM_SVGS.some(approved => importPath.includes(approved));
+      return APPROVED_CUSTOM_SVGS.some(approved =>
+        importPath.includes(approved)
+      );
     }
 
     return {
@@ -104,19 +175,22 @@ module.exports = {
             node,
             messageId: 'directSimpleIcons',
             data: {
-              platform: 'appropriate-platform'
-            }
+              platform: 'appropriate-platform',
+            },
           });
           return;
         }
 
         // Check for specific SimpleIcons imports
         if (importPath.startsWith('simple-icons/')) {
-          const platform = importPath.replace('simple-icons/', '').replace('si', '').toLowerCase();
+          const platform = importPath
+            .replace('simple-icons/', '')
+            .replace('si', '')
+            .toLowerCase();
           context.report({
             node,
             messageId: 'useSocialIcon',
-            data: { platform }
+            data: { platform },
           });
         }
       },
@@ -125,10 +199,12 @@ module.exports = {
       JSXElement(node) {
         if (node.openingElement.name.name === 'svg') {
           // Allow SVGs in approved components and server-side templates
-          const allowedComponents = ['SocialIcon.tsx', 'IconBadge.tsx', 'IconButton.tsx'];
+          const allowedComponents = ['SocialIcon.tsx', 'IconBadge.tsx'];
           const allowedFiles = ['footer.ts']; // Server-side templates with brand logos
-          if (allowedComponents.some(comp => filename.includes(comp)) || 
-              allowedFiles.some(file => filename.includes(file))) {
+          if (
+            allowedComponents.some(comp => filename.includes(comp)) ||
+            allowedFiles.some(file => filename.includes(file))
+          ) {
             return;
           }
 
@@ -138,7 +214,7 @@ module.exports = {
             context.report({
               node,
               messageId: 'useSocialIcon',
-              data: { platform: 'detected-platform' }
+              data: { platform: 'detected-platform' },
             });
             return;
           }
@@ -185,7 +261,10 @@ module.exports = {
       VariableDeclarator(node) {
         if (node.init && node.init.type === 'TemplateLiteral') {
           const templateValue = sourceCode.getText(node.init);
-          if (templateValue.includes('<svg') && templateValue.includes('</svg>')) {
+          if (
+            templateValue.includes('<svg') &&
+            templateValue.includes('</svg>')
+          ) {
             // Allow SVG in server-side templates (footer.ts, etc.)
             const allowedServerFiles = ['footer.ts', 'email-template.ts'];
             if (allowedServerFiles.some(file => filename.includes(file))) {
@@ -195,7 +274,7 @@ module.exports = {
               context.report({
                 node,
                 messageId: 'useSocialIcon',
-                data: { platform: 'detected-platform' }
+                data: { platform: 'detected-platform' },
               });
             } else if (containsUIIcon(templateValue)) {
               context.report({
@@ -210,7 +289,7 @@ module.exports = {
             }
           }
         }
-      }
+      },
     };
   },
 };

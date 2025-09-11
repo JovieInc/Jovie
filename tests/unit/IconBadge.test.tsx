@@ -1,4 +1,3 @@
-import { BoltIcon } from '@heroicons/react/24/outline';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IconBadge } from '@/components/atoms/IconBadge';
@@ -8,7 +7,7 @@ describe('IconBadge', () => {
 
   it('renders icon with correct styling', () => {
     const { container } = render(
-      <IconBadge Icon={BoltIcon} colorVar='--accent-speed' />
+      <IconBadge name='Bolt' colorVar='--accent-speed' />
     );
 
     const icon = container.querySelector('svg');
@@ -21,7 +20,7 @@ describe('IconBadge', () => {
   it('applies custom className', () => {
     const { container } = render(
       <IconBadge
-        Icon={BoltIcon}
+        name='Bolt'
         colorVar='--accent-speed'
         className='custom-class'
       />
@@ -33,11 +32,7 @@ describe('IconBadge', () => {
 
   it('uses aria-label when provided', () => {
     render(
-      <IconBadge
-        Icon={BoltIcon}
-        colorVar='--accent-speed'
-        ariaLabel='Bolt icon'
-      />
+      <IconBadge name='Bolt' colorVar='--accent-speed' ariaLabel='Bolt icon' />
     );
 
     const icon = screen.getByLabelText('Bolt icon');

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { LoadingSpinner } from './LoadingSpinner';
 
 const meta: Meta<typeof LoadingSpinner> = {
-  title: 'Atoms/LoadingSpinner',
+  title: 'UI/LoadingSpinner',
   component: LoadingSpinner,
   parameters: {
     layout: 'centered',
@@ -11,14 +11,11 @@ const meta: Meta<typeof LoadingSpinner> = {
   argTypes: {
     size: {
       control: { type: 'select' },
-      options: ['xs', 'sm', 'md', 'lg'],
+      options: ['sm', 'md', 'lg'],
     },
     variant: {
       control: { type: 'select' },
       options: ['light', 'dark', 'auto'],
-    },
-    showDebounce: {
-      control: { type: 'boolean' },
     },
   },
 };
@@ -28,12 +25,6 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {},
-};
-
-export const ExtraSmall: Story = {
-  args: {
-    size: 'xs',
-  },
 };
 
 export const Small: Story = {
@@ -51,12 +42,6 @@ export const Medium: Story = {
 export const Large: Story = {
   args: {
     size: 'lg',
-  },
-};
-
-export const WithDebounce: Story = {
-  args: {
-    showDebounce: true,
   },
 };
 
@@ -119,10 +104,6 @@ export const DarkAndLightVariants: Story = {
 export const AllSizes: Story = {
   render: () => (
     <div className='flex items-center gap-4'>
-      <div className='text-center'>
-        <LoadingSpinner size='xs' />
-        <p className='text-xs mt-1'>XS</p>
-      </div>
       <div className='text-center'>
         <LoadingSpinner size='sm' />
         <p className='text-xs mt-1'>SM</p>

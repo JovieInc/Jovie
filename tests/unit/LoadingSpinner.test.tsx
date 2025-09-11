@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { useTheme } from 'next-themes';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Spinner } from '@/components/ui/Spinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 // Mock next-themes
 vi.mock('next-themes', () => ({
@@ -10,7 +10,7 @@ vi.mock('next-themes', () => ({
 
 const mockUseTheme = useTheme as ReturnType<typeof vi.fn>;
 
-describe('Spinner', () => {
+describe('LoadingSpinner', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockUseTheme.mockReturnValue({
@@ -27,28 +27,28 @@ describe('Spinner', () => {
   });
 
   it('renders with default props and has proper accessibility', () => {
-    render(<Spinner />);
+    render(<LoadingSpinner />);
 
     const spinner = screen.getByRole('status');
     expect(spinner).toHaveAttribute('aria-label', 'Loading');
   });
 
   it('applies correct size classes', () => {
-    render(<Spinner size='sm' />);
+    render(<LoadingSpinner size='sm' />);
 
     const spinner = screen.getByRole('status');
     expect(spinner).toHaveClass('h-4', 'w-4');
   });
 
   it('applies custom className', () => {
-    render(<Spinner className='custom-class' />);
+    render(<LoadingSpinner className='custom-class' />);
 
     const spinner = screen.getByRole('status');
     expect(spinner).toHaveClass('custom-class');
   });
 
   it('implements debounced visibility behavior', () => {
-    render(<Spinner />);
+    render(<LoadingSpinner />);
 
     // Should render initially (even if placeholder)
     const spinner = screen.getByRole('status');

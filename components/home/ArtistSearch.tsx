@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function ArtistSearch() {
   const [query, setQuery] = useState('');
