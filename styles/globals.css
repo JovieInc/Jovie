@@ -2,6 +2,8 @@
 @import "./theme.css";
 
 @plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
+@plugin '@tailwindcss/line-clamp';
 
 @custom-variant dark (&:is(.dark *));
 

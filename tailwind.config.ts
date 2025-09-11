@@ -1,8 +1,4 @@
 /* eslint-disable import/no-unresolved */
-
-import forms from '@tailwindcss/forms';
-import lineClamp from '@tailwindcss/line-clamp';
-import typography from '@tailwindcss/typography';
 import type { Config } from 'tailwindcss';
 import {
   colors,
@@ -56,7 +52,6 @@ const config: Config = {
       },
     },
   },
-  plugins: [typography, forms, lineClamp],
 };
 
 export default config;
