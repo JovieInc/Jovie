@@ -1,4 +1,3 @@
-/* eslint-disable import/no-unresolved */
 import type { Config } from 'tailwindcss';
 import {
   colors,
@@ -7,8 +6,6 @@ import {
   shadows,
   spacing,
 } from './packages/ui/theme/tokens';
-
-/* eslint-enable import/no-unresolved */
 
 const config: Config = {
   darkMode: ['class', '[data-theme="dark"]'],
