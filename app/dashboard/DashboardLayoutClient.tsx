@@ -37,7 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-import type { DashboardData } from '../actions';
+import type { DashboardData } from './actions';
 
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
