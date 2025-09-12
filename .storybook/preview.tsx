@@ -1,4 +1,4 @@
-import type { Preview } from '@storybook/react';
+import type { Preview } from '@storybook/nextjs-vite';
 import { ThemeProvider } from 'next-themes';
 import React from 'react';
 import { ToastProvider } from '../components/ui/ToastContainer';

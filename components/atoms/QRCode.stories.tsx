@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QRCode } from './QRCode';
 
 const meta: Meta<typeof QRCode> = {
