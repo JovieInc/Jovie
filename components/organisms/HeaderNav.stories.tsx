@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { HeaderNav } from './HeaderNav';
 
 const meta: Meta<typeof HeaderNav> = {

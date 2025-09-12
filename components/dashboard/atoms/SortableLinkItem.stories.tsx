@@ -1,6 +1,6 @@
 import { DndContext } from '@dnd-kit/core';
 import { SortableContext } from '@dnd-kit/sortable';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   type DetectedLink,
   detectPlatform,

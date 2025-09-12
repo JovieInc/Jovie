@@ -1,7 +1,7 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { DSPButton } from './DSPButton';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { DSPButton } from './DSPButton';
 
 // Mock DSP configurations for stories
 const spotifyConfig = {
@@ -39,7 +39,7 @@ const meta: Meta<typeof DSPButton> = {
   },
   tags: ['autodocs'],
   decorators: [
-    (Story) => (
+    Story => (
       <ToastProvider>
         <Story />
       </ToastProvider>
@@ -124,7 +124,7 @@ export const AllPlatforms: Story = {
 
 const InteractiveComponent = () => {
   const notifications = useNotifications();
-  
+
   return (
     <DSPButton
       {...spotifyConfig}
@@ -135,8 +135,8 @@ const InteractiveComponent = () => {
             onClick: () => {
               navigator.clipboard.writeText(url);
               notifications.success('URL copied to clipboard!');
-            }
-          }
+            },
+          },
         });
       }}
     />

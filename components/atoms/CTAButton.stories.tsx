@@ -1,5 +1,5 @@
 import { ArrowRightIcon } from '@heroicons/react/24/solid';
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ToastProvider } from '@/components/providers/ToastProvider';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { CTAButton } from './CTAButton';

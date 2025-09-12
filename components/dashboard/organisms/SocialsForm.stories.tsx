@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
 import { Artist } from '@/types/db';
 import { SocialsForm } from './SocialsForm';

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { CTASection } from './CTASection';
 
 const meta: Meta<typeof CTASection> = {
