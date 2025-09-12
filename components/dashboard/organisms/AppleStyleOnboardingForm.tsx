@@ -394,6 +394,7 @@ export function AppleStyleOnboardingForm() {
         await completeOnboarding({
           username: handle.toLowerCase(),
           displayName: fullName.trim() || handle,
+          email: user.emailAddresses?.[0]?.emailAddress ?? null,
         });
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));

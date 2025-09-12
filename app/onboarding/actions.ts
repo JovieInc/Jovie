@@ -1,6 +1,6 @@
 'use server';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -20,9 +20,11 @@ import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 export async function completeOnboarding({
   username,
   displayName,
+  email,
 }: {
   username: string;
   displayName?: string;
+  email?: string | null;
 }) {
   try {
     // Step 1: Authentication check
@@ -93,10 +95,9 @@ export async function completeOnboarding({
     const normalizedUsername = normalizeUsername(username);
 
     // Run checks in parallel to reduce total operation time
-    const [hasExistingProfile, availabilityResult, user] = await Promise.all([
+    const [hasExistingProfile, availabilityResult] = await Promise.all([
       checkUserHasProfile(userId),
       checkUsernameAvailability(normalizedUsername),
-      currentUser(),
     ]);
 
     // Early exit if user already has profile
@@ -120,7 +121,7 @@ export async function completeOnboarding({
     }
 
     // Step 7: Prepare user data for database operations
-    const userEmail = user?.emailAddresses?.[0]?.emailAddress;
+    const userEmail = email ?? null;
 
     // Step 8: Create user and profile via stored function in a single DB call (RLS-safe on neon-http)
     try {
