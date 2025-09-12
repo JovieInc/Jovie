@@ -14,6 +14,14 @@ export interface ArtistCardProps {
   className?: string;
 }
 
+// Size mapping extracted to avoid re-creation on every render
+const AVATAR_SIZE_MAP = {
+  sm: 64,
+  md: 128,
+  lg: 256,
+  xl: 384,
+} as const;
+
 export function ArtistCard({
   handle,
   name,
@@ -60,14 +68,7 @@ export function ArtistCard({
         transition: { type: 'spring', stiffness: 400, damping: 17 },
       };
 
-  const avatarSize = (
-    {
-      sm: 64,
-      md: 128,
-      lg: 256,
-      xl: 384,
-    } as const
-  )[size];
+  const avatarSize = AVATAR_SIZE_MAP[size];
 
   return (
     <motion.div

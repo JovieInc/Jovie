@@ -11,6 +11,13 @@ export type FeaturedCreator = {
   src: string;
 };
 
+/**
+ * Mulberry32 pseudorandom number generator for deterministic shuffling.
+ * Uses a 32-bit state to produce consistent random sequences from the same seed.
+ * Based on Tommy Ettinger's Mulberry32 algorithm.
+ * @param a - The seed value for the random number generator
+ * @returns A function that produces deterministic random numbers between 0 and 1
+ */
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -50,7 +57,9 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     .orderBy(creatorProfiles.displayName)
     .limit(12);
 
-  const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+  // Calculate a weekly seed to ensure consistent shuffle for the same week
+  const WEEKLY_SEED_DIVISOR = 1000 * 60 * 60 * 24 * 7; // milliseconds in a week
+  const seed = Math.floor(Date.now() / WEEKLY_SEED_DIVISOR);
   return shuffle(
     data.map(a => ({
       id: a.id,
