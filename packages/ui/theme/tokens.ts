@@ -13,6 +13,16 @@ export const colors = {
   'accent-foreground': 'var(--color-accent-foreground)',
   'btn-primary': 'var(--color-btn-primary-bg)',
   'btn-primary-foreground': 'var(--color-btn-primary-fg)',
+  
+  // Sidebar colors
+  sidebar: 'hsl(var(--sidebar-background))',
+  'sidebar-foreground': 'hsl(var(--sidebar-foreground))',
+  'sidebar-primary': 'hsl(var(--sidebar-primary))',
+  'sidebar-primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+  'sidebar-accent': 'hsl(var(--sidebar-accent))',
+  'sidebar-accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+  'sidebar-border': 'hsl(var(--sidebar-border))',
+  'sidebar-ring': 'hsl(var(--sidebar-ring))',
 };
 
 export const radii = {
