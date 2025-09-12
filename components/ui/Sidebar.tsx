@@ -8,7 +8,6 @@ import { PanelLeft } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
-import { Divider } from '@/components/atoms/Divider';
 import { Input } from '@/components/ui/Input';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
