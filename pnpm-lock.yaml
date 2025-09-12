@@ -196,6 +196,12 @@ devDependencies:
   '@storybook/react':
     specifier: ^9.1.3
     version: 9.1.3(react-dom@18.3.1)(react@18.3.1)(storybook@9.1.3)(typescript@5.9.2)
+  '@tailwindcss/forms':
+    specifier: ^0.5.9
+    version: 0.5.10(tailwindcss@4.1.13)
+  '@tailwindcss/line-clamp':
+    specifier: ^0.4.4
+    version: 0.4.4(tailwindcss@4.1.13)
   '@tailwindcss/postcss':
     specifier: ^4.1.13
     version: 4.1.13
@@ -4041,6 +4047,23 @@ packages:
     resolution: {integrity: sha512-5IKx/Y13RsYd+sauPb2x+U/xZikHjolzfuDgTAl/Tdf3Q8rslRvC19NKDLgAJQ6wsqADk10ntlv08nPFw/gO/A==}
     dependencies:
       tslib: 2.8.1
+
+  /@tailwindcss/forms@0.5.10(tailwindcss@4.1.13):
+    resolution: {integrity: sha512-utI1ONF6uf/pPNO68kmN1b8rEwNXv3czukalo8VtJH8ksIkZXr3Q3VYudZLkCsDd4Wku120uF02hYK25XGPorw==}
+    peerDependencies:
+      tailwindcss: '>=3.0.0 || >= 3.0.0-alpha.1 || >= 4.0.0-alpha.20 || >= 4.0.0-beta.1'
+    dependencies:
+      mini-svg-data-uri: 1.4.4
+      tailwindcss: 4.1.13
+    dev: true
+
+  /@tailwindcss/line-clamp@0.4.4(tailwindcss@4.1.13):
+    resolution: {integrity: sha512-5U6SY5z8N42VtrCrKlsTAA35gy2VSyYtHWCsg1H87NU1SXnEfekTVlrga9fzUDrrHcGi2Lb5KenUWb4lRQT5/g==}
+    peerDependencies:
+      tailwindcss: '>=2.0.0 || >=3.0.0 || >=3.0.0-alpha.1'
+    dependencies:
+      tailwindcss: 4.1.13
+    dev: true
 
   /@tailwindcss/node@4.1.13:
     resolution: {integrity: sha512-eq3ouolC1oEFOAvOMOBAmfCIqZBJuvWvvYWh5h5iOYfe1HFC6+GZ6EIL0JdM3/niGRJmnrOc+8gl9/HGUaaptw==}
@@ -9850,6 +9873,11 @@ packages:
   /min-indent@1.0.1:
     resolution: {integrity: sha512-I9jwMn07Sy/IwOj3zVkVik2JTvgpaykDZEigL6Rx6N9LbMywwUSMtxET+7lVoDLLd3O3IXwJwvuuns8UB/HeAg==}
     engines: {node: '>=4'}
+    dev: true
+
+  /mini-svg-data-uri@1.4.4:
+    resolution: {integrity: sha512-r9deDe9p5FJUPZAk3A59wGH7Ii9YrjjWw0jmw/liSbHl2CHiyXj6FcDXDu2K3TjVAXqiJdaw3xxwlZZr9E6nHg==}
+    hasBin: true
     dev: true
 
   /minimatch@10.0.3:
