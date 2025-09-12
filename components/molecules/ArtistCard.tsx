@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
-import { ArtistAvatar } from '@/components/atoms/ArtistAvatar';
+import { OptimizedAvatar } from '@/components/ui/OptimizedAvatar';
 
 export interface ArtistCardProps {
   handle: string;
@@ -60,6 +60,15 @@ export function ArtistCard({
         transition: { type: 'spring', stiffness: 400, damping: 17 },
       };
 
+  const avatarSize = (
+    {
+      sm: 64,
+      md: 128,
+      lg: 256,
+      xl: 384,
+    } as const
+  )[size];
+
   return (
     <motion.div
       {...containerAnimationProps}
@@ -74,11 +83,10 @@ export function ArtistCard({
       >
         <div className='text-center'>
           <motion.div {...avatarAnimationProps}>
-            <ArtistAvatar
+            <OptimizedAvatar
               src={src}
               alt={alt ?? name}
-              name={name}
-              size={size}
+              size={avatarSize}
               className='mx-auto'
             />
           </motion.div>
