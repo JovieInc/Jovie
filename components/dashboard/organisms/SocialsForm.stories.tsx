@@ -197,8 +197,6 @@ export const Loading: Story = {
 export const SuccessMessage: Story = {
   decorators: [
     Story => {
-      const originalUseState = React.useState;
-
       const originalFetch = globalThis.fetch;
       globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === 'string' ? input : input.toString();
@@ -222,24 +220,10 @@ export const SuccessMessage: Story = {
         return originalFetch!(input as RequestInfo, init);
       }) as typeof fetch;
 
-      // Mock useState to show success message
-      let callCount = 0;
-      // @ts-expect-error - we're intentionally mocking this
-      React.useState = (initialState: unknown) => {
-        callCount++;
-        if (callCount === 1) return [false, () => {}]; // loading
-        if (callCount === 2) return [undefined, () => {}]; // error
-        if (callCount === 3) return [true, () => {}]; // success
-        if (callCount === 4) return [mockSocialLinks, () => {}]; // socialLinks
-        return originalUseState(initialState);
-      };
-
       // Render the story
       const result = <Story />;
 
       // Restore the original implementations after rendering
-      // @ts-expect-error - we're intentionally restoring this
-      React.useState = originalUseState;
       globalThis.fetch = originalFetch!;
 
       return result;
