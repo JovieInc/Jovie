@@ -4,6 +4,14 @@ import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { OptimizedAvatar } from '@/components/ui/OptimizedAvatar';
 
+// Constants to avoid recreation on every render
+const SIZE_MAPPING = {
+  sm: 64,
+  md: 128,
+  lg: 256,
+  xl: 384,
+} as const;
+
 export interface ArtistCardProps {
   handle: string;
   name: string;
@@ -60,14 +68,7 @@ export function ArtistCard({
         transition: { type: 'spring', stiffness: 400, damping: 17 },
       };
 
-  const avatarSize = (
-    {
-      sm: 64,
-      md: 128,
-      lg: 256,
-      xl: 384,
-    } as const
-  )[size];
+  const avatarSize = SIZE_MAPPING[size];
 
   return (
     <motion.div

@@ -4,6 +4,9 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { transformImageUrl } from '@/lib/images/versioning';
 
+// Constants
+const WEEKLY_SEED_DIVISOR = 1000 * 60 * 60 * 24 * 7; // milliseconds in a week
+
 export type FeaturedCreator = {
   id: string;
   handle: string;
@@ -11,6 +14,11 @@ export type FeaturedCreator = {
   src: string;
 };
 
+/**
+ * Mulberry32 pseudorandom number generator
+ * A simple, fast PRNG that provides deterministic output for consistent shuffling
+ * Based on the Mulberry32 algorithm: https://stackoverflow.com/a/47593316
+ */
 function mulberry32(a: number) {
   return function () {
     let t = (a += 0x6d2b79f5);
@@ -50,7 +58,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
     .orderBy(creatorProfiles.displayName)
     .limit(12);
 
-  const seed = Math.floor(Date.now() / (1000 * 60 * 60 * 24 * 7));
+  const seed = Math.floor(Date.now() / WEEKLY_SEED_DIVISOR);
   return shuffle(
     data.map(a => ({
       id: a.id,
