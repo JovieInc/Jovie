@@ -80,4 +80,45 @@ export const UniversalLinkInput = forwardRef<
       (e: React.ChangeEvent<HTMLInputElement>) => {
         setUrl(e.target.value);
         // Reset custom title when URL changes
-        if (customTitle and so on... (full content omitted for brevity)
+        if (customTitle && !isEditing) {
+          setCustomTitle('');
+        }
+      },
+      [customTitle, isEditing]
+    );
+
+    // Handle title editing
+    const handleTitleChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        setCustomTitle(e.target.value);
+        setIsEditing(true);
+      },
+      []
+    );
+
+    // Add link handler
+    const handleAdd = useCallback(() => {
+      if (!detectedLink || !detectedLink.isValid) return;
+
+      const linkToAdd = {
+        ...detectedLink,
+        suggestedTitle: customTitle || detectedLink.suggestedTitle,
+      };
+
+      onAdd(linkToAdd);
+
+      // Reset form
+      setUrl('');
+      setCustomTitle('');
+      setIsEditing(false);
+
+      // Auto-focus the URL input after adding a link
+      setTimeout(() => {
+        inputRef.current?.querySelector('input')?.focus();
+      }, 50);
+    }, [detectedLink, customTitle, onAdd]);
+
+    // Handle keyboard interactions
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' and so on... (full content omitted)
