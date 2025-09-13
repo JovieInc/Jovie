@@ -1,10 +1,10 @@
 'use client';
 
 import { useUser } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
-import { Button } from '@/components/ui/Button';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { APP_URL } from '@/constants/app';
 import { identify, track } from '@/lib/analytics';
@@ -394,7 +394,6 @@ export function AppleStyleOnboardingForm() {
         await completeOnboarding({
           username: handle.toLowerCase(),
           displayName: fullName.trim() || handle,
-          email: user.emailAddresses?.[0]?.emailAddress ?? null,
         });
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));

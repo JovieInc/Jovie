@@ -1,10 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { Tooltip } from '@/components/atoms/Tooltip';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 type Platform =

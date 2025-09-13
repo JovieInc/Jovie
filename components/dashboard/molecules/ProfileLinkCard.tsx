@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { Button } from '@/components/ui/Button';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { DashboardCard } from '../atoms/DashboardCard';
 
@@ -29,15 +29,10 @@ export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
             successLabel='Copied!'
             errorLabel='Failed to copy'
           />
-          <Button
-            as={Link}
-            href={`/${handle}`}
-            target='_blank'
-            rel='noopener noreferrer'
-            variant='primary'
-            size='sm'
-          >
-            View Profile
+          <Button asChild variant='primary' size='sm'>
+            <Link href={`/${handle}`} target='_blank' rel='noopener noreferrer'>
+              View Profile
+            </Link>
           </Button>
         </div>
       </div>
