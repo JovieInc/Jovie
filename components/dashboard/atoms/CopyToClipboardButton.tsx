@@ -53,4 +53,61 @@ export function CopyToClipboardButton({
     
     try {
       // Try modern clipboard API first
-      if (navigator.clipboard and etc...
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+        copySuccess = true;
+      } else {
+        // Fall back to textarea selection method
+        copySuccess = fallbackCopy(url);
+      }
+      
+      if (copySuccess) {
+        setStatus('success');
+        track('profile_copy_url_click', { status: 'success' });
+      } else {
+        setStatus('error');
+        track('profile_copy_url_click', { status: 'error' });
+      }
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      
+      // Try fallback method if modern API failed
+      try {
+        copySuccess = fallbackCopy(url);
+        
+        if (copySuccess) {
+          setStatus('success');
+          track('profile_copy_url_click', { status: 'success' });
+        } else {
+          setStatus('error');
+          track('profile_copy_url_click', { status: 'error' });
+        }
+      } catch (fallbackError) {
+        console.error('Both copy methods failed:', fallbackError);
+        setStatus('error');
+        track('profile_copy_url_click', { status: 'error' });
+      }
+    } finally {
+      setTimeout(() => setStatus('idle'), 2000);
+    }
+  };
+
+  return (
+    <div className='relative'>
+      <Button variant='secondary' size='sm' onClick={onCopy}>
+        {status === 'success'
+          ? successLabel
+          : status === 'error'
+            ? errorLabel
+            : idleLabel}
+      </Button>
+      <span className='sr-only' aria-live='polite' role='status'>
+        {status === 'success'
+          ? 'Profile URL copied to clipboard'
+          : status === 'error'
+            ? 'Failed to copy profile URL'
+            : ''}
+      </span>
+    </div>
+  );
+}
