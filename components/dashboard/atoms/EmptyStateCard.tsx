@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 interface EmptyStateCardProps {

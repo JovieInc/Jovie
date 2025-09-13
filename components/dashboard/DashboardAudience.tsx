@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
 import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardAudienceProps {

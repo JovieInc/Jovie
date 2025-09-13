@@ -2,7 +2,7 @@
 
 import { Icon } from '@/components/atoms/Icon';
 import { Tooltip } from '@/components/atoms/Tooltip';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 interface LinkActionsProps {
