@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -10,7 +11,6 @@ import React, {
   useState,
 } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { Button } from '@jovie/ui';
 import { Input } from '@/components/ui/Input';
 import {
   type DetectedLink,
@@ -361,4 +361,60 @@ export const UniversalLinkInput = forwardRef<
                   size='sm'
                   style={{
                     backgroundColor:
-                      detectedLink.isValid and so on...
+                      detectedLink.isValid && !isPlatformDuplicate
+                        ? brandColor
+                        : undefined,
+                  }}
+                  className={`${
+                    !detectedLink.isValid || isPlatformDuplicate
+                      ? 'opacity-50'
+                      : ''
+                  } ${readableTextIsWhite ? 'text-white dark:text-white' : 'text-black dark:text-black'}`}
+                  aria-label={
+                    isPlatformDuplicate
+                      ? `Cannot add duplicate ${detectedLink.platform.name} link`
+                      : `Add ${detectedLink.platform.name}`
+                  }
+                >
+                  {`Add ${detectedLink.platform.name}`}
+                </Button>
+
+                {/* Quota badge (muted) */}
+                <div className='text-[11px] text-secondary-token'>
+                  {detectedLink.platform.category === 'social' ? (
+                    <span>
+                      {Math.min(socialVisibleCount, socialVisibleLimit)}/
+                      {socialVisibleLimit} visible
+                    </span>
+                  ) : (
+                    <span>No limit</span>
+                  )}
+                </div>
+                {/* Cap reached helper */}
+                {detectedLink.platform.category === 'social' &&
+                  socialVisibleCount >= socialVisibleLimit && (
+                    <div className='text-[11px] text-secondary-token max-w-[220px] text-right'>
+                      Limit reached: new social links will be hidden until you
+                      unhide or hide another.
+                    </div>
+                  )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Validation hint */}
+        {url && !detectedLink?.isValid && (
+          <div className='text-xs text-secondary-token' role='status'>
+            💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more
+            for automatic detection
+          </div>
+        )}
+      </div>
+    );
+  }
+);
+
+UniversalLinkInput.displayName = 'UniversalLinkInput';
+
+export default UniversalLinkInput;
