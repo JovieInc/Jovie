@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require('path');
+
 const nextConfig = {
   turbopack: {},
   typescript: {
@@ -168,6 +170,13 @@ const nextConfig = {
         use: 'ignore-loader',
       });
     }
+
+    // Alias '@jovie/ui' to local package sources so imports resolve in dev/build
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      ['@jovie/ui']: path.resolve(__dirname, 'packages/ui'),
+    };
 
     return config;
   },
