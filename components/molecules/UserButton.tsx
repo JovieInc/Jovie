@@ -1,24 +1,19 @@
 'use client';
 
-import { useClerk, useUser } from '@clerk/nextjs';
-import {
-  autoUpdate,
-  FloatingFocusManager,
-  FloatingPortal,
-  flip,
-  offset,
-  shift,
-  size,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions,
-  useRole,
-} from '@floating-ui/react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useClerk, useUser } from '@clerk/nextjs';
 import { Icon } from '@/components/atoms/Icon';
+import { Button } from '@/components/ui/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -34,7 +29,6 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const billingStatus = useBillingStatus();
 
   // User display info
@@ -53,68 +47,19 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         .slice(0, 2)
     : 'U';
 
-  // Floating UI setup for dropdown
-  const { refs, floatingStyles, context } = useFloating({
-    open: isOpen,
-    onOpenChange: setIsOpen,
-    middleware: [
-      offset(8),
-      flip({
-        mainAxis: true,
-        crossAxis: true,
-        fallbackPlacements: [
-          'bottom-start',
-          'top-end',
-          'top-start',
-          'left',
-          'right',
-        ],
-        padding: 16,
-      }),
-      shift({
-        mainAxis: true,
-        crossAxis: true,
-        padding: 16,
-      }),
-      size({
-        apply({ availableWidth, availableHeight, elements }) {
-          Object.assign(elements.floating.style, {
-            maxWidth: `${Math.min(availableWidth, 256)}px`,
-            maxHeight: `${Math.min(availableHeight, 400)}px`,
-          });
-        },
-        padding: 16,
-      }),
-    ],
-    whileElementsMounted: autoUpdate,
-    placement: 'bottom-end',
-    strategy: 'fixed',
-  });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-  const role = useRole(context, { role: 'menu' });
-
-  const { getReferenceProps, getFloatingProps } = useInteractions([
-    click,
-    dismiss,
-    role,
-  ]);
+  // shadcn dropdown-menu handles focus/aria for us
 
   // Handle loading state
   if (!isLoaded || !user) {
-    if (showUserInfo) {
-      return (
-        <div className='flex w-full items-center gap-3 p-2'>
-          <div className='h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
-          <div className='flex-1 space-y-1'>
-            <div className='h-4 w-24 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
-            <div className='h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
-          </div>
+    return showUserInfo ? (
+      <div className='flex w-full items-center gap-3 p-2'>
+        <div className='h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+        <div className='flex-1 space-y-1'>
+          <div className='h-4 w-24 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
+          <div className='h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
         </div>
-      );
-    }
-    return (
+      </div>
+    ) : (
       <div className='h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
     );
   }
@@ -133,7 +78,6 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   // Handle profile click
   const handleProfile = () => {
     openUserProfile();
-    setIsOpen(false);
   };
 
   // Handle billing portal
@@ -187,138 +131,58 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   };
 
   return (
-    <>
-      <button
-        ref={refs.setReference}
-        className={cn(
-          'flex items-center transition-all duration-150',
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-          'rounded-full',
-          showUserInfo
-            ? 'gap-2.5 w-full px-3 py-1.5 text-left border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-            : 'justify-center w-9 h-9 p-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50',
-          isOpen &&
-            'ring-2 ring-offset-2 ring-primary/50 ring-offset-white dark:ring-offset-gray-900'
-        )}
-        aria-haspopup='menu'
-        aria-expanded={isOpen}
-        {...getReferenceProps()}
-      >
-        {userImageUrl ? (
-          <Image
-            src={userImageUrl}
-            alt={displayName || 'User avatar'}
-            width={showUserInfo ? 32 : 20}
-            height={showUserInfo ? 32 : 20}
-            className={`${showUserInfo ? 'w-8 h-8' : 'w-5 h-5'} rounded-full object-cover flex-shrink-0`}
-          />
-        ) : (
-          <div
-            className={`${showUserInfo ? 'w-8 h-8 text-sm' : 'w-5 h-5 text-xs'} rounded-full bg-indigo-500 text-white flex items-center justify-center font-medium`}
-          >
-            {userInitials}
-          </div>
-        )}
-
-        {showUserInfo && (
-          <div className='flex-1 min-w-0'>
-            <p className='text-sm font-medium text-gray-900 dark:text-gray-100 truncate'>
-              {displayName}
-            </p>
-            <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-              {user.primaryEmailAddress?.emailAddress}
-            </p>
-          </div>
-        )}
-
-        {showUserInfo && (
-          <Icon
-            name='ChevronRight'
-            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
-            aria-hidden='true'
-          />
-        )}
-      </button>
-
-      {/* Dropdown menu */}
-      {isOpen && (
-        <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false}>
-            <div
-              ref={refs.setFloating}
-              style={floatingStyles}
-              className='z-50 min-w-[220px] rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/10 dark:ring-white/10 overflow-hidden backdrop-blur-sm bg-opacity-95 dark:bg-opacity-95'
-              {...getFloatingProps()}
-            >
-              <div className='p-2'>
-                {/* Profile section */}
-                <div className='flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/30 mb-2'>
-                  {userImageUrl ? (
-                    <Image
-                      src={userImageUrl}
-                      alt={displayName || 'User avatar'}
-                      width={40}
-                      height={40}
-                      className='w-10 h-10 rounded-full object-cover flex-shrink-0'
-                    />
-                  ) : (
-                    <div className='w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-medium text-sm'>
-                      {userInitials}
-                    </div>
-                  )}
-                  <div className='min-w-0'>
-                    <p className='text-sm font-medium text-gray-900 dark:text-white truncate'>
-                      {displayName}
-                    </p>
-                    <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
-                      {user.primaryEmailAddress?.emailAddress}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Menu items */}
-                <div className='space-y-1'>
-                  <button
-                    onClick={handleProfile}
-                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors'
-                  >
-                    <Icon
-                      name='User'
-                      className='w-4 h-4 text-gray-500 dark:text-gray-400'
-                    />
-                    <span>Profile</span>
-                  </button>
-
-                  <button
-                    onClick={handleBilling}
-                    disabled={isBillingLoading}
-                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-md transition-colors disabled:opacity-50'
-                  >
-                    <Icon
-                      name='CreditCard'
-                      className='w-4 h-4 text-gray-500 dark:text-gray-400'
-                    />
-                    <span>
-                      {isBillingLoading ? 'Loading...' : 'Billing & Plans'}
-                    </span>
-                  </button>
-
-                  <div className='border-t border-gray-100 dark:border-gray-700 my-1' />
-
-                  <button
-                    onClick={handleSignOut}
-                    disabled={isLoading}
-                    className='w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50'
-                  >
-                    <Icon name='LogOut' className='w-4 h-4' />
-                    <span>{isLoading ? 'Signing out...' : 'Sign out'}</span>
-                  </button>
-                </div>
-              </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        {showUserInfo ? (
+          <div className={cn('flex w-full items-center gap-3 p-2 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 transition-colors')}>
+            {userImageUrl ? (
+              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium">{userInitials}</div>
+            )}
+            <div className='min-w-0 flex-1'>
+              <p className='text-sm font-medium truncate'>{displayName}</p>
+              <p className='text-xs text-secondary-token truncate'>{user.primaryEmailAddress?.emailAddress}</p>
             </div>
-          </FloatingFocusManager>
-        </FloatingPortal>
-      )}
-    </>
+            <Icon name='ChevronRight' className='w-4 h-4 text-tertiary-token' aria-hidden='true' />
+          </div>
+        ) : (
+          <Button variant='ghost' size='icon' className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'>
+            {userImageUrl ? (
+              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={20} height={20} className="w-5 h-5 rounded-full object-cover" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items center justify-center font-medium">{userInitials}</div>
+            )}
+            <span className='sr-only'>Open user menu</span>
+          </Button>
+        )}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align='end' className='w-64'>
+        <DropdownMenuLabel>
+          <div className='flex items-center gap-3'>
+            {userImageUrl ? (
+              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium">{userInitials}</div>
+            )}
+            <div className='min-w-0'>
+              <div className='text-sm font-medium truncate'>{displayName}</div>
+              <div className='text-xs text-secondary-token truncate'>{user.primaryEmailAddress?.emailAddress}</div>
+            </div>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleProfile} className='cursor-pointer'>
+          <Icon name='User' className='w-4 h-4 mr-2 text-tertiary-token' /> Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleBilling} disabled={isBillingLoading} className='cursor-pointer'>
+          <Icon name='CreditCard' className='w-4 h-4 mr-2 text-tertiary-token' /> {isBillingLoading ? 'Loading…' : 'Billing & Plans'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut} disabled={isLoading} className='cursor-pointer text-red-600 focus:text-red-600'>
+          <Icon name='LogOut' className='w-4 h-4 mr-2' /> {isLoading ? 'Signing out…' : 'Sign out'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

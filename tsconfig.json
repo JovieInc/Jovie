@@ -38,6 +38,8 @@
     "supabase/functions",
     ".next/types/**/*",
     "vitest.config.ts",
-    "vitest.config.fast.ts"
+    "vitest.config.fast.ts",
+    "**/*.stories.*",
+    "storybook-static"
   ]
 }
