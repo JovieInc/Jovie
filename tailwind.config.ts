@@ -1,3 +1,6 @@
+import forms from '@tailwindcss/forms';
+import lineClamp from '@tailwindcss/line-clamp';
+import typography from '@tailwindcss/typography';
 import type { Config } from 'tailwindcss';
 import {
   colors,

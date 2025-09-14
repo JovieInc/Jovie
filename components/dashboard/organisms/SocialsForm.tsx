@@ -1,7 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';

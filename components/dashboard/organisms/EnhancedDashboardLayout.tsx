@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { LinkCategory } from '../molecules/LinkCategory';

@@ -6,12 +6,7 @@ import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
-import {
-  type Artist,
-  convertDrizzleCreatorProfileToArtist,
-  type LegacySocialLink,
-} from '@/types/db';
-import { DashboardPreview } from './DashboardPreview';
+import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { GroupedLinksManager } from './GroupedLinksManager';
 
 interface LinkItem extends DetectedLink {
@@ -138,33 +133,7 @@ export function DashboardLinks({
     return [...socialLinks, ...dspLinks].sort((a, b) => a.order - b.order);
   }, [socialLinks, dspLinks]);
 
-  // Convert social LinkItems to LegacySocialLink format for preview
-  const previewSocialLinks = useMemo((): LegacySocialLink[] => {
-    return socialLinks
-      .filter(link => link.isVisible && link.platform.category === 'social')
-      .map(link => ({
-        id: link.id,
-        artist_id: artist!.id, // LegacySocialLink still uses artist_id for backwards compatibility
-        platform: link.platform.icon,
-        url: link.normalizedUrl,
-        clicks: 0,
-        created_at: new Date().toISOString(),
-      }))
-      .sort((a, b) => {
-        const aIndex = socialLinks.findIndex(l => l.id === a.id);
-        const bIndex = socialLinks.findIndex(l => l.id === b.id);
-        return aIndex - bIndex;
-      });
-  }, [socialLinks, artist]);
-
-  // Create preview artist object
-  const previewArtist = useMemo(
-    (): Artist => ({
-      ...artist!,
-      // Apply any real-time changes here
-    }),
-    [artist]
-  );
+  // Preview logic removed in favor of EnhancedDashboardLinks
 
   // Show update indicator
   const showUpdateIndicator = useCallback((success: boolean) => {

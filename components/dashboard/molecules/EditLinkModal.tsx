@@ -1,10 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
 import { Label } from '@/components/atoms/Label';
-import { Button } from '@/components/ui/Button';
 import {
   Dialog,
   DialogBody,

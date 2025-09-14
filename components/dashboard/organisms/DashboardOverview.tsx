@@ -1,12 +1,12 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
-import { Button } from '@/components/ui/Button';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -51,14 +51,14 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
           <div className='space-y-4'>
             <CompletionBanner />
             <div className='flex gap-3'>
-              <Button
-                as={Link}
-                href={`/${artist.handle}`}
-                target='_blank'
-                rel='noopener noreferrer'
-                size='sm'
-              >
-                View Profile
+              <Button asChild size='sm'>
+                <Link
+                  href={`/${artist.handle}`}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  View Profile
+                </Link>
               </Button>
               <CopyToClipboardButton relativePath={`/${artist.handle}`} />
             </div>
@@ -96,14 +96,8 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                 completeLabel='Handle claimed'
                 incompleteLabel='Secure your unique profile URL'
                 action={
-                  <Button
-                    as={Link}
-                    href='/dashboard/settings'
-                    size='sm'
-                    variant='primary'
-                    color='blue'
-                  >
-                    Claim handle
+                  <Button asChild size='sm' variant='primary'>
+                    <Link href='/dashboard/settings'>Claim handle</Link>
                   </Button>
                 }
               />
@@ -115,14 +109,8 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                 completeLabel='Music link added'
                 incompleteLabel='Connect Spotify, Apple Music, or YouTube'
                 action={
-                  <Button
-                    as={Link}
-                    href='/dashboard/links'
-                    size='sm'
-                    variant='primary'
-                    color='blue'
-                  >
-                    Add music link
+                  <Button asChild size='sm' variant='primary'>
+                    <Link href='/dashboard/links'>Add music link</Link>
                   </Button>
                 }
               />
@@ -134,14 +122,8 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
                 completeLabel='Social links added'
                 incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
                 action={
-                  <Button
-                    as={Link}
-                    href='/dashboard/links'
-                    size='sm'
-                    variant='primary'
-                    color='blue'
-                  >
-                    Add social links
+                  <Button asChild size='sm' variant='primary'>
+                    <Link href='/dashboard/links'>Add social links</Link>
                   </Button>
                 }
               />

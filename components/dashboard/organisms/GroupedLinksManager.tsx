@@ -5,20 +5,21 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter,
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@jovie/ui';
+import { AnimatePresence, motion } from 'framer-motion';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { Tooltip } from '@/components/atoms/Tooltip';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
-import { Button } from '@/components/ui/Button';
 import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
-import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { canonicalIdentity } from '@/lib/utils/platform-detection';
+import {
+  canonicalIdentity,
+  type DetectedLink,
+} from '@/lib/utils/platform-detection';
 import { LinkActions } from '../atoms/LinkActions';
 
 export interface GroupedLinksManagerProps<
@@ -41,38 +42,7 @@ export const CROSS_CATEGORY: Record<
   youtube: ['social', 'dsp'],
   // soundcloud: ['social', 'dsp'],
 };
-// Animation variants for the group container
-const groupVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      when: 'beforeChildren',
-      staggerChildren: 0.05,
-    },
-  },
-};
-
-// Animation variants for individual link items
-const itemVariants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      type: 'spring',
-      stiffness: 500,
-      damping: 30,
-    },
-  },
-  exit: {
-    opacity: 0,
-    y: -8,
-    transition: {
-      duration: 0.2,
-    },
-  },
-};
+// (animation variants were removed as they are no longer referenced)
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
@@ -81,13 +51,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   creatorName,
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
-  const [animatingLinks, setAnimatingLinks] = useState<Record<string, boolean>>({});
+  // const [animatingLinks, setAnimatingLinks] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState<
     Record<'social' | 'dsp' | 'earnings' | 'custom', boolean>
   >({ social: false, dsp: false, earnings: false, custom: false });
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // const inputRef = useRef<HTMLInputElement>(null);
   const [collapsedInitialized, setCollapsedInitialized] = useState(false);
   const [tippingEnabled, setTippingEnabled] = useState<boolean>(false);
   const [tippingJustEnabled, setTippingJustEnabled] = useState<boolean>(false);
@@ -112,19 +82,19 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         earnings: groups.earnings.length === 0,
         custom: groups.custom.length === 0,
       };
-      
+
       // Small delay to allow initial render before animating
       const timer = setTimeout(() => {
         setCollapsed(initialCollapsed);
         setCollapsedInitialized(true);
       }, 50);
-      
+
       return () => clearTimeout(timer);
     } else {
       // Smoothly collapse sections that become empty
       setCollapsed(prev => {
         const next = { ...prev };
-        
+
         // Only update sections that need to be collapsed (not already collapsed)
         if (groups.social.length === 0 && !prev.social) {
           next.social = true;
@@ -138,7 +108,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         if (groups.custom.length === 0 && !prev.custom) {
           next.custom = true;
         }
-        
+
         return next;
       });
     }
@@ -191,24 +161,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [links]);
 
-  // Toggle section collapse with animation
-  const toggleSection = (section: keyof typeof collapsed) => {
-    // If section is being expanded, ensure it's scrolled into view after animation
-    if (collapsed[section]) {
-      // Small delay to allow the collapse animation to start first
-      setTimeout(() => {
-        const sectionEl = document.getElementById(`section-${section}`);
-        sectionEl?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'nearest',
-        });
-      }, 50);
-    }
-    setCollapsed(prev => ({
-      ...prev,
-      [section]: !prev[section],
-    }));
-  };
+  // Toggle function inlined where needed to keep file simpler.
 
   // Controls
   async function handleAdd(link: DetectedLink) {
@@ -231,8 +184,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       platform: (enriched as DetectedLink).platform,
       normalizedUrl: (enriched as DetectedLink).normalizedUrl,
     });
-    const dupAt = links.findIndex(l =>
-      canonicalIdentity({ platform: (l as DetectedLink).platform, normalizedUrl: (l as DetectedLink).normalizedUrl }) === newId
+    const dupAt = links.findIndex(
+      l =>
+        canonicalIdentity({
+          platform: (l as DetectedLink).platform,
+          normalizedUrl: (l as DetectedLink).normalizedUrl,
+        }) === newId
     );
     if (dupAt !== -1) {
       const merged = {
@@ -363,123 +320,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     setCollapsed(prev => ({ ...prev, [toSection]: false }));
   }
 
-  // Render a group of links with animations
-  const renderLinkGroup = (
-    section: 'social' | 'dsp' | 'earnings' | 'custom',
-    links: T[],
-    label: string,
-    icon: React.ReactNode
-  ) => {
-    const isCollapsed = collapsed[section];
-    const hasLinks = links.length > 0;
-    
-    return (
-      <div 
-        id={`section-${section}`}
-        key={section}
-        className="relative group"
-      >
-        <button
-          type="button"
-          onClick={() => toggleSection(section)}
-          className={cn(
-            'flex items-center w-full text-left py-2 px-3 rounded-lg transition-colors',
-            'hover:bg-surface-2/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-            'mb-1.5',
-            !isCollapsed && 'text-primary-token font-medium'
-          )}
-          aria-expanded={!isCollapsed}
-          aria-controls={`${section}-links`}
-        >
-          <div className="flex items-center flex-1">
-            <span className="mr-2 text-muted-foreground">{icon}</span>
-            <span>{label}</span>
-            {hasLinks && (
-              <span className="ml-2 text-xs text-muted-foreground bg-surface-2 px-2 py-0.5 rounded-full">
-                {links.length}
-              </span>
-            )}
-          </div>
-          <motion.span
-            animate={{ rotate: isCollapsed ? 0 : 90 }}
-            transition={{ duration: 0.2 }}
-            className="text-muted-foreground"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-          </motion.span>
-        </button>
-        
-        <AnimatePresence initial={false}>
-          {!isCollapsed && (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              exit="hidden"
-              variants={groupVariants}
-              id={`${section}-links`}
-              className={cn(
-                'space-y-1.5',
-                'pt-1',
-                'overflow-hidden',
-                'transition-all duration-200 ease-in-out'
-              )}
-            >
-              {hasLinks ? (
-                <DndContext
-                  sensors={sensors}
-                  onDragEnd={onDragEnd}
-                  collisionDetection={closestCenter}
-                >
-                  <SortableContext items={links.map(idFor)}>
-                    {links.map((link, idx) => (
-                      <motion.div
-                        key={idFor(link)}
-                        variants={itemVariants}
-                        layoutId={idFor(link)}
-                        className="relative"
-                      >
-                        <SortableRow
-                          id={idFor(link)}
-                          link={link}
-                          index={idx}
-                          onToggle={handleToggle}
-                          onRemove={handleRemove}
-                          visible={linkIsVisible(link)}
-                          draggable={links.length > 1}
-                        />
-                      </motion.div>
-                    ))}
-                  </SortableContext>
-                </DndContext>
-              ) : (
-                <motion.div
-                  variants={itemVariants}
-                  className="py-2 px-3 text-sm text-muted-foreground italic"
-                >
-                  No {label.toLowerCase()} links yet
-                </motion.div>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  };
+  // (deprecated) renderLinkGroup removed — groups are rendered inline below.
 
   return (
-    <section 
-      className={cn('space-y-4', className)} 
+    <section
+      className={cn('space-y-4', className)}
       aria-label='Links Manager'
       ref={containerRef}
     >
@@ -491,7 +336,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="mb-4 rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm"
+            className='mb-4 rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
             role='status'
             aria-live='polite'
           >
@@ -684,17 +529,21 @@ function SortableRow<T extends DetectedLink>({
   visible: boolean;
   draggable?: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ 
-    id, 
-    disabled: !draggable 
-  });
-  
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({
+      id,
+      disabled: !draggable,
+    });
+
   // Create a properly typed pointer down handler for the drag handle
-  const handleDragHandlePointerDown = React.useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
-    if (listeners?.onPointerDown) {
-      listeners.onPointerDown(e);
-    }
-  }, [listeners?.onPointerDown]);
+  const handleDragHandlePointerDown = React.useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (listeners?.onPointerDown) {
+        listeners.onPointerDown(e);
+      }
+    },
+    [listeners]
+  );
   const [isDarkTheme, setIsDarkTheme] = React.useState(false);
   React.useEffect(() => {
     const root = document.documentElement;
@@ -763,7 +612,7 @@ function SortableRow<T extends DetectedLink>({
           </div>
         </div>
       </div>
-      
+
       <div className='flex items-center gap-1'>
         <LinkActions
           onToggle={() => onToggle(index)}

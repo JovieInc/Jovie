@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@jovie/ui';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { useState } from 'react';
 import { track } from '@/lib/analytics';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 type CopyStatus = 'idle' | 'success' | 'error';
 
@@ -31,15 +31,15 @@ export function CopyToClipboardButton({
       textarea.style.left = '-999999px';
       textarea.style.top = '-999999px';
       document.body.appendChild(textarea);
-      
+
       // Select and copy the text
       textarea.focus();
       textarea.select();
       const successful = document.execCommand('copy');
-      
+
       // Clean up
       document.body.removeChild(textarea);
-      
+
       return successful;
     } catch (error) {
       console.error('Fallback copy failed:', error);
@@ -50,7 +50,7 @@ export function CopyToClipboardButton({
   const onCopy = async () => {
     const url = `${getBaseUrl()}${relativePath}`;
     let copySuccess = false;
-    
+
     try {
       // Try modern clipboard API first
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -60,7 +60,7 @@ export function CopyToClipboardButton({
         // Fall back to textarea selection method
         copySuccess = fallbackCopy(url);
       }
-      
+
       if (copySuccess) {
         setStatus('success');
         track('profile_copy_url_click', { status: 'success' });
@@ -70,11 +70,11 @@ export function CopyToClipboardButton({
       }
     } catch (error) {
       console.error('Failed to copy URL:', error);
-      
+
       // Try fallback method if modern API failed
       try {
         copySuccess = fallbackCopy(url);
-        
+
         if (copySuccess) {
           setStatus('success');
           track('profile_copy_url_click', { status: 'success' });

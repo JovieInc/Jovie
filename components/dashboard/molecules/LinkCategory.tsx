@@ -1,9 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useState } from 'react';
 import { Icon, type IconName } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { LinkCard } from './LinkCard';
 

@@ -197,10 +197,11 @@ export async function getUpcomingInvoice(
   customerId: string
 ): Promise<Stripe.Invoice | null> {
   try {
-    const invoice = await stripe.invoices.retrieveUpcoming({
+    // Use createPreview to fetch an upcoming invoice preview in this SDK version
+    const resp = await stripe.invoices.createPreview({
       customer: customerId,
     });
-    return invoice;
+    return resp;
   } catch {
     // It's normal for there to be no upcoming invoice
     return null;

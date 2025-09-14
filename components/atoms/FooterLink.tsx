@@ -9,7 +9,7 @@ const variantStyles = {
   dark: 'text-white/60 hover:text-white',
 } as const;
 
-interface FooterLinkProps extends Omit<ButtonProps, 'children'> {
+interface FooterLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
   href: string;
   children: React.ReactNode;
   variant?: keyof typeof variantStyles;

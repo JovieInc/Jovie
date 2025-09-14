@@ -1,10 +1,10 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
 import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
-import { Button } from '@/components/ui/Button';
 import { ErrorSummary } from '@/components/ui/ErrorSummary';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';

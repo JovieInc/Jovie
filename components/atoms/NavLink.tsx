@@ -3,7 +3,7 @@ import React from 'react';
 import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-interface NavLinkProps extends Omit<ButtonProps, 'children'> {
+interface NavLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
   href: string;
   children: React.ReactNode;
   variant?: 'default' | 'primary';
@@ -19,7 +19,6 @@ export function NavLink({
   children,
   className,
   variant = 'default',
-  prefetch,
   external,
   ...props
 }: NavLinkProps) {
@@ -29,12 +28,11 @@ export function NavLink({
     primary: '',
   } as const;
 
-  const common = {
-    variant: variant === 'primary' ? 'primary' : 'plain',
-    size: 'sm' as const,
-    className: cn('h-auto px-0 py-0', variantClasses[variant], className),
-    ...props,
-  };
+  const computedClassName = cn(
+    'h-auto px-0 py-0',
+    variantClasses[variant],
+    className
+  );
 
   if (external) {
     return (
@@ -43,7 +41,10 @@ export function NavLink({
         href={href}
         target='_blank'
         rel='noopener noreferrer'
-        {...common}
+        variant={variant === 'primary' ? 'primary' : 'plain'}
+        size='sm'
+        className={computedClassName}
+        {...props}
       >
         {children}
       </Button>
@@ -51,7 +52,14 @@ export function NavLink({
   }
 
   return (
-    <Button as={Link} href={href} prefetch={prefetch} {...common}>
+    <Button
+      as={Link}
+      href={href}
+      variant={variant === 'primary' ? 'primary' : 'plain'}
+      size='sm'
+      className={computedClassName}
+      {...props}
+    >
       {children}
     </Button>
   );
