@@ -15,14 +15,14 @@ export const colors = {
   'btn-primary-foreground': 'var(--color-btn-primary-fg)',
   
   // Sidebar colors
-  sidebar: 'hsl(var(--sidebar-background))',
-  'sidebar-foreground': 'hsl(var(--sidebar-foreground))',
-  'sidebar-primary': 'hsl(var(--sidebar-primary))',
-  'sidebar-primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  'sidebar-accent': 'hsl(var(--sidebar-accent))',
-  'sidebar-accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-  'sidebar-border': 'hsl(var(--sidebar-border))',
-  'sidebar-ring': 'hsl(var(--sidebar-ring))',
+  sidebar: 'rgb(var(--sidebar-background))',
+  'sidebar-foreground': 'rgb(var(--sidebar-foreground))',
+  'sidebar-primary': 'rgb(var(--sidebar-primary))',
+  'sidebar-primary-foreground': 'rgb(var(--sidebar-primary-foreground))',
+  'sidebar-accent': 'rgb(var(--sidebar-accent))',
+  'sidebar-accent-foreground': 'rgb(var(--sidebar-accent-foreground))',
+  'sidebar-border': 'rgb(var(--sidebar-border))',
+  'sidebar-ring': 'rgb(var(--sidebar-ring))',
 };
 
 export const radii = {

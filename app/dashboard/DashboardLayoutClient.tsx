@@ -3,7 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState, useTransition } from 'react';
-import { ChevronUp, Sparkles, User } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
@@ -11,8 +11,8 @@ import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedTh
 import { FeedbackButton } from '@/components/dashboard/molecules/FeedbackButton';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { UserButton } from '@/components/molecules/UserButton';
-import { Button } from '@/components/ui/Button';
-import { Logo } from '@/components/ui/Logo';
+// import { Button } from '@/components/ui/Button';
+// import { Logo } from '@/components/ui/Logo';
 import {
   Sidebar,
   SidebarContent,
@@ -24,18 +24,9 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator,
   SidebarTrigger,
 } from '@/components/ui/Sidebar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+// Dropdown menu imports removed until used
 
 import type { DashboardData } from './actions';
 
@@ -51,6 +42,32 @@ export default function DashboardLayoutClient({
   children,
 }: DashboardLayoutClientProps) {
   const [, startTransition] = useTransition();
+  const pathname = usePathname();
+
+  // Build a simple breadcrumb from the current path
+  const crumbs = (() => {
+    const parts = (pathname || '/dashboard')
+      .split('/')
+      .filter(Boolean);
+    const idx = parts.indexOf('dashboard');
+    const subs = idx >= 0 ? parts.slice(idx + 1) : [];
+    const toTitle = (s: string): string =>
+      s
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, ch => ch.toUpperCase());
+    const items: Array<{ label: string; href?: string }> = [
+      { label: 'Dashboard', href: '/dashboard/overview' },
+    ];
+    if (subs.length > 0) {
+      let acc = '/dashboard';
+      subs.forEach((seg, i) => {
+        acc += `/${seg}`;
+        const isLast = i === subs.length - 1;
+        items.push({ label: toTitle(seg), href: isLast ? undefined : acc });
+      });
+    }
+    return items;
+  })();
 
   // For sidebar-08 pattern, we'll use the built-in state management
   const [sidebarOpen, setSidebarOpen] = useState(!(dashboardData.sidebarCollapsed ?? false));
@@ -93,12 +110,7 @@ export default function DashboardLayoutClient({
       <PendingClaimHandler />
 
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className="min-h-screen bg-base transition-colors relative">
-          {/* Background patterns */}
-          <div className="absolute inset-0 grid-bg dark:grid-bg-dark pointer-events-none" />
-          <div className="hidden dark:block absolute top-0 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="hidden dark:block absolute bottom-1/4 left-1/3 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="min-h-screen bg-base">
           <Sidebar variant="inset">
             <SidebarHeader>
               <SidebarMenu>
@@ -149,14 +161,30 @@ export default function DashboardLayoutClient({
           </Sidebar>
 
           <SidebarInset>
-            <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-              <div className="flex items-center gap-2 px-4">
-                <SidebarTrigger className="-ml-1" />
-                {/* Add breadcrumb or header content here if needed */}
-              </div>
+            <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-subtle bg-base/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-base/60 transition-[height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+              <SidebarTrigger className="-ml-1" />
+              <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-sm text-secondary-token">
+                {crumbs.map((c, i) => {
+                  const isLast = i === crumbs.length - 1;
+                  return (
+                    <span key={`${c.label}-${i}`} className="flex items-center gap-1">
+                      {c.href && !isLast ? (
+                        <Link href={c.href} className="hover:underline">
+                          {c.label}
+                        </Link>
+                      ) : (
+                        <span className="text-primary-token">{c.label}</span>
+                      )}
+                      {!isLast && <span className="text-tertiary-token">/</span>}
+                    </span>
+                  );
+                })}
+              </nav>
             </header>
-            <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-              {children}
+            <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
+              <div className="container mx-auto w-full max-w-5xl px-0">
+                {children}
+              </div>
             </div>
           </SidebarInset>
         </div>
