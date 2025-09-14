@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { Tooltip } from '@/components/atoms/Tooltip';
 import { cn } from '@/lib/utils';
 
 type Platform =
@@ -170,49 +169,54 @@ export function LinkCard({
           </button>
 
           {/* Edit button */}
-          <Tooltip content='Edit link' placement='top'>
-            <button
-              type='button'
-              onClick={handleEditClick}
-              className={cn(
-                'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                'group-hover:opacity-100 transition-opacity',
-                isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
-              )}
-              aria-label='Edit link'
-            >
-              <Icon name='Pencil' className='w-4 h-4' />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type='button'
+                onClick={handleEditClick}
+                className={cn(
+                  'flex-shrink-0 p-1.5 rounded-md transition-colors',
+                  'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+                  'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                  'group-hover:opacity-100 transition-opacity',
+                  isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
+                )}
+                aria-label='Edit link'
+              >
+                <Icon name='Pencil' className='w-4 h-4' />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side='top'>Edit link</TooltipContent>
           </Tooltip>
 
           {/* Toggle visibility */}
-          <Tooltip
-            content={isVisible ? 'Hide link' : 'Show link'}
-            placement='top'
-          >
-            <button
-              type='button'
-              onClick={() => onToggleVisibility(id)}
-              className={cn(
-                'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                isVisible && 'text-primary-600 dark:text-primary-400',
-                'group-hover:opacity-100 transition-opacity',
-                isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
-              )}
-              aria-label={isVisible ? 'Hide link' : 'Show link'}
-              disabled={isSaving}
-            >
-              <Icon
-                name='Eye'
-                className={cn('w-4 h-4', !isVisible && 'opacity-50')}
-              />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type='button'
+                onClick={() => onToggleVisibility(id)}
+                className={cn(
+                  'flex-shrink-0 p-1.5 rounded-md transition-colors',
+                  'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
+                  'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                  isVisible && 'text-primary-600 dark:text-primary-400',
+                  'group-hover:opacity-100 transition-opacity',
+                  isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
+                )}
+                aria-label={isVisible ? 'Hide link' : 'Show link'}
+                disabled={isSaving}
+              >
+                <Icon
+                  name='Eye'
+                  className={cn('w-4 h-4', !isVisible && 'opacity-50')}
+                />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side='top'>
+              {isVisible ? 'Hide link' : 'Show link'}
+            </TooltipContent>
           </Tooltip>
 
           {/* Expand/collapse button */}
