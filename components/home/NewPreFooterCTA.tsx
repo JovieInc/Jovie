@@ -1,7 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export function NewPreFooterCTA() {
   return (
@@ -59,13 +59,12 @@ export function NewPreFooterCTA() {
           {/* CTA buttons with enhanced spacing and interactions */}
           <div className='mt-12 flex flex-col sm:flex-row gap-6 justify-center items-center'>
             <Button
-              as={Link}
-              href='/onboarding'
+              asChild
               size='lg'
               variant='primary'
               className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
             >
-              Claim Your @handle →
+              <Link href='/onboarding'>Claim Your @handle →</Link>
             </Button>
 
             {/* Secondary info with better visual hierarchy */}

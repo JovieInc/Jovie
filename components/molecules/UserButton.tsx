@@ -1,6 +1,11 @@
 'use client';
 
 import { useClerk, useUser } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,12 +13,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@jovie/ui';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Icon } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
+} from '@/components/ui/dropdown-menu';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -28,8 +28,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const { signOut, openUserProfile } = useClerk();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
-  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const [isBillingLoading, setIsBillingLoading] = useState(false);
   const billingStatus = useBillingStatus();
 
   // User display info
@@ -81,65 +80,53 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     openUserProfile();
   };
 
-  const handleManageBilling = async () => {
-    if (isManageBillingLoading) return;
-    setIsManageBillingLoading(true);
+  // Handle billing portal
+  const handleBilling = async () => {
+    if (isBillingLoading) return;
+    setIsBillingLoading(true);
 
     try {
-      if (!billingStatus.hasStripeCustomer) {
-        throw new Error('Missing Stripe customer for billing portal');
+      if (billingStatus.isPro && billingStatus.hasStripeCustomer) {
+        const response = await fetch('/api/stripe/portal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok)
+          throw new Error('Failed to create billing portal session');
+        const { url } = await response.json();
+        window.location.href = url;
+      } else {
+        // Handle subscription flow
+        const pricingResponse = await fetch('/api/stripe/pricing-options');
+        if (!pricingResponse.ok)
+          throw new Error('Failed to fetch pricing options');
+
+        const { pricingOptions } = await pricingResponse.json();
+        const defaultPlan =
+          pricingOptions.find(
+            (option: { interval: string }) => option.interval === 'month'
+          ) || pricingOptions[0];
+
+        if (!defaultPlan?.priceId)
+          throw new Error('No pricing options available');
+
+        const checkoutResponse = await fetch('/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: defaultPlan.priceId }),
+        });
+
+        if (!checkoutResponse.ok)
+          throw new Error('Failed to create checkout session');
+        const { url } = await checkoutResponse.json();
+        window.location.href = url;
       }
-
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok)
-        throw new Error('Failed to create billing portal session');
-      const { url } = await response.json();
-      window.location.href = url;
     } catch (error) {
-      console.error('Error opening billing portal:', error);
+      console.error('Error handling billing:', error);
       router.push('/pricing');
     } finally {
-      setIsManageBillingLoading(false);
-    }
-  };
-
-  const handleUpgrade = async () => {
-    if (isUpgradeLoading) return;
-    setIsUpgradeLoading(true);
-
-    try {
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      if (!pricingResponse.ok)
-        throw new Error('Failed to fetch pricing options');
-
-      const { pricingOptions } = await pricingResponse.json();
-      const defaultPlan =
-        pricingOptions.find(
-          (option: { interval: string }) => option.interval === 'month'
-        ) || pricingOptions[0];
-
-      if (!defaultPlan?.priceId)
-        throw new Error('No pricing options available');
-
-      const checkoutResponse = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: defaultPlan.priceId }),
-      });
-
-      if (!checkoutResponse.ok)
-        throw new Error('Failed to create checkout session');
-      const { url } = await checkoutResponse.json();
-      window.location.href = url;
-    } catch (error) {
-      console.error('Error starting upgrade checkout:', error);
-      router.push('/pricing');
-    } finally {
-      setIsUpgradeLoading(false);
+      setIsBillingLoading(false);
     }
   };
 
@@ -192,7 +179,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                 className='w-5 h-5 rounded-full object-cover'
               />
             ) : (
-              <div className='w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center font-medium'>
+              <div className='w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items center justify-center font-medium'>
                 {userInitials}
               </div>
             )}
@@ -229,36 +216,17 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           <Icon name='User' className='w-4 h-4 mr-2 text-tertiary-token' />{' '}
           Profile
         </DropdownMenuItem>
-        {billingStatus.loading ? (
-          <DropdownMenuItem disabled className='cursor-default'>
-            <Icon
-              name='Loader2'
-              className='w-4 h-4 mr-2 text-tertiary-token animate-spin'
-            />
-            Checking plan…
-          </DropdownMenuItem>
-        ) : billingStatus.isPro ? (
-          <DropdownMenuItem
-            onClick={handleManageBilling}
-            disabled={isManageBillingLoading}
-            className='cursor-pointer'
-          >
-            <Icon
-              name='CreditCard'
-              className='w-4 h-4 mr-2 text-tertiary-token'
-            />
-            {isManageBillingLoading ? 'Opening portal…' : 'Manage Billing'}
-          </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem
-            onClick={handleUpgrade}
-            disabled={isUpgradeLoading}
-            className='cursor-pointer font-medium text-primary-token focus:text-primary-token'
-          >
-            <Icon name='Sparkles' className='w-4 h-4 mr-2 text-primary-token' />
-            {isUpgradeLoading ? 'Securing your upgrade…' : 'Upgrade to Pro'}
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem
+          onClick={handleBilling}
+          disabled={isBillingLoading}
+          className='cursor-pointer'
+        >
+          <Icon
+            name='CreditCard'
+            className='w-4 h-4 mr-2 text-tertiary-token'
+          />{' '}
+          {isBillingLoading ? 'Loading…' : 'Billing & Plans'}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}
