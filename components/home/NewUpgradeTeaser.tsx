@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { Button } from '@/components/ui/Button';
 
 export function NewUpgradeTeaser() {
   return (
@@ -28,12 +28,11 @@ export function NewUpgradeTeaser() {
                 </p>
 
                 <Button
-                  as={Link}
-                  href='/pricing'
+                  asChild
                   variant='primary'
                   className='w-full justify-center'
                 >
-                  Upgrade → Remove Branding
+                  <Link href='/pricing'>Upgrade → Remove Branding</Link>
                 </Button>
               </div>
             </div>
