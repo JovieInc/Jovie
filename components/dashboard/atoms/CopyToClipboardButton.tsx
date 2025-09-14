@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { track } from '@/lib/analytics';
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -10,7 +11,6 @@ import React, {
   useState,
 } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import {
   type DetectedLink,
