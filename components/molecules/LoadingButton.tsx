@@ -27,6 +27,8 @@ export function LoadingButton({
   const defaultSpinnerVariant = variant === 'primary' ? 'light' : 'dark';
 
   const effectiveSpinnerVariant = spinnerVariant || defaultSpinnerVariant;
+  const normalizedSpinnerSize: 'sm' | 'md' | 'lg' =
+    spinnerSize === 'xs' ? 'sm' : (spinnerSize ?? 'sm');
 
   return (
     <Button disabled={disabled || isLoading} variant={variant} {...props}>
@@ -42,7 +44,7 @@ export function LoadingButton({
         >
           <span className='inline-flex items-center gap-2'>
             <LoadingSpinner
-              size={spinnerSize}
+              size={normalizedSpinnerSize}
               variant={effectiveSpinnerVariant}
             />
             <span>{loadingText || 'Loading...'}</span>

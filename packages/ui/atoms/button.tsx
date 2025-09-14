@@ -33,11 +33,9 @@ const buttonVariants = cva(
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    React.AnchorHTMLAttributes<HTMLAnchorElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
-  href?: string;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -48,15 +46,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size,
       asChild = false,
       loading = false,
-      href,
       disabled,
-      'data-testid': dataTestId,
       children,
       ...props
     },
     ref
   ) => {
-    const Comp = asChild ? Slot : href ? 'a' : 'button';
+    const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
 
     // In asChild mode (Radix Slot), React.Children.only requires a single child.
@@ -69,7 +65,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
             buttonVariants({ variant, size, className }),
             isDisabled && 'pointer-events-none'
           )}
-          data-testid={dataTestId ?? 'button'}
           aria-disabled={isDisabled || undefined}
           aria-busy={loading || undefined}
           data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
@@ -88,27 +83,41 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           buttonVariants({ variant, size, className }),
           isDisabled && 'pointer-events-none'
         )}
-        data-testid={dataTestId ?? 'button'}
-        href={Comp === 'a' ? href : undefined}
         aria-disabled={isDisabled || undefined}
         aria-busy={loading || undefined}
         data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
         {...(Comp === 'button'
-          ? { disabled: isDisabled, type: (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ?? 'button' }
+          ? {
+              disabled: isDisabled,
+              type:
+                (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
+                'button',
+            }
           : {})}
         {...props}
       >
-        {loading && (
-          <span
-            className='absolute inset-0 flex items-center justify-center'
-            data-testid='spinner'
-          >
-            <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
+        {Comp === 'button' ? (
+          <>
+            {loading && (
+              <span
+                className='absolute inset-0 flex items-center justify-center'
+                data-testid='spinner'
+              >
+                <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
+              </span>
+            )}
+            <span className={loading ? 'opacity-0' : 'opacity-100'}>
+              {children}
+            </span>
+          </>
+        ) : // asChild case (Slot) — must render exactly one element child
+        React.isValidElement(children) ? (
+          children
+        ) : (
+          <span className={loading ? 'opacity-0' : 'opacity-100'}>
+            {children}
           </span>
         )}
-        <span className={loading ? 'opacity-0' : 'opacity-100'}>
-          {children}
-        </span>
       </Comp>
     );
   }

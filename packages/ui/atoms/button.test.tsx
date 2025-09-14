@@ -5,10 +5,10 @@ import { describe, expect, it } from 'vitest';
 import { Button } from './button';
 
 describe('Button', () => {
-  it('renders with text and default test id', () => {
+  it('renders with text', () => {
     render(<Button>Press</Button>);
-    const btn = screen.getByTestId('button');
-    expect(btn).toHaveTextContent('Press');
+    const btn = screen.getByRole('button', { name: /press/i });
+    expect(btn).toBeInTheDocument();
   });
 
   it('applies variant and size classes', () => {
@@ -17,7 +17,7 @@ describe('Button', () => {
         Press
       </Button>
     );
-    const btn = screen.getByTestId('button');
+    const btn = screen.getByRole('button');
     expect(btn.className).toContain('bg-surface-2');
     expect(btn.className).toContain('h-8');
   });
@@ -39,20 +39,13 @@ describe('Button', () => {
 
   it('respects disabled state', () => {
     render(<Button disabled>Off</Button>);
-    expect(screen.getByTestId('button')).toBeDisabled();
+    expect(screen.getByRole('button')).toBeDisabled();
   });
 
   it('renders spinner when loading', () => {
     render(<Button loading>Load</Button>);
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
-    expect(screen.getByTestId('button')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
   });
-
-  it('renders anchor when href is provided', () => {
-    render(<Button href='https://example.com'>Go</Button>);
-    expect(screen.getByRole('link')).toHaveAttribute(
-      'href',
-      'https://example.com'
-    );
-  });
+  // href prop removed; use asChild with an anchor element instead
 });

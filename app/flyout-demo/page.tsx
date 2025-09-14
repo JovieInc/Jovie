@@ -45,7 +45,7 @@ export default function FlyoutDemoPage() {
                 className='p-6 bg-gray-50 dark:bg-gray-800 rounded-lg'
               >
                 <div className='flex items-center mb-4'>
-                  <IconBadge Icon={feature.Icon} colorVar={feature.colorVar} />
+                  <IconBadge name={feature.icon} colorVar={feature.colorVar} />
                   <h3 className='ml-3 text-lg font-semibold text-gray-900 dark:text-white'>
                     {feature.title}
                   </h3>

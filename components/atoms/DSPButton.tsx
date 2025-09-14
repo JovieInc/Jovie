@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 
 const sizeMap = { sm: 'sm', md: 'md', lg: 'lg' } as const;
 
-export interface DSPButtonProps extends Omit<ButtonProps, 'children'> {
+export interface DSPButtonProps
+  extends Omit<ButtonProps, 'children' | 'onClick'> {
   name: string;
   dspKey: string;
   url: string;

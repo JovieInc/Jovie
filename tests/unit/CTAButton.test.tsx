@@ -157,7 +157,7 @@ describe('CTAButton', () => {
   });
 
   it('applies aria-label correctly', () => {
-    render(<CTAButton ariaLabel='Custom Label'>Button</CTAButton>);
+    render(<CTAButton aria-label='Custom Label'>Button</CTAButton>);
 
     expect(screen.getByRole('button')).toHaveAttribute(
       'aria-label',
