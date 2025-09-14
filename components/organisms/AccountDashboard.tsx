@@ -1,8 +1,8 @@
 'use client';
 
 import { CogIcon, CreditCardIcon, UserIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export function AccountDashboard() {
   return (
@@ -35,8 +35,8 @@ export function AccountDashboard() {
             </div>
           </div>
           <div className='mt-4'>
-            <Button variant='outline' size='sm' as={Link} href='/billing'>
-              Manage Billing
+            <Button variant='outline' size='sm' asChild>
+              <Link href='/billing'>Manage Billing</Link>
             </Button>
           </div>
         </div>
@@ -57,13 +57,8 @@ export function AccountDashboard() {
             </div>
           </div>
           <div className='mt-4'>
-            <Button
-              variant='outline'
-              size='sm'
-              as={Link}
-              href='/dashboard/settings'
-            >
-              Edit Profile
+            <Button variant='outline' size='sm' asChild>
+              <Link href='/dashboard/settings'>Edit Profile</Link>
             </Button>
           </div>
         </div>
@@ -84,13 +79,8 @@ export function AccountDashboard() {
             </div>
           </div>
           <div className='mt-4'>
-            <Button
-              variant='outline'
-              size='sm'
-              as={Link}
-              href='/dashboard/settings'
-            >
-              View Settings
+            <Button variant='outline' size='sm' asChild>
+              <Link href='/dashboard/settings'>View Settings</Link>
             </Button>
           </div>
         </div>
@@ -130,11 +120,11 @@ export function AccountDashboard() {
           Get support, view documentation, or contact our team
         </p>
         <div className='flex flex-col sm:flex-row gap-3'>
-          <Button variant='outline' size='sm' as={Link} href='/support'>
-            Contact Support
+          <Button variant='outline' size='sm' asChild>
+            <Link href='/support'>Contact Support</Link>
           </Button>
-          <Button variant='outline' size='sm' as={Link} href='/docs'>
-            View Documentation
+          <Button variant='outline' size='sm' asChild>
+            <Link href='/docs'>View Documentation</Link>
           </Button>
         </div>
       </div>
