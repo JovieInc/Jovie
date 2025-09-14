@@ -1,12 +1,12 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { NavLink } from '@/components/atoms/NavLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
-import { Button } from '@/components/ui/Button';
 import {
   Popover,
   PopoverContent,
@@ -30,7 +30,7 @@ export function HeaderNav() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    variant='plain'
+                    variant='ghost'
                     size='sm'
                     className='font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   >
@@ -77,7 +77,7 @@ export function HeaderNav() {
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    variant='plain'
+                    variant='ghost'
                     size='sm'
                     className='min-h-[44px] px-2 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   >
