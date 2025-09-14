@@ -52,6 +52,7 @@ const config: Config = {
       },
     },
   },
+  plugins: [typography, forms, lineClamp],
 };
 
 export default config;

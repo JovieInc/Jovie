@@ -1,12 +1,9 @@
-'use client';
-
 import { Button, type ButtonProps } from '@jovie/ui';
-import { cn } from '@jovie/ui/lib/utils';
 import Link from 'next/link';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
-interface NavLinkProps
-  extends Omit<ButtonProps, 'children' | 'variant' | 'size' | 'asChild'> {
+interface NavLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
   href: string;
   children: React.ReactNode;
   variant?: 'default' | 'primary';
@@ -14,37 +11,26 @@ interface NavLinkProps
   external?: boolean;
 }
 
-const navVariantMap = {
-  default: {
-    variant: 'ghost' as ButtonProps['variant'],
-    size: 'sm' as ButtonProps['size'],
-    className:
-      'h-auto px-0 py-0 text-sm text-secondary-token hover:text-primary-token dark:text-white/70 dark:hover:text-white',
-  },
-  primary: {
-    variant: 'primary' as ButtonProps['variant'],
-    size: 'sm' as ButtonProps['size'],
-    className: 'text-sm font-semibold shadow-sm hover:shadow-md',
-  },
-} as const;
-
 /**
- * Navigation link styled with @jovie/ui button primitives.
+ * Navigation link built on the shared Button component for consistent theming.
  */
 export function NavLink({
   href,
   children,
   className,
   variant = 'default',
-  prefetch,
-  external = false,
+  external,
   ...props
 }: NavLinkProps) {
-  const config = navVariantMap[variant];
+  const variantClasses = {
+    default:
+      'text-sm text-gray-600 dark:text-white/70 hover:text-gray-900 dark:hover:text-white',
+    primary: '',
+  } as const;
 
   const computedClassName = cn(
-    'inline-flex items-center gap-2 whitespace-nowrap transition-colors',
-    config.className,
+    'h-auto px-0 py-0',
+    variantClasses[variant],
     className
   );
 
@@ -52,12 +38,12 @@ export function NavLink({
     return (
       <Button
         asChild
+        variant={variant === 'primary' ? 'primary' : 'ghost'}
+        size='sm'
         className={computedClassName}
-        size={config.size}
-        variant={config.variant}
         {...props}
       >
-        <a href={href} rel='noopener noreferrer' target='_blank'>
+        <a href={href} target='_blank' rel='noopener noreferrer'>
           {children}
         </a>
       </Button>
@@ -67,14 +53,12 @@ export function NavLink({
   return (
     <Button
       asChild
+      variant={variant === 'primary' ? 'primary' : 'ghost'}
+      size='sm'
       className={computedClassName}
-      size={config.size}
-      variant={config.variant}
       {...props}
     >
-      <Link href={href} prefetch={prefetch}>
-        {children}
-      </Link>
+      <Link href={href}>{children}</Link>
     </Button>
   );
 }

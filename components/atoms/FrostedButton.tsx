@@ -1,66 +1,43 @@
-'use client';
-
 import { Button, type ButtonProps } from '@jovie/ui';
-import { cn } from '@jovie/ui/lib/utils';
 import React, { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
 
-interface FrostedButtonProps
-  extends Omit<ButtonProps, 'variant' | 'size' | 'asChild'> {
+interface FrostedButtonProps extends Omit<ButtonProps, 'variant'> {
   shape?: 'default' | 'circle' | 'square';
-  variant?: 'default' | 'ghost' | 'outline';
-  size?: ButtonProps['size'];
+  frostedStyle?: 'default' | 'ghost' | 'outline';
 }
 
-const shapeClasses = {
-  default: 'rounded-xl',
-  circle: 'rounded-full',
-  square: 'rounded-none',
-} as const;
-
-const frostedVariants: Record<
-  NonNullable<FrostedButtonProps['variant']>,
-  string
-> = {
-  default:
-    'border-white/40 bg-white/60 text-primary-token shadow-sm backdrop-blur-md hover:bg-white/70 dark:border-white/10 dark:bg-white/10 dark:text-white dark:hover:bg-white/20',
-  ghost:
-    'border-white/25 bg-white/30 text-primary-token backdrop-blur-md hover:bg-white/40 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10',
-  outline:
-    'border-white/50 bg-transparent text-primary-token backdrop-blur-md hover:bg-white/20 dark:border-white/20 dark:text-white dark:hover:bg-white/10',
-};
-
-const variantMap: Record<
-  NonNullable<FrostedButtonProps['variant']>,
-  ButtonProps['variant']
-> = {
-  default: 'ghost',
-  ghost: 'ghost',
-  outline: 'outline',
-};
-
 /**
- * Button with a frosted glass effect using shadcn primitives.
+ * Button with a frosted glass effect built on the shared Button component.
  */
 export const FrostedButton = forwardRef<HTMLButtonElement, FrostedButtonProps>(
   (
-    {
-      className,
-      shape = 'default',
-      variant = 'default',
-      size = 'default',
-      ...props
-    },
+    { className, shape = 'default', frostedStyle = 'default', ...props },
     ref
   ) => {
+    const shapeClasses = {
+      default: 'rounded-lg',
+      circle: 'rounded-full',
+      square: 'rounded-none',
+    } as const;
+
+    const variantClasses = {
+      default:
+        'backdrop-blur-sm bg-white/60 dark:bg-white/10 hover:bg-white/80 dark:hover:bg-white/20',
+      ghost:
+        'backdrop-blur-sm bg-white/30 dark:bg-white/5 hover:bg-white/50 dark:hover:bg-white/10',
+      outline:
+        'backdrop-blur-sm bg-transparent border border-gray-200/30 dark:border-white/10 hover:bg-white/20 dark:hover:bg-white/5',
+    } as const;
+
     return (
       <Button
         ref={ref}
-        variant={variantMap[variant]}
-        size={size}
+        variant={frostedStyle === 'outline' ? 'outline' : 'ghost'}
         className={cn(
-          'border px-5 py-2 font-medium text-sm transition-colors',
+          'border border-gray-200/30 dark:border-white/10',
+          variantClasses[frostedStyle],
           shapeClasses[shape],
-          frostedVariants[variant],
           className
         )}
         {...props}
