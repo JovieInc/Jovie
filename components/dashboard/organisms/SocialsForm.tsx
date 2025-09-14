@@ -1,11 +1,10 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Select } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { track } from '@/lib/analytics';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';
@@ -247,8 +246,10 @@ export function SocialsForm({ artist }: SocialsFormProps) {
       )}
 
       {error && (
-        <div className='bg-red-500/10 border border-red-500/20 rounded-lg p-3'>
-          <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
+        <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
+          <p className='text-sm text-green-600 dark:text-green-400'>
+            Social links saved successfully!
+          </p>
         </div>
       )}
 
