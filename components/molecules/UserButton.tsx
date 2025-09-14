@@ -1,19 +1,19 @@
 'use client';
 
 import { useClerk, useUser } from '@clerk/nextjs';
-import { Button } from '@jovie/ui';
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { Icon } from '@/components/atoms/Icon';
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@jovie/ui';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';

@@ -1,5 +1,11 @@
+@config "../tailwind.config.ts";
 @import "tailwindcss";
 @import "./theme.css";
+
+@source "../app/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../pages/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../packages/ui/**/*.{ts,tsx}";
 
 @plugin '@tailwindcss/typography';
 @plugin '@tailwindcss/forms';

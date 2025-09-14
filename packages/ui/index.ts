@@ -1,5 +1,3 @@
-export type { BadgeProps } from './atoms/badge';
-export { Badge, badgeVariants } from './atoms/badge';
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
 export {
@@ -19,6 +17,12 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './atoms/dropdown-menu';
+
+export {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './atoms/popover';
 export {
   Tooltip,
   TooltipContent,
