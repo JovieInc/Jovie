@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import React from 'react';
 import { Tooltip } from '@/components/atoms/Tooltip';
-import { Button } from '@/components/ui/Button';
 import { useArtistTheme } from './ArtistThemeProvider';
 
 export function ArtistThemeToggle() {
