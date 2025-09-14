@@ -66,7 +66,7 @@ export function ProfileShell({
         {showBackButton && (
           <div className='absolute top-4 left-4 z-10'>
             <FrostedButton
-              frostedStyle='default'
+              variant='default'
               shape='circle'
               aria-label='Back to profile'
               onClick={() => {
@@ -100,7 +100,7 @@ export function ProfileShell({
         {showNotificationButton && process.env.NODE_ENV === 'development' && (
           <div className='absolute top-4 right-4 z-10 flex items-center gap-3'>
             <FrostedButton
-              frostedStyle='default'
+              variant='default'
               shape='circle'
               aria-label='Notifications'
             >
