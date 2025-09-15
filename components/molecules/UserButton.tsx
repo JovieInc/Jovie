@@ -192,7 +192,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                 className='w-5 h-5 rounded-full object-cover'
               />
             ) : (
-              <div className='w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items center justify-center font-medium'>
+              <div className='w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center font-medium'>
                 {userInitials}
               </div>
             )}
