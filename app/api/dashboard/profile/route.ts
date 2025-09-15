@@ -1,3 +1,4 @@
+import { clerkClient } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
@@ -79,6 +80,68 @@ export async function PUT(req: Request) {
         if (allowedFields.includes(key)) {
           validUpdates[key] = value;
         }
+      }
+
+      if (Object.keys(validUpdates).length === 0) {
+        return NextResponse.json(
+          { error: 'No supported changes detected' },
+          { status: 400 }
+        );
+      }
+
+      const clerkUpdates: Record<string, unknown> = {};
+
+      if (typeof validUpdates.username === 'string') {
+        clerkUpdates.username = validUpdates.username;
+      }
+
+      if (typeof validUpdates.displayName === 'string') {
+        const displayName = validUpdates.displayName.trim();
+        if (displayName.length > 0) {
+          const nameParts = displayName.split(' ');
+          const firstName = nameParts.shift() ?? displayName;
+          const lastName = nameParts.join(' ').trim();
+
+          clerkUpdates.firstName = firstName;
+          if (lastName) {
+            clerkUpdates.lastName = lastName;
+          } else {
+            clerkUpdates.lastName = undefined;
+          }
+        }
+      }
+
+      const avatarUrl =
+        typeof validUpdates.avatarUrl === 'string'
+          ? validUpdates.avatarUrl
+          : undefined;
+
+      try {
+        if (Object.keys(clerkUpdates).length > 0) {
+          await clerkClient.users.updateUser(clerkUserId, clerkUpdates);
+        }
+
+        if (avatarUrl) {
+          const avatarResponse = await fetch(avatarUrl);
+          if (!avatarResponse.ok) {
+            throw new Error('Unable to download uploaded avatar');
+          }
+
+          const contentType =
+            avatarResponse.headers.get('content-type') || 'image/png';
+          const arrayBuffer = await avatarResponse.arrayBuffer();
+          const blob = new Blob([arrayBuffer], { type: contentType });
+
+          await clerkClient.users.updateUserProfileImage(clerkUserId, {
+            file: blob,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to sync profile updates with Clerk:', error);
+        return NextResponse.json(
+          { error: 'Failed to sync profile updates' },
+          { status: 502 }
+        );
       }
 
       const [updatedProfile] = await db
