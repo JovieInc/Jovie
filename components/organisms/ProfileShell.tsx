@@ -190,7 +190,7 @@ export function ProfileShell({
                         href={`/${artist.handle}?mode=tip`}
                         variant='ghost'
                         size='sm'
-                        className='px-3 py-1.5 text-xs rounded-full bg-white/10 hover:bg-white/20 dark:bg白/5 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10 backdrop-blur-sm'
+                        className='px-3 py-1.5 text-xs rounded-full bg-white/10 hover:bg-white/20 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10 backdrop-blur-sm'
                         isLoading={isTipNavigating}
                         onClick={() => setIsTipNavigating(true)}
                       >
