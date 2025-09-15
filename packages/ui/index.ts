@@ -17,12 +17,24 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './atoms/dropdown-menu';
-
 export {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
+export { Select } from './atoms/select';
+export {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetOverlay,
+  SheetPortal,
+  SheetTitle,
+  SheetTrigger,
+} from './atoms/sheet';
 export {
   Tooltip,
   TooltipContent,

@@ -93,19 +93,23 @@ module.exports = [
             },
             {
               name: '@/components/ui/sheet',
-              message: "Use Sheet components from '@jovie/ui' instead of local UI.",
+              message:
+                "Use Sheet components from '@jovie/ui' instead of local UI.",
             },
             {
               name: '@/components/ui/tooltip',
-              message: "Use Tooltip components from '@jovie/ui' instead of local UI.",
+              message:
+                "Use Tooltip components from '@jovie/ui' instead of local UI.",
             },
             {
               name: '@/components/ui/popover',
-              message: "Use Popover components from '@jovie/ui' instead of local UI.",
+              message:
+                "Use Popover components from '@jovie/ui' instead of local UI.",
             },
             {
               name: '@/components/ui/dropdown-menu',
-              message: "Use DropdownMenu components from '@jovie/ui' instead of local UI.",
+              message:
+                "Use DropdownMenu components from '@jovie/ui' instead of local UI.",
             },
           ],
         },

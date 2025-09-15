@@ -216,7 +216,9 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
 
         <Headless.Combobox
           value={value}
-          onChange={handleSelect}
+          onChange={val => {
+            if (val) handleSelect(val);
+          }}
           disabled={disabled}
           nullable
         >
