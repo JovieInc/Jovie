@@ -1,9 +1,12 @@
+'use client';
+
+import { Button, type ButtonProps } from '@jovie/ui';
+import { cn } from '@jovie/ui/lib/utils';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
-interface NavLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
+interface NavLinkProps
+  extends Omit<ButtonProps, 'children' | 'variant' | 'size' | 'asChild'> {
   href: string;
   children: React.ReactNode;
   variant?: 'default' | 'primary';
@@ -11,56 +14,67 @@ interface NavLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
   external?: boolean;
 }
 
+const navVariantMap = {
+  default: {
+    variant: 'ghost' as ButtonProps['variant'],
+    size: 'sm' as ButtonProps['size'],
+    className:
+      'h-auto px-0 py-0 text-sm text-secondary-token hover:text-primary-token dark:text-white/70 dark:hover:text-white',
+  },
+  primary: {
+    variant: 'primary' as ButtonProps['variant'],
+    size: 'sm' as ButtonProps['size'],
+    className: 'text-sm font-semibold shadow-sm hover:shadow-md',
+  },
+} as const;
+
 /**
- * Navigation link built on the shared Button component for consistent theming.
+ * Navigation link styled with @jovie/ui button primitives.
  */
 export function NavLink({
   href,
   children,
   className,
   variant = 'default',
-  external,
+  prefetch,
+  external = false,
   ...props
 }: NavLinkProps) {
-  const variantClasses = {
-    default:
-      'text-sm text-gray-600 dark:text-white/70 hover:text-gray-900 dark:hover:text-white',
-    primary: '',
-  } as const;
+  const config = navVariantMap[variant];
 
   const computedClassName = cn(
-    'h-auto px-0 py-0',
-    variantClasses[variant],
+    'inline-flex items-center gap-2 whitespace-nowrap transition-colors',
+    config.className,
     className
   );
 
   if (external) {
     return (
       <Button
-        as='a'
-        href={href}
-        target='_blank'
-        rel='noopener noreferrer'
-        variant={variant === 'primary' ? 'primary' : 'plain'}
-        size='sm'
+        asChild
         className={computedClassName}
+        size={config.size}
+        variant={config.variant}
         {...props}
       >
-        {children}
+        <a href={href} rel='noopener noreferrer' target='_blank'>
+          {children}
+        </a>
       </Button>
     );
   }
 
   return (
     <Button
-      as={Link}
-      href={href}
-      variant={variant === 'primary' ? 'primary' : 'plain'}
-      size='sm'
+      asChild
       className={computedClassName}
+      size={config.size}
+      variant={config.variant}
       {...props}
     >
-      {children}
+      <Link href={href} prefetch={prefetch}>
+        {children}
+      </Link>
     </Button>
   );
 }
