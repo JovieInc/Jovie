@@ -1,3 +1,4 @@
+'use client';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -65,7 +66,7 @@ export function ProfileShell({
         {showBackButton && (
           <div className='absolute top-4 left-4 z-10'>
             <FrostedButton
-              variant='default'
+              frostedStyle='default'
               shape='circle'
               aria-label='Back to profile'
               onClick={() => {
@@ -99,7 +100,7 @@ export function ProfileShell({
         {showNotificationButton && process.env.NODE_ENV === 'development' && (
           <div className='absolute top-4 right-4 z-10 flex items-center gap-3'>
             <FrostedButton
-              variant='default'
+              frostedStyle='default'
               shape='circle'
               aria-label='Notifications'
             >
@@ -187,7 +188,7 @@ export function ProfileShell({
                     <div className='flex-shrink-0'>
                       <CTAButton
                         href={`/${artist.handle}?mode=tip`}
-                        variant='plain'
+                        variant='ghost'
                         size='sm'
                         className='px-3 py-1.5 text-xs rounded-full bg-white/10 hover:bg-white/20 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10 backdrop-blur-sm'
                         isLoading={isTipNavigating}
