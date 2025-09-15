@@ -33,8 +33,8 @@ dependencies:
     specifier: ^2.2.0
     version: 2.2.0(react@18.3.1)
   '@hookform/resolvers':
-    specifier: ^5.2.1
-    version: 5.2.1(react-hook-form@7.62.0)
+    specifier: ^5.2.2
+    version: 5.2.2(react-hook-form@7.62.0)
   '@neondatabase/serverless':
     specifier: ^1.0.1
     version: 1.0.1
@@ -2284,8 +2284,8 @@ packages:
       react: 18.3.1
     dev: false
 
-  /@hookform/resolvers@5.2.1(react-hook-form@7.62.0):
-    resolution: {integrity: sha512-u0+6X58gkjMcxur1wRWokA7XsiiBJ6aK17aPZxhkoYiK5J+HcTx0Vhu9ovXe6H+dVpO6cjrn2FkJTryXEMlryQ==}
+  /@hookform/resolvers@5.2.2(react-hook-form@7.62.0):
+    resolution: {integrity: sha512-A/IxlMLShx3KjV/HeTcTfaMxdwy690+L/ZADoeaTltLx+CVuzkeVIPuybK3jrRfw7YZnmdKsVVHAlEPIAEUNlA==}
     peerDependencies:
       react-hook-form: ^7.55.0
     dependencies:
