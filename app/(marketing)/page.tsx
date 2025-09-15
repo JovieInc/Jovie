@@ -1,12 +1,10 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
-const NewFeaturedArtists = dynamic(
-  () => import('@/components/home/NewFeaturedArtists').then(m => m.NewFeaturedArtists),
-  { ssr: false }
-);
+// Use a client wrapper for the Featured Artists carousel to avoid ssr:false in a Server Component
 const NewFeaturesSection = dynamic(
   () => import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
 );
@@ -153,7 +151,7 @@ export default function HomePage() {
         <NewHomeHero />
 
         {/* 2. Artist carousel (visual proof, not endorsement) */}
-        <NewFeaturedArtists />
+        <FeaturedArtistsClient />
 
         {/* 3. Features (what Free includes, forever) */}
         <NewFeaturesSection />

@@ -5,8 +5,8 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 
-// Use Edge runtime for better performance
-export const runtime = 'edge';
+// Use Node.js runtime for compatibility with PostHog Node client and DB libs
+export const runtime = 'nodejs';
 
 export async function GET() {
   try {

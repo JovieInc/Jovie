@@ -1,4 +1,4 @@
-import dynamic from 'next/dynamic';
+import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
@@ -10,10 +10,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 
-const DesktopQrOverlay = dynamic(
-  () => import('@/components/profile/DesktopQrOverlay'),
-  { ssr: false, loading: () => null }
-);
+// Use a client wrapper to avoid ssr:false in a Server Component
 
 // Use centralized server helper for public data access
 
@@ -149,7 +146,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         showTipButton={showTipButton}
         showBackButton={showBackButton}
       />
-      <DesktopQrOverlay handle={artist.handle} />
+      <DesktopQrOverlayClient handle={artist.handle} />
     </>
   );
 }
