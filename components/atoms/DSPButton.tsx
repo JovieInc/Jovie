@@ -1,11 +1,11 @@
 'use client';
 
+import { Button, type ButtonProps } from '@jovie/ui';
+import { cn } from '@jovie/ui/lib/utils';
 import DOMPurify from 'isomorphic-dompurify';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
-const sizeMap = { sm: 'sm', md: 'md', lg: 'lg' } as const;
+const sizeMap = { sm: 'sm', md: 'default', lg: 'lg' } as const;
 
 export interface DSPButtonProps
   extends Omit<ButtonProps, 'children' | 'onClick'> {
@@ -15,6 +15,10 @@ export interface DSPButtonProps
   backgroundColor: string;
   textColor: string;
   logoSvg: string;
+  /**
+   * Optional analytics hook that receives the provider key and resolved URL
+   * before navigation occurs.
+   */
   onClick?: (dspKey: string, url: string) => void;
   size?: keyof typeof sizeMap;
 }
@@ -58,19 +62,27 @@ export function DSPButton({
       onClick={handleClick}
       disabled={disabled}
       size={sizeMap[size]}
+      variant='primary'
+      className={cn(
+        'w-full max-w-md gap-3 rounded-lg px-4 py-2 text-sm font-semibold',
+        className
+      )}
       style={{
         backgroundColor: disabled ? '#9CA3AF' : backgroundColor,
         color: disabled ? '#FFFFFF' : textColor,
       }}
-      className={cn('w-full max-w-md', className)}
       {...props}
     >
-      <span className='inline-flex items-center gap-2'>
+      <span
+        className='flex items-center gap-2'
+        style={{ color: disabled ? '#FFFFFF' : textColor }}
+      >
         <span
-          className='flex-shrink-0'
+          aria-hidden
+          className='flex h-5 w-5 items-center justify-center'
           dangerouslySetInnerHTML={{ __html: sanitizedLogo }}
         />
-        <span>Open in {name}</span>
+        <span className='truncate'>Open in {name}</span>
       </span>
     </Button>
   );
