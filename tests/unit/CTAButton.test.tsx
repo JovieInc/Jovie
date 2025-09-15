@@ -40,7 +40,7 @@ describe('CTAButton', () => {
     const button = screen.getByRole('link', { name: /click me/i });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('href', '/test');
-    expect(button).toHaveClass('bg-neutral-900'); // Primary variant
+    expect(button).toHaveClass('bg-btn-primary'); // Primary variant
   });
 
   it('renders as a button when no href is provided', () => {
@@ -54,24 +54,24 @@ describe('CTAButton', () => {
     const { rerender } = render(
       <CTAButton variant='primary'>Primary</CTAButton>
     );
-    expect(screen.getByRole('button')).toHaveClass('bg-neutral-900');
+    expect(screen.getByRole('button')).toHaveClass('bg-btn-primary');
 
     rerender(<CTAButton variant='secondary'>Secondary</CTAButton>);
-    expect(screen.getByRole('button')).toHaveClass('bg-indigo-600');
+    expect(screen.getByRole('button')).toHaveClass('bg-surface-2');
 
     rerender(<CTAButton variant='outline'>Outline</CTAButton>);
-    expect(screen.getByRole('button')).toHaveClass('border');
+    expect(screen.getByRole('button')).toHaveClass('border-border');
   });
 
   it('applies different sizes correctly', () => {
     const { rerender } = render(<CTAButton size='sm'>Small</CTAButton>);
-    expect(screen.getByRole('button')).toHaveClass('text-sm');
+    expect(screen.getByRole('button')).toHaveClass('h-8');
 
     rerender(<CTAButton size='md'>Medium</CTAButton>);
-    expect(screen.getByRole('button')).toHaveClass('text-base');
+    expect(screen.getByRole('button')).toHaveClass('h-10');
 
     rerender(<CTAButton size='lg'>Large</CTAButton>);
-    expect(screen.getByRole('button')).toHaveClass('text-lg');
+    expect(screen.getByRole('button')).toHaveClass('h-11');
   });
 
   it('renders in loading state correctly', () => {

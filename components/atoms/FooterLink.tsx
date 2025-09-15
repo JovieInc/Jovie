@@ -1,18 +1,20 @@
+'use client';
+
+import { Button, type ButtonProps } from '@jovie/ui';
+import { cn } from '@jovie/ui/lib/utils';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
-const variantStyles = {
-  light:
-    'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
-  dark: 'text-white/60 hover:text-white',
+const toneStyles = {
+  light: 'text-secondary-token hover:text-primary-token',
+  dark: 'text-white/70 hover:text-white',
 } as const;
 
-interface FooterLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
+interface FooterLinkProps
+  extends Omit<ButtonProps, 'children' | 'variant' | 'size' | 'asChild'> {
   href: string;
   children: React.ReactNode;
-  variant?: keyof typeof variantStyles;
+  variant?: keyof typeof toneStyles;
 }
 
 export function FooterLink({
@@ -23,34 +25,38 @@ export function FooterLink({
   ...props
 }: FooterLinkProps) {
   const external = /^https?:\/\//.test(href);
-  const common = {
-    variant: 'plain' as const,
-    size: 'sm' as const,
-    className: cn(
-      'h-auto px-0 py-0 transition-colors',
-      variantStyles[variant],
-      className
-    ),
-    ...props,
-  };
+
+  const computedClassName = cn(
+    'inline-flex items-center gap-2 h-auto px-0 py-0 text-sm transition-colors',
+    toneStyles[variant],
+    className
+  );
 
   if (external) {
     return (
       <Button
-        as='a'
-        href={href}
-        target='_blank'
-        rel='noopener noreferrer'
-        {...common}
+        asChild
+        className={computedClassName}
+        size='sm'
+        variant='ghost'
+        {...props}
       >
-        {children}
+        <a href={href} rel='noopener noreferrer' target='_blank'>
+          {children}
+        </a>
       </Button>
     );
   }
 
   return (
-    <Button as={Link} href={href} {...common}>
-      {children}
+    <Button
+      asChild
+      className={computedClassName}
+      size='sm'
+      variant='ghost'
+      {...props}
+    >
+      <Link href={href}>{children}</Link>
     </Button>
   );
 }

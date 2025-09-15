@@ -1,17 +1,26 @@
 'use client';
 
 import { CheckIcon } from '@heroicons/react/24/solid';
+import { Button, type ButtonProps } from '@jovie/ui';
+import { cn } from '@jovie/ui/lib/utils';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
 
-export interface CTAButtonProps extends Omit<ButtonProps, 'loading'> {
+const sizeMap = {
+  sm: 'sm',
+  md: 'default',
+  lg: 'lg',
+} as const;
+
+export interface CTAButtonProps
+  extends Omit<ButtonProps, 'asChild' | 'loading' | 'size'> {
   href?: string;
   external?: boolean;
   isLoading?: boolean;
   isSuccess?: boolean;
   icon?: React.ReactNode;
+  size?: keyof typeof sizeMap;
+  prefetch?: boolean;
 }
 
 /**
@@ -21,33 +30,56 @@ export interface CTAButtonProps extends Omit<ButtonProps, 'loading'> {
 export function CTAButton({
   href,
   external,
-  isLoading,
-  isSuccess,
+  isLoading = false,
+  isSuccess = false,
   icon,
   children,
   className,
+  size = 'md',
+  prefetch,
+  disabled,
   ...props
 }: CTAButtonProps) {
-  const Component = href ? Link : 'button';
+  const resolvedSize = sizeMap[size] ?? 'default';
 
-  return (
-    <Button
-      as={Component}
-      href={href}
-      target={external ? '_blank' : undefined}
-      rel={external ? 'noopener noreferrer' : undefined}
-      loading={isLoading}
-      className={cn('gap-2', className)}
-      {...props}
-    >
-      {isSuccess ? (
-        <CheckIcon className='h-5 w-5' />
-      ) : (
-        <>
-          {icon}
-          {children}
-        </>
-      )}
-    </Button>
+  const content = isSuccess ? (
+    <span className='flex items-center justify-center'>
+      <CheckIcon aria-hidden className='h-5 w-5' />
+      <span className='sr-only'>Action completed</span>
+    </span>
+  ) : (
+    <span className='inline-flex items-center gap-2'>
+      {icon}
+      <span className='whitespace-nowrap'>{children}</span>
+    </span>
   );
+
+  const commonProps: Partial<ButtonProps> = {
+    size: resolvedSize,
+    loading: isLoading,
+    className: cn('gap-2', className),
+    'data-state': isSuccess ? 'success' : undefined,
+    disabled,
+    ...props,
+  };
+
+  if (href) {
+    const linkContent = external ? (
+      <a href={href} rel='noopener noreferrer' target='_blank'>
+        {content}
+      </a>
+    ) : (
+      <Link href={href} prefetch={prefetch}>
+        {content}
+      </Link>
+    );
+
+    return (
+      <Button asChild {...commonProps}>
+        {linkContent}
+      </Button>
+    );
+  }
+
+  return <Button {...commonProps}>{content}</Button>;
 }
