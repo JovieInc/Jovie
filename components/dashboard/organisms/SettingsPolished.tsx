@@ -12,11 +12,11 @@ import {
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
-import { AccountSettingsModal } from '@/components/dashboard/molecules/AccountSettingsModal';
+import { AccountSettingsSection } from '@/components/dashboard/organisms/AccountSettingsSection';
 import { AvatarUpload } from '@/components/ui/AvatarUpload';
+import { useToast } from '@/components/ui/ToastContainer';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
-import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
@@ -73,7 +73,6 @@ export function SettingsPolished({
 }: SettingsPolishedProps) {
   const [currentSection, setCurrentSection] = useState('profile');
   const [isLoading, setIsLoading] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const billingStatus = useBillingStatus();
@@ -100,6 +99,58 @@ export function SettingsPolished({
     artist.settings?.hide_branding ?? false
   );
   const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const { showToast } = useToast();
+
+  const handleAvatarUpdate = useCallback(
+    async (imageUrl: string) => {
+      const previousImage = artist.image_url;
+
+      try {
+        const response = await fetch('/api/dashboard/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            updates: {
+              avatarUrl: imageUrl,
+            },
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            (data as { error?: string }).error ||
+              'Failed to update profile photo'
+          );
+        }
+
+        const profile = (data as { profile?: { avatarUrl?: string } }).profile;
+
+        if (onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            image_url: profile?.avatarUrl ?? imageUrl,
+          });
+        }
+      } catch (error) {
+        if (onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            image_url: previousImage,
+          });
+        }
+
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to update profile photo';
+        showToast({ type: 'error', message });
+      }
+    },
+    [artist, onArtistUpdate, showToast]
+  );
 
   const handleBrandingToggle = useCallback(
     async (enabled: boolean) => {
@@ -379,14 +430,7 @@ export function SettingsPolished({
           <AvatarUpload
             currentAvatarUrl={artist.image_url}
             artistName={artist.name}
-            onUploadSuccess={(imageUrl) => {
-              if (onArtistUpdate) {
-                onArtistUpdate({
-                  ...artist,
-                  image_url: imageUrl,
-                });
-              }
-            }}
+            onUploadSuccess={handleAvatarUpdate}
           />
         </DashboardCard>
 
@@ -463,32 +507,8 @@ export function SettingsPolished({
 
   const renderAccountSection = () => (
     <div className='space-y-6'>
-      {/* Clerk Account/Profile management */}
       {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-        <DashboardCard variant='settings'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <h3 className='text-lg font-medium text-primary'>
-                Account settings
-              </h3>
-              <p className='mt-1 text-sm text-secondary'>
-                Open a focused modal to manage email, password, and connected
-                accounts.
-              </p>
-            </div>
-            <button
-              type='button'
-              onClick={() => {
-                setIsAccountModalOpen(true);
-                track('settings_account_modal_open');
-              }}
-              className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
-              style={{ backgroundColor: 'var(--color-accent)' }}
-            >
-              Open
-            </button>
-          </div>
-        </DashboardCard>
+        <AccountSettingsSection />
       ) : (
         <DashboardCard variant='settings'>
           <div className='text-center py-4'>
@@ -1018,10 +1038,6 @@ export function SettingsPolished({
           </section>
         </div>
       </div>
-      <AccountSettingsModal
-        isOpen={isAccountModalOpen}
-        onClose={() => setIsAccountModalOpen(false)}
-      />
     </div>
   );
 }
