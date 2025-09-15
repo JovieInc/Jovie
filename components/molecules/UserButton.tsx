@@ -1,11 +1,6 @@
 'use client';
 
-import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { useClerk, useUser } from '@clerk/nextjs';
-import { Icon } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +8,12 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@jovie/ui';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
+import { Button } from '@/components/ui/Button';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -28,7 +28,8 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const { signOut, openUserProfile } = useClerk();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isBillingLoading, setIsBillingLoading] = useState(false);
+  const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
+  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
   const billingStatus = useBillingStatus();
 
   // User display info
@@ -80,53 +81,65 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     openUserProfile();
   };
 
-  // Handle billing portal
-  const handleBilling = async () => {
-    if (isBillingLoading) return;
-    setIsBillingLoading(true);
+  const handleManageBilling = async () => {
+    if (isManageBillingLoading) return;
+    setIsManageBillingLoading(true);
 
     try {
-      if (billingStatus.isPro && billingStatus.hasStripeCustomer) {
-        const response = await fetch('/api/stripe/portal', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok)
-          throw new Error('Failed to create billing portal session');
-        const { url } = await response.json();
-        window.location.href = url;
-      } else {
-        // Handle subscription flow
-        const pricingResponse = await fetch('/api/stripe/pricing-options');
-        if (!pricingResponse.ok)
-          throw new Error('Failed to fetch pricing options');
-
-        const { pricingOptions } = await pricingResponse.json();
-        const defaultPlan =
-          pricingOptions.find(
-            (option: { interval: string }) => option.interval === 'month'
-          ) || pricingOptions[0];
-
-        if (!defaultPlan?.priceId)
-          throw new Error('No pricing options available');
-
-        const checkoutResponse = await fetch('/api/stripe/checkout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId: defaultPlan.priceId }),
-        });
-
-        if (!checkoutResponse.ok)
-          throw new Error('Failed to create checkout session');
-        const { url } = await checkoutResponse.json();
-        window.location.href = url;
+      if (!billingStatus.hasStripeCustomer) {
+        throw new Error('Missing Stripe customer for billing portal');
       }
+
+      const response = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok)
+        throw new Error('Failed to create billing portal session');
+      const { url } = await response.json();
+      window.location.href = url;
     } catch (error) {
-      console.error('Error handling billing:', error);
+      console.error('Error opening billing portal:', error);
       router.push('/pricing');
     } finally {
-      setIsBillingLoading(false);
+      setIsManageBillingLoading(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (isUpgradeLoading) return;
+    setIsUpgradeLoading(true);
+
+    try {
+      const pricingResponse = await fetch('/api/stripe/pricing-options');
+      if (!pricingResponse.ok)
+        throw new Error('Failed to fetch pricing options');
+
+      const { pricingOptions } = await pricingResponse.json();
+      const defaultPlan =
+        pricingOptions.find(
+          (option: { interval: string }) => option.interval === 'month'
+        ) || pricingOptions[0];
+
+      if (!defaultPlan?.priceId)
+        throw new Error('No pricing options available');
+
+      const checkoutResponse = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: defaultPlan.priceId }),
+      });
+
+      if (!checkoutResponse.ok)
+        throw new Error('Failed to create checkout session');
+      const { url } = await checkoutResponse.json();
+      window.location.href = url;
+    } catch (error) {
+      console.error('Error starting upgrade checkout:', error);
+      router.push('/pricing');
+    } finally {
+      setIsUpgradeLoading(false);
     }
   };
 
@@ -134,24 +147,54 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {showUserInfo ? (
-          <div className={cn('flex w-full items-center gap-3 p-2 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 transition-colors')}>
+          <div
+            className={cn(
+              'flex w-full items-center gap-3 p-2 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 transition-colors'
+            )}
+          >
             {userImageUrl ? (
-              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover flex-shrink-0" />
+              <Image
+                src={userImageUrl}
+                alt={displayName || 'User avatar'}
+                width={32}
+                height={32}
+                className='w-8 h-8 rounded-full object-cover flex-shrink-0'
+              />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium">{userInitials}</div>
+              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
+                {userInitials}
+              </div>
             )}
             <div className='min-w-0 flex-1'>
               <p className='text-sm font-medium truncate'>{displayName}</p>
-              <p className='text-xs text-secondary-token truncate'>{user.primaryEmailAddress?.emailAddress}</p>
+              <p className='text-xs text-secondary-token truncate'>
+                {user.primaryEmailAddress?.emailAddress}
+              </p>
             </div>
-            <Icon name='ChevronRight' className='w-4 h-4 text-tertiary-token' aria-hidden='true' />
+            <Icon
+              name='ChevronRight'
+              className='w-4 h-4 text-tertiary-token'
+              aria-hidden='true'
+            />
           </div>
         ) : (
-          <Button variant='ghost' size='icon' className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'>
+          <Button
+            variant='ghost'
+            size='icon'
+            className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'
+          >
             {userImageUrl ? (
-              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={20} height={20} className="w-5 h-5 rounded-full object-cover" />
+              <Image
+                src={userImageUrl}
+                alt={displayName || 'User avatar'}
+                width={20}
+                height={20}
+                className='w-5 h-5 rounded-full object-cover'
+              />
             ) : (
-              <div className="w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items center justify-center font-medium">{userInitials}</div>
+              <div className='w-5 h-5 rounded-full bg-indigo-500 text-white text-xs flex items-center justify-center font-medium'>
+                {userInitials}
+              </div>
             )}
             <span className='sr-only'>Open user menu</span>
           </Button>
@@ -161,26 +204,69 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         <DropdownMenuLabel>
           <div className='flex items-center gap-3'>
             {userImageUrl ? (
-              <Image src={userImageUrl} alt={displayName || 'User avatar'} width={32} height={32} className="w-8 h-8 rounded-full object-cover" />
+              <Image
+                src={userImageUrl}
+                alt={displayName || 'User avatar'}
+                width={32}
+                height={32}
+                className='w-8 h-8 rounded-full object-cover'
+              />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium">{userInitials}</div>
+              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
+                {userInitials}
+              </div>
             )}
             <div className='min-w-0'>
               <div className='text-sm font-medium truncate'>{displayName}</div>
-              <div className='text-xs text-secondary-token truncate'>{user.primaryEmailAddress?.emailAddress}</div>
+              <div className='text-xs text-secondary-token truncate'>
+                {user.primaryEmailAddress?.emailAddress}
+              </div>
             </div>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleProfile} className='cursor-pointer'>
-          <Icon name='User' className='w-4 h-4 mr-2 text-tertiary-token' /> Profile
+          <Icon name='User' className='w-4 h-4 mr-2 text-tertiary-token' />{' '}
+          Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={handleBilling} disabled={isBillingLoading} className='cursor-pointer'>
-          <Icon name='CreditCard' className='w-4 h-4 mr-2 text-tertiary-token' /> {isBillingLoading ? 'Loading…' : 'Billing & Plans'}
-        </DropdownMenuItem>
+        {billingStatus.loading ? (
+          <DropdownMenuItem disabled className='cursor-default'>
+            <Icon
+              name='Loader2'
+              className='w-4 h-4 mr-2 text-tertiary-token animate-spin'
+            />
+            Checking plan…
+          </DropdownMenuItem>
+        ) : billingStatus.isPro ? (
+          <DropdownMenuItem
+            onClick={handleManageBilling}
+            disabled={isManageBillingLoading}
+            className='cursor-pointer'
+          >
+            <Icon
+              name='CreditCard'
+              className='w-4 h-4 mr-2 text-tertiary-token'
+            />
+            {isManageBillingLoading ? 'Opening portal…' : 'Manage Billing'}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onClick={handleUpgrade}
+            disabled={isUpgradeLoading}
+            className='cursor-pointer font-medium text-primary-token focus:text-primary-token'
+          >
+            <Icon name='Sparkles' className='w-4 h-4 mr-2 text-primary-token' />
+            {isUpgradeLoading ? 'Securing your upgrade…' : 'Upgrade to Pro'}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} disabled={isLoading} className='cursor-pointer text-red-600 focus:text-red-600'>
-          <Icon name='LogOut' className='w-4 h-4 mr-2' /> {isLoading ? 'Signing out…' : 'Sign out'}
+        <DropdownMenuItem
+          onClick={handleSignOut}
+          disabled={isLoading}
+          className='cursor-pointer text-red-600 focus:text-red-600'
+        >
+          <Icon name='LogOut' className='w-4 h-4 mr-2' />{' '}
+          {isLoading ? 'Signing out…' : 'Sign out'}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
