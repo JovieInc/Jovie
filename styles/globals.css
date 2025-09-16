@@ -1,12 +1,6 @@
 @import "tailwindcss";
 @import "./theme.css";
 
-@plugin '@tailwindcss/typography';
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/line-clamp';
-
-@custom-variant dark (&:is(.dark *));
-
 /* Base document sizing and immediate dark-aware fallback colors */
 html,
 body {
@@ -107,7 +101,16 @@ body {
 }
 
 @utility btn-primary {
-  @apply bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90;
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+@utility bg-btn-primary {
+  background-color: var(--color-btn-primary-bg);
+}
+
+@utility text-btn-primary-foreground {
+  color: var(--color-btn-primary-fg);
 }
 
 @utility btn-secondary {
