@@ -18,7 +18,7 @@ export function DashboardTopBar({
   actions,
 }: DashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-subtle bg-base/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-base/60 transition-[height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12'>
+    <header className='flex h-14 shrink-0 items-center gap-3 border-b border-subtle bg-base px-4 transition-[height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12'>
       <SidebarTrigger className='-ml-1' />
       <nav
         aria-label='Breadcrumb'

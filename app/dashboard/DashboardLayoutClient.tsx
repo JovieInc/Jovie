@@ -105,10 +105,12 @@ export default function DashboardLayoutClient({
           <DashboardSidebar />
 
           <SidebarInset>
-            <DashboardTopBar breadcrumbs={crumbs} />
-            <div className='flex flex-1 flex-col gap-4 p-4 lg:p-6'>
-              <div className='container mx-auto w-full max-w-5xl px-0'>
-                {children}
+            <div className='flex h-screen flex-col'>
+              <DashboardTopBar breadcrumbs={crumbs} />
+              <div className='flex-1 overflow-auto'>
+                <div className='flex flex-1 flex-col gap-4 p-4 lg:p-6'>
+                  <div className='mx-auto w-full max-w-7xl'>{children}</div>
+                </div>
               </div>
             </div>
           </SidebarInset>
