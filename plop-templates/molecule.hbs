@@ -1,0 +1,31 @@
+import { cn } from '@/lib/utils';
+
+export interface {{name}}Props {
+  children?: React.ReactNode;
+  className?: string;
+  // TODO: Add specific props for this molecule
+}
+
+/**
+ * {{name}} - A molecule component that combines atoms for a specific use case
+ * 
+ * TODO: Add component description and usage guidelines
+ */
+export function {{name}}({ children, className, ...props }: {{name}}Props) {
+  return (
+    <div
+      className={cn(
+        // Add base styles here
+        '',
+        className
+      )}
+      data-testid="{{kebabCase name}}"
+      {...props}
+    >
+      {children}
+      {/* TODO: Add atom components and composition logic */}
+    </div>
+  );
+}
+
+export default {{name}};
