@@ -414,3 +414,13 @@ body {
 @utility btn-press {
   @apply transform transition-transform duration-100 ease-out active:scale-95;
 }
+
+/* Motion preference utility for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .transition-all,
+  .transform,
+  [data-state] {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
