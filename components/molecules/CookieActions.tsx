@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@/components/ui/Button';
+import { Button } from '@jovie/ui';
 
 export interface CookieActionsProps {
   onAcceptAll: () => void;

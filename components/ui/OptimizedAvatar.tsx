@@ -28,7 +28,7 @@ export function OptimizedAvatar({
   size = 64,
   className,
   priority = false,
-  quality = 90,
+  quality = 85,
   fallbackSrc = '/android-chrome-192x192.png',
 }: OptimizedAvatarProps) {
   const [error, setError] = useState(false);
@@ -90,7 +90,7 @@ export function ResponsiveAvatar({
   alt,
   className,
   priority = false,
-  quality = 90,
+  quality = 85,
   fallbackSrc = '/android-chrome-192x192.png',
   sizes = '(max-width: 768px) 64px, 128px',
   desktopSize = 128,

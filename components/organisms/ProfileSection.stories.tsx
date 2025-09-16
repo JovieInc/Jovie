@@ -1,5 +1,5 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Button } from '@/components/ui/Button';
 import { Artist } from '@/types/db';
 import { ProfileSection } from './ProfileSection';
 

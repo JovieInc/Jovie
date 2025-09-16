@@ -1,8 +1,8 @@
 'use client';
 
 import { ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { useCallback, useMemo, useState } from 'react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { useCallback, useState } from 'react';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { cn } from '@/lib/utils';
 import { FeedbackModal } from './FeedbackModal';
@@ -29,43 +29,40 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
     setIsModalOpen(false);
   }, []);
 
-  const icon = useMemo(
-    () => (
-      <ChatBubbleBottomCenterTextIcon
-        className={cn(
-          'h-4 w-4 transition-colors duration-200',
-          collapsed
-            ? 'text-emerald-400'
-            : 'text-emerald-500 group-hover:text-emerald-400'
-        )}
-      />
-    ),
-    [collapsed]
-  );
-
   const buttonContent = (
-    <Button
-      type='button'
-      variant='ghost'
-      size={collapsed ? 'icon' : 'sm'}
+    <button
       onClick={handleFeedbackClick}
+      className={cn(
+        'group flex transition-all duration-200 ease-in-out',
+        'rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+        collapsed
+          ? 'items-center justify-center w-8 h-8 p-0 gap-0'
+          : 'items-center w-full px-3 gap-2',
+        'hover:scale-105 active:scale-95',
+        'motion-reduce:transform-none'
+      )}
       aria-label={collapsed ? 'Send feedback' : undefined}
       aria-haspopup='dialog'
       aria-expanded={isModalOpen}
       aria-controls={modalId}
-      className={cn(
-        'group transition-all duration-200 ease-in-out',
-        collapsed
-          ? 'h-9 w-9 rounded-full bg-surface-2 text-secondary-token hover:bg-surface-3 hover:text-primary-token'
-          : 'w-full justify-start gap-2 rounded-lg px-3 text-sm font-medium text-secondary-token hover:bg-surface-2 hover:text-primary-token',
-        'focus-visible:ring-offset-1',
-        'motion-reduce:transform-none',
-        !collapsed && 'active:scale-95 hover:scale-[1.02]'
-      )}
     >
-      {icon}
-      {!collapsed && <span className='leading-none'>Feedback</span>}
-    </Button>
+      <ChatBubbleBottomCenterTextIcon
+        className={cn(
+          'h-4 w-4 shrink-0 text-emerald-500 group-hover:text-emerald-400 transition-colors duration-200',
+          collapsed ? 'mx-auto my-auto' : ''
+        )}
+      />
+      <span
+        className={cn(
+          'text-xs font-medium transition-all duration-200 ease-in-out',
+          collapsed
+            ? 'opacity-0 w-0 overflow-hidden'
+            : 'opacity-100 w-auto leading-none'
+        )}
+      >
+        Feedback
+      </span>
+    </button>
   );
 
   // In collapsed mode, wrap with tooltip
@@ -74,9 +71,7 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
       <>
         <Tooltip>
           <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
-          <TooltipContent side='right' className='text-xs font-medium'>
-            Send feedback
-          </TooltipContent>
+          <TooltipContent side='right'>Send feedback</TooltipContent>
         </Tooltip>
         <FeedbackModal
           isOpen={isModalOpen}

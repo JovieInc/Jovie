@@ -1,11 +1,10 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Select } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import { track } from '@/lib/analytics';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';

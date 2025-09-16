@@ -1,9 +1,8 @@
 'use client';
 
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { Monitor, Moon, Sun } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface EnhancedThemeToggleProps {
@@ -11,8 +10,6 @@ interface EnhancedThemeToggleProps {
   showSystemOption?: boolean;
   variant?: 'default' | 'compact';
 }
-
-type ThemeValue = 'light' | 'dark' | 'system';
 
 export function EnhancedThemeToggle({
   onThemeChange,
@@ -27,21 +24,31 @@ export function EnhancedThemeToggle({
     setMounted(true);
   }, []);
 
-  const appliedTheme = useMemo<ThemeValue>(() => {
-    if (!mounted) return 'system';
-    if (theme === 'system') {
-      if (resolvedTheme === 'dark') return 'dark';
-      if (resolvedTheme === 'light') return 'light';
-      return 'system';
-    }
-    return (theme as ThemeValue) ?? 'system';
-  }, [mounted, resolvedTheme, theme]);
+  if (!mounted) {
+    return showSystemOption ? (
+      <div className='space-y-3'>
+        <div className='animate-pulse space-y-3'>
+          <div className='h-4 bg-surface-hover-token rounded w-24'></div>
+          <div className='h-8 bg-surface-hover-token rounded'></div>
+        </div>
+      </div>
+    ) : (
+      <div className='flex items-center space-x-3'>
+        <span className='text-sm text-secondary-token'>Light</span>
+        <div className='relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
+          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'></span>
+        </div>
+        <span className='text-sm text-secondary-token'>Dark</span>
+      </div>
+    );
+  }
 
-  const savePreference = async (newTheme: ThemeValue) => {
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
     setIsUpdating(true);
     setTheme(newTheme);
 
     try {
+      // Save theme preference to database for signed-in users
       const response = await fetch('/api/dashboard/profile', {
         method: 'PUT',
         headers: {
@@ -66,95 +73,44 @@ export function EnhancedThemeToggle({
     }
   };
 
-  if (!mounted) {
-    if (showSystemOption) {
-      return (
-        <div className='space-y-3'>
-          <div className='h-4 w-28 rounded-md bg-surface-2 animate-pulse' />
-          <div className='grid grid-cols-3 gap-2'>
-            {(['light', 'dark', 'system'] as ThemeValue[]).map(option => (
-              <div
-                key={option}
-                className='h-16 rounded-xl border border-subtle bg-surface-1 animate-pulse'
-              />
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    if (variant === 'compact') {
-      return (
-        <div className='h-9 w-9 rounded-full bg-surface-2 animate-pulse' />
-      );
-    }
-
-    return (
-      <div className='flex items-center gap-2'>
-        <div className='h-9 flex-1 rounded-md border border-subtle bg-surface-1 animate-pulse' />
-        <div className='h-9 flex-1 rounded-md border border-subtle bg-surface-1 animate-pulse' />
-      </div>
-    );
-  }
-
-  const options: ThemeValue[] = showSystemOption
-    ? ['light', 'dark', 'system']
-    : ['light', 'dark'];
-
-  const optionCopy: Record<ThemeValue, string> = {
-    light: 'Light',
-    dark: 'Dark',
-    system: 'System',
-  };
-
-  const optionIcons: Record<ThemeValue, JSX.Element> = {
-    light: <Sun className='h-4 w-4' aria-hidden='true' />,
-    dark: <Moon className='h-4 w-4' aria-hidden='true' />,
-    system: <Monitor className='h-4 w-4' aria-hidden='true' />,
-  };
-
-  const isDarkMode = appliedTheme === 'dark';
-
   if (showSystemOption) {
+    // Full theme selector with system option (for settings page)
     return (
       <div className='space-y-3'>
         <label className='text-sm font-medium text-primary-token'>
-          Theme preference
+          Theme Preference
         </label>
         <div className='grid grid-cols-3 gap-2'>
-          {options.map(option => {
-            const isActive = theme === option;
-
-            return (
-              <Button
-                key={option}
-                type='button'
-                variant='ghost'
-                className={cn(
-                  'h-auto flex flex-col items-center justify-center gap-1 rounded-xl border px-3 py-3 text-sm transition-all',
-                  isActive
-                    ? 'border-accent bg-accent/10 text-primary-token shadow-sm'
-                    : 'border-transparent bg-surface-1 text-secondary-token hover:bg-surface-2',
-                  isUpdating && option === theme && 'opacity-80'
-                )}
-                onClick={() => savePreference(option)}
-                disabled={isUpdating}
-                aria-pressed={isActive}
-              >
-                <span className='flex size-8 items-center justify-center rounded-full bg-surface-2 text-primary-token'>
-                  {optionIcons[option]}
+          {[
+            { value: 'light', label: 'Light', icon: '☀️' },
+            { value: 'dark', label: 'Dark', icon: '🌙' },
+            { value: 'system', label: 'System', icon: '💻' },
+          ].map(option => (
+            <button
+              key={option.value}
+              onClick={() =>
+                handleThemeChange(option.value as 'light' | 'dark' | 'system')
+              }
+              disabled={isUpdating}
+              className={`
+                flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
+                ${
+                  theme === option.value
+                    ? 'border-accent bg-accent/10 text-primary-token'
+                    : 'border-border hover:bg-surface-hover-token text-secondary-token'
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+            >
+              <span className='text-lg mb-1'>{option.icon}</span>
+              <span className='text-xs font-medium'>{option.label}</span>
+              {theme === option.value && option.value === 'system' && (
+                <span className='text-xs text-secondary-token mt-1'>
+                  ({resolvedTheme})
                 </span>
-                <span className='text-xs font-medium'>
-                  {optionCopy[option]}
-                </span>
-                {option === 'system' && theme === 'system' ? (
-                  <span className='text-xs text-tertiary-token'>
-                    ({resolvedTheme ?? 'auto'})
-                  </span>
-                ) : null}
-              </Button>
-            );
-          })}
+              )}
+            </button>
+          ))}
         </div>
         <p className='text-xs text-secondary-token'>
           Choose how the interface appears. System follows your device settings.
@@ -163,66 +119,111 @@ export function EnhancedThemeToggle({
     );
   }
 
-  if (variant === 'compact') {
-    const nextTheme: ThemeValue = isDarkMode ? 'light' : 'dark';
+  // Simple toggle (for sidebar)
+  const isDark = resolvedTheme === 'dark';
 
+  if (variant === 'compact') {
     return (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
+          <button
             type='button'
-            variant='ghost'
-            size='icon'
-            onClick={() => savePreference(nextTheme)}
             disabled={isUpdating}
-            aria-label={`Switch to ${isDarkMode ? 'light' : 'dark'} mode`}
-            className='h-9 w-9 rounded-full text-secondary-token hover:text-primary-token'
-          >
-            {isDarkMode ? (
-              <Moon className='h-4 w-4' aria-hidden='true' />
-            ) : (
-              <Sun className='h-4 w-4' aria-hidden='true' />
+            onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
+            className={cn(
+              'w-8 h-8 p-0 group items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+              isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'
             )}
-          </Button>
+          >
+            {isDark ? (
+              <svg
+                className='h-4 w-4 mx-auto my-auto text-blue-400 group-hover:text-blue-300 transition-colors duration-200'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            ) : (
+              <svg
+                className='h-4 w-4 mx-auto my-auto text-amber-500 group-hover:text-amber-400 transition-colors duration-200'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            )}
+          </button>
         </TooltipTrigger>
         <TooltipContent side='right'>
-          {isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         </TooltipContent>
       </Tooltip>
     );
   }
 
   return (
-    <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-1 p-1'>
-      {options.map(option => {
-        const isActive =
-          option === appliedTheme ||
-          (theme === 'system' && option === appliedTheme);
-
-        return (
-          <Button
-            key={option}
-            type='button'
-            variant='ghost'
-            size='sm'
-            className={cn(
-              'flex-1 justify-center rounded-md border text-sm font-medium transition-all',
-              isActive
-                ? 'border-accent bg-accent/10 text-primary-token shadow-sm'
-                : 'border-transparent text-secondary-token hover:bg-surface-2',
-              isUpdating && option === appliedTheme && 'opacity-80'
-            )}
-            onClick={() => savePreference(option)}
-            disabled={isUpdating}
-            aria-pressed={isActive}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type='button'
+          disabled={isUpdating}
+          onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
+            isDark ? 'bg-accent' : 'bg-surface-hover-token'
+          } p-0.5`}
+          role='switch'
+          aria-checked={isDark}
+        >
+          <span className='sr-only'>
+            {isUpdating
+              ? 'Updating theme...'
+              : `Switch to ${isDark ? 'light' : 'dark'} mode`}
+          </span>
+          <span
+            aria-hidden='true'
+            className={`flex h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
+              isDark ? 'translate-x-5' : 'translate-x-0'
+            } ${isUpdating ? 'animate-pulse' : ''}`}
           >
-            <span className='flex items-center gap-2'>
-              {optionIcons[option]}
-              <span>{optionCopy[option]}</span>
-            </span>
-          </Button>
-        );
-      })}
-    </div>
+            {isDark ? (
+              <svg
+                className='h-3 w-3 text-accent-token'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            ) : (
+              <svg
+                className='h-3 w-3 text-yellow-500'
+                fill='currentColor'
+                viewBox='0 0 20 20'
+              >
+                <path
+                  fillRule='evenodd'
+                  d='M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z'
+                  clipRule='evenodd'
+                />
+              </svg>
+            )}
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side='right'>
+        {isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      </TooltipContent>
+    </Tooltip>
   );
 }

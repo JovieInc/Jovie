@@ -1,5 +1,5 @@
+import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { v4 as uuidv4 } from 'uuid';
 import { db, withDb } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 
@@ -14,9 +14,9 @@ async function createTestUser() {
   console.log('Creating test user...');
 
   // Generate unique IDs for test data
-  const userId = uuidv4();
-  const creatorId = uuidv4();
-  const linkId = uuidv4();
+  const userId = randomUUID();
+  const creatorId = randomUUID();
+  const linkId = randomUUID();
   const clerkId = `user_${Date.now()}`;
   const username = `testuser-${Date.now()}`;
 

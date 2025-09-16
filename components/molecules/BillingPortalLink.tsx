@@ -1,8 +1,8 @@
 'use client';
 
 import { CreditCardIcon } from '@heroicons/react/24/outline';
+import { Button, type ButtonProps } from '@jovie/ui';
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { track } from '@/lib/analytics';
 
 interface BillingPortalLinkProps {
@@ -74,13 +74,15 @@ export function BillingPortalLink({
     }
   };
 
+  const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : size;
+
   return (
     <div className={className}>
       <Button
         onClick={handleClick}
         disabled={loading}
         variant={variant}
-        size={size}
+        size={mappedSize}
         className='inline-flex items-center gap-2'
       >
         <CreditCardIcon className='h-4 w-4' />

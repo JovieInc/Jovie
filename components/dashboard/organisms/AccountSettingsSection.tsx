@@ -1,10 +1,8 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Note: Using any for Clerk types as they're not exported from @clerk/nextjs
 import { useSession, useUser } from '@clerk/nextjs';
-import type {
-  EmailAddressResource,
-  SessionWithActivitiesResource,
-} from '@clerk/types';
 import {
   CheckCircleIcon,
   EnvelopeIcon,
@@ -63,16 +61,14 @@ export function AccountSettingsSection() {
 
   const [newEmail, setNewEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [pendingEmail, setPendingEmail] = useState<EmailAddressResource | null>(
-    null
-  );
+  const [pendingEmail, setPendingEmail] = useState<any>(null);
   const [emailStatus, setEmailStatus] = useState<
     'idle' | 'sending' | 'code' | 'verifying'
   >('idle');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [syncingEmailId, setSyncingEmailId] = useState<string | null>(null);
 
-  const [sessions, setSessions] = useState<SessionWithActivitiesResource[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
@@ -123,7 +119,7 @@ export function AccountSettingsSection() {
 
   const primaryEmailId = user?.primaryEmailAddressId ?? null;
   const sortedEmails = useMemo(() => {
-    if (!user) return [] as EmailAddressResource[];
+    if (!user) return [] as any[];
     const addresses = [...user.emailAddresses];
     return addresses.sort((a, b) => {
       if (a.id === primaryEmailId) return -1;
@@ -219,7 +215,7 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handleMakePrimary = async (email: EmailAddressResource) => {
+  const handleMakePrimary = async (email: any) => {
     if (!user) return;
     setSyncingEmailId(email.id);
 
@@ -239,7 +235,7 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handleRemoveEmail = async (email: EmailAddressResource) => {
+  const handleRemoveEmail = async (email: any) => {
     if (!user) return;
     setSyncingEmailId(email.id);
     try {
@@ -288,7 +284,7 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handleEndSession = async (session: SessionWithActivitiesResource) => {
+  const handleEndSession = async (session: any) => {
     setEndingSessionId(session.id);
     try {
       await session.revoke();

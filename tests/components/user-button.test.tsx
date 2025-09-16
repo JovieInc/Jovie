@@ -17,17 +17,33 @@ vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
 }));
 
+const showToastMock = vi.fn();
+
+vi.mock('@/components/ui/ToastContainer', () => ({
+  __esModule: true,
+  useToast: () => ({
+    showToast: showToastMock,
+    hideToast: vi.fn(),
+    clearToasts: vi.fn(),
+  }),
+}));
+
+vi.mock('@/lib/analytics', () => ({
+  __esModule: true,
+  track: vi.fn(),
+}));
+
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/molecules/UserButton';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { track } from '@/lib/analytics';
 
 const mockUseBillingStatus = vi.mocked(useBillingStatus);
 const mockUseUser = vi.mocked(useUser);
 const mockUseClerk = vi.mocked(useClerk);
 const mockUseRouter = vi.mocked(useRouter);
 
-const originalFetch = global.fetch;
 const originalLocation = window.location;
 
 describe('UserButton billing actions', () => {
@@ -38,10 +54,11 @@ describe('UserButton billing actions', () => {
     vi.clearAllMocks();
 
     fetchMock = vi.fn();
-    global.fetch = fetchMock as unknown as typeof global.fetch;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
 
     mockUseUser.mockReturnValue({
       isLoaded: true,
+      isSignedIn: true,
       user: {
         imageUrl: null,
         fullName: 'Adele Adkins',
@@ -62,6 +79,7 @@ describe('UserButton billing actions', () => {
     } as any);
 
     mockUseBillingStatus.mockReset();
+    showToastMock.mockReset();
 
     Object.defineProperty(window, 'location', {
       value: { href: '' },
@@ -71,7 +89,6 @@ describe('UserButton billing actions', () => {
   });
 
   afterAll(() => {
-    global.fetch = originalFetch;
     Object.defineProperty(window, 'location', {
       value: originalLocation,
       configurable: true,
@@ -127,6 +144,14 @@ describe('UserButton billing actions', () => {
         })
       );
       expect(window.location.href).toBe(checkoutUrl);
+      expect(track).toHaveBeenCalledWith(
+        'billing_upgrade_clicked',
+        expect.objectContaining({ surface: 'sidebar_user_menu' })
+      );
+      expect(track).toHaveBeenCalledWith(
+        'billing_upgrade_checkout_redirected',
+        expect.objectContaining({ interval: 'month' })
+      );
     });
   });
 
@@ -159,6 +184,14 @@ describe('UserButton billing actions', () => {
         headers: { 'Content-Type': 'application/json' },
       });
       expect(window.location.href).toBe(portalUrl);
+      expect(track).toHaveBeenCalledWith(
+        'billing_manage_billing_clicked',
+        expect.objectContaining({ surface: 'sidebar_user_menu' })
+      );
+      expect(track).toHaveBeenCalledWith(
+        'billing_manage_billing_redirected',
+        expect.any(Object)
+      );
     });
   });
 });

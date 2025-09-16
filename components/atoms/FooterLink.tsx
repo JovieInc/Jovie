@@ -1,20 +1,18 @@
-'use client';
-
 import { Button, type ButtonProps } from '@jovie/ui';
-import { cn } from '@jovie/ui/lib/utils';
 import Link from 'next/link';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
-const toneStyles = {
-  light: 'text-secondary-token hover:text-primary-token',
-  dark: 'text-white/70 hover:text-white',
+const variantStyles = {
+  light:
+    'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+  dark: 'text-white/60 hover:text-white',
 } as const;
 
-interface FooterLinkProps
-  extends Omit<ButtonProps, 'children' | 'variant' | 'size' | 'asChild'> {
+interface FooterLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
   href: string;
   children: React.ReactNode;
-  variant?: keyof typeof toneStyles;
+  variant?: keyof typeof variantStyles;
 }
 
 export function FooterLink({
@@ -25,23 +23,21 @@ export function FooterLink({
   ...props
 }: FooterLinkProps) {
   const external = /^https?:\/\//.test(href);
-
-  const computedClassName = cn(
-    'inline-flex items-center gap-2 h-auto px-0 py-0 text-sm transition-colors',
-    toneStyles[variant],
-    className
-  );
+  const common = {
+    variant: 'ghost' as const,
+    size: 'sm' as const,
+    className: cn(
+      'h-auto px-0 py-0 transition-colors',
+      variantStyles[variant],
+      className
+    ),
+    ...props,
+  };
 
   if (external) {
     return (
-      <Button
-        asChild
-        className={computedClassName}
-        size='sm'
-        variant='ghost'
-        {...props}
-      >
-        <a href={href} rel='noopener noreferrer' target='_blank'>
+      <Button asChild {...common}>
+        <a href={href} target='_blank' rel='noopener noreferrer'>
           {children}
         </a>
       </Button>
@@ -49,13 +45,7 @@ export function FooterLink({
   }
 
   return (
-    <Button
-      asChild
-      className={computedClassName}
-      size='sm'
-      variant='ghost'
-      {...props}
-    >
+    <Button asChild {...common}>
       <Link href={href}>{children}</Link>
     </Button>
   );
