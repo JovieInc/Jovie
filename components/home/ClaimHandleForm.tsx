@@ -1,9 +1,9 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { ErrorSummary } from '@/components/ui/ErrorSummary';
 import { FormField } from '@/components/ui/FormField';
 import { Input } from '@/components/ui/Input';
@@ -183,7 +183,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const showChecking = checkingAvail;
   const unavailable = available === false || !!handleError || !!availError;
   const canSubmit = available === true && !checkingAvail && !navigating;
-  const btnColor: 'green' | 'indigo' = available === true ? 'green' : 'indigo';
+  // Previously used a color prop to swap tones; now rely on variant styling only
   const btnDisabled = !canSubmit;
 
   // Collect all form errors for the error summary
@@ -329,7 +329,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
       <Button
         type='submit'
         variant='primary'
-        color={btnColor}
         size='lg'
         className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg active:scale-[0.98] transform-gpu group'
         disabled={btnDisabled || !handle}

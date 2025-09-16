@@ -5,17 +5,17 @@ import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Use a client wrapper for the Featured Artists carousel to avoid ssr:false in a Server Component
-const NewFeaturesSection = dynamic(
-  () => import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
+const NewFeaturesSection = dynamic(() =>
+  import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
 );
-const NewUpgradeTeaser = dynamic(
-  () => import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
+const NewUpgradeTeaser = dynamic(() =>
+  import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
 );
-const NewHowItWorks = dynamic(
-  () => import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
+const NewHowItWorks = dynamic(() =>
+  import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
 );
-const NewPreFooterCTA = dynamic(
-  () => import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
+const NewPreFooterCTA = dynamic(() =>
+  import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
 );
 
 // Root layout handles dynamic rendering

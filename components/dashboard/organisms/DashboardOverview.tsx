@@ -88,7 +88,7 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
               </div>
             </div>
 
-            <ol className='space-y-3'>
+            <ol className='space-y-3 list-none pl-0'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'

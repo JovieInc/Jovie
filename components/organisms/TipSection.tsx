@@ -1,8 +1,8 @@
+import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { LoadingButton } from '@/components/molecules/LoadingButton';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/ToastContainer';
 
 interface TipSectionProps {

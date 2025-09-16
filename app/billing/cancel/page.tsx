@@ -1,10 +1,10 @@
 'use client';
 
 import { XCircleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
-import { Button } from '@/components/ui/Button';
 import { page, track } from '@/lib/analytics';
 
 export default function CheckoutCancelPage() {
@@ -43,8 +43,8 @@ export default function CheckoutCancelPage() {
       <div className='mt-8 flex flex-col sm:flex-row gap-4 justify-center'>
         <UpgradeButton>Try Again</UpgradeButton>
 
-        <Button variant='outline' as={Link} href='/dashboard'>
-          Back to Dashboard
+        <Button variant='outline' asChild>
+          <Link href='/dashboard'>Back to Dashboard</Link>
         </Button>
       </div>
 

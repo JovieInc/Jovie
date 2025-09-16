@@ -1,6 +1,6 @@
+import { Button, type ButtonProps } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 const variantStyles = {
@@ -24,7 +24,7 @@ export function FooterLink({
 }: FooterLinkProps) {
   const external = /^https?:\/\//.test(href);
   const common = {
-    variant: 'plain' as const,
+    variant: 'ghost' as const,
     size: 'sm' as const,
     className: cn(
       'h-auto px-0 py-0 transition-colors',
@@ -36,21 +36,17 @@ export function FooterLink({
 
   if (external) {
     return (
-      <Button
-        as='a'
-        href={href}
-        target='_blank'
-        rel='noopener noreferrer'
-        {...common}
-      >
-        {children}
+      <Button asChild {...common}>
+        <a href={href} target='_blank' rel='noopener noreferrer'>
+          {children}
+        </a>
       </Button>
     );
   }
 
   return (
-    <Button as={Link} href={href} {...common}>
-      {children}
+    <Button asChild {...common}>
+      <Link href={href}>{children}</Link>
     </Button>
   );
 }

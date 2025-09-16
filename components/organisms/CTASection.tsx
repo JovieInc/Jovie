@@ -61,7 +61,7 @@ export function CTASection({
           <CTAButton
             href={buttonHref}
             variant={variant === 'secondary' ? 'secondary' : 'primary'}
-            size={variant === 'secondary' ? 'lg' : 'md'}
+            size={variant === 'secondary' ? 'lg' : 'default'}
           >
             {buttonText}
           </CTAButton>

@@ -2,6 +2,8 @@
 
 import { useClerk, useUser } from '@clerk/nextjs';
 import {
+  Badge,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -13,8 +15,6 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/ToastContainer';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';

@@ -1,8 +1,8 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/Button';
 
 interface ThemeToggleProps {
   appearance?: 'icon' | 'segmented';

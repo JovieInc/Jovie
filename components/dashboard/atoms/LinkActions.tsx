@@ -1,8 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { Tooltip } from '@/components/atoms/Tooltip';
 import { cn } from '@/lib/utils';
 
 interface LinkActionsProps {
@@ -24,32 +23,40 @@ export function LinkActions({
 }: LinkActionsProps) {
   return (
     <div className={cn('flex items-center gap-1', className)}>
-      <Tooltip content={isVisible ? 'Hide link' : 'Show link'} placement='top'>
-        <Button
-          size='icon'
-          variant='ghost'
-          className='h-7 w-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity'
-          onClick={onToggle}
-          aria-label={isVisible ? 'Hide link' : 'Show link'}
-        >
-          {isVisible ? (
-            <Icon name='Eye' className='h-3.5 w-3.5' />
-          ) : (
-            <Icon name='EyeOff' className='h-3.5 w-3.5' />
-          )}
-        </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size='icon'
+            variant='ghost'
+            className='h-7 w-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity'
+            onClick={onToggle}
+            aria-label={isVisible ? 'Hide link' : 'Show link'}
+          >
+            {isVisible ? (
+              <Icon name='Eye' className='h-3.5 w-3.5' />
+            ) : (
+              <Icon name='EyeOff' className='h-3.5 w-3.5' />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side='top'>
+          {isVisible ? 'Hide link' : 'Show link'}
+        </TooltipContent>
       </Tooltip>
 
-      <Tooltip content='Remove link' placement='top'>
-        <Button
-          size='icon'
-          variant='ghost'
-          className='h-7 w-7 text-destructive/70 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity'
-          onClick={onRemove}
-          aria-label='Remove link'
-        >
-          <Icon name='Trash2' className='h-3.5 w-3.5' />
-        </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size='icon'
+            variant='ghost'
+            className='h-7 w-7 text-destructive/70 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity'
+            onClick={onRemove}
+            aria-label='Remove link'
+          >
+            <Icon name='Trash2' className='h-3.5 w-3.5' />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side='top'>Remove link</TooltipContent>
       </Tooltip>
 
       {showDragHandle && (

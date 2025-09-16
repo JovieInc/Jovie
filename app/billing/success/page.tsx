@@ -1,9 +1,9 @@
 'use client';
 
 import { CheckCircleIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
 import { page, track } from '@/lib/analytics';
 
 export default function CheckoutSuccessPage() {
@@ -40,12 +40,12 @@ export default function CheckoutSuccessPage() {
       </p>
 
       <div className='mt-8 flex flex-col sm:flex-row gap-4 justify-center'>
-        <Button as={Link} href='/dashboard'>
-          Go to Dashboard
+        <Button asChild>
+          <Link href='/dashboard'>Go to Dashboard</Link>
         </Button>
 
-        <Button variant='outline' as={Link} href='/billing'>
-          View Billing
+        <Button variant='outline' asChild>
+          <Link href='/billing'>View Billing</Link>
         </Button>
       </div>
 

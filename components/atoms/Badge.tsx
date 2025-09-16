@@ -1,1 +1,1 @@
-export { Badge, type BadgeProps } from '@/components/ui/Badge';
+export { Badge, type BadgeProps } from '@jovie/ui';

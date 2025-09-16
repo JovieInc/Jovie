@@ -1,7 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export function WaitlistLink() {
   return (
@@ -15,15 +15,14 @@ export function WaitlistLink() {
               Artist profile claiming is currently in beta. Join our waitlist to
               get early access when we launch.
             </p>
-            <Link href='/waitlist'>
-              <Button
-                variant='primary'
-                size='lg'
-                className='rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200'
-              >
-                Join Waitlist
-              </Button>
-            </Link>
+            <Button
+              asChild
+              variant='primary'
+              size='lg'
+              className='rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200'
+            >
+              <Link href='/waitlist'>Join Waitlist</Link>
+            </Button>
           </div>
         </div>
       </div>

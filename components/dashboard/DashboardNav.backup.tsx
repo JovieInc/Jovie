@@ -8,11 +8,10 @@ import {
   LinkIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Divider } from '@/components/atoms/Divider';
-import { Tooltip } from '@/components/atoms/Tooltip';
-import { Button } from '@jovie/ui';
 import { cn } from '@/lib/utils';
 
 // Primary Navigation - Core features
@@ -160,12 +159,18 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
         return (
           <li key={item.name}>
             {collapsed ? (
-              <Tooltip
-                content={item.name}
-                shortcut={navShortcuts[item.id]}
-                placement='right'
-              >
-                {linkContent}
+              <Tooltip>
+                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                <TooltipContent side='right'>
+                  <div className='flex items-center gap-2'>
+                    <span>{item.name}</span>
+                    {navShortcuts[item.id] && (
+                      <kbd className='text-xs text-tertiary-token border rounded px-1'>
+                        {navShortcuts[item.id]}
+                      </kbd>
+                    )}
+                  </div>
+                </TooltipContent>
               </Tooltip>
             ) : (
               linkContent

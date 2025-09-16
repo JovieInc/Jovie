@@ -1,5 +1,5 @@
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export function LinkInBioCTA() {
   return (
@@ -54,23 +54,21 @@ export function LinkInBioCTA() {
         {/* CTA buttons */}
         <div className='mt-12 flex flex-col sm:flex-row gap-6 justify-center items-center'>
           <Button
-            as={Link}
-            href='/onboarding'
+            asChild
             size='lg'
             variant='primary'
             className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
           >
-            Create Your Profile
+            <Link href='/onboarding'>Create Your Profile</Link>
           </Button>
 
           <Button
-            as={Link}
-            href='/pricing'
+            asChild
             size='lg'
             variant='secondary'
             className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105'
           >
-            View Pricing
+            <Link href='/pricing'>View Pricing</Link>
           </Button>
         </div>
 

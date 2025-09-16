@@ -7,14 +7,14 @@ Refactor legacy components to align with the `shadcn/ui` design system. Each tas
 ## Tasks
 
 ### CTAButton (`components/atoms/CTAButton.tsx`)
-- [ ] Rebuild using `components/ui/Button` with prop parity
-- [ ] Fold loading/success states into `LoadingButton` or `OptimisticProgress`
-- [ ] Remove direct theme and motion logic in favor of shared hooks
+- [x] Rebuild using `components/ui/Button` with prop parity
+- [x] Fold loading/success states into `LoadingButton` or `OptimisticProgress`
+- [x] Remove direct theme and motion logic in favor of shared hooks
 
 ### FrostedButton (`components/atoms/FrostedButton.tsx`)
-- [ ] Convert to a `Button` variant (`ghost` or `outline`) with a frosted style token
-- [ ] Ensure focus and hover states match shadcn defaults
-- [ ] Delete bespoke shape utilities once migrated
+- [x] Convert to a `Button` variant (`ghost` or `outline`) with a frosted style token
+- [x] Ensure focus and hover states match shadcn defaults
+- [x] Delete bespoke shape utilities once migrated
 
 ### IconButton (`components/atoms/IconButton.tsx`)
 - [x] Replace with `Button` `size="icon"`
@@ -22,19 +22,19 @@ Refactor legacy components to align with the `shadcn/ui` design system. Each tas
 - [x] Leverage shared disabled and focus handling
 
 ### DSPButton (`components/atoms/DSPButton.tsx`)
-- [ ] Extend `Button` to accept dynamic brand colors and SVG logos
-- [ ] Centralize external link behavior
-- [ ] Document analytics events within component props
+- [x] Extend `Button` to accept dynamic brand colors and SVG logos
+- [x] Centralize external link behavior
+- [x] Document analytics events within component props
 
 ### NavLink (`components/atoms/NavLink.tsx`) & FooterLink (`components/atoms/FooterLink.tsx`)
-- [ ] Replace custom link styling with `buttonVariants` or `Link` wrappers from `ui`
-- [ ] Merge accessibility and external-link safeguards
-- [ ] Provide concise, human copy for labels
+- [x] Replace custom link styling with `buttonVariants` or `Link` wrappers from `ui`
+- [x] Merge accessibility and external-link safeguards
+- [x] Provide concise, human copy for labels
 
 ### Badge (`components/atoms/Badge.tsx`)
-- [ ] Migrate to `Badge` from `shadcn/ui`
-- [ ] Map existing variants to design tokens
-- [ ] Remove legacy size logic once unified
+- [x] Migrate to `Badge` from `shadcn/ui`
+- [x] Map existing variants to design tokens
+- [x] Remove legacy size logic once unified
 
 ### LoadingSpinner (`components/atoms/LoadingSpinner.tsx` & `components/ui/Spinner.tsx`)
 - [x] Consolidate into a single spinner component under `ui`

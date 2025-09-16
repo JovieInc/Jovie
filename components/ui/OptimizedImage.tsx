@@ -111,7 +111,7 @@ export const OptimizedImage = React.memo(function OptimizedImage({
   fill = false,
   width,
   height,
-  quality = 90,
+  quality = 85,
   aspectRatio,
   objectFit = 'cover',
   objectPosition = 'center',

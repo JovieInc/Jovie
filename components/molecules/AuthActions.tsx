@@ -1,6 +1,6 @@
 import { useUser } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { Button } from '@/components/ui/Button';
 
 export function AuthActions() {
   const { isSignedIn } = useUser();
@@ -25,8 +25,8 @@ export function AuthActions() {
       >
         Sign in
       </Link>
-      <Button as={Link} href='/signup' variant='primary' size='md'>
-        Sign up
+      <Button asChild variant='primary' size='default'>
+        <Link href='/signup'>Sign up</Link>
       </Button>
     </div>
   );

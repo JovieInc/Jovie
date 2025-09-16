@@ -1,17 +1,20 @@
+import { Button, type ButtonProps } from '@jovie/ui';
 import React, { forwardRef } from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-interface FrostedButtonProps extends ButtonProps {
+interface FrostedButtonProps extends Omit<ButtonProps, 'variant'> {
   shape?: 'default' | 'circle' | 'square';
-  variant?: 'default' | 'ghost' | 'outline';
+  frostedStyle?: 'default' | 'ghost' | 'outline';
 }
 
 /**
  * Button with a frosted glass effect built on the shared Button component.
  */
 export const FrostedButton = forwardRef<HTMLButtonElement, FrostedButtonProps>(
-  ({ className, shape = 'default', variant = 'default', ...props }, ref) => {
+  (
+    { className, shape = 'default', frostedStyle = 'default', ...props },
+    ref
+  ) => {
     const shapeClasses = {
       default: 'rounded-lg',
       circle: 'rounded-full',
@@ -30,10 +33,10 @@ export const FrostedButton = forwardRef<HTMLButtonElement, FrostedButtonProps>(
     return (
       <Button
         ref={ref}
-        variant='ghost'
+        variant={frostedStyle === 'outline' ? 'outline' : 'ghost'}
         className={cn(
           'border border-gray-200/30 dark:border-white/10',
-          variantClasses[variant],
+          variantClasses[frostedStyle],
           shapeClasses[shape],
           className
         )}

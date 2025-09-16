@@ -522,7 +522,8 @@ export function AppleStyleOnboardingForm() {
             </p>
             <Button
               onClick={goToNextStep}
-              className='btn btn-primary w-full py-4 text-lg rounded-xl'
+              variant='primary'
+              className='w-full py-4 text-lg rounded-xl'
             >
               Start
             </Button>
@@ -559,11 +560,8 @@ export function AppleStyleOnboardingForm() {
                 <Button
                   onClick={goToNextStep}
                   disabled={!fullName.trim() || fullName.trim().length < 1}
-                  className={`w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out ${
-                    fullName.trim().length >= 1
-                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
-                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
-                  }`}
+                  variant='primary'
+                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
                 >
                   Continue
                 </Button>
@@ -688,13 +686,8 @@ export function AppleStyleOnboardingForm() {
                     !handleValidation.clientValid ||
                     state.isSubmitting
                   }
-                  className={`w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out ${
-                    handleValidation.available &&
-                    handleValidation.clientValid &&
-                    !state.isSubmitting
-                      ? 'btn btn-primary hover:scale-[1.02] active:scale-[0.98]'
-                      : 'bg-[var(--panel)] border border-[var(--border)] text-[var(--muted)] cursor-not-allowed scale-100'
-                  }`}
+                  variant='primary'
+                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
                 >
                   {state.isSubmitting ? (
                     <div className='flex items-center justify-center space-x-2'>
@@ -780,14 +773,16 @@ export function AppleStyleOnboardingForm() {
               <div className='space-y-3'>
                 <Button
                   onClick={goToDashboard}
-                  className='btn btn-primary w-full py-4 text-lg rounded-xl'
+                  variant='primary'
+                  className='w-full py-4 text-lg rounded-xl'
                 >
                   Go to Dashboard
                 </Button>
 
                 <Button
                   onClick={copyProfileLink}
-                  className='btn btn-secondary w-full py-4 text-lg rounded-xl'
+                  variant='secondary'
+                  className='w-full py-4 text-lg rounded-xl'
                 >
                   Copy Link
                 </Button>
@@ -837,7 +832,7 @@ export function AppleStyleOnboardingForm() {
       {/* Skip link for accessibility */}
       <a
         href='#main-content'
-        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 btn btn-primary px-4 py-2 rounded-md z-50'
+        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 bg-black text-white dark:bg-white dark:text-black'
       >
         Skip to main content
       </a>
