@@ -1,7 +1,7 @@
 // postcss.config.mjs (ESM)
 const config = {
   plugins: {
-    '@tailwindcss/postcss': {},
+    "@tailwindcss/postcss": {},
   },
 };
 
