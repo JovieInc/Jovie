@@ -587,3 +587,99 @@ MockedComponents.Description.displayName = 'MockedDescription';
 MockedComponents.Input.displayName = 'MockedInput';
 
 vi.mock('@headlessui/react', () => MockedComponents);
+
+// Mock @dnd-kit/core
+vi.mock('@dnd-kit/core', () => ({
+  DndContext: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'dnd-context' }, children),
+  useDraggable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    isDragging: false,
+  }),
+  useDroppable: () => ({
+    setNodeRef: vi.fn(),
+    isOver: false,
+  }),
+  useSensor: vi.fn(),
+  useSensors: vi.fn(() => []),
+  PointerSensor: vi.fn(),
+  KeyboardSensor: vi.fn(),
+  DragOverlay: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'drag-overlay' }, children),
+  MouseSensor: vi.fn(),
+  TouchSensor: vi.fn(),
+}));
+
+// Mock @dnd-kit/sortable
+vi.mock('@dnd-kit/sortable', () => ({
+  SortableContext: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'sortable-context' }, children),
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: vi.fn(),
+    transform: null,
+    transition: null,
+    isDragging: false,
+  }),
+  arrayMove: (array: unknown[], oldIndex: number, newIndex: number) => {
+    const newArray = [...array];
+    const [moved] = newArray.splice(oldIndex, 1);
+    newArray.splice(newIndex, 0, moved);
+    return newArray;
+  },
+  sortableKeyboardCoordinates: vi.fn(),
+  verticalListSortingStrategy: 'vertical',
+  horizontalListSortingStrategy: 'horizontal',
+}));
+
+// Mock @dnd-kit/utilities
+vi.mock('@dnd-kit/utilities', () => ({
+  CSS: {
+    Transform: {
+      toString: (transform: { x: number; y: number } | null) =>
+        transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : '',
+    },
+  },
+}));
+
+// Mock @jovie/ui components
+vi.mock('@jovie/ui', () => ({
+  Tooltip: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'tooltip' }, children),
+  TooltipTrigger: ({ children }: { children: React.ReactNode }) => children,
+  TooltipContent: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'tooltip-content' }, children),
+  TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
+  Button: React.forwardRef<HTMLButtonElement, React.ComponentProps<'button'>>(
+    function MockButton(props, ref) {
+      return React.createElement('button', { ...props, ref });
+    }
+  ),
+  DropdownMenu: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
+    children,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'dropdown-menu-content' },
+      children
+    ),
+  DropdownMenuItem: ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'dropdown-menu-item' },
+      children
+    ),
+  DropdownMenuSeparator: () =>
+    React.createElement('div', { 'data-testid': 'dropdown-menu-separator' }),
+  Popover: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'popover' }, children),
+  PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
+  PopoverContent: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('div', { 'data-testid': 'popover-content' }, children),
+}));
