@@ -1,27 +1,28 @@
-'use client';
-
 import { cn } from '@jovie/ui/lib/utils';
 import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:pointer-events-none',
+  'relative inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         primary:
-          'bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90',
-        accent: 'bg-accent text-accent-foreground hover:bg-accent/90',
-        secondary: 'bg-surface-2 text-primary-token hover:bg-surface-3',
-        ghost: 'hover:bg-surface-2',
-        outline: 'border border-border bg-transparent hover:bg-surface-1',
+          'bg-btn-primary text-btn-primary-foreground shadow hover:bg-btn-primary/90',
+        destructive: 'bg-red-500 text-white shadow-sm hover:bg-red-500/90',
+        outline:
+          'border border-border bg-transparent shadow-sm hover:bg-surface-1 hover:text-primary-token',
+        secondary:
+          'bg-surface-2 text-primary-token shadow-sm hover:bg-surface-3',
+        ghost: 'hover:bg-surface-2 hover:text-primary-token',
+        link: 'text-accent underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 px-3',
-        lg: 'h-11 px-8',
-        icon: 'h-10 w-10',
+        default: 'h-9 px-4 py-2',
+        sm: 'h-8 rounded-md px-3 text-xs',
+        lg: 'h-10 rounded-md px-8',
+        icon: 'h-9 w-9',
       },
     },
     defaultVariants: {
@@ -36,6 +37,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
   loading?: boolean;
+  /**
+   * For icon-only buttons, provide descriptive text for screen readers
+   */
+  'aria-label'?: string;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -48,76 +53,63 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       loading = false,
       disabled,
       children,
+      'aria-label': ariaLabel,
       ...props
     },
     ref
   ) => {
     const Comp = asChild ? Slot : 'button';
     const isDisabled = disabled || loading;
+    const isIconOnly = size === 'icon';
 
-    // In asChild mode (Radix Slot), React.Children.only requires a single child.
-    // Do NOT render additional wrappers/spinner here; apply styles/props to the child.
+    // Warn if icon-only button doesn't have aria-label
+    if (
+      process.env.NODE_ENV === 'development' &&
+      isIconOnly &&
+      !ariaLabel &&
+      !props['aria-labelledby']
+    ) {
+      console.warn(
+        'Button: Icon-only buttons should have an aria-label for accessibility'
+      );
+    }
+
+    const buttonProps = {
+      className: cn(buttonVariants({ variant, size }), className),
+      'aria-disabled': isDisabled || undefined,
+      'aria-busy': loading || undefined,
+      'aria-label': ariaLabel,
+      'data-state': loading ? 'loading' : isDisabled ? 'disabled' : 'idle',
+      ...props,
+    };
+
     if (asChild) {
       return (
-        <Comp
-          ref={ref}
-          className={cn(
-            buttonVariants({ variant, size, className }),
-            isDisabled && 'pointer-events-none'
-          )}
-          aria-disabled={isDisabled || undefined}
-          aria-busy={loading || undefined}
-          data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
-          {...props}
-        >
+        <Comp ref={ref} {...buttonProps}>
           {children}
         </Comp>
       );
     }
 
-    // Normal button/anchor rendering with optional loading spinner and content opacity
     return (
       <Comp
         ref={ref}
-        className={cn(
-          buttonVariants({ variant, size, className }),
-          isDisabled && 'pointer-events-none'
-        )}
-        aria-disabled={isDisabled || undefined}
-        aria-busy={loading || undefined}
-        data-state={loading ? 'loading' : isDisabled ? 'disabled' : 'idle'}
-        {...(Comp === 'button'
-          ? {
-              disabled: isDisabled,
-              type:
-                (props as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
-                'button',
-            }
-          : {})}
-        {...props}
+        {...buttonProps}
+        disabled={isDisabled}
+        type={props.type ?? 'button'}
       >
-        {Comp === 'button' ? (
-          <>
-            {loading && (
-              <span
-                className='absolute inset-0 flex items-center justify-center'
-                data-testid='spinner'
-              >
-                <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
-              </span>
-            )}
-            <span className={loading ? 'opacity-0' : 'opacity-100'}>
-              {children}
-            </span>
-          </>
-        ) : // asChild case (Slot) — must render exactly one element child
-        React.isValidElement(children) ? (
-          children
-        ) : (
-          <span className={loading ? 'opacity-0' : 'opacity-100'}>
-            {children}
-          </span>
+        {loading && (
+          <div
+            className='absolute inset-0 flex items-center justify-center'
+            data-testid='spinner'
+            aria-hidden='true'
+          >
+            <div className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent motion-reduce:animate-none' />
+          </div>
         )}
+        <span className={cn(loading && 'opacity-0', 'flex items-center gap-2')}>
+          {children}
+        </span>
       </Comp>
     );
   }
