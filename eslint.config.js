@@ -16,6 +16,10 @@ module.exports = [
       '**/build/**',
       '**/coverage/**',
       '**/.vercel/**',
+      // Generated static outputs/reports
+      'storybook-static/**',
+      'playwright-report/**',
+      'test-results/**',
       '**/*.d.ts',
       '**/*.tsbuildinfo',
       '**/.cache/**',
@@ -81,6 +85,31 @@ module.exports = [
               name: '@clerk/clerk-react',
               message:
                 'Use @clerk/nextjs in the App Router. Import components/hooks from @clerk/nextjs or @clerk/nextjs/server only.',
+            },
+            // Enforce using shared UI package
+            {
+              name: '@/components/ui/Select',
+              message: "Use Select from '@jovie/ui' instead of local UI.",
+            },
+            {
+              name: '@/components/ui/sheet',
+              message:
+                "Use Sheet components from '@jovie/ui' instead of local UI.",
+            },
+            {
+              name: '@/components/ui/tooltip',
+              message:
+                "Use Tooltip components from '@jovie/ui' instead of local UI.",
+            },
+            {
+              name: '@/components/ui/popover',
+              message:
+                "Use Popover components from '@jovie/ui' instead of local UI.",
+            },
+            {
+              name: '@/components/ui/dropdown-menu',
+              message:
+                "Use DropdownMenu components from '@jovie/ui' instead of local UI.",
             },
           ],
         },

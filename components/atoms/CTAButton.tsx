@@ -1,17 +1,18 @@
 'use client';
 
 import { CheckIcon } from '@heroicons/react/24/solid';
+import { Button, type ButtonProps } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-export interface CTAButtonProps extends Omit<ButtonProps, 'loading'> {
+export interface CTAButtonProps extends Omit<ButtonProps, 'loading' | 'size'> {
   href?: string;
   external?: boolean;
   isLoading?: boolean;
   isSuccess?: boolean;
   icon?: React.ReactNode;
+  size?: 'sm' | 'md' | 'lg' | 'icon' | 'default';
 }
 
 /**
@@ -26,28 +27,55 @@ export function CTAButton({
   icon,
   children,
   className,
+  size,
   ...props
 }: CTAButtonProps) {
-  const Component = href ? Link : 'button';
+  const content = isSuccess ? (
+    <CheckIcon className='h-5 w-5' />
+  ) : (
+    <>
+      {icon}
+      {children}
+    </>
+  );
+  let mappedSize: ButtonProps['size'];
+  if (size === 'md') {
+    mappedSize = 'default';
+  } else if (size) {
+    // props.size may include 'default' | 'sm' | 'lg' | 'icon'
+    mappedSize = size as Exclude<CTAButtonProps['size'], 'md'>;
+  } else {
+    mappedSize = undefined;
+  }
+
+  if (href) {
+    return (
+      <Button
+        asChild
+        loading={isLoading}
+        size={mappedSize}
+        className={cn('gap-2', className)}
+        {...props}
+      >
+        <Link
+          href={href}
+          target={external ? '_blank' : undefined}
+          rel={external ? 'noopener noreferrer' : undefined}
+        >
+          {content}
+        </Link>
+      </Button>
+    );
+  }
 
   return (
     <Button
-      as={Component}
-      href={href}
-      target={external ? '_blank' : undefined}
-      rel={external ? 'noopener noreferrer' : undefined}
       loading={isLoading}
+      size={mappedSize}
       className={cn('gap-2', className)}
       {...props}
     >
-      {isSuccess ? (
-        <CheckIcon className='h-5 w-5' />
-      ) : (
-        <>
-          {icon}
-          {children}
-        </>
-      )}
+      {content}
     </Button>
   );
 }

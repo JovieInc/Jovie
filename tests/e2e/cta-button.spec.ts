@@ -120,14 +120,14 @@ test.describe('CTAButton Component', () => {
     const lightThemeSection = await page.$('.bg-white');
     const lightThemeButton = await lightThemeSection?.$('a');
     expect(await lightThemeButton?.getAttribute('class')).toContain(
-      'bg-neutral-900'
+      'bg-btn-primary'
     );
 
     // Check dark theme button
     const darkThemeSection = await page.$('.bg-gray-900');
     const darkThemeButton = await darkThemeSection?.$('a');
     expect(await darkThemeButton?.getAttribute('class')).toContain(
-      'bg-neutral-900'
+      'bg-btn-primary'
     );
   });
 });

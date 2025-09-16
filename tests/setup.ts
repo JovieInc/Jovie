@@ -40,19 +40,31 @@ afterEach(() => {
 });
 
 // Mock Clerk components and hooks
+const mockUseUser = vi.fn(() => ({
+  isSignedIn: false,
+  user: null,
+  isLoaded: true,
+}));
+
+const mockUseClerk = vi.fn(() => ({
+  signOut: vi.fn(),
+  openUserProfile: vi.fn(),
+}));
+
+const mockUseAuth = vi.fn(() => ({
+  has: vi.fn(() => false),
+}));
+
+const mockUseSession = vi.fn(() => ({
+  session: null,
+  isLoaded: true,
+}));
+
 vi.mock('@clerk/nextjs', () => ({
-  useUser: () => ({
-    isSignedIn: false,
-    user: null,
-    isLoaded: true,
-  }),
-  useAuth: () => ({
-    has: vi.fn(() => false),
-  }),
-  useSession: () => ({
-    session: null,
-    isLoaded: true,
-  }),
+  useUser: mockUseUser,
+  useClerk: mockUseClerk,
+  useAuth: mockUseAuth,
+  useSession: mockUseSession,
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
   SignIn: ({ children }: { children: React.ReactNode }) => children,
   SignUp: ({ children }: { children: React.ReactNode }) => children,

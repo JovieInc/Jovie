@@ -1,6 +1,6 @@
+import { Button, type ButtonProps } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 interface NavLinkProps extends Omit<ButtonProps, 'children' | 'variant'> {
@@ -37,30 +37,28 @@ export function NavLink({
   if (external) {
     return (
       <Button
-        as='a'
-        href={href}
-        target='_blank'
-        rel='noopener noreferrer'
-        variant={variant === 'primary' ? 'primary' : 'plain'}
+        asChild
+        variant={variant === 'primary' ? 'primary' : 'ghost'}
         size='sm'
         className={computedClassName}
         {...props}
       >
-        {children}
+        <a href={href} target='_blank' rel='noopener noreferrer'>
+          {children}
+        </a>
       </Button>
     );
   }
 
   return (
     <Button
-      as={Link}
-      href={href}
-      variant={variant === 'primary' ? 'primary' : 'plain'}
+      asChild
+      variant={variant === 'primary' ? 'primary' : 'ghost'}
       size='sm'
       className={computedClassName}
       {...props}
     >
-      {children}
+      <Link href={href}>{children}</Link>
     </Button>
   );
 }

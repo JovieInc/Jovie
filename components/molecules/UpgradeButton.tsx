@@ -1,8 +1,8 @@
 'use client';
 
 import { RocketLaunchIcon } from '@heroicons/react/24/outline';
+import { Button, type ButtonProps } from '@jovie/ui';
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
 
 interface UpgradeButtonProps {
@@ -109,13 +109,15 @@ export function UpgradeButton({
     }
   };
 
+  const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : size;
+
   return (
     <div className={className}>
       <Button
         onClick={handleClick}
         disabled={loading}
         variant={variant}
-        size={size}
+        size={mappedSize}
         className='inline-flex items-center gap-2'
       >
         <RocketLaunchIcon className='h-4 w-4' />

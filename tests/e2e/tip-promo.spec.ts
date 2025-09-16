@@ -56,8 +56,8 @@ test.describe('TipPromo Feature Flag', () => {
 
       // Check button styling
       const ctaButton = page.getByRole('link', { name: 'See it live' });
-      await expect(ctaButton).toHaveClass(/bg-indigo-600/);
-      await expect(ctaButton).toHaveClass(/rounded-lg/);
+      await expect(ctaButton).toHaveClass(/bg-surface-2/);
+      await expect(ctaButton).toHaveClass(/rounded/);
     });
 
     test('appears in the correct position on the page', async ({ page }) => {

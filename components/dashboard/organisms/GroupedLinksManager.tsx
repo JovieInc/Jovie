@@ -8,11 +8,10 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
-import { Tooltip } from '@/components/atoms/Tooltip';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
 import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
@@ -454,24 +453,25 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   )}
                 </button>
                 <div className='flex items-center gap-2'>
-                  <Tooltip
-                    content={
-                      'Links are ordered automatically based on popularity. Some links (like YouTube) can appear in both Music & Social.'
-                    }
-                    placement='top'
-                  >
-                    <span className='inline-flex h-5 w-5 items-center justify-center rounded-md text-tertiary hover:text-secondary ring-1 ring-transparent hover:ring-subtle cursor-help'>
-                      <svg
-                        viewBox='0 0 20 20'
-                        className='h-3.5 w-3.5'
-                        aria-hidden='true'
-                      >
-                        <path
-                          d='M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.75-4.5h1.5v-1.2c0-.62.32-.96 1.02-1.3.94-.45 1.48-1.13 1.48-2.13 0-1.7-1.38-2.87-3.25-2.87-1.7 0-3 .9-3.33 2.35l1.45.38c.17-.74.82-1.2 1.83-1.2 1 0 1.7.56 1.7 1.34 0 .58-.25.89-.97 1.23-.98.46-1.43 1.07-1.43 2.1v1.5Zm0 2.25h1.5v-1.5h-1.5v1.5Z'
-                          fill='currentColor'
-                        />
-                      </svg>
-                    </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className='inline-flex h-5 w-5 items-center justify-center rounded-md text-tertiary hover:text-secondary ring-1 ring-transparent hover:ring-subtle cursor-help'>
+                        <svg
+                          viewBox='0 0 20 20'
+                          className='h-3.5 w-3.5'
+                          aria-hidden='true'
+                        >
+                          <path
+                            d='M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.75-4.5h1.5v-1.2c0-.62.32-.96 1.02-1.3.94-.45 1.48-1.13 1.48-2.13 0-1.7-1.38-2.87-3.25-2.87-1.7 0-3 .9-3.33 2.35l1.45.38c.17-.74.82-1.2 1.83-1.2 1 0 1.7.56 1.7 1.34 0 .58-.25.89-.97 1.23-.98.46-1.43 1.07-1.43 2.1v1.5Zm0 2.25h1.5v-1.5h-1.5v1.5Z'
+                            fill='currentColor'
+                          />
+                        </svg>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side='top'>
+                      Links are ordered automatically based on popularity. Some
+                      links (like YouTube) can appear in both Music & Social.
+                    </TooltipContent>
                   </Tooltip>
                 </div>
               </header>

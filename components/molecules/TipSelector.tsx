@@ -1,6 +1,6 @@
+import { Button } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { AmountSelector } from '@/components/atoms/AmountSelector';
-import { Button } from '@/components/ui/Button';
 
 interface TipSelectorProps {
   amounts?: number[];
@@ -63,7 +63,7 @@ export function TipSelector({
         className='w-full !bg-black !text-white hover:!bg-gray-800 dark:!bg-white dark:!text-black dark:hover:!bg-gray-100'
         size='lg'
         disabled={isLoading}
-        variant='plain'
+        variant='ghost'
         aria-label={`Continue with $${selectedAmount} tip`}
       >
         {isLoading ? 'Processing...' : 'Continue'}

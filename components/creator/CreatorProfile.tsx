@@ -1,7 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/ui/LoadingSkeleton';
 import { OptimizedAvatar as Avatar } from '@/components/ui/OptimizedAvatar';
@@ -61,13 +61,12 @@ export function CreatorProfile({ username }: { username: string }) {
                   variant='outline'
                   size='sm'
                   className='gap-2'
-                  as='a'
-                  href={link.url}
-                  target='_blank'
-                  rel='noopener noreferrer'
+                  asChild
                 >
-                  <Icon name='ExternalLink' className='h-4 w-4' />
-                  {link.displayText || link.platform}
+                  <a href={link.url} target='_blank' rel='noopener noreferrer'>
+                    <Icon name='ExternalLink' className='h-4 w-4' />
+                    {link.displayText || link.platform}
+                  </a>
                 </Button>
               ))}
           </div>

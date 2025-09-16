@@ -1,0 +1,52 @@
+name: Tailwind v4 Smoke
+
+on:
+  pull_request:
+    branches: [preview]
+    paths:
+      - 'styles/**'
+      - 'app/**'
+      - 'components/**'
+      - 'postcss.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/tailwind-smoke.yml'
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  smoke:
+    name: Tailwind CSS Build Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 1 }
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build (Next.js)
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
+      - name: Assert Tailwind CSS emitted
+        run: |
+          set -e
+          # Find a CSS file under .next/static and assert it contains any --tw- token
+          css_file=$(find .next/static -type f -name "*.css" | head -n 1 || true)
+          if [ -z "$css_file" ]; then
+            echo "No built CSS found under .next/static. Failing." >&2
+            exit 1
+          fi
+
+          if grep -q "--tw-" "$css_file"; then
+            echo "✅ Tailwind tokens detected in $css_file"
+          else
+            echo "❌ Tailwind tokens not detected. Check Tailwind v4 setup (@import 'tailwindcss' and @source)." >&2
+            exit 1
+          fi

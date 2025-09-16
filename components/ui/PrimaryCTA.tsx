@@ -1,7 +1,7 @@
 'use client';
 
+import { Button, type ButtonProps } from '@jovie/ui';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
 /**
@@ -37,11 +37,12 @@ export default function PrimaryCTA({
   ...props
 }: PrimaryCTAProps) {
   const a11yLabel = loading && loadingLabel ? loadingLabel : ariaLabel;
+  const mappedSize: ButtonProps['size'] = size === 'md' ? 'default' : 'lg';
 
   return (
     <Button
       variant='primary'
-      size={size}
+      size={mappedSize}
       loading={loading}
       aria-label={a11yLabel}
       data-testid={dataTestId}

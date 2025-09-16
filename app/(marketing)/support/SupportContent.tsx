@@ -1,7 +1,7 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
 import { page, track } from '@/lib/analytics';
 
 export function SupportContent() {
@@ -22,13 +22,12 @@ export function SupportContent() {
 
   return (
     <Button
-      as='a'
-      href='mailto:support@jov.ie'
+      asChild
       className='mt-8'
       aria-label='Send email to support team at support@jov.ie'
       onClick={handleContactClick}
     >
-      Contact Support
+      <a href='mailto:support@jov.ie'>Contact Support</a>
     </Button>
   );
 }

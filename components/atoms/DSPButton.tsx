@@ -1,14 +1,14 @@
 'use client';
 
+import { Button, type ButtonProps } from '@jovie/ui';
 import DOMPurify from 'isomorphic-dompurify';
 import React from 'react';
-import { Button, type ButtonProps } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 
-const sizeMap = { sm: 'sm', md: 'md', lg: 'lg' } as const;
+const sizeMap = { sm: 'sm', md: 'default', lg: 'lg' } as const;
 
 export interface DSPButtonProps
-  extends Omit<ButtonProps, 'children' | 'onClick'> {
+  extends Omit<ButtonProps, 'children' | 'onClick' | 'size'> {
   name: string;
   dspKey: string;
   url: string;

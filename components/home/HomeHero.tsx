@@ -1,9 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { HeroSection } from '@/components/organisms/HeroSection';
-import { Button } from '@/components/ui/Button';
 import { FEATURE_FLAGS, useFeatureFlagWithLoading } from '@/lib/analytics';
 import { ClaimHandleForm } from './ClaimHandleForm';
 
@@ -30,8 +30,8 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
       <p className='text-sm text-gray-600 dark:text-white/70'>
         Create your artist page in seconds.
       </p>
-      <Button as={Link} href='/sign-up' size='lg' data-test='signup-btn'>
-        Sign up to get started
+      <Button asChild size='lg' data-test='signup-btn'>
+        <Link href='/sign-up'>Sign up to get started</Link>
       </Button>
     </div>
   );

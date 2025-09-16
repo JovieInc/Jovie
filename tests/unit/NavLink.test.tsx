@@ -11,6 +11,7 @@ describe('NavLink', () => {
     const link = screen.getByRole('link', { name: 'Test Link' });
     expect(link).toHaveAttribute('href', '/test');
     expect(link).toHaveClass('text-sm');
+    expect(link).toHaveClass('text-secondary-token');
   });
 
   it('renders with primary variant', () => {
@@ -21,8 +22,8 @@ describe('NavLink', () => {
     );
 
     const link = screen.getByRole('link', { name: 'Test Link' });
-    expect(link).toHaveClass('bg-gray-900');
-    expect(link).toHaveClass('text-white');
+    expect(link).toHaveClass('bg-btn-primary');
+    expect(link).toHaveClass('text-btn-primary-foreground');
   });
 
   it('applies custom className', () => {
