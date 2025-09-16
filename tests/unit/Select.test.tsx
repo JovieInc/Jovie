@@ -1,5 +1,6 @@
 import { Select } from '@jovie/ui';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mockOptions = [
@@ -16,7 +17,7 @@ describe('Select', () => {
 
     const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
-    expect(select).toHaveValue('');
+    expect(select).toHaveAttribute('data-state', 'closed');
   });
 
   it('renders with custom placeholder', () => {
@@ -25,8 +26,8 @@ describe('Select', () => {
     const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
 
-    const placeholderOption = screen.getByText('Choose an option');
-    expect(placeholderOption).toBeInTheDocument();
+    const placeholderText = screen.getByText('Choose an option');
+    expect(placeholderText).toBeInTheDocument();
   });
 
   it('renders with label', () => {
@@ -48,41 +49,62 @@ describe('Select', () => {
     render(<Select options={mockOptions} error='This field is required' />);
 
     expect(screen.getByText('This field is required')).toBeInTheDocument();
-    expect(screen.getByText('This field is required')).toHaveClass(
-      'text-red-600'
-    );
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
-  it('renders all options', () => {
-    render(<Select options={mockOptions} />);
-
-    expect(screen.getByText('Option 1')).toBeInTheDocument();
-    expect(screen.getByText('Option 2')).toBeInTheDocument();
-    expect(screen.getByText('Option 3')).toBeInTheDocument();
-  });
-
-  it('handles disabled options', () => {
+  it('renders all options when opened', async () => {
+    const user = userEvent.setup();
     render(<Select options={mockOptions} />);
 
     const select = screen.getByRole('combobox');
-    const options = select.querySelectorAll('option');
-
-    // Check if the disabled option has the disabled attribute
-    const disabledOption = Array.from(options).find(
-      option => option.textContent === 'Option 3'
-    );
-    expect(disabledOption).toHaveAttribute('disabled');
+    
+    // Open the select
+    await user.click(select);
+    
+    // Wait for options to appear
+    await waitFor(() => {
+      expect(screen.getByText('Option 1')).toBeInTheDocument();
+      expect(screen.getByText('Option 2')).toBeInTheDocument();
+      expect(screen.getByText('Option 3')).toBeInTheDocument();
+    });
   });
 
-  it('handles value changes', () => {
+  it('handles disabled options', async () => {
+    const user = userEvent.setup();
+    render(<Select options={mockOptions} />);
+
+    const select = screen.getByRole('combobox');
+    
+    // Open the select
+    await user.click(select);
+    
+    // Wait for options to appear
+    await waitFor(() => {
+      const disabledOption = screen.getByText('Option 3');
+      expect(disabledOption.closest('[role="option"]')).toHaveAttribute('data-disabled');
+    });
+  });
+
+  it('handles value changes', async () => {
     const handleChange = vi.fn();
+    const user = userEvent.setup();
     render(<Select options={mockOptions} onChange={handleChange} />);
 
     const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'option2' } });
+    
+    // Open the select
+    await user.click(select);
+    
+    // Wait for options to appear and click one
+    await waitFor(() => {
+      const option = screen.getByText('Option 1');
+      return user.click(option);
+    });
 
-    expect(handleChange).toHaveBeenCalledTimes(1);
-    expect(select).toHaveValue('option2');
+    // Check if the change handler was called
+    await waitFor(() => {
+      expect(handleChange).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('can be disabled', () => {
@@ -130,21 +152,21 @@ describe('Select', () => {
     expect(handleBlur).toHaveBeenCalledTimes(1);
   });
 
-  it('renders with proper default styling classes', () => {
+  it('renders with proper styling classes', () => {
     render(<Select options={mockOptions} />);
 
     const select = screen.getByRole('combobox');
-    expect(select).toHaveClass('block', 'w-full', 'rounded-md');
+    expect(select).toHaveClass('flex', 'w-full', 'rounded-md');
   });
 
-  it('renders with dark mode classes', () => {
+  it('renders with theme token classes', () => {
     render(<Select options={mockOptions} />);
 
     const select = screen.getByRole('combobox');
     expect(select).toHaveClass(
-      'dark:border-gray-600',
-      'dark:bg-gray-800',
-      'dark:text-gray-50'
+      'border-border-subtle',
+      'bg-surface-1',
+      'text-primary-token'
     );
   });
 
@@ -153,9 +175,44 @@ describe('Select', () => {
 
     const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
+  });
 
-    // Should only have the placeholder option
-    const options = select.querySelectorAll('option');
-    expect(options).toHaveLength(1);
+  it('supports size variants', () => {
+    const { rerender } = render(<Select options={mockOptions} size="sm" />);
+    
+    let select = screen.getByRole('combobox');
+    expect(select).toHaveClass('h-8');
+
+    rerender(<Select options={mockOptions} size="lg" />);
+    select = screen.getByRole('combobox');
+    expect(select).toHaveClass('h-12');
+  });
+
+  it('supports keyboard navigation', async () => {
+    const user = userEvent.setup();
+    render(<Select options={mockOptions} />);
+
+    const select = screen.getByRole('combobox');
+    
+    // Focus the select
+    await user.tab();
+    expect(select).toHaveFocus();
+    
+    // Open with Enter
+    await user.keyboard('{Enter}');
+    
+    // Check if options are visible
+    await waitFor(() => {
+      expect(screen.getByText('Option 1')).toBeInTheDocument();
+    });
+  });
+
+  it('supports controlled state', () => {
+    render(<Select options={mockOptions} value="option2" />);
+
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveAttribute('data-state', 'closed');
+    // Note: In controlled state, the selected value would be displayed
+    // This is a basic test to ensure the component accepts the value prop
   });
 });

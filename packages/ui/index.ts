@@ -33,7 +33,19 @@ export {
   PopoverContent,
   PopoverTrigger,
 } from './atoms/popover';
-export { Select } from './atoms/select';
+export type { SelectProps } from './atoms/select';
+export {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectLabel,
+  SelectRoot,
+  SelectScrollDownButton,
+  SelectScrollUpButton,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from './atoms/select';
 export {
   Sheet,
   SheetClose,
