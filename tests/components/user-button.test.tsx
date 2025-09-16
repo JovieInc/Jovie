@@ -48,19 +48,17 @@ const originalLocation = window.location;
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
   let pushMock: Mock;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     fetchMock = vi.fn();
-    fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
-      .mockImplementation(fetchMock as unknown as typeof globalThis.fetch);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetchMock);
 
     mockUseUser.mockReturnValue({
       isLoaded: true,
+      isSignedIn: true,
       user: {
         imageUrl: null,
         fullName: 'Adele Adkins',
@@ -88,10 +86,6 @@ describe('UserButton billing actions', () => {
       writable: true,
       configurable: true,
     });
-  });
-
-  afterEach(() => {
-    fetchSpy.mockRestore();
   });
 
   afterAll(() => {
