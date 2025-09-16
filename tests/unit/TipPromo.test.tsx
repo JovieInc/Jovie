@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import TipPromo from '@/components/TipPromo';
+import TipPromo from '@/components/organisms/TipPromo';
 
 describe('TipPromo', () => {
   beforeEach(() => {

@@ -15,7 +15,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { useToast } from '@/components/ui/ToastContainer';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';

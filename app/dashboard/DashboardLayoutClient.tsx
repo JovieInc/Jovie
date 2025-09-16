@@ -10,10 +10,7 @@ import {
   DashboardTopBar,
 } from '@/components/dashboard/layout/DashboardTopBar';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
-// import { Button } from '@/components/ui/Button';
-// import { Logo } from '@/components/ui/Logo';
-import { SidebarInset, SidebarProvider } from '@/components/ui/Sidebar';
-// Dropdown menu imports removed until used
+import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import type { DashboardData } from './actions';
 
@@ -101,18 +98,13 @@ export default function DashboardLayoutClient({
       <PendingClaimHandler />
 
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className='min-h-screen bg-base'>
+        <div className='flex h-screen w-full overflow-hidden'>
           <DashboardSidebar />
-
-          <SidebarInset>
-            <div className='flex h-screen flex-col'>
-              <DashboardTopBar breadcrumbs={crumbs} />
-              <div className='flex-1 overflow-auto'>
-                <div className='flex flex-1 flex-col gap-4 p-4 lg:p-6'>
-                  <div className='mx-auto w-full max-w-7xl'>{children}</div>
-                </div>
-              </div>
-            </div>
+          <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
+            <DashboardTopBar breadcrumbs={crumbs} />
+            <main className='flex-1 overflow-auto'>
+              <div className='container mx-auto max-w-7xl p-6'>{children}</div>
+            </main>
           </SidebarInset>
         </div>
       </SidebarProvider>

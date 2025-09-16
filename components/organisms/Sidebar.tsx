@@ -13,8 +13,8 @@ import { cva } from 'class-variance-authority';
 import { PanelLeft } from 'lucide-react';
 import React from 'react';
 import { Divider } from '@/components/atoms/Divider';
-import { Input } from '@/components/ui/Input';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/atoms/Input';
+import { Skeleton } from '@/components/atoms/Skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 

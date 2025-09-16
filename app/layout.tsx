@@ -6,7 +6,7 @@ import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator';
-import '@/styles/globals.css';
+import './globals.css';
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { cookies, headers } from 'next/headers';

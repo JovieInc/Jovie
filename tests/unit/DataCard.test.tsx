@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { DataCard } from '@/components/ui/DataCard';
+import { DataCard } from '@/components/molecules/DataCard';
 
 describe('DataCard', () => {
   afterEach(cleanup);

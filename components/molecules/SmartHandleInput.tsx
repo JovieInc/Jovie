@@ -7,14 +7,14 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Input } from '@/components/atoms/Input';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
   type ClientValidationResult,
   debounce,
   generateUsernameSuggestions,
   validateUsernameFormat,
 } from '@/lib/validation/client-username';
-import { Input } from './Input';
-import { LoadingSpinner } from './LoadingSpinner';
 
 interface SmartHandleInputProps {
   value: string;

@@ -1,8 +1,8 @@
 'use client';
 
 import { ReactNode } from 'react';
+import { Logo } from '@/components/atoms/Logo';
 import { Container } from '@/components/site/Container';
-import { Logo } from '@/components/ui/Logo';
 
 interface AuthFormContainerProps {
   children: ReactNode;

@@ -1,4 +1,4 @@
-import '../styles/globals.css';
+import '../app/globals.css';
 import { neon } from '@neondatabase/serverless';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
@@ -295,7 +295,7 @@ vi.mock('next/image', () => ({
 }));
 
 // Mock OptimizedImage component
-vi.mock('@/components/ui/OptimizedImage', () => ({
+vi.mock('@/components/atoms/OptimizedImage', () => ({
   OptimizedImage: ({
     src,
     alt,
@@ -328,7 +328,7 @@ vi.mock('@/components/ui/OptimizedImage', () => ({
 }));
 
 // Mock PlaceholderImage component
-vi.mock('@/components/ui/PlaceholderImage', () => ({
+vi.mock('@/components/atoms/PlaceholderImage', () => ({
   PlaceholderImage: ({ className, ...props }: React.ComponentProps<'div'>) => {
     return React.createElement('div', {
       className: `bg-gray-200 animate-pulse ${className || ''}`,

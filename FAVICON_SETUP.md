@@ -26,7 +26,7 @@ This project uses the official Jovie logos and favicons from the repository, wit
 The official Jovie logo is available as a reusable component:
 
 ```tsx
-import { Logo } from '@/components/ui/Logo';
+import { Logo } from '@/components/atoms/Logo';
 
 // Different sizes available
 <Logo size="sm" />   // 24px height

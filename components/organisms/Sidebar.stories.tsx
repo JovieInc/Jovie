@@ -9,7 +9,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from '@/components/ui/Sidebar';
+} from '@/components/organisms/Sidebar';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Dashboard/Sidebar-08',

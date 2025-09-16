@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { FormStatus } from '@/components/ui/FormStatus';
+import { FormStatus } from '@/components/molecules/FormStatus';
 
 describe('FormStatus', () => {
   afterEach(cleanup);

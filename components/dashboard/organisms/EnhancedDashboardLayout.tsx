@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
 import { cn } from '@/lib/utils';
 import { LinkCategory } from '../molecules/LinkCategory';
 

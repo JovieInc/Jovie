@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ErrorSummary } from '@/components/ui/ErrorSummary';
+import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 
 // Mock the router
 vi.mock('next/navigation', () => ({

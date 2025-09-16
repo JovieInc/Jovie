@@ -1,7 +1,7 @@
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import React, { forwardRef, useId } from 'react';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 export function InputGroup({
   children,

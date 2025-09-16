@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface AnimatedAccordionProps {
@@ -27,22 +27,22 @@ export function AnimatedAccordion({
   duration = 0.3,
 }: AnimatedAccordionProps) {
   const shouldReduceMotion = useReducedMotion();
-  
+
   // Motion variants for the container
   const containerVariants = {
     open: {
       opacity: 1,
       height: 'auto',
       transition: {
-        height: { 
+        height: {
           duration: shouldReduceMotion ? 0 : duration,
           ease: [0.32, 0.72, 0.32, 0.98],
-          delay: shouldReduceMotion ? 0 : delay
+          delay: shouldReduceMotion ? 0 : delay,
         },
-        opacity: { 
+        opacity: {
           duration: shouldReduceMotion ? 0 : duration * 0.7,
           ease: [0.32, 0, 0.67, 1],
-          delay: shouldReduceMotion ? 0 : delay * 1.2
+          delay: shouldReduceMotion ? 0 : delay * 1.2,
         },
       },
     },
@@ -50,14 +50,14 @@ export function AnimatedAccordion({
       opacity: 0,
       height: 0,
       transition: {
-        height: { 
+        height: {
           duration: shouldReduceMotion ? 0 : duration * 0.8,
           ease: [0.32, 0.72, 0.32, 0.98],
-          delay: shouldReduceMotion ? 0 : 0.05
+          delay: shouldReduceMotion ? 0 : 0.05,
         },
-        opacity: { 
+        opacity: {
           duration: shouldReduceMotion ? 0 : duration * 0.5,
-          ease: [0.32, 0, 0.67, 1]
+          ease: [0.32, 0, 0.67, 1],
         },
       },
     },
@@ -69,7 +69,7 @@ export function AnimatedAccordion({
       y: 0,
       opacity: 1,
       transition: {
-        y: { 
+        y: {
           type: 'spring',
           stiffness: 500,
           damping: 30,
@@ -86,7 +86,7 @@ export function AnimatedAccordion({
       y: -8,
       opacity: 0,
       transition: {
-        y: { 
+        y: {
           type: 'spring',
           stiffness: 500,
           damping: 30,
@@ -103,16 +103,20 @@ export function AnimatedAccordion({
     <AnimatePresence initial={false}>
       {isOpen && (
         <motion.div
-          initial="collapsed"
-          animate="open"
-          exit="collapsed"
+          initial='collapsed'
+          animate='open'
+          exit='collapsed'
           variants={shouldReduceMotion ? undefined : containerVariants}
           className={cn('overflow-hidden', className)}
-          style={shouldReduceMotion ? { display: isOpen ? 'block' : 'none' } : undefined}
+          style={
+            shouldReduceMotion
+              ? { display: isOpen ? 'block' : 'none' }
+              : undefined
+          }
         >
           <motion.div
             variants={shouldReduceMotion ? undefined : contentVariants}
-            className="origin-top"
+            className='origin-top'
           >
             {children}
           </motion.div>

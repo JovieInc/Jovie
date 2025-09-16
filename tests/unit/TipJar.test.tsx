@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TipJar } from '@/components/profile/TipJar';
 
 // Mock the ToastContainer module
-vi.mock('@/components/ui/ToastContainer', () => {
+vi.mock('@/components/molecules/ToastContainer', () => {
   return {
     useToast: () => ({
       showToast: vi.fn(),

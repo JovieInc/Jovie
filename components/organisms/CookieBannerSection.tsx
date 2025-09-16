@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import CookieModal from '@/components/CookieModal';
 import { CookieActions } from '@/components/molecules/CookieActions';
+import CookieModal from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
 
 declare global {

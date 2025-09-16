@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
 
 describe('Input', () => {
   afterEach(cleanup);

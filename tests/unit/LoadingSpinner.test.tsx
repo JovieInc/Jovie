@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { useTheme } from 'next-themes';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 // Mock next-themes
 vi.mock('next-themes', () => ({
