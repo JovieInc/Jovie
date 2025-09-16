@@ -395,6 +395,72 @@ Before creating a component, ask:
 
 ---
 
+## 🎨 Tailwind CSS v4 Configuration (LOCKED - DO NOT MODIFY)
+
+**❌ CRITICAL: Never modify the working Tailwind CSS configuration. Changes can break styling entirely.**
+
+### **Required File Structure (DO NOT CHANGE):**
+
+**`postcss.config.mjs`** (LOCKED):
+```js
+export default {
+  plugins: {
+    "@tailwindcss/postcss": {},
+  },
+};
+```
+
+**`tailwind.config.js`** (LOCKED):
+```js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: [
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './packages/ui/**/*.{ts,tsx}',
+  ],
+  darkMode: ['class'],
+  theme: { extend: {} },
+  plugins: [],
+};
+```
+
+**`styles/globals.css`** (Top section LOCKED):
+```css
+@import "tailwindcss";
+@import "./theme.css";
+
+/* Rest of globals.css content... */
+```
+
+### **Critical Rules (NEVER VIOLATE):**
+
+1. **❌ NEVER** rename or move `tailwind.config.js` 
+2. **❌ NEVER** add `@config` directives to CSS files
+3. **❌ NEVER** add `@source` directives to CSS files  
+4. **❌ NEVER** use `.ts` config files with Tailwind v4
+5. **❌ NEVER** modify the PostCSS configuration
+6. **✅ ONLY** add custom utilities using `@utility` directive in globals.css
+7. **✅ ONLY** add content paths to the `content` array in tailwind.config.js
+
+### **Working Configuration Details:**
+- **Approach**: CSS-first configuration (Tailwind v4 best practice)
+- **Content Scanning**: Via `tailwind.config.js` content array
+- **Custom Utilities**: Added via `@utility` directive in globals.css
+- **PostCSS Plugin**: `@tailwindcss/postcss` for v4 compatibility
+
+### **If Tailwind Breaks:**
+1. Check that `tailwind.config.js` exists and has correct content paths
+2. Verify `postcss.config.mjs` has only the `@tailwindcss/postcss` plugin
+3. Ensure `styles/globals.css` starts with `@import "tailwindcss";`
+4. Clear Next.js cache: `rm -rf .next && pnpm dev`
+5. Check for TypeScript errors that might block compilation
+
+**This configuration was fixed in PR #909 and MUST NOT be modified without extreme caution.**
+
+---
+
 ## ⚙️ Runtime Modes on Vercel
 
 - **Edge** for public profile reads and other latency‑sensitive, DB‑read paths.
