@@ -62,7 +62,7 @@
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:check": "drizzle-kit check",
     "drizzle:up": "drizzle-kit up",
-    "tailwind:check": "node scripts/tailwind-guard.js",
+    "tailwind:check": "node scripts/tailwind-guard.mjs",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
   },
