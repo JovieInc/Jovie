@@ -46,6 +46,7 @@ export {
   SheetTitle,
   SheetTrigger,
 } from './atoms/sheet';
+export type { TooltipContentProps, TooltipProviderProps } from './atoms/tooltip';
 export {
   Tooltip,
   TooltipContent,
