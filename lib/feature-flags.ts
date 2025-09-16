@@ -13,6 +13,8 @@ export interface FeatureFlags {
   profileSettingsEnabled: boolean;
   // Avatar upload with Vercel Blob integration
   avatarUploadEnabled?: boolean;
+  // Advanced avatar uploader component with radial progress and drag/drop
+  avatarUploaderEnabled?: boolean;
   // Minimalist design for onboarding screens (Apple-inspired)
   minimalistOnboardingEnabled?: boolean;
   // New Apple-style full-screen onboarding with improved UX (JOV-134)
@@ -32,6 +34,7 @@ export const POSTHOG_FLAGS = {
   APPLE_STYLE_ONBOARDING_ENABLED: 'feature_apple_style_onboarding_enabled',
   PROFILE_SETTINGS_ENABLED: 'feature_profile_settings',
   AVATAR_UPLOAD_ENABLED: 'feature_avatar_upload',
+  AVATAR_UPLOADER_ENABLED: 'feature_avatar_uploader',
 } as const;
 
 // Default feature flags (fallback)
@@ -50,6 +53,8 @@ const defaultFeatureFlags: FeatureFlags = {
   profileSettingsEnabled: true,
   // Avatar upload disabled by default (requires Vercel Blob setup)
   avatarUploadEnabled: false,
+  // Advanced avatar uploader disabled by default (requires feature flag)
+  avatarUploaderEnabled: false,
   // Minimalist design for onboarding screens (Apple-inspired)
   minimalistOnboardingEnabled: true,
   // New Apple-style full-screen onboarding with improved UX (JOV-134)
@@ -126,6 +131,10 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
           avatarUploadEnabled: Boolean(
             (data as Record<string, unknown>).avatarUploadEnabled ??
               defaultFeatureFlags.avatarUploadEnabled
+          ),
+          avatarUploaderEnabled: Boolean(
+            (data as Record<string, unknown>).avatarUploaderEnabled ??
+              defaultFeatureFlags.avatarUploaderEnabled
           ),
         };
       }
@@ -223,6 +232,7 @@ async function getPostHogServerFlags(
       appleStyleOnboardingEnabled,
       profileSettingsEnabled,
       avatarUploadEnabled,
+      avatarUploaderEnabled,
     ] = await Promise.all([
       client.isFeatureEnabled(POSTHOG_FLAGS.ARTIST_SEARCH_ENABLED, distinctId),
       client.isFeatureEnabled(POSTHOG_FLAGS.DEBUG_BANNER_ENABLED, distinctId),
@@ -253,6 +263,7 @@ async function getPostHogServerFlags(
         distinctId
       ),
       client.isFeatureEnabled(POSTHOG_FLAGS.AVATAR_UPLOAD_ENABLED, distinctId),
+      client.isFeatureEnabled(POSTHOG_FLAGS.AVATAR_UPLOADER_ENABLED, distinctId),
     ]);
 
     await client.shutdown();
@@ -282,6 +293,9 @@ async function getPostHogServerFlags(
       }),
       ...(typeof avatarUploadEnabled === 'boolean' && {
         avatarUploadEnabled,
+      }),
+      ...(typeof avatarUploaderEnabled === 'boolean' && {
+        avatarUploaderEnabled,
       }),
     };
   } catch (error) {
@@ -336,6 +350,7 @@ export async function getServerFeatureFlags(
             ),
             profileSettingsEnabled: Boolean(data.profileSettingsEnabled),
             avatarUploadEnabled: Boolean(data.avatarUploadEnabled),
+            avatarUploaderEnabled: Boolean(data.avatarUploaderEnabled),
           };
         }
       } catch {
@@ -389,6 +404,10 @@ export async function getServerFeatureFlags(
         postHogFlags.avatarUploadEnabled ??
         localFlags.avatarUploadEnabled ??
         defaultFeatureFlags.avatarUploadEnabled,
+      avatarUploaderEnabled:
+        postHogFlags.avatarUploaderEnabled ??
+        localFlags.avatarUploaderEnabled ??
+        defaultFeatureFlags.avatarUploaderEnabled,
     };
   } catch (error) {
     console.warn('[Feature Flags] Server flags failed:', error);
