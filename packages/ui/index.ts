@@ -3,6 +3,14 @@ export { Badge, badgeVariants } from './atoms/badge';
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
 export {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from './atoms/card';
+export {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
