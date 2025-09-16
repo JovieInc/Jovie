@@ -118,7 +118,8 @@ export async function PUT(req: Request) {
 
       try {
         if (Object.keys(clerkUpdates).length > 0) {
-          await clerkClient().users.updateUser(clerkUserId, clerkUpdates);
+          const clerk = clerkClient();
+          await clerk.users.updateUser(clerkUserId, clerkUpdates);
         }
 
         if (avatarUrl) {
@@ -132,7 +133,8 @@ export async function PUT(req: Request) {
           const arrayBuffer = await avatarResponse.arrayBuffer();
           const blob = new Blob([arrayBuffer], { type: contentType });
 
-          await clerkClient().users.updateUserProfileImage(clerkUserId, {
+          const clerk = clerkClient();
+          await clerk.users.updateUserProfileImage(clerkUserId, {
             file: blob,
           });
         }
