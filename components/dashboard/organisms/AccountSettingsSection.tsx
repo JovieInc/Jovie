@@ -1,10 +1,10 @@
 'use client';
 
-import { useSession, useUser } from '@clerk/nextjs';
 import type {
   EmailAddressResource,
   SessionWithActivitiesResource,
-} from '@clerk/types';
+} from '@clerk/nextjs';
+import { useSession, useUser } from '@clerk/nextjs';
 import {
   CheckCircleIcon,
   EnvelopeIcon,

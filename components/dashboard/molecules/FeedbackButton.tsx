@@ -3,7 +3,6 @@
 import { ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { useCallback, useState } from 'react';
-import { controlClasses } from '@/components/atoms/ControlStyles';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { cn } from '@/lib/utils';
 import { FeedbackModal } from './FeedbackModal';
@@ -35,7 +34,7 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
       onClick={handleFeedbackClick}
       className={cn(
         'group flex transition-all duration-200 ease-in-out',
-        controlClasses({ variant: 'neutral', size: 'sm' }),
+        'rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
         collapsed
           ? 'items-center justify-center w-8 h-8 p-0 gap-0'
           : 'items-center w-full px-3 gap-2',

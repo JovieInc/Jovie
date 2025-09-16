@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const { email } = result.data;
 
     return await withDbSession(async clerkUserId => {
-      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      const clerkUser = await clerkClient().users.getUser(clerkUserId);
       const normalizedEmail = email.toLowerCase();
 
       const matchingEmail = clerkUser.emailAddresses.find(address => {

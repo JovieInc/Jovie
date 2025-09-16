@@ -42,6 +42,7 @@ describe('UserButton billing actions', () => {
 
     mockUseUser.mockReturnValue({
       isLoaded: true,
+      isSignedIn: true,
       user: {
         imageUrl: null,
         fullName: 'Adele Adkins',

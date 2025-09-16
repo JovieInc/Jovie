@@ -1,9 +1,9 @@
 'use client';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { useTheme } from 'next-themes';
 import React, { useEffect, useState } from 'react';
-import { controlClasses } from '@/components/atoms/ControlStyles';
+import { cn } from '@/lib/utils';
 
 interface EnhancedThemeToggleProps {
   onThemeChange?: (theme: 'light' | 'dark' | 'system') => void;
@@ -130,9 +130,10 @@ export function EnhancedThemeToggle({
             type='button'
             disabled={isUpdating}
             onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-            className={`${controlClasses({ variant: 'neutral', size: 'sm' })} w-8 h-8 p-0 group items-center justify-center ${
+            className={cn(
+              'w-8 h-8 p-0 group items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
               isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'
-            }`}
+            )}
           >
             {isDark ? (
               <svg
