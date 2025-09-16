@@ -1,5 +1,6 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Note: Using any for Clerk types as they're not exported from @clerk/nextjs
 import { useSession, useUser } from '@clerk/nextjs';
 import {
@@ -60,9 +61,7 @@ export function AccountSettingsSection() {
 
   const [newEmail, setNewEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [pendingEmail, setPendingEmail] = useState<any>(
-    null
-  );
+  const [pendingEmail, setPendingEmail] = useState<any>(null);
   const [emailStatus, setEmailStatus] = useState<
     'idle' | 'sending' | 'code' | 'verifying'
   >('idle');
