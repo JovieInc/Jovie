@@ -101,9 +101,11 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
     }, [activeIndex, isOpen]);
 
     // Forward declaration of handleSelect for TypeScript
-    const handleSelect: (option: ComboboxOption) => void = useCallback(
-      (option: ComboboxOption) => {
-        onChange(option);
+    const handleSelect: (option: ComboboxOption | null) => void = useCallback(
+      (option: ComboboxOption | null) => {
+        if (option) {
+          onChange(option);
+        }
         setQuery('');
         setIsOpen(false);
       },

@@ -1,6 +1,6 @@
-import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
+import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 // Simple sanity check that Tailwind classes resolve to expected computed styles in the browser
 // We do not rely on specific pages to include elements; instead we inject a transient node.
