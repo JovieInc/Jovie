@@ -1,5 +1,16 @@
+/**
+ * 🔒 CRITICAL IMPORTS - DO NOT MODIFY ORDER OR PATHS
+ *
+ * ❌ DO NOT CHANGE:
+ * - Import order (tailwindcss must be first)
+ * - Theme path: "../styles/theme.css" (NOT "./theme.css")
+ * - Import syntax
+ *
+ * ⚠️  CHANGING THESE WILL BREAK ALL STYLING
+ */
+
 @import "tailwindcss";
-@import "./theme.css";
+@import "../styles/theme.css";
 /* @import "tw-animate-css"; */
 
 @custom-variant dark (&:is(.dark *));

@@ -1,97 +1,119 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import React from 'react';
+import { render, screen } from '@testing-library/react';
+import { vi } from 'vitest';
 import { FormStatus } from '@/components/molecules/FormStatus';
 
-describe('FormStatus', () => {
-  afterEach(cleanup);
+// Mock the LoadingSpinner component
+vi.mock('@/components/atoms/LoadingSpinner', () => ({
+  LoadingSpinner: ({ size }: { size?: string }) => (
+    <div data-testid="loading-spinner" data-size={size}>
+      Loading...
+    </div>
+  ),
+}));
 
-  it('renders nothing when no status is provided', () => {
+describe('FormStatus', () => {
+  it('renders nothing when no props are provided', () => {
     const { container } = render(<FormStatus />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders loading state', () => {
-    render(<FormStatus loading />);
+  it('renders nothing when all values are falsy', () => {
+    const { container } = render(
+      <FormStatus loading={false} error="" success="" />
+    );
+    expect(container.firstChild).toBeNull();
+  });
 
+  it('displays loading state with spinner and text', () => {
+    render(<FormStatus loading={true} />);
+
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+    expect(screen.getByTestId('loading-spinner')).toHaveAttribute('data-size', 'sm');
     expect(screen.getByText('Processing...')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('renders error message', () => {
-    render(<FormStatus error='Something went wrong' />);
+  it('displays error message with correct styling', () => {
+    const errorMessage = 'Something went wrong!';
+    render(<FormStatus error={errorMessage} />);
 
-    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-    expect(screen.getByText('Something went wrong')).toHaveClass(
-      'text-red-600'
-    );
+    const errorElement = screen.getByText(errorMessage);
+    expect(errorElement).toBeInTheDocument();
+    expect(errorElement).toHaveClass('text-sm', 'text-red-600', 'dark:text-red-400');
+    expect(errorElement.tagName.toLowerCase()).toBe('p');
   });
 
-  it('renders success message', () => {
-    render(<FormStatus success='Operation completed successfully' />);
+  it('displays success message with correct styling', () => {
+    const successMessage = 'Operation completed successfully!';
+    render(<FormStatus success={successMessage} />);
 
-    expect(
-      screen.getByText('Operation completed successfully')
-    ).toBeInTheDocument();
-    expect(screen.getByText('Operation completed successfully')).toHaveClass(
-      'text-green-600'
-    );
+    const successElement = screen.getByText(successMessage);
+    expect(successElement).toBeInTheDocument();
+    expect(successElement).toHaveClass('text-sm', 'text-green-600', 'dark:text-green-400');
+    expect(successElement.tagName.toLowerCase()).toBe('p');
   });
 
-  it('renders all states together', () => {
+  it('does not render error when error is only whitespace', () => {
+    const { container } = render(<FormStatus error="   " />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('does not render success when success is only whitespace', () => {
+    const { container } = render(<FormStatus success="   " />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('can display multiple states simultaneously', () => {
     render(
-      <FormStatus loading error='Error message' success='Success message' />
+      <FormStatus
+        loading={true}
+        error="An error occurred"
+        success="Success message"
+      />
     );
 
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
     expect(screen.getByText('Processing...')).toBeInTheDocument();
-    expect(screen.getByText('Error message')).toBeInTheDocument();
+    expect(screen.getByText('An error occurred')).toBeInTheDocument();
     expect(screen.getByText('Success message')).toBeInTheDocument();
   });
 
-  it('applies custom className', () => {
-    render(<FormStatus loading className='custom-status' />);
+  it('applies custom className to the container', () => {
+    const customClass = 'custom-form-status';
+    render(<FormStatus loading={true} className={customClass} />);
 
-    const statusContainer = screen
-      .getByText('Processing...')
-      .closest('div[class*="space-y-2"]');
-    expect(statusContainer).toHaveClass('custom-status');
+    const container = screen.getByTestId('loading-spinner').closest('div');
+    expect(container).toHaveClass(customClass, 'space-y-2');
   });
 
-  it('renders with proper spacing classes', () => {
-    render(<FormStatus loading />);
+  it('has proper semantic structure for accessibility', () => {
+    render(
+      <FormStatus
+        loading={true}
+        error="Error message"
+        success="Success message"
+      />
+    );
 
-    const statusContainer = screen
-      .getByText('Processing...')
-      .closest('div[class*="space-y-2"]');
-    expect(statusContainer).toHaveClass('space-y-2');
+    // Check that loading state is in a div with proper content structure
+    const loadingContainer = screen.getByText('Processing...').closest('div');
+    expect(loadingContainer).toHaveClass('flex', 'items-center', 'space-x-2');
+
+    // Check that error and success are paragraph elements
+    expect(screen.getByText('Error message').tagName.toLowerCase()).toBe('p');
+    expect(screen.getByText('Success message').tagName.toLowerCase()).toBe('p');
   });
 
-  it('renders loading spinner with correct size', () => {
-    render(<FormStatus loading />);
+  it('maintains proper spacing between elements', () => {
+    render(
+      <FormStatus
+        loading={true}
+        error="Error message"
+        success="Success message"
+      />
+    );
 
-    const spinner = screen.getByRole('status');
-    expect(spinner).toBeInTheDocument();
-    expect(spinner.querySelector('svg')).toBeInTheDocument();
-  });
-
-  it('handles empty error message', () => {
-    render(<FormStatus error='' />);
-    // Should not render error text when error is empty
-    expect(screen.queryByText('error=""')).not.toBeInTheDocument();
-  });
-
-  it('handles empty success message', () => {
-    render(<FormStatus success='' />);
-    // Should not render success text when success is empty
-    expect(screen.queryByText('success=""')).not.toBeInTheDocument();
-  });
-
-  it('renders with dark mode classes', () => {
-    render(<FormStatus error='Error' success='Success' />);
-
-    const errorElement = screen.getByText('Error');
-    const successElement = screen.getByText('Success');
-
-    expect(errorElement).toHaveClass('dark:text-red-400');
-    expect(successElement).toHaveClass('dark:text-green-400');
+    const container = screen.getByTestId('loading-spinner').closest('div');
+    expect(container).toHaveClass('space-y-2');
   });
 });

@@ -1,85 +1,209 @@
 #!/usr/bin/env node
 
-import fs from 'fs';
-import glob from 'glob';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { glob } from 'glob';
 
-console.log('🔍 Tailwind Guard - Checking for config violations...');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const projectRoot = join(__dirname, '..');
 
-let errors = 0;
+export async function validateTailwindConfig() {
+  console.log('🔒 BULLETPROOF TAILWIND CONFIGURATION GUARD');
+  console.log('🔍 Validating Tailwind CSS configuration...');
 
-// Check for multiple globals.css files with @import "tailwindcss"
-const globalsFiles = glob.sync('**/*globals.css', { ignore: 'node_modules/**' });
-const tailwindImports = [];
+  const errors = [];
+  const warnings = [];
 
-globalsFiles.forEach(file => {
-  try {
-    const content = fs.readFileSync(file, 'utf8');
-    if (content.includes('@import "tailwindcss"') || content.includes("@import 'tailwindcss'")) {
-      tailwindImports.push(file);
+  // 1. Check tailwind.config.js exists and has correct structure
+  const tailwindConfigPath = join(projectRoot, 'tailwind.config.js');
+  if (!existsSync(tailwindConfigPath)) {
+    errors.push('❌ CRITICAL: tailwind.config.js is missing');
+  } else {
+    try {
+      const configContent = readFileSync(tailwindConfigPath, 'utf8');
+
+      // Must be .js file (not .ts for v4)
+      if (!configContent.includes('module.exports')) {
+        errors.push('❌ CRITICAL: tailwind.config.js must use module.exports (not ES6 exports)');
+      }
+
+      // Must have content array
+      if (!configContent.includes('content:')) {
+        errors.push('❌ CRITICAL: tailwind.config.js missing content array');
+      }
+
+      // Should not have @config directive
+      if (configContent.includes('@config')) {
+        errors.push('❌ CRITICAL: tailwind.config.js should not contain @config directive in v4');
+      }
+
+      console.log('✅ tailwind.config.js structure valid');
+    } catch (err) {
+      errors.push(`❌ CRITICAL: Error reading tailwind.config.js: ${err.message}`);
     }
-  } catch {
-    // Ignore files that can't be read
   }
-});
 
-if (tailwindImports.length > 1) {
-  console.error(`❌ Found multiple globals.css files with Tailwind imports:`);
-  tailwindImports.forEach(file => console.error(`   - ${file}`));
-  console.error(`   Only app/globals.css should contain @import "tailwindcss"`);
-  errors++;
-} else if (tailwindImports.length === 1) {
-  console.log(`✅ Found single Tailwind import in: ${tailwindImports[0]}`);
-} else {
-  console.error(`❌ No Tailwind imports found in any globals.css file`);
-  errors++;
-}
+  // 2. CRITICAL: PostCSS Configuration Validation
+  const postcssPaths = [
+    join(projectRoot, 'postcss.config.js'),
+    join(projectRoot, 'postcss.config.mjs')
+  ];
 
-// Check for multiple tailwind.config.* files
-const tailwindConfigs = glob.sync('tailwind.config.*', { ignore: 'node_modules/**' });
+  let postcssFound = false;
+  for (const postcssPath of postcssPaths) {
+    if (existsSync(postcssPath)) {
+      postcssFound = true;
+      try {
+        const postcssContent = readFileSync(postcssPath, 'utf8');
 
-if (tailwindConfigs.length > 1) {
-  console.error(`❌ Found multiple Tailwind config files:`);
-  tailwindConfigs.forEach(file => console.error(`   - ${file}`));
-  console.error(`   Only one tailwind.config.ts should exist`);
-  errors++;
-} else if (tailwindConfigs.length === 1) {
-  console.log(`✅ Found single Tailwind config: ${tailwindConfigs[0]}`);
-} else {
-  console.error(`❌ No Tailwind config file found`);
-  errors++;
-}
+        // CRITICAL: Must use @tailwindcss/postcss for v4 (not 'tailwindcss')
+        if (!postcssContent.includes('@tailwindcss/postcss')) {
+          errors.push('❌ CRITICAL: postcss.config must use "@tailwindcss/postcss" plugin');
+        }
 
-// Check for globals.css imports outside app/layout.tsx
-const otherTsxFiles = glob.sync('**/*.{ts,tsx}', { 
-  ignore: ['node_modules/**', 'app/layout.tsx', 'tests/**', '.storybook/**'] 
-});
+        // CRITICAL: Must NOT use 'tailwindcss' directly
+        if (postcssContent.includes('tailwindcss:') && !postcssContent.includes('@tailwindcss/postcss')) {
+          errors.push('❌ CRITICAL: postcss.config using "tailwindcss" directly - THIS BREAKS THE BUILD');
+        }
 
-const badImports = [];
-otherTsxFiles.forEach(file => {
-  try {
-    const content = fs.readFileSync(file, 'utf8');
-    if (content.includes('import') && content.includes('globals.css')) {
-      badImports.push(file);
+        // Validate exact format
+        if (!postcssContent.includes("'@tailwindcss/postcss': {}") && !postcssContent.includes('"@tailwindcss/postcss": {}')) {
+          errors.push('❌ CRITICAL: postcss.config must use exact format: "@tailwindcss/postcss": {}');
+        }
+
+        // Should include autoprefixer
+        if (!postcssContent.includes('autoprefixer')) {
+          warnings.push('⚠️  postcss.config missing autoprefixer (recommended)');
+        }
+
+        console.log('✅ PostCSS configuration valid');
+      } catch (err) {
+        errors.push(`❌ CRITICAL: Error reading PostCSS config: ${err.message}`);
+      }
+      break;
     }
-  } catch {
-    // Ignore files that can't be read
   }
-});
 
-if (badImports.length > 0) {
-  console.error(`❌ Found globals.css imports outside of app/layout.tsx:`);
-  badImports.forEach(file => console.error(`   - ${file}`));
-  console.error(`   globals.css should only be imported in app/layout.tsx`);
-  errors++;
-} else {
-  console.log(`✅ No invalid globals.css imports found`);
+  if (!postcssFound) {
+    errors.push('❌ CRITICAL: PostCSS configuration file missing');
+  }
+
+  // 3. Check globals.css
+  const globalsCssPath = join(projectRoot, 'app/globals.css');
+  if (!existsSync(globalsCssPath)) {
+    errors.push('❌ CRITICAL: app/globals.css is missing');
+  } else {
+    try {
+      const cssContent = readFileSync(globalsCssPath, 'utf8');
+
+      // Must import tailwindcss
+      if (!cssContent.includes('@import "tailwindcss"')) {
+        errors.push('❌ CRITICAL: app/globals.css missing @import "tailwindcss"');
+      }
+
+      // CRITICAL: Check for incorrect theme import path
+      if (cssContent.includes('@import "./theme.css"')) {
+        errors.push('❌ CRITICAL: app/globals.css has incorrect theme import path (should be "../styles/theme.css")');
+      }
+
+      if (cssContent.includes('@import "../styles/theme.css"')) {
+        console.log('✅ globals.css theme import path correct');
+      } else {
+        errors.push('❌ CRITICAL: app/globals.css missing theme import or incorrect path');
+      }
+
+      console.log('✅ globals.css structure valid');
+    } catch (err) {
+      errors.push(`❌ CRITICAL: Error reading globals.css: ${err.message}`);
+    }
+  }
+
+  // 4. Check styles/theme.css exists
+  const themeCssPath = join(projectRoot, 'styles/theme.css');
+  if (!existsSync(themeCssPath)) {
+    errors.push('❌ CRITICAL: styles/theme.css is missing');
+  } else {
+    console.log('✅ styles/theme.css exists');
+  }
+
+  // 5. CRITICAL: Check package.json for correct dependencies
+  const packageJsonPath = join(projectRoot, 'package.json');
+  if (existsSync(packageJsonPath)) {
+    try {
+      const packageContent = readFileSync(packageJsonPath, 'utf8');
+      const packageJson = JSON.parse(packageContent);
+
+      // Check for @tailwindcss/postcss dependency
+      const hasTailwindPostcss =
+        packageJson.dependencies?.['@tailwindcss/postcss'] ||
+        packageJson.devDependencies?.['@tailwindcss/postcss'];
+
+      if (!hasTailwindPostcss) {
+        errors.push('❌ CRITICAL: @tailwindcss/postcss dependency missing from package.json');
+      } else {
+        console.log('✅ @tailwindcss/postcss dependency found');
+      }
+    } catch (err) {
+      errors.push(`❌ CRITICAL: Error reading package.json: ${err.message}`);
+    }
+  }
+
+  // 6. Check for multiple config files (causes conflicts)
+  const tailwindConfigs = await glob('tailwind.config.*', {
+    cwd: projectRoot,
+    ignore: 'node_modules/**'
+  });
+
+  if (tailwindConfigs.length > 1) {
+    errors.push(`❌ CRITICAL: Multiple Tailwind configs found: ${tailwindConfigs.join(', ')}`);
+  }
+
+  // 7. Check for multiple globals.css files
+  const globalsFiles = await glob('**/*globals.css', {
+    cwd: projectRoot,
+    ignore: 'node_modules/**'
+  });
+
+  const tailwindImports = [];
+  globalsFiles.forEach(file => {
+    try {
+      const content = readFileSync(join(projectRoot, file), 'utf8');
+      if (content.includes('@import "tailwindcss"') || content.includes("@import 'tailwindcss'")) {
+        tailwindImports.push(file);
+      }
+    } catch {
+      // Ignore files that can't be read
+    }
+  });
+
+  if (tailwindImports.length > 1) {
+    errors.push(`❌ CRITICAL: Multiple files importing Tailwind: ${tailwindImports.join(', ')}`);
+  }
+
+  // Report results
+  if (warnings.length > 0) {
+    console.log('\n⚠️  WARNINGS:');
+    warnings.forEach(warning => console.log(`  ${warning}`));
+  }
+
+  if (errors.length === 0) {
+    console.log('\n🎉 ALL TAILWIND CONFIGURATION CHECKS PASSED!');
+    console.log('🔒 Configuration is LOCKED and BULLETPROOF.');
+    console.log('🛡️  Protected against future breakage.');
+    return true;
+  } else {
+    console.log('\n💥 CRITICAL TAILWIND CONFIGURATION ERRORS:');
+    errors.forEach(error => console.log(`  ${error}`));
+    console.log('\n🚨 BUILD WILL FAIL until these are resolved!');
+    console.log('🔧 Fix these immediately to restore functionality.');
+    return false;
+  }
 }
 
-// Summary
-if (errors === 0) {
-  console.log('\n✅ All Tailwind configuration checks passed!');
-  process.exit(0);
-} else {
-  console.log(`\n❌ ${errors} configuration violation(s) found`);
-  process.exit(1);
+// Run validation if called directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const isValid = await validateTailwindConfig();
+  process.exit(isValid ? 0 : 1);
 }

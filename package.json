@@ -19,7 +19,7 @@
     "lint": "eslint --max-warnings=0 .",
     "lint:fix": "eslint --fix .",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
-    "pre-push": "run-s typecheck lint",
+    "pre-push": "run-s tailwind:check typecheck lint",
     "check": "run-s validate build test",
     "check:ci": "run-s validate test:ci",
     "validate": "run-p format:check lint typecheck",
@@ -63,6 +63,7 @@
     "drizzle:check": "drizzle-kit check",
     "drizzle:up": "drizzle-kit up",
     "tailwind:check": "node scripts/tailwind-guard.mjs",
+    "tailwind:guard": "node scripts/tailwind-guard.mjs",
     "generate": "plop",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
