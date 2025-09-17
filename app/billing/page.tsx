@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { BillingDashboard } from '@/components/organisms/BillingDashboard';
+import { BillingDashboard } from '@/components/_legacy/BillingDashboard';
 import { page } from '@/lib/analytics';
 
 export default function BillingPage() {

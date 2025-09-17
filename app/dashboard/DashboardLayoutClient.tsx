@@ -1,16 +1,15 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
-
+import { useState, useTransition } from 'react';
+import { AppSidebar } from '@/components/app-sidebar';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
-import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import {
   type DashboardBreadcrumbItem,
   DashboardTopBar,
 } from '@/components/dashboard/layout/DashboardTopBar';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
-import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 import type { DashboardData } from './actions';
 
@@ -49,7 +48,7 @@ export default function DashboardLayoutClient({
     return items;
   })();
 
-  // For sidebar-08 pattern, we'll use the built-in state management
+  // Simplified sidebar state - ensure sidebar is open by default unless explicitly collapsed
   const [sidebarOpen, setSidebarOpen] = useState(
     !(dashboardData.sidebarCollapsed ?? false)
   );
@@ -64,46 +63,24 @@ export default function DashboardLayoutClient({
     }
   };
 
-  // Sync with localStorage
-  useEffect(() => {
-    const serverValue = !(dashboardData.sidebarCollapsed ?? false);
-    try {
-      const stored = localStorage.getItem('dashboard.sidebarCollapsed');
-      if (stored === null) {
-        localStorage.setItem(
-          'dashboard.sidebarCollapsed',
-          serverValue ? '0' : '1'
-        );
-        setSidebarOpen(serverValue);
-      } else {
-        const storedBool = stored === '0';
-        if (storedBool !== serverValue) {
-          localStorage.setItem(
-            'dashboard.sidebarCollapsed',
-            serverValue ? '0' : '1'
-          );
-          setSidebarOpen(serverValue);
-        } else {
-          setSidebarOpen(storedBool);
-        }
-      }
-    } catch {
-      // ignore storage errors
-    }
-  }, [dashboardData.sidebarCollapsed]);
-
   return (
     <>
       <PendingClaimRunner />
       <PendingClaimHandler />
 
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className='flex h-screen w-full overflow-hidden'>
-          <DashboardSidebar />
-          <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
+      <SidebarProvider
+        defaultOpen={true}
+        open={sidebarOpen}
+        onOpenChange={handleOpenChange}
+      >
+        <div className='flex min-h-screen w-full bg-base'>
+          <AppSidebar />
+          <SidebarInset className='flex flex-1 flex-col'>
             <DashboardTopBar breadcrumbs={crumbs} />
-            <main className='flex-1 overflow-auto'>
-              <div className='container mx-auto max-w-7xl p-6'>{children}</div>
+            <main className='flex-1 overflow-y-auto overflow-x-hidden'>
+              <div className='w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8'>
+                <div className='mx-auto max-w-7xl space-y-6'>{children}</div>
+              </div>
             </main>
           </SidebarInset>
         </div>

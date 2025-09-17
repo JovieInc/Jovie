@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { SidebarTrigger } from '@/components/organisms/Sidebar';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 export interface DashboardBreadcrumbItem {
   label: string;
@@ -18,7 +18,7 @@ export function DashboardTopBar({
   actions,
 }: DashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-sidebar/60'>
+    <header className='sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-sidebar/60 sm:px-6'>
       <SidebarTrigger className='-ml-1' />
       <div className='h-4 w-px bg-sidebar-border' />
       <nav

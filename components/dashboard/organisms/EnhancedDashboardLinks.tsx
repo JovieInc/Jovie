@@ -6,12 +6,17 @@ import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
+import type { LinkItemData } from '@/components/atoms/LinkItem';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { EnhancedLinkManager } from '@/components/organisms/EnhancedLinkManager';
 import { debounce } from '@/lib/utils';
+import {
+  type DetectedLink,
+  detectPlatform,
+} from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { EnhancedDashboardLayout } from './EnhancedDashboardLayout';
 
 // Define platform types
 type PlatformType = 'social' | 'dsp' | 'custom';
@@ -251,33 +256,49 @@ export function EnhancedDashboardLinks({
     []
   );
 
-  // Handle adding a new link
-  const handleAddLink = useCallback(() => {
-    const newLink: LinkItem = {
-      id: `temp-${Date.now()}`,
-      title: 'New Link',
-      platform: {
-        id: 'custom',
-        name: 'Custom Link',
-        category: 'custom',
-        icon: 'link',
-        color: '#000000',
-        placeholder: 'https://example.com',
-      },
-      isVisible: true,
-      order: links.length,
-      category: 'custom',
-      normalizedUrl: '',
-      originalUrl: '',
-      suggestedTitle: 'New Link',
-      isValid: false,
-      url: '',
-    };
+  // Handle adding a new link with auto-detection
+  const handleAddLink = useCallback(
+    (url: string, detectedInfo?: DetectedLink) => {
+      if (!detectedInfo) {
+        detectedInfo = detectPlatform(url, artist?.name);
+      }
 
-    const updatedLinks = [...links, newLink];
-    setLinks(updatedLinks);
-    debouncedSave(updatedLinks);
-  }, [links, debouncedSave]);
+      const category = getPlatformCategory(detectedInfo.platform.id);
+      const platformCategory: PlatformType =
+        category === 'dsp'
+          ? 'dsp'
+          : category === 'social'
+            ? 'social'
+            : 'custom';
+      const platform: Platform = {
+        id: detectedInfo.platform.id,
+        name: detectedInfo.platform.name,
+        category: platformCategory,
+        icon: detectedInfo.platform.icon,
+        color: detectedInfo.platform.color,
+        placeholder: detectedInfo.platform.placeholder,
+      };
+
+      const newLink: LinkItem = {
+        id: `temp-${Date.now()}`,
+        title: detectedInfo.suggestedTitle,
+        platform,
+        isVisible: true,
+        order: links.length,
+        category,
+        normalizedUrl: detectedInfo.normalizedUrl,
+        originalUrl: url,
+        suggestedTitle: detectedInfo.suggestedTitle,
+        isValid: detectedInfo.isValid,
+        url: detectedInfo.normalizedUrl,
+      };
+
+      const updatedLinks = [...links, newLink];
+      setLinks(updatedLinks);
+      debouncedSave(updatedLinks);
+    },
+    [links, debouncedSave, artist]
+  );
 
   // Handle editing a link
   const handleEditLink = useCallback((id: string) => {
@@ -311,33 +332,36 @@ export function EnhancedDashboardLinks({
 
   // Handle reordering links
   const handleReorderLinks = useCallback(
-    (items: Array<LinkItem | ExternalLayoutLink>) => {
-      // Convert back to our internal LinkItem type if needed
-      const reorderedLinks = items.map(item => {
-        if ('platform' in item && typeof item.platform === 'string') {
-          // This is coming from EnhancedDashboardLayout
-          return {
-            ...item,
-            platform: {
-              id: item.platform,
-              name: item.title || 'Custom Link',
-              category:
-                item.category === 'music'
-                  ? 'dsp'
-                  : item.category === 'social'
-                    ? 'social'
-                    : 'custom',
-              icon: item.platform,
-              color: '#000000',
-              placeholder: 'https://example.com',
-            },
-            normalizedUrl: item.url,
-            originalUrl: item.url,
-            suggestedTitle: item.title,
-            isValid: true,
-          } as LinkItem;
-        }
-        return item as LinkItem;
+    (reorderedLinkData: LinkItemData[]) => {
+      // Convert LinkItemData back to our internal LinkItem format
+      const reorderedLinks = reorderedLinkData.map((linkData, index) => {
+        const category: PlatformType =
+          linkData.category === 'music'
+            ? 'dsp'
+            : linkData.category === 'social'
+              ? 'social'
+              : 'custom';
+
+        return {
+          id: linkData.id,
+          title: linkData.title,
+          url: linkData.url,
+          platform: {
+            id: linkData.platform,
+            name: linkData.title,
+            category,
+            icon: linkData.platform,
+            color: '#000000',
+            placeholder: 'https://example.com',
+          },
+          isVisible: linkData.isVisible,
+          order: index,
+          category,
+          normalizedUrl: linkData.url,
+          originalUrl: linkData.url,
+          suggestedTitle: linkData.title,
+          isValid: true,
+        } as LinkItem;
       });
 
       setLinks(reorderedLinks);
@@ -346,18 +370,50 @@ export function EnhancedDashboardLinks({
     [debouncedSave]
   );
 
+  // Handle moving link to different category
+  const handleMoveToCategory = useCallback(
+    (linkId: string, newCategory: string) => {
+      const updatedLinks = links.map(link => {
+        if (link.id === linkId) {
+          const mappedCategory: PlatformType =
+            newCategory === 'music'
+              ? 'dsp'
+              : newCategory === 'social'
+                ? 'social'
+                : 'custom';
+          return {
+            ...link,
+            category: mappedCategory,
+            platform: {
+              ...link.platform,
+              category: mappedCategory as PlatformType,
+            },
+          };
+        }
+        return link;
+      });
+
+      setLinks(updatedLinks);
+      debouncedSave(updatedLinks);
+      toast.success(
+        `Link moved to ${newCategory === 'music' ? 'Music & Streaming' : newCategory === 'social' ? 'Social Media' : newCategory === 'commerce' ? 'Commerce & Payments' : 'Other Links'}`
+      );
+    },
+    [links, debouncedSave]
+  );
+
   // Get username and avatar for preview
   const username = artist?.name || 'username';
   const avatarUrl = artist?.image_url || null;
 
-  // Convert links to the format expected by EnhancedDashboardLayout
-  const dashboardLinks = useMemo(
-    () =>
+  // Convert links to the format expected by EnhancedLinkManager
+  const linkManagerData = useMemo(
+    (): LinkItemData[] =>
       links.map(link => {
-        // Map our internal category type to the expected category type in EnhancedDashboardLayout
+        // Map internal category to LinkItemData category
         const mapCategory = (
           category: 'social' | 'dsp' | 'custom'
-        ): 'social' | 'music' | 'commerce' | 'other' | undefined => {
+        ): 'music' | 'social' | 'commerce' | 'other' => {
           switch (category) {
             case 'dsp':
               return 'music';
@@ -366,22 +422,15 @@ export function EnhancedDashboardLinks({
             case 'custom':
               return 'other';
             default:
-              return undefined;
+              return 'other';
           }
         };
 
         return {
           id: link.id,
           title: link.title,
-          url: link.normalizedUrl,
-          platform: link.platform.id as
-            | 'instagram'
-            | 'twitter'
-            | 'tiktok'
-            | 'youtube'
-            | 'spotify'
-            | 'applemusic'
-            | 'custom',
+          url: link.normalizedUrl || link.url,
+          platform: link.platform.id,
           isVisible: link.isVisible,
           category: mapCategory(link.category),
         };
@@ -397,13 +446,15 @@ export function EnhancedDashboardLinks({
   return (
     <div className='grid grid-cols-1 xl:grid-cols-[1fr_24rem] gap-6'>
       <div className='w-full'>
-        <EnhancedDashboardLayout
-          links={dashboardLinks}
+        <EnhancedLinkManager
+          links={linkManagerData}
           onAddLink={handleAddLink}
           onEditLink={handleEditLink}
           onDeleteLink={handleDeleteLink}
           onToggleVisibility={handleToggleVisibility}
           onReorderLinks={handleReorderLinks}
+          onMoveToCategory={handleMoveToCategory}
+          creatorName={artist?.name}
         />
       </div>
 
@@ -427,7 +478,7 @@ export function EnhancedDashboardLinks({
               <ProfilePreview
                 username={username}
                 avatarUrl={avatarUrl || null}
-                links={dashboardLinks}
+                links={linkManagerData}
                 className='h-full w-full'
               />
             </div>

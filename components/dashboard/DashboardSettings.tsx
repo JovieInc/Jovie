@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
-import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
+import { SettingsManager } from '@/components/organisms/SettingsManager';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardSettingsProps {
@@ -32,7 +32,7 @@ export function DashboardSettings({ initialData }: DashboardSettingsProps) {
       </div>
 
       {/* Settings content */}
-      <SettingsPolished artist={artist} onArtistUpdate={setArtist} />
+      <SettingsManager artist={artist} onArtistUpdate={setArtist} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { AccountDashboard } from '@/components/organisms/AccountDashboard';
+import { AccountDashboard } from '@/components/_legacy/AccountDashboard';
 
 export default function AccountPage() {
   return <AccountDashboard />;
