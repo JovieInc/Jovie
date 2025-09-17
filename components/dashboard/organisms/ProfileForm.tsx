@@ -4,10 +4,10 @@ import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
-import { ErrorSummary } from '@/components/ui/ErrorSummary';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
+import { FormField } from '@/components/molecules/FormField';
+import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 // flags import removed - pre-launch
 import {
   Artist,

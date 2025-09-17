@@ -1,8 +1,8 @@
 import { Button } from '@jovie/ui';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Form } from '@/components/ui/Form';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
+import { Form } from '@/components/organisms/Form';
 
 describe('Form', () => {
   afterEach(cleanup);

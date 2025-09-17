@@ -4,8 +4,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import React, { forwardRef, KeyboardEvent, useCallback, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { Input } from '@/components/ui/Input';
 import type { LinkItem } from '@/types/links';
 
 interface SortableLinkItemProps {

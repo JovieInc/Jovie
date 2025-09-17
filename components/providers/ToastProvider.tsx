@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ToastProvider as ToastContextProvider } from '@/components/ui/ToastContainer';
+import { ToastProvider as ToastContextProvider } from '@/components/molecules/ToastContainer';
 
 interface ToastProviderProps {
   children: React.ReactNode;

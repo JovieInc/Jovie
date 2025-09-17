@@ -3,7 +3,7 @@
 import { ClerkLoaded, ClerkLoading, SignUp } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { AuthLayout } from '@/components/auth';
-import { AuthFormSkeleton } from '@/components/ui/LoadingSkeleton';
+import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export default function SignUpPage() {
   const searchParams = useSearchParams();

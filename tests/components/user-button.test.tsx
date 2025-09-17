@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
 
 const showToastMock = vi.fn();
 
-vi.mock('@/components/ui/ToastContainer', () => ({
+vi.mock('@/components/molecules/ToastContainer', () => ({
   __esModule: true,
   useToast: () => ({
     showToast: showToastMock,

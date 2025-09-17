@@ -100,6 +100,7 @@ Last updated: 2025-09-12 19:14 PT
 
 - Replace `from '@/components/ui/Button'` → `from '@jovie/ui'`.
 - Replace `from '@/components/ui/tooltip'` and `from '@/components/ui/Tooltip'` → `from '@jovie/ui'` (app layer keeps re-export temporarily).
+- Components migrated to atomic structure: `@/components/atoms/`, `@/components/molecules/`, `@/components/organisms/`.
 - Headless UI removals: migrate `Dialog`, `Input`, `Combobox`, `Select` imports to canonical `@jovie/ui` equivalents.
 
 ---

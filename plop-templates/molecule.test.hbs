@@ -1,0 +1,18 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { {{name}} } from './{{name}}';
+
+describe('{{name}}', () => {
+  it('renders correctly', () => {
+    render(<{{name}}>Test content</{{name}}>);
+    expect(screen.getByTestId('{{kebabCase name}}')).toBeInTheDocument();
+  });
+
+  it('applies custom className', () => {
+    render(<{{name}} className="custom-class">Test</{{name}}>);
+    const element = screen.getByTestId('{{kebabCase name}}');
+    expect(element).toHaveClass('custom-class');
+  });
+
+  // TODO: Add tests for component interactions and behavior
+});

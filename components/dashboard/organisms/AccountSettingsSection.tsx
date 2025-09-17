@@ -10,12 +10,12 @@ import {
   ShieldExclamationIcon,
   SignalSlashIcon,
 } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/ui/Button';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
-import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
-import { useToast } from '@/components/ui/ToastContainer';
+import { Input } from '@/components/atoms/Input';
+import { FormField } from '@/components/molecules/FormField';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { cn } from '@/lib/utils';
 import { DashboardCard } from '../atoms/DashboardCard';
 

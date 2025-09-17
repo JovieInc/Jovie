@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Toast, ToastProps } from './Toast';
+import { Toast, ToastProps } from '@/components/atoms/Toast';
 
 export interface ToastOptions extends Omit<ToastProps, 'id' | 'onClose'> {
   id?: string;
@@ -45,7 +45,8 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       setToasts(prevToasts => {
         // Deduplication: check if a toast with the same message already exists
         const existingToast = prevToasts.find(
-          toast => toast.message === options.message && toast.type === options.type
+          toast =>
+            toast.message === options.message && toast.type === options.type
         );
 
         if (existingToast) {
@@ -86,10 +87,16 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
       showToast(event.detail);
     };
 
-    window.addEventListener('error-boundary-toast', handleErrorBoundaryToast as EventListener);
+    window.addEventListener(
+      'error-boundary-toast',
+      handleErrorBoundaryToast as EventListener
+    );
 
     return () => {
-      window.removeEventListener('error-boundary-toast', handleErrorBoundaryToast as EventListener);
+      window.removeEventListener(
+        'error-boundary-toast',
+        handleErrorBoundaryToast as EventListener
+      );
       setToasts([]);
     };
   }, [showToast]);

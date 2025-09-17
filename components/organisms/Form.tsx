@@ -1,6 +1,6 @@
 import React from 'react';
+import { FormStatus } from '@/components/molecules/FormStatus';
 import { cn } from '@/lib/utils';
-import { FormStatus } from './FormStatus';
 
 interface FormProps extends React.FormHTMLAttributes<HTMLFormElement> {
   children: React.ReactNode;

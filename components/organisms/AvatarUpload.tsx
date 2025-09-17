@@ -3,7 +3,7 @@
 import { PhotoIcon } from '@heroicons/react/24/outline';
 import { useCallback, useRef, useState } from 'react';
 import { ArtistAvatar } from '@/components/atoms/ArtistAvatar';
-import { useToast } from '@/components/ui/ToastContainer';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { cn } from '@/lib/utils';
 
 interface AvatarUploadProps {
@@ -33,7 +33,8 @@ export function AvatarUpload({
 
       // Validate file type
       if (!file.type.match(/^image\/(jpeg|png|webp)$/)) {
-        const errorMsg = 'Please select a valid image file (JPEG, PNG, or WebP)';
+        const errorMsg =
+          'Please select a valid image file (JPEG, PNG, or WebP)';
         showToast({
           type: 'error',
           message: errorMsg,
@@ -55,7 +56,7 @@ export function AvatarUpload({
 
       // Show preview
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = e => {
         setPreviewUrl(e.target?.result as string);
       };
       reader.readAsDataURL(file);
@@ -85,8 +86,9 @@ export function AvatarUpload({
 
         onUploadSuccess?.(blobUrl);
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : 'Upload failed';
-        
+        const errorMsg =
+          error instanceof Error ? error.message : 'Upload failed';
+
         showToast({
           type: 'error',
           message: 'Failed to upload photo',
@@ -117,22 +119,22 @@ export function AvatarUpload({
 
   return (
     <div className={cn('flex items-start space-x-6', className)}>
-      <div className="flex-shrink-0">
+      <div className='flex-shrink-0'>
         {displayImageUrl ? (
-          <div className="relative">
+          <div className='relative'>
             <ArtistAvatar
               src={displayImageUrl}
               alt={artistName}
               name={artistName}
-              size="lg"
+              size='lg'
               className={cn(
                 'transition-opacity duration-200',
                 isUploading && 'opacity-50'
               )}
             />
             {isUploading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-full">
-                <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className='absolute inset-0 flex items-center justify-center bg-black/20 rounded-full'>
+                <div className='w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin' />
               </div>
             )}
           </div>
@@ -145,17 +147,17 @@ export function AvatarUpload({
             onClick={!isUploading ? handleUploadClick : undefined}
           >
             {isUploading ? (
-              <div className="w-6 h-6 border-2 border-secondary border-t-transparent rounded-full animate-spin" />
+              <div className='w-6 h-6 border-2 border-secondary border-t-transparent rounded-full animate-spin' />
             ) : (
-              <PhotoIcon className="w-8 h-8 text-secondary group-hover:text-accent-token transition-colors" />
+              <PhotoIcon className='w-8 h-8 text-secondary group-hover:text-accent-token transition-colors' />
             )}
           </div>
         )}
       </div>
-      
-      <div className="flex-1 space-y-3">
+
+      <div className='flex-1 space-y-3'>
         <button
-          type="button"
+          type='button'
           onClick={handleUploadClick}
           disabled={isUploading}
           className={cn(
@@ -163,27 +165,27 @@ export function AvatarUpload({
             isUploading && 'opacity-50 cursor-not-allowed'
           )}
         >
-          <PhotoIcon className="w-4 h-4 mr-2" />
+          <PhotoIcon className='w-4 h-4 mr-2' />
           {isUploading ? 'Uploading...' : 'Upload photo'}
         </button>
-        
-        <p className="text-sm text-secondary">
+
+        <p className='text-sm text-secondary'>
           JPG, PNG or WebP. Max size 4MB. Square images work best.
         </p>
-        
+
         {/* Error state hint */}
-        <p className="text-xs text-tertiary">
+        <p className='text-xs text-tertiary'>
           If upload fails, a default avatar will be used automatically.
         </p>
       </div>
 
       <input
         ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
+        type='file'
+        accept='image/jpeg,image/png,image/webp'
         onChange={handleFileChange}
-        className="hidden"
-        aria-label="Upload profile photo"
+        className='hidden'
+        aria-label='Upload profile photo'
       />
     </div>
   );

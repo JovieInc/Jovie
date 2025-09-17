@@ -10,8 +10,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { Input } from '@/components/ui/Input';
 import {
   type DetectedLink,
   detectPlatform,

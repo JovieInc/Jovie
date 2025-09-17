@@ -5,7 +5,7 @@ import { TipSection } from './TipSection';
 
 // Mock the ToastContainer module
 const mockShowToast = vi.fn();
-vi.mock('@/components/ui/ToastContainer', () => {
+vi.mock('@/components/molecules/ToastContainer', () => {
   return {
     useToast: () => ({
       showToast: mockShowToast,

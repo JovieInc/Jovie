@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Logo } from '@/components/ui/Logo';
+import { Logo } from '@/components/atoms/Logo';
 import { cn } from '@/lib/utils';
 
 interface LogoLinkProps {

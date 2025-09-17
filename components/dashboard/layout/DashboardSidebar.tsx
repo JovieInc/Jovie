@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-} from '@/components/ui/Sidebar';
+} from '@/components/organisms/Sidebar';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;
 

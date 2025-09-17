@@ -4,10 +4,10 @@ import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ErrorSummary } from '@/components/ui/ErrorSummary';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Input } from '@/components/atoms/Input';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { FormField } from '@/components/molecules/FormField';
+import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { APP_URL } from '@/constants/app';
 
 interface ClaimHandleFormProps {

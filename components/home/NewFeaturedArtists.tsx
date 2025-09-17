@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
   type FeaturedCreator,
   FeaturedCreatorsSection,
 } from '@/components/organisms/FeaturedArtistsSection';
 import { Container } from '@/components/site/Container';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 export function NewFeaturedArtists() {
   const [artists, setArtists] = useState<FeaturedCreator[]>([]);

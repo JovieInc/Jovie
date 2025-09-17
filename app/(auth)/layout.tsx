@@ -1,4 +1,4 @@
-import { ClerkAnalytics } from '@/components/ClerkAnalytics';
+import { ClerkAnalytics } from '@/components/providers/ClerkAnalytics';
 
 export default function AuthLayout({
   children,

@@ -4,14 +4,14 @@ import { Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
+import { Input } from '@/components/atoms/Input';
 import { Label } from '@/components/atoms/Label';
 import {
   Dialog,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/components/ui/Dialog';
-import { Input } from '@/components/ui/Input';
+} from '@/components/organisms/Dialog';
 
 type Platform =
   | 'instagram'

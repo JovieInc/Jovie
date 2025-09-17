@@ -3,15 +3,15 @@
 import { Button } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { Textarea } from '@/components/atoms/Textarea';
+import { FormField } from '@/components/molecules/FormField';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/components/ui/Dialog';
-import { FormField } from '@/components/ui/FormField';
-import { Textarea } from '@/components/ui/Textarea';
+} from '@/components/organisms/Dialog';
 import { track } from '@/lib/analytics';
 
 interface FeedbackModalProps {

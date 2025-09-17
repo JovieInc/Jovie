@@ -1,14 +1,14 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
+import { TooltipProvider } from '@jovie/ui';
 import { ThemeProvider } from 'next-themes';
 import React, { type ComponentProps, useEffect, useState } from 'react';
-import { Analytics } from '@/components/Analytics';
+import { Analytics } from '@/components/providers/Analytics';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import { ToastProvider } from './ToastProvider';
-import { TooltipProvider } from '@jovie/ui';
 
 // import { Toolbar } from '@vercel/toolbar/next';
 

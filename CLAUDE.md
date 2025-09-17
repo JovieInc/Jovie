@@ -395,9 +395,17 @@ Before creating a component, ask:
 
 ---
 
-## 🎨 Tailwind CSS v4 Configuration (LOCKED - DO NOT MODIFY)
+## 🎨 Tailwind CSS v4 Configuration (BULLETPROOF LOCKDOWN 🔒)
 
-**❌ CRITICAL: Never modify the working Tailwind CSS configuration. Changes can break styling entirely.**
+**🚨 CRITICAL: This configuration is BULLETPROOF LOCKED with automated validation.**
+
+**⚠️ BEFORE ANY CHANGES: Run `pnpm tailwind:check` to validate configuration integrity.**
+
+**📋 PROTECTION LAYERS:**
+- Pre-push git hooks block invalid configurations
+- Automated guard script validates all critical files
+- Configuration files have protection warnings
+- Comprehensive documentation at `docs/TAILWIND_LOCKDOWN.md`
 
 ### **Required File Structure (DO NOT CHANGE):**
 

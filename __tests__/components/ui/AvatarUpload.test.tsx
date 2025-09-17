@@ -1,10 +1,10 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AvatarUpload } from '@/components/ui/AvatarUpload';
+import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 
 // Mock the toast context
 const mockShowToast = vi.fn();
-vi.mock('@/components/ui/ToastContainer', () => ({
+vi.mock('@/components/molecules/ToastContainer', () => ({
   useToast: () => ({
     showToast: mockShowToast,
     hideToast: vi.fn(),

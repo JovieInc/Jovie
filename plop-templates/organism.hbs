@@ -1,0 +1,36 @@
+'use client';
+
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+
+export interface {{name}}Props {
+  className?: string;
+  // TODO: Add specific props for this organism
+}
+
+/**
+ * {{name}} - A complex, self-contained organism component
+ * 
+ * TODO: Add component description, business logic, and usage guidelines
+ */
+export function {{name}}({ className, ...props }: {{name}}Props) {
+  // TODO: Add state management, API calls, and complex interactions
+  const [isLoading, setIsLoading] = useState(false);
+
+  return (
+    <div
+      className={cn(
+        // Add base styles here
+        '',
+        className
+      )}
+      data-testid="{{kebabCase name}}"
+      {...props}
+    >
+      {/* TODO: Add molecules, atoms, and business logic */}
+      {isLoading ? 'Loading...' : '{{name}} content'}
+    </div>
+  );
+}
+
+export default {{name}};
