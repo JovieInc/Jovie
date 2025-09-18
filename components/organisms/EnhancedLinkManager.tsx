@@ -128,6 +128,16 @@ export function EnhancedLinkManager({
     });
   }, [links, creatorName]);
 
+  // Determine if user is searching vs adding a URL
+  const isSearching = React.useMemo(() => {
+    return (
+      searchQuery &&
+      !searchQuery.includes('.') &&
+      !searchQuery.startsWith('http') &&
+      !searchQuery.startsWith('@')
+    );
+  }, [searchQuery]);
+
   // Filter links based on search query
   const filteredLinks = React.useMemo(() => {
     if (!searchQuery.trim()) return enhancedLinks;
@@ -330,7 +340,8 @@ export function EnhancedLinkManager({
           {categoryOrder.map(category => {
             const categoryLinks = categorizedLinks[category] || [];
 
-            if (categoryLinks.length === 0 && !searchQuery) return null;
+            // Don't show empty categories unless user is actively searching (not adding a URL)
+            if (categoryLinks.length === 0 && !isSearching) return null;
 
             return (
               <div
@@ -357,7 +368,7 @@ export function EnhancedLinkManager({
                   </SortableContext>
                 ) : (
                   <div className='text-center py-6 text-gray-500 dark:text-gray-400'>
-                    {searchQuery
+                    {isSearching
                       ? 'No links match your search'
                       : `Drop links here to add to ${categoryTitles[category]}`}
                   </div>
