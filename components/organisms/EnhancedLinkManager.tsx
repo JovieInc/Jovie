@@ -17,15 +17,12 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { PlusIcon } from '@heroicons/react/24/outline';
 import * as React from 'react';
 import { toast } from 'sonner';
-import { AddLinkButton } from '@/components/atoms/AddLinkButton';
 import { type LinkItemData } from '@/components/atoms/LinkItem';
-import { LinkSearch } from '@/components/atoms/LinkSearch';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { UnifiedLinkInput } from '@/components/molecules/UnifiedLinkInput';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
   canonicalIdentity,
@@ -86,8 +83,6 @@ export function EnhancedLinkManager({
   className,
 }: EnhancedLinkManagerProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
-  const [newLinkUrl, setNewLinkUrl] = React.useState('');
-  const [isAddingLink, setIsAddingLink] = React.useState(false);
   const [draggedItem, setDraggedItem] = React.useState<EnhancedLinkItem | null>(
     null
   );
@@ -221,46 +216,34 @@ export function EnhancedLinkManager({
   };
 
   // Handle adding a new link with auto-detection
-  const handleAddNewLink = React.useCallback(() => {
-    if (!newLinkUrl.trim()) {
-      toast.error('Please enter a URL');
-      return;
-    }
-
-    // Detect platform and normalize URL
-    const detectedInfo = detectPlatform(newLinkUrl, creatorName);
-
-    if (!detectedInfo.isValid) {
-      toast.error(detectedInfo.error || 'Invalid URL format');
-      return;
-    }
-
-    // Check for duplicates
-    const canonicalId = canonicalIdentity(detectedInfo);
-    const duplicate = enhancedLinks.find(
-      link => link.canonicalId === canonicalId
-    );
-
-    if (duplicate) {
-      toast.error(`You already have a link to ${detectedInfo.platform.name}`);
-      return;
-    }
-
-    // Add the link
-    onAddLink(detectedInfo.normalizedUrl, detectedInfo);
-    setNewLinkUrl('');
-    setIsAddingLink(false);
-
-    // Special handling for YouTube (can be both social and Music)
-    if (detectedInfo.platform.id === 'youtube') {
-      toast.info(
-        "YouTube detected! You can drag this to Music & Streaming if it's for YouTube Music.",
-        { duration: 5000 }
+  const handleAddNewLink = React.useCallback(
+    (url: string, detectedInfo: DetectedLink) => {
+      // Check for duplicates
+      const canonicalId = canonicalIdentity(detectedInfo);
+      const duplicate = enhancedLinks.find(
+        link => link.canonicalId === canonicalId
       );
-    }
 
-    toast.success(`${detectedInfo.platform.name} link added successfully!`);
-  }, [newLinkUrl, creatorName, enhancedLinks, onAddLink]);
+      if (duplicate) {
+        toast.error(`You already have a link to ${detectedInfo.platform.name}`);
+        return;
+      }
+
+      // Add the link
+      onAddLink(url, detectedInfo);
+
+      // Special handling for YouTube (can be both social and Music)
+      if (detectedInfo.platform.id === 'youtube') {
+        toast.info(
+          "YouTube detected! You can drag this to Music & Streaming if it's for YouTube Music.",
+          { duration: 5000 }
+        );
+      }
+
+      toast.success(`${detectedInfo.platform.name} link added successfully!`);
+    },
+    [enhancedLinks, onAddLink]
+  );
 
   // Render a single link item with icon
   const renderLinkItem = (link: EnhancedLinkItem) => (
@@ -321,60 +304,20 @@ export function EnhancedLinkManager({
     </div>
   );
 
+  // Empty state check
+  const isEmpty = enhancedLinks.length === 0;
+
   return (
     <div className={cn('space-y-6', className)}>
-      {/* Header Toolbar */}
-      <div className='flex flex-col sm:flex-row gap-3'>
-        <LinkSearch
-          value={searchQuery}
-          onChange={setSearchQuery}
-          placeholder='Search links...'
-          className='flex-1'
+      {/* Unified Search/Add Input - Always prominent */}
+      <div className={cn('w-full max-w-2xl', isEmpty ? 'mx-auto' : '')}>
+        <UnifiedLinkInput
+          onSearch={setSearchQuery}
+          onAddLink={handleAddNewLink}
+          existingLinkCount={enhancedLinks.length}
+          autoFocus={isEmpty}
         />
-
-        {isAddingLink ? (
-          <div className='flex gap-2'>
-            <Input
-              type='url'
-              value={newLinkUrl}
-              onChange={e => setNewLinkUrl(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddNewLink();
-                if (e.key === 'Escape') {
-                  setIsAddingLink(false);
-                  setNewLinkUrl('');
-                }
-              }}
-              placeholder='Paste any link (Instagram, Spotify, etc.)'
-              className='flex-1'
-              autoFocus
-            />
-            <Button onClick={handleAddNewLink} size='sm'>
-              Add
-            </Button>
-            <Button
-              onClick={() => {
-                setIsAddingLink(false);
-                setNewLinkUrl('');
-              }}
-              size='sm'
-              variant='outline'
-            >
-              Cancel
-            </Button>
-          </div>
-        ) : (
-          <AddLinkButton onClick={() => setIsAddingLink(true)} />
-        )}
       </div>
-
-      {/* Auto-detection helper text */}
-      {isAddingLink && (
-        <div className='text-sm text-gray-500 dark:text-gray-400 -mt-3'>
-          💡 Just paste any link - we&apos;ll automatically detect the platform
-          and organize it for you!
-        </div>
-      )}
 
       {/* Links by Category with Drag & Drop */}
       <DndContext
@@ -432,30 +375,41 @@ export function EnhancedLinkManager({
         </DragOverlay>
       </DndContext>
 
-      {/* Empty State */}
-      {enhancedLinks.length === 0 && (
-        <div className='text-center py-12'>
-          <div className='max-w-md mx-auto'>
-            <div className='mb-4 text-4xl'>🔗</div>
-            <h3 className='text-lg font-semibold text-primary-token mb-2'>
-              No links yet
+      {/* Improved Empty State */}
+      {isEmpty && (
+        <div className='text-center py-8'>
+          <div className='max-w-lg mx-auto'>
+            <div className='mb-6 text-6xl opacity-20'>🔗</div>
+            <h3 className='text-xl font-semibold text-primary-token mb-3'>
+              Ready to connect your audience?
             </h3>
-            <p className='text-muted-foreground mb-6'>
-              Start by adding your social media, music platforms, and other
-              links. We&apos;ll automatically organize them for you!
+            <p className='text-muted-foreground mb-8 text-lg leading-relaxed'>
+              Add your social media, music platforms, and other links above.
+              <br />
+              <span className='text-sm'>
+                We&apos;ll automatically organize them by category!
+              </span>
             </p>
-            <Button onClick={() => setIsAddingLink(true)}>
-              <PlusIcon className='h-4 w-4 mr-2' />
-              Add Your First Link
-            </Button>
+
+            {/* Popular platforms showcase */}
+            <div className='flex justify-center gap-4 opacity-40'>
+              {['instagram', 'spotify', 'youtube', 'tiktok', 'twitter'].map(
+                platform => (
+                  <div key={platform} className='w-8 h-8'>
+                    <SocialIcon platform={platform} className='w-full h-full' />
+                  </div>
+                )
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Help Text */}
-      {enhancedLinks.length > 0 && (
-        <div className='text-xs text-gray-500 dark:text-gray-400 space-y-1'>
-          <p>💡 Tip: Drag links between categories to reorganize them</p>
+      {!isEmpty && (
+        <div className='text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 space-y-2'>
+          <p className='font-medium mb-2'>Quick tips:</p>
+          <p>💡 Drag links between categories to reorganize them</p>
           <p>🎵 YouTube links can go in either Social or Music categories</p>
           <p>✨ Links are automatically detected and normalized</p>
         </div>

@@ -10,7 +10,7 @@ import type { LinkItemData } from '@/components/atoms/LinkItem';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { EnhancedLinkManager } from '@/components/organisms/EnhancedLinkManager';
-import { debounce } from '@/lib/utils';
+import { cn, debounce } from '@/lib/utils';
 import {
   type DetectedLink,
   detectPlatform,
@@ -443,9 +443,16 @@ export function EnhancedDashboardLinks({
 
   const profilePath = `/${artist?.handle || 'username'}`;
 
+  const hasLinks = linkManagerData.length > 0;
+
   return (
-    <div className='grid grid-cols-1 xl:grid-cols-[1fr_24rem] gap-6'>
-      <div className='w-full'>
+    <div
+      className={cn(
+        'grid gap-6',
+        hasLinks ? 'xl:grid-cols-[1fr_20rem]' : 'grid-cols-1'
+      )}
+    >
+      <div className={cn('w-full', !hasLinks && 'max-w-4xl mx-auto')}>
         <EnhancedLinkManager
           links={linkManagerData}
           onAddLink={handleAddLink}
@@ -458,72 +465,72 @@ export function EnhancedDashboardLinks({
         />
       </div>
 
-      {/* Right column: Live Preview (only on Links page) */}
-      <aside className='hidden xl:block'>
-        <div className='sticky top-6 space-y-6'>
-          {/* Preview Container */}
-          <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <div className='mb-4 flex items-center justify-between'>
-              <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
-                Live Preview
-              </h2>
-              <div className='text-sm text-gray-500 dark:text-gray-400'>
-                Last saved:{' '}
-                {saveStatus.lastSaved
-                  ? saveStatus.lastSaved.toLocaleTimeString()
-                  : '—'}
+      {/* Right column: Live Preview (only when there are links) */}
+      {hasLinks && (
+        <aside className='hidden xl:block'>
+          <div className='sticky top-6 space-y-4'>
+            {/* Compact Preview Container */}
+            <div className='bg-surface-1 rounded-xl p-4 shadow-sm border border-subtle'>
+              <div className='mb-3 flex items-center justify-between'>
+                <h2 className='text-sm font-medium text-gray-900 dark:text-white'>
+                  Live Preview
+                </h2>
+                <div className='text-xs text-gray-500 dark:text-gray-400'>
+                  {saveStatus.lastSaved
+                    ? saveStatus.lastSaved.toLocaleTimeString()
+                    : 'Not saved'}
+                </div>
               </div>
-            </div>
-            <div className='h-[600px] w-full overflow-hidden rounded-xl border border-subtle'>
-              <ProfilePreview
-                username={username}
-                avatarUrl={avatarUrl || null}
-                links={linkManagerData}
-                className='h-full w-full'
-              />
-            </div>
-          </div>
-
-          {/* URL Preview */}
-          <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-3'>
-              Your Profile URL
-            </h3>
-            <div className='flex flex-col sm:flex-row gap-2'>
-              <div className='flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono truncate'>
-                {typeof window !== 'undefined'
-                  ? `${window.location.origin}${profilePath}`
-                  : 'Loading...'}
-              </div>
-              <div className='flex gap-2'>
-                <CopyToClipboardButton
-                  relativePath={profilePath}
-                  idleLabel='Copy'
-                  successLabel='Copied!'
+              <div className='h-[480px] w-full overflow-hidden rounded-lg border border-subtle bg-gray-50 dark:bg-gray-900'>
+                <ProfilePreview
+                  username={username}
+                  avatarUrl={avatarUrl || null}
+                  links={linkManagerData}
+                  className='h-full w-full scale-90 origin-top'
                 />
-                <Button
-                  asChild
-                  variant='outline'
-                  size='sm'
-                  className='shrink-0 flex-1 sm:flex-initial whitespace-nowrap'
-                >
-                  <Link
-                    href={profilePath}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                  >
-                    <ArrowTopRightOnSquareIcon className='h-4 w-4 mr-1.5' />
-                    Open
-                  </Link>
-                </Button>
               </div>
             </div>
-            <p className='mt-2 text-xs text-gray-500 dark:text-gray-400'>
-              Share this link with your audience
-            </p>
+
+            {/* Compact URL Preview */}
+            <div className='bg-surface-1 rounded-xl p-4 shadow-sm border border-subtle'>
+              <h3 className='text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wide'>
+                Share URL
+              </h3>
+              <div className='flex flex-col gap-2'>
+                <div className='bg-gray-50 dark:bg-gray-800 rounded-md px-3 py-2 text-xs text-gray-900 dark:text-gray-100 font-mono truncate'>
+                  {typeof window !== 'undefined'
+                    ? `${window.location.origin}${profilePath}`
+                    : 'Loading...'}
+                </div>
+                <div className='flex gap-1'>
+                  <div className='flex-1'>
+                    <CopyToClipboardButton
+                      relativePath={profilePath}
+                      idleLabel='Copy'
+                      successLabel='Copied!'
+                    />
+                  </div>
+                  <Button
+                    asChild
+                    variant='outline'
+                    size='sm'
+                    className='flex-1 text-xs h-7'
+                  >
+                    <Link
+                      href={profilePath}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                    >
+                      <ArrowTopRightOnSquareIcon className='h-3 w-3 mr-1' />
+                      Open
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
+      )}
     </div>
   );
 }
