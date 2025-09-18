@@ -74,7 +74,13 @@ export default function DashboardLayoutClient({
         onOpenChange={handleOpenChange}
       >
         <div className='flex min-h-screen w-full bg-base'>
-          <AppSidebar />
+          <AppSidebar
+            user={{
+              name: dashboardData.user?.name,
+              email: dashboardData.user?.email,
+              avatar: dashboardData.user?.imageUrl,
+            }}
+          />
           <SidebarInset className='flex flex-1 flex-col'>
             <DashboardTopBar breadcrumbs={crumbs} />
             <main className='flex-1 overflow-y-auto overflow-x-hidden'>

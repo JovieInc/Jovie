@@ -10,6 +10,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import * as React from 'react';
 
 import { NavMain } from '@/components/nav-main';
@@ -25,50 +26,73 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 
-const data = {
-  user: {
-    name: 'Creator',
-    email: 'creator@jovie.com',
-    avatar: '/avatars/default.png',
-  },
-  navMain: [
-    {
-      title: 'Overview',
-      url: '/dashboard/overview',
-      icon: HomeIcon,
-      isActive: true,
-    },
-    {
-      title: 'Links',
-      url: '/dashboard/links',
-      icon: LinkIcon,
-    },
-    {
-      title: 'Analytics',
-      url: '/dashboard/analytics',
-      icon: ChartPieIcon,
-    },
-    {
-      title: 'Audience',
-      url: '/dashboard/audience',
-      icon: UsersIcon,
-    },
-  ],
-  navSecondary: [
-    {
-      title: 'Earnings',
-      url: '/dashboard/tipping',
-      icon: BanknotesIcon,
-    },
-    {
-      title: 'Settings',
-      url: '/dashboard/settings',
-      icon: Cog6ToothIcon,
-    },
-  ],
-};
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    avatar?: string | null;
+  };
+}
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ user, ...props }: AppSidebarProps) {
+  const pathname = usePathname();
+
+  // Build navigation items with active state
+  const navMain = React.useMemo(
+    () => [
+      {
+        title: 'Overview',
+        url: '/dashboard/overview',
+        icon: HomeIcon,
+        isActive:
+          pathname === '/dashboard/overview' || pathname === '/dashboard',
+      },
+      {
+        title: 'Links',
+        url: '/dashboard/links',
+        icon: LinkIcon,
+        isActive: pathname === '/dashboard/links',
+      },
+      {
+        title: 'Analytics',
+        url: '/dashboard/analytics',
+        icon: ChartPieIcon,
+        isActive: pathname === '/dashboard/analytics',
+      },
+      {
+        title: 'Audience',
+        url: '/dashboard/audience',
+        icon: UsersIcon,
+        isActive: pathname === '/dashboard/audience',
+      },
+    ],
+    [pathname]
+  );
+
+  const navSecondary = React.useMemo(
+    () => [
+      {
+        title: 'Earnings',
+        url: '/dashboard/tipping',
+        icon: BanknotesIcon,
+        isActive: pathname === '/dashboard/tipping',
+      },
+      {
+        title: 'Settings',
+        url: '/dashboard/settings',
+        icon: Cog6ToothIcon,
+        isActive: pathname === '/dashboard/settings',
+      },
+    ],
+    [pathname]
+  );
+
+  // Use provided user data or defaults
+  const userData = {
+    name: user?.name || 'Creator',
+    email: user?.email || 'creator@jovie.com',
+    avatar: user?.avatar || '/avatars/default.png',
+  };
   return (
     <Sidebar variant='inset' {...props}>
       <SidebarHeader>
@@ -95,11 +119,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavSecondary items={data.navSecondary} className='mt-auto' />
+        <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className='mt-auto' />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={userData} />
       </SidebarFooter>
     </Sidebar>
   );

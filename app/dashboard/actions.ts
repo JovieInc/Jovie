@@ -14,7 +14,12 @@ import {
 } from '@/lib/db/schema';
 
 export interface DashboardData {
-  user: { id: string } | null;
+  user: {
+    id: string;
+    email?: string | null;
+    name?: string | null;
+    imageUrl?: string | null;
+  } | null;
   creatorProfiles: CreatorProfile[];
   selectedProfile: CreatorProfile | null;
   needsOnboarding: boolean;
