@@ -411,10 +411,59 @@ export function normalizeUrl(url: string): string {
 }
 
 /**
+ * Smart URL preprocessing before normalization
+ * - Strip protocol case-insensitively
+ * - Lowercase domain
+ * - Handle common paste errors
+ */
+function preprocessUrl(url: string): string {
+  let processed = url.trim();
+
+  // Remove zero-width spaces and other invisible characters
+  processed = processed.replace(/[\u200B-\u200D\uFEFF]/g, '');
+
+  // Strip any protocol (case-insensitive) including typos
+  processed = processed.replace(
+    /^(https?:\/\/+|htp:\/\/|htps:\/\/|htttp:\/\/)/gi,
+    ''
+  );
+
+  // Handle double slashes after stripping protocol
+  processed = processed.replace(/^\/\/+/g, '');
+
+  // Split into domain and path
+  const firstSlashIndex = processed.indexOf('/');
+  let domain =
+    firstSlashIndex > -1 ? processed.substring(0, firstSlashIndex) : processed;
+  const path = firstSlashIndex > -1 ? processed.substring(firstSlashIndex) : '';
+
+  // Lowercase the domain part only
+  domain = domain.toLowerCase();
+
+  // Reconstruct with https://
+  const reconstructed = domain + path;
+
+  // Add protocol if missing
+  if (
+    !reconstructed.startsWith('http://') &&
+    !reconstructed.startsWith('https://')
+  ) {
+    return 'https://' + reconstructed;
+  }
+
+  return reconstructed;
+}
+
+/**
  * Detect platform from URL and return normalized link info
  */
-export function detectPlatform(url: string, creatorName?: string): DetectedLink {
-  const normalizedUrl = normalizeUrl(url);
+export function detectPlatform(
+  url: string,
+  creatorName?: string
+): DetectedLink {
+  // Smart preprocessing first
+  const preprocessedUrl = preprocessUrl(url);
+  const normalizedUrl = normalizeUrl(preprocessedUrl);
 
   // Find matching platform
   let detectedPlatform: PlatformInfo | null = null;
@@ -432,17 +481,25 @@ export function detectPlatform(url: string, creatorName?: string): DetectedLink 
   }
 
   // Generate suggested title
-  const suggestedTitle = generateSuggestedTitle(normalizedUrl, detectedPlatform, creatorName);
+  const suggestedTitle = generateSuggestedTitle(
+    normalizedUrl,
+    detectedPlatform,
+    creatorName
+  );
 
   // Validate URL
   const isValid = validateUrl(normalizedUrl, detectedPlatform);
 
   // Friendly error copy per platform
   const errorExamples: Record<string, string> = {
-    spotify: "That doesn’t look like a Spotify link. Example: https://open.spotify.com/artist/1234",
-    instagram: "That doesn’t look like an Instagram link. Example: https://instagram.com/username",
-    tiktok: "That doesn’t look like a TikTok link. Example: https://tiktok.com/@username",
-    youtube: "That doesn’t look like a YouTube link. Example: https://youtube.com/@handle",
+    spotify:
+      'That doesn’t look like a Spotify link. Example: https://open.spotify.com/artist/1234',
+    instagram:
+      'That doesn’t look like an Instagram link. Example: https://instagram.com/username',
+    tiktok:
+      'That doesn’t look like a TikTok link. Example: https://tiktok.com/@username',
+    youtube:
+      'That doesn’t look like a YouTube link. Example: https://youtube.com/@handle',
   };
 
   return {
@@ -451,7 +508,9 @@ export function detectPlatform(url: string, creatorName?: string): DetectedLink 
     originalUrl: url,
     suggestedTitle,
     isValid,
-    error: isValid ? undefined : (errorExamples[detectedPlatform.id] || 'Invalid URL format'),
+    error: isValid
+      ? undefined
+      : errorExamples[detectedPlatform.id] || 'Invalid URL format',
   };
 }
 
@@ -462,8 +521,8 @@ export function detectPlatform(url: string, creatorName?: string): DetectedLink 
  * @param creatorName Optional creator's name to use in the title (e.g., "Tim White")
  */
 function generateSuggestedTitle(
-  url: string, 
-  platform: PlatformInfo, 
+  url: string,
+  platform: PlatformInfo,
   creatorName?: string
 ): string {
   try {
@@ -491,17 +550,17 @@ function generateSuggestedTitle(
       case 'linkedin': {
         const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
         const username = pathParts[0]?.replace('@', '') || '';
-        
+
         // If we have a creator name, use it in the title
         if (creatorName) {
           return `${creatorName} on ${platform.name}`;
         }
-        
+
         // Fall back to username if available
         if (username) {
           return `@${username} on ${platform.name}`;
         }
-        
+
         return platform.name;
       }
 
@@ -625,7 +684,9 @@ export function getPlatform(id: string): PlatformInfo | undefined {
  * small URL variations (missing dots, protocol, www, with/without @, etc.).
  * The identity is stable per platform + primary handle/ID where possible.
  */
-export function canonicalIdentity(link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>): string {
+export function canonicalIdentity(
+  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
+): string {
   try {
     const u = new URL(link.normalizedUrl);
     const host = u.hostname.replace(/^www\./, '').toLowerCase();
@@ -635,17 +696,23 @@ export function canonicalIdentity(link: Pick<DetectedLink, 'platform' | 'normali
       case 'instagram':
       case 'twitter':
         // x.com and twitter.com both map here; username is first segment
-        if (parts[0]) return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
+        if (parts[0])
+          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
         break;
       case 'tiktok':
-        if (parts[0]) return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
+        if (parts[0])
+          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
         break;
       case 'youtube':
         // Prefer @handle, else channel/ID, else legacy single segment
-        if (parts[0]?.startsWith('@')) return `youtube:${parts[0].slice(1).toLowerCase()}`;
-        if (parts[0] === 'channel' && parts[1]) return `youtube:channel:${parts[1].toLowerCase()}`;
-        if (parts[0] === 'user' && parts[1]) return `youtube:user:${parts[1].toLowerCase()}`;
-        if (parts.length === 1) return `youtube:legacy:${parts[0].toLowerCase()}`;
+        if (parts[0]?.startsWith('@'))
+          return `youtube:${parts[0].slice(1).toLowerCase()}`;
+        if (parts[0] === 'channel' && parts[1])
+          return `youtube:channel:${parts[1].toLowerCase()}`;
+        if (parts[0] === 'user' && parts[1])
+          return `youtube:user:${parts[1].toLowerCase()}`;
+        if (parts.length === 1)
+          return `youtube:legacy:${parts[0].toLowerCase()}`;
         break;
       case 'facebook':
       case 'twitch':
