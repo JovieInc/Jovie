@@ -1,12 +1,12 @@
 'use client';
 
-import { Button } from '@/components/atoms/Button';
 import {
+  Button,
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/atoms/Tooltip';
+} from '@jovie/ui';
 import { useSidebar } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +14,9 @@ interface SidebarCollapseButtonProps {
   className?: string;
 }
 
-export function SidebarCollapseButton({ className }: SidebarCollapseButtonProps) {
+export function SidebarCollapseButton({
+  className,
+}: SidebarCollapseButtonProps) {
   const { toggleSidebar, state } = useSidebar();
   const isCollapsed = state === 'closed';
 
