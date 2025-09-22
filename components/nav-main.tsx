@@ -78,8 +78,10 @@ export function NavMain({
                   <Link
                     href={item.url}
                     className={cn(
-                      'group relative overflow-hidden',
-                      isPending && 'opacity-75'
+                      'group relative overflow-hidden rounded-lg',
+                      'transition-all duration-300 ease-out',
+                      isPending && 'opacity-75',
+                      isActive && 'bg-sidebar-accent/50'
                     )}
                     onMouseEnter={() => preloadRoute(item.url)}
                     onClick={e => {
@@ -89,20 +91,38 @@ export function NavMain({
                       }
                     }}
                   >
-                    <div className='absolute inset-0 bg-sidebar-accent scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out origin-left' />
+                    {/* Linear-inspired hover background effect */}
+                    <div className='absolute inset-0 bg-gradient-to-r from-sidebar-accent/0 to-sidebar-accent/60 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 ease-out origin-left' />
+
+                    {/* Enhanced active state indicator */}
                     {isActive && (
-                      <div className='absolute left-0 top-0 h-full w-1 bg-sidebar-primary rounded-r-full transform transition-all duration-300' />
+                      <>
+                        <div className='absolute left-0 top-1/2 -translate-y-1/2 h-4 w-1 bg-sidebar-primary rounded-r-full transition-all duration-300' />
+                        <div className='absolute inset-0 bg-sidebar-accent/30 rounded-lg' />
+                      </>
                     )}
+
+                    {/* Subtle glow effect on hover */}
+                    <div className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
+                      <div className='absolute inset-0 bg-gradient-to-r from-transparent via-sidebar-primary/5 to-transparent' />
+                    </div>
+
                     <item.icon
                       className={cn(
-                        'h-5 w-5 relative z-10 transition-all duration-200 group-hover:scale-110',
-                        isActive ? 'text-sidebar-primary' : ''
+                        'h-5 w-5 relative z-10 transition-all duration-300 ease-out',
+                        'group-hover:scale-110 group-hover:rotate-3',
+                        isActive
+                          ? 'text-sidebar-primary scale-105'
+                          : 'text-sidebar-foreground'
                       )}
                     />
                     <span
                       className={cn(
-                        'flex-1 relative z-10 transition-all duration-200',
-                        isActive ? 'text-sidebar-primary font-medium' : ''
+                        'flex-1 relative z-10 transition-all duration-300 ease-out',
+                        'group-hover:translate-x-1',
+                        isActive
+                          ? 'text-sidebar-primary font-medium'
+                          : 'text-sidebar-foreground'
                       )}
                     >
                       {item.title}
@@ -119,7 +139,7 @@ export function NavMain({
                         />
                       )}
                       {shortcutKey && (
-                        <kbd className='pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-sidebar-border bg-sidebar-accent px-1.5 font-mono text-[10px] font-medium text-sidebar-accent-foreground opacity-60 group-hover:opacity-100 transition-all duration-200 group-hover:scale-105'>
+                        <kbd className='pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded-md border border-sidebar-border bg-sidebar-surface/80 backdrop-blur-sm px-1.5 font-mono text-[10px] font-medium text-sidebar-muted-foreground opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out group-hover:scale-105 group-hover:bg-sidebar-accent group-hover:text-sidebar-accent-foreground shadow-sm'>
                           {shortcutKey}
                         </kbd>
                       )}

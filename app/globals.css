@@ -352,6 +352,10 @@ body {
   background-color: var(--color-bg-surface-3);
 }
 
+@utility bg-surface-4 {
+  background-color: var(--surface-4);
+}
+
 /* Legacy surface utilities (map to new system) */
 @utility surface {
   background-color: var(--color-bg-surface-1);
@@ -493,44 +497,101 @@ body {
     --focus-ring: 59 130 246; /* blue-500 */
   }
 
-  /* Dark mode - Apple-style inverse relationships */
+  /* Dark mode - Linear-inspired sophistication with Apple-level polish */
   :root.dark {
-    /* Background hierarchy (inverted) */
-    --bg-base: hsl(220, 13%, 9%);
-    --bg-elevated: hsl(220, 13%, 13%);
-    --bg-overlay: hsl(220, 12%, 17%);
+    /* Background hierarchy - Linear-inspired depth and richness */
+    --bg-base: hsl(220, 15%, 8%); /* Deeper, richer base for better contrast */
+    --bg-elevated: hsl(220, 14%, 11%); /* Subtle elevation with warmth */
+    --bg-overlay: hsl(220, 13%, 14%); /* Modal/overlay backgrounds with depth */
 
-    /* Surface hierarchy */
-    --surface-1: hsl(220, 13%, 13%);
-    --surface-2: hsl(220, 12%, 17%);
-    --surface-3: hsl(220, 12%, 21%);
+    /* Surface hierarchy - Enhanced contrast and sophistication */
+    --surface-1: hsl(220, 14%, 11%); /* Primary surface with subtle warmth */
+    --surface-2: hsl(220, 13%, 14%); /* Secondary surface for layering */
+    --surface-3: hsl(220, 12%, 18%); /* Tertiary surface for complex UIs */
+    --surface-4: hsl(220, 11%, 22%); /* Quaternary surface for maximum depth */
 
-    /* Border system */
-    --border-subtle: hsl(220, 11%, 25%);
-    --border-strong: hsl(220, 10%, 29%);
-    --border-interactive: hsl(220, 9%, 46%);
+    /* Border system - Linear-inspired subtlety and precision */
+    --border-subtle: hsl(
+      220,
+      12%,
+      20%
+    ); /* Very subtle borders that feel refined */
+    --border-default: hsl(
+      220,
+      11%,
+      24%
+    ); /* Default border weight with contrast */
+    --border-strong: hsl(220, 10%, 32%); /* Stronger borders for emphasis */
+    --border-interactive: hsl(220, 15%, 40%); /* Interactive element borders */
 
-    /* Text hierarchy (inverted) */
-    --text-primary: hsl(0, 0%, 100%);
-    --text-secondary: hsl(220, 8%, 62%);
-    --text-muted: hsl(220, 9%, 54%);
-    --text-placeholder: hsl(220, 9%, 46%);
-    --text-disabled: hsl(220, 10%, 29%);
+    /* Text hierarchy - Perfect contrast ratios with Linear's precision */
+    --text-primary: hsl(220, 5%, 98%); /* Pure white with subtle warmth */
+    --text-secondary: hsl(
+      220,
+      8%,
+      72%
+    ); /* Secondary text with perfect readability */
+    --text-muted: hsl(220, 9%, 58%); /* Muted text that remains accessible */
+    --text-placeholder: hsl(
+      220,
+      10%,
+      48%
+    ); /* Placeholder text with proper contrast */
+    --text-disabled: hsl(
+      220,
+      12%,
+      32%
+    ); /* Disabled text that's clearly distinct */
 
-    /* Interactive states */
-    --interactive-hover: hsl(220, 12%, 17%);
-    --interactive-active: hsl(220, 12%, 21%);
-    --interactive-focus: hsl(220, 100%, 60%);
+    /* Interactive states - Linear-style responsiveness and depth */
+    --interactive-hover: hsl(
+      220,
+      13%,
+      16%
+    ); /* Subtle hover states that feel alive */
+    --interactive-active: hsl(
+      220,
+      12%,
+      20%
+    ); /* Active/pressed states with feedback */
+    --interactive-focus: hsl(
+      220,
+      100%,
+      65%
+    ); /* Focus indicators with accessibility */
 
-    /* Button system (Apple's approach - inverted) */
-    --btn-primary-bg: hsl(0, 0%, 100%); /* White in dark mode */
-    --btn-primary-fg: hsl(220, 13%, 9%); /* Black text */
+    /* Enhanced elevation system for sophisticated depth */
+    --elevation-1: 0 1px 2px 0 hsl(220, 15%, 4% / 0.08);
+    --elevation-2: 0 2px 4px 0 hsl(220, 15%, 4% / 0.12);
+    --elevation-3: 0 4px 8px 0 hsl(220, 15%, 4% / 0.16);
+    --elevation-4: 0 8px 16px 0 hsl(220, 15%, 4% / 0.2);
+    --elevation-5: 0 16px 32px 0 hsl(220, 15%, 4% / 0.24);
 
-    /* Loading/skeleton colors for dark mode */
+    /* Button system - Apple's approach with Linear polish */
+    --btn-primary-bg: hsl(220, 5%, 98%); /* Crisp white buttons that pop */
+    --btn-primary-fg: hsl(220, 15%, 8%); /* Dark text with perfect contrast */
+
+    /* Glass effects for modern, sophisticated UI */
+    --glass-subtle: hsla(220, 13%, 14%, 0.8); /* Subtle glass effect */
+    --glass-medium: hsla(220, 13%, 14%, 0.9); /* Medium glass effect */
+    --glass-strong: hsla(220, 13%, 14%, 0.95); /* Strong glass effect */
+
+    /* Status colors optimized for dark mode accessibility */
+    --status-success: hsl(
+      142,
+      70%,
+      55%
+    ); /* Success green with proper contrast */
+    --status-warning: hsl(38, 85%, 60%); /* Warning amber that stands out */
+    --status-error: hsl(0, 75%, 65%); /* Error red with accessibility */
+    --status-info: hsl(220, 85%, 65%); /* Info blue that harmonizes */
+
+    /* Loading/skeleton colors - Enhanced for sophisticated dark mode */
     --color-skeleton-base: var(--surface-2);
     --color-skeleton-shimmer: var(--surface-3);
 
-    --focus-ring: 96 165 250; /* blue-400 for dark mode */
+    /* Focus ring with proper dark mode visibility and accessibility */
+    --focus-ring: 96 165 250; /* blue-400 optimized for dark backgrounds */
   }
 
   body {
@@ -640,13 +701,21 @@ body {
   background-color: var(--color-bg-base);
 }
 
-/* Enhanced border utilities */
+/* Enhanced border utilities - Linear-inspired precision */
 @utility border-subtle {
-  border-color: var(--color-border-subtle);
+  border-color: var(--border-subtle);
 }
 
 @utility border-default {
-  border-color: var(--color-border-default);
+  border-color: var(--border-default);
+}
+
+@utility border-strong {
+  border-color: var(--border-strong);
+}
+
+@utility border-interactive {
+  border-color: var(--border-interactive);
 }
 
 @utility text-accent-token {
@@ -664,6 +733,36 @@ body {
 
 @utility text-disabled {
   color: var(--text-disabled);
+}
+
+/* Glass effect utilities for modern UI */
+@utility bg-glass-subtle {
+  background-color: var(--glass-subtle);
+}
+
+@utility bg-glass-medium {
+  background-color: var(--glass-medium);
+}
+
+@utility bg-glass-strong {
+  background-color: var(--glass-strong);
+}
+
+/* Status color utilities for badges and indicators */
+@utility bg-status-success {
+  background-color: var(--status-success);
+}
+
+@utility bg-status-warning {
+  background-color: var(--status-warning);
+}
+
+@utility bg-status-error {
+  background-color: var(--status-error);
+}
+
+@utility bg-status-info {
+  background-color: var(--status-info);
 }
 
 /* Skeleton loading utilities */
@@ -1070,4 +1169,236 @@ body {
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);
   --color-muted-foreground: var(--color-text-secondary-token);
+}
+
+/* ====================================
+ * ENHANCED MICRO-INTERACTIONS & TRANSITIONS
+ * Linear-inspired sophisticated animations with Apple-level polish
+ * ====================================*/
+
+/* Enhanced surface interaction utilities */
+@utility surface-base {
+  background-color: hsl(var(--bg-base));
+  transition: background-color 200ms ease-out;
+}
+
+@utility surface-elevated {
+  background-color: hsl(var(--bg-elevated));
+  transition: background-color 200ms ease-out;
+}
+
+@utility surface-overlay {
+  background-color: hsl(var(--bg-overlay));
+  transition: background-color 200ms ease-out;
+}
+
+@utility surface-2 {
+  background-color: hsl(var(--surface-2));
+  transition: background-color 200ms ease-out;
+}
+
+@utility surface-3 {
+  background-color: hsl(var(--surface-3));
+  transition: background-color 200ms ease-out;
+}
+
+/* Sophisticated micro-interaction utilities */
+@utility interactive-scale {
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility interactive-scale:hover {
+  transform: scale(1.02);
+}
+
+@utility interactive-scale:active {
+  transform: scale(0.98);
+}
+
+@utility interactive-lift {
+  transition:
+    transform 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility interactive-lift:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 25px -8px rgba(0, 0, 0, 0.15),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@utility interactive-lift:active {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.1);
+}
+
+/* Linear-style floating action states */
+@utility interactive-float {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility interactive-float:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 20px 40px -12px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+@utility interactive-float:active {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 8px 16px -6px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced focus states with Linear sophistication */
+@utility focus-ring-linear {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility focus-ring-linear:focus-visible {
+  outline-color: var(--interactive-focus);
+  box-shadow:
+    0 0 0 4px hsla(var(--interactive-focus), 0.15),
+    0 0 0 1px var(--interactive-focus);
+  transform: scale(1.02);
+}
+
+/* Sophisticated shimmer effects */
+@utility shimmer-subtle {
+  position: relative;
+  overflow: hidden;
+}
+
+@utility shimmer-subtle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  transition: left 600ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility shimmer-subtle:hover::after {
+  left: 100%;
+}
+
+/* Apple-style glass morphism with interactions */
+@utility glass-interactive {
+  background: var(--glass-subtle);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility glass-interactive:hover {
+  background: var(--glass-medium);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+/* Enhanced button press animations */
+@utility btn-press-refined {
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@utility btn-press-refined:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+@utility btn-press-refined:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Linear-inspired loading states */
+@utility loading-pulse-linear {
+  animation: linear-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes linear-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.02);
+  }
+}
+
+/* Sophisticated stagger animations for lists */
+@utility stagger-animation {
+  animation: stagger-in 400ms cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Enhanced card interactions */
+@utility card-interactive-linear {
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+@utility card-interactive-linear:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+@utility card-interactive-linear:active {
+  transform: translateY(-1px) scale(1.005);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.1),
+    0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* Smooth page transitions */
+@utility page-transition {
+  animation: page-enter 500ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Enhanced text selection */
+::selection {
+  background-color: hsla(var(--interactive-focus), 0.2);
+  color: var(--text-primary);
+}
+
+::-moz-selection {
+  background-color: hsla(var(--interactive-focus), 0.2);
+  color: var(--text-primary);
 }

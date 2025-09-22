@@ -185,19 +185,21 @@ export default function DashboardLayoutClient({
         open={sidebarOpen}
         onOpenChange={handleOpenChange}
       >
-        <div className='flex min-h-screen w-full bg-base'>
-          {/* Desktop Sidebar */}
+        <div className='flex min-h-screen w-full bg-base transition-colors duration-300 ease-out'>
+          {/* Desktop Sidebar with enhanced transitions */}
           {!isMobile && (
-            <AppSidebar
-              user={{
-                name: dashboardData.user?.name,
-                email: dashboardData.user?.email,
-                avatar: dashboardData.user?.imageUrl,
-              }}
-            />
+            <div className='transition-all duration-300 ease-out'>
+              <AppSidebar
+                user={{
+                  name: dashboardData.user?.name,
+                  email: dashboardData.user?.email,
+                  avatar: dashboardData.user?.imageUrl,
+                }}
+              />
+            </div>
           )}
 
-          {/* Mobile Navigation */}
+          {/* Mobile Navigation with sophisticated animations */}
           {isMobile && (
             <MobileNavigation
               isOpen={mobileNavOpen}
@@ -213,26 +215,41 @@ export default function DashboardLayoutClient({
             </MobileNavigation>
           )}
 
-          <SidebarInset className='flex flex-1 flex-col'>
-            <DashboardTopBar
-              breadcrumbs={crumbs}
-              actions={
-                isMobile ? (
-                  <MobileNavTrigger
-                    isOpen={mobileNavOpen}
-                    onOpenChange={setMobileNavOpen}
-                  />
-                ) : undefined
-              }
-            />
+          <SidebarInset className='flex flex-1 flex-col transition-all duration-300 ease-out'>
+            {/* Enhanced top bar with slide-in animation */}
+            <div className='animate-in slide-in-from-top-2 duration-300 ease-out'>
+              <DashboardTopBar
+                breadcrumbs={crumbs}
+                actions={
+                  isMobile ? (
+                    <MobileNavTrigger
+                      isOpen={mobileNavOpen}
+                      onOpenChange={setMobileNavOpen}
+                    />
+                  ) : undefined
+                }
+              />
+            </div>
+
+            {/* Main content with sophisticated transitions */}
             <main
               className={cn(
-                'flex-1 overflow-y-auto overflow-x-hidden',
+                'flex-1 overflow-y-auto overflow-x-hidden relative',
+                'transition-all duration-300 ease-out',
                 isMobile ? 'pb-20' : '' // Add bottom padding on mobile for tab nav
               )}
             >
-              <div className='w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8'>
-                <div className='mx-auto max-w-7xl space-y-6'>{children}</div>
+              {/* Subtle scroll gradient */}
+              <div className='absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-base/80 to-transparent pointer-events-none z-10' />
+              <div className='absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-base/80 to-transparent pointer-events-none z-10' />
+
+              <div className='w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 transition-all duration-300 ease-out'>
+                <div className='mx-auto max-w-7xl space-y-6'>
+                  {/* Enhanced content wrapper with fade-in animation */}
+                  <div className='animate-in fade-in-0 slide-in-from-bottom-4 duration-500 ease-out'>
+                    {children}
+                  </div>
+                </div>
               </div>
             </main>
           </SidebarInset>

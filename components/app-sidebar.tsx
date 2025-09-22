@@ -215,19 +215,31 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' asChild>
-              <Link href='/dashboard/overview' className='group'>
-                <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition-all duration-200 group-hover:scale-110 group-hover:rotate-6'>
+              <Link
+                href='/dashboard/overview'
+                className='group relative overflow-hidden'
+              >
+                {/* Subtle glow effect on hover */}
+                <div className='absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
+                  <div className='absolute inset-0 bg-gradient-to-r from-transparent via-sidebar-primary/5 to-transparent rounded-lg' />
+                </div>
+
+                <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 text-sidebar-primary-foreground transition-all duration-300 ease-out group-hover:scale-110 group-hover:rotate-6 shadow-sm ring-1 ring-sidebar-border/50 group-hover:ring-sidebar-primary/20 group-hover:shadow-md relative z-10'>
                   <Image
                     src='/brand/Jovie-Logo-Icon.svg'
                     alt='Jovie'
                     width={16}
                     height={16}
-                    className='size-4 transition-all duration-200'
+                    className='size-4 transition-all duration-300 ease-out group-hover:scale-110'
                   />
                 </div>
-                <div className='grid flex-1 text-left text-sm leading-tight transition-all duration-200 group-hover:translate-x-1'>
-                  <span className='truncate font-semibold'>Jovie</span>
-                  <span className='truncate text-xs'>Creator Dashboard</span>
+                <div className='grid flex-1 text-left text-sm leading-tight transition-all duration-300 ease-out group-hover:translate-x-1 relative z-10'>
+                  <span className='truncate font-semibold text-sidebar-foreground transition-colors duration-200 group-hover:text-sidebar-primary'>
+                    Jovie
+                  </span>
+                  <span className='truncate text-xs text-sidebar-muted-foreground transition-colors duration-200 group-hover:text-sidebar-foreground'>
+                    Creator Dashboard
+                  </span>
                 </div>
               </Link>
             </SidebarMenuButton>
@@ -256,11 +268,12 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                     key={item.title}
                     href={item.url}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-all duration-200',
-                      'hover:bg-sidebar-accent group',
+                      'flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-all duration-300 ease-out',
+                      'hover:bg-sidebar-accent hover:translate-x-1 group relative overflow-hidden',
+                      'ring-1 ring-transparent hover:ring-sidebar-border/30',
                       isActive
-                        ? 'bg-sidebar-accent text-sidebar-primary font-medium'
-                        : 'text-sidebar-foreground'
+                        ? 'bg-sidebar-accent/70 text-sidebar-primary font-medium shadow-sm ring-sidebar-border/50'
+                        : 'text-sidebar-foreground hover:text-sidebar-primary'
                     )}
                   >
                     <item.icon />
