@@ -7,58 +7,82 @@
  */
 
 export const cardTokens = {
-  // Base card styles applied to all card variants
-  base: 'bg-surface-1 border border-subtle rounded-xl shadow-sm transition-all duration-300',
+  // Base card styles - Linear-inspired sophistication
+  base: 'bg-surface-1 border border-subtle rounded-xl transition-all duration-300 ease-out',
 
-  // Padding variations
+  // Padding variations with mathematical consistency
   padding: {
     default: 'p-6',
     large: 'p-8',
     compact: 'p-4',
+    micro: 'p-3',
   },
 
-  // Border radius variations
+  // Border radius variations - Linear-style precision
   radius: {
     default: 'rounded-xl',
     small: 'rounded-lg',
     large: 'rounded-2xl',
+    minimal: 'rounded-md',
   },
 
-  // Shadow variations
+  // Enhanced shadow system for dark mode depth
   shadow: {
-    default: 'shadow-sm',
-    medium: 'shadow-md',
-    large: 'shadow-lg',
-    hover: 'hover:shadow-lg hover:shadow-accent/5',
+    none: 'shadow-none',
+    subtle: 'shadow-sm shadow-black/5 dark:shadow-black/20',
+    default: 'shadow-md shadow-black/8 dark:shadow-black/25',
+    medium: 'shadow-lg shadow-black/10 dark:shadow-black/30',
+    large: 'shadow-xl shadow-black/12 dark:shadow-black/35',
+    floating: 'shadow-2xl shadow-black/15 dark:shadow-black/40',
   },
 
-  // Border variations
+  // Sophisticated border system
   border: {
-    default: 'border border-subtle',
-    accent: 'border border-accent/20',
-    hover: 'hover:border-accent/20',
+    none: 'border-0',
+    subtle: 'border border-subtle',
+    default: 'border border-default',
+    strong: 'border border-strong',
+    interactive: 'border border-interactive',
   },
 
-  // Interactive state variations
+  // Interactive states - Linear-inspired responsiveness
   interactive: {
     hover:
-      'hover:bg-surface-2 hover:border-accent/30 hover:shadow-xl hover:shadow-accent/10 hover:ring-1 ring-accent transform hover:-translate-y-1',
-    active: 'active:bg-surface-3 active:shadow-inner',
+      'hover:bg-surface-2 hover:border-interactive hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:ring-1 hover:ring-interactive/20 transform hover:-translate-y-0.5',
+    active:
+      'active:bg-surface-3 active:shadow-inner active:transform active:translate-y-0',
     focus:
-      'focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+      'focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base',
   },
 
-  // Variant compositions (combining tokens for specific use cases)
+  // Glass effects for modern UI depth
+  glass: {
+    subtle: 'backdrop-blur-sm bg-glass-subtle',
+    medium: 'backdrop-blur-md bg-glass-medium',
+    strong: 'backdrop-blur-lg bg-glass-strong',
+  },
+
+  // Enhanced variant compositions with Linear-level sophistication
   variants: {
     default:
-      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm hover:shadow-md hover:border-accent/10 transition-all duration-300',
+      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 hover:border-default transition-all duration-300 ease-out',
+
     interactive:
-      'bg-surface-1 backdrop-blur-sm rounded-xl border border-subtle p-6 text-left hover:shadow-xl hover:shadow-accent/10 hover:ring-1 ring-accent hover:border-accent/30 hover:bg-surface-2 transition-all duration-300 group transform hover:-translate-y-1 cursor-pointer',
+      'bg-surface-1 backdrop-blur-sm rounded-xl border border-subtle p-6 text-left shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-xl hover:shadow-black/12 dark:hover:shadow-black/35 hover:ring-1 hover:ring-interactive/20 hover:border-interactive hover:bg-surface-2 transition-all duration-300 ease-out group transform hover:-translate-y-1 cursor-pointer',
+
     settings:
-      'bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm hover:shadow-md hover:border-accent/10 transition-all duration-300',
+      'bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 hover:border-default transition-all duration-300 ease-out',
+
     analytics:
-      'bg-surface-1 border border-subtle rounded-xl p-6 hover:shadow-lg hover:shadow-accent/5 hover:border-accent/20 transition-all duration-300 group',
+      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-interactive transition-all duration-300 ease-out group',
+
     'empty-state':
-      'bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden',
+      'bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden shadow-sm shadow-black/5 dark:shadow-black/20',
+
+    elevated:
+      'bg-surface-2 border border-default rounded-xl p-6 shadow-md shadow-black/8 dark:shadow-black/25 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 transition-all duration-300 ease-out',
+
+    floating:
+      'bg-surface-1 backdrop-blur-lg border border-default rounded-xl p-6 shadow-xl shadow-black/12 dark:shadow-black/35 hover:shadow-2xl hover:shadow-black/15 dark:hover:shadow-black/40 transition-all duration-300 ease-out',
   },
 };
