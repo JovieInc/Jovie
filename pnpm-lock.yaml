@@ -6,8 +6,8 @@ settings:
 
 dependencies:
   '@clerk/elements':
-    specifier: 0.23.62
-    version: 0.23.62(@types/react-dom@18.3.7)(@types/react@18.3.24)(next@15.5.3)(react-dom@18.3.1)(react@18.3.1)
+    specifier: 0.23.63
+    version: 0.23.63(@types/react-dom@18.3.7)(@types/react@18.3.24)(next@15.5.3)(react-dom@18.3.1)(react@18.3.1)
   '@clerk/nextjs':
     specifier: ^6.31.9
     version: 6.32.0(next@15.5.3)(react-dom@18.3.1)(react@18.3.1)
@@ -1032,8 +1032,8 @@ packages:
       - supports-color
     dev: true
 
-  /@clerk/elements@0.23.62(@types/react-dom@18.3.7)(@types/react@18.3.24)(next@15.5.3)(react-dom@18.3.1)(react@18.3.1):
-    resolution: {integrity: sha512-aba/dZ+tP3GQOX8vkoqbjECUahm++v+hIvLRh1lbYpjeybDMlsVfUCgbMRxawvIkRiVUoamTbfD5xJ2xRhNcdQ==}
+  /@clerk/elements@0.23.63(@types/react-dom@18.3.7)(@types/react@18.3.24)(next@15.5.3)(react-dom@18.3.1)(react@18.3.1):
+    resolution: {integrity: sha512-dJ2Fcn0QDaK1INlMsIRb2z6JMlI5l5hHP2V8a/uwHOXjuRRisVMg2S13FJxuGD9AEZcm/2HQBDLcmo+DJ1/LMA==}
     engines: {node: '>=18.17.0'}
     peerDependencies:
       next: ^13.5.4 || ^14.0.3 || ^15
@@ -1049,14 +1049,14 @@ packages:
       '@radix-ui/primitive': 1.1.3
       '@radix-ui/react-form': 0.1.8(@types/react-dom@18.3.7)(@types/react@18.3.24)(react-dom@18.3.1)(react@18.3.1)
       '@radix-ui/react-slot': 1.2.3(@types/react@18.3.24)(react@18.3.1)
-      '@xstate/react': 6.0.0(@types/react@18.3.24)(react@18.3.1)(xstate@5.21.0)
+      '@xstate/react': 6.0.0(@types/react@18.3.24)(react@18.3.1)(xstate@5.22.0)
       client-only: 0.0.1
       next: 15.5.3(@babel/core@7.28.4)(@playwright/test@1.55.0)(react-dom@18.3.1)(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       tslib: 2.8.1
       type-fest: 4.41.0
-      xstate: 5.21.0
+      xstate: 5.22.0
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
@@ -5903,7 +5903,7 @@ packages:
       tinyrainbow: 2.0.0
     dev: true
 
-  /@xstate/react@6.0.0(@types/react@18.3.24)(react@18.3.1)(xstate@5.21.0):
+  /@xstate/react@6.0.0(@types/react@18.3.24)(react@18.3.1)(xstate@5.22.0):
     resolution: {integrity: sha512-xXlLpFJxqLhhmecAXclBECgk+B4zYSrDTl8hTfPZBogkn82OHKbm9zJxox3Z/YXoOhAQhKFTRLMYGdlbhc6T9A==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -5915,7 +5915,7 @@ packages:
       react: 18.3.1
       use-isomorphic-layout-effect: 1.2.1(@types/react@18.3.24)(react@18.3.1)
       use-sync-external-store: 1.5.0(react@18.3.1)
-      xstate: 5.21.0
+      xstate: 5.22.0
     transitivePeerDependencies:
       - '@types/react'
     dev: false
@@ -14162,8 +14162,8 @@ packages:
   /xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
-  /xstate@5.21.0:
-    resolution: {integrity: sha512-y4wmqxjyAa0tgz4k3m/MgTF1kDOahE5+xLfWt5eh1sk+43DatLhKlI8lQDJZpvihZavjbD3TUgy2PRMphhhqgQ==}
+  /xstate@5.22.0:
+    resolution: {integrity: sha512-5d73WWQaAozOaHl/la5TuriybLab9DNkzzYEte5UG2YwsVCR7SSDZJkyS6qfaOYGCFOjZjjSwEEVro4iqN3Slw==}
     dev: false
 
   /xtend@4.0.2:
