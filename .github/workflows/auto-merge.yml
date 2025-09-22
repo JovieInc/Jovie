@@ -209,7 +209,7 @@ jobs:
       - name: Wait for required CI checks
         id: wait_for_ci
         if: steps.should_merge.outputs.should_merge == 'true' && (steps.dependabot_check.outputs.allowed != 'false')
-        uses: lewagon/wait-on-check-action@v1.3.3
+        uses: lewagon/wait-on-check-action@v1.4.1
         continue-on-error: true
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
