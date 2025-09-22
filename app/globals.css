@@ -76,6 +76,7 @@ body {
     var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
 
+  /* Design System Colors */
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
@@ -87,21 +88,100 @@ body {
   --color-gray-800: #1f2937;
   --color-gray-900: #111827;
 
+  /* Border Radius Scale (4px base unit) */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-full: 9999px;
+
+  /* Component-specific radius tokens */
+  --radius-button: var(--radius-md);
+  --radius-input: var(--radius-md);
+  --radius-card: var(--radius-lg);
+  --radius-modal: var(--radius-xl);
+  --radius-badge: var(--radius-sm);
+  --radius-avatar: var(--radius-md);
+  --radius-tooltip: var(--radius-md);
+
+  /* Border Width Scale */
+  --border-0: 0;
+  --border-1: 1px;
+  --border-2: 2px;
+  --border-4: 4px;
+  --border-8: 8px;
+
+  /* Typography Scale */
   --tracking-tighter: -0.02em;
   --tracking-tight: -0.01em;
   --tracking-normal: 0;
   --tracking-wide: 0.01em;
   --tracking-wider: 0.02em;
 
+  --leading-none: 1;
   --leading-tight: 1.25;
   --leading-snug: 1.375;
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
   --leading-loose: 2;
 
-  /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
+  /* Semantic token mappings */
   --color-btn-primary: var(--color-btn-primary-bg);
   --color-btn-primary-foreground: var(--color-btn-primary-fg);
+
+  /* Border tokens for components */
+  --color-border-button: var(--border-subtle);
+  --color-border-input: var(--border-subtle);
+  --color-border-card: var(--border-subtle);
+  --color-border-focus: var(--interactive-focus);
+
+  /* Spacing Scale (4px base unit for mathematical consistency) */
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0_5: 2px; /* 0.5 * 4px */
+  --space-1: 4px; /* 1 * 4px - base unit */
+  --space-1_5: 6px; /* 1.5 * 4px */
+  --space-2: 8px; /* 2 * 4px */
+  --space-2_5: 10px; /* 2.5 * 4px */
+  --space-3: 12px; /* 3 * 4px */
+  --space-3_5: 14px; /* 3.5 * 4px */
+  --space-4: 16px; /* 4 * 4px */
+  --space-5: 20px; /* 5 * 4px */
+  --space-6: 24px; /* 6 * 4px */
+  --space-7: 28px; /* 7 * 4px */
+  --space-8: 32px; /* 8 * 4px */
+  --space-9: 36px; /* 9 * 4px */
+  --space-10: 40px; /* 10 * 4px */
+  --space-12: 48px; /* 12 * 4px */
+  --space-14: 56px; /* 14 * 4px */
+  --space-16: 64px; /* 16 * 4px */
+  --space-20: 80px; /* 20 * 4px */
+  --space-24: 96px; /* 24 * 4px */
+  --space-28: 112px; /* 28 * 4px */
+  --space-32: 128px; /* 32 * 4px */
+
+  /* Component-specific spacing tokens */
+  --space-component-padding-xs: var(--space-2); /* 8px - tight padding */
+  --space-component-padding-sm: var(--space-3); /* 12px - small padding */
+  --space-component-padding-md: var(--space-4); /* 16px - medium padding */
+  --space-component-padding-lg: var(--space-6); /* 24px - large padding */
+  --space-component-padding-xl: var(--space-8); /* 32px - extra large padding */
+
+  --space-component-gap-xs: var(--space-1); /* 4px - tight gap */
+  --space-component-gap-sm: var(--space-2); /* 8px - small gap */
+  --space-component-gap-md: var(--space-3); /* 12px - medium gap */
+  --space-component-gap-lg: var(--space-4); /* 16px - large gap */
+  --space-component-gap-xl: var(--space-6); /* 24px - extra large gap */
+
+  /* Layout spacing tokens */
+  --space-layout-section-xs: var(--space-8); /* 32px - tight sections */
+  --space-layout-section-sm: var(--space-12); /* 48px - small sections */
+  --space-layout-section-md: var(--space-16); /* 64px - medium sections */
+  --space-layout-section-lg: var(--space-20); /* 80px - large sections */
+  --space-layout-section-xl: var(--space-24); /* 96px - extra large sections */
 }
 
 @utility grid-bg {
@@ -136,18 +216,63 @@ body {
   }
 }
 
-/* Standard focus ring utility for all interactive elements */
-@utility focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+/* Standard border radius utilities */
+@utility rounded-button {
+  border-radius: var(--radius-button);
 }
 
-/* Standard focus ring utility with transparent offset (for elements with white backgrounds) */
+@utility rounded-input {
+  border-radius: var(--radius-input);
+}
+
+@utility rounded-card {
+  border-radius: var(--radius-card);
+}
+
+@utility rounded-modal {
+  border-radius: var(--radius-modal);
+}
+
+@utility rounded-badge {
+  border-radius: var(--radius-badge);
+}
+
+@utility rounded-avatar {
+  border-radius: var(--radius-avatar);
+}
+
+@utility rounded-tooltip {
+  border-radius: var(--radius-tooltip);
+}
+
+/* Standard border utilities */
+@utility border-button {
+  border: var(--border-1) solid var(--color-border-button);
+}
+
+@utility border-input {
+  border: var(--border-1) solid var(--color-border-input);
+}
+
+@utility border-card {
+  border: var(--border-1) solid var(--color-border-card);
+}
+
+/* Enhanced focus ring utility using design tokens */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  --tw-ring-color: var(--color-border-focus);
+  --tw-ring-offset-color: var(--bg-base);
+}
+
+/* Focus ring with transparent offset for overlays */
 @utility focus-ring-transparent-offset {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent;
+  --tw-ring-color: var(--color-border-focus);
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none;
+  @apply inline-flex items-center justify-center rounded-button text-sm font-medium transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none;
 }
 
 @utility btn-primary {
@@ -307,54 +432,105 @@ body {
 }
 
 @layer base {
-  /* Enhanced Linear-style dashboard tokens (light) */
+  /* Design System Tokens - Apple-level consistency with semantic roles */
   :root {
-    --color-bg-base: #ffffff; /* app background */
-    --color-bg-surface-0: #fafbfc; /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8; /* cards/panels */
-    --color-bg-surface-2: #eef0f2; /* interactive/hover */
-    --color-bg-surface-3: #e5e7eb; /* pressed/active */
-    --color-border-subtle: #e5e7eb;
-    --color-border-default: #d1d5db;
-    --color-text-primary-token: #0c0c0c;
-    --color-text-secondary-token: #6b7280;
-    --color-text-tertiary-token: #9ca3af;
-    --color-accent: #7c3aed; /* accent */
-    --color-accent-foreground: #fff; /* accent text */
-    --color-btn-primary-bg: #000; /* primary button background */
-    --color-btn-primary-fg: #fff; /* primary button text */
+    /* Background hierarchy */
+    --bg-base: hsl(0, 0%, 100%);
+    --bg-elevated: hsl(220, 3%, 97%);
+    --bg-overlay: hsl(220, 4%, 94%);
+
+    /* Surface hierarchy (cards, panels, modals) */
+    --surface-1: hsl(220, 3%, 97%);
+    --surface-2: hsl(220, 4%, 94%);
+    --surface-3: hsl(220, 5%, 86%);
+
+    /* Border system */
+    --border-subtle: hsl(220, 6%, 78%);
+    --border-strong: hsl(220, 7%, 70%);
+    --border-interactive: hsl(220, 8%, 62%);
+
+    /* Text hierarchy */
+    --text-primary: hsl(220, 13%, 9%);
+    --text-secondary: hsl(220, 10%, 29%);
+    --text-muted: hsl(220, 9%, 46%);
+    --text-placeholder: hsl(220, 9%, 54%);
+    --text-disabled: hsl(220, 8%, 62%);
+
+    /* Interactive states */
+    --interactive-hover: hsl(220, 4%, 94%);
+    --interactive-active: hsl(220, 5%, 86%);
+    --interactive-focus: hsl(220, 100%, 50%);
+
+    /* Brand colors (color-agnostic approach) */
+    --accent: hsl(220, 100%, 50%);
+    --accent-foreground: hsl(0, 0%, 100%);
+
+    /* Button system (Apple's approach - context determines color) */
+    --btn-primary-bg: hsl(220, 13%, 9%); /* Black in light mode */
+    --btn-primary-fg: hsl(0, 0%, 100%); /* White text */
+
+    /* Legacy compatibility mappings */
+    --color-bg-base: var(--bg-base);
+    --color-bg-surface-0: var(--bg-elevated);
+    --color-bg-surface-1: var(--surface-1);
+    --color-bg-surface-2: var(--surface-2);
+    --color-bg-surface-3: var(--surface-3);
+    --color-border-subtle: var(--border-subtle);
+    --color-border-default: var(--border-strong);
+    --color-text-primary-token: var(--text-primary);
+    --color-text-secondary-token: var(--text-secondary);
+    --color-text-tertiary-token: var(--text-muted);
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-btn-primary-bg: var(--btn-primary-bg);
+    --color-btn-primary-fg: var(--btn-primary-fg);
 
     /* Loading/skeleton colors */
-    --color-skeleton-base: #f3f4f6;
-    --color-skeleton-shimmer: #ffffff;
+    --color-skeleton-base: var(--surface-2);
+    --color-skeleton-shimmer: var(--bg-base);
 
-    /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
-    --focus-ring: 124 58 237; /* approx. #7c3aed */
+    /* Focus ring RGB triplet */
+    --focus-ring: 59 130 246; /* blue-500 */
   }
 
-  /* Dark mode overrides — ensure this block comes AFTER light tokens */
+  /* Dark mode - Apple-style inverse relationships */
   :root.dark {
-    /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0a0a0a; /* deepest app background */
-    --color-bg-surface-0: #111111; /* elevated backgrounds (sidebars) */
-    --color-bg-surface-1: #171717; /* cards/panels */
-    --color-bg-surface-2: #1f1f1f; /* interactive/hover */
-    --color-bg-surface-3: #262626; /* pressed/active */
-    --color-border-subtle: #262626; /* subtle borders */
-    --color-border-default: #404040; /* default borders */
-    --color-text-primary-token: #f5f5f5;
-    --color-text-secondary-token: #a3a3a3;
-    --color-text-tertiary-token: #737373;
-    --color-accent: #7c3aed; /* accent */
-    --color-accent-foreground: #fff; /* accent text */
-    --color-btn-primary-bg: #fff; /* primary button background */
-    --color-btn-primary-fg: #000; /* primary button text */
+    /* Background hierarchy (inverted) */
+    --bg-base: hsl(220, 13%, 9%);
+    --bg-elevated: hsl(220, 13%, 13%);
+    --bg-overlay: hsl(220, 12%, 17%);
+
+    /* Surface hierarchy */
+    --surface-1: hsl(220, 13%, 13%);
+    --surface-2: hsl(220, 12%, 17%);
+    --surface-3: hsl(220, 12%, 21%);
+
+    /* Border system */
+    --border-subtle: hsl(220, 11%, 25%);
+    --border-strong: hsl(220, 10%, 29%);
+    --border-interactive: hsl(220, 9%, 46%);
+
+    /* Text hierarchy (inverted) */
+    --text-primary: hsl(0, 0%, 100%);
+    --text-secondary: hsl(220, 8%, 62%);
+    --text-muted: hsl(220, 9%, 54%);
+    --text-placeholder: hsl(220, 9%, 46%);
+    --text-disabled: hsl(220, 10%, 29%);
+
+    /* Interactive states */
+    --interactive-hover: hsl(220, 12%, 17%);
+    --interactive-active: hsl(220, 12%, 21%);
+    --interactive-focus: hsl(220, 100%, 60%);
+
+    /* Button system (Apple's approach - inverted) */
+    --btn-primary-bg: hsl(0, 0%, 100%); /* White in dark mode */
+    --btn-primary-fg: hsl(220, 13%, 9%); /* Black text */
 
     /* Loading/skeleton colors for dark mode */
-    --color-skeleton-base: #1a1a1a;
-    --color-skeleton-shimmer: #2a2a2a;
+    --color-skeleton-base: var(--surface-2);
+    --color-skeleton-shimmer: var(--surface-3);
 
-    --focus-ring: 124 58 237;
+    --focus-ring: 96 165 250; /* blue-400 for dark mode */
   }
 
   body {
@@ -365,37 +541,97 @@ body {
       "calt" 1;
   }
 
+  /* Typography Hierarchy - Apple-level consistency */
   h1,
   h2,
   h3,
   h4,
   h5,
   h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-semibold text-primary-token;
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
   }
 
+  /* Display typography for hero sections */
   h1 {
-    @apply text-4xl lg:text-5xl;
+    font-size: 3rem; /* 48px */
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tighter);
   }
 
+  @media (min-width: 1024px) {
+    h1 {
+      font-size: 3.75rem; /* 60px */
+    }
+  }
+
+  /* Primary headings */
   h2 {
-    @apply text-3xl lg:text-4xl;
+    font-size: 1.875rem; /* 30px */
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-tight);
   }
 
+  @media (min-width: 1024px) {
+    h2 {
+      font-size: 2.25rem; /* 36px */
+    }
+  }
+
+  /* Section headings */
   h3 {
-    @apply text-2xl lg:text-3xl;
+    font-size: 1.5rem; /* 24px */
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-normal);
   }
 
+  @media (min-width: 1024px) {
+    h3 {
+      font-size: 1.875rem; /* 30px */
+    }
+  }
+
+  /* Subsection headings */
   h4 {
-    @apply text-xl lg:text-2xl;
+    font-size: 1.25rem; /* 20px */
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
+    font-weight: 600;
   }
 
+  @media (min-width: 1024px) {
+    h4 {
+      font-size: 1.5rem; /* 24px */
+    }
+  }
+
+  /* Component headings */
   h5 {
-    @apply text-lg lg:text-xl;
+    font-size: 1.125rem; /* 18px */
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-normal);
+    font-weight: 500;
   }
 
+  @media (min-width: 1024px) {
+    h5 {
+      font-size: 1.25rem; /* 20px */
+    }
+  }
+
+  /* Small headings */
   h6 {
-    @apply text-base lg:text-lg;
+    font-size: 1rem; /* 16px */
+    line-height: var(--leading-normal);
+    letter-spacing: var(--tracking-wide);
+    font-weight: 500;
+  }
+
+  @media (min-width: 1024px) {
+    h6 {
+      font-size: 1.125rem; /* 18px */
+    }
   }
 }
 
@@ -421,6 +657,15 @@ body {
   --tw-ring-color: var(--color-accent);
 }
 
+/* Semantic text color utilities */
+@utility text-muted {
+  color: var(--text-muted);
+}
+
+@utility text-disabled {
+  color: var(--text-disabled);
+}
+
 /* Skeleton loading utilities */
 @utility skeleton {
   background-color: var(--color-skeleton-base);
@@ -443,6 +688,69 @@ body {
   }
 }
 
+/* Apple-style keyframe animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes gentleBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
 /* Preview update animation */
 @utility animate-shimmer {
   animation: shimmer 1.5s ease-in-out infinite;
@@ -454,11 +762,241 @@ body {
 }
 
 @utility input-focus-glow {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
 }
 
 @utility btn-press {
   @apply transform transition-transform duration-100 ease-out active:scale-95;
+}
+
+/* Error and Empty State Utilities - Apple-level polish */
+
+/* Error state styling */
+@utility error-input {
+  @apply border-red-500 bg-red-50 dark:bg-red-950/10 text-red-900 dark:text-red-100;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 0.1);
+}
+
+@utility error-text {
+  @apply text-red-600 dark:text-red-400 text-sm;
+}
+
+@utility error-icon {
+  @apply text-red-500 w-4 h-4;
+}
+
+@utility error-card {
+  @apply border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/10;
+}
+
+/* Success state styling */
+@utility success-input {
+  @apply border-green-500 bg-green-50 dark:bg-green-950/10 text-green-900 dark:text-green-100;
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.1);
+}
+
+@utility success-text {
+  @apply text-green-600 dark:text-green-400 text-sm;
+}
+
+@utility success-icon {
+  @apply text-green-500 w-4 h-4;
+}
+
+@utility success-card {
+  @apply border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/10;
+}
+
+/* Warning state styling */
+@utility warning-input {
+  @apply border-orange-500 bg-orange-50 dark:bg-orange-950/10 text-orange-900 dark:text-orange-100;
+  box-shadow: 0 0 0 3px rgb(249 115 22 / 0.1);
+}
+
+@utility warning-text {
+  @apply text-orange-600 dark:text-orange-400 text-sm;
+}
+
+@utility warning-icon {
+  @apply text-orange-500 w-4 h-4;
+}
+
+@utility warning-card {
+  @apply border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/10;
+}
+
+/* Empty state styling */
+@utility empty-state {
+  @apply flex flex-col items-center justify-center gap-3 p-8 text-center;
+  min-height: 200px;
+}
+
+@utility empty-state-icon {
+  @apply w-12 h-12 text-gray-500 dark:text-gray-400 mb-2 opacity-60;
+}
+
+@utility empty-state-title {
+  @apply text-lg font-medium text-gray-700 dark:text-gray-300 mb-1;
+}
+
+@utility empty-state-description {
+  @apply text-sm text-gray-600 dark:text-gray-400 max-w-sm;
+}
+
+@utility empty-state-subtle {
+  @apply bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700;
+}
+
+/* Loading state styling */
+@utility loading-state {
+  @apply flex items-center justify-center gap-2 p-6;
+}
+
+@utility loading-spinner {
+  @apply w-5 h-5 animate-spin text-gray-500 dark:text-gray-400;
+}
+
+@utility loading-text {
+  @apply text-sm text-gray-600 dark:text-gray-400;
+}
+
+/* Status badges */
+@utility badge-error {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium bg-red-100 text-red-800 dark:bg-red-950/20 dark:text-red-400;
+}
+
+@utility badge-success {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium bg-green-100 text-green-800 dark:bg-green-950/20 dark:text-green-400;
+}
+
+@utility badge-warning {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-950/20 dark:text-orange-400;
+}
+
+@utility badge-info {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-950/20 dark:text-blue-400;
+}
+
+@utility badge-neutral {
+  @apply inline-flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300;
+}
+
+/* Validation feedback */
+@utility validation-group {
+  @apply space-y-1;
+}
+
+@utility validation-message {
+  @apply flex items-start gap-2 text-xs;
+}
+
+@utility validation-icon {
+  @apply w-3 h-3 mt-0.5 flex-shrink-0;
+}
+
+/* Disabled states */
+@utility disabled-input {
+  @apply bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60;
+}
+
+@utility disabled-button {
+  @apply bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed opacity-60 pointer-events-none;
+}
+
+@utility disabled-text {
+  @apply text-gray-400 dark:text-gray-500 opacity-60;
+}
+
+/* Typography Utilities - Semantic text classes */
+@utility text-display-2xl {
+  font-size: 4.5rem; /* 72px */
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tighter);
+  font-weight: 700;
+}
+
+@utility text-display-xl {
+  font-size: 3.75rem; /* 60px */
+  line-height: var(--leading-none);
+  letter-spacing: var(--tracking-tighter);
+  font-weight: 700;
+}
+
+@utility text-display-lg {
+  font-size: 3rem; /* 48px */
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: 700;
+}
+
+@utility text-display-md {
+  font-size: 2.25rem; /* 36px */
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: 600;
+}
+
+@utility text-body-lg {
+  font-size: 1.125rem; /* 18px */
+  line-height: var(--leading-relaxed);
+  letter-spacing: var(--tracking-normal);
+  font-weight: 400;
+}
+
+@utility text-body-md {
+  font-size: 1rem; /* 16px */
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-normal);
+  font-weight: 400;
+}
+
+@utility text-body-sm {
+  font-size: 0.875rem; /* 14px */
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-normal);
+  font-weight: 400;
+}
+
+@utility text-body-xs {
+  font-size: 0.75rem; /* 12px */
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 400;
+}
+
+@utility text-label-lg {
+  font-size: 0.875rem; /* 14px */
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-normal);
+  font-weight: 500;
+}
+
+@utility text-label-md {
+  font-size: 0.75rem; /* 12px */
+  line-height: var(--leading-normal);
+  letter-spacing: var(--tracking-wide);
+  font-weight: 500;
+}
+
+@utility text-label-sm {
+  font-size: 0.6875rem; /* 11px */
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-wider);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Component spacing utilities (simplified) */
+@utility padding-component-sm {
+  padding: 12px;
+}
+
+@utility padding-component-md {
+  padding: 16px;
+}
+
+@utility padding-component-lg {
+  padding: 24px;
 }
 
 /* Motion preference utility for accessibility */
