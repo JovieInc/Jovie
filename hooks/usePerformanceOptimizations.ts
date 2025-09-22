@@ -157,7 +157,7 @@ export function usePerformanceMonitoring() {
       setMetrics(prev => ({
         ...prev,
         navigationTime:
-          navigationStart.loadEventEnd - navigationStart.navigationStart,
+          navigationStart.loadEventEnd - navigationStart.fetchStart,
       }));
     }
 

@@ -2,7 +2,7 @@
 
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import * as React from 'react';
-import { useGestures, useMobile, useSwipeToClose } from '@/hooks/useGestures';
+import { useMobile } from '@/hooks/useGestures';
 import { cn } from '@/lib/utils';
 
 interface MobileNavigationProps {
@@ -18,24 +18,9 @@ export function MobileNavigation({
   children,
   className,
 }: MobileNavigationProps) {
-  const { isMobile, isTouch } = useMobile();
+  const { isMobile } = useMobile();
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragOffset, setDragOffset] = React.useState(0);
-
-  // Swipe to close functionality
-  const swipeGestures = useSwipeToClose(
-    () => onOpenChange(false),
-    80,
-    isOpen && isMobile
-  );
-
-  // Enhanced gestures for smooth dragging
-  const dragGestures = useGestures({
-    onSwipeLeft: () => onOpenChange(false),
-    onSwipeRight: () => onOpenChange(true),
-    threshold: 30,
-    enabled: isMobile && isTouch,
-  });
 
   // Handle drag to close
   const handleDragStart = React.useCallback(() => {
@@ -45,7 +30,7 @@ export function MobileNavigation({
   }, [isMobile, isOpen]);
 
   const handleDragMove = React.useCallback(
-    (e: React.TouchEvent) => {
+    (e: React.TouchEvent<HTMLDivElement>) => {
       if (!isDragging) return;
 
       const touch = e.touches[0];
@@ -93,7 +78,6 @@ export function MobileNavigation({
         <div
           className='fixed inset-0 bg-black/50 z-40 transition-opacity duration-300'
           onClick={() => onOpenChange(false)}
-          {...swipeGestures}
         />
       )}
 
@@ -117,7 +101,6 @@ export function MobileNavigation({
         onTouchStart={handleDragStart}
         onTouchMove={handleDragMove}
         onTouchEnd={handleDragEnd}
-        {...dragGestures}
       >
         {/* Mobile Header */}
         <div className='flex items-center justify-between p-4 border-b border-sidebar-border'>
