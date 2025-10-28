@@ -1,10 +1,9 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
@@ -299,6 +298,16 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         id='handle-input'
         required
       >
+        {/* TODO: Migrate Input props:
+
+           - inputClassName → className
+
+           - validationState → variant (invalid→error, valid→success)
+
+           - Wrap with <Field label error description> if needed
+
+           - See: packages/ui/atoms/input.tsx for new API */}
+
         <Input
           ref={inputRef}
           type='text'

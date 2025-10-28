@@ -1,3 +1,18 @@
+/**
+ * @deprecated Use Input from @jovie/ui instead.
+ *
+ * Migration guide:
+ * 1. Import: import { Input, Field } from '@jovie/ui'
+ * 2. Props:
+ *    - inputClassName → className
+ *    - validationState → variant (invalid→error, valid→success, pending→remove)
+ *    - label/error/helpText → wrap with <Field label error description>
+ * 3. See: packages/ui/atoms/input.tsx for new API
+ *
+ * Migration codemod (import changes only):
+ *   pnpm tsx tools/codemods/migrate-input-simple.ts
+ */
+
 import * as Headless from '@headlessui/react';
 import { clsx } from 'clsx';
 import React, { forwardRef, useId } from 'react';

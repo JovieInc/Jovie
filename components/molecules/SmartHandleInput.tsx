@@ -1,5 +1,6 @@
 'use client';
 
+import { Input } from '@jovie/ui';
 import React, {
   useCallback,
   useEffect,
@@ -7,7 +8,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import {
   type ClientValidationResult,
@@ -352,6 +352,16 @@ export function SmartHandleInput({
         <div className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm font-mono z-10'>
           {prefix}
         </div>
+        {/* TODO: Migrate Input props:
+
+           - inputClassName → className
+
+           - validationState → variant (invalid→error, valid→success)
+
+           - Wrap with <Field label error description> if needed
+
+           - See: packages/ui/atoms/input.tsx for new API */}
+
         <Input
           type='text'
           value={value}

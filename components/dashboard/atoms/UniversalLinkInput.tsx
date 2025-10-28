@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -10,7 +10,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import {
   type DetectedLink,
@@ -182,6 +181,16 @@ export const UniversalLinkInput = forwardRef<
           <label htmlFor='link-url-input' className='sr-only'>
             Enter link URL
           </label>
+          {/* TODO: Migrate Input props:
+
+             - inputClassName → className
+
+             - validationState → variant (invalid→error, valid→success)
+
+             - Wrap with <Field label error description> if needed
+
+             - See: packages/ui/atoms/input.tsx for new API */}
+
           <Input
             ref={urlInputRef}
             id='link-url-input'

@@ -1,8 +1,7 @@
 'use client';
 
-import { Button, Select } from '@jovie/ui';
+import { Button, Input, Select } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { track } from '@/lib/analytics';
@@ -205,6 +204,20 @@ export function SocialsForm({ artist }: SocialsFormProps) {
                   ]}
                 />
               </FormField>
+
+              {/* TODO: Migrate Input props:
+
+
+                 - inputClassName → className
+
+
+                 - validationState → variant (invalid→error, valid→success)
+
+
+                 - Wrap with <Field label error description> if needed
+
+
+                 - See: packages/ui/atoms/input.tsx for new API */}
 
               <Input
                 type='url'

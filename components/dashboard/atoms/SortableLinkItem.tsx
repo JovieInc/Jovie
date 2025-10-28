@@ -2,9 +2,8 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Input, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import React, { forwardRef, KeyboardEvent, useCallback, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { LinkItem } from '@/types/links';
 
@@ -239,6 +238,7 @@ export const SortableLinkItem = forwardRef<
           {/* Link content */}
           <div className='flex-1 min-w-0'>
             {/* Title (editable) */}
+            {/* TODO: Migrate Input props: inputClassName → className, validationState → variant */}
             {isEditing ? (
               <Input
                 type='text'

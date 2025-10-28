@@ -1,6 +1,7 @@
 'use client';
 import {
   Button,
+  Input,
   Sheet,
   SheetContent,
   Tooltip,
@@ -13,7 +14,6 @@ import { cva } from 'class-variance-authority';
 import { PanelLeft } from 'lucide-react';
 import React from 'react';
 import { Divider } from '@/components/atoms/Divider';
-import { Input } from '@/components/atoms/Input';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -330,6 +330,7 @@ const SidebarInput = React.forwardRef<
   React.ElementRef<typeof Input>,
   React.ComponentProps<typeof Input>
 >(({ className, ...props }, ref) => {
+  // TODO: Migrate Input props: inputClassName → className, validationState → variant
   return (
     <Input
       ref={ref}

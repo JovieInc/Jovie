@@ -177,13 +177,78 @@ git restore .
 tsx tools/codemods/[name].ts --dry-run
 ```
 
+### 2. `migrate-input-simple.ts`
+
+Migrates Headless UI Input to shadcn Input (import changes only).
+
+**Transformations:**
+- Import: `from '@/components/atoms/Input'` → `from '@jovie/ui'`
+- Adds TODO comments for manual prop migration
+- Safe, non-breaking transformations only
+
+**Manual migration required:**
+- `inputClassName` → `className`
+- `validationState` → `variant` (invalid→error, valid→success)
+- `label`/`error`/`helpText` → wrap with `<Field>`
+
+**Usage:**
+```bash
+# Dry run (preview changes)
+tsx tools/codemods/migrate-input-simple.ts --dry-run
+
+# Apply changes (imports only, adds TODOs)
+tsx tools/codemods/migrate-input-simple.ts
+
+# Apply to specific directory
+tsx tools/codemods/migrate-input-simple.ts "components/dashboard/**/*.tsx"
+```
+
+**Example:**
+
+Before:
+```tsx
+import { Input } from '@/components/atoms/Input';
+
+<Input
+  label="Email"
+  error={errors.email}
+  validationState="invalid"
+  inputClassName="font-mono"
+/>
+```
+
+After (import + TODO):
+```tsx
+import { Input } from '@jovie/ui';
+
+{/* TODO: Migrate Input props:
+   - inputClassName → className
+   - validationState → variant (invalid→error, valid→success)
+   - Wrap with <Field label error description> if needed
+   - See: packages/ui/atoms/input.tsx for new API */}
+<Input
+  label="Email"
+  error={errors.email}
+  validationState="invalid"
+  inputClassName="font-mono"
+/>
+```
+
+Manual migration result:
+```tsx
+import { Input, Field } from '@jovie/ui';
+
+<Field label="Email" error={errors.email}>
+  <Input variant="error" className="font-mono" />
+</Field>
+```
+
 ---
 
 ## Future Codemods
 
 Planned codemods for remaining migration phases:
 
-- `migrate-input.ts` - Headless UI Input → shadcn Input
 - `migrate-select.ts` - Native Select → Radix Select
 - `consolidate-imports.ts` - Consolidate all imports to @jovie/ui
 - `migrate-cta-button.ts` - CTAButton wrapper → Button behavior

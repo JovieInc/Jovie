@@ -1,10 +1,9 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
@@ -204,6 +203,16 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         id='artist-name'
         required
       >
+        {/* TODO: Migrate Input props:
+
+           - inputClassName → className
+
+           - validationState → variant (invalid→error, valid→success)
+
+           - Wrap with <Field label error description> if needed
+
+           - See: packages/ui/atoms/input.tsx for new API */}
+
         <Input
           ref={nameInputRef}
           type='text'

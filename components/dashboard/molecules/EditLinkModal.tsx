@@ -1,10 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
-import { Input } from '@/components/atoms/Input';
 import { Label } from '@/components/atoms/Label';
 import {
   Dialog,
@@ -124,6 +123,16 @@ export function EditLinkModal({
 
           <div className='space-y-2'>
             <Label htmlFor='title'>Title</Label>
+            {/* TODO: Migrate Input props:
+
+               - inputClassName → className
+
+               - validationState → variant (invalid→error, valid→success)
+
+               - Wrap with <Field label error description> if needed
+
+               - See: packages/ui/atoms/input.tsx for new API */}
+
             <Input
               id='title'
               value={title}

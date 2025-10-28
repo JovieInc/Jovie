@@ -10,9 +10,8 @@ import {
   ShieldExclamationIcon,
   SignalSlashIcon,
 } from '@heroicons/react/24/outline';
-import { Button } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { useEffect, useMemo, useState } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useToast } from '@/components/molecules/ToastContainer';
@@ -411,6 +410,16 @@ export function AccountSettingsSection() {
             >
               {!pendingEmail && (
                 <FormField label='New email address' required>
+                  {/* TODO: Migrate Input props:
+
+                     - inputClassName → className
+
+                     - validationState → variant (invalid→error, valid→success)
+
+                     - Wrap with <Field label error description> if needed
+
+                     - See: packages/ui/atoms/input.tsx for new API */}
+
                   <Input
                     type='email'
                     value={newEmail}
