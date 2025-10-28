@@ -134,6 +134,38 @@ export async function PUT(req: Request) {
         );
       }
 
+      // Validate URLs before proceeding
+      const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+      for (const link of links) {
+        try {
+          const url = new URL(link.url);
+          const protocol = url.protocol.toLowerCase();
+
+          if (dangerousProtocols.includes(protocol)) {
+            return NextResponse.json(
+              {
+                error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
+              },
+              { status: 400 }
+            );
+          }
+
+          if (protocol !== 'http:' && protocol !== 'https:') {
+            return NextResponse.json(
+              {
+                error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
+              },
+              { status: 400 }
+            );
+          }
+        } catch {
+          return NextResponse.json(
+            { error: `Invalid URL format: ${link.url}` },
+            { status: 400 }
+          );
+        }
+      }
+
       // Delete existing links
       await db
         .delete(socialLinks)

@@ -8,7 +8,19 @@ interface FrostedButtonProps extends Omit<ButtonProps, 'variant'> {
 }
 
 /**
- * Button with a frosted glass effect built on the shared Button component.
+ * @deprecated Use Button with variant="frosted" instead.
+ *
+ * Migration:
+ * - <FrostedButton> → <Button variant="frosted">
+ * - frostedStyle="ghost" → variant="frosted-ghost"
+ * - frostedStyle="outline" → variant="frosted-outline"
+ * - shape="circle" → className="rounded-full"
+ * - shape="square" → className="rounded-none"
+ *
+ * This component will be removed in a future release.
+ * Use the automated codemod: `pnpm tsx tools/codemods/migrate-frosted-button.ts`
+ *
+ * @see packages/ui/atoms/button.tsx for the canonical Button component
  */
 export const FrostedButton = forwardRef<HTMLButtonElement, FrostedButtonProps>(
   (

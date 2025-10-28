@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from './index';
 import { creatorProfiles, socialLinks, users } from './schema';
 
@@ -88,4 +88,23 @@ export async function deleteSocialLink(linkId: string) {
     .where(eq(socialLinks.id, linkId))
     .returning();
   return deleted || null;
+}
+
+/**
+ * Increment profile view count atomically
+ * Used for analytics tracking on public profile pages
+ */
+export async function incrementProfileViews(username: string) {
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        profileViews: drizzleSql`${creatorProfiles.profileViews} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()));
+  } catch (error) {
+    // Fail silently to avoid blocking page load
+    console.error('Failed to increment profile views:', error);
+  }
 }
