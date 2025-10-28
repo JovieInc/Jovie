@@ -1,5 +1,6 @@
 'use client';
 
+import DOMPurify from 'isomorphic-dompurify';
 import { useEffect, useState } from 'react';
 
 interface LegalContentProps {
@@ -13,10 +14,40 @@ export function LegalContent({ endpoint, fallbackHtml }: LegalContentProps) {
   useEffect(() => {
     fetch(endpoint)
       .then(res => res.text())
-      .then(setContentHtml)
+      .then(html => {
+        // Sanitize HTML to prevent XSS attacks
+        const sanitized = DOMPurify.sanitize(html, {
+          ALLOWED_TAGS: [
+            'h1',
+            'h2',
+            'h3',
+            'h4',
+            'h5',
+            'h6',
+            'p',
+            'a',
+            'ul',
+            'ol',
+            'li',
+            'strong',
+            'em',
+            'code',
+            'pre',
+            'blockquote',
+          ],
+          ALLOWED_ATTR: ['href', 'target', 'rel'],
+          ALLOW_DATA_ATTR: false,
+        });
+        setContentHtml(sanitized);
+      })
       .catch(err => {
         console.error(`Failed to load ${endpoint}:`, err);
-        setContentHtml(fallbackHtml);
+        // Sanitize fallback HTML as well
+        const sanitized = DOMPurify.sanitize(fallbackHtml, {
+          ALLOWED_TAGS: ['p'],
+          ALLOWED_ATTR: [],
+        });
+        setContentHtml(sanitized);
       });
   }, [endpoint, fallbackHtml]);
 

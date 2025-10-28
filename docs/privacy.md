@@ -25,9 +25,10 @@ We automatically collect:
 We use:
 
 - **Clerk**: User authentication and management
-- **Supabase**: Database and backend services
-- **Segment**: Analytics and tracking
+- **Neon**: Database services
+- **PostHog**: Analytics and tracking
 - **Spotify**: Music data and artist information
+- **Stripe**: Payment processing for subscriptions
 
 ## How We Use Your Information
 
@@ -43,7 +44,7 @@ We use your information to:
 
 We do not sell your personal data. We may share data with:
 
-- Third-party service providers (Clerk, Supabase, Segment)
+- Third-party service providers (Clerk, Neon, PostHog, Stripe)
 - Legal authorities when required by law
 - Business partners for service functionality
 

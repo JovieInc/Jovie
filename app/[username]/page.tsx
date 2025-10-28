@@ -3,7 +3,10 @@ import { cache } from 'react';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import {
+  getCreatorProfileWithLinks,
+  incrementProfileViews,
+} from '@/lib/db/queries';
 import {
   CreatorProfile,
   convertCreatorProfileToArtist,
@@ -113,6 +116,11 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     notFound();
   }
 
+  // Track profile view (fire-and-forget, non-blocking)
+  incrementProfileViews(username).catch(() => {
+    // Fail silently, don't block page render
+  });
+
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
@@ -201,5 +209,5 @@ export async function generateMetadata({ params }: Props) {
 // Enable ISR with 30 minute revalidation for fresher content
 export const revalidate = 1800;
 
-// Temporarily disable edge runtime for debugging
-// export const runtime = 'edge';
+// Use Edge runtime for low-latency public profile reads
+export const runtime = 'edge';
