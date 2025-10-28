@@ -1,9 +1,9 @@
 'use client';
+import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CTAButton } from '@/components/atoms/CTAButton';
-import { FrostedButton } from '@/components/atoms/FrostedButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
@@ -65,9 +65,9 @@ export function ProfileShell({
         {/* Back Button - Top left */}
         {showBackButton && (
           <div className='absolute top-4 left-4 z-10'>
-            <FrostedButton
-              frostedStyle='default'
-              shape='circle'
+            <Button
+              className='rounded-full'
+              variant='frosted'
               aria-label='Back to profile'
               onClick={() => {
                 setIsBackNavigating(true);
@@ -92,16 +92,16 @@ export function ProfileShell({
                   />
                 </svg>
               )}
-            </FrostedButton>
+            </Button>
           </div>
         )}
 
         {/* Top right controls */}
         {showNotificationButton && process.env.NODE_ENV === 'development' && (
           <div className='absolute top-4 right-4 z-10 flex items-center gap-3'>
-            <FrostedButton
-              frostedStyle='default'
-              shape='circle'
+            <Button
+              className='rounded-full'
+              variant='frosted'
               aria-label='Notifications'
             >
               <svg
@@ -117,7 +117,7 @@ export function ProfileShell({
                   d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
                 />
               </svg>
-            </FrostedButton>
+            </Button>
           </div>
         )}
 
