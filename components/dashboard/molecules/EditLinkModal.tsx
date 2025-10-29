@@ -123,16 +123,6 @@ export function EditLinkModal({
 
           <div className='space-y-2'>
             <Label htmlFor='title'>Title</Label>
-            {/* TODO: Migrate Input props:
-
-               - inputClassName → className
-
-               - validationState → variant (invalid→error, valid→success)
-
-               - Wrap with <Field label error description> if needed
-
-               - See: packages/ui/atoms/input.tsx for new API */}
-
             <Input
               id='title'
               value={title}

@@ -352,16 +352,6 @@ export function SmartHandleInput({
         <div className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm font-mono z-10'>
           {prefix}
         </div>
-        {/* TODO: Migrate Input props:
-
-           - inputClassName → className
-
-           - validationState → variant (invalid→error, valid→success)
-
-           - Wrap with <Field label error description> if needed
-
-           - See: packages/ui/atoms/input.tsx for new API */}
-
         <Input
           type='text'
           value={value}
@@ -369,17 +359,14 @@ export function SmartHandleInput({
           placeholder={placeholder}
           disabled={disabled}
           className='font-mono pl-20'
-          inputClassName='font-mono'
-          validationState={
+          variant={
             !value
-              ? null
+              ? 'default'
               : handleValidation.error || clientValidation.error
-                ? 'invalid'
+                ? 'error'
                 : handleValidation.available && clientValidation.valid
-                  ? 'valid'
-                  : handleValidation.checking
-                    ? 'pending'
-                    : null
+                  ? 'success'
+                  : 'default' // 'pending' state not supported, use default
           }
           statusIcon={showAvailability ? getValidationIcon() : undefined}
           aria-describedby='handle-status handle-preview'

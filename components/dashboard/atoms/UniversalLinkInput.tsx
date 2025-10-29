@@ -181,16 +181,6 @@ export const UniversalLinkInput = forwardRef<
           <label htmlFor='link-url-input' className='sr-only'>
             Enter link URL
           </label>
-          {/* TODO: Migrate Input props:
-
-             - inputClassName → className
-
-             - validationState → variant (invalid→error, valid→success)
-
-             - Wrap with <Field label error description> if needed
-
-             - See: packages/ui/atoms/input.tsx for new API */}
-
           <Input
             ref={urlInputRef}
             id='link-url-input'

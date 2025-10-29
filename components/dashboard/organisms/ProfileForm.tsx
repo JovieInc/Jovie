@@ -203,16 +203,6 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         id='artist-name'
         required
       >
-        {/* TODO: Migrate Input props:
-
-           - inputClassName → className
-
-           - validationState → variant (invalid→error, valid→success)
-
-           - Wrap with <Field label error description> if needed
-
-           - See: packages/ui/atoms/input.tsx for new API */}
-
         <Input
           ref={nameInputRef}
           type='text'
@@ -223,9 +213,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           autoCapitalize='words'
           autoCorrect='on'
           autoComplete='name'
-          validationState={
-            formSubmitted && validationErrors.name ? 'invalid' : null
-          }
+          variant={formSubmitted && validationErrors.name ? 'error' : 'default'}
         />
       </FormField>
 
@@ -243,8 +231,8 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
           autoCapitalize='sentences'
           autoCorrect='on'
           autoComplete='off'
-          validationState={
-            formSubmitted && validationErrors.tagline ? 'invalid' : null
+          variant={
+            formSubmitted && validationErrors.tagline ? 'error' : 'default'
           }
         />
       </FormField>

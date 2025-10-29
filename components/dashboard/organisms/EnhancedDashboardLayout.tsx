@@ -178,16 +178,6 @@ export function EnhancedDashboardLayout({
                 name='Search'
                 className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400'
               />
-              {/* TODO: Migrate Input props:
-
-                 - inputClassName → className
-
-                 - validationState → variant (invalid→error, valid→success)
-
-                 - Wrap with <Field label error description> if needed
-
-                 - See: packages/ui/atoms/input.tsx for new API */}
-
               <Input
                 type='text'
                 placeholder='Search links...'

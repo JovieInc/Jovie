@@ -298,16 +298,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         id='handle-input'
         required
       >
-        {/* TODO: Migrate Input props:
-
-           - inputClassName → className
-
-           - validationState → variant (invalid→error, valid→success)
-
-           - Wrap with <Field label error description> if needed
-
-           - See: packages/ui/atoms/input.tsx for new API */}
-
         <Input
           ref={inputRef}
           type='text'
@@ -317,19 +307,16 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
           required
           autoCapitalize='none'
           autoCorrect='off'
-          validationState={
+          variant={
             !handle
-              ? null
+              ? 'default'
               : unavailable
-                ? 'invalid'
+                ? 'error'
                 : available === true
-                  ? 'valid'
-                  : checkingAvail
-                    ? 'pending'
-                    : null
+                  ? 'success'
+                  : 'default' // 'pending' state not supported, use default
           }
-          className={`${isShaking ? 'jv-shake' : ''} ${available === true ? 'jv-available' : ''} transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`}
-          inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1'
+          className={`${isShaking ? 'jv-shake' : ''} ${available === true ? 'jv-available' : ''} transition-all duration-150 hover:shadow-lg focus-within:shadow-lg text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[48px]`}
           statusIcon={<StatusIcon />}
         />
       </FormField>

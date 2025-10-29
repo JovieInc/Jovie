@@ -238,7 +238,6 @@ export const SortableLinkItem = forwardRef<
           {/* Link content */}
           <div className='flex-1 min-w-0'>
             {/* Title (editable) */}
-            {/* TODO: Migrate Input props: inputClassName → className, validationState → variant */}
             {isEditing ? (
               <Input
                 type='text'

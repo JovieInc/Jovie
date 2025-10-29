@@ -410,16 +410,6 @@ export function AccountSettingsSection() {
             >
               {!pendingEmail && (
                 <FormField label='New email address' required>
-                  {/* TODO: Migrate Input props:
-
-                     - inputClassName → className
-
-                     - validationState → variant (invalid→error, valid→success)
-
-                     - Wrap with <Field label error description> if needed
-
-                     - See: packages/ui/atoms/input.tsx for new API */}
-
                   <Input
                     type='email'
                     value={newEmail}

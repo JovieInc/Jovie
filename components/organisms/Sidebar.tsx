@@ -330,7 +330,6 @@ const SidebarInput = React.forwardRef<
   React.ElementRef<typeof Input>,
   React.ComponentProps<typeof Input>
 >(({ className, ...props }, ref) => {
-  // TODO: Migrate Input props: inputClassName → className, validationState → variant
   return (
     <Input
       ref={ref}

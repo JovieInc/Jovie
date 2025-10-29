@@ -94,16 +94,6 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   return (
     <form onSubmit={handleSubmit} className='space-y-4'>
       <FormField label='Spotify URL' error={error}>
-        {/* TODO: Migrate Input props:
-
-           - inputClassName → className
-
-           - validationState → variant (invalid→error, valid→success)
-
-           - Wrap with <Field label error description> if needed
-
-           - See: packages/ui/atoms/input.tsx for new API */}
-
         <Input
           type='url'
           value={formData.spotify_url}
