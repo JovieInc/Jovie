@@ -175,7 +175,7 @@ export function PhoneMockupPreview({
                     className={cn(
                       'relative block p-4 rounded-xl',
                       'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30',
-                      'border border-gray-100 dark:border-gray-700/50',
+                      'border border-subtle',
                       'shadow-sm hover:shadow-md',
                       'transition-all duration-200',
                       'overflow-hidden',

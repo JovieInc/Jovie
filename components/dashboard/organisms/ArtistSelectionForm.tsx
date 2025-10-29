@@ -215,7 +215,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='bg-white/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200/50 dark:border-white/10 rounded-xl p-6 shadow-xl transition-colors'>
+            <div className='bg-white/80 dark:bg-white/5 backdrop-blur-sm border border-subtle/50 rounded-xl p-6 shadow-xl transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox

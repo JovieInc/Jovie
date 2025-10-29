@@ -150,7 +150,7 @@ export function LinkCard({
                 className={cn(
                   'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
                   'bg-white dark:bg-gray-700/80 shadow-sm',
-                  'border border-gray-100 dark:border-gray-600/50',
+                  'border border-subtle',
                   'text-gray-700 dark:text-gray-200',
                   'group-hover:shadow-md group-hover:scale-105',
                   'transition-all duration-200'
@@ -256,7 +256,7 @@ export function LinkCard({
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className='overflow-hidden'
               >
-                <div className='mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50'>
+                <div className='mt-4 pt-4 border-t border-subtle'>
                   <div className='flex items-center justify-between'>
                     <a
                       href={url}

@@ -198,10 +198,10 @@ export default function AvatarUploader({
                 alt='Profile photo'
                 width={80}
                 height={80}
-                className='rounded-full object-cover border border-gray-200 dark:border-gray-700'
+                className='rounded-full object-cover border border-subtle'
               />
             ) : (
-              <div className='w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-800 border border-gray-200 dark:border-gray-700' />
+              <div className='w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-800 border border-subtle' />
             )}
             {isLoading && (
               <div className='absolute inset-0 flex items-center justify-center rounded-full bg-black/50'>
@@ -257,7 +257,7 @@ export default function AvatarUploader({
             ${
               isDragActive
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                : 'border-default hover:border-default/70'
             }
             ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
