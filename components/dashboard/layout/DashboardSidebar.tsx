@@ -26,7 +26,12 @@ export function DashboardSidebar({
   ...props
 }: DashboardSidebarProps) {
   return (
-    <Sidebar variant='inset' className={className} {...props}>
+    <Sidebar
+      variant='inset'
+      collapsible='icon'
+      className={className}
+      {...props}
+    >
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
