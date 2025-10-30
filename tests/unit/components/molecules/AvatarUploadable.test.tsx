@@ -1,6 +1,7 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+/* eslint-disable @next/next/no-img-element */
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, describe, it, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 
 // Mock analytics tracking
@@ -8,24 +9,33 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
+// Import the mocked track function
+import { track } from '@/lib/analytics';
+
 // Mock Next.js Image component (already mocked in setup.ts but explicit here for clarity)
 vi.mock('next/image', () => ({
-  default: vi.fn().mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => {
-    return (
-      <img
-        src={src}
-        alt={alt}
-        onLoad={onLoad}
-        onError={onError}
-        {...props}
-        data-testid="avatar-image"
-      />
-    );
-  }),
+  default: vi
+    .fn()
+    .mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => {
+      return (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={onLoad}
+          onError={onError}
+          {...props}
+          data-testid='avatar-image'
+        />
+      );
+    }),
 }));
 
 // Mock file for testing
-const createMockFile = (name = 'test.jpg', type = 'image/jpeg', size = 1024): File => {
+const createMockFile = (
+  name = 'test.jpg',
+  type = 'image/jpeg',
+  size = 1024
+): File => {
   const file = new File(['test content'], name, { type });
   Object.defineProperty(file, 'size', { value: size });
   return file;
@@ -44,9 +54,9 @@ describe('AvatarUploadable Component', () => {
     it('renders as regular avatar when uploadable is false', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={false}
         />
       );
@@ -60,9 +70,9 @@ describe('AvatarUploadable Component', () => {
     it('does not show hover overlay when not uploadable', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={false}
         />
       );
@@ -76,9 +86,9 @@ describe('AvatarUploadable Component', () => {
     it('renders with upload functionality when uploadable is true', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -93,9 +103,9 @@ describe('AvatarUploadable Component', () => {
     it('shows file input for upload', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -111,12 +121,12 @@ describe('AvatarUploadable Component', () => {
   describe('File Upload Interactions', () => {
     it('triggers file input click when avatar is clicked', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -131,23 +141,23 @@ describe('AvatarUploadable Component', () => {
 
     it('handles keyboard interaction (Enter and Space)', async () => {
       const user = userEvent.setup();
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
       );
 
       const container = screen.getByRole('button');
-      
+
       // Test Enter key
       container.focus();
       await user.keyboard('{Enter}');
-      
+
       // Test Space key
       await user.keyboard(' ');
 
@@ -156,12 +166,12 @@ describe('AvatarUploadable Component', () => {
 
     it('calls onUpload when file is selected', async () => {
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onSuccess={mockOnSuccess}
@@ -183,9 +193,9 @@ describe('AvatarUploadable Component', () => {
     it('validates file type and shows error for invalid types', async () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onError={mockOnError}
@@ -193,7 +203,11 @@ describe('AvatarUploadable Component', () => {
       );
 
       const fileInput = screen.getByLabelText('Choose profile photo file');
-      const invalidFile = createMockFile('document.pdf', 'application/pdf', 1024);
+      const invalidFile = createMockFile(
+        'document.pdf',
+        'application/pdf',
+        1024
+      );
 
       await userEvent.upload(fileInput, invalidFile);
 
@@ -206,12 +220,12 @@ describe('AvatarUploadable Component', () => {
 
     it('validates file size and shows error for large files', async () => {
       const maxSize = 5 * 1024 * 1024; // 5MB
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onError={mockOnError}
@@ -220,7 +234,11 @@ describe('AvatarUploadable Component', () => {
       );
 
       const fileInput = screen.getByLabelText('Choose profile photo file');
-      const largeFile = createMockFile('large.jpg', 'image/jpeg', 6 * 1024 * 1024); // 6MB
+      const largeFile = createMockFile(
+        'large.jpg',
+        'image/jpeg',
+        6 * 1024 * 1024
+      ); // 6MB
 
       await userEvent.upload(fileInput, largeFile);
 
@@ -233,15 +251,15 @@ describe('AvatarUploadable Component', () => {
 
     it('accepts valid file types', async () => {
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
-      
+
       for (const type of validTypes) {
         const { unmount } = render(
           <AvatarUploadable
-            src="https://example.com/avatar.jpg"
-            alt="User avatar"
-            name="John Doe"
+            src='https://example.com/avatar.jpg'
+            alt='User avatar'
+            name='John Doe'
             uploadable={true}
             onUpload={mockOnUpload}
             onError={mockOnError}
@@ -249,7 +267,11 @@ describe('AvatarUploadable Component', () => {
         );
 
         const fileInput = screen.getByLabelText('Choose profile photo file');
-        const validFile = createMockFile(`test.${type.split('/')[1]}`, type, 1024);
+        const validFile = createMockFile(
+          `test.${type.split('/')[1]}`,
+          type,
+          1024
+        );
 
         await userEvent.upload(fileInput, validFile);
 
@@ -267,16 +289,16 @@ describe('AvatarUploadable Component', () => {
     it('handles drag enter and shows drag overlay', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
       );
 
       const container = screen.getByRole('button');
-      
+
       fireEvent.dragEnter(container, {
         dataTransfer: {
           files: [createMockFile()],
@@ -289,12 +311,12 @@ describe('AvatarUploadable Component', () => {
 
     it('handles file drop and triggers upload', async () => {
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -317,17 +339,20 @@ describe('AvatarUploadable Component', () => {
     it('prevents default drag behavior', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
       );
 
       const container = screen.getByRole('button');
-      
-      const dragOverEvent = new Event('dragover', { bubbles: true, cancelable: true });
+
+      const dragOverEvent = new Event('dragover', {
+        bubbles: true,
+        cancelable: true,
+      });
       fireEvent(container, dragOverEvent);
       expect(dragOverEvent.defaultPrevented).toBe(true);
 
@@ -345,9 +370,9 @@ describe('AvatarUploadable Component', () => {
     it('shows progress ring during upload', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           progress={50}
@@ -362,9 +387,9 @@ describe('AvatarUploadable Component', () => {
     it('announces progress to screen readers', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           progress={75}
@@ -378,12 +403,12 @@ describe('AvatarUploadable Component', () => {
 
     it('shows success state with check icon', async () => {
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onSuccess={mockOnSuccess}
@@ -402,12 +427,12 @@ describe('AvatarUploadable Component', () => {
 
     it('shows error state when upload fails', async () => {
       mockOnUpload.mockRejectedValue(new Error('Upload failed'));
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onError={mockOnError}
@@ -427,14 +452,13 @@ describe('AvatarUploadable Component', () => {
 
   describe('Analytics Tracking', () => {
     it('tracks upload events', async () => {
-      const { track } = require('@/lib/analytics');
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -460,13 +484,11 @@ describe('AvatarUploadable Component', () => {
     });
 
     it('tracks validation errors', async () => {
-      const { track } = require('@/lib/analytics');
-      
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
           onError={mockOnError}
@@ -474,7 +496,11 @@ describe('AvatarUploadable Component', () => {
       );
 
       const fileInput = screen.getByLabelText('Choose profile photo file');
-      const invalidFile = createMockFile('document.pdf', 'application/pdf', 1024);
+      const invalidFile = createMockFile(
+        'document.pdf',
+        'application/pdf',
+        1024
+      );
 
       await userEvent.upload(fileInput, invalidFile);
 
@@ -491,9 +517,9 @@ describe('AvatarUploadable Component', () => {
     it('has proper ARIA labels and roles', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -503,17 +529,20 @@ describe('AvatarUploadable Component', () => {
       expect(button).toHaveAttribute('aria-label', 'Upload profile photo');
 
       const fileInput = screen.getByLabelText('Choose profile photo file');
-      expect(fileInput).toHaveAttribute('aria-label', 'Choose profile photo file');
+      expect(fileInput).toHaveAttribute(
+        'aria-label',
+        'Choose profile photo file'
+      );
     });
 
     it('announces status changes to screen readers', async () => {
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
-      
+
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />
@@ -525,7 +554,9 @@ describe('AvatarUploadable Component', () => {
       await userEvent.upload(fileInput, file);
 
       await waitFor(() => {
-        const successAnnouncement = screen.getByText('Profile photo uploaded successfully');
+        const successAnnouncement = screen.getByText(
+          'Profile photo uploaded successfully'
+        );
         expect(successAnnouncement).toBeInTheDocument();
         expect(successAnnouncement).toHaveAttribute('aria-live', 'polite');
       });
@@ -534,9 +565,9 @@ describe('AvatarUploadable Component', () => {
     it('has keyboard focus management', () => {
       render(
         <AvatarUploadable
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
         />

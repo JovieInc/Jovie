@@ -1,0 +1,80 @@
+name: Neon Preview Branch Migration
+
+on:
+  push:
+    branches:
+      - preview
+    paths:
+      - 'drizzle/migrations/**'
+      - 'lib/db/schema.ts'
+      - 'scripts/neon-migrate-preview.ts'
+      - '.github/workflows/neon-preview-migrate.yml'
+
+  workflow_dispatch:
+    inputs:
+      compare_schemas:
+        description: 'Compare schemas after migration'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  migrate:
+    name: Run Migrations on Preview Branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run migrations on preview branch
+        run: pnpm neon:migrate:preview
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+
+      - name: Compare schemas (if requested)
+        if: ${{ github.event.inputs.compare_schemas == 'true' }}
+        run: pnpm neon:migrate:preview:compare
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Database migrations successfully applied to Neon preview branch'
+            })
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            if (context.eventName === 'pull_request') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '❌ Database migration failed on Neon preview branch. Check the workflow logs for details.'
+              })
+            }

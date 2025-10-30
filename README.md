@@ -131,12 +131,20 @@ pnpm run drizzle:generate
 # Run migrations
 pnpm run drizzle:migrate
 
+# Run migrations on Neon preview branch
+pnpm run neon:migrate:preview
+
+# Run migrations on preview and compare schemas
+pnpm run neon:migrate:preview:compare
+
 # Open Drizzle Studio (database GUI)
 pnpm run drizzle:studio
 
 # Seed the database with test data
 pnpm run db:seed
 ```
+
+For detailed information about Neon branch migrations and zero-downtime patterns, see [docs/neon-migrations.md](./docs/neon-migrations.md).
 
 ### Testing
 

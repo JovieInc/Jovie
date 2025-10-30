@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Button } from '../../../components/ui/Button';
+import { Button } from '../../../components/atoms/Button';
 import {
   Tooltip,
   TooltipContent,

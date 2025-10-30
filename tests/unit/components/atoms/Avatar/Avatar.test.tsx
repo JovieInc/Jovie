@@ -1,21 +1,24 @@
+/* eslint-disable @next/next/no-img-element */
 import { render, screen } from '@testing-library/react';
-import { expect, describe, it, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/atoms/Avatar';
 
 // Mock Next.js Image component
 vi.mock('next/image', () => ({
-  default: vi.fn().mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => {
-    return (
-      <img
-        src={src}
-        alt={alt}
-        onLoad={onLoad}
-        onError={onError}
-        {...props}
-        data-testid="avatar-image"
-      />
-    );
-  }),
+  default: vi
+    .fn()
+    .mockImplementation(({ src, alt, onLoad, onError, ...props }: any) => {
+      return (
+        <img
+          src={src}
+          alt={alt}
+          onLoad={onLoad}
+          onError={onError}
+          {...props}
+          data-testid='avatar-image'
+        />
+      );
+    }),
 }));
 
 describe('Avatar Component', () => {
@@ -27,9 +30,9 @@ describe('Avatar Component', () => {
     it('renders with image source', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
         />
       );
 
@@ -42,9 +45,9 @@ describe('Avatar Component', () => {
     it('applies correct ARIA attributes', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
         />
       );
 
@@ -55,10 +58,10 @@ describe('Avatar Component', () => {
     it('applies correct size classes', () => {
       const { rerender } = render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
-          size="sm"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          size='sm'
         />
       );
 
@@ -67,10 +70,10 @@ describe('Avatar Component', () => {
 
       rerender(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
-          size="lg"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          size='lg'
         />
       );
 
@@ -81,10 +84,10 @@ describe('Avatar Component', () => {
     it('applies correct rounded classes', () => {
       const { rerender } = render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
-          rounded="sm"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          rounded='sm'
         />
       );
 
@@ -93,10 +96,10 @@ describe('Avatar Component', () => {
 
       rerender(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
-          rounded="full"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          rounded='full'
         />
       );
 
@@ -107,26 +110,14 @@ describe('Avatar Component', () => {
 
   describe('Fallback States', () => {
     it('shows initials when no image source provided', () => {
-      render(
-        <Avatar
-          src={null}
-          alt="User avatar"
-          name="John Doe"
-        />
-      );
+      render(<Avatar src={null} alt='User avatar' name='John Doe' />);
 
       expect(screen.getByText('JD')).toBeInTheDocument();
       expect(screen.queryByTestId('avatar-image')).not.toBeInTheDocument();
     });
 
     it('shows initials when empty string provided', () => {
-      render(
-        <Avatar
-          src=""
-          alt="User avatar"
-          name="Jane Smith"
-        />
-      );
+      render(<Avatar src='' alt='User avatar' name='Jane Smith' />);
 
       expect(screen.getByText('JS')).toBeInTheDocument();
     });
@@ -145,7 +136,7 @@ describe('Avatar Component', () => {
         const { unmount } = render(
           <Avatar
             src={null}
-            alt="User avatar"
+            alt='User avatar'
             name={name}
             data-testid={`avatar-${expected}`}
           />
@@ -159,9 +150,9 @@ describe('Avatar Component', () => {
     it('handles error state by showing fallback', () => {
       render(
         <Avatar
-          src="https://broken-url.com/image.jpg"
-          alt="User avatar"
-          name="Error User"
+          src='https://broken-url.com/image.jpg'
+          alt='User avatar'
+          name='Error User'
         />
       );
 
@@ -178,9 +169,9 @@ describe('Avatar Component', () => {
     it('has correct role attribute', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
         />
       );
 
@@ -191,24 +182,21 @@ describe('Avatar Component', () => {
     it('has correct aria-label', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="Profile picture of John Doe"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='Profile picture of John Doe'
+          name='John Doe'
         />
       );
 
       const container = screen.getByLabelText('Profile picture of John Doe');
-      expect(container).toHaveAttribute('aria-label', 'Profile picture of John Doe');
+      expect(container).toHaveAttribute(
+        'aria-label',
+        'Profile picture of John Doe'
+      );
     });
 
     it('fallback initials are not selectable', () => {
-      render(
-        <Avatar
-          src={null}
-          alt="User avatar"
-          name="John Doe"
-        />
-      );
+      render(<Avatar src={null} alt='User avatar' name='John Doe' />);
 
       const initialsElement = screen.getByText('JD');
       expect(initialsElement).toHaveClass('select-none');
@@ -219,10 +207,10 @@ describe('Avatar Component', () => {
     it('accepts custom className', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
-          className="custom-avatar-class"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          className='custom-avatar-class'
         />
       );
 
@@ -232,12 +220,12 @@ describe('Avatar Component', () => {
 
     it('accepts custom style props', () => {
       const customStyle = { border: '2px solid red' };
-      
+
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           style={customStyle}
         />
       );
@@ -249,9 +237,9 @@ describe('Avatar Component', () => {
     it('applies priority prop to Next.js Image', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
           priority={true}
         />
       );
@@ -266,9 +254,9 @@ describe('Avatar Component', () => {
     it('shows loading shimmer before image loads', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
         />
       );
 
@@ -280,9 +268,9 @@ describe('Avatar Component', () => {
     it('hides loading shimmer after image loads', () => {
       render(
         <Avatar
-          src="https://example.com/avatar.jpg"
-          alt="User avatar"
-          name="John Doe"
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
         />
       );
 
@@ -290,7 +278,7 @@ describe('Avatar Component', () => {
       const image = screen.getByTestId('avatar-image');
       image.dispatchEvent(new Event('load'));
 
-      // Note: In a real scenario, the shimmer would be hidden, but our mock doesn't 
+      // Note: In a real scenario, the shimmer would be hidden, but our mock doesn't
       // trigger the onLoad callback properly. This test demonstrates the pattern.
       expect(image).toBeInTheDocument();
     });
