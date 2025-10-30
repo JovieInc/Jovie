@@ -1,6 +1,14 @@
 'use client';
 
-import { Button, Input, Select } from '@jovie/ui';
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { FormField } from '@/components/molecules/FormField';
 import { EmptyState } from '@/components/organisms/EmptyState';
@@ -190,19 +198,23 @@ export function SocialsForm({ artist }: SocialsFormProps) {
               <FormField label='Platform' className='w-32'>
                 <Select
                   value={link.platform}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    updateSocialLink(index, 'platform', e.target.value)
+                  onValueChange={value =>
+                    updateSocialLink(index, 'platform', value)
                   }
-                  options={[
-                    { value: 'instagram', label: 'Instagram' },
-                    { value: 'twitter', label: 'Twitter' },
-                    { value: 'tiktok', label: 'TikTok' },
-                    { value: 'youtube', label: 'YouTube' },
-                    { value: 'facebook', label: 'Facebook' },
-                    { value: 'linkedin', label: 'LinkedIn' },
-                    { value: 'website', label: 'Website' },
-                  ]}
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='instagram'>Instagram</SelectItem>
+                    <SelectItem value='twitter'>Twitter</SelectItem>
+                    <SelectItem value='tiktok'>TikTok</SelectItem>
+                    <SelectItem value='youtube'>YouTube</SelectItem>
+                    <SelectItem value='facebook'>Facebook</SelectItem>
+                    <SelectItem value='linkedin'>LinkedIn</SelectItem>
+                    <SelectItem value='website'>Website</SelectItem>
+                  </SelectContent>
+                </Select>
               </FormField>
 
               <Input
