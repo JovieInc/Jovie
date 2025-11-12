@@ -1,11 +1,26 @@
 /**
  * Signed URL API Route (/api/link/[id])
  * Generates time-limited signed URLs for sensitive links with bot protection
+ *
+ * Rate Limiting Status: IMPLEMENTED BUT DISABLED
+ * This endpoint calls checkRateLimit() which is currently globally disabled in lib/utils/bot-detection.ts.
+ * Following YC principle: "do things that don't scale until you have to"
+ *
+ * Rate limiting will be enabled when:
+ * - Signed link requests exceed ~5k/day
+ * - Abuse patterns detected (same IP hammering links)
+ *
+ * Current Protection:
+ * - Bot detection (aggressive for API endpoints)
+ * - Time-limited tokens (60 second TTL)
+ * - Timestamp verification (5 minute window)
+ * - Human verification required
  */
 
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { captureError, logFallback } from '@/lib/error-tracking';
 import {
   getWrappedLink,
   incrementClickCount,
@@ -102,18 +117,37 @@ export async function POST(
     const expiresAt = new Date(Date.now() + 60 * 1000); // 60 seconds TTL
 
     // TODO: Create signed_link_access table in Drizzle schema and store signed access record
-    // For now, log the signed access attempt
-    console.log('Signed link access:', {
+    // Schema should include:
+    // - id (uuid primary key)
+    // - wrapped_link_id (foreign key to wrapped_links)
+    // - signed_token (text, indexed)
+    // - ip_address (text)
+    // - user_agent (text)
+    // - expires_at (timestamp)
+    // - accessed_at (timestamp, nullable - set when token is used)
+    // - created_at (timestamp, default now())
+    //
+    // This table enables:
+    // - Audit trail for sensitive link access
+    // - Token reuse prevention (check accessed_at)
+    // - Abuse pattern detection (IP + frequency analysis)
+    // - Compliance with data access logging requirements
+    //
+    // For now, log the signed access attempt using error tracking for visibility
+    await logFallback('Signed link access (no database table yet)', {
       link_id: wrappedLink.id,
-      signed_token: signedToken,
+      signed_token: signedToken.substring(0, 10) + '...', // Only log prefix for security
       expires_at: expiresAt.toISOString(),
       ip_address: ip,
-      user_agent: botResult.userAgent,
+      user_agent_prefix: botResult.userAgent.substring(0, 50),
     });
 
     // Increment click count asynchronously
-    incrementClickCount(shortId).catch(error => {
-      console.error('Failed to increment click count:', error);
+    incrementClickCount(shortId).catch(async error => {
+      await captureError('Failed to increment click count', error, {
+        shortId,
+        route: '/api/link/[id]',
+      });
     });
 
     // Return the original URL directly (single-use)
@@ -136,7 +170,10 @@ export async function POST(
 
     return response;
   } catch (error) {
-    console.error('Signed URL API error:', error);
+    await captureError('Signed URL API error', error, {
+      route: '/api/link/[id]',
+      method: 'POST',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
