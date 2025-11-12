@@ -28,7 +28,10 @@ export async function enforceOnboardingRateLimit({
     throw error;
   }
 
-  if (checkIP && ip !== 'unknown') {
+  // Always check IP-based rate limiting when requested
+  // This includes 'unknown' IPs, which share a common bucket to prevent abuse
+  // from users behind proxies or with missing/invalid IP headers
+  if (checkIP) {
     const ipKey = `onboarding:ip:${ip}`;
     if (checkRateLimit(ipKey)) {
       const error = createOnboardingError(

@@ -2,6 +2,27 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { captureError, captureWarning } from '@/lib/error-tracking';
+
+/**
+ * Handle Availability Check API
+ *
+ * Rate Limiting Status: NOT IMPLEMENTED
+ * Following YC principle: "do things that don't scale until you have to"
+ * Will add rate limiting when:
+ * - Handle checks exceed ~100k/day
+ * - Enumeration abuse becomes measurable problem
+ *
+ * Known Security Issue: Username Enumeration
+ * This endpoint allows checking if a handle exists, which could enable enumeration attacks.
+ * Mitigation strategies for future:
+ * - Add rate limiting (per IP and per session)
+ * - Add small random delay to responses
+ * - Return same response time for available/unavailable
+ * - Implement CAPTCHA after N failed checks
+ *
+ * For now: Basic input validation prevents most abuse. Monitor PostHog events for patterns.
+ */
 
 // In-memory cache for mock responses to reduce server load during testing
 // Cache expires after 10 seconds to balance performance with realistic behavior
@@ -133,15 +154,20 @@ export async function GET(request: Request) {
       }
     );
   } catch (error: unknown) {
-    console.error('Error checking handle availability:', error);
+    await captureError('Error checking handle availability', error, {
+      handle,
+      route: '/api/handle/check',
+    });
 
     // Handle timeout and provide mock response
     if (
       (error as Error)?.message?.includes('timeout') ||
       (error as Error)?.message?.includes('Database timeout')
     ) {
-      console.log(
-        'Database timeout, providing cached mock handle availability for testing'
+      await captureWarning(
+        'Database timeout, providing cached mock handle availability for testing',
+        error,
+        { handle }
       );
 
       return createMockResponse(handle.toLowerCase());

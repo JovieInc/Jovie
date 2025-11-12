@@ -15,6 +15,7 @@ import {
   checkUserHasProfile,
   checkUsernameAvailability,
 } from '@/lib/username/availability';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export async function completeOnboarding({
@@ -57,33 +58,12 @@ export async function completeOnboarding({
 
     // Step 3: Rate limiting check
     const headersList = await headers();
-    const forwarded = headersList.get('x-forwarded-for');
-    const realIP = headersList.get('x-real-ip');
+    const clientIP = extractClientIP(headersList);
 
-    // Extract and validate IP address with fallback chain
-    let clientIP = 'unknown';
-    if (forwarded) {
-      const firstIP = forwarded.split(',')[0].trim();
-      // Basic IP validation (IPv4 and IPv6)
-      if (
-        /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
-          firstIP
-        ) ||
-        /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(firstIP)
-      ) {
-        clientIP = firstIP;
-      }
-    } else if (
-      realIP &&
-      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
-        realIP
-      )
-    ) {
-      clientIP = realIP;
-    }
-
-    // Skip IP rate limiting for unknown IPs to avoid shared limits
-    const shouldCheckIP = clientIP !== 'unknown';
+    // IMPORTANT: Always check IP-based rate limiting, even for 'unknown' IPs
+    // The 'unknown' bucket acts as a shared rate limit to prevent abuse
+    // from users behind proxies or with missing/invalid headers
+    const shouldCheckIP = true;
 
     await enforceOnboardingRateLimit({
       userId,
