@@ -31,10 +31,9 @@ The onboarding happy path tests verify the complete user onboarding flow from si
 #### Requirements
 
 1. **Environment Variables**: The following real environment variables must be set:
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` - Clerk publishable key for authentication
+   - `CLERK_SECRET_KEY` - Clerk secret key for server-side operations
+   - `DATABASE_URL` - Neon database connection string (for RLS testing)
 
 2. **Enable Full Onboarding Tests**: Set `E2E_ONBOARDING_FULL=1`
 

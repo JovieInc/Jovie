@@ -13,8 +13,8 @@ import { expect, test } from '@playwright/test';
  * 3. Verify submit button is disabled
  *
  * Requirements:
- * - E2E_ONBOARDING_HANDLE_TAKEN=1 environment variable (optional)
- * - Real Clerk and Supabase environment variables
+ * - E2E_ONBOARDING_HANDLE_TAKEN=1 environment variable (optional, enables real API mode)
+ * - Real Clerk environment variables (when running with real API)
  */
 
 test.describe('Onboarding Handle Taken Prevention', () => {
@@ -30,8 +30,6 @@ test.describe('Onboarding Handle Taken Prevention', () => {
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
           process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
         CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
       };
 
       // Skip if any required env var is missing or contains dummy values
