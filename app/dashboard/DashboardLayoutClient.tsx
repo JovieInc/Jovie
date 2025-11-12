@@ -102,9 +102,9 @@ export default function DashboardLayoutClient({
           <DashboardSidebar />
           <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
             <DashboardTopBar breadcrumbs={crumbs} />
-            <main className='flex-1 overflow-auto'>
-              <div className='container mx-auto max-w-7xl p-4'>{children}</div>
-            </main>
+            <div className='flex flex-1 flex-col gap-4 p-4 pt-0 overflow-auto'>
+              {children}
+            </div>
           </SidebarInset>
         </div>
       </SidebarProvider>
