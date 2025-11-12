@@ -12,6 +12,11 @@ import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { env } from '@/lib/env';
+import {
+  captureCriticalError,
+  captureWarning,
+  logFallback,
+} from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { getPlanFromPriceId } from '@/lib/stripe/config';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
@@ -37,10 +42,14 @@ async function getUserIdFromStripeCustomer(
 
     return user?.clerkId || null;
   } catch (error) {
-    console.error('[FALLBACK] Error looking up user by Stripe customer ID:', {
-      stripeCustomerId,
+    await captureWarning(
+      'Failed to lookup user by Stripe customer ID in fallback',
       error,
-    });
+      {
+        stripeCustomerId,
+        function: 'getUserIdFromStripeCustomer',
+      }
+    );
     return null;
   }
 }
@@ -130,21 +139,25 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   // Fallback: Look up user by Stripe customer ID if metadata is missing
   if (!userId && typeof session.customer === 'string') {
-    console.warn(
-      '[FALLBACK] No user ID in metadata, looking up by customer ID',
-      {
-        sessionId: session.id,
-        customerId: session.customer,
-      }
-    );
+    await logFallback('No user ID in checkout session metadata', {
+      sessionId: session.id,
+      customerId: session.customer,
+      event: 'checkout.session.completed',
+    });
     userId = (await getUserIdFromStripeCustomer(session.customer)) ?? undefined;
   }
 
   if (!userId) {
-    console.error('[CRITICAL] Cannot identify user for checkout session', {
-      sessionId: session.id,
-      customerId: session.customer,
-    });
+    await captureCriticalError(
+      'Cannot identify user for checkout session',
+      new Error('Missing user ID in checkout session'),
+      {
+        sessionId: session.id,
+        customerId: session.customer,
+        route: '/api/stripe/webhooks',
+        event: 'checkout.session.completed',
+      }
+    );
     throw new Error('Missing user ID in checkout session');
   }
 
