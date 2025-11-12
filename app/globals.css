@@ -287,11 +287,11 @@ body {
   :root {
     --color-bg-base: #ffffff; /* app background */
     --color-bg-surface-0: #fafbfc; /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8; /* cards/panels */
+    --color-bg-surface-1: #f3f4f6; /* cards/panels - increased contrast */
     --color-bg-surface-2: #eef0f2; /* interactive/hover */
     --color-bg-surface-3: #e5e7eb; /* pressed/active */
-    --color-border-subtle: #e5e7eb;
-    --color-border-default: #d1d5db;
+    --color-border-subtle: #d1d5db; /* increased visibility for light mode */
+    --color-border-default: #9ca3af; /* clear and distinct borders */
     --color-text-primary-token: #0c0c0c;
     --color-text-secondary-token: #6b7280;
     --color-text-tertiary-token: #9ca3af;

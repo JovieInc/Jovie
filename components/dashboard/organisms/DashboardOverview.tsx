@@ -34,10 +34,10 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   ).length;
 
   return (
-    <div>
-      <div className='mb-8'>
+    <>
+      <div className='space-y-1'>
         <h1 className='text-2xl font-bold text-primary-token'>Dashboard</h1>
-        <p className='text-secondary-token mt-1'>
+        <p className='text-secondary-token'>
           Welcome back, {artist.name || 'Artist'}
         </p>
       </div>
@@ -131,6 +131,6 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
           </div>
         )}
       </DashboardCard>
-    </div>
+    </>
   );
 }

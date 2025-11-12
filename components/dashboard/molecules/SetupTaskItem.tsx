@@ -18,7 +18,7 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): JSX.Element {
   return (
-    <li className='flex items-center gap-3 p-3 rounded-lg border border-subtle'>
+    <li className='flex items-center gap-3 p-3 rounded-lg border border-default'>
       <div className='flex-shrink-0'>
         <div
           className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
