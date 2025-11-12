@@ -14,6 +14,16 @@ interface SidebarCollapseButtonProps {
   className?: string;
 }
 
+/**
+ * @deprecated Use SidebarTrigger from @/components/organisms/Sidebar instead.
+ * This component will be removed in a future release.
+ *
+ * Migration: Replace with:
+ * ```tsx
+ * import { SidebarTrigger } from '@/components/organisms/Sidebar';
+ * <SidebarTrigger className="-ml-1" />
+ * ```
+ */
 export function SidebarCollapseButton({
   className,
 }: SidebarCollapseButtonProps) {

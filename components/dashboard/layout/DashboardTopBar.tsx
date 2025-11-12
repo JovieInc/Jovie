@@ -1,7 +1,20 @@
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+  Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@jovie/ui';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-
-import { SidebarCollapseButton } from '@/components/atoms/SidebarCollapseButton';
+import * as React from 'react';
+import { SidebarTrigger } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
 import { zIndex } from '@/lib/utils/z-index';
 
@@ -26,34 +39,51 @@ export function DashboardTopBar({
         zIndex.sticky
       )}
     >
-      <SidebarCollapseButton />
-      <div className='h-4 w-px bg-border' />
-      <nav
-        aria-label='Breadcrumb'
-        className='flex items-center gap-1 text-sm text-muted-foreground'
-      >
-        {breadcrumbs.map((crumb, index) => {
-          const isLast = index === breadcrumbs.length - 1;
-          return (
-            <span
-              key={`${crumb.label}-${index}`}
-              className='flex items-center gap-1'
-            >
-              {crumb.href && !isLast ? (
-                <Link
-                  href={crumb.href}
-                  className='transition-colors hover:text-foreground'
+      <TooltipProvider delayDuration={0}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SidebarTrigger className='-ml-1' />
+          </TooltipTrigger>
+          <TooltipContent side='right'>
+            <div className='flex items-center gap-2'>
+              <span>Toggle sidebar</span>
+              <kbd className='inline-flex items-center rounded border border-border bg-surface-1 px-1 font-mono text-xs'>
+                ⌘ B
+              </kbd>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <Separator orientation='vertical' className='mr-2 h-4' />
+      <Breadcrumb>
+        <BreadcrumbList>
+          {breadcrumbs.map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            const isFirst = index === 0;
+
+            return (
+              <React.Fragment key={`${crumb.label}-${index}`}>
+                <BreadcrumbItem
+                  className={isFirst ? 'hidden md:block' : undefined}
                 >
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span className='text-foreground'>{crumb.label}</span>
-              )}
-              {!isLast && <span className='text-muted-foreground/50'>/</span>}
-            </span>
-          );
-        })}
-      </nav>
+                  {crumb.href && !isLast ? (
+                    <BreadcrumbLink asChild>
+                      <Link href={crumb.href}>{crumb.label}</Link>
+                    </BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+                {!isLast && (
+                  <BreadcrumbSeparator
+                    className={isFirst ? 'hidden md:block' : undefined}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+        </BreadcrumbList>
+      </Breadcrumb>
       {actions ? (
         <div className='ml-auto flex items-center gap-2'>{actions}</div>
       ) : null}
