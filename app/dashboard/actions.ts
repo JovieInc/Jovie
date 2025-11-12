@@ -20,6 +20,11 @@ export interface DashboardData {
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
+  error?: {
+    message: string;
+    type: 'database' | 'unknown';
+    retryable: boolean;
+  };
 }
 
 // Minimal link shape for initializing DashboardLinks client from the server
@@ -47,6 +52,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      error: undefined,
     };
   }
 
@@ -68,6 +74,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           needsOnboarding: true,
           sidebarCollapsed: false,
           hasSocialLinks: false,
+          error: undefined,
         };
       }
 
@@ -87,6 +94,7 @@ export async function getDashboardData(): Promise<DashboardData> {
           needsOnboarding: true,
           sidebarCollapsed: false,
           hasSocialLinks: false,
+          error: undefined,
         };
       }
 
@@ -135,17 +143,35 @@ export async function getDashboardData(): Promise<DashboardData> {
         needsOnboarding: false,
         sidebarCollapsed: settings?.sidebarCollapsed ?? false,
         hasSocialLinks: hasLinks,
+        error: undefined,
       };
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      // On error, treat as needs onboarding to be safe
+
+      // Determine if this is a database connection error or something else
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      const isDatabaseError =
+        errorMessage.includes('connect') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('ECONNREFUSED') ||
+        errorMessage.includes('network');
+
+      // Return error state instead of incorrectly sending to onboarding
       return {
         user: null,
         creatorProfiles: [],
         selectedProfile: null,
-        needsOnboarding: true,
+        needsOnboarding: false, // ✅ Fixed: Don't redirect to onboarding on DB errors
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        error: {
+          message: isDatabaseError
+            ? 'Unable to connect to database. Please try again.'
+            : 'An error occurred loading your dashboard.',
+          type: isDatabaseError ? 'database' : 'unknown',
+          retryable: true,
+        },
       };
     }
   });
