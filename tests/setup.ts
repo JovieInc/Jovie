@@ -20,7 +20,7 @@ if (process.env.NODE_ENV === 'test') {
 
     beforeAll(async () => {
       try {
-        await migrate(db, { migrationsFolder: './drizzle' });
+        await migrate(db, { migrationsFolder: './drizzle/migrations' });
       } catch (error) {
         console.error('Failed to run migrations:', error);
         throw error;
@@ -264,6 +264,22 @@ Object.defineProperty(window, 'scrollTo', {
   writable: true,
   value: vi.fn(),
 });
+
+// Mock pointer capture APIs for Radix UI
+if (!HTMLElement.prototype.hasPointerCapture) {
+  HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+}
+if (!HTMLElement.prototype.setPointerCapture) {
+  HTMLElement.prototype.setPointerCapture = vi.fn();
+}
+if (!HTMLElement.prototype.releasePointerCapture) {
+  HTMLElement.prototype.releasePointerCapture = vi.fn();
+}
+
+// Mock scrollIntoView for Radix UI
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+}
 
 // Mock console methods to reduce noise in tests
 global.console = {

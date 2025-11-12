@@ -1,176 +1,367 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
-// @ts-nocheck - This file tests the old Select API and will be rewritten for Radix UI
-import { Select } from '@jovie/ui';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from '@jovie/ui';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import * as React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const mockOptions = [
-  { value: 'option1', label: 'Option 1' },
-  { value: 'option2', label: 'Option 2' },
-  { value: 'option3', label: 'Option 3', disabled: true },
-];
-
 /**
- * TODO: Rewrite tests for new Radix UI Select API
+ * Select Component Tests (Radix UI)
  *
- * The Select component has been migrated from a native <select> with options prop
- * to Radix UI compound components (Select, SelectTrigger, SelectContent, SelectItem).
- *
- * These tests need to be rewritten to:
- * 1. Test compound component composition instead of single component with options
- * 2. Use Radix UI testing patterns (click trigger to open, select item from portal)
- * 3. Update assertions for new DOM structure and interaction patterns
- *
- * Related: Phase 4 Select Migration (shadcn/ui migration plan)
+ * Tests the Radix UI Select compound component pattern.
+ * Select uses a portal for dropdown content, requiring specific testing approaches.
  */
-describe.skip('Select', () => {
+describe('Select (Radix UI)', () => {
   afterEach(cleanup);
 
-  it('renders correctly with default props', () => {
-    render(<Select options={mockOptions} />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
-    expect(select).toHaveValue('');
-  });
-
-  it('renders with custom placeholder', () => {
-    render(<Select options={mockOptions} placeholder='Choose an option' />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
-
-    const placeholderOption = screen.getByText('Choose an option');
-    expect(placeholderOption).toBeInTheDocument();
-  });
-
-  it('renders with label', () => {
-    render(<Select options={mockOptions} label='Select Option' />);
-
-    expect(screen.getByText('Select Option')).toBeInTheDocument();
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
-  });
-
-  it('renders with required indicator', () => {
-    render(<Select options={mockOptions} label='Select Option' required />);
-
-    const label = screen.getByText('Select Option');
-    expect(label).toBeInTheDocument();
-    expect(label.parentElement).toHaveTextContent('*');
-  });
-
-  it('renders with error message', () => {
-    render(<Select options={mockOptions} error='This field is required' />);
-
-    expect(screen.getByText('This field is required')).toBeInTheDocument();
-    expect(screen.getByText('This field is required')).toHaveClass(
-      'text-red-600'
+  it('renders trigger with placeholder text', () => {
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Select an option' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+        </SelectContent>
+      </Select>
     );
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toBeInTheDocument();
+    expect(trigger).toHaveTextContent('Select an option');
   });
 
-  it('renders all options', () => {
-    render(<Select options={mockOptions} />);
-
-    expect(screen.getByText('Option 1')).toBeInTheDocument();
-    expect(screen.getByText('Option 2')).toBeInTheDocument();
-    expect(screen.getByText('Option 3')).toBeInTheDocument();
-  });
-
-  it('handles disabled options', () => {
-    render(<Select options={mockOptions} />);
-
-    const select = screen.getByRole('combobox');
-    const options = select.querySelectorAll('option');
-
-    // Check if the disabled option has the disabled attribute
-    const disabledOption = Array.from(options).find(
-      option => option.textContent === 'Option 3'
-    );
-    expect(disabledOption).toHaveAttribute('disabled');
-  });
-
-  it('handles value changes', () => {
-    const handleChange = vi.fn();
-    render(<Select options={mockOptions} onChange={handleChange} />);
-
-    const select = screen.getByRole('combobox');
-    fireEvent.change(select, { target: { value: 'option2' } });
-
-    expect(handleChange).toHaveBeenCalledTimes(1);
-    expect(select).toHaveValue('option2');
-  });
-
-  it('can be disabled', () => {
-    render(<Select options={mockOptions} disabled />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toBeDisabled();
-  });
-
-  it('applies custom className', () => {
-    render(<Select options={mockOptions} className='custom-select' />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveClass('custom-select');
-  });
-
-  it('forwards ref correctly', () => {
-    const ref = vi.fn();
-    render(<Select options={mockOptions} ref={ref} />);
-
-    expect(ref).toHaveBeenCalled();
-  });
-
-  it('renders with error styling when error is provided', () => {
-    render(<Select options={mockOptions} error='Error message' />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveClass('border-red-500');
-  });
-
-  it('handles focus and blur events', () => {
-    const handleFocus = vi.fn();
-    const handleBlur = vi.fn();
+  it('opens dropdown when trigger is clicked', async () => {
+    const user = userEvent.setup();
 
     render(
-      <Select options={mockOptions} onFocus={handleFocus} onBlur={handleBlur} />
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2'>Option 2</SelectItem>
+        </SelectContent>
+      </Select>
     );
 
-    const select = screen.getByRole('combobox');
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
 
-    fireEvent.focus(select);
-    expect(handleFocus).toHaveBeenCalledTimes(1);
-
-    fireEvent.blur(select);
-    expect(handleBlur).toHaveBeenCalledTimes(1);
+    // Items should be visible after opening
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Option 1' })).toBeVisible();
+    });
+    expect(screen.getByRole('option', { name: 'Option 2' })).toBeVisible();
   });
 
-  it('renders with proper default styling classes', () => {
-    render(<Select options={mockOptions} />);
+  it('selects an item when clicked', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
 
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveClass('block', 'w-full', 'rounded-md');
-  });
-
-  it('renders with dark mode classes', () => {
-    render(<Select options={mockOptions} />);
-
-    const select = screen.getByRole('combobox');
-    expect(select).toHaveClass(
-      'dark:border-gray-600',
-      'dark:bg-gray-800',
-      'dark:text-gray-50'
+    render(
+      <Select onValueChange={onValueChange}>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2'>Option 2</SelectItem>
+        </SelectContent>
+      </Select>
     );
+
+    // Open dropdown
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+
+    // Click option
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Option 2' })).toBeVisible();
+    });
+    await user.click(screen.getByRole('option', { name: 'Option 2' }));
+
+    // Verify callback was called
+    expect(onValueChange).toHaveBeenCalledWith('option2');
+    expect(onValueChange).toHaveBeenCalledTimes(1);
   });
 
-  it('handles empty options array', () => {
-    render(<Select options={[]} />);
+  it('displays selected value in trigger', async () => {
+    render(
+      <Select defaultValue='option1'>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2'>Option 2</SelectItem>
+        </SelectContent>
+      </Select>
+    );
 
-    const select = screen.getByRole('combobox');
-    expect(select).toBeInTheDocument();
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveTextContent('Option 1');
+  });
 
-    // Should only have the placeholder option
-    const options = select.querySelectorAll('option');
-    expect(options).toHaveLength(1);
+  it('renders disabled trigger correctly', () => {
+    render(
+      <Select disabled>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toBeDisabled();
+  });
+
+  it('renders disabled items correctly', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+
+    render(
+      <Select onValueChange={onValueChange}>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2' disabled>
+            Option 2 (Disabled)
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    // Open dropdown
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+
+    await waitFor(() => {
+      const disabledOption = screen.getByRole('option', {
+        name: 'Option 2 (Disabled)',
+      });
+      expect(disabledOption).toBeVisible();
+      expect(disabledOption).toHaveAttribute('data-disabled');
+    });
+
+    // Attempt to click disabled item
+    const disabledOption = screen.getByRole('option', {
+      name: 'Option 2 (Disabled)',
+    });
+    await user.click(disabledOption);
+
+    // Should not trigger value change
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it('renders with groups and labels', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose fruit' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            <SelectLabel>Fruits</SelectLabel>
+            <SelectItem value='apple'>Apple</SelectItem>
+            <SelectItem value='banana'>Banana</SelectItem>
+          </SelectGroup>
+          <SelectGroup>
+            <SelectLabel>Vegetables</SelectLabel>
+            <SelectItem value='carrot'>Carrot</SelectItem>
+            <SelectItem value='potato'>Potato</SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    );
+
+    // Open dropdown
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+
+    // Check for group labels
+    await waitFor(() => {
+      expect(screen.getByText('Fruits')).toBeVisible();
+      expect(screen.getByText('Vegetables')).toBeVisible();
+    });
+
+    // Check for items
+    expect(screen.getByRole('option', { name: 'Apple' })).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Carrot' })).toBeVisible();
+  });
+
+  it('supports controlled value changes', async () => {
+    const user = userEvent.setup();
+    const TestComponent = () => {
+      const [value, setValue] = React.useState('option1');
+
+      return (
+        <>
+          <Select value={value} onValueChange={setValue}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value='option1'>Option 1</SelectItem>
+              <SelectItem value='option2'>Option 2</SelectItem>
+            </SelectContent>
+          </Select>
+          <button onClick={() => setValue('option2')}>Set Option 2</button>
+        </>
+      );
+    };
+
+    render(<TestComponent />);
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveTextContent('Option 1');
+
+    // Click button to change value
+    await user.click(screen.getByRole('button', { name: 'Set Option 2' }));
+
+    expect(trigger).toHaveTextContent('Option 2');
+  });
+
+  it('supports keyboard accessibility attributes', () => {
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2'>Option 2</SelectItem>
+          <SelectItem value='option3'>Option 3</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    const trigger = screen.getByRole('combobox');
+
+    // Verify keyboard accessibility attributes
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveAttribute('aria-autocomplete', 'none');
+    expect(trigger).toHaveAttribute('data-state', 'closed');
+  });
+
+  it('closes dropdown when Escape is pressed', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+          <SelectItem value='option2'>Option 2</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    // Open dropdown
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Option 1' })).toBeVisible();
+    });
+
+    // Press Escape
+    await user.keyboard('{Escape}');
+
+    // Dropdown should close
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('option', { name: 'Option 1' })
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('applies custom className to trigger', () => {
+    render(
+      <Select>
+        <SelectTrigger className='custom-trigger-class'>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveClass('custom-trigger-class');
+  });
+
+  it('applies custom className to items', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1' className='custom-item-class'>
+            Option 1
+          </SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    // Open dropdown
+    const trigger = screen.getByRole('combobox');
+    await user.click(trigger);
+
+    await waitFor(() => {
+      const item = screen.getByRole('option', { name: 'Option 1' });
+      expect(item).toHaveClass('custom-item-class');
+    });
+  });
+
+  it('renders empty state correctly', () => {
+    render(
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder='No options available' />
+        </SelectTrigger>
+        <SelectContent>{/* No items */}</SelectContent>
+      </Select>
+    );
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveTextContent('No options available');
+  });
+
+  it('renders with required attribute', () => {
+    render(
+      <Select required>
+        <SelectTrigger>
+          <SelectValue placeholder='Choose' />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value='option1'>Option 1</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+
+    const trigger = screen.getByRole('combobox');
+    expect(trigger).toHaveAttribute('aria-required', 'true');
   });
 });
