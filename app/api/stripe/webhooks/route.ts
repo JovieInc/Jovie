@@ -4,11 +4,19 @@
  * Webhooks are the source of truth for billing status
  */
 
+import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema';
 import { env } from '@/lib/env';
+import {
+  captureCriticalError,
+  captureWarning,
+  logFallback,
+} from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { getPlanFromPriceId } from '@/lib/stripe/config';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
@@ -17,6 +25,34 @@ import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 export const runtime = 'nodejs';
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
+
+/**
+ * Fallback: Look up Clerk user ID by Stripe customer ID
+ * Used when subscription metadata is missing (e.g., old subscriptions, metadata loss)
+ */
+async function getUserIdFromStripeCustomer(
+  stripeCustomerId: string
+): Promise<string | null> {
+  try {
+    const [user] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.stripeCustomerId, stripeCustomerId))
+      .limit(1);
+
+    return user?.clerkId || null;
+  } catch (error) {
+    await captureWarning(
+      'Failed to lookup user by Stripe customer ID in fallback',
+      error,
+      {
+        stripeCustomerId,
+        function: 'getUserIdFromStripeCustomer',
+      }
+    );
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -99,11 +135,29 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     subscriptionId: session.subscription,
   });
 
-  const userId = session.metadata?.clerk_user_id;
-  if (!userId) {
-    console.error('[CRITICAL] No user ID in checkout session metadata', {
+  let userId = session.metadata?.clerk_user_id;
+
+  // Fallback: Look up user by Stripe customer ID if metadata is missing
+  if (!userId && typeof session.customer === 'string') {
+    await logFallback('No user ID in checkout session metadata', {
       sessionId: session.id,
+      customerId: session.customer,
+      event: 'checkout.session.completed',
     });
+    userId = (await getUserIdFromStripeCustomer(session.customer)) ?? undefined;
+  }
+
+  if (!userId) {
+    await captureCriticalError(
+      'Cannot identify user for checkout session',
+      new Error('Missing user ID in checkout session'),
+      {
+        sessionId: session.id,
+        customerId: session.customer,
+        route: '/api/stripe/webhooks',
+        event: 'checkout.session.completed',
+      }
+    );
     throw new Error('Missing user ID in checkout session');
   }
 
@@ -126,10 +180,25 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     status: subscription.status,
   });
 
-  const userId = subscription.metadata?.clerk_user_id;
+  let userId: string | undefined = subscription.metadata?.clerk_user_id;
+
+  // Fallback: Look up user by Stripe customer ID if metadata is missing
+  if (!userId && typeof subscription.customer === 'string') {
+    console.warn(
+      '[FALLBACK] No user ID in metadata, looking up by customer ID',
+      {
+        subscriptionId: subscription.id,
+        customerId: subscription.customer,
+      }
+    );
+    userId =
+      (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
+  }
+
   if (!userId) {
-    console.error('[CRITICAL] No user ID in subscription metadata', {
+    console.error('[CRITICAL] Cannot identify user for subscription', {
       subscriptionId: subscription.id,
+      customerId: subscription.customer,
     });
     throw new Error('Missing user ID in subscription');
   }
@@ -145,10 +214,25 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     status: subscription.status,
   });
 
-  const userId = subscription.metadata?.clerk_user_id;
+  let userId: string | undefined = subscription.metadata?.clerk_user_id;
+
+  // Fallback: Look up user by Stripe customer ID if metadata is missing
+  if (!userId && typeof subscription.customer === 'string') {
+    console.warn(
+      '[FALLBACK] No user ID in metadata, looking up by customer ID',
+      {
+        subscriptionId: subscription.id,
+        customerId: subscription.customer,
+      }
+    );
+    userId =
+      (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
+  }
+
   if (!userId) {
-    console.error('[CRITICAL] No user ID in subscription metadata', {
+    console.error('[CRITICAL] Cannot identify user for subscription', {
       subscriptionId: subscription.id,
+      customerId: subscription.customer,
     });
     throw new Error('Missing user ID in subscription');
   }
@@ -163,10 +247,25 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     customerId: subscription.customer,
   });
 
-  const userId = subscription.metadata?.clerk_user_id;
+  let userId: string | undefined = subscription.metadata?.clerk_user_id;
+
+  // Fallback: Look up user by Stripe customer ID if metadata is missing
+  if (!userId && typeof subscription.customer === 'string') {
+    console.warn(
+      '[FALLBACK] No user ID in metadata, looking up by customer ID',
+      {
+        subscriptionId: subscription.id,
+        customerId: subscription.customer,
+      }
+    );
+    userId =
+      (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
+  }
+
   if (!userId) {
-    console.error('[CRITICAL] No user ID in subscription metadata', {
+    console.error('[CRITICAL] Cannot identify user for subscription', {
       subscriptionId: subscription.id,
+      customerId: subscription.customer,
     });
     throw new Error('Missing user ID in subscription');
   }
