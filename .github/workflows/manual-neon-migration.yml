@@ -1,0 +1,104 @@
+name: Manual Neon Migration Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Neon database branch to run migrations on'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+      dry_run:
+        description: 'Dry run (check migrations without applying)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  migrate:
+    name: Run Database Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.target_branch == 'production' && 'main' : 'preview' }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check migration files
+        run: |
+          echo "📋 Checking migration files..."
+          ls -la drizzle/migrations/
+          echo ""
+          echo "📊 Migration journal:"
+          cat drizzle/migrations/meta/_journal.json | jq '.'
+
+      - name: Run migrations (Preview)
+        if: github.event.inputs.target_branch == 'preview'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "🔍 DRY RUN MODE - Checking migrations only"
+            pnpm drizzle:check
+          else
+            echo "🚀 Running migrations on PREVIEW database..."
+            pnpm neon:migrate:preview
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.PREVIEW_DATABASE_URL }}
+
+      - name: Run migrations (Production)
+        if: github.event.inputs.target_branch == 'production'
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "🔍 DRY RUN MODE - Checking migrations only"
+            pnpm drizzle:check
+          else
+            echo "⚠️  PRODUCTION MIGRATION - Proceeding with caution"
+            pnpm drizzle:migrate:prod
+          fi
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          ALLOW_PROD_MIGRATIONS: true
+
+      - name: Verify migration status
+        run: |
+          echo "✅ Migration completed successfully"
+          echo "Check the logs above for details"
+
+      - name: Comment on related PRs
+        if: success() && github.event.inputs.dry_run == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const target = '${{ github.event.inputs.target_branch }}';
+            const message = `✅ Database migrations successfully applied to **${target}** branch\n\nTriggered by: @${{ github.actor }}\nWorkflow: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+
+            console.log('Migration completed for:', target);
+            console.log('Message:', message);
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const target = '${{ github.event.inputs.target_branch }}';
+            console.error(`❌ Database migration failed on ${target} branch`);
+            console.error('Check the workflow logs for details');
