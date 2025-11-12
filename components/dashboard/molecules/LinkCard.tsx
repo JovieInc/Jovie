@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
+import { zIndex } from '@/lib/utils/z-index';
 
 type Platform =
   | 'instagram'
@@ -95,7 +96,7 @@ export function LinkCard({
         transition: { duration: 0.15 },
       }}
       className={cn(
-        isDragging && 'shadow-lg z-10',
+        isDragging && cn('shadow-lg', zIndex.dropdown),
         !isVisible && 'opacity-60',
         isSaving && 'pointer-events-none'
       )}
@@ -109,7 +110,12 @@ export function LinkCard({
         <div className='p-4 relative'>
           {/* Loading overlay */}
           {isSaving && (
-            <div className='absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center z-10'>
+            <div
+              className={cn(
+                'absolute inset-0 bg-surface-1/80 rounded-xl flex items-center justify-center',
+                zIndex.dropdown
+              )}
+            >
               <Icon
                 name='Loader2'
                 className='h-6 w-6 text-primary-500 animate-spin'
@@ -125,8 +131,8 @@ export function LinkCard({
               onPointerDown={handlePointerDown}
               className={cn(
                 'flex-shrink-0 p-1.5 -ml-1.5 rounded-md transition-colors',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                'text-secondary-token hover:text-primary-token',
+                'hover:bg-surface-2',
                 'cursor-grab active:cursor-grabbing',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
               )}
@@ -149,9 +155,9 @@ export function LinkCard({
               <div
                 className={cn(
                   'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
-                  'bg-white dark:bg-gray-700/80 shadow-sm',
+                  'bg-surface-1 shadow-sm',
                   'border border-subtle',
-                  'text-gray-700 dark:text-gray-200',
+                  'text-primary-token',
                   'group-hover:shadow-md group-hover:scale-105',
                   'transition-all duration-200'
                 )}
@@ -160,16 +166,16 @@ export function LinkCard({
                   className={cn(
                     platformIcons[platform] || 'i-heroicons-link',
                     'w-5 h-5',
-                    platform === 'tiktok' && 'text-black dark:text-white'
+                    platform === 'tiktok' && 'text-primary-token'
                   )}
                 />
               </div>
 
               <div className='min-w-0'>
-                <h3 className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                <h3 className='text-sm font-medium text-primary-token truncate'>
                   {title || platformName}
                 </h3>
-                <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                <p className='text-xs text-secondary-token truncate'>
                   {displayUrl}
                 </p>
               </div>
@@ -183,8 +189,8 @@ export function LinkCard({
                   onClick={handleEditClick}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                    'text-secondary-token hover:text-primary-token',
+                    'hover:bg-surface-2',
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     'group-hover:opacity-100 transition-opacity',
                     isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
@@ -205,8 +211,8 @@ export function LinkCard({
                   onClick={() => onToggleVisibility(id)}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                    'text-secondary-token hover:text-primary-token',
+                    'hover:bg-surface-2',
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     isVisible && 'text-primary-600 dark:text-primary-400',
                     'group-hover:opacity-100 transition-opacity',
@@ -232,8 +238,8 @@ export function LinkCard({
               onClick={toggleExpanded}
               className={cn(
                 'flex-shrink-0 p-1.5 -mr-1.5 rounded-md transition-all',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                'text-secondary-token hover:text-primary-token',
+                'hover:bg-surface-2',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                 'transition-transform duration-200',
                 isExpanded ? 'rotate-180' : 'rotate-0'
@@ -285,7 +291,7 @@ export function LinkCard({
                         variant='ghost'
                         size='sm'
                         onClick={() => onDelete(id)}
-                        className='text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                        className='text-destructive hover:bg-surface-2'
                       >
                         Delete
                       </Button>

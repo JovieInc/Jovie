@@ -150,7 +150,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
-            className='h-16 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse'
+            className='h-16 bg-surface-2 dark:bg-surface-1 rounded-lg animate-pulse'
           />
         ))}
       </div>
@@ -160,7 +160,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
   return (
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
+        <h3 className='text-lg font-semibold text-primary-token dark:text-primary-token'>
           Social Media Links
         </h3>
         <Button

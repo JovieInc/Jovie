@@ -413,10 +413,10 @@ export function EnhancedDashboardLinks({
           {/* Preview Container */}
           <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
             <div className='mb-4 flex items-center justify-between'>
-              <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
+              <h2 className='text-lg font-semibold text-primary-token dark:text-primary-token'>
                 Live Preview
               </h2>
-              <div className='text-sm text-gray-500 dark:text-gray-400'>
+              <div className='text-sm text-secondary-token dark:text-secondary-token'>
                 Last saved:{' '}
                 {saveStatus.lastSaved
                   ? saveStatus.lastSaved.toLocaleTimeString()
@@ -435,11 +435,11 @@ export function EnhancedDashboardLinks({
 
           {/* URL Preview */}
           <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-3'>
+            <h3 className='text-sm font-medium text-primary-token dark:text-primary-token mb-3'>
               Your Profile URL
             </h3>
             <div className='flex flex-col sm:flex-row gap-2'>
-              <div className='flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono truncate'>
+              <div className='flex-1 bg-surface-0 dark:bg-surface-1 rounded-lg px-3 py-2 text-sm text-primary-token dark:text-gray-100 font-mono truncate'>
                 {typeof window !== 'undefined'
                   ? `${window.location.origin}${profilePath}`
                   : 'Loading...'}
@@ -467,7 +467,7 @@ export function EnhancedDashboardLinks({
                 </Button>
               </div>
             </div>
-            <p className='mt-2 text-xs text-gray-500 dark:text-gray-400'>
+            <p className='mt-2 text-xs text-secondary-token dark:text-secondary-token'>
               Share this link with your audience
             </p>
           </div>

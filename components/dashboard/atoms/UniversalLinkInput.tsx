@@ -368,7 +368,7 @@ export const UniversalLinkInput = forwardRef<
                     !detectedLink.isValid || isPlatformDuplicate
                       ? 'opacity-50'
                       : ''
-                  } ${readableTextIsWhite ? 'text-white dark:text-white' : 'text-black dark:text-black'}`}
+                  } ${readableTextIsWhite ? 'text-primary-token dark:text-primary-token' : 'text-primary-token dark:text-primary-token'}`}
                   aria-label={
                     isPlatformDuplicate
                       ? `Cannot add duplicate ${detectedLink.platform.name} link`

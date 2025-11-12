@@ -116,7 +116,7 @@ const MockAvatarUploader = ({
             type='button'
             onClick={onUpload}
             disabled={!file || loading}
-            className='px-3 py-1.5 rounded bg-black text-white disabled:opacity-50 dark:bg-white dark:text-black'
+            className='px-3 py-1.5 rounded bg-base text-primary-token disabled:opacity-50 dark:bg-surface-0 dark:text-primary-token'
           >
             {loading ? 'Uploading…' : 'Upload'}
           </button>

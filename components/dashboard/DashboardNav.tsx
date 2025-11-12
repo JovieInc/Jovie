@@ -12,6 +12,7 @@ import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Divider } from '@/components/atoms/Divider';
+import { useSidebar } from '@/components/organisms/Sidebar';
 import { cn } from '@/lib/utils';
 
 // Primary Navigation - Core features
@@ -75,12 +76,10 @@ const secondaryNavigation = [
   },
 ];
 
-interface DashboardNavProps {
-  collapsed?: boolean;
-}
-
-export function DashboardNav({ collapsed = false }: DashboardNavProps) {
+export function DashboardNav() {
   const pathname = usePathname();
+  const { state } = useSidebar();
+  const collapsed = state === 'closed';
 
   const renderNavSection = (
     items: typeof primaryNavigation,
@@ -136,22 +135,21 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
                 aria-hidden='true'
               />
 
-              <span
-                className={cn(
-                  'transition-all duration-200 ease-in-out truncate',
-                  collapsed
-                    ? 'opacity-0 w-0 overflow-hidden'
-                    : 'opacity-100 w-auto',
-                  // Typography colors
-                  isActive
-                    ? 'text-primary-token'
-                    : isPrimary
+              {!collapsed && (
+                <span
+                  className={cn(
+                    'transition-all duration-200 ease-in-out truncate',
+                    // Typography colors
+                    isActive
                       ? 'text-primary-token'
-                      : 'text-secondary-token'
-                )}
-              >
-                {item.name}
-              </span>
+                      : isPrimary
+                        ? 'text-primary-token'
+                        : 'text-secondary-token'
+                  )}
+                >
+                  {item.name}
+                </span>
+              )}
             </Link>
           </Button>
         );

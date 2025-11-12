@@ -3,8 +3,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
 // flags import removed - pre-launch
-import { debounce } from '@/lib/utils';
+import { cn, debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
+import { zIndex } from '@/lib/utils/z-index';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { GroupedLinksManager } from './GroupedLinksManager';
@@ -147,7 +148,7 @@ export function DashboardLinks({
       el.classList.remove('bg-green-500', 'bg-red-500');
       el.classList.add(
         success ? 'bg-green-500' : 'bg-red-500',
-        'text-white',
+        'text-primary-token',
         'px-3',
         'py-1',
         'rounded-full',
@@ -296,7 +297,10 @@ export function DashboardLinks({
           {/* Update Indicator */}
           <div
             ref={updateIndicatorRef}
-            className='fixed top-4 right-4 opacity-0 transition-all duration-500 data-[show=true]:opacity-100 data-[show=true]:translate-y-0 translate-y-2 z-50'
+            className={cn(
+              'fixed top-4 right-4 opacity-0 transition-all duration-500 data-[show=true]:opacity-100 data-[show=true]:translate-y-0 translate-y-2',
+              zIndex.tooltip
+            )}
           />
 
           {/* Grouped Links Manager (Immediate replacement of previous layout) */}

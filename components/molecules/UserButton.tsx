@@ -291,10 +291,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                 alt={displayName || 'User avatar'}
                 width={32}
                 height={32}
-                className='w-8 h-8 rounded-full object-cover flex-shrink-0'
+                className='aspect-square w-8 h-8 rounded-full object-cover flex-shrink-0'
               />
             ) : (
-              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
+              <div className='aspect-square w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
                 {userInitials}
               </div>
             )}
@@ -333,10 +333,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                 alt={displayName || 'User avatar'}
                 width={20}
                 height={20}
-                className='w-5 h-5 rounded-full object-cover'
+                className='aspect-square w-5 h-5 rounded-full object-cover'
               />
             ) : (
-              <div className='flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-xs font-medium text-white'>
+              <div className='aspect-square flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-xs font-medium text-white'>
                 {userInitials}
               </div>
             )}
@@ -344,7 +344,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-64'>
+      <DropdownMenuContent side='top' align='end' className='w-64'>
         <DropdownMenuLabel>
           <div className='flex items-center gap-3'>
             {userImageUrl ? (
@@ -353,10 +353,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                 alt={displayName || 'User avatar'}
                 width={32}
                 height={32}
-                className='w-8 h-8 rounded-full object-cover'
+                className='aspect-square w-8 h-8 rounded-full object-cover'
               />
             ) : (
-              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
+              <div className='aspect-square w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
                 {userInitials}
               </div>
             )}

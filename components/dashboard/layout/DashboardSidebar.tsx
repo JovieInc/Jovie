@@ -12,6 +12,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
@@ -35,7 +36,11 @@ export function DashboardSidebar({
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size='lg' asChild>
+            <SidebarMenuButton
+              size='lg'
+              asChild
+              className='group-data-[collapsible=icon]:justify-center'
+            >
               <Link href='/dashboard/overview'>
                 <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
                   <Image
@@ -63,17 +68,13 @@ export function DashboardSidebar({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className='flex items-center gap-2 px-2 py-1'>
+            <UserButton showUserInfo />
+            <SidebarMenuAction showOnHover asChild>
               <EnhancedThemeToggle variant='compact' />
-              <FeedbackButton collapsed={false} />
-            </div>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton size='lg' asChild>
-              <div>
-                <UserButton showUserInfo />
-              </div>
-            </SidebarMenuButton>
+            </SidebarMenuAction>
+            <SidebarMenuAction showOnHover asChild>
+              <FeedbackButton />
+            </SidebarMenuAction>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

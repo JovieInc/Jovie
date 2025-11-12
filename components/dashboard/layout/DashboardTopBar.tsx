@@ -2,6 +2,8 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 import { SidebarCollapseButton } from '@/components/atoms/SidebarCollapseButton';
+import { cn } from '@/lib/utils';
+import { zIndex } from '@/lib/utils/z-index';
 
 export interface DashboardBreadcrumbItem {
   label: string;
@@ -18,9 +20,14 @@ export function DashboardTopBar({
   actions,
 }: DashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-sidebar/60'>
-      <SidebarCollapseButton className='-ml-1' />
-      <div className='h-4 w-px bg-sidebar-border' />
+    <header
+      className={cn(
+        'sticky top-0 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-sidebar/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-sidebar/60',
+        zIndex.sticky
+      )}
+    >
+      <SidebarCollapseButton />
+      <div className='h-4 w-px bg-border' />
       <nav
         aria-label='Breadcrumb'
         className='flex items-center gap-1 text-sm text-muted-foreground'

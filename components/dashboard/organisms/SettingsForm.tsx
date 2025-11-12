@@ -49,17 +49,17 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
   return (
     <div className='space-y-6'>
       <div>
-        <h2 className='text-lg font-semibold text-gray-900 dark:text-white mb-4'>
+        <h2 className='text-lg font-semibold text-primary-token mb-4'>
           Account Settings
         </h2>
-        <p className='text-sm text-gray-600 dark:text-gray-400 mb-6'>
+        <p className='text-sm text-secondary-token mb-6'>
           Manage your account preferences and privacy settings.
         </p>
       </div>
 
       {/* Marketing Preferences Section */}
       <div className='bg-surface-1 border border-subtle rounded-lg p-6'>
-        <h3 className='text-base font-medium text-gray-900 dark:text-white mb-4'>
+        <h3 className='text-base font-medium text-primary-token mb-4'>
           Marketing & Promotion
         </h3>
         <div className='space-y-4'>
@@ -72,17 +72,17 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
                 onChange={e => handleMarketingOptOutChange(e.target.checked)}
                 disabled={isUpdating}
                 aria-label='Opt out of marketing materials'
-                className='w-5 h-5 text-indigo-600 bg-gray-100 border-gray-300 rounded focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-600 dark:ring-offset-gray-800 focus-visible:ring-2 dark:bg-gray-700 dark:border-gray-600 disabled:opacity-50'
+                className='w-5 h-5 text-indigo-600 bg-surface-2 border-subtle rounded focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-600 dark:ring-offset-base focus-visible:ring-2 disabled:opacity-50'
               />
             </div>
             <div className='text-sm'>
               <label
                 htmlFor='marketing-opt-out'
-                className='font-medium text-gray-700 dark:text-gray-300'
+                className='font-medium text-primary-token'
               >
                 Opt out of marketing materials
               </label>
-              <p className='text-gray-500 dark:text-gray-400 mt-1'>
+              <p className='text-secondary-token mt-1'>
                 When enabled, your profile will not be featured on our homepage
                 or used in marketing materials. You can change this setting at
                 any time.
@@ -91,7 +91,7 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
           </div>
 
           {showSuccess && (
-            <div className='flex items-center space-x-2 text-sm text-green-600 dark:text-green-400'>
+            <div className='flex items-center space-x-2 text-sm text-success'>
               <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 20 20'>
                 <path
                   fillRule='evenodd'
@@ -107,10 +107,10 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
 
       {/* Future Settings Sections */}
       <div className='bg-surface-2 border border-subtle rounded-lg p-6'>
-        <h3 className='text-base font-medium text-gray-900 dark:text-white mb-2'>
+        <h3 className='text-base font-medium text-primary-token mb-2'>
           Additional Settings
         </h3>
-        <p className='text-sm text-gray-500 dark:text-gray-400'>
+        <p className='text-sm text-secondary-token'>
           More account and privacy settings will be available here in the
           future.
         </p>

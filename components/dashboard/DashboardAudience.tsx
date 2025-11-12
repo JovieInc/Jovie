@@ -123,7 +123,7 @@ export function DashboardAudience({ initialData }: DashboardAudienceProps) {
         <div className='absolute inset-0 flex items-center justify-center'>
           <div className='bg-surface-1/95 backdrop-blur-md rounded-2xl p-8 max-w-md text-center shadow-2xl border border-subtle'>
             <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full mb-4'>
-              <UserGroupIcon className='w-8 h-8 text-white' />
+              <UserGroupIcon className='w-8 h-8 text-primary-token' />
             </div>
 
             <h2 className='text-2xl font-bold text-primary-token mb-2'>

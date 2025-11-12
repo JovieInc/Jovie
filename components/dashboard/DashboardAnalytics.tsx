@@ -209,7 +209,7 @@ function RangeToggle({
             onClick={() => onChange(opt.value)}
             className={`relative px-3 py-1.5 text-sm rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               active
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-primary-token'
                 : 'text-secondary-token hover:bg-surface-2'
             }`}
           >

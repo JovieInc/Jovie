@@ -79,7 +79,7 @@ const meta: Meta<typeof SocialsForm> = {
   tags: ['autodocs'],
   decorators: [
     Story => (
-      <div className='max-w-3xl mx-auto p-6 border border-gray-200 dark:border-gray-800 rounded-lg'>
+      <div className='max-w-3xl mx-auto p-6 border border-subtle dark:border-gray-800 rounded-lg'>
         <Story />
       </div>
     ),

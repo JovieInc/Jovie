@@ -1,10 +1,12 @@
 'use client';
 
 import { WalletIcon } from '@heroicons/react/24/outline';
+import { Button, Input } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import type { DashboardData } from '@/app/dashboard/actions';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { cn } from '@/lib/utils';
+import { zIndex } from '@/lib/utils/z-index';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface DashboardTippingProps {
@@ -81,7 +83,8 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       {/* Venmo Handle Setup - Always Visible — border tokens normalized to border-subtle for consistency with dashboard */}
       <div
         className={cn(
-          'mb-6 bg-surface-1 backdrop-blur-sm rounded-lg border p-6 transition-all duration-300 relative z-20 border-subtle hover:shadow-md'
+          'mb-6 bg-surface-1 backdrop-blur-sm rounded-lg border p-6 transition-all duration-300 relative border-subtle hover:shadow-md',
+          zIndex.dropdown
         )}
       >
         <SectionHeader
@@ -111,13 +114,12 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               </label>
               <div className='flex items-center'>
                 <span className='text-sm text-secondary-token mr-1'>@</span>
-                <input
+                <Input
                   type='text'
                   id='venmo-handle'
                   value={venmoHandle}
                   onChange={e => setVenmoHandle(e.target.value)}
                   placeholder='your-username'
-                  className='flex-1 px-3 py-2 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder:text-tertiary focus:ring-2 focus:ring-accent focus:border-accent transition-colors'
                   autoFocus
                 />
               </div>
@@ -127,26 +129,27 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               </p>
             </div>
             <div className='flex gap-3'>
-              <button
+              <Button
                 onClick={handleSaveVenmo}
-                disabled={isSaving || !venmoHandle.trim()}
-                className='px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
+                disabled={!venmoHandle.trim()}
+                loading={isSaving}
+                variant='accent'
               >
-                {isSaving ? 'Saving...' : hasVenmoHandle ? 'Update' : 'Connect'}
-              </button>
+                {hasVenmoHandle ? 'Update' : 'Connect'}
+              </Button>
               {hasVenmoHandle ? (
-                <button
+                <Button
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className='px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
+                  variant='secondary'
                 >
                   Cancel
-                </button>
+                </Button>
               ) : null}
             </div>
             {saveSuccess && (
               <div
-                className='text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md px-3 py-2'
+                className='text-sm text-success bg-surface-2 border border-subtle rounded-md px-3 py-2'
                 role='status'
                 aria-live='polite'
               >
@@ -160,9 +163,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               <span className='text-sm font-mono bg-surface-2 px-3 py-1 rounded-md text-primary-token'>
                 @{artist.venmo_handle}
               </span>
-              <span className='text-xs text-green-700 dark:text-green-400'>
-                ✓ Connected
-              </span>
+              <span className='text-xs text-success'>✓ Connected</span>
             </div>
             <button
               onClick={() => setIsEditing(true)}
@@ -182,7 +183,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         )}
       >
         {/* Earnings Summary */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-md transition-all duration-300 relative z-10'>
+        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-md transition-all duration-300'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Earnings Summary'
@@ -204,7 +205,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         </div>
 
         {/* Recent Earnings */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
+        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Recent Earnings'

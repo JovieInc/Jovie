@@ -495,7 +495,7 @@ export function SettingsPolished({
           <button
             type='submit'
             disabled={isLoading}
-            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
+            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
             style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
@@ -539,9 +539,9 @@ export function SettingsPolished({
               label: 'Light',
               description: 'Bright and clean.',
               preview: {
-                bg: 'bg-white',
-                sidebar: 'bg-gray-50',
-                accent: 'bg-gray-100',
+                bg: 'bg-surface-0',
+                sidebar: 'bg-surface-0',
+                accent: 'bg-surface-1',
               },
             },
             {
@@ -549,8 +549,8 @@ export function SettingsPolished({
               label: 'Dark',
               description: 'Bold and focused.',
               preview: {
-                bg: 'bg-gray-900',
-                sidebar: 'bg-gray-800',
+                bg: 'bg-surface-0',
+                sidebar: 'bg-surface-1',
                 accent: 'bg-gray-700',
               },
             },
@@ -614,7 +614,7 @@ export function SettingsPolished({
               {theme === option.value && (
                 <div className='absolute top-2 right-2 w-5 h-5 bg-accent-token rounded-full flex items-center justify-center animate-in zoom-in-95 fade-in duration-200'>
                   <svg
-                    className='w-3 h-3 text-white'
+                    className='w-3 h-3 text-primary-token'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -670,7 +670,7 @@ export function SettingsPolished({
             >
               <span
                 className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  'inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform',
                   hideBranding ? 'translate-x-6' : 'translate-x-1'
                 )}
               />
@@ -789,7 +789,7 @@ export function SettingsPolished({
         <button
           type='submit'
           disabled={isPixelSaving}
-          className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
+          className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
           style={{ backgroundColor: 'var(--color-accent)' }}
         >
           {isPixelSaving ? 'Saving...' : 'Save Pixels'}
@@ -827,7 +827,7 @@ export function SettingsPolished({
           >
             <span
               className={cn(
-                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                'inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform',
                 marketingEmails ? 'translate-x-6' : 'translate-x-1'
               )}
             />
@@ -850,7 +850,7 @@ export function SettingsPolished({
         <button
           onClick={handleBilling}
           disabled={isBillingLoading || billingStatus.loading}
-          className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
+          className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
           style={{ backgroundColor: 'var(--color-accent)' }}
         >
           {billingStatus.loading
@@ -878,7 +878,7 @@ export function SettingsPolished({
           <button
             onClick={handleBilling}
             disabled={isBillingLoading || billingStatus.loading}
-            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
+            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
             style={{ backgroundColor: 'var(--color-accent)' }}
           >
             {isBillingLoading || billingStatus.loading
@@ -914,7 +914,7 @@ export function SettingsPolished({
                   className={cn(
                     'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-sm font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-accent text-white shadow-sm'
+                      ? 'bg-accent text-primary-token shadow-sm'
                       : 'text-primary hover:bg-surface-2',
                     isLocked && 'opacity-60'
                   )}

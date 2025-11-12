@@ -69,7 +69,7 @@ export function LinkCategory({
           type='button'
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
-            'group flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200',
+            'group flex items-center gap-2 text-sm font-medium text-primary-token dark:text-gray-200',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md',
             'transition-colors duration-200'
           )}
@@ -89,11 +89,11 @@ export function LinkCategory({
           <Icon
             name='ChevronDown'
             className={cn(
-              'w-4 h-4 text-gray-400 transition-transform duration-200',
+              'w-4 h-4 text-secondary-token transition-transform duration-200',
               isExpanded ? 'rotate-0' : '-rotate-90'
             )}
           />
-          <span className='ml-1 text-xs font-normal text-gray-500 dark:text-gray-400'>
+          <span className='ml-1 text-xs font-normal text-secondary-token dark:text-secondary-token'>
             {links.length} {links.length === 1 ? 'link' : 'links'}
           </span>
         </button>

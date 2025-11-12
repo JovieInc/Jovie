@@ -1,90 +1,42 @@
 'use client';
 
 import { ChatBubbleBottomCenterTextIcon } from '@heroicons/react/24/outline';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { useCallback, useState } from 'react';
+import { SidebarMenuButton, useSidebar } from '@/components/organisms/Sidebar';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
-import { cn } from '@/lib/utils';
 import { FeedbackModal } from './FeedbackModal';
 
-interface FeedbackButtonProps {
-  collapsed?: boolean;
-}
-
-export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
+export function FeedbackButton() {
+  const { state } = useSidebar();
+  const isCollapsed = state === 'closed';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const modalId = 'feedback-modal';
 
   const handleFeedbackClick = useCallback(() => {
     // Track via analytics wrapper (no direct posthog-js import)
     void trackEvent('sidebar_feedback_button_click', {
-      sidebar_collapsed: collapsed,
+      sidebar_collapsed: isCollapsed,
       source: 'dashboard_sidebar',
     });
 
     setIsModalOpen(true);
-  }, [collapsed]);
+  }, [isCollapsed]);
 
   const handleModalClose = useCallback(() => {
     setIsModalOpen(false);
   }, []);
 
-  const buttonContent = (
-    <button
-      onClick={handleFeedbackClick}
-      className={cn(
-        'group flex transition-all duration-200 ease-in-out',
-        'rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
-        collapsed
-          ? 'items-center justify-center w-8 h-8 p-0 gap-0'
-          : 'items-center w-full px-3 gap-2',
-        'hover:scale-105 active:scale-95',
-        'motion-reduce:transform-none'
-      )}
-      aria-label={collapsed ? 'Send feedback' : undefined}
-      aria-haspopup='dialog'
-      aria-expanded={isModalOpen}
-      aria-controls={modalId}
-    >
-      <ChatBubbleBottomCenterTextIcon
-        className={cn(
-          'h-4 w-4 shrink-0 text-emerald-500 group-hover:text-emerald-400 transition-colors duration-200',
-          collapsed ? 'mx-auto my-auto' : ''
-        )}
-      />
-      <span
-        className={cn(
-          'text-xs font-medium transition-all duration-200 ease-in-out',
-          collapsed
-            ? 'opacity-0 w-0 overflow-hidden'
-            : 'opacity-100 w-auto leading-none'
-        )}
-      >
-        Feedback
-      </span>
-    </button>
-  );
-
-  // In collapsed mode, wrap with tooltip
-  if (collapsed) {
-    return (
-      <>
-        <Tooltip>
-          <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
-          <TooltipContent side='right'>Send feedback</TooltipContent>
-        </Tooltip>
-        <FeedbackModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          id={modalId}
-        />
-      </>
-    );
-  }
-
   return (
     <>
-      {buttonContent}
+      <SidebarMenuButton
+        onClick={handleFeedbackClick}
+        tooltip={isCollapsed ? 'Send feedback' : undefined}
+        aria-haspopup='dialog'
+        aria-controls={modalId}
+      >
+        <ChatBubbleBottomCenterTextIcon className='h-4 w-4 text-accent' />
+        <span>Feedback</span>
+      </SidebarMenuButton>
       <FeedbackModal
         isOpen={isModalOpen}
         onClose={handleModalClose}

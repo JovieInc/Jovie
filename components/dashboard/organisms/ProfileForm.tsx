@@ -246,10 +246,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         >
           <div className='flex items-center justify-between'>
             <div className='flex flex-col'>
-              <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+              <span className='text-sm font-medium text-primary-token dark:text-gray-300'>
                 Show Jovie branding
               </span>
-              <span className='text-xs text-gray-500 dark:text-gray-400'>
+              <span className='text-xs text-secondary-token dark:text-secondary-token'>
                 Display Jovie branding on your profile
               </span>
             </div>
@@ -263,7 +263,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
                 formData.hide_branding
-                  ? 'bg-gray-200 dark:bg-gray-700'
+                  ? 'bg-surface-2 dark:bg-gray-700'
                   : 'bg-indigo-600'
               }`}
               disabled={loading}
@@ -275,7 +275,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform ${
                   formData.hide_branding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'

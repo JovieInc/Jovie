@@ -7,6 +7,19 @@ vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/dashboard/overview'),
 }));
 
+// Mock Sidebar context
+vi.mock('@/components/organisms/Sidebar', () => ({
+  useSidebar: vi.fn(() => ({
+    state: 'open',
+    open: true,
+    setOpen: vi.fn(),
+    isMobile: false,
+    openMobile: false,
+    setOpenMobile: vi.fn(),
+    toggleSidebar: vi.fn(),
+  })),
+}));
+
 // Mock Tooltip component
 vi.mock('@/components/atoms/Tooltip', () => ({
   Tooltip: ({
@@ -42,12 +55,22 @@ describe('DashboardNav', () => {
     expect(overviewLink).toHaveClass('bg-accent/10');
   });
 
-  it('renders correctly when collapsed', () => {
-    render(<DashboardNav collapsed={true} />);
+  it('renders correctly when collapsed', async () => {
+    const { useSidebar } = await import('@/components/organisms/Sidebar');
+    vi.mocked(useSidebar).mockReturnValue({
+      state: 'closed',
+      open: false,
+      setOpen: vi.fn(),
+      isMobile: false,
+      openMobile: false,
+      setOpenMobile: vi.fn(),
+      toggleSidebar: vi.fn(),
+    });
 
-    // Text should be hidden when collapsed
-    const overviewText = screen.getByText('Overview');
-    expect(overviewText).toHaveClass('opacity-0');
+    render(<DashboardNav />);
+
+    // Text should not be rendered when collapsed
+    expect(screen.queryByText('Overview')).not.toBeInTheDocument();
   });
 
   it('shows different styling for primary vs secondary nav', () => {

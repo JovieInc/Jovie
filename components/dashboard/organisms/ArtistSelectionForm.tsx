@@ -185,10 +185,10 @@ export function ArtistSelectionForm() {
           <div className='w-full max-w-md'>
             {/* Header */}
             <div className='text-center mb-8'>
-              <h1 className='text-3xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors'>
+              <h1 className='text-3xl font-semibold text-primary-token dark:text-primary-token mb-2 transition-colors'>
                 Select Your Artist
               </h1>
-              <p className='text-gray-600 dark:text-white/70 text-lg transition-colors'>
+              <p className='text-secondary-token dark:text-primary-token/70 text-lg transition-colors'>
                 {pendingClaim
                   ? `We found "${pendingClaim.artistName}" in your Spotify. Is this you?`
                   : 'Search for your artist profile on Spotify to get started.'}
@@ -215,7 +215,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='bg-white/80 dark:bg-white/5 backdrop-blur-sm border border-subtle/50 rounded-xl p-6 shadow-xl transition-colors'>
+            <div className='bg-surface-0/80 dark:bg-surface-0/5 backdrop-blur-sm border border-subtle/50 rounded-xl p-6 shadow-xl transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox
@@ -263,7 +263,7 @@ export function ArtistSelectionForm() {
 
             {/* Footer */}
             <div className='text-center mt-8'>
-              <p className='text-sm text-gray-500 dark:text-white/50 transition-colors'>
+              <p className='text-sm text-secondary-token dark:text-primary-token/50 transition-colors'>
                 You can always update your artist profile later
               </p>
             </div>

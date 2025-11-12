@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { zIndex } from '@/lib/utils/z-index';
 
 export interface PhoneMockupPreviewProps {
   username: string;
@@ -44,9 +45,10 @@ export function PhoneMockupPreview({
       {/* Glass background */}
       <div
         className={cn(
-          'absolute inset-0 -z-10 rounded-[2.5rem]',
-          'bg-gradient-to-br from-gray-50/80 to-gray-100/80 dark:from-gray-900/80 dark:to-gray-800/80',
-          'backdrop-blur-xl border border-white/20',
+          'absolute inset-0 rounded-[2.5rem]',
+          zIndex.base,
+          'bg-gradient-to-br from-surface-0/80 to-surface-1/80',
+          'backdrop-blur-xl border border-white/20 dark:border-black/20',
           'shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]',
           'transition-all duration-300',
           'pointer-events-none'
@@ -67,13 +69,18 @@ export function PhoneMockupPreview({
         )}
       >
         {/* Phone notch */}
-        <div className='absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-gray-900 rounded-b-xl z-10' />
+        <div
+          className={cn(
+            'absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-6 bg-gray-900 rounded-b-xl',
+            zIndex.dropdown
+          )}
+        />
 
         {/* Phone screen */}
         <div
           className={cn(
             'relative w-full h-full rounded-3xl overflow-hidden',
-            'bg-white dark:bg-gray-950',
+            'bg-base',
             'transition-colors duration-300'
           )}
         >
@@ -87,7 +94,7 @@ export function PhoneMockupPreview({
                 className={cn(
                   'w-20 h-20 rounded-full mb-3',
                   'border-4 border-white/20',
-                  'bg-gray-200 dark:bg-gray-700',
+                  'bg-surface-2',
                   'overflow-hidden',
                   'shadow-lg',
                   'transition-all duration-300',
@@ -104,8 +111,8 @@ export function PhoneMockupPreview({
                     onLoad={() => setIsLoaded(true)}
                   />
                 ) : (
-                  <div className='w-full h-full flex items-center justify-center bg-gray-300 dark:bg-gray-600'>
-                    <span className='text-2xl font-bold text-gray-500 dark:text-gray-300'>
+                  <div className='w-full h-full flex items-center justify-center bg-surface-3'>
+                    <span className='text-2xl font-bold text-secondary-token'>
                       {username.charAt(0).toUpperCase()}
                     </span>
                   </div>
@@ -174,7 +181,7 @@ export function PhoneMockupPreview({
                     onHoverEnd={() => setActiveLink(null)}
                     className={cn(
                       'relative block p-4 rounded-xl',
-                      'bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/30',
+                      'bg-gradient-to-r from-surface-0 to-surface-1',
                       'border border-subtle',
                       'shadow-sm hover:shadow-md',
                       'transition-all duration-200',
@@ -187,9 +194,9 @@ export function PhoneMockupPreview({
                         className={cn(
                           'flex-shrink-0 w-10 h-10 rounded-lg',
                           'flex items-center justify-center',
-                          'bg-white dark:bg-gray-700/80',
+                          'bg-surface-1',
                           'shadow-sm',
-                          'text-gray-700 dark:text-gray-200',
+                          'text-primary-token',
                           'transition-all duration-200'
                         )}
                       >
@@ -197,24 +204,23 @@ export function PhoneMockupPreview({
                           className={cn(
                             'w-5 h-5',
                             getPlatformIcon(link.platform),
-                            link.platform === 'tiktok' &&
-                              'text-black dark:text-white'
+                            link.platform === 'tiktok' && 'text-primary-token'
                           )}
                         />
                       </div>
 
                       <div className='min-w-0 flex-1'>
-                        <h3 className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                        <h3 className='text-sm font-medium text-primary-token truncate'>
                           {link.title || getPlatformName(link.platform)}
                         </h3>
-                        <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                        <p className='text-xs text-secondary-token truncate'>
                           {link.url
                             .replace(/^https?:\/\//, '')
                             .replace(/\/$/, '')}
                         </p>
                       </div>
 
-                      <div className='flex-shrink-0 text-gray-400 dark:text-gray-500'>
+                      <div className='flex-shrink-0 text-secondary-token'>
                         <svg
                           className='w-4 h-4'
                           fill='none'
@@ -245,9 +251,9 @@ export function PhoneMockupPreview({
                 ))
               ) : (
                 <div className='h-full flex flex-col items-center justify-center text-center p-6'>
-                  <div className='w-12 h-12 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-3'>
+                  <div className='w-12 h-12 rounded-full bg-surface-1 flex items-center justify-center mb-3'>
                     <svg
-                      className='w-6 h-6 text-gray-400'
+                      className='w-6 h-6 text-secondary-token'
                       fill='none'
                       viewBox='0 0 24 24'
                       stroke='currentColor'
@@ -260,10 +266,10 @@ export function PhoneMockupPreview({
                       />
                     </svg>
                   </div>
-                  <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-1'>
+                  <h3 className='text-sm font-medium text-primary-token mb-1'>
                     No links yet
                   </h3>
-                  <p className='text-sm text-gray-500 dark:text-gray-400'>
+                  <p className='text-sm text-secondary-token'>
                     Add your first link to see it here
                   </p>
                 </div>

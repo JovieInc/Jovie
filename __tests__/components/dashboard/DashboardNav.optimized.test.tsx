@@ -19,6 +19,20 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
+// Mock Sidebar context
+const mockUseSidebar = vi.fn(() => ({
+  state: 'open',
+  open: true,
+  setOpen: vi.fn(),
+  isMobile: false,
+  openMobile: false,
+  setOpenMobile: vi.fn(),
+  toggleSidebar: vi.fn(),
+}));
+vi.mock('@/components/organisms/Sidebar', () => ({
+  useSidebar: () => mockUseSidebar(),
+}));
+
 // Lightweight tooltip mock
 vi.mock('@/components/atoms/Tooltip', () => ({
   Tooltip: ({

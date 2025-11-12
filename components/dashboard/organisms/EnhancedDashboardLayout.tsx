@@ -153,14 +153,14 @@ export function EnhancedDashboardLayout({
     <div className={cn('flex flex-col md:flex-row gap-6 h-full', className)}>
       {/* Left column - Links management */}
       <div className='flex-1'>
-        <div className='bg-white dark:bg-gray-900 rounded-2xl p-6 shadow-sm border border-subtle'>
+        <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
           {/* Header */}
           <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6'>
             <div>
-              <h1 className='text-2xl font-bold text-gray-900 dark:text-white'>
+              <h1 className='text-2xl font-bold text-primary-token'>
                 Manage Links
               </h1>
-              <p className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
+              <p className='text-sm text-secondary-token mt-1'>
                 Add, edit, and organize your links
               </p>
             </div>
@@ -176,7 +176,7 @@ export function EnhancedDashboardLayout({
             <div className='relative'>
               <Icon
                 name='Search'
-                className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400'
+                className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary-token'
               />
               <Input
                 type='text'
@@ -189,7 +189,7 @@ export function EnhancedDashboardLayout({
                 <button
                   type='button'
                   onClick={clearSearch}
-                  className='absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-500 dark:hover:text-gray-300'
+                  className='absolute right-3 top-1/2 -translate-y-1/2 text-secondary-token hover:text-primary-token'
                 >
                   <Icon name='X' className='w-4 h-4' />
                 </button>
@@ -197,14 +197,14 @@ export function EnhancedDashboardLayout({
             </div>
 
             <div className='flex items-center justify-between mt-3'>
-              <div className='text-sm text-gray-500 dark:text-gray-400'>
+              <div className='text-sm text-secondary-token'>
                 {filteredLinks.length}{' '}
                 {filteredLinks.length === 1 ? 'link' : 'links'} found
               </div>
 
               <button
                 type='button'
-                className='inline-flex items-center text-sm text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                className='inline-flex items-center text-sm text-secondary-token hover:text-primary-token'
               >
                 <Icon name='ArrowUpDown' className='w-3.5 h-3.5 mr-1.5' />
                 <span>Sort</span>
@@ -242,13 +242,16 @@ export function EnhancedDashboardLayout({
 
             {filteredLinks.length === 0 && (
               <div className='text-center py-12'>
-                <div className='mx-auto w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4'>
-                  <Icon name='Search' className='w-6 h-6 text-gray-400' />
+                <div className='mx-auto w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center mb-4'>
+                  <Icon
+                    name='Search'
+                    className='w-6 h-6 text-secondary-token'
+                  />
                 </div>
-                <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-1'>
+                <h3 className='text-lg font-medium text-primary-token mb-1'>
                   No links found
                 </h3>
-                <p className='text-gray-500 dark:text-gray-400 mb-4'>
+                <p className='text-secondary-token mb-4'>
                   {searchQuery
                     ? "Try adjusting your search or filter to find what you're looking for."
                     : 'Get started by adding your first link.'}
@@ -265,7 +268,7 @@ export function EnhancedDashboardLayout({
 
       {/* Preview is handled by the parent component */}
       <div className='mt-4 text-center'>
-        <p className='text-sm text-gray-500 dark:text-gray-400'>
+        <p className='text-sm text-secondary-token'>
           Changes are saved automatically
         </p>
       </div>

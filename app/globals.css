@@ -242,6 +242,14 @@ body {
   }
 }
 
+@utility text-success {
+  color: #16a34a; /* green-600 */
+
+  &:is(.dark *) {
+    color: #4ade80; /* green-400 */
+  }
+}
+
 /* Interactive state utilities */
 @utility interactive-hover {
   background-color: rgb(var(--interactive-hover));

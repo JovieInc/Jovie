@@ -201,20 +201,20 @@ export default function AvatarUploader({
                 className='rounded-full object-cover border border-subtle'
               />
             ) : (
-              <div className='w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-800 border border-subtle' />
+              <div className='w-20 h-20 rounded-full bg-surface-2 dark:bg-surface-1 border border-subtle' />
             )}
             {isLoading && (
-              <div className='absolute inset-0 flex items-center justify-center rounded-full bg-black/50'>
+              <div className='absolute inset-0 flex items-center justify-center rounded-full bg-base/50'>
                 <div className='w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin' />
               </div>
             )}
           </div>
 
           <div className='flex-1'>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+            <h3 className='text-sm font-medium text-primary-token dark:text-gray-100'>
               Profile Photo
             </h3>
-            <p className='text-xs text-gray-500 dark:text-gray-400'>
+            <p className='text-xs text-secondary-token dark:text-secondary-token'>
               JPG, PNG, or WebP. Max 4MB.
             </p>
             {getStatusMessage() && (
@@ -278,13 +278,13 @@ export default function AvatarUploader({
               </p>
             ) : (
               <div>
-                <p className='text-sm text-gray-600 dark:text-gray-300'>
+                <p className='text-sm text-secondary-token dark:text-gray-300'>
                   <span className='font-medium text-blue-600 dark:text-blue-400'>
                     Click to upload
                   </span>{' '}
                   or drag and drop
                 </p>
-                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                <p className='text-xs text-secondary-token dark:text-secondary-token'>
                   Your image will be automatically resized
                 </p>
               </div>

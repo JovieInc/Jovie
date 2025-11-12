@@ -18,7 +18,7 @@ export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
       <div className='flex items-center justify-between'>
         <div>
           <h3 className='font-medium'>Your Profile Link</h3>
-          <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
+          <p className='mt-1 text-sm text-secondary-token dark:text-secondary-token'>
             {profileUrl}
           </p>
         </div>

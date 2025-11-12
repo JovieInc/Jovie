@@ -5,6 +5,8 @@ import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import { cn } from '@/lib/utils';
+import { zIndex } from '@/lib/utils/z-index';
 import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
 
 interface DashboardPreviewProps {
@@ -82,36 +84,46 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       <div className='flex justify-center'>
         <div className='relative w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
           {/* Top notch */}
-          <div className='absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
+          <div
+            className={cn(
+              'absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg left-1/2 transform -translate-x-1/2 top-2',
+              zIndex.dropdown
+            )}
+          ></div>
 
           <div
-            className='bg-white dark:bg-gray-900 rounded-[1.6rem] overflow-hidden relative'
+            className='bg-surface-0 dark:bg-surface-0 rounded-[1.6rem] overflow-hidden relative'
             style={{ height: '500px' }}
           >
             {/* Status Bar Mockup */}
-            <div className='bg-gray-100 dark:bg-gray-800 h-7 flex items-center justify-between px-4 relative z-20'>
-              <span className='text-[10px] font-semibold text-gray-900 dark:text-gray-100'>
+            <div
+              className={cn(
+                'bg-surface-1 dark:bg-surface-1 h-7 flex items-center justify-between px-4 relative',
+                zIndex.sticky
+              )}
+            >
+              <span className='text-[10px] font-semibold text-primary-token dark:text-gray-100'>
                 9:41
               </span>
               <div className='flex items-center gap-1'>
                 {/* Signal bars */}
                 <div className='flex items-end gap-0.5'>
-                  <div className='w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded'></div>
-                  <div className='w-0.5 h-1.5 bg-gray-900 dark:bg-gray-100 rounded'></div>
-                  <div className='w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded'></div>
-                  <div className='w-0.5 h-2.5 bg-gray-900 dark:bg-gray-100 rounded'></div>
+                  <div className='w-0.5 h-1 bg-surface-0 dark:bg-surface-1 rounded'></div>
+                  <div className='w-0.5 h-1.5 bg-surface-0 dark:bg-surface-1 rounded'></div>
+                  <div className='w-0.5 h-2 bg-surface-0 dark:bg-surface-1 rounded'></div>
+                  <div className='w-0.5 h-2.5 bg-surface-0 dark:bg-surface-1 rounded'></div>
                 </div>
                 {/* Battery */}
                 <div className='w-5 h-3 border border-gray-900 dark:border-gray-100 rounded-sm relative'>
                   <div className='w-full h-full bg-green-500 rounded-sm scale-x-80 origin-left'></div>
-                  <div className='absolute -right-0.5 top-0.5 w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded-r-sm'></div>
+                  <div className='absolute -right-0.5 top-0.5 w-0.5 h-2 bg-surface-0 dark:bg-surface-1 rounded-r-sm'></div>
                 </div>
               </div>
             </div>
 
             {/* Profile Preview - Better scaling and positioning */}
             <div
-              className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'
+              className='flex-1 bg-surface-0 dark:bg-surface-0 relative overflow-hidden'
               style={{ height: 'calc(100% - 28px)' }}
             >
               <div className='w-full h-full overflow-y-auto'>
