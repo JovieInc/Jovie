@@ -44,7 +44,7 @@ jobs:
             exit 1
           fi
 
-          if grep -q "--tw-" "$css_file"; then
+          if grep -q -- "--tw-" "$css_file"; then
             echo "✅ Tailwind tokens detected in $css_file"
           else
             echo "❌ Tailwind tokens not detected. Check Tailwind v4 setup (@import 'tailwindcss' and @source)." >&2
