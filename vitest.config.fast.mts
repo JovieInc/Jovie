@@ -47,8 +47,9 @@ export default defineConfig({
       enabled: false,
     },
 
-    // Optimize test isolation
-    isolate: false, // Disable isolation for speed (use with caution)
+    // Enable isolation to prevent mock conflicts between tests
+    // Component tests need isolation for proper mock scoping
+    isolate: true,
 
     // Reduce reporter overhead
     reporters: [
@@ -78,6 +79,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      '@jovie/ui': path.resolve(__dirname, './packages/ui'),
     },
   },
 

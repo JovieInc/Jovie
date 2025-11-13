@@ -5,7 +5,7 @@ import React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
-import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator';
+// import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
@@ -117,7 +117,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   // Run environment validation at startup (server-side only)
-  await runStartupEnvironmentValidation();
+  // PERFORMANCE: Commented out to improve TTFB - move to build-time validation
+  // await runStartupEnvironmentValidation();
 
   // Fetch feature flags server-side
   // Feature flags removed - pre-launch

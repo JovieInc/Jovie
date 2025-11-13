@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+
+// Bundle analyzer for performance optimization
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig = {
   turbopack: {},
   typescript: {
@@ -184,4 +190,5 @@ const nextConfig = {
 // Enable Vercel Toolbar in Next.js (local/dev)
 const withVercelToolbar = require('@vercel/toolbar/plugins/next')();
 
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
