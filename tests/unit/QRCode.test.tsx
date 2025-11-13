@@ -1,5 +1,5 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { vi } from 'vitest';
 import { QRCode } from '@/components/atoms/QRCode';
 
@@ -7,8 +7,8 @@ import { QRCode } from '@/components/atoms/QRCode';
 vi.mock('next/image', () => ({
   __esModule: true,
   default: ({ src, alt, width, height, onError, ...props }: any) => {
-    // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={alt}
@@ -67,7 +67,7 @@ describe('QRCode', () => {
   });
 
   it('shows error state when image fails to load', () => {
-    render(<QRCode data={mockData} label="Test QR" />);
+    render(<QRCode data={mockData} label='Test QR' />);
 
     const img = screen.getByRole('img');
 
@@ -75,7 +75,9 @@ describe('QRCode', () => {
     img.dispatchEvent(new Event('error'));
 
     // Should show error fallback
-    const errorElement = screen.getByRole('img', { name: 'Test QR unavailable' });
+    const errorElement = screen.getByRole('img', {
+      name: 'Test QR unavailable',
+    });
     expect(errorElement).toBeInTheDocument();
     expect(errorElement).toHaveTextContent('QR code unavailable');
   });
