@@ -257,10 +257,8 @@ export function SocialsForm({ artist }: SocialsFormProps) {
       )}
 
       {error && (
-        <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
-          <p className='text-sm text-green-600 dark:text-green-400'>
-            Social links saved successfully!
-          </p>
+        <div className='bg-red-500/10 border border-red-500/20 rounded-lg p-3'>
+          <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
         </div>
       )}
 
