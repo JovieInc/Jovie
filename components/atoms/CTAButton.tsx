@@ -48,6 +48,16 @@ export function CTAButton({
     mappedSize = undefined;
   }
 
+  // Determine data-state based on button state priority
+  let dataState: string | undefined;
+  if (props.disabled) {
+    dataState = 'disabled';
+  } else if (isLoading) {
+    dataState = 'loading';
+  } else if (isSuccess) {
+    dataState = 'success';
+  }
+
   if (href) {
     return (
       <Button
@@ -55,6 +65,7 @@ export function CTAButton({
         loading={isLoading}
         size={mappedSize}
         className={cn('gap-2', className)}
+        data-state={dataState}
         {...props}
       >
         <Link
@@ -73,6 +84,7 @@ export function CTAButton({
       loading={isLoading}
       size={mappedSize}
       className={cn('gap-2', className)}
+      data-state={dataState}
       {...props}
     >
       {content}
