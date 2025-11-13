@@ -114,27 +114,25 @@ export async function captureError(
     console.error(consoleMessage, consoleData);
   }
 
-  // Send to PostHog for monitoring (don't await to avoid blocking)
-  try {
-    const eventName =
-      severity === 'critical' ? '$exception_critical' : '$exception';
+  // Send to PostHog for monitoring (fire-and-forget to avoid blocking)
+  const eventName =
+    severity === 'critical' ? '$exception_critical' : '$exception';
 
-    await trackEvent(
-      eventName,
-      {
-        error_message: message,
-        error_type: errorData.type,
-        error_stack: errorData.stack,
-        error_severity: severity,
-        error_raw_message: errorData.message,
-        ...metadata.context,
-      },
-      context?.userId as string | undefined
-    );
-  } catch (trackingError) {
+  trackEvent(
+    eventName,
+    {
+      error_message: message,
+      error_type: errorData.type,
+      error_stack: errorData.stack,
+      error_severity: severity,
+      error_raw_message: errorData.message,
+      ...metadata.context,
+    },
+    context?.userId as string | undefined
+  ).catch(trackingError => {
     // Never let error tracking break the app
     console.warn('[Error Tracking] Failed to send to PostHog:', trackingError);
-  }
+  });
 }
 
 /**
