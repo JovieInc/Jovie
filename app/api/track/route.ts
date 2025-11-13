@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { clickEvents, creatorProfiles, socialLinks } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
 import { detectPlatformFromUA } from '@/lib/utils';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { LinkType } from '@/types/db';
 
 // API routes should be dynamic
@@ -96,10 +97,7 @@ export async function POST(request: NextRequest) {
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
-    const ipAddress =
-      request.headers.get('x-forwarded-for') ||
-      request.headers.get('x-real-ip') ||
-      null;
+    const ipAddress = extractClientIP(request.headers);
 
     // Find the creator profile
     const [profile] = await db
