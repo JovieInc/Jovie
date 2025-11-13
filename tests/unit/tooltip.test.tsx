@@ -100,7 +100,11 @@ describe('Tooltip', () => {
       await user.hover(triggerElement);
 
       await waitFor(() => {
-        expect(screen.getByText('Test tooltip content')).toBeInTheDocument();
+        // Radix UI renders content twice: once visible, once hidden for a11y
+        // Use getAllByText and check the first (visible) one
+        const tooltips = screen.getAllByText('Test tooltip content');
+        expect(tooltips.length).toBeGreaterThan(0);
+        expect(tooltips[0]).toBeVisible();
       });
     });
 
@@ -113,16 +117,34 @@ describe('Tooltip', () => {
       // Show tooltip
       await user.hover(triggerElement);
       await waitFor(() => {
-        expect(screen.getByText('Test tooltip content')).toBeInTheDocument();
+        const tooltips = screen.getAllByText('Test tooltip content');
+        expect(tooltips[0]).toBeVisible();
       });
 
       // Hide tooltip
       await user.unhover(triggerElement);
-      await waitFor(() => {
-        expect(
-          screen.queryByText('Test tooltip content')
-        ).not.toBeInTheDocument();
-      });
+      await waitFor(
+        () => {
+          // After hiding, check that tooltip is no longer visible
+          // Radix UI removes it from DOM or sets display:none
+          const tooltips = screen.queryAllByText('Test tooltip content');
+          const contentDiv = tooltips[0]?.closest('[data-state]');
+
+          if (!contentDiv) {
+            // Tooltip removed from DOM
+            return true;
+          }
+
+          // Check if it's hidden via display:none or visibility
+          const style = window.getComputedStyle(contentDiv);
+          expect(
+            style.display === 'none' ||
+              style.visibility === 'hidden' ||
+              !document.body.contains(contentDiv)
+          ).toBe(true);
+        },
+        { timeout: 2000 }
+      );
     });
   });
 
@@ -134,7 +156,8 @@ describe('Tooltip', () => {
       await user.tab(); // Focus the trigger
 
       await waitFor(() => {
-        expect(screen.getByText('Test tooltip content')).toBeInTheDocument();
+        const tooltips = screen.getAllByText('Test tooltip content');
+        expect(tooltips[0]).toBeVisible();
       });
     });
 
@@ -155,13 +178,19 @@ describe('Tooltip', () => {
       // Focus first button to show tooltip
       await user.tab();
       await waitFor(() => {
-        expect(screen.getByText('First tooltip')).toBeInTheDocument();
+        const tooltips = screen.getAllByText('First tooltip');
+        expect(tooltips[0]).toBeVisible();
       });
 
       // Focus second button to hide tooltip
       await user.tab();
       await waitFor(() => {
-        expect(screen.queryByText('First tooltip')).not.toBeInTheDocument();
+        const tooltips = screen.queryAllByText('First tooltip');
+        const visibleTooltip = tooltips.find(el => el.closest('[data-state]'));
+        const state = visibleTooltip
+          ?.closest('[data-state]')
+          ?.getAttribute('data-state');
+        expect(state).toBe('closed');
       });
     });
 
@@ -172,15 +201,19 @@ describe('Tooltip', () => {
       // Show tooltip
       await user.tab();
       await waitFor(() => {
-        expect(screen.getByText('Test tooltip content')).toBeInTheDocument();
+        const tooltips = screen.getAllByText('Test tooltip content');
+        expect(tooltips[0]).toBeVisible();
       });
 
       // Hide tooltip with Escape
       await user.keyboard('{Escape}');
       await waitFor(() => {
-        expect(
-          screen.queryByText('Test tooltip content')
-        ).not.toBeInTheDocument();
+        const tooltips = screen.queryAllByText('Test tooltip content');
+        const visibleTooltip = tooltips.find(el => el.closest('[data-state]'));
+        const state = visibleTooltip
+          ?.closest('[data-state]')
+          ?.getAttribute('data-state');
+        expect(state).toBe('closed');
       });
     });
   });
@@ -194,10 +227,9 @@ describe('Tooltip', () => {
       await user.hover(trigger);
 
       await waitFor(() => {
-        // Look for the arrow element (SVG or styled element)
-        const tooltipContent = screen
-          .getByText('Test tooltip content')
-          .closest('[role="tooltip"]');
+        // Get the tooltip content by text (use getAllByText since Radix duplicates for a11y)
+        const tooltips = screen.getAllByText('Test tooltip content');
+        const tooltipContent = tooltips[0].closest('[data-state]');
         expect(tooltipContent).toBeInTheDocument();
 
         // Check that arrow is rendered (Radix adds it as SVG)
@@ -214,9 +246,8 @@ describe('Tooltip', () => {
       await user.hover(trigger);
 
       await waitFor(() => {
-        const tooltipContent = screen
-          .getByText('Test tooltip content')
-          .closest('[role="tooltip"]');
+        const tooltips = screen.getAllByText('Test tooltip content');
+        const tooltipContent = tooltips[0].closest('[data-state]');
         expect(tooltipContent).toBeInTheDocument();
 
         // Arrow should not be rendered
@@ -282,9 +313,8 @@ describe('Tooltip', () => {
       if (wrapper) {
         fireEvent.mouseEnter(wrapper);
         await waitFor(() => {
-          expect(
-            screen.getByText('This action is unavailable')
-          ).toBeInTheDocument();
+          const tooltips = screen.getAllByText('This action is unavailable');
+          expect(tooltips[0]).toBeVisible();
         });
       }
     });
@@ -308,8 +338,11 @@ describe('Tooltip', () => {
       await user.hover(trigger);
 
       await waitFor(() => {
-        const tooltip = screen.getByRole('tooltip');
-        expect(tooltip).toHaveAttribute('data-side', 'top');
+        // Get the visible tooltip content by text, not the hidden role="tooltip" element
+        const tooltipText = screen.getByText('Top tooltip');
+        // The TooltipContent div is the parent that has data-side
+        const tooltipContent = tooltipText.closest('[data-state]');
+        expect(tooltipContent).toHaveAttribute('data-side', 'top');
       });
     });
 
