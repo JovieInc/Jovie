@@ -1,16 +1,21 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import { TooltipProvider } from '@jovie/ui';
+import dynamic from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
 import React, { type ComponentProps, useEffect, useState } from 'react';
-import { Analytics } from '@/components/providers/Analytics';
 import { env } from '@/lib/env';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
-import { ToastProvider } from './ToastProvider';
 
-// import { Toolbar } from '@vercel/toolbar/next';
+// Lazy load non-critical providers to reduce initial bundle size
+const LazyProviders = dynamic(
+  () => import('./LazyProviders').then(mod => ({ default: mod.LazyProviders })),
+  {
+    ssr: false,
+    loading: () => null,
+  }
+);
 
 interface ClientProvidersProps {
   children: React.ReactNode;
@@ -140,13 +145,7 @@ export function ClientProviders({
           disableTransitionOnChange
           storageKey='jovie-theme'
         >
-          <TooltipProvider delayDuration={120}>
-            <ToastProvider>
-              {children}
-              <Analytics />
-              {/* <Toolbar /> */}
-            </ToastProvider>
-          </TooltipProvider>
+          <LazyProviders>{children}</LazyProviders>
         </ThemeProvider>
       </ClerkWrapper>
     </React.StrictMode>

@@ -105,6 +105,16 @@ vi.mock('server-only', () => ({
   default: vi.fn(),
 }));
 
+// Mock @jovie/ui components (including TooltipProvider)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+  return {
+    ...actual,
+    // Provide a pass-through TooltipProvider for tests
+    TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
+
 // Mock console methods to reduce noise
 global.console = {
   ...console,

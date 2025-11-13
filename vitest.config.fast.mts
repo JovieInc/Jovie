@@ -79,6 +79,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      '@jovie/ui': path.resolve(__dirname, './packages/ui'),
     },
   },
 
