@@ -37,29 +37,22 @@ jobs:
       - name: Assert Tailwind CSS emitted
         run: |
           set -e
-          # Find all CSS files under .next/static for debugging
-          echo "🔍 All CSS files found:"
-          find .next/static -type f -name "*.css" || true
+          # Find the largest CSS file (Tailwind CSS will be in the larger file, not the font file)
+          css_file=$(find .next/static -type f -name "*.css" -exec ls -l {} \; | sort -k5 -nr | head -n 1 | awk '{print $NF}' || true)
 
-          # Find a CSS file under .next/static and assert it contains any --tw- token
-          css_file=$(find .next/static -type f -name "*.css" | head -n 1 || true)
           if [ -z "$css_file" ]; then
-            echo "No built CSS found under .next/static. Failing." >&2
+            echo "❌ No built CSS found under .next/static. Failing." >&2
             exit 1
           fi
 
-          echo "📄 Checking file: $css_file"
+          echo "📄 Checking largest CSS file: $css_file"
           echo "📊 File size: $(wc -c < "$css_file") bytes"
-          echo "🔎 First 500 chars:"
-          head -c 500 "$css_file"
-          echo ""
-          echo "🔎 Searching for --tw- tokens..."
 
           if grep -q -- "--tw-" "$css_file"; then
             echo "✅ Tailwind tokens detected in $css_file"
           else
             echo "❌ Tailwind tokens not detected in $css_file" >&2
-            echo "🔍 Sample of CSS content (first 1000 chars):"
+            echo "🔍 First 1000 chars of CSS:"
             head -c 1000 "$css_file"
             exit 1
           fi
