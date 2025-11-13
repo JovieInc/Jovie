@@ -42,7 +42,7 @@ export function FormField({
         'aria-invalid': error ? 'true' : undefined,
         'aria-describedby': getDescribedByIds(),
         'aria-required': required ? 'true' : undefined,
-      } as React.HTMLAttributes<HTMLElement>);
+      } as Record<string, unknown>);
     }
     return child;
   });
