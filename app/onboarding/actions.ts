@@ -105,6 +105,34 @@ export async function completeOnboarding({
 
     // Step 8: Create user and profile via stored function in a single DB call (RLS-safe on neon-http)
     try {
+      // Defensive check: Verify the stored function exists (helps diagnose deployment issues)
+      const functionCheck = await db.execute(
+        drizzleSql`
+          SELECT EXISTS(
+            SELECT 1 FROM pg_proc
+            WHERE proname = 'onboarding_create_profile'
+          ) AS function_exists
+        `
+      );
+
+      const functionExists = functionCheck.rows[0]?.function_exists;
+
+      if (!functionExists) {
+        console.error(
+          '🔴 CRITICAL: onboarding_create_profile function does not exist!',
+          {
+            environment: process.env.VERCEL_ENV || 'local',
+            databaseUrl: process.env.DATABASE_URL
+              ? 'SET (redacted for security)'
+              : 'MISSING',
+            nodeEnv: process.env.NODE_ENV,
+          }
+        );
+        throw new Error(
+          'Database migration error: onboarding_create_profile function not found. Please contact support.'
+        );
+      }
+
       await db.execute(
         drizzleSql`
           SELECT onboarding_create_profile(
@@ -116,7 +144,16 @@ export async function completeOnboarding({
         `
       );
     } catch (error) {
-      console.error('Error creating user and profile via function:', error);
+      console.error('Error creating user and profile via function:', {
+        error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : 'unknown',
+        userId: userId.substring(0, 8) + '...', // Log partial ID for debugging
+        username: normalizedUsername,
+        environment: process.env.VERCEL_ENV || 'local',
+        nodeEnv: process.env.NODE_ENV,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       const mappedError = mapDatabaseError(error);
       throw new Error(mappedError.message);
     }

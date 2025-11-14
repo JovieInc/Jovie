@@ -7,16 +7,24 @@ vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/dashboard/overview'),
 }));
 
-// Mock Tooltip component
-vi.mock('@/components/atoms/Tooltip', () => ({
-  Tooltip: ({
-    children,
-    content,
-  }: {
-    children: React.ReactNode;
-    content: string;
-  }) => <div title={content}>{children}</div>,
-}));
+// Mock @jovie/ui Tooltip components
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    TooltipContent: ({ children }: { children: React.ReactNode }) => (
+      <div role='tooltip'>{children}</div>
+    ),
+    TooltipProvider: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
 
 describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
@@ -31,7 +39,7 @@ describe('DashboardNav', () => {
   it('renders secondary navigation items', () => {
     render(<DashboardNav />);
 
-    expect(screen.getByText('Tipping')).toBeInTheDocument();
+    expect(screen.getByText('Earnings')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
@@ -45,9 +53,14 @@ describe('DashboardNav', () => {
   it('renders correctly when collapsed', () => {
     render(<DashboardNav collapsed={true} />);
 
-    // Text should be hidden when collapsed
-    const overviewText = screen.getByText('Overview');
-    expect(overviewText).toHaveClass('opacity-0');
+    // Text should be hidden when collapsed (check the span inside the link, not the tooltip)
+    const overviewTexts = screen.getAllByText('Overview');
+    // The first one should be the hidden link text with opacity-0
+    expect(overviewTexts[0]).toHaveClass('opacity-0');
+
+    // Verify tooltips are rendered (when collapsed, tooltips should be present)
+    const tooltips = screen.getAllByRole('tooltip');
+    expect(tooltips.length).toBeGreaterThan(0);
   });
 
   it('shows different styling for primary vs secondary nav', () => {

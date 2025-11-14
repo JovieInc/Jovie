@@ -19,16 +19,22 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
-// Lightweight tooltip mock
-vi.mock('@/components/atoms/Tooltip', () => ({
-  Tooltip: ({
-    children,
-    content,
-  }: {
-    children: React.ReactNode;
-    content: string;
-  }) => React.createElement('div', { title: content }, children),
-}));
+// Mock @jovie/ui Tooltip components
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    Tooltip: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+    TooltipTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+    TooltipContent: ({ children }: { children: React.ReactNode }) =>
+      React.createElement('div', { role: 'tooltip' }, children),
+    TooltipProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+  };
+});
 
 describe('DashboardNav (Optimized)', () => {
   it('renders navigation items', () => {
@@ -38,7 +44,7 @@ describe('DashboardNav (Optimized)', () => {
     expect(getByText('Overview')).toBeDefined();
     expect(getByText('Links')).toBeDefined();
     expect(getByText('Analytics')).toBeDefined();
-    expect(getByText('Tipping')).toBeDefined();
+    expect(getByText('Earnings')).toBeDefined();
   });
 
   it('applies active state correctly', () => {
@@ -50,13 +56,17 @@ describe('DashboardNav (Optimized)', () => {
   });
 
   it('handles collapsed state', () => {
-    const { getByText } = fastRender(
+    const { container } = fastRender(
       React.createElement(DashboardNav, { collapsed: true })
     );
 
     // Check only the essential collapsed behavior
-    const overviewText = getByText('Overview');
-    expect(overviewText.classList.contains('opacity-0')).toBe(true);
+    // Find the link text (not the tooltip) by checking for opacity-0 class
+    const overviewLink = container.querySelector(
+      '[href="/dashboard/overview"] span.opacity-0'
+    );
+    expect(overviewLink).toBeDefined();
+    expect(overviewLink?.classList.contains('opacity-0')).toBe(true);
   });
 
   it('differentiates primary and secondary nav styling', () => {

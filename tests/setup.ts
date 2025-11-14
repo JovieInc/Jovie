@@ -587,3 +587,49 @@ MockedComponents.Description.displayName = 'MockedDescription';
 MockedComponents.Input.displayName = 'MockedInput';
 
 vi.mock('@headlessui/react', () => MockedComponents);
+
+// Mock @jovie/ui Tooltip components (Radix UI)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  // Create a mock TooltipProvider that passes through children
+  const MockTooltipProvider = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(React.Fragment, {}, children);
+  };
+
+  // Create mock Tooltip that doesn't require provider
+  const MockTooltip = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(
+      'div',
+      { 'data-testid': 'tooltip-wrapper' },
+      children
+    );
+  };
+
+  const MockTooltipTrigger = React.forwardRef<
+    HTMLElement,
+    { asChild?: boolean; children: React.ReactNode }
+  >(({ children, asChild }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement, { ref });
+    }
+    return React.createElement('div', { ref }, children);
+  });
+  MockTooltipTrigger.displayName = 'MockTooltipTrigger';
+
+  const MockTooltipContent = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(
+      'div',
+      { 'data-testid': 'tooltip-content', role: 'tooltip' },
+      children
+    );
+  };
+
+  return {
+    ...actual,
+    TooltipProvider: MockTooltipProvider,
+    Tooltip: MockTooltip,
+    TooltipTrigger: MockTooltipTrigger,
+    TooltipContent: MockTooltipContent,
+  };
+});
