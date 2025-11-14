@@ -37,12 +37,20 @@ export function FormField({
   // Clone the child element to add accessibility attributes
   const childrenWithProps = React.Children.map(children, child => {
     if (isValidElement(child)) {
-      return cloneElement(child, {
+      // Explicitly type ARIA attributes for better type safety
+      const ariaProps: {
+        id: string;
+        'aria-invalid'?: 'true';
+        'aria-describedby'?: string;
+        'aria-required'?: 'true';
+      } = {
         id,
-        'aria-invalid': error ? 'true' : undefined,
-        'aria-describedby': getDescribedByIds(),
-        'aria-required': required ? 'true' : undefined,
-      } as Record<string, unknown>);
+        ...(error && { 'aria-invalid': 'true' as const }),
+        ...(getDescribedByIds() && { 'aria-describedby': getDescribedByIds() }),
+        ...(required && { 'aria-required': 'true' as const }),
+      };
+
+      return cloneElement(child, ariaProps);
     }
     return child;
   });
