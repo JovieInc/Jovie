@@ -11,7 +11,7 @@ describe('NavLink', () => {
     const link = screen.getByRole('link', { name: 'Test Link' });
     expect(link).toHaveAttribute('href', '/test');
     expect(link).toHaveClass('text-sm');
-    expect(link).toHaveClass('text-secondary-token');
+    expect(link).toHaveClass('text-gray-600');
   });
 
   it('renders with primary variant', () => {
