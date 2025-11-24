@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { PhoneMockupPreview } from '@/components/dashboard/molecules/PhoneMockupPreview';
 import { debounce } from '@/lib/utils';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -347,7 +347,7 @@ export function EnhancedDashboardLinks({
   );
 
   // Get username and avatar for preview
-  const username = artist?.name || 'username';
+  const username = artist?.handle || artist?.name || 'username';
   const avatarUrl = artist?.image_url || null;
 
   // Convert links to the format expected by EnhancedDashboardLayout
@@ -423,12 +423,11 @@ export function EnhancedDashboardLinks({
                   : '—'}
               </div>
             </div>
-            <div className='h-[600px] w-full overflow-hidden rounded-xl border border-subtle'>
-              <ProfilePreview
+            <div className='h-[600px] w-full flex items-center justify-center'>
+              <PhoneMockupPreview
                 username={username}
                 avatarUrl={avatarUrl || null}
                 links={dashboardLinks}
-                className='h-full w-full'
               />
             </div>
           </div>
