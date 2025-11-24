@@ -8,7 +8,7 @@ export default async function LinksPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/dashboard/links');
+    redirect('/signin?redirect_url=/dashboard/links');
   }
 
   try {
@@ -28,7 +28,10 @@ export default async function LinksPage() {
 
     // Pass server-fetched data to enhanced client component
     return (
-      <EnhancedDashboardLinks initialData={dashboardData} initialLinks={initialLinks} />
+      <EnhancedDashboardLinks
+        initialData={dashboardData}
+        initialLinks={initialLinks}
+      />
     );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)

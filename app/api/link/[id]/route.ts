@@ -20,6 +20,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { db, signedLinkAccess } from '@/lib/db';
 import { captureError, logFallback } from '@/lib/error-tracking';
 import {
   getWrappedLink,
@@ -116,25 +117,25 @@ export async function POST(
     const signedToken = generateSignedToken();
     const expiresAt = new Date(Date.now() + 60 * 1000); // 60 seconds TTL
 
-    // TODO: Create signed_link_access table in Drizzle schema and store signed access record
-    // Schema should include:
-    // - id (uuid primary key)
-    // - wrapped_link_id (foreign key to wrapped_links)
-    // - signed_token (text, indexed)
-    // - ip_address (text)
-    // - user_agent (text)
-    // - expires_at (timestamp)
-    // - accessed_at (timestamp, nullable - set when token is used)
-    // - created_at (timestamp, default now())
-    //
-    // This table enables:
-    // - Audit trail for sensitive link access
-    // - Token reuse prevention (check accessed_at)
-    // - Abuse pattern detection (IP + frequency analysis)
-    // - Compliance with data access logging requirements
-    //
-    // For now, log the signed access attempt using error tracking for visibility
-    await logFallback('Signed link access (no database table yet)', {
+    // Persist signed link access record for audit trail and abuse detection
+    try {
+      await db.insert(signedLinkAccess).values({
+        linkId: wrappedLink.id,
+        signedToken,
+        ipAddress: ip,
+        userAgent: botResult.userAgent,
+        expiresAt,
+      });
+    } catch (dbError) {
+      // Log but do not block the request on persistence errors
+      await captureError('Failed to persist signed link access', dbError, {
+        link_id: wrappedLink.id,
+        route: '/api/link/[id]',
+      });
+    }
+
+    // Log a summarized access record for quick visibility
+    await logFallback('Signed link access recorded', {
       link_id: wrappedLink.id,
       signed_token: signedToken.substring(0, 10) + '...', // Only log prefix for security
       expires_at: expiresAt.toISOString(),

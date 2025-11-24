@@ -5,7 +5,7 @@ import {
   type DetectedLink,
   detectPlatform,
 } from '@/lib/utils/platform-detection';
-import { SortableLinkItem } from './SortableLinkItem';
+import { SortableLinkItem } from '../molecules/SortableLinkItem';
 
 interface LinkItem extends DetectedLink {
   id: string;
@@ -25,7 +25,7 @@ const defaultLink: LinkItem = {
 };
 
 const meta: Meta<typeof SortableLinkItem> = {
-  title: 'Dashboard/Atoms/SortableLinkItem',
+  title: 'Dashboard/Molecules/SortableLinkItem',
   component: SortableLinkItem,
   parameters: {
     layout: 'centered',

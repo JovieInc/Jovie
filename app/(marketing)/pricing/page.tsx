@@ -15,6 +15,7 @@ export default function PricingPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isYearly, setIsYearly] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const freeFeatures = [
     { title: 'Blazing-fast profiles, SEO-optimized' },
@@ -46,9 +47,18 @@ export default function PricingPage() {
     }
 
     setIsLoading(true);
+    setError(null);
     try {
       // Get available pricing options from server
       const pricingResponse = await fetch('/api/stripe/pricing-options');
+      if (!pricingResponse.ok) {
+        console.error(
+          'Failed to fetch pricing options',
+          pricingResponse.status
+        );
+        setError('Unable to load pricing options. Please try again.');
+        return;
+      }
       const pricingData = await pricingResponse.json();
 
       // Use the appropriate price based on billing interval
@@ -61,6 +71,9 @@ export default function PricingPage() {
 
       if (!priceId) {
         console.error('No pricing options available');
+        setError(
+          'No pricing options are currently available. Please try again later.'
+        );
         return;
       }
 
@@ -75,15 +88,26 @@ export default function PricingPage() {
         }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Checkout creation failed', response.status, errorData);
+        setError('Unable to start checkout. Please try again.');
+        return;
+      }
+
       const data = await response.json();
 
       if (data.url) {
         window.location.href = data.url;
       } else {
         console.error('No checkout URL returned');
+        setError('Checkout could not be started. Please try again.');
       }
     } catch (error) {
       console.error('Error creating checkout session:', error);
+      setError(
+        'Something went wrong while starting checkout. Please try again.'
+      );
     } finally {
       setIsLoading(false);
     }
@@ -219,6 +243,11 @@ export default function PricingPage() {
                         ? 'Remove branding →'
                         : 'Upgrade →'}
                   </motion.button>
+                  {error && (
+                    <p className='mt-3 text-sm text-red-600 dark:text-red-400'>
+                      {error}
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

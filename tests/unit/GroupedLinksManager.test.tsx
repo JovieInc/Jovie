@@ -43,7 +43,7 @@ const igSocial = (overrides: Partial<DetectedLink> = {}): DetectedLink => ({
 // Dynamic mocked payload for UniversalLinkInput per test
 let nextAddPayload: DetectedLink | null = null;
 
-vi.mock('@/components/dashboard/atoms/UniversalLinkInput', async () => {
+vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
   return {
     UniversalLinkInput: ({ onAdd }: { onAdd: (l: DetectedLink) => void }) => (
       <button onClick={() => nextAddPayload && onAdd(nextAddPayload)}>

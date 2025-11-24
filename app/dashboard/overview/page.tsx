@@ -8,7 +8,7 @@ export default async function OverviewPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/dashboard/overview');
+    redirect('/signin?redirect_url=/dashboard/overview');
   }
 
   try {

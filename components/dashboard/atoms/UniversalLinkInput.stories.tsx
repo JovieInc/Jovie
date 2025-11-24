@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { UniversalLinkInput } from './UniversalLinkInput';
+import { UniversalLinkInput } from '../molecules/UniversalLinkInput';
 
 const meta: Meta<typeof UniversalLinkInput> = {
-  title: 'Dashboard/Atoms/UniversalLinkInput',
+  title: 'Dashboard/Molecules/UniversalLinkInput',
   component: UniversalLinkInput,
   parameters: {
     layout: 'centered',

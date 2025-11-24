@@ -9,7 +9,7 @@ export default async function AccountLayout({
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    redirect('/sign-in');
+    redirect('/signin');
   }
 
   return (

@@ -29,12 +29,12 @@ async function main() {
   const db = drizzle(sql);
 
   try {
-    // Read the onboarding function migration
+    // Read the onboarding function migration (kept in standard Drizzle folder)
     const migrationPath = join(
       process.cwd(),
       'drizzle',
       'migrations',
-      '20250827195510_onboarding_function.sql'
+      '0001_onboarding_function.sql'
     );
     const migrationSQL = readFileSync(migrationPath, 'utf8');
 

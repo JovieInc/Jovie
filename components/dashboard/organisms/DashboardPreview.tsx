@@ -4,6 +4,7 @@ import { useSession } from '@clerk/nextjs';
 import Link from 'next/link';
 import React, { useEffect, useMemo, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { PhonePreviewFrame } from '@/components/dashboard/molecules/PhonePreviewFrame';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
 
@@ -80,17 +81,11 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
 
       {/* Mobile Frame Preview */}
       <div className='flex justify-center'>
-        <div className='relative w-[280px] bg-gray-900 dark:bg-gray-800 rounded-[2rem] p-2 shadow-2xl ring-1 ring-black/10 dark:ring-white/10 transform transition-transform hover:scale-[1.02] duration-300'>
-          {/* Top notch */}
-          <div className='absolute w-20 h-3 bg-gray-900 dark:bg-gray-800 rounded-b-lg z-10 left-1/2 transform -translate-x-1/2 top-2'></div>
-
-          <div
-            className='bg-white dark:bg-gray-900 rounded-[1.6rem] overflow-hidden relative'
-            style={{ height: '500px' }}
-          >
+        <PhonePreviewFrame>
+          <div className='relative w-full h-full rounded-3xl overflow-hidden bg-surface-1 flex flex-col'>
             {/* Status Bar Mockup */}
-            <div className='bg-gray-100 dark:bg-gray-800 h-7 flex items-center justify-between px-4 relative z-20'>
-              <span className='text-[10px] font-semibold text-gray-900 dark:text-gray-100'>
+            <div className='bg-surface-2 h-7 flex items-center justify-between px-4 relative z-20'>
+              <span className='text-[10px] font-semibold text-primary-token'>
                 9:41
               </span>
               <div className='flex items-center gap-1'>
@@ -110,10 +105,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
             </div>
 
             {/* Profile Preview - Better scaling and positioning */}
-            <div
-              className='flex-1 bg-white dark:bg-gray-900 relative overflow-hidden'
-              style={{ height: 'calc(100% - 28px)' }}
-            >
+            <div className='flex-1 bg-surface-1 relative overflow-hidden'>
               <div className='w-full h-full overflow-y-auto'>
                 <StaticArtistPage
                   mode='default'
@@ -126,7 +118,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </PhonePreviewFrame>
       </div>
 
       {/* Profile URL and Actions */}

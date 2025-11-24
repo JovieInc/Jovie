@@ -42,6 +42,7 @@ const EnvSchema = z.object({
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_TIP_WEBHOOK_SECRET: z.string().optional(),
 
   // Stripe price IDs for introductory pricing
   STRIPE_PRICE_INTRO_MONTHLY: z.string().optional(),
@@ -72,6 +73,7 @@ const rawEnv = {
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_TIP_WEBHOOK_SECRET: process.env.STRIPE_TIP_WEBHOOK_SECRET,
   STRIPE_PRICE_INTRO_MONTHLY: process.env.STRIPE_PRICE_INTRO_MONTHLY,
   STRIPE_PRICE_INTRO_YEARLY: process.env.STRIPE_PRICE_INTRO_YEARLY,
   STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY,
@@ -137,6 +139,9 @@ export const env = {
   STRIPE_WEBHOOK_SECRET: parsed.success
     ? parsed.data.STRIPE_WEBHOOK_SECRET
     : process.env.STRIPE_WEBHOOK_SECRET,
+  STRIPE_TIP_WEBHOOK_SECRET: parsed.success
+    ? parsed.data.STRIPE_TIP_WEBHOOK_SECRET
+    : process.env.STRIPE_TIP_WEBHOOK_SECRET,
   STRIPE_PRICE_INTRO_MONTHLY: parsed.success
     ? parsed.data.STRIPE_PRICE_INTRO_MONTHLY
     : process.env.STRIPE_PRICE_INTRO_MONTHLY,

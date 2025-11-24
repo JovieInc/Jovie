@@ -33,7 +33,7 @@ async function main() {
       DO $$ 
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'creator_type') THEN
-          CREATE TYPE creator_type AS ENUM ('artist', 'band', 'producer', 'label');
+          CREATE TYPE creator_type AS ENUM ('artist', 'podcaster', 'influencer', 'creator');
         END IF;
       END $$;
     `);

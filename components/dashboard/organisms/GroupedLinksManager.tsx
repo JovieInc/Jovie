@@ -12,7 +12,7 @@ import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
-import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
+import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
 import {

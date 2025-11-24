@@ -7,7 +7,7 @@ export default async function OnboardingPage() {
   const { userId } = await auth();
   if (!userId) {
     // Require auth for onboarding; preserve destination
-    redirect('/sign-in?redirect_url=/onboarding');
+    redirect('/signin?redirect_url=/onboarding');
   }
 
   return (
