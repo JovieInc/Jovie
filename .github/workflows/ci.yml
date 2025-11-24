@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache TS build info
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache ESLint cache
@@ -80,7 +80,7 @@ jobs:
       db_url: ${{ steps.finalize-urls.outputs.db_url }}
       db_url_pooled: ${{ steps.finalize-urls.outputs.db_url_pooled }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - name: Determine sanitized branch name
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Run Migration Guard
@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -350,7 +350,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -392,7 +392,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
       - uses: ./.github/actions/setup-node-pnpm
@@ -417,7 +417,7 @@ jobs:
       # Increase Node.js memory limit for tests
       NODE_OPTIONS: '--max_old_space_size=4096'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -487,7 +487,7 @@ jobs:
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with: { node-version: 20 }
       - name: Install Vercel CLI
@@ -550,7 +550,7 @@ jobs:
       name: Preview
       url: https://preview.jov.ie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with: { node-version: 20 }
       - name: Install Vercel CLI
@@ -627,7 +627,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 2 }
       - name: Create/Update PR preview → production (manual review required)
         env:
@@ -776,7 +776,7 @@ jobs:
       name: Production
       url: https://jov.ie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 20

@@ -17,7 +17,7 @@ jobs:
     outputs:
       cache-key: ${{ steps.setup.outputs.cache-key }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Get cache key
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache node_modules
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache node_modules
