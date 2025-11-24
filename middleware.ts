@@ -84,11 +84,15 @@ export default clerkMiddleware(async (auth, req) => {
 
     let res: NextResponse;
 
-    // Handle auth route redirects (normalize to non-hyphenated versions)
+    // Handle auth route redirects (normalize to non-hyphenated versions, preserving query)
     if (pathname === '/sign-in') {
-      res = NextResponse.redirect(new URL('/signin', req.url));
+      const url = req.nextUrl.clone();
+      url.pathname = '/signin';
+      res = NextResponse.redirect(url);
     } else if (pathname === '/sign-up') {
-      res = NextResponse.redirect(new URL('/signup', req.url));
+      const url = req.nextUrl.clone();
+      url.pathname = '/signup';
+      res = NextResponse.redirect(url);
     } else if (userId) {
       // Handle authenticated user redirects
       if (req.nextUrl.pathname === '/') {

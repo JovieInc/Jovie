@@ -170,7 +170,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
 
       if (!isSignedIn) {
         // Send users to sign up; include redirect to onboarding with handle
-        router.push(`/sign-up?redirect_url=${encodeURIComponent(target)}`);
+        router.push(`/signup?redirect_url=${encodeURIComponent(target)}`);
         return;
       }
 

@@ -3,13 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useTransition } from 'react';
 
-import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import {
   type DashboardBreadcrumbItem,
   DashboardTopBar,
 } from '@/components/dashboard/layout/DashboardTopBar';
-import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import type { DashboardData } from './actions';
@@ -94,9 +92,6 @@ export default function DashboardLayoutClient({
 
   return (
     <>
-      <PendingClaimRunner />
-      <PendingClaimHandler />
-
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
         <div className='flex h-screen w-full overflow-hidden'>
           <DashboardSidebar />
