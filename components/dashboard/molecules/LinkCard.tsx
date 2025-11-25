@@ -109,7 +109,7 @@ export function LinkCard({
         <div className='p-4 relative'>
           {/* Loading overlay */}
           {isSaving && (
-            <div className='absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center z-10'>
+            <div className='absolute inset-0 bg-white/80 dark:bg-surface-3/80 rounded-xl flex items-center justify-center z-10'>
               <Icon
                 name='Loader2'
                 className='h-6 w-6 text-primary-500 animate-spin'
@@ -125,8 +125,8 @@ export function LinkCard({
               onPointerDown={handlePointerDown}
               className={cn(
                 'flex-shrink-0 p-1.5 -ml-1.5 rounded-md transition-colors',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                'text-tertiary-token hover:text-secondary-token',
+                'hover:bg-surface-2',
                 'cursor-grab active:cursor-grabbing',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
               )}
@@ -149,9 +149,9 @@ export function LinkCard({
               <div
                 className={cn(
                   'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
-                  'bg-white dark:bg-gray-700/80 shadow-sm',
-                  'border border-gray-100 dark:border-gray-600/50',
-                  'text-gray-700 dark:text-gray-200',
+                  'bg-surface-0 shadow-sm',
+                  'border border-subtle',
+                  'text-primary-token',
                   'group-hover:shadow-md group-hover:scale-105',
                   'transition-all duration-200'
                 )}
@@ -166,10 +166,10 @@ export function LinkCard({
               </div>
 
               <div className='min-w-0'>
-                <h3 className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                <h3 className='text-sm font-medium text-primary-token truncate'>
                   {title || platformName}
                 </h3>
-                <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                <p className='text-xs text-secondary-token truncate'>
                   {displayUrl}
                 </p>
               </div>
@@ -183,8 +183,8 @@ export function LinkCard({
                   onClick={handleEditClick}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                    'text-tertiary-token hover:text-secondary-token',
+                    'hover:bg-surface-2',
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     'group-hover:opacity-100 transition-opacity',
                     isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
@@ -205,8 +205,8 @@ export function LinkCard({
                   onClick={() => onToggleVisibility(id)}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                    'text-tertiary-token hover:text-secondary-token',
+                    'hover:bg-surface-2',
                     'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     isVisible && 'text-primary-600 dark:text-primary-400',
                     'group-hover:opacity-100 transition-opacity',
@@ -232,8 +232,8 @@ export function LinkCard({
               onClick={toggleExpanded}
               className={cn(
                 'flex-shrink-0 p-1.5 -mr-1.5 rounded-md transition-all',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                'text-tertiary-token hover:text-secondary-token',
+                'hover:bg-surface-2',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                 'transition-transform duration-200',
                 isExpanded ? 'rotate-180' : 'rotate-0'
@@ -256,7 +256,7 @@ export function LinkCard({
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className='overflow-hidden'
               >
-                <div className='mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50'>
+                <div className='mt-4 pt-4 border-t border-subtle'>
                   <div className='flex items-center justify-between'>
                     <a
                       href={url}

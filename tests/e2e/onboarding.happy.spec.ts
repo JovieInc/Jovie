@@ -167,9 +167,9 @@ test.describe('Onboarding Happy Path', () => {
       )
       .toBe(true);
 
-    // Step 5: Submit form and wait for redirect to dashboard
+    // Step 5: Submit form and wait for redirect to dashboard overview
     await Promise.all([
-      page.waitForURL('**/dashboard', {
+      page.waitForURL('**/dashboard/overview', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       }),
@@ -199,7 +199,26 @@ test.describe('Onboarding Happy Path', () => {
       timeout: 5_000,
     });
 
-    // Optional: Verify we can access the profile page with the new handle
+    // Verify we can navigate to the Links page from the dashboard nav
+    const linksNav = page.getByRole('link', { name: 'Links' });
+    await expect(linksNav).toBeVisible({ timeout: 5_000 });
+
+    await Promise.all([
+      page.waitForURL('**/dashboard/links', {
+        timeout: 10_000,
+        waitUntil: 'domcontentloaded',
+      }),
+      linksNav.click(),
+    ]);
+
+    await expect(
+      page
+        .locator('h1, h2')
+        .filter({ hasText: /manage links/i })
+        .first()
+    ).toBeVisible({ timeout: 5_000 });
+
+    // Optional: Verify we can access the public profile page with the new handle
     await page.goto(`/${uniqueHandle}`, { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(new RegExp(`/${uniqueHandle}$`));
 

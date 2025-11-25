@@ -6,6 +6,47 @@ test.describe('Onboarding Flow', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
 
+  test('anonymous handle claim redirects to signup with onboarding redirect_url', async ({
+    page,
+  }) => {
+    const handle = `e2e-${Date.now().toString(36)}`;
+
+    const handleInput = page.getByLabel('Choose your handle');
+    await expect(handleInput).toBeVisible({ timeout: 5000 });
+
+    await handleInput.fill(handle);
+
+    const submitButton = page
+      .locator('form:has(#handle-input) button[type="submit"]')
+      .first();
+    await expect(submitButton).toBeVisible();
+
+    await expect
+      .poll(
+        async () => {
+          return await submitButton.isEnabled();
+        },
+        {
+          timeout: 15000,
+          intervals: [500, 750, 1000],
+        }
+      )
+      .toBe(true);
+
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
+      submitButton.click(),
+    ]);
+
+    const url = new URL(page.url());
+    expect(url.pathname).toBe('/signup');
+
+    const redirectUrl = url.searchParams.get('redirect_url');
+    expect(redirectUrl).toBeTruthy();
+    expect(redirectUrl).toContain('/onboarding');
+    expect(redirectUrl).toContain(`handle=${handle}`);
+  });
+
   test('complete onboarding flow with handle validation', async ({ page }) => {
     // Navigate to onboarding (requires authentication first)
     await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
