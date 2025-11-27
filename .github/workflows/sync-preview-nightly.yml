@@ -16,7 +16,7 @@ jobs:
       NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
       DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW || secrets.DATABASE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v4
 

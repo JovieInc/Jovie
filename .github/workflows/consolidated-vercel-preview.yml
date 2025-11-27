@@ -59,7 +59,7 @@ jobs:
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
           echo "sha=$SHA" >> $GITHUB_OUTPUT
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
           # For workflow_dispatch, checkout the PR's head
