@@ -10,8 +10,7 @@ declare const EdgeRuntime: string | undefined;
 
 const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
 
-// Configure connection caching and WebSocket for Node runtimes only
-neonConfig.fetchConnectionCache = true;
+// Configure WebSocket for Node runtimes only (fetch caching is now always enabled)
 if (!isEdgeRuntime) {
   neonConfig.webSocketConstructor = ws;
 }
