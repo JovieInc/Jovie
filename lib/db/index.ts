@@ -1,16 +1,21 @@
-import { type NeonQueryFunction, neon } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
+import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import { env } from '@/lib/env';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
 
+// Configure WebSocket for transaction support
+neonConfig.webSocketConstructor = ws;
+
 declare global {
-  var db: NeonHttpDatabase<typeof schema> | undefined;
+  var db: NeonDatabase<typeof schema> | undefined;
+  var pool: Pool | undefined;
 }
 
 // Create the database client with schema
-export type DbType = NeonHttpDatabase<typeof schema>;
+export type DbType = NeonDatabase<typeof schema>;
 export type TransactionType = Parameters<DbType['transaction']>[0] extends (
   tx: infer T
 ) => unknown
@@ -140,7 +145,7 @@ function isRetryableError(error: unknown): boolean {
 
 // Lazy initialization of database connection
 let _db: DbType | undefined;
-let _sql: NeonQueryFunction<false, false> | undefined;
+let _pool: Pool | undefined;
 
 function initializeDb(): DbType {
   // Validate the database URL at runtime
@@ -152,22 +157,28 @@ function initializeDb(): DbType {
     );
   }
 
-  logDbInfo('db_init', 'Initializing database connection', {
-    environment: process.env.NODE_ENV,
-    hasUrl: !!databaseUrl,
-  });
+  logDbInfo(
+    'db_init',
+    'Initializing database connection with transaction support',
+    {
+      environment: process.env.NODE_ENV,
+      hasUrl: !!databaseUrl,
+      transactionSupport: true,
+    }
+  );
 
-  // Create the database connection with enhanced configuration
-  if (!_sql) {
-    _sql = neon(databaseUrl);
+  // Create the database connection pool
+  if (!_pool) {
+    _pool = new Pool({ connectionString: databaseUrl });
   }
 
   // Use a single connection in development to avoid connection pool exhaustion
   if (process.env.NODE_ENV === 'production') {
-    return drizzle(_sql, { schema, logger: false });
+    return drizzle(_pool, { schema, logger: false });
   } else {
     if (!global.db) {
-      global.db = drizzle(_sql, {
+      global.pool = _pool;
+      global.db = drizzle(_pool, {
         schema,
         logger: {
           logQuery: (query, params) => {

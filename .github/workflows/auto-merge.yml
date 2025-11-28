@@ -368,7 +368,8 @@ jobs:
             let summary = `## Auto-merge Summary for PR #${pr.number}\n\n`;
 
             if (shouldMerge !== 'true') {
-              const reason = JSON.parse('${{ steps.should_merge.outputs.result || "{}" }}').reason || 'Unknown';
+              const resultStr = '${{ steps.should_merge.outputs.result }}' || '{}';
+              const reason = JSON.parse(resultStr).reason || 'Unknown';
               summary += `❌ **Skipped**: ${reason}\n`;
             } else if (waitStatus !== 'success') {
               summary += `⏳ **Waiting**: CI checks still running or failed\n`;

@@ -70,7 +70,8 @@ export async function withDbSessionTx<T>(
     await tx.execute(
       drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`)
     );
-    return await operation(tx as unknown as DbType, userId);
+    // Transaction client now properly typed with neon-serverless driver
+    return await operation(tx, userId);
   });
 }
 

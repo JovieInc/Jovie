@@ -147,7 +147,7 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 ### 8.3 Stack & Packages
 - **Runtime & framework:** Next.js App Router + React Server Components.
 - **Package manager:** `pnpm` only.
-- **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-http`).
+- **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-serverless` with WebSocket support for transactions).
 - **Auth:** Clerk via `@clerk/nextjs` / `@clerk/nextjs/server`.
 - **Styling:** Tailwind CSS v4 + small helpers (e.g., `clsx`, `tailwind-merge`) where needed.
 - **Headless UI:** Prefer `@headlessui/react` and `@floating-ui/*` for dialogs, menus, sheets, tooltips, and popovers.
@@ -174,10 +174,13 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - Ensure Clerk environment and allowed frontend URLs are configured for preview and production domains.
 
 ### 9.3 Database (Neon + Drizzle)
-- Use the Edge-safe client: `@neondatabase/serverless` + `drizzle-orm/neon-http`.
+- Use the transaction-capable client: `@neondatabase/serverless` + `drizzle-orm/neon-serverless`.
+- WebSocket support is configured via `neonConfig.webSocketConstructor = ws` for full transaction capabilities.
+- The database client uses connection pooling (`Pool`) for production-ready performance.
+- Transaction support enables proper RLS with `SET LOCAL` session variables that persist within transaction scope.
 - Run Drizzle migrations only in Node (never from Edge code).
 - Keep Neon branches tidy: production parent + a primary child for preview; ephemeral branches per PR created/destroyed via CI.
-- Set `app.user_id` per request on the server before DB calls when RLS policies depend on it.
+- Set `app.clerk_user_id` per request on the server before DB calls when RLS policies depend on it (use `withDbSession` or `withDbSessionTx` helpers).
 
 ### 9.4 Postgres RLS Pattern
 - Use `current_setting('app.user_id', true)` in RLS policies to authorize access.
