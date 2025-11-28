@@ -37,12 +37,17 @@ export async function getCreatorProfileWithLinks(username: string) {
       spotifyId: creatorProfiles.spotifyId,
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
+      isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
+      claimedAt: creatorProfiles.claimedAt,
+      lastLoginAt: creatorProfiles.lastLoginAt,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       profileViews: creatorProfiles.profileViews,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
       createdAt: creatorProfiles.createdAt,
       updatedAt: creatorProfiles.updatedAt,
     })
@@ -56,10 +61,15 @@ export async function getCreatorProfileWithLinks(username: string) {
   const profileSocialLinks = await db
     .select({
       id: socialLinks.id,
+      creatorProfileId: socialLinks.creatorProfileId,
       platform: socialLinks.platform,
+      platformType: socialLinks.platformType,
       url: socialLinks.url,
+      displayText: socialLinks.displayText,
       clicks: socialLinks.clicks,
+      isActive: socialLinks.isActive,
       createdAt: socialLinks.createdAt,
+      updatedAt: socialLinks.updatedAt,
       sortOrder: socialLinks.sortOrder,
     })
     .from(socialLinks)

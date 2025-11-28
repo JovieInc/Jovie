@@ -93,7 +93,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
           linkType: 'listen',
           target: dsp.key,
         });
-      } catch {};
+      } catch {}
 
       // Try deep linking with lazy import
       try {

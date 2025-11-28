@@ -8,7 +8,8 @@ const meta: Meta<typeof Avatar> = {
     layout: 'centered',
     docs: {
       description: {
-        component: 'Unified Avatar component for display-only usage with optimized loading, fallback states, and accessibility support.',
+        component:
+          'Unified Avatar component for display-only usage with optimized loading, fallback states, and accessibility support.',
       },
     },
   },
@@ -74,19 +75,50 @@ export const Fallback: Story = {
 // Different sizes
 export const Sizes: Story = {
   render: () => (
-    <div className="flex items-center space-x-4">
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="xs" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="sm" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="md" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="lg" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="xl" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" size="2xl" />
+    <div className='flex items-center space-x-4'>
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='xs'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='sm'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='md'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='lg'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='xl'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        size='2xl'
+      />
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Avatar component in different sizes: xs (24px), sm (32px), md (48px), lg (64px), xl (80px), 2xl (96px).',
+        story:
+          'Avatar component in different sizes: xs (24px), sm (32px), md (48px), lg (64px), xl (80px), 2xl (96px).',
       },
     },
   },
@@ -95,12 +127,37 @@ export const Sizes: Story = {
 // Different rounded styles
 export const RoundedVariants: Story = {
   render: () => (
-    <div className="flex items-center space-x-4">
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" rounded="none" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" rounded="sm" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" rounded="md" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" rounded="lg" />
-      <Avatar src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face" alt="Avatar" name="John" rounded="full" />
+    <div className='flex items-center space-x-4'>
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        rounded='none'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        rounded='sm'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        rounded='md'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        rounded='lg'
+      />
+      <Avatar
+        src='https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&crop=face'
+        alt='Avatar'
+        name='John'
+        rounded='full'
+      />
     </div>
   ),
   parameters: {
@@ -115,19 +172,20 @@ export const RoundedVariants: Story = {
 // Fallback initials with different names
 export const FallbackInitials: Story = {
   render: () => (
-    <div className="flex items-center space-x-4">
-      <Avatar src={null} alt="John Doe" name="John Doe" />
-      <Avatar src={null} alt="Jane Smith" name="Jane Smith" />
-      <Avatar src={null} alt="Alex Johnson" name="Alex Johnson" />
-      <Avatar src={null} alt="Maria Garcia" name="Maria Garcia" />
-      <Avatar src={null} alt="Single Name" name="Single" />
-      <Avatar src={null} alt="No Name" name="" />
+    <div className='flex items-center space-x-4'>
+      <Avatar src={null} alt='John Doe' name='John Doe' />
+      <Avatar src={null} alt='Jane Smith' name='Jane Smith' />
+      <Avatar src={null} alt='Alex Johnson' name='Alex Johnson' />
+      <Avatar src={null} alt='Maria Garcia' name='Maria Garcia' />
+      <Avatar src={null} alt='Single Name' name='Single' />
+      <Avatar src={null} alt='No Name' name='' />
     </div>
   ),
   parameters: {
     docs: {
       description: {
-        story: 'Avatar fallback states showing initials generated from different name formats.',
+        story:
+          'Avatar fallback states showing initials generated from different name formats.',
       },
     },
   },
@@ -144,7 +202,8 @@ export const ErrorState: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Avatar with a broken image URL, demonstrating the error fallback to initials.',
+        story:
+          'Avatar with a broken image URL, demonstrating the error fallback to initials.',
       },
     },
   },

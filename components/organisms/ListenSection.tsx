@@ -3,8 +3,8 @@
 import React, { useEffect } from 'react';
 import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
 import { LISTEN_COOKIE } from '@/constants/app';
-import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { track } from '@/lib/analytics';
+import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import type { AvailableDSP } from '@/lib/dsp';
 
 export interface ListenSectionProps {

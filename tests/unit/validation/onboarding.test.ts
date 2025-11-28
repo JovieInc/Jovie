@@ -5,35 +5,57 @@ describe('onboardingSchema', () => {
   describe('handle validation', () => {
     it('should accept valid handles', () => {
       const validHandles = ['abc123', 'test-user', '123456', 'a-b-c'];
-      
+
       validHandles.forEach(handle => {
-        const result = onboardingSchema.safeParse({ handle, fullName: 'Test User' });
+        const result = onboardingSchema.safeParse({
+          handle,
+          fullName: 'Test User',
+        });
         expect(result.success).toBe(true);
       });
     });
 
     it('should reject handles that are too short', () => {
-      const result = onboardingSchema.safeParse({ handle: 'ab', fullName: 'Test User' });
+      const result = onboardingSchema.safeParse({
+        handle: 'ab',
+        fullName: 'Test User',
+      });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Must be at least 3 characters');
+        expect(result.error.issues[0].message).toBe(
+          'Must be at least 3 characters'
+        );
       }
     });
 
     it('should reject handles that are too long', () => {
       const longHandle = 'a'.repeat(25);
-      const result = onboardingSchema.safeParse({ handle: longHandle, fullName: 'Test User' });
+      const result = onboardingSchema.safeParse({
+        handle: longHandle,
+        fullName: 'Test User',
+      });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Must be no more than 24 characters');
+        expect(result.error.issues[0].message).toBe(
+          'Must be no more than 24 characters'
+        );
       }
     });
 
     it('should reject handles with invalid characters', () => {
-      const invalidHandles = ['test@user', 'test user', 'test.user', 'test_user', 'Test'];
-      
+      const invalidHandles = [
+        'test@user',
+        'test user',
+        'test.user',
+        'test_user',
+        'Test',
+      ];
+
       invalidHandles.forEach(handle => {
-        const result = onboardingSchema.safeParse({ handle, fullName: 'Test User' });
+        const result = onboardingSchema.safeParse({
+          handle,
+          fullName: 'Test User',
+        });
         expect(result.success).toBe(false);
         if (!result.success) {
           expect(result.error.issues[0].message).toBe(
@@ -54,9 +76,9 @@ describe('onboardingSchema', () => {
         'John Smith Jr.',
         'João Silva',
         'Anna-Maria',
-        'Test123'
+        'Test123',
       ];
-      
+
       validNames.forEach(fullName => {
         const result = onboardingSchema.safeParse({ handle: 'test', fullName });
         expect(result.success).toBe(true);
@@ -64,7 +86,10 @@ describe('onboardingSchema', () => {
     });
 
     it('should reject empty full names', () => {
-      const result = onboardingSchema.safeParse({ handle: 'test', fullName: '' });
+      const result = onboardingSchema.safeParse({
+        handle: 'test',
+        fullName: '',
+      });
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.error.issues[0].message).toBe('Full name is required');
@@ -73,10 +98,15 @@ describe('onboardingSchema', () => {
 
     it('should reject full names that are too long', () => {
       const longName = 'A'.repeat(51);
-      const result = onboardingSchema.safeParse({ handle: 'test', fullName: longName });
+      const result = onboardingSchema.safeParse({
+        handle: 'test',
+        fullName: longName,
+      });
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Must be no more than 50 characters');
+        expect(result.error.issues[0].message).toBe(
+          'Must be no more than 50 characters'
+        );
       }
     });
 
@@ -87,9 +117,9 @@ describe('onboardingSchema', () => {
         'User&Name',
         'Name*Test',
         'Test(Name)',
-        'User[Name]'
+        'User[Name]',
       ];
-      
+
       invalidNames.forEach(fullName => {
         const result = onboardingSchema.safeParse({ handle: 'test', fullName });
         expect(result.success).toBe(false);
@@ -103,12 +133,18 @@ describe('onboardingSchema', () => {
 
     it('should accept full names with exactly 50 characters', () => {
       const fiftyCharName = 'A'.repeat(50);
-      const result = onboardingSchema.safeParse({ handle: 'test', fullName: fiftyCharName });
+      const result = onboardingSchema.safeParse({
+        handle: 'test',
+        fullName: fiftyCharName,
+      });
       expect(result.success).toBe(true);
     });
 
     it('should accept full names with exactly 1 character', () => {
-      const result = onboardingSchema.safeParse({ handle: 'test', fullName: 'A' });
+      const result = onboardingSchema.safeParse({
+        handle: 'test',
+        fullName: 'A',
+      });
       expect(result.success).toBe(true);
     });
   });
@@ -116,13 +152,13 @@ describe('onboardingSchema', () => {
   it('should validate both fields together', () => {
     const result = onboardingSchema.safeParse({
       handle: 'john-doe',
-      fullName: 'John Doe'
+      fullName: 'John Doe',
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toEqual({
         handle: 'john-doe',
-        fullName: 'John Doe'
+        fullName: 'John Doe',
       });
     }
   });

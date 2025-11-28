@@ -15,9 +15,7 @@
   },
   "Heroicon Usage": {
     "prefix": "heroicon-use",
-    "body": [
-      "<${1:ChevronRightIcon} className=\"${2:h-5 w-5}\" />"
-    ],
+    "body": ["<${1:ChevronRightIcon} className=\"${2:h-5 w-5}\" />"],
     "description": "Use a Heroicon component"
   },
   "SocialIcon Component": {
@@ -29,9 +27,7 @@
   },
   "SocialIcon Import": {
     "prefix": "socialicon-import",
-    "body": [
-      "import { SocialIcon } from '@/components/atoms/SocialIcon';"
-    ],
+    "body": ["import { SocialIcon } from '@/components/atoms/SocialIcon';"],
     "description": "Import the SocialIcon component"
   },
   "Icon Component": {
@@ -43,9 +39,7 @@
   },
   "Icon Import": {
     "prefix": "icon-import",
-    "body": [
-      "import { Icon } from '@/components/atoms/Icon';"
-    ],
+    "body": ["import { Icon } from '@/components/atoms/Icon';"],
     "description": "Import the unified Icon component"
   },
   "IconButton with Heroicon": {
@@ -89,9 +83,7 @@
   },
   "Icon Size Classes": {
     "prefix": "icon-size",
-    "body": [
-      "className=\"${1|h-4 w-4,h-5 w-5,h-6 w-6,h-8 w-8|}\""
-    ],
+    "body": ["className=\"${1|h-4 w-4,h-5 w-5,h-6 w-6,h-8 w-8|}\""],
     "description": "Standard icon size classes"
   },
   "Common Navigation Icons": {
@@ -140,4 +132,3 @@
     "description": "Common state icons import"
   }
 }
-

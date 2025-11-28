@@ -1,21 +1,32 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { ProgressIndicator } from '@/components/atoms/ProgressIndicator';
 
 describe('ProgressIndicator', () => {
   const mockSteps = [
-    { id: '1', title: 'Start', description: 'Begin the process', estimatedTimeSeconds: 30 },
-    { id: '2', title: 'Processing', description: 'Processing data', estimatedTimeSeconds: 60 },
-    { id: '3', title: 'Complete', description: 'Finish up', estimatedTimeSeconds: 15 },
+    {
+      id: '1',
+      title: 'Start',
+      description: 'Begin the process',
+      estimatedTimeSeconds: 30,
+    },
+    {
+      id: '2',
+      title: 'Processing',
+      description: 'Processing data',
+      estimatedTimeSeconds: 60,
+    },
+    {
+      id: '3',
+      title: 'Complete',
+      description: 'Finish up',
+      estimatedTimeSeconds: 15,
+    },
   ];
 
   it('renders progress indicator with correct attributes', () => {
     render(
-      <ProgressIndicator
-        currentStep={1}
-        totalSteps={3}
-        steps={mockSteps}
-      />
+      <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
     const progressbar = screen.getByRole('progressbar');
@@ -27,11 +38,7 @@ describe('ProgressIndicator', () => {
 
   it('displays correct step information', () => {
     render(
-      <ProgressIndicator
-        currentStep={1}
-        totalSteps={3}
-        steps={mockSteps}
-      />
+      <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
     expect(screen.getByText('Step 2 of 3')).toBeInTheDocument();
@@ -84,11 +91,7 @@ describe('ProgressIndicator', () => {
 
   it('renders all steps with correct states', () => {
     render(
-      <ProgressIndicator
-        currentStep={1}
-        totalSteps={3}
-        steps={mockSteps}
-      />
+      <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
     // Step 1 should be completed (shows checkmark)
@@ -105,11 +108,7 @@ describe('ProgressIndicator', () => {
 
   it('shows description for current step only', () => {
     render(
-      <ProgressIndicator
-        currentStep={1}
-        totalSteps={3}
-        steps={mockSteps}
-      />
+      <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
     // Only current step (Processing) should show description
@@ -120,15 +119,13 @@ describe('ProgressIndicator', () => {
 
   it('calculates progress percentage correctly', () => {
     render(
-      <ProgressIndicator
-        currentStep={1}
-        totalSteps={3}
-        steps={mockSteps}
-      />
+      <ProgressIndicator currentStep={1} totalSteps={3} steps={mockSteps} />
     );
 
     // Step 2 of 3 should be 66.67% progress
-    const progressBar = screen.getByRole('progressbar').querySelector('[style*="width"]');
+    const progressBar = screen
+      .getByRole('progressbar')
+      .querySelector('[style*="width"]');
     expect(progressBar).toHaveStyle('width: 66.66666666666666%');
   });
 
