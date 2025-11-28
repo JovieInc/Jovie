@@ -54,15 +54,18 @@ jobs:
 
             if (!pr) {
               core.info('No PR found for this event');
+              core.setOutput('skip', 'true');
               return { skip: true };
             }
 
             if (pr.base.ref !== 'main' && pr.base.ref !== 'production') {
               core.info('PR is not targeting main or production branch, skipping');
+              core.setOutput('skip', 'true');
               return { skip: true };
             }
 
             core.info(`Found PR #${pr.number}: ${pr.title}`);
+            core.setOutput('skip', 'false');
             return {
               skip: false,
               number: pr.number,
@@ -112,7 +115,8 @@ jobs:
         with:
           script: |
             const pr = JSON.parse('${{ steps.get_pr.outputs.result }}');
-            const labels = new Set(pr.labels);
+            const labels = new Set(pr.labels || []);
+            const author = pr.author || '';
 
             // Skip conditions
             const skipReasons = [];
@@ -159,7 +163,7 @@ jobs:
               prType = 'dependabot';
               // For dependabot, check if it's patch/minor or security update
               eligible = true; // We'll validate update type in next step
-            } else if (labels.has('codegen') || pr.author === 'app/codegen-sh' || pr.author === 'codegen-sh[bot]' || pr.author.includes('codegen')) {
+            } else if (labels.has('codegen') || author === 'app/codegen-sh' || author === 'codegen-sh[bot]' || author.includes('codegen')) {
               prType = 'codegen';
               eligible = true;
             } else {
@@ -385,7 +389,8 @@ jobs:
               return resultStr && resultStr !== '{}' ? JSON.parse(resultStr) : {};
             })();
 
+            const labels = Array.isArray(pr.labels) ? pr.labels : [];
             summary += `\n**PR Type**: ${parsed.pr_type || 'unknown'}`;
-            summary += `\n**Labels**: ${pr.labels.join(', ') || 'none'}`;
+            summary += `\n**Labels**: ${labels.join(', ') || 'none'}`;
 
             core.info(summary);
