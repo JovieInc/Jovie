@@ -1,36 +1,15 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { useTheme } from 'next-themes';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-
-// Mock next-themes
-vi.mock('next-themes', () => ({
-  useTheme: vi.fn(),
-}));
-
-const mockUseTheme = useTheme as ReturnType<typeof vi.fn>;
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 describe('LoadingSpinner', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    mockUseTheme.mockReturnValue({
-      theme: 'light',
-      systemTheme: 'light',
-    });
-  });
-
-  afterEach(() => {
-    vi.runOnlyPendingTimers();
-    vi.useRealTimers();
-    vi.clearAllMocks();
-    cleanup();
-  });
-
   it('renders with default props and has proper accessibility', () => {
     render(<LoadingSpinner />);
 
     const spinner = screen.getByRole('status');
     expect(spinner).toHaveAttribute('aria-label', 'Loading');
+    expect(spinner).toHaveAttribute('data-size', 'md');
+    expect(spinner).toHaveAttribute('data-tone', 'primary');
   });
 
   it('applies correct size classes', () => {
@@ -47,12 +26,10 @@ describe('LoadingSpinner', () => {
     expect(spinner).toHaveClass('custom-class');
   });
 
-  it('implements debounced visibility behavior', () => {
-    render(<LoadingSpinner />);
+  it('honors tone prop for readable contrast', () => {
+    render(<LoadingSpinner tone='inverse' />);
 
-    // Should render initially (even if placeholder)
     const spinner = screen.getByRole('status');
-    expect(spinner).toBeInTheDocument();
-    expect(spinner).toHaveAttribute('aria-label', 'Loading');
+    expect(spinner).toHaveAttribute('data-tone', 'inverse');
   });
 });

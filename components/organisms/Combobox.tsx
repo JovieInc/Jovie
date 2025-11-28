@@ -17,7 +17,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface ComboboxOption {
   id: string;

@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { Input } from '@/components/atoms/Input';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
   type ClientValidationResult,
   debounce,
@@ -284,7 +284,7 @@ export function SmartHandleInput({
 
   const getValidationIcon = () => {
     if (handleValidation.checking) {
-      return <LoadingSpinner size='sm' />;
+      return <LoadingSpinner size='sm' tone='muted' />;
     }
     if (
       handleValidation.available &&

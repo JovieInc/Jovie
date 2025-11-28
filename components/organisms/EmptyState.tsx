@@ -5,8 +5,8 @@ import {
   ShareIcon,
   SparklesIcon,
 } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import React from 'react';
-import { Button } from '@/components/atoms/Button';
 
 interface EmptyStateProps {
   type: 'music' | 'social' | 'links' | 'analytics' | 'general';

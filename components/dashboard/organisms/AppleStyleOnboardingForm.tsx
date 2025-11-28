@@ -5,7 +5,7 @@ import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { APP_URL } from '@/constants/app';
 import { identify, track } from '@/lib/analytics';
 

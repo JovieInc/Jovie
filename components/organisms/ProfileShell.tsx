@@ -3,11 +3,11 @@ import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
-import { CTAButton } from '@/components/atoms/CTAButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { Container } from '@/components/site/Container';
+import { CTAButton } from '@/components/ui/CTAButton';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type ProfileShellProps = {

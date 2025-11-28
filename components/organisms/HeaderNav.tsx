@@ -1,10 +1,10 @@
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
-import { NavLink } from '@/components/atoms/NavLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
+import { NavLink } from '@/components/ui/NavLink';
 import { FEATURES } from '@/lib/features';
 
 export function HeaderNav() {
