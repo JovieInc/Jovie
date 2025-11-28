@@ -1,8 +1,10 @@
 'use client';
 
+import { useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect } from 'react';
+import { MyStatsig } from '@/app/my-statsig';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
@@ -44,6 +46,8 @@ export function ClientProviders({
   children,
   initialThemeMode = 'system',
 }: ClientProvidersProps) {
+  const { user } = useUser();
+
   useEffect(() => {
     // Environment-gated startup log
     try {
@@ -84,7 +88,9 @@ export function ClientProviders({
         disableTransitionOnChange
         storageKey='jovie-theme'
       >
-        <LazyProviders>{children}</LazyProviders>
+        <MyStatsig userId={user?.id}>
+          <LazyProviders>{children}</LazyProviders>
+        </MyStatsig>
       </ThemeProvider>
     </React.StrictMode>
   );
