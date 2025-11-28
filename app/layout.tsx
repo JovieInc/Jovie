@@ -2,6 +2,7 @@ import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import React from 'react';
+import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
@@ -177,7 +178,9 @@ export default async function RootLayout({
       <body
         className={`${inter.variable} font-sans bg-base text-primary-token`}
       >
-        <ClientProviders>{children}</ClientProviders>
+        <ClerkAppProvider>
+          <ClientProviders>{children}</ClientProviders>
+        </ClerkAppProvider>
         {showCookieBanner && <CookieBannerSection />}
         {/* <SpeedInsights /> */}
         {shouldInjectToolbar && (

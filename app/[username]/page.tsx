@@ -193,8 +193,7 @@ export async function generateMetadata({ params }: Props) {
 // Note: generateStaticParams removed to allow edge runtime
 // Edge runtime provides better performance for dynamic profile pages
 
-// Enable ISR with 30 minute revalidation for fresher content
-export const revalidate = 1800;
-
-// Use Edge runtime for low-latency public profile reads
+// Always render dynamically to ensure 404s return correct status
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
 export const runtime = 'edge';

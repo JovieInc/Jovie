@@ -27,7 +27,7 @@ jobs:
       FAILED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
 
     steps:
-      - name: Check eligibility (main PR with auto-merge label from same repo)
+      - name: Check eligibility (failed CI on main PR from same repo)
         id: eligibility
         uses: actions/github-script@v8
         with:
@@ -61,13 +61,6 @@ jobs:
 
             if (pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
               core.info('PR is from a fork; skipping auto-fix to avoid pushing to external repos.');
-              core.setOutput('eligible', 'false');
-              return;
-            }
-
-            const labels = new Set(pr.labels.map(l => l.name));
-            if (!labels.has('auto-merge')) {
-              core.info('PR does not have auto-merge label; skipping Codex auto-fix.');
               core.setOutput('eligible', 'false');
               return;
             }
