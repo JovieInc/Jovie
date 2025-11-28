@@ -542,12 +542,12 @@ jobs:
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   deploy:
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy of main
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before deploy of main
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: Preview
+      name: Main
       url: https://preview.jov.ie
     steps:
       - uses: actions/checkout@v6
@@ -556,17 +556,18 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
       - uses: ./.github/actions/setup-node-pnpm
-      - name: DB migrate (preview - Drizzle)
-        run: pnpm run drizzle:migrate:preview
+      - name: DB migrate (main - Drizzle)
+        run: pnpm run drizzle:migrate:main
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
-          GIT_BRANCH: preview
-      - name: DB seed (preview)
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL != '' && secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
+          GIT_BRANCH: main
+      - name: DB seed (main)
         run: pnpm run db:seed
         env:
-          GIT_BRANCH: preview
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL != '' && secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
+          GIT_BRANCH: main
         continue-on-error: false
-      - name: Pull env (preview)
+      - name: Pull env (Vercel preview)
         run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

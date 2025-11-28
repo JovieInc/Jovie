@@ -1,7 +1,7 @@
 name: Manual Promotion (Fallback)
 
 # FALLBACK: Manual promotion workflow
-# Primary promotion path is automatic in ci.yml (promote job on push to preview)
+# Primary promotion path is automatic in ci.yml (promote job on push to main)
 # This workflow is for manual override when the automatic promotion fails or is skipped
 
 on:

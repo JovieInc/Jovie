@@ -8,7 +8,8 @@ on:
 
 jobs:
   reset-preview:
-    if: ${{ vars.FREEZE_DB_RESYNC != 'true' }}
+    # Preview branch removed; keep workflow for history but skip execution.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

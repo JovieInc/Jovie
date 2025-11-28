@@ -55,7 +55,7 @@
     "db:seed": "tsx scripts/drizzle-seed.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "tsx scripts/drizzle-migrate.ts",
-    "drizzle:migrate:preview": "GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
+    "drizzle:migrate:main": "GIT_BRANCH=main tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:prod": "GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",
     "drizzle:push": "drizzle-kit push",
     "neon:migrate:preview": "tsx scripts/neon-migrate-preview.ts",
