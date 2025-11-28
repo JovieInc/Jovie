@@ -1,7 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
 import { MyStatsig } from '../my-statsig';
 import { getDashboardDataCached, setSidebarCollapsed } from './actions';
 import DashboardLayoutClient from './DashboardLayoutClient';
@@ -28,14 +27,12 @@ export default async function DashboardLayout({
 
     return (
       <MyStatsig userId={userId}>
-        <ClerkAppProvider>
-          <DashboardLayoutClient
-            dashboardData={dashboardData}
-            persistSidebarCollapsed={setSidebarCollapsed}
-          >
-            {children}
-          </DashboardLayoutClient>
-        </ClerkAppProvider>
+        <DashboardLayoutClient
+          dashboardData={dashboardData}
+          persistSidebarCollapsed={setSidebarCollapsed}
+        >
+          {children}
+        </DashboardLayoutClient>
       </MyStatsig>
     );
   } catch (error) {

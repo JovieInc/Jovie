@@ -2,6 +2,13 @@
 
 This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo so we ship fast while keeping `main` and `production` clean.
 
+## Quickstart for AI agents
+
+- **Single source of truth:** Treat this file as the canonical ruleset for all AI agents in this repo.
+- **Analytics & flags:** Use **Statsig only** via the existing wrappers; do not introduce PostHog, Segment, RudderStack, or other analytics SDKs.
+- **Branches & PRs:** Always work on feature branches from `main` and follow sections 1–2 for branching and PR expectations.
+- **Guardrails:** Before making product changes, skim sections 8–13 for architecture, runtime/auth/DB rules, testing expectations, and CI/CD/landmine guidance.
+
 ## 0. Analytics & Feature Flags (Statsig-only)
 
 - Statsig is the **only** product analytics and feature flag platform used in this repo.
@@ -112,3 +119,115 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **No direct Neon branch management** from agents; always go through CI workflows.
 - **No direct pushes** to `main` or `production`.
 - New features ship **behind Statsig flags/experiments** and with **Statsig events** (or equivalent Statsig metrics) for primary actions.
+
+## 8. Engineering Guardrails & Architecture
+
+### 8.1 Component Architecture (Atomic)
+- **One component per file.** Named export only; no default exports. Export name must match file name.
+- **Atoms:** UI-only primitives (no business logic, no API calls), usually under `components/atoms/`.
+- **Molecules:** Small combinations of atoms with minimal state, under `components/molecules/`.
+- **Organisms:** Self-contained sections that can own state and feature logic, under `components/organisms/`.
+- **Feature directories:** Use `components/<feature>/...` for domain-specific components that aren't widely reused.
+- **Props:** Interface named `<ComponentName>Props`; children typed as `React.ReactNode`.
+- **A11y & testing:** Add appropriate `aria-*` attributes; organisms must expose stable `data-testid` hooks.
+- **forwardRef:** Use `React.forwardRef` for DOM atoms/molecules and set `Component.displayName`.
+- **Deprecation:** Mark old components with `/** @deprecated Reason */` and point to the replacement.
+
+### 8.2 Design Aesthetic & Copy
+- **Brand:** Color-agnostic; Jovie logo is black or white only.
+- **Surfaces:**
+  - Dark mode: black background, white text/buttons; primary CTAs are solid black with white text.
+  - Light mode: white background, black text/buttons; primary CTAs are solid white with black text.
+  - Marketing sections may use accent colors, but core system components stay neutral.
+- **Copywriting:**
+  - Use "Jovie profile" and "Jovie handle/username".
+  - Never describe Jovie itself as a "link-in-bio" product (only use that phrase when comparing competitors).
+  - Apple-level clarity; concise, active voice; focus copy on activation and MRR.
+
+### 8.3 Stack & Packages
+- **Runtime & framework:** Next.js App Router + React Server Components.
+- **Package manager:** `pnpm` only.
+- **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-http`).
+- **Auth:** Clerk via `@clerk/nextjs` / `@clerk/nextjs/server`.
+- **Styling:** Tailwind CSS v4 + small helpers (e.g., `clsx`, `tailwind-merge`) where needed.
+- **Headless UI:** Prefer `@headlessui/react` and `@floating-ui/*` for dialogs, menus, sheets, tooltips, and popovers.
+- **Billing:** Stripe (`stripe` on server, `@stripe/stripe-js` on client); no Clerk Billing.
+- **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
+
+### 8.4 Tailwind & Layout
+- `tailwind.config.js`, `postcss.config.mjs`, and the top of `styles/globals.css` are effectively locked.
+- Do **not** rename/move `tailwind.config.js`, add `@config`/`@source` directives, or switch to TS configs.
+- Add custom utilities via `@utility` in `globals.css`; add new content paths via the `content` array in `tailwind.config.js`.
+- Ensure `globals.css` starts with `@import "tailwindcss";` and theme imports as documented.
+
+## 9. Runtime, Auth, Database & RLS
+
+### 9.1 Runtime Modes (Vercel)
+- Use **Edge runtime** (`export const runtime = 'edge'`) for latency-sensitive public reads (e.g., public profiles).
+- Use **Node runtime** (`export const runtime = 'nodejs'`) for Stripe, Node-only libraries, and heavy compute.
+- Never import Node-only libraries (e.g., `stripe`, Node crypto) into Edge code.
+
+### 9.2 Auth (Clerk)
+- Use `clerkMiddleware()` in `middleware.ts` to protect private routes.
+- Wrap the app with `<ClerkProvider>` in `app/layout.tsx`.
+- Import server helpers (e.g., `auth`) from `@clerk/nextjs/server` and client hooks/components from `@clerk/nextjs`.
+- Ensure Clerk environment and allowed frontend URLs are configured for preview and production domains.
+
+### 9.3 Database (Neon + Drizzle)
+- Use the Edge-safe client: `@neondatabase/serverless` + `drizzle-orm/neon-http`.
+- Run Drizzle migrations only in Node (never from Edge code).
+- Keep Neon branches tidy: production parent + a primary child for preview; ephemeral branches per PR created/destroyed via CI.
+- Set `app.user_id` per request on the server before DB calls when RLS policies depend on it.
+
+### 9.4 Postgres RLS Pattern
+- Use `current_setting('app.user_id', true)` in RLS policies to authorize access.
+- Do not hardcode user IDs in policies; always drive them through the session variable.
+
+## 10. Performance, Caching & Public Profiles
+
+- Public profile reads:
+  - Edge runtime + direct Neon queries (no cache layer yet).
+  - Use RSC streaming/Suspense to minimize client-side JS.
+- Caching & rate limiting:
+  - Currently disabled by design ("do things that dont scale").
+  - Only introduce Redis/rate limiting when traffic/abuse/latency thresholds are clearly hit.
+
+## 11. Payments (Stripe)
+
+- Stripe is Node-only; do not import `stripe` in Edge handlers or React Server Components.
+- Use dedicated Node routes for:
+  - Checkout (`/app/api/stripe/checkout/route.ts`).
+  - Customer portal (`/app/api/stripe/portal/route.ts`).
+  - Webhooks (`/app/api/stripe/webhook/route.ts`) with **raw body** access.
+- Store `stripe_customer_id` keyed by Clerk `userId` in the database.
+
+## 12. Testing Strategy
+
+- Follow a **pyramid**:
+  - Unit tests (fast, many) > integration tests (fewer) > E2E (critical paths only).
+- Unit tests:
+  - Focus on pure logic and utilities; run quickly (<200ms each).
+  - Mock external services (Clerk, Stripe, Statsig, DB).
+- Integration tests:
+  - Cover API routes and DB interactions with a test database.
+- E2E tests:
+  - Exercise golden paths such as sign-up  create profile  share profile, and monetization flows.
+- CI expectations:
+  - `pnpm typecheck`, `pnpm lint`, `pnpm test` must be green before merge.
+  - Smoke E2E tests run on PRs touching critical flows.
+
+## 13. CI/CD, Critical Modules & Landmines
+
+- **CI/CD:**
+  - Fast checks always run: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
+  - Full CI (build, Drizzle checks, E2E) runs for higher-risk changes or when labeled (`full-ci`).
+- **Critical module protection:**
+  - Protected areas: marketing homepage, Featured Creators, and money-path flows (checkout/portal/pricing/onboarding).
+  - Do not introduce mocks/static lists in protected modules; keep using adapters and real data sources.
+  - Preserve existing `data-testid` hooks so homepage/money-path smoke tests remain stable.
+- **Landmines to avoid:**
+  - Edge/Node leakage (Node-only libs in Edge).
+  - Clerk host/environment mismatches.
+  - Running migrations from Edge.
+  - Tailwind v4 plugin/config drift.
+  - Env/secret sprawl or mixing preview and production credentials.
