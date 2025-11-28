@@ -24,7 +24,7 @@ export function FooterNavigation({
   return (
     <nav className={`flex items-center gap-4 ${textSize} ${className}`}>
       {links.map((link, index) => (
-        <FooterLink key={index} href={link.href} variant={variant}>
+        <FooterLink key={index} href={link.href} tone={variant}>
           {link.label}
         </FooterLink>
       ))}

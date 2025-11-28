@@ -90,7 +90,6 @@ export const CTAButton = React.forwardRef<
     if (href) {
       return (
         <Button
-          ref={ref as React.Ref<HTMLAnchorElement>}
           asChild
           disabled={isDisabled}
           size={mappedSize}
@@ -101,6 +100,7 @@ export const CTAButton = React.forwardRef<
           {...props}
         >
           <Link
+            ref={ref as React.Ref<HTMLAnchorElement>}
             href={href}
             prefetch={prefetch}
             target={external ? '_blank' : undefined}

@@ -39,14 +39,9 @@ export const FrostedButton = React.forwardRef<
 
     if (href) {
       return (
-        <Button
-          ref={ref as React.Ref<HTMLAnchorElement>}
-          asChild
-          variant={variant}
-          className={frostedClasses}
-          {...props}
-        >
+        <Button asChild variant={variant} className={frostedClasses} {...props}>
           <Link
+            ref={ref as React.Ref<HTMLAnchorElement>}
             href={href}
             prefetch={prefetch}
             target={external ? '_blank' : undefined}
