@@ -294,49 +294,9 @@ vi.mock('next/image', () => ({
   },
 }));
 
-// Mock OptimizedImage component
-vi.mock('@/components/atoms/OptimizedImage', () => ({
-  OptimizedImage: ({
-    src,
-    alt,
-    width,
-    height,
-    className,
-    ...props
-  }: React.ComponentProps<'img'>) => {
-    // If src is null or empty, render a placeholder div
-    if (!src) {
-      return React.createElement('div', {
-        className: `bg-gray-200 animate-pulse ${className || ''}`,
-        style: { width, height },
-        'data-testid': 'placeholder-image',
-        ...props,
-      });
-    }
-
-    // For valid images, render the image directly
-    return React.createElement('img', {
-      src,
-      alt,
-      width,
-      height,
-      className: `${className || ''} opacity-100`,
-      'data-testid': 'optimized-image',
-      ...props,
-    });
-  },
-}));
-
-// Mock PlaceholderImage component
-vi.mock('@/components/atoms/PlaceholderImage', () => ({
-  PlaceholderImage: ({ className, ...props }: React.ComponentProps<'div'>) => {
-    return React.createElement('div', {
-      className: `bg-gray-200 animate-pulse ${className || ''}`,
-      'data-testid': 'placeholder-image',
-      ...props,
-    });
-  },
-}));
+// Note: OptimizedImage and PlaceholderImage are no longer globally mocked here.
+// Individual tests can mock them as needed, while unit tests for these atoms
+// exercise the real implementations.
 
 // Mock @headlessui/react properly with all components
 const MockedComponents = {

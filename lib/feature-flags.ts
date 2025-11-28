@@ -21,22 +21,6 @@ export interface FeatureFlags {
   appleStyleOnboardingEnabled?: boolean;
 }
 
-// PostHog feature flag names (match what's defined in PostHog dashboard)
-export const POSTHOG_FLAGS = {
-  ARTIST_SEARCH_ENABLED: 'feature_artist_search_enabled',
-  DEBUG_BANNER_ENABLED: 'feature_debug_banner_enabled',
-  TIP_PROMO_ENABLED: 'feature_tip_promo_enabled',
-  PRICING_USE_CLERK: 'feature_pricing_use_clerk',
-  UNIVERSAL_NOTIFICATIONS_ENABLED: 'feature_universal_notifications_enabled',
-  FEATURE_CLICK_ANALYTICS_RPC: 'feature_click_analytics_rpc',
-  PROGRESSIVE_ONBOARDING_ENABLED: 'feature_progressive_onboarding_enabled',
-  MINIMALIST_ONBOARDING_ENABLED: 'feature_minimalist_onboarding_enabled',
-  APPLE_STYLE_ONBOARDING_ENABLED: 'feature_apple_style_onboarding_enabled',
-  PROFILE_SETTINGS_ENABLED: 'feature_profile_settings',
-  AVATAR_UPLOAD_ENABLED: 'feature_avatar_upload',
-  AVATAR_UPLOADER_ENABLED: 'feature_avatar_uploader',
-} as const;
-
 // Default feature flags (fallback)
 const defaultFeatureFlags: FeatureFlags = {
   artistSearchEnabled: true,
@@ -200,119 +184,13 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
   return defaultFeatureFlags;
 }
 
-// Server-side PostHog feature flag helper
-async function getPostHogServerFlags(
-  userId?: string
-): Promise<Partial<FeatureFlags>> {
-  try {
-    // Dynamically import PostHog to avoid bundling in client
-    const { PostHog } = await import('posthog-node');
-    const { ANALYTICS } = await import('@/constants/app');
-
-    if (!ANALYTICS.posthogKey) {
-      return {};
-    }
-
-    const client = new PostHog(ANALYTICS.posthogKey, {
-      host: ANALYTICS.posthogHost || 'https://us.posthog.com',
-    });
-
-    const distinctId = userId || 'anonymous';
-
-    // Check each PostHog feature flag
-    const [
-      artistSearchEnabled,
-      debugBannerEnabled,
-      tipPromoEnabled,
-      pricingUseClerk,
-      universalNotificationsEnabled,
-      featureClickAnalyticsRpc,
-      progressiveOnboardingEnabled,
-      minimalistOnboardingEnabled,
-      appleStyleOnboardingEnabled,
-      profileSettingsEnabled,
-      avatarUploadEnabled,
-      avatarUploaderEnabled,
-    ] = await Promise.all([
-      client.isFeatureEnabled(POSTHOG_FLAGS.ARTIST_SEARCH_ENABLED, distinctId),
-      client.isFeatureEnabled(POSTHOG_FLAGS.DEBUG_BANNER_ENABLED, distinctId),
-      client.isFeatureEnabled(POSTHOG_FLAGS.TIP_PROMO_ENABLED, distinctId),
-      client.isFeatureEnabled(POSTHOG_FLAGS.PRICING_USE_CLERK, distinctId),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.UNIVERSAL_NOTIFICATIONS_ENABLED,
-        distinctId
-      ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.FEATURE_CLICK_ANALYTICS_RPC,
-        distinctId
-      ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.PROGRESSIVE_ONBOARDING_ENABLED,
-        distinctId
-      ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.MINIMALIST_ONBOARDING_ENABLED,
-        distinctId
-      ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.APPLE_STYLE_ONBOARDING_ENABLED,
-        distinctId
-      ),
-      client.isFeatureEnabled(
-        POSTHOG_FLAGS.PROFILE_SETTINGS_ENABLED,
-        distinctId
-      ),
-      client.isFeatureEnabled(POSTHOG_FLAGS.AVATAR_UPLOAD_ENABLED, distinctId),
-      client.isFeatureEnabled(POSTHOG_FLAGS.AVATAR_UPLOADER_ENABLED, distinctId),
-    ]);
-
-    await client.shutdown();
-
-    return {
-      ...(typeof artistSearchEnabled === 'boolean' && { artistSearchEnabled }),
-      ...(typeof debugBannerEnabled === 'boolean' && { debugBannerEnabled }),
-      ...(typeof tipPromoEnabled === 'boolean' && { tipPromoEnabled }),
-      ...(typeof pricingUseClerk === 'boolean' && { pricingUseClerk }),
-      ...(typeof universalNotificationsEnabled === 'boolean' && {
-        universalNotificationsEnabled,
-      }),
-      ...(typeof featureClickAnalyticsRpc === 'boolean' && {
-        featureClickAnalyticsRpc,
-      }),
-      ...(typeof progressiveOnboardingEnabled === 'boolean' && {
-        progressiveOnboardingEnabled,
-      }),
-      ...(typeof minimalistOnboardingEnabled === 'boolean' && {
-        minimalistOnboardingEnabled,
-      }),
-      ...(typeof appleStyleOnboardingEnabled === 'boolean' && {
-        appleStyleOnboardingEnabled,
-      }),
-      ...(typeof profileSettingsEnabled === 'boolean' && {
-        profileSettingsEnabled,
-      }),
-      ...(typeof avatarUploadEnabled === 'boolean' && {
-        avatarUploadEnabled,
-      }),
-      ...(typeof avatarUploaderEnabled === 'boolean' && {
-        avatarUploaderEnabled,
-      }),
-    };
-  } catch (error) {
-    console.warn('[Feature Flags] PostHog server flags failed:', error);
-    return {};
-  }
-}
-
 // Server-side function to get feature flags
 export async function getServerFeatureFlags(
-  userId?: string
+  _userId?: string
 ): Promise<FeatureFlags> {
+  void _userId;
   try {
-    // 1) Try PostHog server-side feature flags first
-    const postHogFlags = await getPostHogServerFlags(userId);
-
-    // 2) Try app-internal endpoint as fallback
+    // 1) Try app-internal endpoint
     const { headers } = await import('next/headers');
     const h = await headers();
     const host = h.get('x-forwarded-host') ?? h.get('host');
@@ -358,54 +236,39 @@ export async function getServerFeatureFlags(
       }
     }
 
-    // 3) Merge flags with priority: PostHog > Local > Defaults
+    // 2) Merge flags with priority: Local > Defaults
     return {
       artistSearchEnabled:
-        postHogFlags.artistSearchEnabled ??
         localFlags.artistSearchEnabled ??
         defaultFeatureFlags.artistSearchEnabled,
       debugBannerEnabled:
-        postHogFlags.debugBannerEnabled ??
-        localFlags.debugBannerEnabled ??
-        defaultFeatureFlags.debugBannerEnabled,
+        localFlags.debugBannerEnabled ?? defaultFeatureFlags.debugBannerEnabled,
       tipPromoEnabled:
-        postHogFlags.tipPromoEnabled ??
-        localFlags.tipPromoEnabled ??
-        defaultFeatureFlags.tipPromoEnabled,
+        localFlags.tipPromoEnabled ?? defaultFeatureFlags.tipPromoEnabled,
       pricingUseClerk:
-        postHogFlags.pricingUseClerk ??
-        localFlags.pricingUseClerk ??
-        defaultFeatureFlags.pricingUseClerk,
+        localFlags.pricingUseClerk ?? defaultFeatureFlags.pricingUseClerk,
       universalNotificationsEnabled:
-        postHogFlags.universalNotificationsEnabled ??
         localFlags.universalNotificationsEnabled ??
         defaultFeatureFlags.universalNotificationsEnabled,
       featureClickAnalyticsRpc:
-        postHogFlags.featureClickAnalyticsRpc ??
         localFlags.featureClickAnalyticsRpc ??
         defaultFeatureFlags.featureClickAnalyticsRpc,
       progressiveOnboardingEnabled:
-        postHogFlags.progressiveOnboardingEnabled ??
         localFlags.progressiveOnboardingEnabled ??
         defaultFeatureFlags.progressiveOnboardingEnabled,
       minimalistOnboardingEnabled:
-        postHogFlags.minimalistOnboardingEnabled ??
         localFlags.minimalistOnboardingEnabled ??
         defaultFeatureFlags.minimalistOnboardingEnabled,
       appleStyleOnboardingEnabled:
-        postHogFlags.appleStyleOnboardingEnabled ??
         localFlags.appleStyleOnboardingEnabled ??
         defaultFeatureFlags.appleStyleOnboardingEnabled,
       profileSettingsEnabled:
-        postHogFlags.profileSettingsEnabled ??
         localFlags.profileSettingsEnabled ??
         defaultFeatureFlags.profileSettingsEnabled,
       avatarUploadEnabled:
-        postHogFlags.avatarUploadEnabled ??
         localFlags.avatarUploadEnabled ??
         defaultFeatureFlags.avatarUploadEnabled,
       avatarUploaderEnabled:
-        postHogFlags.avatarUploaderEnabled ??
         localFlags.avatarUploaderEnabled ??
         defaultFeatureFlags.avatarUploaderEnabled,
     };

@@ -2,7 +2,11 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { and, asc, count, eq } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidateTag,
+  unstable_cache,
+} from 'next/cache';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import {
@@ -32,24 +36,7 @@ export interface ProfileSocialLink {
   isActive: boolean | null;
   displayText?: string | null;
 }
-
-export async function getDashboardData(): Promise<DashboardData> {
-  // Prevent caching of user-specific data
-  noStore();
-
-  const { userId } = await auth();
-
-  if (!userId) {
-    return {
-      user: null,
-      creatorProfiles: [],
-      selectedProfile: null,
-      needsOnboarding: true,
-      sidebarCollapsed: false,
-      hasSocialLinks: false,
-    };
-  }
-
+async function fetchDashboardDataWithSession(): Promise<DashboardData> {
   return await withDbSession(async clerkUserId => {
     try {
       // First check if user exists in users table
@@ -60,7 +47,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         .limit(1);
 
       if (!userData?.id) {
-        // No user row yet → send to onboarding to create user/artist
+        // No user row yet 	 send to onboarding to create user/artist
         return {
           user: null,
           creatorProfiles: [],
@@ -79,7 +66,7 @@ export async function getDashboardData(): Promise<DashboardData> {
         .orderBy(asc(creatorProfiles.createdAt));
 
       if (!creatorData || creatorData.length === 0) {
-        // No creator profiles yet → onboarding
+        // No creator profiles yet 	 onboarding
         return {
           user: userData,
           creatorProfiles: [],
@@ -90,42 +77,46 @@ export async function getDashboardData(): Promise<DashboardData> {
         };
       }
 
-      // Load user settings for UI preferences; tolerate missing column/table during migrations
-      let settings: { sidebarCollapsed: boolean } | undefined;
-      try {
-        const result = await db
-          .select()
-          .from(userSettings)
-          .where(eq(userSettings.userId, userData.id))
-          .limit(1);
-        settings = result?.[0];
-      } catch {
-        console.warn(
-          'user_settings not available yet, defaulting sidebarCollapsed=false'
-        );
-        settings = undefined;
-      }
-
-      // Compute presence of active social links for the selected profile
       const selected = creatorData[0];
-      let hasLinks = false;
-      try {
-        const result = await db
-          .select({ c: count() })
-          .from(socialLinks)
-          .where(
-            and(
-              eq(socialLinks.creatorProfileId, selected.id),
-              eq(socialLinks.isActive, true)
-            )
-          );
-        const total = Number(result?.[0]?.c ?? 0);
-        hasLinks = total > 0;
-      } catch {
-        // On query error, default to false without failing dashboard load
-        console.warn('Error counting social links, defaulting to false');
-        hasLinks = false;
-      }
+
+      // Load user settings for UI preferences and social links presence in parallel;
+      // tolerate missing user_settings column/table during migrations.
+      const [settings, hasLinks] = await Promise.all([
+        (async () => {
+          try {
+            const result = await db
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1);
+            return result?.[0] as { sidebarCollapsed: boolean } | undefined;
+          } catch {
+            console.warn(
+              'user_settings not available yet, defaulting sidebarCollapsed=false'
+            );
+            return undefined;
+          }
+        })(),
+        (async () => {
+          try {
+            const result = await db
+              .select({ c: count() })
+              .from(socialLinks)
+              .where(
+                and(
+                  eq(socialLinks.creatorProfileId, selected.id),
+                  eq(socialLinks.isActive, true)
+                )
+              );
+            const total = Number(result?.[0]?.c ?? 0);
+            return total > 0;
+          } catch {
+            // On query error, default to false without failing dashboard load
+            console.warn('Error counting social links, defaulting to false');
+            return false;
+          }
+        })(),
+      ]);
 
       // Return data with first profile selected by default
       return {
@@ -149,6 +140,55 @@ export async function getDashboardData(): Promise<DashboardData> {
       };
     }
   });
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  // Prevent caching of user-specific data
+  noStore();
+
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+    };
+  }
+
+  return await fetchDashboardDataWithSession();
+}
+
+const getDashboardDataCachedInternal = unstable_cache(
+  async (clerkUserId: string): Promise<DashboardData> => {
+    void clerkUserId;
+    return fetchDashboardDataWithSession();
+  },
+  ['dashboard-data'],
+  {
+    revalidate: 60,
+    tags: ['dashboard-data'],
+  }
+);
+
+export async function getDashboardDataCached(): Promise<DashboardData> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+    };
+  }
+
+  return getDashboardDataCachedInternal(userId);
 }
 
 // Fetch social links for a given profile owned by the current user
@@ -236,6 +276,7 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
         set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
       });
   });
+  revalidateTag('dashboard-data');
 }
 
 export async function updateCreatorProfile(
@@ -288,6 +329,8 @@ export async function updateCreatorProfile(
       if (!updatedProfile) {
         throw new Error('Profile not found or unauthorized');
       }
+
+      revalidateTag('dashboard-data');
 
       return updatedProfile;
     } catch (error) {

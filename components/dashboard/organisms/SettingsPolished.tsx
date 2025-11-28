@@ -9,6 +9,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
+import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
@@ -17,6 +18,7 @@ import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
@@ -85,6 +87,9 @@ export function SettingsPolished({
 
   const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
   const [isMarketingSaving, setIsMarketingSaving] = useState(false);
+
+  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+  const notificationsEnabled = notificationsGate.value;
 
   const [pixelData, setPixelData] = useState({
     facebookPixel: '',
@@ -901,6 +906,10 @@ export function SettingsPolished({
               const isActive = currentSection === item.id;
               const isLocked = item.isPro && !isPro;
 
+              if (item.id === 'notifications' && !notificationsEnabled) {
+                return null;
+              }
+
               return (
                 <button
                   key={item.id}
@@ -983,7 +992,21 @@ export function SettingsPolished({
                 Manage your email preferences and communication settings.
               </p>
             </div>
-            {renderNotificationsSection()}
+            {notificationsEnabled ? (
+              renderNotificationsSection()
+            ) : (
+              <DashboardCard variant='settings'>
+                <div className='text-center py-4'>
+                  <h3 className='text-lg font-medium text-primary mb-2'>
+                    Notifications are not available yet
+                  </h3>
+                  <p className='text-sm text-secondary'>
+                    We&apos;re focused on getting the core Jovie profile
+                    experience right before launching notifications.
+                  </p>
+                </div>
+              </DashboardCard>
+            )}
           </section>
 
           {/* Pro Features */}

@@ -37,7 +37,7 @@ describe('Avatar Component', () => {
       const image = screen.getByTestId('avatar-image');
       expect(image).toBeInTheDocument();
       expect(image).toHaveAttribute('src', 'https://example.com/avatar.jpg');
-      expect(image).toHaveAttribute('alt', 'User avatar');
+      expect(image).toHaveAttribute('alt', '');
     });
 
     it('applies correct ARIA attributes', () => {

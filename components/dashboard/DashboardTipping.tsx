@@ -2,19 +2,16 @@
 
 import { WalletIcon } from '@heroicons/react/24/outline';
 import { useCallback, useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-interface DashboardTippingProps {
-  initialData: DashboardData;
-}
-
-export function DashboardTipping({ initialData }: DashboardTippingProps) {
+export function DashboardTipping() {
+  const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
   const [venmoHandle, setVenmoHandle] = useState(artist?.venmo_handle || '');

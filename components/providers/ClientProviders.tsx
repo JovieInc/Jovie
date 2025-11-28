@@ -1,19 +1,37 @@
 'use client';
 
-import { ClerkProvider } from '@clerk/nextjs';
-import dynamic from 'next/dynamic';
+import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
-import React, { type ComponentProps, useEffect, useState } from 'react';
-import { env } from '@/lib/env';
+import React, { useEffect } from 'react';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
+import type { LazyProvidersProps } from './LazyProviders';
+
+type LazyProvidersLoadingProps = LazyProvidersProps &
+  DynamicOptionsLoadingProps;
+
+function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
+  const { children } = props as LazyProvidersLoadingProps;
+  return (
+    <>
+      {children}
+      <div
+        aria-hidden='true'
+        className='fixed bottom-4 right-4 z-[40] flex items-center gap-2 rounded-full bg-surface-1/80 px-3 py-1.5 text-[11px] text-secondary shadow-lg backdrop-blur-sm'
+      >
+        <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-current' />
+        <span className='opacity-70'>Enhancing experience…</span>
+      </div>
+    </>
+  );
+}
 
 // Lazy load non-critical providers to reduce initial bundle size
-const LazyProviders = dynamic(
+const LazyProviders = dynamic<LazyProvidersProps>(
   () => import('./LazyProviders').then(mod => ({ default: mod.LazyProviders })),
   {
     ssr: false,
-    loading: () => null,
+    loading: LazyProvidersSkeleton,
   }
 );
 
@@ -22,75 +40,11 @@ interface ClientProvidersProps {
   initialThemeMode?: ThemeMode;
 }
 
-function ClerkWrapper({ children }: { children: React.ReactNode }) {
-  const publishableKey = env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-  // In test mode without Clerk keys, bypass authentication
-  if (!publishableKey) {
-    if (
-      process.env.NODE_ENV === 'test' ||
-      process.env.NODE_ENV === 'development'
-    ) {
-      // Bypass Clerk in test/dev mode when no keys are provided
-      logger.debug('Bypassing Clerk authentication (no keys provided)');
-      return <>{children}</>;
-    }
-
-    return (
-      <div className='flex items-center justify-center min-h-screen'>
-        <div className='text-center'>
-          <h1 className='text-2xl font-bold text-red-600 mb-4'>
-            Configuration Error
-          </h1>
-          <p className='text-gray-600'>
-            Clerk publishable key is not configured.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <ClerkProvider
-      clerkJSVersion='latest'
-      publishableKey={publishableKey}
-      appearance={
-        {
-          elements: {
-            rootBox: 'bg-base text-primary',
-            card: 'bg-surface-1 border border-subtle dark:border-default',
-            headerTitle: 'text-primary',
-            headerSubtitle: 'text-secondary',
-            formFieldInput:
-              'bg-surface-0 border border-default focus-ring-themed',
-            formButtonPrimary: 'btn btn-primary btn-md',
-            socialButtonsBlockButton: 'btn btn-secondary btn-md',
-            footerActionText: 'text-secondary',
-            footerActionLink: 'text-accent-token',
-          },
-        } as ComponentProps<typeof ClerkProvider>['appearance']
-      }
-    >
-      {children}
-    </ClerkProvider>
-  );
-}
-
 export function ClientProviders({
   children,
   initialThemeMode = 'system',
 }: ClientProvidersProps) {
-  const [isClient, setIsClient] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
-    setIsClient(true);
-
-    // Add a small delay to ensure proper hydration
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 100);
-
     // Environment-gated startup log
     try {
       logger.group('Jovie App');
@@ -119,35 +73,19 @@ export function ClientProviders({
     } catch (error) {
       console.error('Error initializing monitoring:', error);
     }
-
-    return () => clearTimeout(timer);
   }, []);
-
-  // Show loading state during hydration
-  if (!isClient || isLoading) {
-    return (
-      <div className='min-h-dvh grid place-items-center bg-[rgb(10,10,11)] text-[rgb(235,235,235)] dark:bg-black dark:text-white'>
-        <div className='flex items-center gap-3'>
-          <span className='size-2 rounded-full animate-ping bg-current' />
-          <span className='text-sm tracking-wide'>Loading…</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <React.StrictMode>
-      <ClerkWrapper>
-        <ThemeProvider
-          attribute='class'
-          defaultTheme={initialThemeMode}
-          enableSystem={true}
-          disableTransitionOnChange
-          storageKey='jovie-theme'
-        >
-          <LazyProviders>{children}</LazyProviders>
-        </ThemeProvider>
-      </ClerkWrapper>
+      <ThemeProvider
+        attribute='class'
+        defaultTheme={initialThemeMode}
+        enableSystem={true}
+        disableTransitionOnChange
+        storageKey='jovie-theme'
+      >
+        <LazyProviders>{children}</LazyProviders>
+      </ThemeProvider>
     </React.StrictMode>
   );
 }

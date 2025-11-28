@@ -1,12 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-
-interface DashboardAnalyticsProps {
-  initialData: DashboardData;
-}
 
 type Range = '1d' | '7d' | '30d';
 
@@ -20,10 +16,11 @@ type ApiPayload = {
   top_referrers: { referrer: string; count: number }[];
 };
 
-export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
+export function DashboardAnalytics() {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
 

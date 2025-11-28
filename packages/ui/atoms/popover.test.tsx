@@ -5,6 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { Popover, PopoverContent, PopoverTrigger } from './popover';
 
+const createUser = () => userEvent.setup({ delay: null });
+
 // Helper component for testing
 const TestPopover = ({
   open,
@@ -34,7 +36,7 @@ const TestPopover = ({
 describe('Popover', () => {
   describe('Basic Functionality', () => {
     it('renders trigger and shows content on click', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -53,7 +55,7 @@ describe('Popover', () => {
     });
 
     it('closes on outside click', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(
         <div>
           <TestPopover />
@@ -79,7 +81,7 @@ describe('Popover', () => {
     });
 
     it('closes on escape key', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -120,7 +122,7 @@ describe('Popover', () => {
     });
 
     it('calls onOpenChange when trigger is clicked', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       const onOpenChange = vi.fn();
       render(<TestPopover onOpenChange={onOpenChange} />);
 
@@ -133,7 +135,7 @@ describe('Popover', () => {
 
   describe('Accessibility', () => {
     it('has proper ARIA attributes', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -154,7 +156,7 @@ describe('Popover', () => {
     });
 
     it('manages focus correctly - does not trap focus like Dialog', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(
         <div>
           <TestPopover>
@@ -184,7 +186,7 @@ describe('Popover', () => {
     });
 
     it('returns focus to trigger when closed with escape', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -200,7 +202,7 @@ describe('Popover', () => {
     });
 
     it('supports keyboard navigation', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -261,7 +263,7 @@ describe('Popover', () => {
 
   describe('Interactive Content', () => {
     it('supports interactive content without focus trapping', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       const handleClick = vi.fn();
 
       render(
@@ -287,7 +289,7 @@ describe('Popover', () => {
     });
 
     it('supports form submission within popover', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       const handleSubmit = vi.fn(e => e.preventDefault());
 
       render(
@@ -330,7 +332,7 @@ describe('Popover', () => {
 
   describe('Edge Cases', () => {
     it('handles rapid open/close cycles', async () => {
-      const user = userEvent.setup();
+      const user = createUser();
       render(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });

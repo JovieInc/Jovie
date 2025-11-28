@@ -1,5 +1,3 @@
-'use client';
-
 import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';

@@ -2,18 +2,18 @@ name: CI
 
 on:
   pull_request:
-    branches: [preview, production]
+    branches: [main, production]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.vscode/**'
   push:
-    branches: [preview, production, 'codegen-bot/**']
+    branches: [main, production, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
   merge_group:
-    branches: [preview, production]
+    branches: [main, production]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -72,7 +72,7 @@ jobs:
   neon-db:
     name: Neon DB
     # Only run for push/merge_group and PRs to production (or full-ci label)
-    # Skip for preview PRs to keep fast lane truly fast (UI-only changes don't need DB)
+    # Skip for PRs to main to keep the fast lane truly fast (UI-only changes don't need DB)
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -282,9 +282,9 @@ jobs:
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          # For push events to production/preview, always run full CI
-          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/preview") ]]; then
-            echo "Running full CI for push to production/preview branch"
+          # For push events to production/main, always run full CI
+          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/main") ]]; then
+            echo "Running full CI for push to production/main branch"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -463,8 +463,8 @@ jobs:
         run: pnpm run e2e:smoke --trace=retain-on-failure
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
-      - name: E2E Full (Preview Branch)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/preview' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+      - name: E2E Full (Main Branch)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: pnpm run test:e2e --reporter=line
 
       - name: Upload Playwright Artifacts on Failure
@@ -481,7 +481,7 @@ jobs:
     name: Preview Deploy (PR)
     # Only needs build - no DB dependencies for fast UI-only PRs
     needs: [ci-build]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -542,8 +542,8 @@ jobs:
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   deploy:
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy of main
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
@@ -589,7 +589,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Canary health check
+      - name: Canary health check (Preview deployment for main)
         run: |
           echo "Running canary health check on preview deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
@@ -617,10 +617,10 @@ jobs:
 
   promote:
     name: Auto Promote to Production (Primary)
-    # PRIMARY: Automatic promotion path - creates/updates preview → production PR
+    # PRIMARY: Automatic promotion path - creates/updates main → production PR
     # Fallback: Manual promotion available via auto-promote.yml workflow
     needs: [deploy]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -629,16 +629,16 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 2 }
-      - name: Create/Update PR preview → production (manual review required)
+      - name: Create/Update PR main → production (manual review required)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create PR body with QA checklist
-          pr_body="## Release Promotion: preview → production
+          pr_body="## Release Promotion: main → production
 
           **⚠️ Manual Review Required**
 
-          This PR promotes changes from \`preview\` to \`production\` for production release.
+          This PR promotes changes from `main` to `production` for production release.
 
           ### Pre-merge Checklist
           - [ ] **Full CI passed** (ci-full job completed successfully)
@@ -651,7 +651,7 @@ jobs:
           - [ ] **Rollback plan documented** (feature flags, DB, etc.)
 
           ### Release QA
-          - [ ] **Smoke tests passed** in preview environment
+          - [ ] **Smoke tests passed** in preview/main environment
           - [ ] **Key user journeys verified** manually
           - [ ] **Mobile/responsive tested** (if UI changes)
           - [ ] **Cross-browser compatibility** verified (if applicable)
@@ -665,13 +665,13 @@ jobs:
           **🚨 Do not merge until all checks pass and manual QA is complete.**"
 
           # Check if PR already exists
-          existing_pr=$(gh pr list --head preview --base production --json number --jq '.[0].number // empty')
+          existing_pr=$(gh pr list --head main --base production --json number --jq '.[0].number // empty')
           if [ -z "$existing_pr" ]; then
-            echo "Creating new PR: preview → production"
-            gh pr create --base production --head preview --title "🚀 Release: Promote preview → production" --body "$pr_body"
+            echo "Creating new PR: main → production"
+            gh pr create --base production --head main --title "🚀 Release: Promote main → production" --body "$pr_body"
           else
             echo "PR already exists: #$existing_pr (updating with latest checklist)"
-            gh pr edit "$existing_pr" --title "🚀 Release: Promote preview → production" --body "$pr_body"
+            gh pr edit "$existing_pr" --title "🚀 Release: Promote main → production" --body "$pr_body"
           fi
 
   ai-review-gate:

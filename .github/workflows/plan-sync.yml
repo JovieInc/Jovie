@@ -24,12 +24,8 @@ jobs:
       group: plan-sync
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 20
-      - name: Install Octokit (runtime)
-        run: npm i octokit@latest --no-save --silent
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Sync plan to issues and assign Copilot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

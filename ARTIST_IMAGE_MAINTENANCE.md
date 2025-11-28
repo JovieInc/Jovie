@@ -28,7 +28,7 @@ The following artists are seeded in the database:
 Check the current status of all artist images without making changes:
 
 ```bash
-npm run verify-artist-images
+pnpm run verify-artist-images
 ```
 
 This script will:
@@ -43,7 +43,7 @@ This script will:
 Force update all artist images from Spotify (regardless of current status):
 
 ```bash
-npm run update-artist-images
+pnpm run update-artist-images
 ```
 
 This script will:
@@ -58,7 +58,7 @@ This script will:
 Intelligently check and update only invalid or missing images:
 
 ```bash
-npm run ensure-valid-artist-images
+pnpm run ensure-valid-artist-images
 ```
 
 This script will:
@@ -75,7 +75,7 @@ This script will:
 Run the ensure script weekly or monthly:
 
 ```bash
-npm run ensure-valid-artist-images
+pnpm run ensure-valid-artist-images
 ```
 
 ### Before Deployments
@@ -83,7 +83,7 @@ npm run ensure-valid-artist-images
 Run the verify script to check image status:
 
 ```bash
-npm run verify-artist-images
+pnpm run verify-artist-images
 ```
 
 ### After Adding New Artists
@@ -91,7 +91,7 @@ npm run verify-artist-images
 Run the update script to fetch fresh images:
 
 ```bash
-npm run update-artist-images
+pnpm run update-artist-images
 ```
 
 ## Requirements
@@ -177,8 +177,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
-      - run: npm run ensure-valid-artist-images
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run ensure-valid-artist-images
         env:
           SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
           SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}

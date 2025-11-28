@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 // flags import removed - pre-launch
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -16,11 +17,6 @@ interface LinkItem extends DetectedLink {
   order: number;
 }
 
-interface DashboardLinksProps {
-  initialData: DashboardData;
-  initialLinks: ProfileSocialLink[];
-}
-
 interface SaveStatus {
   saving: boolean;
   success: boolean | null;
@@ -29,12 +25,14 @@ interface SaveStatus {
 }
 
 export function DashboardLinks({
-  initialData,
   initialLinks,
-}: DashboardLinksProps) {
+}: {
+  initialLinks: ProfileSocialLink[];
+}) {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
   // Convert database social links to LinkItem format

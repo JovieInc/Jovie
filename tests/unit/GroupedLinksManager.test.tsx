@@ -55,14 +55,25 @@ vi.mock('@/components/dashboard/atoms/UniversalLinkInput', async () => {
 
 // dnd-kit minimal mocks to avoid complex interactions in unit tests
 vi.mock('@dnd-kit/core', async () => {
+  const actual =
+    await vi.importActual<typeof import('@dnd-kit/core')>('@dnd-kit/core');
   const React = await import('react');
+
   return {
+    ...actual,
+    // Keep real PointerSensor export so useSensor(PointerSensor, ...) works
+    PointerSensor: actual.PointerSensor,
+    // Simplify DndContext to just render children without real DnD behavior
     DndContext: ({ children }: { children: React.ReactNode }) => (
       <div>{children}</div>
     ),
-    useSensor: vi.fn(),
-    useSensors: vi.fn(() => []),
-  } as unknown as typeof import('@dnd-kit/core');
+    // Stub sensors to avoid complex behavior in unit tests
+    useSensor: vi.fn().mockImplementation((_sensor, options) => ({
+      sensor: _sensor,
+      options,
+    })),
+    useSensors: vi.fn().mockImplementation(() => []),
+  };
 });
 
 vi.mock('@dnd-kit/sortable', async () => {

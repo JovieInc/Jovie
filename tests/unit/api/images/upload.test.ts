@@ -31,6 +31,26 @@ vi.mock('@/lib/rate-limit', () => ({
   avatarUploadRateLimit: null, // Disabled in tests
 }));
 
+function createMultipartRequest(formData: FormData): NextRequest {
+  const request = new NextRequest('http://localhost:3000/api/images/upload', {
+    method: 'POST',
+  });
+
+  // Explicitly mock formData resolution instead of relying on NextRequest's
+  // internal body handling in the Vitest environment.
+  const requestWithFormData = request as NextRequest & {
+    formData: () => Promise<FormData>;
+  };
+  requestWithFormData.formData = async () => formData;
+
+  request.headers.set(
+    'content-type',
+    'multipart/form-data; boundary=----vitest-test-boundary'
+  );
+
+  return request;
+}
+
 describe('/api/images/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,10 +100,7 @@ describe('/api/images/upload', () => {
     // Create form data without file
     const formData = new FormData();
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -101,10 +118,7 @@ describe('/api/images/upload', () => {
     const file = new File(['test'], 'test.txt', { type: 'text/plain' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -117,16 +131,14 @@ describe('/api/images/upload', () => {
     // Mock authenticated user
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
-    // Create large file (5MB)
-    const largeContent = new Array(5 * 1024 * 1024).fill('a').join('');
     const formData = new FormData();
-    const file = new File([largeContent], 'large.jpg', { type: 'image/jpeg' });
+    const file = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(file, 'size', {
+      value: 5 * 1024 * 1024 + 1,
+    });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -146,10 +158,7 @@ describe('/api/images/upload', () => {
     });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
@@ -167,10 +176,7 @@ describe('/api/images/upload', () => {
     const file = new File(['fake-jpeg'], 'test.jpeg', { type: 'image/jpeg' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
@@ -183,10 +189,7 @@ describe('/api/images/upload', () => {
     const file = new File(['fake-png'], 'test.png', { type: 'image/png' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
@@ -199,10 +202,7 @@ describe('/api/images/upload', () => {
     const file = new File(['fake-webp'], 'test.webp', { type: 'image/webp' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);

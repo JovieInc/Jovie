@@ -13,6 +13,7 @@ import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler'
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import type { DashboardData } from './actions';
+import { DashboardDataProvider } from './DashboardDataContext';
 
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
@@ -93,7 +94,7 @@ export default function DashboardLayoutClient({
   }, [dashboardData.sidebarCollapsed]);
 
   return (
-    <>
+    <DashboardDataProvider value={dashboardData}>
       <PendingClaimRunner />
       <PendingClaimHandler />
 
@@ -108,6 +109,6 @@ export default function DashboardLayoutClient({
           </SidebarInset>
         </div>
       </SidebarProvider>
-    </>
+    </DashboardDataProvider>
   );
 }

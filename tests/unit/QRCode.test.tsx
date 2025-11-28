@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { vi } from 'vitest';
 import { QRCode } from '@/components/atoms/QRCode';
@@ -71,8 +71,8 @@ describe('QRCode', () => {
 
     const img = screen.getByRole('img');
 
-    // Simulate image load error
-    img.dispatchEvent(new Event('error'));
+    // Simulate image load error using Testing Library helper
+    fireEvent.error(img);
 
     // Should show error fallback
     const errorElement = screen.getByRole('img', {

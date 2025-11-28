@@ -1,11 +1,4 @@
-'use client';
-
-import dynamic from 'next/dynamic';
-
-const NewFeaturedArtists = dynamic(
-  () => import('./NewFeaturedArtists').then(m => m.NewFeaturedArtists),
-  { ssr: false }
-);
+import { NewFeaturedArtists } from './NewFeaturedArtists';
 
 export function FeaturedArtistsClient() {
   return <NewFeaturedArtists />;

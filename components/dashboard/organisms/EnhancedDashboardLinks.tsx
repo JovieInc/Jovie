@@ -5,7 +5,8 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { debounce } from '@/lib/utils';
@@ -57,17 +58,17 @@ interface SaveStatus {
 }
 
 export function EnhancedDashboardLinks({
-  initialData,
   initialLinks,
 }: {
-  initialData: DashboardData;
   initialLinks: ProfileSocialLink[];
 }) {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
+  const profileId = dashboardData.selectedProfile?.id;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
     saving: false,
@@ -207,24 +208,27 @@ export function EnhancedDashboardLinks({
             displayText: l.title,
           }));
 
-          const response = await fetch('/api/links', {
-            method: 'POST',
+          if (!profileId) {
+            setSaveStatus({
+              saving: false,
+              success: false,
+              error:
+                'Missing profile id; please refresh the page and try again.',
+              lastSaved: null,
+            });
+            toast.error('Unable to save links. Please refresh and try again.');
+            return;
+          }
+
+          const response = await fetch('/api/dashboard/social-links', {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ links: payload }),
+            body: JSON.stringify({ profileId, links: payload }),
           });
           if (!response.ok) throw new Error('Failed to save links');
 
-          const data: { links: Array<{ id: string; url: string }> } =
-            await response.json();
-
-          const updatedLinks: LinkItem[] = data.links.map((link, index) => {
-            const existing = normalized.find(
-              l => l.normalizedUrl === link.url
-            )!;
-            return { ...existing, id: link.id, order: index };
-          });
-
-          setLinks(updatedLinks);
+          // Keep normalized links locally; server IDs will be applied on next load
+          setLinks(normalized);
 
           const now = new Date();
           setSaveStatus({
@@ -248,7 +252,7 @@ export function EnhancedDashboardLinks({
           toast.error('Failed to save links. Please try again.');
         }
       }, 500),
-    []
+    [profileId]
   );
 
   // Handle adding a new link

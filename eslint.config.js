@@ -22,6 +22,8 @@ module.exports = [
       'test-results/**',
       '**/*.d.ts',
       '**/*.tsbuildinfo',
+      '**/*.config.js',
+      '**/*.config.ts',
       '**/.cache/**',
       '**/.temp/**',
       '**/.tmp/**',

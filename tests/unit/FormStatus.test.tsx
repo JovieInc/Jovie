@@ -1,12 +1,12 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { vi } from 'vitest';
 import { FormStatus } from '@/components/molecules/FormStatus';
 
 // Mock the LoadingSpinner component
 vi.mock('@/components/atoms/LoadingSpinner', () => ({
   LoadingSpinner: ({ size }: { size?: string }) => (
-    <div data-testid="loading-spinner" data-size={size}>
+    <div data-testid='loading-spinner' data-size={size}>
       Loading...
     </div>
   ),
@@ -20,7 +20,7 @@ describe('FormStatus', () => {
 
   it('renders nothing when all values are falsy', () => {
     const { container } = render(
-      <FormStatus loading={false} error="" success="" />
+      <FormStatus loading={false} error='' success='' />
     );
     expect(container.firstChild).toBeNull();
   });
@@ -29,7 +29,10 @@ describe('FormStatus', () => {
     render(<FormStatus loading={true} />);
 
     expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-    expect(screen.getByTestId('loading-spinner')).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByTestId('loading-spinner')).toHaveAttribute(
+      'data-size',
+      'sm'
+    );
     expect(screen.getByText('Processing...')).toBeInTheDocument();
   });
 
@@ -39,7 +42,11 @@ describe('FormStatus', () => {
 
     const errorElement = screen.getByText(errorMessage);
     expect(errorElement).toBeInTheDocument();
-    expect(errorElement).toHaveClass('text-sm', 'text-red-600', 'dark:text-red-400');
+    expect(errorElement).toHaveClass(
+      'text-sm',
+      'text-red-600',
+      'dark:text-red-400'
+    );
     expect(errorElement.tagName.toLowerCase()).toBe('p');
   });
 
@@ -49,17 +56,21 @@ describe('FormStatus', () => {
 
     const successElement = screen.getByText(successMessage);
     expect(successElement).toBeInTheDocument();
-    expect(successElement).toHaveClass('text-sm', 'text-green-600', 'dark:text-green-400');
+    expect(successElement).toHaveClass(
+      'text-sm',
+      'text-green-600',
+      'dark:text-green-400'
+    );
     expect(successElement.tagName.toLowerCase()).toBe('p');
   });
 
   it('does not render error when error is only whitespace', () => {
-    const { container } = render(<FormStatus error="   " />);
+    const { container } = render(<FormStatus error='   ' />);
     expect(container.firstChild).toBeNull();
   });
 
   it('does not render success when success is only whitespace', () => {
-    const { container } = render(<FormStatus success="   " />);
+    const { container } = render(<FormStatus success='   ' />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -67,8 +78,8 @@ describe('FormStatus', () => {
     render(
       <FormStatus
         loading={true}
-        error="An error occurred"
-        success="Success message"
+        error='An error occurred'
+        success='Success message'
       />
     );
 
@@ -82,7 +93,8 @@ describe('FormStatus', () => {
     const customClass = 'custom-form-status';
     render(<FormStatus loading={true} className={customClass} />);
 
-    const container = screen.getByTestId('loading-spinner').closest('div');
+    const container = screen.getByTestId('loading-spinner').parentElement
+      ?.parentElement as HTMLElement;
     expect(container).toHaveClass(customClass, 'space-y-2');
   });
 
@@ -90,8 +102,8 @@ describe('FormStatus', () => {
     render(
       <FormStatus
         loading={true}
-        error="Error message"
-        success="Success message"
+        error='Error message'
+        success='Success message'
       />
     );
 
@@ -108,12 +120,13 @@ describe('FormStatus', () => {
     render(
       <FormStatus
         loading={true}
-        error="Error message"
-        success="Success message"
+        error='Error message'
+        success='Success message'
       />
     );
 
-    const container = screen.getByTestId('loading-spinner').closest('div');
+    const container = screen.getByTestId('loading-spinner').parentElement
+      ?.parentElement as HTMLElement;
     expect(container).toHaveClass('space-y-2');
   });
 });

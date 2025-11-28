@@ -21,7 +21,7 @@ export default async function AudiencePage() {
     }
 
     // Pass server-fetched data to client component
-    return <DashboardAudience initialData={dashboardData} />;
+    return <DashboardAudience />;
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

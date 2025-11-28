@@ -3,18 +3,15 @@
 import { UserGroupIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-interface DashboardAudienceProps {
-  initialData: DashboardData;
-}
-
-export function DashboardAudience({ initialData }: DashboardAudienceProps) {
+export function DashboardAudience() {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
   // Note: Profile switching functionality will be implemented in the future

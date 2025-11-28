@@ -2,20 +2,17 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-interface DashboardOverviewProps {
-  initialData: DashboardData;
-}
-
-export function DashboardOverview({ initialData }: DashboardOverviewProps) {
-  const artist: Artist | null = initialData.selectedProfile
-    ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+export function DashboardOverview() {
+  const dashboardData = useDashboardData();
+  const artist: Artist | null = dashboardData.selectedProfile
+    ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
     : null;
 
   if (!artist) {
@@ -26,7 +23,7 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const hasSocialLinks = initialData.hasSocialLinks;
+  const hasSocialLinks = dashboardData.hasSocialLinks;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
   const totalSteps = 3;
   const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(

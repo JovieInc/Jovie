@@ -1,28 +1,8 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './ClaimHandleForm';
 import { QRCodeCard } from './QRCodeCard';
 
 export function NewHomeHero() {
-  const [isMounted, setIsMounted] = useState(false);
-  const [previewHandle, setPreviewHandle] = useState('yourhandle');
-
-  // Handle form state updates for QR code preview
-  const handlePreviewUpdate = (handle: string) => {
-    if (handle && handle.length > 0) {
-      setPreviewHandle(handle);
-    } else {
-      setPreviewHandle('yourhandle');
-    }
-  };
-
-  // Hydration fix
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   return (
     <section className='relative overflow-hidden pt-10 pb-12 sm:pt-16 sm:pb-16 lg:pt-20 lg:pb-24'>
       {/* Subtle background gradient */}
@@ -54,9 +34,7 @@ export function NewHomeHero() {
 
             {/* Handle claim form */}
             <div className='mt-8 max-w-md mx-auto lg:mx-0'>
-              {isMounted && (
-                <ClaimHandleForm onHandleChange={handlePreviewUpdate} />
-              )}
+              <ClaimHandleForm />
             </div>
           </div>
 
@@ -72,7 +50,7 @@ export function NewHomeHero() {
                     <div className='absolute top-8 inset-x-0 text-center'>
                       <div className='inline-flex items-center px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200'>
                         <span className='mr-1 text-gray-400'>@</span>
-                        {previewHandle}
+                        {'yourhandle'}
                       </div>
                     </div>
 
@@ -98,7 +76,7 @@ export function NewHomeHero() {
 
               {/* QR code card */}
               <div className='absolute -right-12 bottom-12'>
-                <QRCodeCard handle={previewHandle} />
+                <QRCodeCard handle='yourhandle' />
               </div>
             </div>
           </div>

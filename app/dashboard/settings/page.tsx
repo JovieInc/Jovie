@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
-import { getDashboardData } from '../actions';
+import { getDashboardDataCached } from '../actions';
 
 export default async function SettingsPage() {
   const { userId } = await auth();
@@ -12,8 +12,8 @@ export default async function SettingsPage() {
   }
 
   try {
-    // Fetch dashboard data server-side
-    const dashboardData = await getDashboardData();
+    // Fetch dashboard data server-side (cached per request)
+    const dashboardData = await getDashboardDataCached();
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
@@ -21,7 +21,7 @@ export default async function SettingsPage() {
     }
 
     // Pass server-fetched data to client component
-    return <DashboardSettings initialData={dashboardData} />;
+    return <DashboardSettings />;
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

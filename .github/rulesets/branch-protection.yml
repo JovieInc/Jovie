@@ -3,7 +3,7 @@ enforcement: 'active'
 target:
   ref_name:
     include:
-      - 'refs/heads/preview'
+      - 'refs/heads/main'
       - 'refs/heads/production'
     exclude: []
 rules:

@@ -1,4 +1,5 @@
 import { ClerkAnalytics } from '@/components/providers/ClerkAnalytics';
+import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
 
 export default function AuthLayout({
   children,
@@ -6,9 +7,9 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <ClerkAppProvider>
       {children}
       <ClerkAnalytics />
-    </>
+    </ClerkAppProvider>
   );
 }

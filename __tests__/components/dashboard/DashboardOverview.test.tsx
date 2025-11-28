@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
 
@@ -54,6 +55,14 @@ function makeData(
   } satisfies DashboardData;
 }
 
+function renderDashboard(data: DashboardData) {
+  return render(
+    <DashboardDataProvider value={data}>
+      <DashboardOverview />
+    </DashboardDataProvider>
+  );
+}
+
 describe('DashboardOverview', () => {
   afterEach(() => {
     cleanup();
@@ -66,7 +75,7 @@ describe('DashboardOverview', () => {
     const profile = makeProfile({ userId: null });
     const data = makeData(profile, { hasSocialLinks: false });
 
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(data);
 
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
@@ -100,7 +109,7 @@ describe('DashboardOverview', () => {
     });
     const data = makeData(profile, { hasSocialLinks: false });
 
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(data);
 
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
@@ -136,7 +145,7 @@ describe('DashboardOverview', () => {
     });
     const data = makeData(profile, { hasSocialLinks: true });
 
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(data);
 
     // Completion UI
     expect(screen.getByText('Profile Ready!')).toBeInTheDocument();

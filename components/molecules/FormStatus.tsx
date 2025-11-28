@@ -15,7 +15,11 @@ export function FormStatus({
   success,
   className,
 }: FormStatusProps) {
-  if (!loading && !error && !success) return null;
+  const trimmedError = error?.trim() ?? '';
+  const trimmedSuccess = success?.trim() ?? '';
+
+  // Render nothing when there's no loading state and no meaningful messages
+  if (!loading && !trimmedError && !trimmedSuccess) return null;
 
   return (
     <div className={cn('space-y-2', className)}>
@@ -26,12 +30,14 @@ export function FormStatus({
         </div>
       )}
 
-      {error && error.trim() !== '' && (
-        <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
+      {trimmedError && (
+        <p className='text-sm text-red-600 dark:text-red-400'>{trimmedError}</p>
       )}
 
-      {success && success.trim() !== '' && (
-        <p className='text-sm text-green-600 dark:text-green-400'>{success}</p>
+      {trimmedSuccess && (
+        <p className='text-sm text-green-600 dark:text-green-400'>
+          {trimmedSuccess}
+        </p>
       )}
     </div>
   );

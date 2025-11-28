@@ -53,8 +53,18 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const billingStatus = useBillingStatus();
   const billingErrorNotifiedRef = useRef(false);
+
+  const redirectToUrl = (url: string) => {
+    if (typeof window === 'undefined') return;
+    if (typeof window.location.assign === 'function') {
+      window.location.assign(url);
+      return;
+    }
+    window.location.href = url;
+  };
 
   useEffect(() => {
     if (billingStatus.error && !billingErrorNotifiedRef.current) {
@@ -170,7 +180,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         plan: billingStatus.plan ?? 'unknown',
       });
 
-      window.location.assign(portal.url);
+      redirectToUrl(portal.url);
     } catch (error) {
       const message =
         error instanceof Error
@@ -250,7 +260,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
         interval: preferredPlan.interval,
       });
 
-      window.location.assign(checkout.url);
+      redirectToUrl(checkout.url);
     } catch (error) {
       const message =
         error instanceof Error
@@ -277,13 +287,14 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
         {showUserInfo ? (
           <div
             className={cn(
               'flex w-full items-center gap-3 p-2 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 transition-colors'
             )}
+            onClick={() => setIsMenuOpen(prev => !prev)}
           >
             {userImageUrl ? (
               <Image
@@ -326,6 +337,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
             variant='ghost'
             size='icon'
             className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'
+            onClick={() => setIsMenuOpen(prev => !prev)}
           >
             {userImageUrl ? (
               <Image

@@ -1,7 +1,9 @@
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getDashboardData, setSidebarCollapsed } from './actions';
+import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
+import { MyStatsig } from '../my-statsig';
+import { getDashboardDataCached, setSidebarCollapsed } from './actions';
 import DashboardLayoutClient from './DashboardLayoutClient';
 
 export default async function DashboardLayout({
@@ -17,8 +19,7 @@ export default async function DashboardLayout({
   }
 
   try {
-    // Fetch dashboard data server-side
-    const dashboardData = await getDashboardData();
+    const dashboardData = await getDashboardDataCached();
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
@@ -26,12 +27,16 @@ export default async function DashboardLayout({
     }
 
     return (
-      <DashboardLayoutClient
-        dashboardData={dashboardData}
-        persistSidebarCollapsed={setSidebarCollapsed}
-      >
-        {children}
-      </DashboardLayoutClient>
+      <MyStatsig userId={userId}>
+        <ClerkAppProvider>
+          <DashboardLayoutClient
+            dashboardData={dashboardData}
+            persistSidebarCollapsed={setSidebarCollapsed}
+          >
+            {children}
+          </DashboardLayoutClient>
+        </ClerkAppProvider>
+      </MyStatsig>
     );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)

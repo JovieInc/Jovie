@@ -1,4 +1,8 @@
-# Claude AI Guidelines for Jovie Project (Next.js + Edge + Neon + Drizzle + Clerk + Tailwind v4 + PostHog + Stripe)
+# Claude AI Guidelines for Jovie Project
+
+> **Deprecated:** This file is no longer maintained. For all up-to-date AI agent guidelines (including Statsig-only analytics/feature flags), see `agents.md` at the repo root.
+
+The rest of this document is retained only for historical context. **Do not** follow any instructions here; always use `agents.md` as the single source of truth.
 
 ## 🚦 Jovie PR & Integration Rules
 
@@ -13,8 +17,8 @@
    - New functionality ships directly to production after testing.
 
 3. **Environment & Branching**
-   - Work exclusively on feature branches derived from `preview`.
-   - Never push directly to `preview` or `production`.
+   - Work exclusively on feature branches derived from `main`.
+   - Never push directly to `main` or `production`.
    - Standard branch naming: `feat/<slug>`, `fix/<slug>`, `chore/<slug>`.
    - Keep branch names scoped to 3–6 words in kebab-case.
 
@@ -25,7 +29,7 @@
    - Ensure preview deploy builds successfully.
 
 5. **Policy**
-   - PRs must be up-to-date with `preview`.
+   - PRs must be up-to-date with `main`.
    - PR titles formatted as `[feat|fix|chore]: <slug>`.
    - PR body includes:
      1. Goal (1–2 sentences)
@@ -47,7 +51,7 @@
    - E2E @smoke passes
 
    Behavior:
-   - Auto-merge to `preview` after green CI
+   - Auto-merge to `main` after green CI
    - Auto-promote to `production` (see Production Delivery)
 
 6. **Failure Behavior**
@@ -91,18 +95,18 @@
      ```
 
 9. **Post-Open Flow**
-   - Ensure PR is rebased onto latest `preview`.
+   - Ensure PR is rebased onto latest `main`.
    - Run all CI checks.
    - Address review comments promptly.
    - After merge, monitor metrics and events.
    - Use PostHog feature flags for gradual rollouts if needed.
 
 10. **Branching & Protection**
-    - `preview` and `production` are protected.
+    - `main` and `production` are protected.
     - No direct pushes allowed.
-    - All changes via PR to `preview`.
-    - Feature branches must be current with `preview`.
-    - Manual promotion from `preview` to `production`.
+    - All changes go through PRs targeting `main`.
+    - Feature branches must be current with `main`.
+    - Promotion from `main` to `production` happens via release PRs (fast-path PRs may auto-promote after green CI).
 
 ---
 
@@ -380,7 +384,7 @@ Before creating a component, ask:
 
 ## 🧱 Stack & Packages (Pin to this shape)
 
-- **Package Manager:** pnpm (preferred over npm for speed, determinism, and CI reliability)
+- **Package Manager:** pnpm (sole package manager for speed, determinism, and CI reliability)
 - **Next.js (App Router, RSC):** `next`, `react`, `react-dom`
 - **DB (Neon + Drizzle):** `drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`
 - **Auth (Clerk):** `@clerk/nextjs`
@@ -515,9 +519,10 @@ export const dbNode = drizzle(new Pool({ connectionString: process.env.DATABASE_
 ```
 
 ## Neon Branch Hygiene
-- Auto-create DB branch per feature and auto-delete on PR close/merge.
-- Cap active Neon branches at 15; CI fails if cap exceeded.
-- One migration per PR; no destructive change without data-move plan.
+- Auto-create a Neon DB branch per feature (using sanitized branch name) for full CI runs.
+- Auto-delete ephemeral Neon branches when the corresponding PR/feature branch is closed to stay under the Neon plan limit (10 total branches).
+- Reserve long-lived Neon branches for `production` and its primary child branch only; all other branches are treated as ephemeral.
+- One migration per PR; no destructive change without a data-move plan.
 
 ### Staging Reset Policy
 - After every successful promotion of `preview` to `production`, the long-lived `preview` branch is reset from its parent to keep schema and data in sync.

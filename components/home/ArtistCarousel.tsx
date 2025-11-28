@@ -44,6 +44,8 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
                     size='2xl'
                     shape='circle'
                     className='w-full h-full object-cover'
+                    aspectRatio='square'
+                    sizes='(max-width: 640px) 96px, (max-width: 1024px) 128px, 128px'
                   />
                 </div>
 

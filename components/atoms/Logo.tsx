@@ -19,6 +19,8 @@ export function Logo({ className, size = 'md' }: LogoProps) {
       xmlns='http://www.w3.org/2000/svg'
       xmlnsXlink='http://www.w3.org/1999/xlink'
       viewBox='0 0 136 39'
+      role='img'
+      aria-label='Jovie logo'
       className={cn(
         sizeClasses[size],
         'text-black dark:text-white transition-colors duration-200',

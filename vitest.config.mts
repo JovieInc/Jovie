@@ -1,3 +1,4 @@
+import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import path from 'path';
 import { defineConfig } from 'vitest/config';
@@ -6,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 dotenv.config({ path: '.env.test' });
 
 export default defineConfig({
+  plugins: [react()],
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],

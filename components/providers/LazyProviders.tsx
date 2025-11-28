@@ -28,7 +28,7 @@ const Analytics = dynamic(
   }
 );
 
-interface LazyProvidersProps {
+export interface LazyProvidersProps {
   children: React.ReactNode;
 }
 

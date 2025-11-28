@@ -2,23 +2,7 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GET } from '@/app/api/images/status/[id]/route';
 
-// Mock dependencies
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(),
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: vi.fn(),
-  },
-  profilePhotos: {},
-}));
-
-vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-}));
-
+// Hoisted mocks so they can be shared between vi.mock and tests
 const { auth } = vi.hoisted(() => ({
   auth: vi.fn(),
 }));
@@ -33,6 +17,21 @@ const { db } = vi.hoisted(() => ({
       }),
     }),
   },
+}));
+
+// Module mocks use the same hoisted instances the tests manipulate
+vi.mock('@clerk/nextjs/server', () => ({
+  auth,
+}));
+
+vi.mock('@/lib/db', () => ({
+  db,
+  profilePhotos: {},
+}));
+
+vi.mock('drizzle-orm', () => ({
+  eq: vi.fn(),
+  and: vi.fn(),
 }));
 
 describe('/api/images/status/[id]', () => {

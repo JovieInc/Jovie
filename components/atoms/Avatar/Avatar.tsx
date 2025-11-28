@@ -61,7 +61,7 @@ const BLUR_DATA_URLS = {
  */
 function generateInitials(name?: string): string {
   if (!name) return '?';
-  
+
   return name
     .split(' ')
     .map(part => part[0])
@@ -72,7 +72,7 @@ function generateInitials(name?: string): string {
 
 /**
  * Unified Avatar component for display-only usage
- * 
+ *
  * This component handles:
  * - Multiple sizes with consistent design system values
  * - Fallback initials when image fails to load
@@ -95,15 +95,16 @@ export const Avatar = React.memo(function Avatar({
 }: AvatarProps) {
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  
+
   const { width, height, className: sizeClass, textSize } = SIZE_MAP[size];
   const roundedClass = ROUNDED_MAP[rounded];
-  const blurDataURL = BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS] || BLUR_DATA_URLS[48];
+  const blurDataURL =
+    BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS] || BLUR_DATA_URLS[48];
   const initials = generateInitials(name);
-  
+
   // Show fallback if no src or error occurred
   const shouldShowFallback = !src || hasError;
-  
+
   if (shouldShowFallback) {
     return (
       <div
@@ -116,7 +117,7 @@ export const Avatar = React.memo(function Avatar({
           className
         )}
         style={style}
-        role="img"
+        role='img'
         aria-label={alt}
       >
         <span className={cn('font-medium select-none', textSize)}>
@@ -136,17 +137,18 @@ export const Avatar = React.memo(function Avatar({
         className
       )}
       style={style}
-      role="img"
+      role='img'
       aria-label={alt}
     >
       <Image
         src={src}
-        alt={alt}
+        alt=''
+        aria-hidden='true'
         width={width}
         height={height}
         priority={priority}
         quality={quality}
-        placeholder="blur"
+        placeholder='blur'
         blurDataURL={blurDataURL}
         sizes={`${width}px`}
         className={cn(
@@ -159,10 +161,10 @@ export const Avatar = React.memo(function Avatar({
           aspectRatio: '1 / 1',
         }}
       />
-      
+
       {/* Loading shimmer effect */}
       {!isLoaded && !hasError && (
-        <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700" />
+        <div className='absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700' />
       )}
     </div>
   );

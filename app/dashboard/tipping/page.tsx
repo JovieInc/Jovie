@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardTipping } from '@/components/dashboard/DashboardTipping';
+import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGate';
 import { getDashboardData } from '../actions';
 
 export default async function TippingPage() {
@@ -20,8 +20,8 @@ export default async function TippingPage() {
       redirect('/onboarding');
     }
 
-    // Pass server-fetched data to client component
-    return <DashboardTipping initialData={dashboardData} />;
+    // Pass server-fetched data to client component behind Statsig gate
+    return <DashboardTippingGate />;
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

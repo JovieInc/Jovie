@@ -81,6 +81,8 @@ export default async function ArtistsPage() {
                     size='xl'
                     shape='circle'
                     className='mx-auto'
+                    aspectRatio='square'
+                    sizes='(max-width: 640px) 96px, (max-width: 1024px) 96px, 96px'
                   />
                 </div>
 

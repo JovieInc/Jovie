@@ -19,7 +19,7 @@ const clerkClientMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkClient: clerkClientMock,
+  clerkClient: async () => clerkClientMock,
 }));
 
 vi.mock('@/lib/auth/session', () => ({

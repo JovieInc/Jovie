@@ -1,10 +1,12 @@
 'use client';
 
+import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
 import { track } from '@/lib/analytics';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 // Email validation schema
 const emailSchema = z.string().email('Please enter a valid email address');
@@ -24,6 +26,22 @@ export default function NotificationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+
+  if (!notificationsGate.value) {
+    return (
+      <div className='container mx-auto px-4 py-8 max-w-md'>
+        <h1 className='text-2xl font-bold mb-6'>
+          Notifications are not available yet
+        </h1>
+        <p className='text-gray-600 dark:text-gray-400'>
+          We&apos;re focused on getting the core Jovie profile experience right
+          before launching notifications.
+        </p>
+      </div>
+    );
+  }
 
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {

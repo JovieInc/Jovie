@@ -2,7 +2,7 @@ name: Tailwind v4 Smoke
 
 on:
   pull_request:
-    branches: [preview]
+    branches: [main]
     paths:
       - 'styles/**'
       - 'app/**'
