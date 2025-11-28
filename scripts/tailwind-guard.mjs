@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { readFileSync, existsSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { existsSync, readFileSync } from 'fs';
 import { glob } from 'glob';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,7 +26,9 @@ export async function validateTailwindConfig() {
 
       // Must be .js file (not .ts for v4)
       if (!configContent.includes('module.exports')) {
-        errors.push('❌ CRITICAL: tailwind.config.js must use module.exports (not ES6 exports)');
+        errors.push(
+          '❌ CRITICAL: tailwind.config.js must use module.exports (not ES6 exports)'
+        );
       }
 
       // Must have content array
@@ -36,19 +38,23 @@ export async function validateTailwindConfig() {
 
       // Should not have @config directive
       if (configContent.includes('@config')) {
-        errors.push('❌ CRITICAL: tailwind.config.js should not contain @config directive in v4');
+        errors.push(
+          '❌ CRITICAL: tailwind.config.js should not contain @config directive in v4'
+        );
       }
 
       console.log('✅ tailwind.config.js structure valid');
     } catch (err) {
-      errors.push(`❌ CRITICAL: Error reading tailwind.config.js: ${err.message}`);
+      errors.push(
+        `❌ CRITICAL: Error reading tailwind.config.js: ${err.message}`
+      );
     }
   }
 
   // 2. CRITICAL: PostCSS Configuration Validation
   const postcssPaths = [
     join(projectRoot, 'postcss.config.js'),
-    join(projectRoot, 'postcss.config.mjs')
+    join(projectRoot, 'postcss.config.mjs'),
   ];
 
   let postcssFound = false;
@@ -60,17 +66,29 @@ export async function validateTailwindConfig() {
 
         // CRITICAL: Must use @tailwindcss/postcss for v4 (not 'tailwindcss')
         if (!postcssContent.includes('@tailwindcss/postcss')) {
-          errors.push('❌ CRITICAL: postcss.config must use "@tailwindcss/postcss" plugin');
+          errors.push(
+            '❌ CRITICAL: postcss.config must use "@tailwindcss/postcss" plugin'
+          );
         }
 
         // CRITICAL: Must NOT use 'tailwindcss' directly
-        if (postcssContent.includes('tailwindcss:') && !postcssContent.includes('@tailwindcss/postcss')) {
-          errors.push('❌ CRITICAL: postcss.config using "tailwindcss" directly - THIS BREAKS THE BUILD');
+        if (
+          postcssContent.includes('tailwindcss:') &&
+          !postcssContent.includes('@tailwindcss/postcss')
+        ) {
+          errors.push(
+            '❌ CRITICAL: postcss.config using "tailwindcss" directly - THIS BREAKS THE BUILD'
+          );
         }
 
         // Validate exact format
-        if (!postcssContent.includes("'@tailwindcss/postcss': {}") && !postcssContent.includes('"@tailwindcss/postcss": {}')) {
-          errors.push('❌ CRITICAL: postcss.config must use exact format: "@tailwindcss/postcss": {}');
+        if (
+          !postcssContent.includes("'@tailwindcss/postcss': {}") &&
+          !postcssContent.includes('"@tailwindcss/postcss": {}')
+        ) {
+          errors.push(
+            '❌ CRITICAL: postcss.config must use exact format: "@tailwindcss/postcss": {}'
+          );
         }
 
         // Should include autoprefixer
@@ -80,7 +98,9 @@ export async function validateTailwindConfig() {
 
         console.log('✅ PostCSS configuration valid');
       } catch (err) {
-        errors.push(`❌ CRITICAL: Error reading PostCSS config: ${err.message}`);
+        errors.push(
+          `❌ CRITICAL: Error reading PostCSS config: ${err.message}`
+        );
       }
       break;
     }
@@ -100,18 +120,24 @@ export async function validateTailwindConfig() {
 
       // Must import tailwindcss
       if (!cssContent.includes('@import "tailwindcss"')) {
-        errors.push('❌ CRITICAL: app/globals.css missing @import "tailwindcss"');
+        errors.push(
+          '❌ CRITICAL: app/globals.css missing @import "tailwindcss"'
+        );
       }
 
       // CRITICAL: Check for incorrect theme import path
       if (cssContent.includes('@import "./theme.css"')) {
-        errors.push('❌ CRITICAL: app/globals.css has incorrect theme import path (should be "../styles/theme.css")');
+        errors.push(
+          '❌ CRITICAL: app/globals.css has incorrect theme import path (should be "../styles/theme.css")'
+        );
       }
 
       if (cssContent.includes('@import "../styles/theme.css"')) {
         console.log('✅ globals.css theme import path correct');
       } else {
-        errors.push('❌ CRITICAL: app/globals.css missing theme import or incorrect path');
+        errors.push(
+          '❌ CRITICAL: app/globals.css missing theme import or incorrect path'
+        );
       }
 
       console.log('✅ globals.css structure valid');
@@ -141,7 +167,9 @@ export async function validateTailwindConfig() {
         packageJson.devDependencies?.['@tailwindcss/postcss'];
 
       if (!hasTailwindPostcss) {
-        errors.push('❌ CRITICAL: @tailwindcss/postcss dependency missing from package.json');
+        errors.push(
+          '❌ CRITICAL: @tailwindcss/postcss dependency missing from package.json'
+        );
       } else {
         console.log('✅ @tailwindcss/postcss dependency found');
       }
@@ -153,24 +181,29 @@ export async function validateTailwindConfig() {
   // 6. Check for multiple config files (causes conflicts)
   const tailwindConfigs = await glob('tailwind.config.*', {
     cwd: projectRoot,
-    ignore: 'node_modules/**'
+    ignore: 'node_modules/**',
   });
 
   if (tailwindConfigs.length > 1) {
-    errors.push(`❌ CRITICAL: Multiple Tailwind configs found: ${tailwindConfigs.join(', ')}`);
+    errors.push(
+      `❌ CRITICAL: Multiple Tailwind configs found: ${tailwindConfigs.join(', ')}`
+    );
   }
 
   // 7. Check for multiple globals.css files
   const globalsFiles = await glob('**/*globals.css', {
     cwd: projectRoot,
-    ignore: 'node_modules/**'
+    ignore: 'node_modules/**',
   });
 
   const tailwindImports = [];
   globalsFiles.forEach(file => {
     try {
       const content = readFileSync(join(projectRoot, file), 'utf8');
-      if (content.includes('@import "tailwindcss"') || content.includes("@import 'tailwindcss'")) {
+      if (
+        content.includes('@import "tailwindcss"') ||
+        content.includes("@import 'tailwindcss'")
+      ) {
         tailwindImports.push(file);
       }
     } catch {
@@ -179,7 +212,9 @@ export async function validateTailwindConfig() {
   });
 
   if (tailwindImports.length > 1) {
-    errors.push(`❌ CRITICAL: Multiple files importing Tailwind: ${tailwindImports.join(', ')}`);
+    errors.push(
+      `❌ CRITICAL: Multiple files importing Tailwind: ${tailwindImports.join(', ')}`
+    );
   }
 
   // Report results

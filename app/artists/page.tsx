@@ -8,6 +8,7 @@ import { creatorProfiles } from '@/lib/db/schema';
 
 // Root layout handles dynamic rendering
 export const revalidate = 3600; // Revalidate every hour
+export const dynamic = 'force-dynamic';
 
 export default async function ArtistsPage() {
   let profiles: Array<{
@@ -20,6 +21,11 @@ export default async function ArtistsPage() {
   let error = false;
 
   try {
+    if (!process.env.DATABASE_URL) {
+      // Skip DB lookup when database is unavailable (e.g., static builds without env)
+      return renderFallback();
+    }
+
     // Fetch all public creator profiles
     profiles = await db
       .select({
@@ -38,18 +44,7 @@ export default async function ArtistsPage() {
   }
 
   if (error) {
-    return (
-      <div className='min-h-screen bg-[#0D0E12]'>
-        <Container className='py-16'>
-          <div className='text-center'>
-            <h1 className='text-2xl font-semibold text-white'>
-              Error loading profiles
-            </h1>
-            <p className='mt-4 text-white/70'>Please try again later.</p>
-          </div>
-        </Container>
-      </div>
-    );
+    return renderFallback();
   }
 
   return (
@@ -87,7 +82,7 @@ export default async function ArtistsPage() {
                 </div>
 
                 <h3 className='text-lg font-semibold text-white group-hover:text-blue-400 transition-colors'>
-                  {profile.displayName}
+                  {profile.displayName || profile.username}
                 </h3>
 
                 {profile.bio && (
@@ -116,6 +111,23 @@ export default async function ArtistsPage() {
             </p>
           </div>
         )}
+      </Container>
+    </div>
+  );
+}
+
+function renderFallback() {
+  return (
+    <div className='min-h-screen bg-[#0D0E12]'>
+      <Container className='py-16'>
+        <div className='text-center'>
+          <h1 className='text-2xl font-semibold text-white'>
+            Profiles are loading
+          </h1>
+          <p className='mt-4 text-white/70'>
+            Please check back shortly once the connection is available.
+          </p>
+        </div>
       </Container>
     </div>
   );

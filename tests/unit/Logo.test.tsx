@@ -1,5 +1,5 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import React from 'react';
 import { Logo } from '@/components/atoms/Logo';
 
 describe('Logo', () => {
@@ -59,7 +59,12 @@ describe('Logo', () => {
     render(<Logo />);
 
     const logo = screen.getByRole('img', { hidden: true });
-    expect(logo).toHaveClass('text-black', 'dark:text-white', 'transition-colors', 'duration-200');
+    expect(logo).toHaveClass(
+      'text-black',
+      'dark:text-white',
+      'transition-colors',
+      'duration-200'
+    );
   });
 
   it('contains the Jovie logo path data', () => {
