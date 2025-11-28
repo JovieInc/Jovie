@@ -4,7 +4,7 @@
 
 ### Preview Deployment Workflow
 
-The `consolidated-vercel-preview.yml` workflow handles Vercel preview deployments for pull requests and feature branches.
+Vercel preview deployments for pull requests and feature branches are handled by the `ci.yml` workflow via the `ci-pr-vercel-preview` and `deploy` jobs.
 
 #### Features:
 
