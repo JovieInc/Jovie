@@ -1,9 +1,10 @@
-name: sync-preview-on-prod-promotion
+name: sync-main-db-on-prod-promotion
 
 on:
   workflow_run:
-    workflows: ["promote-preview-to-production"]
+    workflows: ["CI"]
     types: [completed]
+    branches: [production]
 
 jobs:
   reset-preview:

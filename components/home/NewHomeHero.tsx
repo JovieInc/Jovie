@@ -1,5 +1,6 @@
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './ClaimHandleForm';
+import { HeroHandlePreviewChip } from './HeroHandlePreviewChip';
 import { QRCodeCard } from './QRCodeCard';
 
 export function NewHomeHero() {
@@ -50,7 +51,7 @@ export function NewHomeHero() {
                     <div className='absolute top-8 inset-x-0 text-center'>
                       <div className='inline-flex items-center px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-sm font-medium text-gray-800 dark:text-gray-200'>
                         <span className='mr-1 text-gray-400'>@</span>
-                        {'yourhandle'}
+                        <HeroHandlePreviewChip />
                       </div>
                     </div>
 

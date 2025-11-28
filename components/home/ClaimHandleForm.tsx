@@ -55,6 +55,14 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
     if (onHandleChange) {
       onHandleChange(handle);
     }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('jovie-hero-handle-change', {
+          detail: { handle },
+        })
+      );
+    }
   }, [handle, onHandleChange]);
 
   // Optimistic prefetch when handle becomes available

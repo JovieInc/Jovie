@@ -9,10 +9,33 @@ interface QRCodeCardProps {
 }
 
 export function QRCodeCard({ handle }: QRCodeCardProps) {
+  const [effectiveHandle, setEffectiveHandle] = useState(handle);
   const [qrCodeUrl, setQrCodeUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const profileUrl = `${APP_URL}/${handle}`;
+  const profileUrl = `${APP_URL}/${effectiveHandle}`;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const listener = (event: Event) => {
+      const customEvent = event as CustomEvent<{ handle?: string }>;
+      const next = customEvent.detail?.handle?.trim();
+      setEffectiveHandle(next && next.length > 0 ? next : handle);
+    };
+
+    window.addEventListener(
+      'jovie-hero-handle-change',
+      listener as EventListener
+    );
+
+    return () => {
+      window.removeEventListener(
+        'jovie-hero-handle-change',
+        listener as EventListener
+      );
+    };
+  }, [handle]);
 
   // Generate QR code URL using a free QR code API
   useEffect(() => {

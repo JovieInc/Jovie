@@ -16,7 +16,7 @@ The `consolidated-vercel-preview.yml` workflow handles Vercel preview deployment
 #### Triggers:
 
 - Pull request events (opened, reopened, synchronize)
-- Push events to non-production, non-preview branches
+- Push events to non-production, non-main branches
 - Manual workflow dispatch with PR number input
 
 #### Secrets:

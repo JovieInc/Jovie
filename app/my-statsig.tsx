@@ -1,6 +1,8 @@
 'use client';
 
 import { LogLevel, StatsigProvider } from '@statsig/react-bindings';
+import { StatsigSessionReplayPlugin } from '@statsig/session-replay';
+import { usePathname } from 'next/navigation';
 import React from 'react';
 import { env } from '@/lib/env';
 
@@ -11,6 +13,8 @@ export interface MyStatsigProps {
 
 export function MyStatsig({ children, userId }: MyStatsigProps) {
   const sdkKey = env.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
+  const pathname = usePathname();
+
   const user = React.useMemo(
     () => ({
       userID: userId ?? 'anonymous',
@@ -24,6 +28,14 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
     'development';
   const isProductionEnv = vercelEnv === 'production';
 
+  const plugins = React.useMemo(
+    () =>
+      pathname.startsWith('/dashboard')
+        ? [new StatsigSessionReplayPlugin()]
+        : [],
+    [pathname]
+  );
+
   // Only initialize Statsig in production for authenticated users with a configured key
   if (!sdkKey || !isProductionEnv || !userId) {
     return <>{children}</>;
@@ -35,6 +47,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
       user={user}
       options={{
         logLevel: LogLevel.Debug,
+        plugins,
       }}
     >
       {children}

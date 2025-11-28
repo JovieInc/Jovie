@@ -1,4 +1,4 @@
-name: sync-preview-nightly
+name: sync-main-db-nightly
 permissions:
   contents: read
 
