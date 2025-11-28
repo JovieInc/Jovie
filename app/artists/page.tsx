@@ -82,7 +82,7 @@ export default async function ArtistsPage() {
                 </div>
 
                 <h3 className='text-lg font-semibold text-white group-hover:text-blue-400 transition-colors'>
-                  {profile.displayName}
+                  {profile.displayName || profile.username}
                 </h3>
 
                 {profile.bio && (
