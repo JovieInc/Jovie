@@ -141,7 +141,7 @@
     "zod": "^4.1.8"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.2.2",
+    "@biomejs/biome": "^2.3.8",
     "@chromatic-com/storybook": "^4.1.2",
     "@clerk/clerk-js": "^5.90.0",
     "@clerk/dev-cli": "^0.0.12",
