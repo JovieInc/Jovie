@@ -22,12 +22,6 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
     [userId]
   );
 
-  const vercelEnv =
-    process.env.NEXT_PUBLIC_VERCEL_ENV ??
-    process.env.VERCEL_ENV ??
-    'development';
-  const isProductionEnv = vercelEnv === 'production';
-
   const plugins = React.useMemo(
     () =>
       pathname.startsWith('/dashboard')
@@ -36,8 +30,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
     [pathname]
   );
 
-  // Only initialize Statsig in production for authenticated users with a configured key
-  if (!sdkKey || !isProductionEnv || !userId) {
+  // If we don't have a configured key, bail out quietly (previews/staging)
+  if (!sdkKey) {
     return <>{children}</>;
   }
 
