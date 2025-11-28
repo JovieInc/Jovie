@@ -63,7 +63,7 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 
 - **Trigger:**
   - Runs after the primary `CI` workflow **fails** on a PR into `main`.
-  - Only for PRs from the same repo (no forks) that have the `auto-merge` label.
+  - Only for PRs from the same repo (no forks).
 
 - **Behavior:**
   - Uses the Codex CLI to:
