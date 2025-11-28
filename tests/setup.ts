@@ -20,7 +20,7 @@ if (process.env.NODE_ENV === 'test') {
 
     beforeAll(async () => {
       try {
-        await migrate(db, { migrationsFolder: './drizzle' });
+        await migrate(db, { migrationsFolder: './drizzle/migrations' });
       } catch (error) {
         console.error('Failed to run migrations:', error);
         throw error;
