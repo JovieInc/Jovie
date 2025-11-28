@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { NavLink } from '@/components/atoms/NavLink';
+import { NavLink } from '@/components/ui/NavLink';
 
 describe('NavLink', () => {
   afterEach(cleanup);
@@ -11,7 +11,7 @@ describe('NavLink', () => {
     const link = screen.getByRole('link', { name: 'Test Link' });
     expect(link).toHaveAttribute('href', '/test');
     expect(link).toHaveClass('text-sm');
-    expect(link).toHaveClass('text-gray-600');
+    expect(link).toHaveClass('text-muted-foreground');
   });
 
   it('renders with primary variant', () => {

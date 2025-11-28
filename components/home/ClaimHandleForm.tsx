@@ -5,9 +5,9 @@ import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { APP_URL } from '@/constants/app';
 
 interface ClaimHandleFormProps {

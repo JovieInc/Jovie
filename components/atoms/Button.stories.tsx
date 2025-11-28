@@ -1,5 +1,5 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Button } from './Button';
 
 const meta: Meta<typeof Button> = {
   title: 'UI/Atoms/Button',
@@ -17,11 +17,22 @@ const meta: Meta<typeof Button> = {
   argTypes: {
     size: {
       control: { type: 'select' },
-      options: ['sm', 'md', 'lg'],
+      options: ['default', 'sm', 'lg', 'icon'],
     },
     variant: {
       control: { type: 'select' },
-      options: ['primary', 'secondary', 'outline', 'ghost'],
+      options: [
+        'primary',
+        'accent',
+        'secondary',
+        'outline',
+        'ghost',
+        'destructive',
+        'link',
+        'frosted',
+        'frosted-ghost',
+        'frosted-outline',
+      ],
     },
     disabled: {
       control: { type: 'boolean' },

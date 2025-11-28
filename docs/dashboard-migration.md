@@ -17,7 +17,7 @@
 
 | Existing Component(s) | New Primitive | Atomic Layer | Notes |
 |-----------------------|--------------|--------------|-------|
-| `components/ui/Button`, `components/atoms/CTAButton`, `components/atoms/FrostedButton`, `components/molecules/LoadingButton` | `packages/ui/atoms/Button` | Atom | Consolidate all button variants into token-driven `Button` built on shadcn/Radix |
+| `components/ui/Button`, `components/ui/CTAButton`, `components/ui/FrostedButton`, `components/molecules/LoadingButton` | `packages/ui/atoms/Button` | Atom | Consolidate all button variants into token-driven `Button` built on shadcn/Radix |
 | `components/atoms/Tooltip` | `packages/ui/atoms/Tooltip` (Radix) | Atom | Replace custom tooltip with Radix Tooltip for a11y and portal handling |
 | `components/ui/Sidebar`, `components/dashboard/DashboardNav` | `packages/ui/organisms/Sidebar` | Organism | Single responsive sidebar with collapsible behaviour |
 | `components/molecules/UserButton` | `@clerk/nextjs` shadcn wrapper | Atom | Theme Clerk `UserButton` to tokens; remove custom styling |

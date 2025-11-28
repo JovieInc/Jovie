@@ -1,5 +1,5 @@
 import React from 'react';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn } from '@/lib/utils';
 
 interface FormStatusProps {
@@ -25,7 +25,7 @@ export function FormStatus({
     <div className={cn('space-y-2', className)}>
       {loading && (
         <div className='flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400'>
-          <LoadingSpinner size='sm' />
+          <LoadingSpinner size='sm' tone='muted' />
           <span>Processing...</span>
         </div>
       )}

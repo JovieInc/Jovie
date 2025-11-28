@@ -27,7 +27,7 @@ Last updated: 2025-09-12 19:14 PT
 
 | Existing | New (shadcn/Radix) | Atomic Layer | Notes |
 |---|---|---|---|
-| `components/ui/Button.tsx` (deprecated), `components/atoms/CTAButton.tsx`, `components/atoms/FrostedButton.tsx`, loading variants | `@jovie/ui` `Button` | Atom | Codemod imports to `@jovie/ui` with `asChild` for `next/link` |
+| `components/ui/Button.tsx` (deprecated), `components/ui/CTAButton.tsx`, `components/ui/FrostedButton.tsx`, loading variants | `@jovie/ui` `Button` | Atom | Codemod imports to `@jovie/ui` with `asChild` for `next/link` |
 | `components/ui/tooltip.tsx` + `components/ui/Tooltip.tsx` + `components/atoms/Tooltip.tsx` | Canonical `@jovie/ui` Tooltip (Radix) | Atom | Established in this PR; app layer re-exports from UI pkg |
 | `components/ui/Dialog.tsx` (Headless UI) | Radix Dialog, shadcn-styled wrapper under `@jovie/ui` | Atom | Replace Headless UI; ensure portal and focus traps |
 | `components/ui/Input.tsx` (Headless UI) | shadcn Input | Atom | Remove Headless UI; align help/error/status to shadcn pattern |

@@ -94,6 +94,10 @@ module.exports = [
               message: "Use Select from '@jovie/ui' instead of local atoms.",
             },
             {
+              name: '@/components/atoms/Button',
+              message: "Use Button from '@jovie/ui' instead of local atoms.",
+            },
+            {
               name: '@/components/atoms/Sheet',
               message:
                 "Use Sheet components from '@jovie/ui' instead of local atoms.",
@@ -112,6 +116,16 @@ module.exports = [
               name: '@/components/atoms/DropdownMenu',
               message:
                 "Use DropdownMenu components from '@jovie/ui' instead of local atoms.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                '../components/atoms/Button',
+                './components/atoms/Button',
+                'components/atoms/Button',
+              ],
+              message: "Use Button from '@jovie/ui' instead of local atoms.",
             },
           ],
         },

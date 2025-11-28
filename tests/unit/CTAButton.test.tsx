@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { CTAButton } from '@/components/atoms/CTAButton';
+import { CTAButton } from '@/components/ui/CTAButton';
 
 // Mock the next/link component
 vi.mock('next/link', () => {
@@ -40,7 +40,7 @@ describe('CTAButton', () => {
     const button = screen.getByRole('link', { name: /click me/i });
     expect(button).toBeInTheDocument();
     expect(button).toHaveAttribute('href', '/test');
-    expect(button).toHaveClass('bg-btn-primary'); // Primary variant
+    expect(button).toHaveClass('bg-btn-primary');
   });
 
   it('renders as a button when no href is provided', () => {
