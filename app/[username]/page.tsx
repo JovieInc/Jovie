@@ -1,5 +1,5 @@
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { cache } from 'react';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
@@ -19,9 +19,9 @@ import {
 
 // Using CreatorProfile type and convertCreatorProfileToArtist utility from types/db.ts
 
-// Cache the database query to prevent duplicate calls during page + metadata generation.
+// Cache the database query across requests with a short TTL to keep hot profiles sub-100ms.
 // This helper returns both the legacy CreatorProfile and LegacySocialLink[] in one DB call.
-const getProfileAndLinks = cache(
+const getProfileAndLinks = unstable_cache(
   async (
     username: string
   ): Promise<{ profile: CreatorProfile | null; links: LegacySocialLink[] }> => {
@@ -80,7 +80,9 @@ const getProfileAndLinks = cache(
       console.error('Error fetching creator profile:', error);
       return { profile: null, links: [] };
     }
-  }
+  },
+  ['public-profile-v1'],
+  { revalidate: 60 }
 );
 
 interface Props {
@@ -97,14 +99,15 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const resolvedSearchParams = await searchParams;
   const { mode = 'profile' } = resolvedSearchParams || {};
 
-  const { profile, links } = await getProfileAndLinks(username);
+  const normalizedUsername = username.toLowerCase();
+  const { profile, links } = await getProfileAndLinks(normalizedUsername);
 
   if (!profile) {
     notFound();
   }
 
   // Track profile view (fire-and-forget, non-blocking)
-  incrementProfileViews(username).catch(() => {
+  incrementProfileViews(normalizedUsername).catch(() => {
     // Fail silently, don't block page render
   });
 
@@ -149,7 +152,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 // Generate metadata for the page
 export async function generateMetadata({ params }: Props) {
   const { username } = await params;
-  const { profile } = await getProfileAndLinks(username);
+  const { profile } = await getProfileAndLinks(username.toLowerCase());
 
   if (!profile) {
     return {

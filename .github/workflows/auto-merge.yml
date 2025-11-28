@@ -368,8 +368,9 @@ jobs:
             let summary = `## Auto-merge Summary for PR #${pr.number}\n\n`;
 
             if (shouldMerge !== 'true') {
-              const resultStr = '${{ steps.should_merge.outputs.result }}' || '{}';
-              const reason = JSON.parse(resultStr).reason || 'Unknown';
+              const resultStr = '${{ steps.should_merge.outputs.result }}';
+              const parsed = resultStr && resultStr !== '{}' ? JSON.parse(resultStr) : {};
+              const reason = parsed.reason || 'Unknown';
               summary += `❌ **Skipped**: ${reason}\n`;
             } else if (waitStatus !== 'success') {
               summary += `⏳ **Waiting**: CI checks still running or failed\n`;
@@ -379,7 +380,12 @@ jobs:
               summary += `⚠️ **Partial**: CI passed but auto-merge could not be enabled\n`;
             }
 
-            summary += `\n**PR Type**: ${JSON.parse('${{ steps.should_merge.outputs.result || "{}" }}').pr_type || 'unknown'}`;
+            const parsed = (() => {
+              const resultStr = '${{ steps.should_merge.outputs.result }}';
+              return resultStr && resultStr !== '{}' ? JSON.parse(resultStr) : {};
+            })();
+
+            summary += `\n**PR Type**: ${parsed.pr_type || 'unknown'}`;
             summary += `\n**Labels**: ${pr.labels.join(', ') || 'none'}`;
 
             core.info(summary);

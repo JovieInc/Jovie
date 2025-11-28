@@ -6,8 +6,17 @@ import { env } from '@/lib/env';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
 
-// Configure WebSocket for transaction support
-neonConfig.webSocketConstructor = ws;
+declare const EdgeRuntime: string | undefined;
+
+const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
+
+// Configure connection caching and WebSocket for Node runtimes only
+neonConfig.fetchConnectionCache = true;
+if (!isEdgeRuntime) {
+  neonConfig.webSocketConstructor = ws;
+}
+// Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
+// but ensure firewall rules allow it if WS performance is required.
 
 declare global {
   var db: NeonDatabase<typeof schema> | undefined;
@@ -146,6 +155,7 @@ function isRetryableError(error: unknown): boolean {
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
+let cleanupRegistered = false;
 
 function initializeDb(): DbType {
   // Validate the database URL at runtime
@@ -163,13 +173,40 @@ function initializeDb(): DbType {
     {
       environment: process.env.NODE_ENV,
       hasUrl: !!databaseUrl,
-      transactionSupport: true,
+      transactionSupport: !isEdgeRuntime, // WebSocket/transactions not available in Edge
+      isEdge: isEdgeRuntime,
     }
   );
 
   // Create the database connection pool
+  // Note: Pool works in both Edge and Node, but WebSocket (for transactions) is Node-only
   if (!_pool) {
     _pool = new Pool({ connectionString: databaseUrl });
+
+    // In development, clean up pools created during hot reloads to avoid leaks
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      !cleanupRegistered &&
+      typeof process !== 'undefined'
+    ) {
+      cleanupRegistered = true;
+      const cleanup = () => {
+        if (_pool) {
+          _pool.end().catch(() => {});
+          _pool = undefined;
+        }
+      };
+
+      process.once('beforeExit', cleanup);
+      process.once('SIGINT', () => {
+        cleanup();
+        process.exit(0);
+      });
+      process.once('SIGTERM', () => {
+        cleanup();
+        process.exit(0);
+      });
+    }
   }
 
   // Use a single connection in development to avoid connection pool exhaustion

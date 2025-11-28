@@ -21,9 +21,31 @@ export async function getCreatorProfileByUsername(username: string) {
 }
 
 export async function getCreatorProfileWithLinks(username: string) {
-  // First get the profile
+  // First get the profile with only the columns needed for public rendering
   const [profile] = await db
-    .select()
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      creatorType: creatorProfiles.creatorType,
+      username: creatorProfiles.username,
+      displayName: creatorProfiles.displayName,
+      bio: creatorProfiles.bio,
+      avatarUrl: creatorProfiles.avatarUrl,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      spotifyId: creatorProfiles.spotifyId,
+      isPublic: creatorProfiles.isPublic,
+      isVerified: creatorProfiles.isVerified,
+      isFeatured: creatorProfiles.isFeatured,
+      marketingOptOut: creatorProfiles.marketingOptOut,
+      settings: creatorProfiles.settings,
+      theme: creatorProfiles.theme,
+      profileViews: creatorProfiles.profileViews,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      createdAt: creatorProfiles.createdAt,
+      updatedAt: creatorProfiles.updatedAt,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
@@ -32,7 +54,14 @@ export async function getCreatorProfileWithLinks(username: string) {
 
   // Then get all social links for this profile
   const profileSocialLinks = await db
-    .select()
+    .select({
+      id: socialLinks.id,
+      platform: socialLinks.platform,
+      url: socialLinks.url,
+      clicks: socialLinks.clicks,
+      createdAt: socialLinks.createdAt,
+      sortOrder: socialLinks.sortOrder,
+    })
     .from(socialLinks)
     .where(eq(socialLinks.creatorProfileId, profile.id))
     .orderBy(socialLinks.sortOrder);
