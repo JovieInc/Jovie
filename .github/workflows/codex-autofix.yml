@@ -88,7 +88,7 @@ jobs:
 
       - name: Checkout failing ref
         if: steps.eligibility.outputs.eligible == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.FAILED_HEAD_SHA }}
           fetch-depth: 0
