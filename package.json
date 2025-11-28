@@ -12,6 +12,14 @@
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@8.15.9",
+  "pnpm": {
+    "overrides": {
+      "body-parser": "2.2.1",
+      "glob": "11.1.0",
+      "js-yaml": "4.1.1",
+      "path-to-regexp": "6.3.0"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
