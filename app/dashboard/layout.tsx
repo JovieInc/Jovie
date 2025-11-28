@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { MyStatsig } from '../my-statsig';
 import { getDashboardDataCached, setSidebarCollapsed } from './actions';
 import DashboardLayoutClient from './DashboardLayoutClient';
 
@@ -25,12 +26,14 @@ export default async function DashboardLayout({
     }
 
     return (
-      <DashboardLayoutClient
-        dashboardData={dashboardData}
-        persistSidebarCollapsed={setSidebarCollapsed}
-      >
-        {children}
-      </DashboardLayoutClient>
+      <MyStatsig userId={userId}>
+        <DashboardLayoutClient
+          dashboardData={dashboardData}
+          persistSidebarCollapsed={setSidebarCollapsed}
+        >
+          {children}
+        </DashboardLayoutClient>
+      </MyStatsig>
     );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
