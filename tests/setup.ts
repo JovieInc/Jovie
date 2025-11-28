@@ -1,12 +1,16 @@
 import '../app/globals.css';
-import { neon } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { migrate } from 'drizzle-orm/neon-http/migrator';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import React from 'react';
 import { afterEach, beforeAll, expect, vi } from 'vitest';
+import ws from 'ws';
 import * as schema from '@/lib/db/schema';
+
+// Configure WebSocket for transaction support in tests
+neonConfig.webSocketConstructor = ws;
 
 // Setup test database
 if (process.env.NODE_ENV === 'test') {
@@ -15,8 +19,8 @@ if (process.env.NODE_ENV === 'test') {
   if (!databaseUrl) {
     console.warn('DATABASE_URL is not set. Database tests will be skipped.');
   } else {
-    const sql = neon(databaseUrl);
-    const db = drizzle(sql, { schema });
+    const pool = new Pool({ connectionString: databaseUrl });
+    const db = drizzle(pool, { schema });
 
     beforeAll(async () => {
       try {

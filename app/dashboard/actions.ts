@@ -158,7 +158,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 
   return await withDbSessionTx(async (tx, clerkUserId) => {
-    return fetchDashboardDataWithSession(tx as unknown as DbType, clerkUserId);
+    return fetchDashboardDataWithSession(tx, clerkUserId);
   });
 }
 
