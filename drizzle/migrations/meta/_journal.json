@@ -36,6 +36,27 @@
       "when": 1764364315000,
       "tag": "0004_public_profile_perf",
       "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1732877400000,
+      "tag": "0005_featured_creators_composite_index",
+      "breakpoints": false
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1732877500000,
+      "tag": "0006_rls_use_app_user_id",
+      "breakpoints": false
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1732882800000,
+      "tag": "0007_stripe_webhook_events_and_tips_idempotency",
+      "breakpoints": true
     }
   ]
 }

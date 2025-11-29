@@ -1,6 +1,11 @@
+import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { db } from '@/lib/db';
+import { creatorProfiles, tips } from '@/lib/db/schema';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,10 +47,51 @@ export async function POST(req: NextRequest) {
         pi as Stripe.PaymentIntent & { charges?: { data: Stripe.Charge[] } }
       ).charges?.data?.[0];
 
-      // TODO: Create tips table in Drizzle schema and insert tip record
-      // For now, log the successful tip
+      const handle =
+        typeof pi.metadata?.handle === 'string' ? pi.metadata.handle : null;
+
+      let creatorProfileId: string | null = null;
+
+      if (handle) {
+        const [profile] = await db
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
+          .limit(1);
+
+        creatorProfileId = profile?.id ?? null;
+      }
+
+      if (!creatorProfileId) {
+        console.warn('Tip received for unknown or missing handle', {
+          handle,
+          payment_intent: pi.id,
+        });
+      } else {
+        const [inserted] = await db
+          .insert(tips)
+          .values({
+            creatorProfileId,
+            amountCents: pi.amount_received,
+            // All tips are currently created in USD in create-tip-intent.
+            currency: 'USD',
+            paymentIntentId: pi.id,
+            contactEmail: charge?.billing_details?.email ?? null,
+            contactPhone: charge?.billing_details?.phone ?? null,
+            metadata: (pi.metadata ?? {}) as Record<string, unknown>,
+          })
+          .onConflictDoNothing({ target: tips.paymentIntentId })
+          .returning({ id: tips.id });
+
+        if (!inserted) {
+          console.log('Duplicate tip event, record already exists', {
+            payment_intent: pi.id,
+          });
+        }
+      }
+
       console.log('Tip received:', {
-        artist_id: pi.metadata.handle,
+        artist_id: handle,
         amount_cents: pi.amount_received,
         currency: pi.currency?.toUpperCase(),
         payment_intent: pi.id,
