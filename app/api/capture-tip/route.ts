@@ -63,31 +63,41 @@ export async function POST(req: NextRequest) {
       }
 
       if (!creatorProfileId) {
-        console.warn('Tip received for unknown or missing handle', {
-          handle,
+        // CRITICAL: If no profile found, we MUST return 500 to trigger Stripe retry
+        // Otherwise customer payment succeeds but tip is lost
+        console.error(
+          'CRITICAL: Tip payment succeeded but no creator profile found',
+          {
+            handle,
+            payment_intent: pi.id,
+            amount_cents: pi.amount_received,
+          }
+        );
+        return NextResponse.json(
+          { error: 'Creator profile not found', payment_intent: pi.id },
+          { status: 500 }
+        );
+      }
+
+      const [inserted] = await db
+        .insert(tips)
+        .values({
+          creatorProfileId,
+          amountCents: pi.amount_received,
+          // All tips are currently created in USD in create-tip-intent.
+          currency: 'USD',
+          paymentIntentId: pi.id,
+          contactEmail: charge?.billing_details?.email ?? null,
+          contactPhone: charge?.billing_details?.phone ?? null,
+          metadata: (pi.metadata ?? {}) as Record<string, unknown>,
+        })
+        .onConflictDoNothing({ target: tips.paymentIntentId })
+        .returning({ id: tips.id });
+
+      if (!inserted) {
+        console.log('Duplicate tip event, record already exists', {
           payment_intent: pi.id,
         });
-      } else {
-        const [inserted] = await db
-          .insert(tips)
-          .values({
-            creatorProfileId,
-            amountCents: pi.amount_received,
-            // All tips are currently created in USD in create-tip-intent.
-            currency: 'USD',
-            paymentIntentId: pi.id,
-            contactEmail: charge?.billing_details?.email ?? null,
-            contactPhone: charge?.billing_details?.phone ?? null,
-            metadata: (pi.metadata ?? {}) as Record<string, unknown>,
-          })
-          .onConflictDoNothing({ target: tips.paymentIntentId })
-          .returning({ id: tips.id });
-
-        if (!inserted) {
-          console.log('Duplicate tip event, record already exists', {
-            payment_intent: pi.id,
-          });
-        }
       }
 
       console.log('Tip received:', {
