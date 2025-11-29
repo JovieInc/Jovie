@@ -26,15 +26,19 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
   - **`main`**
     - Source of truth for all day-to-day development.
     - Must always be **green** on: `pnpm typecheck`, `pnpm lint`, `pnpm test`, basic E2E smoke.
-    - Deploys to the **Preview Vercel environment** and Neon child DB branch.
+    - Deploys to [main.jov.ie](https://main.jov.ie) (Main Staging Vercel environment) automatically on push.
+    - Full CI runs on push: build, unit tests, E2E smoke, Drizzle checks, database migrations.
   - **`production`**
-    - Mirrors what users see in production.
+    - Mirrors what users see at [jov.ie](https://jov.ie) in production.
     - Only updated via **release PRs from `main` → `production`**, never by direct commits.
+    - Requires manual approval before merge (enforced by branch protection).
+    - Deploys automatically to production after PR merge.
 
-- **Neon**
-  - One **primary production branch** mapped to Git `production`.
-  - One **child branch** (the preview/"main" DB branch) kept in sync with production via reset + migrations.
-  - **Ephemeral branches** created per feature/PR for full CI and **auto-deleted on PR close** (see CI workflows).
+- **Neon Database Branches**
+  - **`production`** - Primary production branch mapped to Git `production`.
+  - **`main`** - Staging branch mapped to Git `main` for rapid iteration.
+  - **NO preview branch** - Legacy preview environment removed (main is the staging environment now).
+  - **Ephemeral branches** - Auto-created per PR for full CI, auto-deleted on PR close (see neon-ephemeral-branch-cleanup.yml).
 
 ## 2. PR Expectations (All Agents)
 
@@ -91,13 +95,61 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 ## 5. Neon & Migrations
 
 - **Do not** run Drizzle migrations manually in ad-hoc ways.
+- **Long-lived branches:** Only `main` and `production` (no preview branch).
 - CI is responsible for:
-  - Creating per-branch Neon ephemeral DBs for full CI when needed.
-  - Resetting the long-lived preview/"main" DB branch from the production parent using `neonctl`.
-  - Running `drizzle:check` and `drizzle:migrate:*` scripts against the appropriate DATABASE_URL.
+  - Creating per-PR Neon ephemeral DBs for full CI (auto-created, auto-deleted on PR close).
+  - Running `drizzle:check` to validate schema changes before merge.
+  - Running `pnpm run drizzle:migrate` automatically on main and production deploys.
 - Per PR:
   - Aim for **one migration per PR**.
   - Avoid destructive changes without a clear data-migration plan.
+  - **Linear append-only migrations** - never edit or squash existing migrations.
+
+## 5.5 CI/CD Workflow Details (YC-Aligned Rapid Deployment)
+
+### Fast Path (Feature PRs → main)
+- **Triggers:** PRs to `main` branch
+- **Checks:** TypeScript typecheck + ESLint (~10-15s total)
+- **Auto-merge:** Enabled for dependabot, codegen, PRs with `auto-merge` label
+- **Deployment:** Automatic to [main.jov.ie](https://main.jov.ie) on merge
+- **Timeline:** Feature → production in ~2 minutes (if auto-merge eligible)
+
+### Full CI (main → production PRs)
+- **Triggers:** Push to `main` or PRs to `production`
+- **Checks:**
+  - All fast checks (typecheck, lint)
+  - Drizzle schema validation
+  - Next.js build
+  - Unit tests
+  - E2E smoke tests
+- **Database migrations:** Run automatically via `drizzle:migrate` on deployment
+- **Auto-merge:** Disabled (requires manual approval for production)
+- **Deployment:** Automatic to [jov.ie](https://jov.ie) after PR merge
+- **Timeline:** Main → production in ~5 minutes (with review)
+
+### Database Migrations
+- **Auto-run:** Migrations run automatically on Vercel deploy via `drizzle:migrate` script
+- **Ephemeral Neon branches:** Auto-created per PR with unique name, auto-deleted on PR close
+- **Long-lived branches:** Only `main` and `production` (NO preview branch)
+- **Migration strategy:** Linear append-only (no squashing, no editing existing migrations)
+- **Testing:** Each PR gets isolated ephemeral database for safe schema testing
+
+### Environment URLs
+- **Main staging:** [main.jov.ie](https://main.jov.ie) - Deployed from `main` branch
+- **Production:** [jov.ie](https://jov.ie) - Deployed from `production` branch
+- **PR previews:** Unique Vercel preview URLs per PR (ephemeral)
+
+### YC-Optimized Velocity
+- **Ship multiple times per day:** Fast CI enables rapid iteration
+- **Feature → main:** ~2 minutes (auto-merge)
+- **Main → production:** ~5 minutes (manual review + auto-deploy)
+- **Total:** Ship to production in < 10 minutes from PR creation
+
+### Rollback Strategy
+- **Code rollback:** `git revert` + push to main
+- **Database rollback:** Create reverse migration (append-only, no destructive rollback)
+- **Emergency:** Direct PR to production (bypass main)
+- **Backups:** Neon point-in-time recovery available
 
 ## 6. Agent-Specific Notes
 
