@@ -228,6 +228,7 @@ jobs:
         if: (steps.wait_for_ci.outputs.status == 'success' || steps.wait_for_ci.outcome == 'failure') && steps.is_promotion.outputs.promotion != 'true'
         uses: actions/github-script@v8
         with:
+          result-encoding: string
           script: |
             const pr = JSON.parse('${{ steps.get_pr.outputs.result }}');
 
@@ -238,25 +239,33 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: pr.number
               });
-              
+
               core.info(`PR mergeable: ${prData.mergeable}, mergeable_state: ${prData.mergeable_state}`);
-              
+
               // Check if branch is behind
               const needsUpdate = prData.mergeable_state === 'behind' || prData.mergeable_state === 'dirty';
-              
-              return {
+
+              // Set outputs directly instead of returning object
+              core.setOutput('needs_update', needsUpdate ? 'true' : 'false');
+              core.setOutput('mergeable', prData.mergeable !== null ? String(prData.mergeable) : 'null');
+              core.setOutput('mergeable_state', prData.mergeable_state || 'unknown');
+
+              return JSON.stringify({
                 needs_update: needsUpdate,
                 mergeable: prData.mergeable,
                 mergeable_state: prData.mergeable_state
-              };
+              });
             } catch (error) {
               core.warning(`Error checking branch status: ${error.message}`);
-              return { needs_update: false, mergeable: null, mergeable_state: 'unknown' };
+              core.setOutput('needs_update', 'false');
+              core.setOutput('mergeable', 'null');
+              core.setOutput('mergeable_state', 'unknown');
+              return JSON.stringify({ needs_update: false, mergeable: null, mergeable_state: 'unknown' });
             }
 
       - name: Update branch if needed
         id: update_branch
-        if: fromJSON(steps.check_branch_status.outputs.result).needs_update
+        if: steps.check_branch_status.outputs.needs_update == 'true'
         uses: actions/github-script@v8
         with:
           script: |
