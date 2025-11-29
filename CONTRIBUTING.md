@@ -195,6 +195,17 @@ This project includes comprehensive guidelines for AI coding tools:
 - Mock Supabase calls appropriately
 - Test RLS policy compliance
 
+#### Vitest & jsdom environment
+
+- Tests run under Vitest with a jsdom environment.
+- `parse5` is pinned via `pnpm.overrides` to a 7.x CommonJS release to avoid `ERR_REQUIRE_ESM` errors from jsdom. If you update jsdom or parse5, rerun `pnpm test` and adjust the override only once the suite is green.
+- If you see `Error: require() of ES Module ...parse5...`, run `pnpm install` to ensure overrides are applied before debugging further.
+
+#### Drizzle migrations & indexes
+
+- Drizzle's SQL migrator runs inside a transaction; PostgreSQL does not allow `CREATE INDEX CONCURRENTLY` inside a transaction block.
+- In migrations, use `CREATE INDEX IF NOT EXISTS ...` and, if a concurrent build is ever required operationally, run `CREATE INDEX CONCURRENTLY` manually outside of Drizzle. See `db_indexes.md` for details.
+
 ### E2E Tests
 
 - Use Playwright for end-to-end testing

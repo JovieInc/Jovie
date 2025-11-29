@@ -9,10 +9,18 @@ import * as schema from './schema';
 declare const EdgeRuntime: string | undefined;
 
 const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
+const isWebSocketAvailable = typeof WebSocket !== 'undefined';
 
-// Configure WebSocket for Node runtimes only (fetch caching is now always enabled)
-if (!isEdgeRuntime) {
-  neonConfig.webSocketConstructor = ws;
+// Configure WebSocket for Node runtimes only, preferring the built-in WebSocket
+// to avoid bundling issues with `ws` in serverless/preview environments.
+const webSocketConstructor = !isEdgeRuntime
+  ? isWebSocketAvailable
+    ? (WebSocket as unknown as typeof ws)
+    : ws
+  : undefined;
+
+if (webSocketConstructor) {
+  neonConfig.webSocketConstructor = webSocketConstructor;
 }
 // Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
 // but ensure firewall rules allow it if WS performance is required.
