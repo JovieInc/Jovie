@@ -182,5 +182,5 @@ export async function updateUserBillingStatus({
  */
 export async function userHasProFeatures(): Promise<boolean> {
   const billing = await getUserBillingInfo();
-  return billing.success && billing.data?.isPro === true;
+  return billing.success === true && billing.data?.isPro === true;
 }

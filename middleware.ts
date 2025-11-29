@@ -98,7 +98,11 @@ export default clerkMiddleware(async (auth, req) => {
       }
     } else {
       // Handle unauthenticated users
-      if (req.nextUrl.pathname.startsWith('/dashboard')) {
+      if (
+        pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/account') ||
+        pathname.startsWith('/billing')
+      ) {
         // Redirect unauthenticated users to sign-in
         const signInUrl = new URL('/signin', req.url);
         signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);

@@ -285,6 +285,9 @@ export async function setSessionUser(userId: string) {
       if (!_db) {
         _db = initializeDb();
       }
+      // Primary session variable for RLS policies
+      await _db.execute(drizzleSql`SET LOCAL app.user_id = ${userId}`);
+      // Backwards-compatible session variable for legacy policies and tooling
       await _db.execute(drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`);
     }, 'setSessionUser');
 

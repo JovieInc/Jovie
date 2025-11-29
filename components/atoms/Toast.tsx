@@ -65,6 +65,8 @@ export const Toast: React.FC<ToastProps> = ({
     <div
       role='status'
       aria-live={type === 'error' ? 'assertive' : 'polite'}
+      aria-label={`${type} toast`}
+      data-testid='toast'
       className={cn(
         'px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50',
         typeStyles[type],

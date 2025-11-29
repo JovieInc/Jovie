@@ -35,6 +35,7 @@ export async function setupDbSession() {
 
   // Set the session variable for RLS
   // Using sql.raw with validated input to prevent SQL injection
+  await db.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
   await db.execute(drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`));
 
   return { userId };
@@ -67,6 +68,7 @@ export async function withDbSessionTx<T>(
 
   return await db.transaction(async tx => {
     // Important: SET LOCAL must be inside the transaction to take effect
+    await tx.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
     await tx.execute(
       drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`)
     );
