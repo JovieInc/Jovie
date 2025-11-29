@@ -10,7 +10,7 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
+import { stripeWebhookEvents, users } from '@/lib/db/schema';
 import { env } from '@/lib/env';
 import {
   captureCriticalError,
@@ -25,6 +25,14 @@ import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 export const runtime = 'nodejs';
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
+
+function getStripeObjectId(event: Stripe.Event): string | null {
+  const object = event.data?.object as { id?: string } | null | undefined;
+  if (object && typeof object.id === 'string') {
+    return object.id;
+  }
+  return null;
+}
 
 /**
  * Fallback: Look up Clerk user ID by Stripe customer ID
@@ -78,6 +86,28 @@ export async function POST(request: NextRequest) {
       type: event.type,
       id: event.id,
     });
+
+    // Record the event for auditing and idempotency. If an event with the same
+    // Stripe event ID already exists, we skip further processing to keep
+    // handlers idempotent under Stripe retries.
+    const [webhookRecord] = await db
+      .insert(stripeWebhookEvents)
+      .values({
+        stripeEventId: event.id,
+        type: event.type,
+        stripeObjectId: getStripeObjectId(event),
+        payload: event as unknown as Record<string, unknown>,
+      })
+      .onConflictDoNothing()
+      .returning({ id: stripeWebhookEvents.id });
+
+    if (!webhookRecord) {
+      console.log('Duplicate Stripe webhook event, skipping processing', {
+        eventId: event.id,
+        type: event.type,
+      });
+      return NextResponse.json({ received: true });
+    }
 
     // Handle the event
     switch (event.type) {

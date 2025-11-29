@@ -161,12 +161,22 @@ export const tips = pgTable('tips', {
     .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
   amountCents: integer('amount_cents').notNull(),
   currency: currencyCodeEnum('currency').notNull().default('USD'),
-  paymentIntentId: text('payment_intent_id').notNull(),
+  paymentIntentId: text('payment_intent_id').notNull().unique(),
   contactEmail: text('contact_email'),
   contactPhone: text('contact_phone'),
   message: text('message'),
   isAnonymous: boolean('is_anonymous').default(false),
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  stripeEventId: text('stripe_event_id').notNull().unique(),
+  type: text('type').notNull(),
+  stripeObjectId: text('stripe_object_id'),
+  userClerkId: text('user_clerk_id'),
+  payload: jsonb('payload').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -256,6 +266,11 @@ export const selectSignedLinkAccessSchema =
 export const insertWrappedLinkSchema = createInsertSchema(wrappedLinks);
 export const selectWrappedLinkSchema = createSelectSchema(wrappedLinks);
 
+export const insertStripeWebhookEventSchema =
+  createInsertSchema(stripeWebhookEvents);
+export const selectStripeWebhookEventSchema =
+  createSelectSchema(stripeWebhookEvents);
+
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
@@ -280,6 +295,9 @@ export type NewSignedLinkAccess = typeof signedLinkAccess.$inferInsert;
 
 export type WrappedLink = typeof wrappedLinks.$inferSelect;
 export type NewWrappedLink = typeof wrappedLinks.$inferInsert;
+
+export type StripeWebhookEvent = typeof stripeWebhookEvents.$inferSelect;
+export type NewStripeWebhookEvent = typeof stripeWebhookEvents.$inferInsert;
 
 export type UserSettings = typeof userSettings.$inferSelect;
 export type NewUserSettings = typeof userSettings.$inferInsert;
