@@ -89,21 +89,20 @@ export function Footer({
   if (variant === 'profile') {
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5'>
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-4'>
           <FooterBranding
             artistHandle={artistHandle}
             variant={config.colorVariant}
+            size='sm'
           />
+        </div>
 
-          {/* Mobile privacy link */}
-          <div className='mt-3 pt-3 border-t border-black/5 dark:border-white/10 w-full'>
-            <div className='text-center md:hidden'>
-              <FooterNavigation
-                variant={config.colorVariant}
-                links={[{ href: '/legal/privacy', label: 'Privacy' }]}
-              />
-            </div>
-          </div>
+        {/* Mobile privacy link - small and corner-aligned to keep footer tight */}
+        <div className='md:hidden absolute bottom-2 right-4 text-[11px]'>
+          <FooterNavigation
+            variant={config.colorVariant}
+            links={[{ href: '/legal/privacy', label: 'Privacy' }]}
+          />
         </div>
 
         {/* Desktop privacy link - positioned in bottom left corner */}

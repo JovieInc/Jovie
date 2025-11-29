@@ -4,8 +4,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@jovie/ui/atoms/tooltip';
-import { cleanup, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock reduced motion
@@ -14,11 +13,6 @@ Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: mockMatchMedia,
 });
-
-const createUser = () =>
-  userEvent.setup({
-    delay: null,
-  });
 
 // Test wrapper component with provider
 const TooltipWrapper = ({
@@ -70,7 +64,6 @@ describe('Tooltip', () => {
   });
 
   afterEach(() => {
-    cleanup();
     vi.clearAllMocks();
   });
 
@@ -101,32 +94,30 @@ describe('Tooltip', () => {
   });
 
   describe('Hover Interactions', () => {
-    it('shows tooltip on hover', async () => {
-      const user = createUser();
+    it('shows tooltip on hover', () => {
       render(<BasicTooltip />);
 
       const triggerElement = screen.getByRole('button', { name: 'Trigger' });
 
-      await user.hover(triggerElement);
+      fireEvent.mouseEnter(triggerElement);
 
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips.length).toBeGreaterThan(0);
       expect(tooltips[0]).toBeVisible();
     });
 
-    it.skip('hides tooltip on unhover', async () => {
-      const user = createUser();
+    it.skip('hides tooltip on unhover', () => {
       render(<BasicTooltip />);
 
       const triggerElement = screen.getByRole('button', { name: 'Trigger' });
 
       // Show tooltip
-      await user.hover(triggerElement);
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      fireEvent.mouseEnter(triggerElement);
+      const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
 
       // Hide tooltip
-      await user.unhover(triggerElement);
+      fireEvent.mouseLeave(triggerElement);
       const hidden = screen.queryAllByText('Test tooltip content');
       const openTooltip = hidden.find(el =>
         el.closest('[data-state="delayed-open"]')
@@ -136,18 +127,17 @@ describe('Tooltip', () => {
   });
 
   describe('Keyboard Interactions', () => {
-    it('shows tooltip on focus', async () => {
-      const user = createUser();
+    it('shows tooltip on focus', () => {
       render(<BasicTooltip />);
 
-      await user.tab(); // Focus the trigger
+      const trigger = screen.getByRole('button', { name: 'Trigger' });
+      trigger.focus();
 
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
     });
 
-    it('hides tooltip on blur', async () => {
-      const user = createUser();
+    it('hides tooltip on blur', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -160,13 +150,20 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
+      const firstButton = screen.getByRole('button', {
+        name: 'First button',
+      });
+      const secondButton = screen.getByRole('button', {
+        name: 'Second button',
+      });
+
       // Focus first button to show tooltip
-      await user.tab();
-      const tooltips = await screen.findAllByText('First tooltip');
+      firstButton.focus();
+      const tooltips = screen.getAllByText('First tooltip');
       expect(tooltips[0]).toBeVisible();
 
       // Focus second button to hide tooltip
-      await user.tab();
+      secondButton.focus();
       const hidden = screen.queryAllByText('First tooltip');
       const openTooltip = hidden.find(el =>
         el.closest('[data-state="delayed-open"]')
@@ -175,17 +172,18 @@ describe('Tooltip', () => {
       expect(openTooltip).toBeUndefined();
     });
 
-    it('hides tooltip on Escape key', async () => {
-      const user = createUser();
+    it('hides tooltip on Escape key', () => {
       render(<BasicTooltip />);
 
+      const trigger = screen.getByRole('button', { name: 'Trigger' });
+
       // Show tooltip
-      await user.tab();
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      trigger.focus();
+      const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
 
       // Hide tooltip with Escape
-      await user.keyboard('{Escape}');
+      fireEvent.keyDown(trigger, { key: 'Escape' });
       const hidden = screen.queryAllByText('Test tooltip content');
       const visibleTooltip = hidden.find(el =>
         el.closest('[data-state="delayed-open"]')
@@ -196,14 +194,13 @@ describe('Tooltip', () => {
   });
 
   describe('Arrow Display', () => {
-    it('shows arrow by default', async () => {
-      const user = createUser();
+    it('shows arrow by default', () => {
       render(<BasicTooltip showArrow={true} />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      const tooltips = screen.getAllByText('Test tooltip content');
       const tooltipContent = tooltips[0].closest('[data-state]');
       expect(tooltipContent).toBeInTheDocument();
 
@@ -212,14 +209,13 @@ describe('Tooltip', () => {
       expect(arrow).toBeInTheDocument();
     });
 
-    it('hides arrow when showArrow is false', async () => {
-      const user = createUser();
+    it('hides arrow when showArrow is false', () => {
       render(<BasicTooltip showArrow={false} />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltips = await screen.findAllByText('Test tooltip content');
+      const tooltips = screen.getAllByText('Test tooltip content');
       const tooltipContent = tooltips[0].closest('[data-state]');
       expect(tooltipContent).toBeInTheDocument();
 
@@ -230,33 +226,30 @@ describe('Tooltip', () => {
   });
 
   describe('Accessibility', () => {
-    it('has correct ARIA relationships', async () => {
-      const user = createUser();
+    it('has correct ARIA relationships', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
 
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltip = await screen.findByRole('tooltip');
+      const tooltip = screen.getByRole('tooltip');
       const triggerId = trigger.getAttribute('aria-describedby');
       const tooltipId = tooltip.getAttribute('id');
       expect(triggerId).toBe(tooltipId);
     });
 
-    it('has proper role attributes', async () => {
-      const user = createUser();
+    it('has proper role attributes', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltip = await screen.findByRole('tooltip');
+      const tooltip = screen.getByRole('tooltip');
       expect(tooltip).toHaveAttribute('role', 'tooltip');
     });
 
-    it('works with disabled elements via wrapper', async () => {
-      const user = createUser();
+    it('works with disabled elements via wrapper', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -277,18 +270,15 @@ describe('Tooltip', () => {
 
       // Hovering the wrapper should show tooltip
       if (wrapper) {
-        await user.hover(wrapper);
-        const tooltips = await screen.findAllByText(
-          'This action is unavailable'
-        );
+        fireEvent.mouseEnter(wrapper);
+        const tooltips = screen.getAllByText('This action is unavailable');
         expect(tooltips[0]).toBeVisible();
       }
     });
   });
 
   describe('Positioning', () => {
-    it('supports different side positions', async () => {
-      const user = createUser();
+    it('supports different side positions', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -301,15 +291,14 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const [tooltipText] = await screen.findAllByText('Top tooltip');
+      const [tooltipText] = screen.getAllByText('Top tooltip');
       const tooltipContent = tooltipText.closest('[data-state]');
       expect(tooltipContent).toHaveAttribute('data-side', 'top');
     });
 
-    it('supports custom sideOffset', async () => {
-      const user = createUser();
+    it('supports custom sideOffset', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -324,15 +313,14 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
-      const rendered = await screen.findAllByText('Custom offset tooltip');
+      fireEvent.mouseEnter(trigger);
+      const rendered = screen.getAllByText('Custom offset tooltip');
       expect(rendered.length).toBeGreaterThan(0);
     });
   });
 
   describe('Provider Configuration', () => {
-    it('respects custom delay durations', async () => {
-      const user = createUser();
+    it('respects custom delay durations', () => {
       render(
         <TooltipWrapper delayDuration={10}>
           <Tooltip>
@@ -345,27 +333,26 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Delayed trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
       // Should not appear immediately
       expect(screen.queryByText('Delayed tooltip')).not.toBeInTheDocument();
 
       expect(screen.queryByText('Delayed tooltip')).not.toBeInTheDocument();
 
-      const tooltips = await screen.findAllByText('Delayed tooltip');
+      const tooltips = screen.getAllByText('Delayed tooltip');
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });
 
   describe('Reduced Motion', () => {
-    it('includes motion-reduce classes for accessibility', async () => {
-      const user = createUser();
+    it('includes motion-reduce classes for accessibility', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltip = await screen.findByRole('tooltip');
+      const tooltip = screen.getByRole('tooltip');
       const tooltipContent =
         tooltip.closest('[data-state]') ?? tooltip.parentElement;
       expect(tooltipContent).toHaveAttribute('data-state', 'delayed-open');
@@ -373,8 +360,7 @@ describe('Tooltip', () => {
   });
 
   describe('Complex Content', () => {
-    it('renders complex React node content', async () => {
-      const user = createUser();
+    it('renders complex React node content', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -392,18 +378,17 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Complex trigger' });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
       expect(
-        (await screen.findAllByText('Complex content title')).length
+        screen.getAllByText('Complex content title').length
       ).toBeGreaterThan(0);
       expect(
-        (await screen.findAllByText('With multiple elements')).length
+        screen.getAllByText('With multiple elements').length
       ).toBeGreaterThan(0);
     });
 
-    it('applies custom className to content', async () => {
-      const user = createUser();
+    it('applies custom className to content', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -420,11 +405,9 @@ describe('Tooltip', () => {
       const trigger = screen.getByRole('button', {
         name: 'Custom class trigger',
       });
-      await user.hover(trigger);
+      fireEvent.mouseEnter(trigger);
 
-      const tooltipElements = await screen.findAllByText(
-        'Custom styled tooltip'
-      );
+      const tooltipElements = screen.getAllByText('Custom styled tooltip');
       const hasCustomClass = tooltipElements.some(element =>
         element
           .closest('[data-state="delayed-open"]')
