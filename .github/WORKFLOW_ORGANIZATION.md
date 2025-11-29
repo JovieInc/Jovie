@@ -7,89 +7,126 @@ This document outlines the organization and purpose of all GitHub workflows in t
 ### **Branch Strategy**
 
 ```
-develop → preview → production
-   ↓        ↓        ↓
-  CI/CD    CI/CD   Production
-Pipeline  Pipeline  Deployment
+main → production
+ ↓         ↓
+Fast CI   Full CI + Manual Review
+ ↓         ↓
+Auto Deploy  Auto Deploy (after approval)
+main.jov.ie  jov.ie
 ```
 
-### **Workflow Flow**
+## Branch Structure
 
-1. **Develop Branch** → `develop-ci.yml` → Auto-promote to Preview
-2. **Preview Branch** → `preview-ci.yml` → Manual review → Main
-3. **Main Branch** → `production-deploy.yml` → Production Deployment
+- **main**: Default development branch
+  - All feature branches merge here
+  - Deploys to [main.jov.ie](https://main.jov.ie) automatically
+  - Requires: `ci-fast` (typecheck + lint)
+  - **Auto-merge enabled** for safe changes (dependabot, codegen)
+
+- **production**: Live production environment
+  - Only accepts PRs from `main`
+  - Requires: Full CI (build + tests + E2E)
+  - **Manual approval required** for merge
+  - Deploys to [jov.ie](https://jov.ie) automatically
 
 ## 📋 **Active Workflows**
 
-### 1. **Develop CI/CD Pipeline** (`develop-ci.yml`)
+### 1. **Main CI/CD Pipeline** (`ci.yml`)
 
-**Purpose:** Continuous integration and auto-promotion for the develop branch
-
-**Triggers:**
-
-- Push to `develop` branch
-- Pull requests to `develop` branch
-- Manual dispatch
-
-**Jobs:**
-
-- **CI Job:** Lint, test, build, deploy to preview environment
-- **Promote Job:** Auto-create PR from develop → preview with auto-merge
-
-**Features:**
-
-- ✅ Type checking and linting
-- ✅ Unit and integration tests
-- ✅ Build verification
-- ✅ Preview deployment
-- ✅ Lighthouse performance testing
-- ✅ Security dependency scanning
-- ✅ Auto-promotion to preview branch
-
-### 2. **Preview CI/CD Pipeline** (`preview-ci.yml`)
-
-**Purpose:** Comprehensive testing and validation for the preview branch
+**Purpose:** Unified CI/CD pipeline with fast-path optimization for rapid iteration
 
 **Triggers:**
 
-- Push to `preview` branch
-- Pull requests to `preview` branch
+- Pull requests to `main` or `production`
+- Push to `main` or `production`
+- Merge queue events
 - Manual dispatch
 
-**Jobs:**
+**Key Jobs:**
 
-- **CI Job:** Full testing suite with production-like environment
-- **Promote Job:** Create PR from preview → production (manual review required)
+#### **Fast Path (PRs → main):**
+
+- `ci-typecheck`: TypeScript type checking (~5-10s)
+- `ci-lint`: ESLint with zero warnings (~5-10s)
+- **Total CI time:** ~10-15 seconds
+
+#### **Full CI (main → production):**
+
+- `neon-db`: Create/reuse ephemeral Neon database branch
+- `ci-drizzle-check`: Validate database schema changes
+- `ci-build`: Build Next.js application
+- `ci-unit-tests`: Run unit test suite
+- `ci-e2e-tests`: End-to-end Playwright tests
+- `deploy`: Deploy to main.jov.ie with migrations
+- `promote`: Auto-create production PR
 
 **Features:**
 
-- ✅ Full E2E testing (desktop + mobile)
-- ✅ Visual regression testing
-- ✅ Lighthouse performance budgets
-- ✅ Bundle size analysis
-- ✅ ZAP security scanning
-- ✅ Dependency security audit
-- ✅ Manual promotion to production
+- ✅ **Path-based job skipping** - Only run relevant jobs based on file changes
+- ✅ **Ephemeral Neon branches** - Auto-created per PR, auto-deleted on close
+- ✅ **Database migrations** - Run automatically on main deploys
+- ✅ **Canary health checks** - Verify deployment success
+- ✅ **Auto-merge support** - Safe changes merge automatically
+- ✅ **Production promotion** - Auto-create PRs for production deployment
 
-### 3. **Production Deployment** (`production-deploy.yml`)
+---
 
-**Purpose:** Production deployment and verification
+### 2. **Auto-Merge** (`auto-merge.yml`)
+
+**Purpose:** Automated PR merging with safety checks for eligible changes
 
 **Triggers:**
 
-- Push to `production` branch
+- `pull_request_target` events (synchronize, labeled, unlabeled, reopened)
+- `pull_request_review` events (submitted, dismissed)
+- `check_run` completion
+- `workflow_run` completion
 - Manual dispatch
 
-**Jobs:**
+**Logic:**
 
-- **Deploy Job:** Production deployment with verification
+```typescript
+// Auto-merge eligible if:
+- Dependabot PR (patch/minor versions)
+- Codegen PR (Supabase types, GraphQL codegen)
+- PR with "automerge" label
+- All required checks passing
+- No merge conflicts
+```
 
-**Features:**
+**Safety Features:**
 
-- ✅ Production environment deployment
-- ✅ Post-deployment verification
-- ✅ Environment protection
-- ✅ Deployment monitoring
+- ✅ Validates PR author (dependabot, github-actions, authorized users)
+- ✅ Checks all required status checks pass
+- ✅ Verifies no merge conflicts
+- ✅ Ensures PR is not draft
+- ✅ Confirms target branch allows auto-merge (main only)
+
+---
+
+### 3. **Neon Ephemeral Branch Cleanup** (`neon-ephemeral-branch-cleanup.yml`)
+
+**Purpose:** Automatic cleanup of ephemeral Neon database branches
+
+**Triggers:**
+
+- PR closed events
+- Manual dispatch
+
+**Process:**
+
+1. Sanitize branch name (same logic as creation)
+2. Guard against deleting protected branches (`main`, `production`)
+3. Delete ephemeral Neon branch via API
+4. Verify deletion success
+
+**Protected Branches:**
+
+- ❌ `production` - Never deleted
+- ❌ `main` - Never deleted
+- ✅ All other branches - Eligible for cleanup
+
+---
 
 ### 4. **CodeQL Security Analysis** (`codeql.yml`)
 
@@ -97,93 +134,83 @@ Pipeline  Pipeline  Deployment
 
 **Triggers:**
 
-- Push to main branches (`production`, `develop`, `preview`)
-- Pull requests to main branches
+- Push to `main` or `production`
+- Pull requests to `main` or `production`
 - Weekly scheduled scan (Monday 13:36 UTC)
 
-**Jobs:**
+**Languages Analyzed:**
 
-- **Analyze Job:** Security analysis for multiple languages
+- JavaScript/TypeScript
+- GitHub Actions workflows
 
 **Features:**
 
-- ✅ JavaScript/TypeScript analysis
-- ✅ GitHub Actions analysis
-- ✅ Weekly scheduled scans
-- ✅ Security vulnerability detection
+- ✅ Automated security vulnerability detection
+- ✅ Weekly scheduled scans for drift
+- ✅ Pull request security analysis
+- ✅ GitHub Security tab integration
 
-### 5. **Dependabot Auto-Merge** (`dependabot-auto-merge.yml`)
+---
 
-**Purpose:** Automated dependency updates with safety checks
+### 5. **Dependabot Auto-Approve** (`dependabot-auto-approve.yml`)
+
+**Purpose:** Auto-approve safe Dependabot updates to speed up auto-merge
 
 **Triggers:**
 
 - Dependabot pull requests
-- Manual dispatch
 
-**Jobs:**
+**Logic:**
 
-- **Auto-Merge Job:** Automated merging of safe dependency updates
+- Auto-approves patch & minor updates
+- Requires manual review for major version bumps
+- Works with `auto-merge.yml` for full automation
 
-**Features:**
-
-- ✅ Automated dependency updates
-- ✅ Safety checks before merging
-- ✅ Conflict resolution
-- ✅ Version bump automation
-
-## 🗑️ **Removed Workflows**
-
-The following workflows were removed during cleanup as they were unused or redundant:
-
-### ❌ **Removed Workflows:**
-
-1. `web-confidence-loop.yml` - **UNUSED** (Preview Confidence Loop)
-2. `web-lighthouse-ci.yml` - **REDUNDANT** (Lighthouse CI)
-3. `web-pr-verify.yml` - **MISSING** (File didn't exist)
-4. `web-rapid-loop.yml` - **REDUNDANT** (Dev Rapid Loop)
-5. `web-release-loop.yml` - **REDUNDANT** (Release Loop)
-6. `codeql-analysis.yml` - **REDUNDANT** (Duplicate CodeQL)
-7. `promote-preview.yml` - **REDUNDANT** (Manual promotion)
-
-### **Removal Reasons:**
-
-- **Unused:** Workflows that weren't being triggered
-- **Redundant:** Duplicate functionality already covered by other workflows
-- **Missing:** Files that didn't actually exist
-- **Outdated:** Workflows using old patterns or configurations
+---
 
 ## 🔄 **Workflow Dependencies**
 
-### **Develop → Preview Promotion**
+### **Feature → Main Flow**
 
 ```
-develop-ci.yml
-├── CI checks pass
-├── Preview deployment
-└── Auto-create PR (develop → preview)
-    └── Auto-merge enabled
+Feature PR → main
+├── ci-typecheck (parallel)
+├── ci-lint (parallel)
+└── Auto-merge (if eligible)
+    └── Deploy to main.jov.ie
 ```
 
-### **Preview → Main Promotion**
+### **Main → Production Flow**
 
 ```
-preview-ci.yml
-├── Full E2E tests
-├── Security scans
-├── Performance budgets
-└── Manual PR (preview → production)
-    └── Manual review required
+Push to main
+├── Full CI Suite
+│   ├── neon-db (ephemeral branch)
+│   ├── ci-drizzle-check
+│   ├── ci-build
+│   ├── ci-unit-tests
+│   └── ci-e2e-tests
+├── deploy
+│   ├── Run migrations (drizzle:migrate)
+│   ├── Seed database
+│   ├── Deploy to main.jov.ie
+│   └── Canary health check
+└── promote
+    └── Create PR (main → production)
+        └── Manual review required
 ```
 
-### **Main → Production Deployment**
+### **Production Deployment**
 
 ```
-production-deploy.yml
-├── Production deployment
-├── Environment verification
-└── Post-deployment checks
+PR merge (main → production)
+└── CI runs (full suite)
+    └── Deploy to jov.ie
+        ├── Run migrations
+        └── Post-deployment verification
 ```
+
+---
 
 ## 🛡️ **Security & Compliance**
 
@@ -191,103 +218,154 @@ production-deploy.yml
 
 - **CodeQL:** Weekly security vulnerability scanning
 - **Dependabot:** Automated dependency updates with security checks
-- **ZAP Scanning:** DAST security testing in preview environment
-- **Dependency Audit:** High+ severity vulnerability detection
+- **Auto-merge safety:** Validates PR author and checks before merging
+
+### **Database Security:**
+
+- **Ephemeral branches:** Isolated per-PR databases prevent cross-contamination
+- **Protected branches:** `main` and `production` never deleted
+- **Migration safety:** Append-only migrations, no destructive changes allowed
 
 ### **Compliance Features:**
 
-- ✅ Automated security scanning
-- ✅ Dependency vulnerability management
-- ✅ Performance monitoring
-- ✅ Accessibility testing
-- ✅ Visual regression testing
+- ✅ Automated security scanning (CodeQL)
+- ✅ Dependency vulnerability management (Dependabot)
+- ✅ Migration guards (check-migrations.sh)
+- ✅ PR size limits (< 400 LOC)
+- ✅ Required status checks before merge
+
+---
 
 ## 📊 **Monitoring & Metrics**
 
 ### **Performance Metrics:**
 
-- Lighthouse performance scores
-- Bundle size analysis
-- E2E test coverage
-- Build time optimization
+- Typecheck time: < 10s
+- Lint time: < 10s
+- Build time: < 2min
+- E2E test time: < 5min
+- **Total CI time:** < 10min (full suite)
 
-### **Security Metrics:**
+### **Deployment Metrics:**
 
-- CodeQL vulnerability detection
-- Dependency security status
-- ZAP security scan results
-- Audit compliance
+- Feature PR → main deploy: ~2 minutes
+- Main → production: ~5 minutes (with review)
+- **Total:** Ship to production in < 10 minutes
 
 ### **Quality Metrics:**
 
-- Test coverage
-- Type checking
-- Linting compliance
-- Build success rate
+- Zero warnings policy (ESLint)
+- Full type safety (TypeScript strict mode)
+- E2E coverage for critical paths
+- Database schema validation
+
+---
 
 ## 🚀 **Deployment Strategy**
 
 ### **Environment Promotion:**
 
-1. **Develop:** Development and testing
-2. **Preview:** Staging and validation
-3. **Production:** Live application
+1. **Feature branches:** Development and testing (ephemeral Neon DBs)
+2. **Main:** Staging and validation ([main.jov.ie](https://main.jov.ie))
+3. **Production:** Live application ([jov.ie](https://jov.ie))
 
 ### **Deployment Triggers:**
 
-- **Automatic:** develop → preview (auto-merge)
-- **Manual:** preview → main (manual review)
-- **Automatic:** main → production (deployment)
+- **Automatic:** Feature PR → main (auto-merge eligible)
+- **Automatic:** Main push → deploy to main.jov.ie
+- **Manual:** Main → production (requires approval)
+- **Automatic:** Production merge → deploy to jov.ie
+
+### **Database Strategy:**
+
+- **Long-lived branches:** `main`, `production` only
+- **Ephemeral branches:** Auto-created per PR, deleted on close
+- **Migrations:** Linear append-only, auto-run on deploy
+- **Testing:** Each PR gets isolated database
 
 ### **Rollback Strategy:**
 
-- **Preview:** Automatic rollback on CI failure
-- **Production:** Manual rollback via Vercel dashboard
-- **Database:** Supabase point-in-time recovery
+- **Code:** `git revert` + push to main
+- **Database:** Create reverse migration (append-only)
+- **Emergency:** Direct PR to production (bypass main)
+- **Backups:** Neon point-in-time recovery available
+
+---
+
+## 🗑️ **Recently Removed Workflows**
+
+The following legacy workflows were removed during CI/CD modernization:
+
+### ❌ **Removed Workflows:**
+
+1. `sync-preview-nightly.yml` - **DEPRECATED** (Preview branch no longer exists)
+2. `sync-preview-on-prod-promotion.yml` - **DEPRECATED** (Preview DB resync no longer needed)
+
+### **Removal Reasons:**
+
+- **Deprecated branch model:** Moved from develop → preview → production to main → production
+- **Reduced complexity:** Two-branch model simplifies workflow
+- **Faster iteration:** Removed unnecessary staging environment
+
+---
 
 ## 📝 **Maintenance**
 
 ### **Regular Tasks:**
 
-- Monitor workflow success rates
-- Update dependencies via Dependabot
-- Review security scan results
-- Optimize build times
-- Update workflow configurations
+- Monitor workflow success rates via GitHub Actions dashboard
+- Review Dependabot PRs for major version bumps
+- Update security scan results from CodeQL
+- Optimize build times (caching, parallel jobs)
+- Clean up old ephemeral Neon branches (automated)
 
 ### **Troubleshooting:**
 
-- Check workflow logs for failures
-- Verify environment variables
-- Review branch protection rules
-- Monitor resource usage
+- **CI failures:** Check workflow logs in GitHub Actions
+- **Migration issues:** Validate with `pnpm drizzle:check`
+- **Deploy failures:** Review canary health check logs
+- **Auto-merge stuck:** Verify all required checks passing
+
+---
 
 ## 🎯 **Best Practices**
 
 ### **Workflow Design:**
 
-- ✅ Single responsibility per workflow
-- ✅ Clear naming conventions
-- ✅ Proper error handling
-- ✅ Comprehensive testing
-- ✅ Security-first approach
+- ✅ Fast feedback loop (< 15s for typecheck + lint)
+- ✅ Path-based job skipping (only run what's needed)
+- ✅ Parallel job execution where possible
+- ✅ Clear error messages and status updates
 
 ### **Performance:**
 
-- ✅ Caching strategies
-- ✅ Parallel job execution
-- ✅ Resource optimization
-- ✅ Timeout management
+- ✅ Aggressive caching (Next.js cache, pnpm store, TypeScript build info)
+- ✅ Minimal CI for feature PRs (fast path)
+- ✅ Full CI only for production-bound changes
+- ✅ Timeout management (prevent hanging jobs)
 
 ### **Security:**
 
-- ✅ Minimal permissions
-- ✅ Secret management
-- ✅ Vulnerability scanning
-- ✅ Dependency monitoring
+- ✅ Minimal permissions (GITHUB_TOKEN with read-all by default)
+- ✅ Secret management (DATABASE_URL, VERCEL_TOKEN, etc.)
+- ✅ Automated vulnerability scanning (CodeQL, Dependabot)
+- ✅ Protected branch rules (main, production)
 
 ---
 
-**Status:** ✅ **Organized and Optimized**
+## 🏁 **YC-Aligned Rapid Deployment**
 
-All workflows are now properly organized, documented, and optimized for the Jovie development workflow. The CI/CD pipeline provides comprehensive testing, security scanning, and automated deployment with proper manual review gates for production releases.
+This workflow organization enables **multiple deployments per day** through:
+
+1. **Fast CI:** 10-15s for feature PRs
+2. **Auto-merge:** Safe changes merge without waiting
+3. **Instant staging:** Changes live on main.jov.ie within 2 minutes
+4. **Quick production:** Manual review + auto-deploy in ~5 minutes
+
+**Total time:** Ship a feature to production in **< 10 minutes** from PR creation.
+
+---
+
+**Status:** ✅ **Optimized for YC-Style Rapid Iteration**
+
+All workflows are organized for maximum velocity while maintaining production safety through automated testing, manual production gates, and comprehensive monitoring.

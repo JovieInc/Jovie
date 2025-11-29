@@ -56,7 +56,7 @@ jobs:
         run: |
           NAME="${{ steps.sanitize.outputs.name }}"
           case "$NAME" in
-            production|preview|main)
+            production|main)
               echo "Protected Neon branch '$NAME'; skipping delete." >&2
               echo "skip=true" >> "$GITHUB_OUTPUT"
               ;;

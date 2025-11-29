@@ -1,249 +1,262 @@
 # CI/CD Pipeline Flow
 
-This document explains the complete CI/CD pipeline flow from develop branch to production deployment.
+This document explains the complete CI/CD pipeline flow from feature development to production deployment.
 
 ## 🔄 **Complete Flow Overview**
 
 ```
-develop → preview → production
-   ↓        ↓        ↓        ↓
-  CI/CD    CI/CD   Manual   Production
-Pipeline  Pipeline  Review   Deployment
+main → production
+ ↓         ↓
+Fast CI   Full CI + Manual Review
+ ↓         ↓
+Auto Deploy  Auto Deploy (after approval)
+main.jov.ie  jov.ie
 ```
 
 ## 📋 **Step-by-Step Flow**
 
-### **Step 1: Develop Branch (develop-ci.yml)**
+### **Step 1: Feature Development → Main**
 
-**Trigger:** Push to `develop` branch
+**Trigger:** PR to `main` branch from feature branch
 
 **Process:**
 
-1. ✅ **CI Checks:**
-   - Type checking and linting
-   - Unit and integration tests
+1. ✅ **Fast CI Checks** (`ci-fast`):
+   - TypeScript type checking (~5-10s)
+   - ESLint (zero warnings policy) (~5-10s)
+   - **Total:** ~10-15 seconds
+
+2. ✅ **Path-Based Guards:**
+   - Drizzle check only runs if DB changes detected
+   - Build only runs if code changes detected
+   - Tests only run if test/code changes detected
+
+3. ✅ **Auto-Merge Eligible:**
+   - Dependabot updates
+   - Code generation (e.g., Supabase types)
+   - PRs with `automerge` label
+
+**Output:** Changes merged to `main` branch, deployed to [main.jov.ie](https://main.jov.ie)
+
+---
+
+### **Step 2: Main Branch Deployment**
+
+**Trigger:** Push to `main` branch (after PR merge)
+
+**Process:**
+
+1. ✅ **Full CI Suite:**
+   - All fast checks (typecheck, lint)
+   - Drizzle schema check
    - Build verification
-   - Preview deployment
-   - Lighthouse performance testing
-   - Security dependency scanning
+   - Unit tests
+   - E2E smoke tests
 
-2. ✅ **Auto-Promotion:**
-   - Check if develop is ahead of preview
-   - Create PR: `develop → preview`
-   - Enable auto-merge (squash)
-   - Auto-merge when all checks pass
+2. ✅ **Database Migrations:**
+   - Run `pnpm run drizzle:migrate` against main database
+   - Seed data if needed
 
-**Output:** Changes automatically merged to `preview` branch
+3. ✅ **Vercel Deployment:**
+   - Deploy to main.jov.ie environment
+   - Run canary health check
+   - Verify key content loads
 
-### **Step 2: Preview Branch (preview-ci.yml)**
+4. ✅ **Auto-Promotion:**
+   - Automatically creates PR: `main → production`
+   - Adds "needs-review" label
+   - **Manual approval required**
 
-**Trigger:** Push to `preview` branch (after develop → preview merge)
+**Output:**
+- Main environment updated at [main.jov.ie](https://main.jov.ie)
+- PR created for production promotion (requires review)
 
-**Process:**
+---
 
-1. ✅ **Comprehensive Testing:**
-   - Full E2E testing (desktop + mobile)
-   - Visual regression testing
-   - Lighthouse performance budgets
-   - Bundle size analysis
-   - ZAP security scanning
-   - Dependency security audit
+### **Step 3: Production Deployment**
 
-2. ✅ **Auto-Promotion to Main:**
-   - Check if preview is ahead of production
-   - Create PR: `preview → production`
-   - Add "needs-review" label
-   - **Manual review required**
-
-**Output:** PR created for `preview → production` (manual approval needed)
-
-### **Step 3: Production Branch (production-deploy.yml)**
-
-**Trigger:** Push to `production` branch (after preview → production merge)
+**Trigger:** PR merge from `main → production` (manual approval)
 
 **Process:**
 
 1. ✅ **Production Deployment:**
-   - Production environment deployment
+   - Deploy to production environment (jov.ie)
+   - Run database migrations on production
    - Post-deployment verification
-   - Environment protection
-   - Deployment monitoring
+   - Monitor for errors
 
-**Output:** Changes deployed to production
-
-## 🎯 **Key Features**
-
-### **Automated Promotions:**
-
-- ✅ **develop → preview:** Fully automated with auto-merge
-- ✅ **preview → production:** Automated PR creation, manual review required
-
-### **Safety Gates:**
-
-- ✅ **Develop:** All CI checks must pass
-- ✅ **Preview:** Full E2E tests + security scans must pass
-- ✅ **Main:** Manual review required
-- ✅ **Production:** Automatic deployment with verification
-
-### **Error Handling:**
-
-- ✅ **Branch ahead checks:** Prevents unnecessary PRs
-- ✅ **Conditional execution:** Only runs when needed
-- ✅ **Comprehensive logging:** Clear status messages
-- ✅ **Graceful failures:** Continues pipeline on non-critical errors
-
-## 🔍 **Workflow Triggers**
-
-### **develop-ci.yml:**
-
-```yaml
-on:
-  push:
-    branches: [develop]
-  pull_request:
-    branches: [develop]
-  workflow_dispatch: {}
-```
-
-### **preview-ci.yml:**
-
-```yaml
-on:
-  push:
-    branches: [preview]
-  pull_request:
-    branches: [preview]
-  workflow_dispatch: {}
-```
-
-### **production-deploy.yml:**
-
-```yaml
-on:
-  push:
-    branches: [production]
-  workflow_dispatch: {}
-```
-
-## 🛡️ **Security & Quality Gates**
-
-### **Develop Branch:**
-
-- ✅ TypeScript type checking
-- ✅ ESLint code quality
-- ✅ Unit and integration tests
-- ✅ Build verification
-- ✅ Smoke E2E tests
-- ✅ Lighthouse performance
-- ✅ Dependency security audit
-
-### **Preview Branch:**
-
-- ✅ Full E2E testing (desktop + mobile)
-- ✅ Visual regression testing
-- ✅ Lighthouse performance budgets
-- ✅ Bundle size analysis
-- ✅ ZAP security scanning
-- ✅ Comprehensive security audit
-
-### **Main Branch:**
-
-- ✅ Production deployment
-- ✅ Post-deployment verification
-- ✅ Environment protection
-
-## 📊 **Monitoring & Observability**
-
-### **Workflow Status:**
-
-- ✅ **Success:** All checks passed, promotion successful
-- ✅ **Failure:** Check logs for specific issues
-- ✅ **Skipped:** No changes to promote (expected)
-
-### **Deployment URLs:**
-
-- ✅ **Preview:** Available in PR description
-- ✅ **Production:** Available in deployment logs
-
-### **Notifications:**
-
-- ✅ **PR Creation:** Automatic PR with detailed description
-- ✅ **Auto-merge:** Automatic merging when conditions met
-- ✅ **Manual Review:** Clear indication when manual review needed
-
-## 🔧 **Troubleshooting**
-
-### **Common Issues:**
-
-1. **Develop → Preview not triggering:**
-   - Check if develop is ahead of preview
-   - Verify CI checks are passing
-   - Check auto-merge conditions
-
-2. **Preview → Production not creating PR:**
-   - Check if preview is ahead of production
-   - Verify all preview CI checks passed
-   - Check workflow permissions
-
-3. **Production deployment failing:**
-   - Check environment variables
-   - Verify Vercel configuration
-   - Check deployment logs
-
-### **Debug Commands:**
-
-```bash
-# Check branch status
-git fetch origin
-git rev-list --count preview..develop
-git rev-list --count production..preview
-
-# Check workflow runs
-gh run list --workflow=develop-ci.yml
-gh run list --workflow=preview-ci.yml
-gh run list --workflow=production-deploy.yml
-```
-
-## 🎯 **Best Practices**
-
-### **Development:**
-
-- ✅ Always work on `develop` branch
-- ✅ Ensure all tests pass before pushing
-- ✅ Monitor CI/CD pipeline status
-- ✅ Review auto-created PRs
-
-### **Review Process:**
-
-- ✅ Review preview → production PRs carefully
-- ✅ Test preview environment before approval
-- ✅ Check security scan results
-- ✅ Verify performance metrics
-
-### **Deployment:**
-
-- ✅ Monitor production deployment
-- ✅ Verify post-deployment checks
-- ✅ Monitor application performance
-- ✅ Check error tracking
-
-## 📈 **Performance Metrics**
-
-### **Pipeline Efficiency:**
-
-- ✅ **Develop CI:** ~40 minutes
-- ✅ **Preview CI:** ~60 minutes
-- ✅ **Production Deploy:** ~30 minutes
-
-### **Quality Metrics:**
-
-- ✅ **Test Coverage:** Comprehensive E2E testing
-- ✅ **Performance:** Lighthouse budget compliance
-- ✅ **Security:** Automated vulnerability scanning
-- ✅ **Reliability:** Multiple safety gates
+**Output:** Changes live at [jov.ie](https://jov.ie)
 
 ---
 
-**Status:** ✅ **Fully Automated Pipeline**
+## 🎯 **Key Features**
 
-The CI/CD pipeline is now fully automated with proper safety gates, comprehensive testing, and clear promotion flow from develop to production. The pipeline ensures quality, security, and reliability at every stage.
+### **Fast-Path Development (YC-Optimized):**
+
+✅ **Feature PRs → main:**
+- Lightning-fast CI (~10-15s for typecheck + lint)
+- Auto-merge for safe changes (dependabot, codegen)
+- Instant deployment to main.jov.ie
+- **Ship multiple times per day**
+
+✅ **Main → production:**
+- Full CI suite with tests
+- Manual review for production safety
+- Automatic deployment after approval
+
+### **Safety Gates:**
+
+- ✅ **Feature PRs:** Typecheck + lint (fast feedback)
+- ✅ **Main deploys:** Full CI + E2E tests + manual review for production
+- ✅ **Production:** Manual approval + automated verification
+
+### **Database Strategy:**
+
+- ✅ **Migrations:** Run automatically on deployment via `drizzle:migrate`
+- ✅ **Long-lived branches:** Only `main` and `production` (no ephemeral preview)
+- ✅ **PR branches:** Ephemeral Neon branches auto-created per PR
+- ✅ **Cleanup:** Ephemeral branches deleted when PR closes
+
+### **Error Handling:**
+
+- ✅ **Path guards:** Skip unnecessary jobs when no relevant changes
+- ✅ **Graceful fallbacks:** Use fallback secrets if primary unavailable
+- ✅ **Conditional execution:** Only runs when needed
+- ✅ **Comprehensive logging:** Clear status messages
+
+---
+
+## 🚀 **YC-Aligned Rapid Deployment**
+
+This pipeline enables **multiple deployments per day** through:
+
+1. **Fast feedback loop:** 10-15s CI for feature PRs
+2. **Auto-merge:** Safe changes merge automatically
+3. **Instant staging:** Changes live on main.jov.ie within minutes
+4. **Manual production gate:** Quick review + auto-deploy
+
+**Typical timeline:**
+- Feature PR → main: **~2 minutes** (CI + merge + deploy)
+- Main → production: **~5 minutes** (review + CI + deploy)
+- **Total:** Ship to production in **< 10 minutes** from PR approval
+
+---
+
+## 🔧 **Workflow Configuration**
+
+### **ci.yml Triggers:**
+
+```yaml
+on:
+  pull_request:
+    branches: [main, production]
+  push:
+    branches: [main, production]
+  merge_group:
+    branches: [main, production]
+```
+
+### **Fast vs Full CI:**
+
+**Fast CI** (PRs to main):
+- `ci-typecheck`
+- `ci-lint`
+
+**Full CI** (main → production):
+- All fast checks
+- `ci-drizzle-check`
+- `ci-build`
+- `ci-unit-tests`
+- `ci-e2e-tests`
+
+---
+
+## 📊 **Migration Strategy**
+
+### **Linear Append-Only:**
+
+✅ **Always add new migrations** - never edit or squash existing ones
+✅ **Run migrations automatically** - via CI deployment jobs
+✅ **Test migrations locally** - against ephemeral Neon branches
+
+### **Migration Commands:**
+
+```bash
+# Create new migration
+pnpm run drizzle:generate
+
+# Apply migrations (auto-run by CI)
+pnpm run drizzle:migrate
+
+# Check schema drift
+pnpm run drizzle:check
+```
+
+---
+
+## 🔄 **Rollback Procedure**
+
+### **Immediate Rollback:**
+
+1. **Revert PR merge:**
+   ```bash
+   git revert <commit-sha>
+   git push origin main
+   ```
+
+2. **Emergency hotfix:**
+   - Create fix branch from `production`
+   - PR directly to `production` (bypass main)
+   - Manual approval + deploy
+
+### **Database Rollback:**
+
+⚠️ **Migrations are append-only** - cannot auto-rollback
+
+**Options:**
+1. Create reverse migration (preferred)
+2. Manual database restore from backup (Neon snapshots)
+3. Deploy code that handles both schema versions
+
+---
+
+## 📈 **Monitoring & Observability**
+
+### **Deployment Verification:**
+
+- ✅ Canary health checks after every deploy
+- ✅ HTTP 200 response verification
+- ✅ Key content verification (homepage, dashboard)
+- ✅ Error rate monitoring (via logs)
+
+### **Performance Budgets:**
+
+- ⏱️ Typecheck: < 10s
+- ⏱️ Lint: < 10s
+- ⏱️ Build: < 2min
+- ⏱️ E2E tests: < 5min
+- ⏱️ Total CI: < 10min
+
+---
+
+## 🎓 **Best Practices**
+
+### **For Developers:**
+
+1. **Keep PRs small:** < 400 LOC (enforced by CI)
+2. **Use semantic commits:** `feat:`, `fix:`, `chore:`
+3. **Run checks locally:** `pnpm typecheck && pnpm lint`
+4. **Test migrations:** Create ephemeral Neon branch
+
+### **For Reviews:**
+
+1. **Main → production PRs:**
+   - Verify all tests pass
+   - Check migration safety
+   - Review deployment plan
+   - Confirm rollback strategy
+
+2. **Feature PRs:**
+   - Fast approval for safe changes
+   - Focus on business logic
+   - Ensure tests cover new code

@@ -23,7 +23,7 @@ Go to **Settings > General > Pull Requests** and:
 
 ### 2. Branch Protection Rules
 
-For both `preview` and `production` branches, ensure these settings:
+For both `main` and `production` branches, ensure these settings:
 
 **Required Status Checks:**
 
@@ -56,7 +56,7 @@ For both `preview` and `production` branches, ensure these settings:
 
 ### For Regular PRs
 
-1. Create PR against `preview` branch
+1. Create PR against `main` branch
 2. Ensure all CI checks pass
 3. Get required approvals
 4. Click "Merge when ready" instead of "Merge"
