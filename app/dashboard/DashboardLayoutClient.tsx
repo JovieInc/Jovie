@@ -99,11 +99,11 @@ export default function DashboardLayoutClient({
       <PendingClaimHandler />
 
       <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className='flex h-screen w-full overflow-hidden'>
+        <div className='flex min-h-screen w-full overflow-hidden bg-base'>
           <DashboardSidebar />
           <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
             <DashboardTopBar breadcrumbs={crumbs} />
-            <main className='flex-1 overflow-auto'>
+            <main className='flex-1 min-h-0 overflow-auto'>
               <div className='container mx-auto max-w-7xl p-6'>{children}</div>
             </main>
           </SidebarInset>

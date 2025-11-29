@@ -53,19 +53,11 @@ The public URL of your application.
 
 **Default:** `https://jov.ie`
 
-## Analytics
+## Analytics & Feature Flags (Statsig)
 
-### `NEXT_PUBLIC_SEGMENT_WRITE_KEY`
+### `NEXT_PUBLIC_STATSIG_CLIENT_KEY`
 
-The write key for Segment analytics.
-
-### `NEXT_PUBLIC_POSTHOG_KEY`
-
-The API key for PostHog analytics.
-
-### `NEXT_PUBLIC_POSTHOG_HOST`
-
-The host URL for PostHog analytics.
+Public Statsig client SDK key. Analytics and feature gates remain disabled when this is missing.
 
 ## Stripe Billing
 

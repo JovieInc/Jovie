@@ -194,7 +194,9 @@ function initializeDb(): DbType {
     if (
       process.env.NODE_ENV !== 'production' &&
       !cleanupRegistered &&
-      typeof process !== 'undefined'
+      typeof process !== 'undefined' &&
+      'once' in process &&
+      typeof process.once === 'function'
     ) {
       cleanupRegistered = true;
       const cleanup = () => {

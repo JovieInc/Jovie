@@ -18,38 +18,40 @@ export function DashboardTopBar({
   actions,
 }: DashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border bg-sidebar/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-sidebar/60'>
-      <SidebarCollapseButton className='-ml-1' />
-      <div className='h-4 w-px bg-sidebar-border' />
-      <nav
-        aria-label='Breadcrumb'
-        className='flex items-center gap-1 text-sm text-muted-foreground'
-      >
-        {breadcrumbs.map((crumb, index) => {
-          const isLast = index === breadcrumbs.length - 1;
-          return (
-            <span
-              key={`${crumb.label}-${index}`}
-              className='flex items-center gap-1'
-            >
-              {crumb.href && !isLast ? (
-                <Link
-                  href={crumb.href}
-                  className='transition-colors hover:text-foreground'
-                >
-                  {crumb.label}
-                </Link>
-              ) : (
-                <span className='text-foreground'>{crumb.label}</span>
-              )}
-              {!isLast && <span className='text-muted-foreground/50'>/</span>}
-            </span>
-          );
-        })}
-      </nav>
-      {actions ? (
-        <div className='ml-auto flex items-center gap-2'>{actions}</div>
-      ) : null}
+    <header className='sticky top-0 z-20 border-b border-subtle bg-surface-0 backdrop-blur supports-[backdrop-filter]:bg-surface-0'>
+      <div className='mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8'>
+        <SidebarCollapseButton className='-ml-1' />
+        <div className='hidden h-5 border-l border-subtle sm:block' />
+        <nav
+          aria-label='Breadcrumb'
+          className='flex items-center gap-1 text-sm text-secondary-token'
+        >
+          {breadcrumbs.map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            return (
+              <span
+                key={`${crumb.label}-${index}`}
+                className='flex items-center gap-1'
+              >
+                {crumb.href && !isLast ? (
+                  <Link
+                    href={crumb.href}
+                    className='transition-colors hover:text-primary-token'
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className='text-primary-token'>{crumb.label}</span>
+                )}
+                {!isLast && <span className='text-secondary-token'>/</span>}
+              </span>
+            );
+          })}
+        </nav>
+        {actions ? (
+          <div className='ml-auto flex items-center gap-2'>{actions}</div>
+        ) : null}
+      </div>
     </header>
   );
 }

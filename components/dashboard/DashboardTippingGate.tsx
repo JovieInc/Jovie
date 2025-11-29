@@ -9,14 +9,16 @@ export function DashboardTippingGate() {
 
   if (!tippingGate.value) {
     return (
-      <div className='text-center'>
-        <h1 className='text-2xl font-semibold text-gray-900 dark:text-white mb-4'>
-          Tipping is not available yet
-        </h1>
-        <p className='text-gray-600 dark:text-white/70'>
-          We&apos;re focusing on getting the core Jovie profile experience right
-          before launching tipping.
-        </p>
+      <div className='flex items-center justify-center'>
+        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
+          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
+            Tipping is not available yet
+          </h1>
+          <p className='text-secondary-token'>
+            We&apos;re focusing on getting the core Jovie profile experience
+            right before launching tipping.
+          </p>
+        </div>
       </div>
     );
   }

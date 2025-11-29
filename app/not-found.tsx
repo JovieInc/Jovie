@@ -6,72 +6,37 @@ import { Header } from '@/components/site/Header';
 export default function NotFound() {
   return (
     <div className='min-h-screen bg-white dark:bg-gray-900'>
-      {/* Header */}
       <Header />
 
-      {/* Main Content */}
-      <main className='flex-1'>
-        <Container>
-          <div className='flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center px-4'>
-            {/* Elegant 404 Display */}
-            <div className='mb-8 relative'>
-              <div className='absolute -inset-1 bg-gradient-to-r from-blue-600 to-purple-600 opacity-20 blur-xl rounded-full'></div>
-              <h1 className='relative text-8xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 tracking-tight'>
-                404
-              </h1>
-            </div>
-
-            {/* Main Message - Apple-style copywriting */}
-            <div className='max-w-md mx-auto space-y-4'>
-              <h2 className='text-2xl font-medium text-gray-900 dark:text-white tracking-tight'>
-                This page is missing.
-              </h2>
-
-              <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed'>
-                The link you followed may be broken, or the page may have moved.
-              </p>
-
-              {/* Primary Action */}
-              <div className='pt-6'>
-                <Link
-                  href='/'
-                  className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
-                >
-                  Return Home
-                </Link>
+      <main>
+        <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
+          <div className='w-full max-w-xl mx-auto text-center px-4 py-16'>
+            <div className='mb-10 relative'>
+              <div className='absolute -inset-1 rounded-full bg-gradient-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
+              <div className='relative inline-flex items-baseline gap-3'>
+                <span className='text-6xl md:text-8xl font-semibold tracking-tight text-gray-900 dark:text-white'>
+                  404
+                </span>
+                <span className='hidden md:inline text-xs font-medium tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400'>
+                  Not found
+                </span>
               </div>
             </div>
 
-            {/* Helpful Suggestions - Minimal & Elegant */}
-            <div className='mt-16 max-w-lg'>
-              <p className='text-sm font-medium text-gray-900 dark:text-white mb-4'>
-                You might be looking for:
-              </p>
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                <Link
-                  href='/artists'
-                  className='p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group'
-                >
-                  <div className='font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'>
-                    Discover Artists
-                  </div>
-                  <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
-                    Find and connect with musicians
-                  </div>
-                </Link>
+            <h1 className='text-2xl md:text-3xl font-medium text-gray-900 dark:text-white tracking-tight mb-3'>
+              This page is missing.
+            </h1>
+            <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed mb-8'>
+              The link you followed may be broken, or the page may have moved.
+            </p>
 
-                <Link
-                  href='/dashboard'
-                  className='p-4 rounded-xl border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors group'
-                >
-                  <div className='font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors'>
-                    Your Dashboard
-                  </div>
-                  <div className='text-sm text-gray-500 dark:text-gray-400 mt-1'>
-                    Manage your profile and content
-                  </div>
-                </Link>
-              </div>
+            <div className='flex items-center justify-center gap-3'>
+              <Link
+                href='/'
+                className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
+              >
+                Return Home
+              </Link>
             </div>
           </div>
         </Container>
