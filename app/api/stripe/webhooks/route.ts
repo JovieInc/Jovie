@@ -26,11 +26,23 @@ export const runtime = 'nodejs';
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 
+/**
+ * Safely extract the Stripe object ID from a webhook event
+ * @param event - Stripe webhook event
+ * @returns The object ID if present, null otherwise
+ */
 function getStripeObjectId(event: Stripe.Event): string | null {
-  const object = event.data?.object as { id?: string } | null | undefined;
-  if (object && typeof object.id === 'string') {
+  // Stripe webhook events always have data.object with an 'id' field
+  // Cast to unknown first to satisfy TypeScript
+  const object = event.data?.object as unknown as
+    | { id?: string }
+    | null
+    | undefined;
+
+  if (object && typeof object.id === 'string' && object.id.length > 0) {
     return object.id;
   }
+
   return null;
 }
 

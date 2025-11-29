@@ -116,4 +116,134 @@ describe('/api/capture-tip', () => {
     expect(mockSelect).toHaveBeenCalled();
     expect(mockInsert).toHaveBeenCalled();
   });
+
+  it('returns 500 when creator profile not found (CRITICAL bug prevention)', async () => {
+    mockHeaders.mockResolvedValue(
+      new Map([['stripe-signature', 'sig_test']]) as any
+    );
+
+    const stripeModule = await import('stripe');
+    const stripeInstance: any = new (stripeModule as any).default('sk_test');
+    const event = {
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_456',
+          amount_received: 1000,
+          currency: 'usd',
+          metadata: { handle: 'deleted_artist' },
+        },
+      },
+    } as any;
+
+    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
+    (stripeModule as any).default = vi.fn(() => stripeInstance);
+
+    // Simulate creator profile not found
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]), // Empty array = no profile
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/capture-tip', {
+      method: 'POST',
+      body: 'test-body',
+    });
+
+    const response = await POST(request);
+
+    // MUST return 500 to trigger Stripe retry, preventing silent payment loss
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('Creator profile not found');
+    expect(data.payment_intent).toBe('pi_456');
+
+    // Should not attempt to insert tip when profile missing
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('handles duplicate tip events via onConflictDoNothing', async () => {
+    mockHeaders.mockResolvedValue(
+      new Map([['stripe-signature', 'sig_test']]) as any
+    );
+
+    const stripeModule = await import('stripe');
+    const stripeInstance: any = new (stripeModule as any).default('sk_test');
+    const event = {
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_duplicate',
+          amount_received: 500,
+          currency: 'usd',
+          metadata: { handle: 'artist' },
+        },
+      },
+    } as any;
+
+    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
+    (stripeModule as any).default = vi.fn(() => stripeInstance);
+
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ id: 'creator_1' }]),
+        }),
+      }),
+    });
+
+    // Simulate duplicate: onConflictDoNothing returns empty array
+    mockInsert.mockReturnValue({
+      values: () => ({
+        onConflictDoNothing: () => ({
+          returning: () => Promise.resolve([]), // Empty = conflict, no insert
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost:3000/api/capture-tip', {
+      method: 'POST',
+      body: 'test-body',
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.received).toBe(true);
+  });
+
+  it('ignores non-payment_intent.succeeded events', async () => {
+    mockHeaders.mockResolvedValue(
+      new Map([['stripe-signature', 'sig_test']]) as any
+    );
+
+    const stripeModule = await import('stripe');
+    const stripeInstance: any = new (stripeModule as any).default('sk_test');
+    const event = {
+      type: 'payment_intent.created', // Different event type
+      data: {
+        object: {
+          id: 'pi_789',
+        },
+      },
+    } as any;
+
+    stripeInstance.webhooks.constructEvent = vi.fn().mockReturnValue(event);
+    (stripeModule as any).default = vi.fn(() => stripeInstance);
+
+    const request = new NextRequest('http://localhost:3000/api/capture-tip', {
+      method: 'POST',
+      body: 'test-body',
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(200);
+
+    // Should not query database for non-succeeded events
+    expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
 });
