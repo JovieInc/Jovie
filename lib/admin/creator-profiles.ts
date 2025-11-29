@@ -1,6 +1,6 @@
 'server only';
 
-import { desc, ilike, or } from 'drizzle-orm';
+import { count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
@@ -77,28 +77,39 @@ export async function getAdminCreatorProfiles(
     }
   })();
 
-  const rows = await db
-    .select({
-      id: creatorProfiles.id,
-      username: creatorProfiles.username,
-      avatarUrl: creatorProfiles.avatarUrl,
-      isVerified: creatorProfiles.isVerified,
-      isClaimed: creatorProfiles.isClaimed,
-      createdAt: creatorProfiles.createdAt,
-    })
-    .from(creatorProfiles)
-    .where(
-      likePattern
-        ? or(
-            ilike(creatorProfiles.username, likePattern),
-            ilike(creatorProfiles.displayName, likePattern)
-          )
-        : undefined
-    )
-    .orderBy(...orderByExpressions);
+  // Build where clause for reuse in both queries
+  const whereClause: SQL | undefined = likePattern
+    ? or(
+        ilike(creatorProfiles.username, likePattern),
+        ilike(creatorProfiles.displayName, likePattern)
+      )
+    : undefined;
 
-  const total = rows.length;
-  const pageRows = rows.slice(offset, offset + pageSize);
+  // Execute queries in parallel for better performance
+  const [rows, [{ value: total }]] = await Promise.all([
+    // Paginated data query
+    db
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        avatarUrl: creatorProfiles.avatarUrl,
+        isVerified: creatorProfiles.isVerified,
+        isClaimed: creatorProfiles.isClaimed,
+        createdAt: creatorProfiles.createdAt,
+      })
+      .from(creatorProfiles)
+      .where(whereClause)
+      .orderBy(...orderByExpressions)
+      .limit(pageSize)
+      .offset(offset),
+    // Total count query
+    db
+      .select({ value: count() })
+      .from(creatorProfiles)
+      .where(whereClause),
+  ]);
+
+  const pageRows = rows;
 
   return {
     profiles: pageRows.map(row => ({
