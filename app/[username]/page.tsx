@@ -1,5 +1,6 @@
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
@@ -24,12 +25,16 @@ import {
 const getProfileAndLinks = unstable_cache(
   async (
     username: string
-  ): Promise<{ profile: CreatorProfile | null; links: LegacySocialLink[] }> => {
+  ): Promise<{
+    profile: CreatorProfile | null;
+    links: LegacySocialLink[];
+    status: 'ok' | 'not_found' | 'error';
+  }> => {
     try {
       const result = await getCreatorProfileWithLinks(username);
 
       if (!result || !result.isPublic) {
-        return { profile: null, links: [] };
+        return { profile: null, links: [], status: 'not_found' };
       }
 
       const profile: CreatorProfile = {
@@ -75,10 +80,10 @@ const getProfileAndLinks = unstable_cache(
           created_at: link.createdAt.toISOString(),
         })) ?? [];
 
-      return { profile, links };
+      return { profile, links, status: 'ok' };
     } catch (error) {
       console.error('Error fetching creator profile:', error);
-      return { profile: null, links: [] };
+      return { profile: null, links: [], status: 'error' };
     }
   },
   ['public-profile-v1'],
@@ -100,7 +105,24 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const { mode = 'profile' } = resolvedSearchParams || {};
 
   const normalizedUsername = username.toLowerCase();
-  const { profile, links } = await getProfileAndLinks(normalizedUsername);
+  const { profile, links, status } =
+    await getProfileAndLinks(normalizedUsername);
+
+  if (status === 'error') {
+    return (
+      <div className='px-4 py-8'>
+        <ErrorBanner
+          title='Profile is temporarily unavailable'
+          description='We could not load this Jovie profile right now. Please refresh or try again in a few minutes.'
+          actions={[
+            { label: 'Try again', href: `/${normalizedUsername}` },
+            { label: 'Go home', href: '/' },
+          ]}
+          testId='public-profile-error'
+        />
+      </div>
+    );
+  }
 
   if (!profile) {
     notFound();
@@ -152,7 +174,14 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 // Generate metadata for the page
 export async function generateMetadata({ params }: Props) {
   const { username } = await params;
-  const { profile } = await getProfileAndLinks(username.toLowerCase());
+  const { profile, status } = await getProfileAndLinks(username.toLowerCase());
+
+  if (status === 'error') {
+    return {
+      title: 'Profile temporarily unavailable',
+      description: 'We are working to restore this profile. Please try again.',
+    };
+  }
 
   if (!profile) {
     return {

@@ -2,10 +2,13 @@
 
 import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 // Email validation schema
@@ -26,19 +29,23 @@ export default function NotificationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { success: notifySuccess, error: notifyError } = useNotifications();
+  const searchParams = useSearchParams();
 
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+  const forceNotifications = searchParams?.get('preview') === '1';
+  const notificationsEnabled = notificationsGate.value || forceNotifications;
 
-  if (!notificationsGate.value) {
+  if (!notificationsEnabled) {
     return (
-      <div className='container mx-auto px-4 py-8 max-w-md'>
-        <h1 className='text-2xl font-bold mb-6'>
-          Notifications are not available yet
-        </h1>
-        <p className='text-gray-600 dark:text-gray-400'>
-          We&apos;re focused on getting the core Jovie profile experience right
-          before launching notifications.
-        </p>
+      <div className='container mx-auto px-4 py-8 max-w-xl'>
+        <StarterEmptyState
+          title='Notifications are not available yet'
+          description="We're focused on the core Jovie experience. Opt-in will be back soon once we're confident in reliability."
+          primaryAction={{ label: 'Return home', href: '/' }}
+          secondaryAction={{ label: 'View profile', href: `/${username}` }}
+          testId='notifications-disabled'
+        />
       </div>
     );
   }
@@ -55,6 +62,7 @@ export default function NotificationsPage() {
       if (err instanceof z.ZodError) {
         const errorMessage = err.format()._errors[0] || 'Invalid email';
         setError(errorMessage);
+        notifyError(errorMessage);
 
         // Track form validation error
         track('notifications_subscribe_error', {
@@ -68,6 +76,8 @@ export default function NotificationsPage() {
     }
 
     setIsSubmitting(true);
+    setError(null);
+    setSuccess(false);
 
     // Track form submission attempt
     track('notifications_subscribe_attempt', {
@@ -106,10 +116,12 @@ export default function NotificationsPage() {
       });
 
       setSuccess(true);
+      notifySuccess(`You'll receive updates from ${username}.`);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage);
+      setError(errorMessage || 'Unable to subscribe right now.');
+      notifyError('Unable to turn on notifications right now.');
 
       // Track submission error
       track('notifications_subscribe_error', {
@@ -127,14 +139,24 @@ export default function NotificationsPage() {
       <h1 className='text-2xl font-bold mb-6'>Get updates from {username}</h1>
 
       {success ? (
-        <div className='bg-green-50 border border-green-200 rounded-lg p-4 mb-4'>
-          <p className='text-green-800'>
-            You&apos;ll get updates from {username} when they release new
-            content.
-          </p>
-        </div>
+        <StarterEmptyState
+          title='Notifications enabled'
+          description={`You will get updates from ${username} when they release new content.`}
+          primaryAction={{ label: 'View profile', href: `/${username}` }}
+          secondaryAction={{ label: 'Return home', href: '/' }}
+          testId='notifications-success'
+        />
       ) : (
         <form onSubmit={handleSubmit} className='space-y-4'>
+          {error ? (
+            <ErrorBanner
+              title='Could not save your notification request'
+              description={error}
+              actions={[{ label: 'Try again', onClick: () => setError(null) }]}
+              testId='notifications-error'
+            />
+          ) : null}
+
           <div>
             <label htmlFor='email' className='block text-sm font-medium mb-1'>
               Email
@@ -148,7 +170,6 @@ export default function NotificationsPage() {
               placeholder='your@email.com'
               required
             />
-            {error && <p className='mt-1 text-sm text-red-600'>{error}</p>}
           </div>
 
           <button

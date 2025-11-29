@@ -7,6 +7,7 @@ import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipbo
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
+import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 export function DashboardOverview() {
@@ -16,7 +17,15 @@ export function DashboardOverview() {
     : null;
 
   if (!artist) {
-    return null; // Safety: server should always provide a selected profile
+    return (
+      <StarterEmptyState
+        title='We could not load your profile'
+        description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
+        primaryAction={{ label: 'Refresh dashboard', href: '/dashboard' }}
+        secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
+        testId='dashboard-missing-profile'
+      />
+    );
   }
 
   const isHandleClaimed = Boolean(artist.owner_user_id);

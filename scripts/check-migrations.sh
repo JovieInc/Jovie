@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 MIGRATIONS_DIR="drizzle/migrations"
-BASE_BRANCH=${1:-"origin/preview"}
+BASE_BRANCH=${1:-"origin/main"}
 BULK_LABEL_MARKER="schema:bulk"
 
 # Colors for output

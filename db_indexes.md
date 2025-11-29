@@ -35,6 +35,8 @@ WHERE is_public = true AND is_featured = true AND marketing_opt_out = false;
 
 These indexes should be created via Drizzle migration in the next database schema update. The partial WHERE clause in the index definition will make the index smaller and more efficient since it only indexes rows that match our query criteria.
 
+When using Drizzle's SQL migrator, migrations are executed inside a transaction. PostgreSQL does not allow `CREATE INDEX CONCURRENTLY` inside a transaction block, so Drizzle migrations should use standard `CREATE INDEX IF NOT EXISTS ...` statements. If a truly concurrent index build is required for operational reasons, run the `CREATE INDEX CONCURRENTLY` statement manually (outside Drizzle) and keep the migration history append-only.
+
 ## Performance Impact
 
 - **Before**: O(n) full table scan

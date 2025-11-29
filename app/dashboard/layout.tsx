@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { MyStatsig } from '../my-statsig';
 import { getDashboardDataCached, setSidebarCollapsed } from './actions';
 import DashboardLayoutClient from './DashboardLayoutClient';
@@ -46,20 +47,29 @@ export default async function DashboardLayout({
 
     // On actual error, show a simple error page
     return (
-      <div className='min-h-screen bg-white dark:bg-[#0D0E12] flex items-center justify-center'>
-        <div className='text-center'>
-          <h1 className='text-2xl font-semibold text-gray-900 dark:text-white mb-4'>
-            Something went wrong
-          </h1>
-          <p className='text-gray-600 dark:text-white/70 mb-4'>
-            Failed to load dashboard data. Please refresh the page.
+      <div className='min-h-screen bg-white dark:bg-[#0D0E12] flex items-center justify-center px-6'>
+        <div className='w-full max-w-lg space-y-4'>
+          <ErrorBanner
+            title='Dashboard failed to load'
+            description='We could not load your workspace data. Refresh to try again or return to your profile.'
+            actions={[
+              { label: 'Retry', href: '/dashboard' },
+              { label: 'Go to my profile', href: '/' },
+            ]}
+            testId='dashboard-error'
+          />
+          <p className='text-sm text-gray-600 dark:text-white/70 text-center'>
+            If this keeps happening, please reach out to support so we can help
+            restore access.
           </p>
-          <Link
-            href='/dashboard'
-            className='inline-block px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700'
-          >
-            Refresh Page
-          </Link>
+          <div className='flex justify-center'>
+            <Link
+              href='/'
+              className='inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
+            >
+              Back to home
+            </Link>
+          </div>
         </div>
       </div>
     );

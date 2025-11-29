@@ -12,6 +12,11 @@
     "pnpm": ">=8.0.0"
   },
   "packageManager": "pnpm@9.0.0",
+  "pnpm": {
+    "overrides": {
+      "parse5": "7.1.2"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -62,7 +67,7 @@
     "neon:migrate:preview:compare": "tsx scripts/neon-migrate-preview.ts --compare",
     "neon:migration:status": "tsx scripts/neon-migration-status.ts",
     "neon:init:migration-history": "tsx scripts/neon-init-migration-history.ts",
-    "migration:guard": "bash scripts/check-migrations.sh",
+    "migration:guard": "bash scripts/check-migrations.sh origin/main",
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:check": "drizzle-kit check",
     "drizzle:up": "drizzle-kit up",

@@ -296,3 +296,12 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
     platform.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
   );
 }
+
+export interface UserEntitlements {
+  userId: string | null;
+  email: string | null;
+  isAuthenticated: boolean;
+  isPro: boolean;
+  hasAdvancedFeatures: boolean;
+  canRemoveBranding: boolean;
+}

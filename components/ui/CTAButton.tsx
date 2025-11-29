@@ -55,12 +55,12 @@ export const CTAButton = React.forwardRef<
 
     const isDisabled = props.disabled || isLoading;
 
-    const dataState = isDisabled
-      ? 'disabled'
-      : isLoading
-        ? 'loading'
-        : isSuccess
-          ? 'success'
+    const dataState = isLoading
+      ? 'loading'
+      : isSuccess
+        ? 'success'
+        : props.disabled
+          ? 'disabled'
           : 'idle';
 
     const content = (
