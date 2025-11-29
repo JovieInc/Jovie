@@ -1,21 +1,22 @@
-'use client';
-
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { publishProfileBasics } from '@/app/dashboard/actions';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
-export function DashboardOverview() {
-  const dashboardData = useDashboardData();
-  const artist: Artist | null = dashboardData.selectedProfile
-    ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
-    : null;
+interface DashboardOverviewProps {
+  artist: Artist | null;
+  hasSocialLinks: boolean;
+}
 
+export function DashboardOverview({
+  artist,
+  hasSocialLinks,
+}: DashboardOverviewProps) {
   if (!artist) {
     return (
       <StarterEmptyState
@@ -32,7 +33,6 @@ export function DashboardOverview() {
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const hasSocialLinks = dashboardData.hasSocialLinks;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
   const totalSteps = 3;
   const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
@@ -47,6 +47,60 @@ export function DashboardOverview() {
           Welcome back, {artist.name || 'Artist'}
         </p>
       </div>
+
+      <DashboardCard variant='settings' className='mb-6'>
+        <form
+          action={publishProfileBasics}
+          className='space-y-4'
+          data-testid='profile-publish-form'
+        >
+          <input type='hidden' name='profileId' value={artist.id} />
+          <div className='space-y-2'>
+            <label
+              className='text-sm font-medium text-secondary-token'
+              htmlFor='displayName'
+            >
+              Display name
+            </label>
+            <input
+              id='displayName'
+              name='displayName'
+              defaultValue={artist.name}
+              required
+              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-secondary-token shadow-sm focus:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+            />
+          </div>
+          <div className='space-y-2'>
+            <label
+              className='text-sm font-medium text-secondary-token'
+              htmlFor='bio'
+            >
+              Bio (optional)
+            </label>
+            <textarea
+              id='bio'
+              name='bio'
+              defaultValue={artist.tagline}
+              rows={3}
+              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-secondary-token shadow-sm focus:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+            />
+          </div>
+          <div className='flex flex-wrap gap-3'>
+            <Button type='submit' size='sm' variant='primary'>
+              Save &amp; Publish
+            </Button>
+            <Button asChild size='sm' variant='secondary'>
+              <Link
+                href={`/${artist.handle}`}
+                target='_blank'
+                rel='noopener noreferrer'
+              >
+                Preview live profile
+              </Link>
+            </Button>
+          </div>
+        </form>
+      </DashboardCard>
 
       <DashboardCard variant='settings'>
         <h3 className='text-lg font-medium text-primary-token mb-4'>

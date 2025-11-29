@@ -32,8 +32,8 @@ export function DashboardAudience() {
       {/* CRM Coming Soon */}
       <div className='relative'>
         {/* Blurred placeholder table */}
-        <div className='filter blur-sm pointer-events-none select-none'>
-          <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle overflow-hidden'>
+        <div className='pointer-events-none select-none filter blur-sm'>
+          <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1 backdrop-blur-sm'>
             <SectionHeader
               title='Fan Contacts'
               right={
@@ -100,7 +100,7 @@ export function DashboardAudience() {
                       </div>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
-                      <span className='px-2 py-1 text-xs rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'>
+                      <span className='rounded-full bg-surface-2 px-2 py-1 text-xs text-primary-token'>
                         VIP
                       </span>
                     </td>
@@ -118,9 +118,9 @@ export function DashboardAudience() {
 
         {/* Coming Soon Overlay */}
         <div className='absolute inset-0 flex items-center justify-center'>
-          <div className='bg-surface-1/95 backdrop-blur-md rounded-2xl p-8 max-w-md text-center shadow-2xl border border-subtle'>
-            <div className='inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-600 rounded-full mb-4'>
-              <UserGroupIcon className='w-8 h-8 text-white' />
+          <div className='max-w-md rounded-2xl border border-subtle bg-surface-1/95 p-8 text-center shadow-2xl backdrop-blur-md'>
+            <div className='mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+              <UserGroupIcon className='h-8 w-8 text-primary-token' />
             </div>
 
             <h2 className='text-2xl font-bold text-primary-token mb-2'>

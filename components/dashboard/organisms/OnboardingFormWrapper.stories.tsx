@@ -15,6 +15,12 @@ const meta: Meta<typeof OnboardingFormWrapper> = {
     },
   },
   tags: ['autodocs'],
+  args: {
+    userId: 'story-user-1',
+    initialDisplayName: 'Story User',
+    initialHandle: 'story-handle',
+    userEmail: 'story@example.com',
+  },
   decorators: [
     Story => (
       <div className='w-full max-w-md'>
