@@ -29,11 +29,18 @@ export function CreatorAvatarCell({
   );
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   const handleUploaded = (url: string) => {
-    setPreviewUrl(url);
+    setError(null);
     startTransition(async () => {
-      await updateCreatorAvatarAsAdmin(profileId, url);
+      try {
+        await updateCreatorAvatarAsAdmin(profileId, url);
+        setPreviewUrl(url);
+      } catch (err) {
+        console.error('Failed to update creator avatar as admin', err);
+        setError('Failed to update avatar. Please try again.');
+      }
     });
   };
 
@@ -81,6 +88,9 @@ export function CreatorAvatarCell({
             }
           }}
         />
+        {error && (
+          <p className='mt-2 text-sm text-destructive-token'>{error}</p>
+        )}
         <div className='mt-4 flex justify-end'>
           <Button
             type='button'

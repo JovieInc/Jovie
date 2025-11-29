@@ -2,10 +2,12 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
+import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 
 type WebhookEvent = {
   data: {
     id: string;
+    username?: string | null;
     email_addresses: Array<{
       email_address: string;
       verification: { status: string };
@@ -146,6 +148,34 @@ export async function POST(request: NextRequest) {
           { status: 200 } // Return 200 to prevent retries for non-critical errors
         );
       }
+    }
+
+    if (evt.type === 'user.updated') {
+      const { data: user } = evt;
+
+      try {
+        await syncUsernameFromClerkEvent(
+          user.id,
+          user.username ?? null,
+          user.private_metadata
+        );
+      } catch (error) {
+        console.error(
+          `Failed to sync username from Clerk for user.updated ${user.id}:`,
+          error
+        );
+
+        // Do not cause Clerk retries on non-critical sync failures
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Failed to sync username from Clerk',
+          },
+          { status: 200 }
+        );
+      }
+
+      return NextResponse.json({ success: true, type: evt.type });
     }
 
     // For other event types, just acknowledge

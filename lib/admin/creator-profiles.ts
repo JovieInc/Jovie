@@ -36,6 +36,21 @@ export interface AdminCreatorProfilesResult {
   total: number;
 }
 
+function sanitizeSearchInput(rawSearch?: string): string | undefined {
+  if (!rawSearch) return undefined;
+
+  const trimmed = rawSearch.trim();
+  if (trimmed.length === 0) return undefined;
+
+  // Enforce a reasonable max length to avoid pathological inputs
+  const limited = trimmed.slice(0, 100);
+
+  // Allow basic handle-like characters and spaces; drop anything else
+  const sanitized = limited.replace(/[^a-zA-Z0-9_\-\s]/g, '');
+
+  return sanitized.length > 0 ? sanitized : undefined;
+}
+
 export async function getAdminCreatorProfiles(
   params: AdminCreatorProfilesParams = {}
 ): Promise<AdminCreatorProfilesResult> {
@@ -48,8 +63,8 @@ export async function getAdminCreatorProfiles(
   const pageSize = Math.min(Math.max(rawPageSize || 20, 1), 100);
   const offset = (page - 1) * pageSize;
 
-  const search = params.search?.trim();
-  const likePattern = search && search.length > 0 ? `%${search}%` : null;
+  const sanitizedSearch = sanitizeSearchInput(params.search);
+  const likePattern = sanitizedSearch ? `%${sanitizedSearch}%` : null;
 
   const sort: AdminCreatorProfilesSort = params.sort ?? 'created_desc';
 

@@ -5,6 +5,10 @@ import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import {
+  syncCanonicalUsernameFromApp,
+  UsernameValidationError,
+} from '@/lib/username/sync';
 
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
 export const runtime = 'nodejs';
@@ -91,8 +95,22 @@ export async function PUT(req: Request) {
 
       const clerkUpdates: Record<string, unknown> = {};
 
-      if (typeof validUpdates.username === 'string') {
-        clerkUpdates.username = validUpdates.username;
+      const usernameUpdate =
+        typeof validUpdates.username === 'string'
+          ? (validUpdates.username as string)
+          : undefined;
+
+      if (usernameUpdate) {
+        try {
+          await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
+        } catch (error) {
+          if (error instanceof UsernameValidationError) {
+            return NextResponse.json({ error: error.message }, { status: 400 });
+          }
+          throw error;
+        }
+
+        delete validUpdates.username;
       }
 
       if (typeof validUpdates.displayName === 'string') {

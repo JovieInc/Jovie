@@ -161,11 +161,11 @@ export function CreatorProfilesTable({
                     </td>
                     <td className='px-2 py-3 text-secondary-token'>
                       {profile.createdAt
-                        ? profile.createdAt.toLocaleDateString(undefined, {
+                        ? new Intl.DateTimeFormat('en-US', {
                             year: 'numeric',
                             month: 'short',
                             day: 'numeric',
-                          })
+                          }).format(profile.createdAt)
                         : '—'}
                     </td>
                     <td className='px-2 py-3'>

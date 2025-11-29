@@ -11,6 +11,7 @@ import {
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -191,6 +192,8 @@ export async function completeOnboarding({
         return { username: normalizedUsername, status: 'created' as const };
       }
     );
+
+    await syncCanonicalUsernameFromApp(userId, completion.username);
 
     if (redirectToDashboard) {
       redirect('/dashboard/overview');
