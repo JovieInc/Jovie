@@ -561,6 +561,7 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'  # Allow automated migrations on main (staging environment)
       - name: DB seed (main)
         run: pnpm run db:seed
         env:
