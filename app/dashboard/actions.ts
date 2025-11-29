@@ -2,7 +2,12 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { and, asc, count, eq } from 'drizzle-orm';
-import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidatePath,
+  revalidateTag,
+} from 'next/cache';
+import { redirect } from 'next/navigation';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
 import {
@@ -20,6 +25,20 @@ export interface DashboardData {
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
+}
+
+function profileIsPublishable(profile: CreatorProfile | null): boolean {
+  if (!profile) return false;
+
+  // A minimum viable profile must have a claimed handle, a display name,
+  // be public, and have completed onboarding at least once.
+  const hasHandle =
+    Boolean(profile.usernameNormalized) && Boolean(profile.username);
+  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const isPublic = profile.isPublic !== false;
+  const hasCompleted = Boolean(profile.onboardingCompletedAt);
+
+  return hasHandle && hasName && isPublic && hasCompleted;
 }
 
 // Minimal link shape for initializing DashboardLinks client from the server
@@ -122,7 +141,7 @@ async function fetchDashboardDataWithSession(
       user: userData,
       creatorProfiles: creatorData,
       selectedProfile: selected,
-      needsOnboarding: false,
+      needsOnboarding: !profileIsPublishable(selected),
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
     };
@@ -264,6 +283,10 @@ export async function updateCreatorProfile(
     displayName: string;
     bio: string;
     avatarUrl: string;
+    onboardingCompletedAt: Date | null;
+    isPublic: boolean;
+    username: string;
+    usernameNormalized: string;
     // Add other updatable fields as needed
   }>
 ): Promise<CreatorProfile> {
@@ -316,4 +339,41 @@ export async function updateCreatorProfile(
       throw error;
     }
   });
+}
+
+export async function publishProfileBasics(formData: FormData): Promise<void> {
+  'use server';
+  noStore();
+
+  const profileId = formData.get('profileId');
+  const displayNameRaw = formData.get('displayName');
+  const bioRaw = formData.get('bio');
+
+  if (!profileId || typeof profileId !== 'string') {
+    throw new Error('Profile ID is required');
+  }
+
+  const displayName =
+    typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
+  if (!displayName) {
+    throw new Error('Display name is required');
+  }
+
+  const bio =
+    typeof bioRaw === 'string' && bioRaw.trim().length > 0
+      ? bioRaw.trim()
+      : undefined;
+
+  await updateCreatorProfile(profileId, {
+    displayName,
+    bio,
+    onboardingCompletedAt: new Date(),
+    isPublic: true,
+  });
+
+  revalidateTag('dashboard-data');
+  revalidatePath('/dashboard/overview');
+
+  // Ensure the page reflects the latest data after publishing
+  redirect('/dashboard/overview?published=1');
 }
