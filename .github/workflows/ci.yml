@@ -110,8 +110,8 @@ jobs:
             echo "Neon branch creation did not return db_url; falling back to repository secrets."
             if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.NEON_DATABASE_URL }}"
-            elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
-              DB_URL="${{ secrets.DATABASE_URL_PREVIEW }}"
+            elif [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL_MAIN }}"
             elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.DATABASE_URL }}"
             fi
@@ -163,10 +163,10 @@ jobs:
             echo "Using NEON_DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
             SRC="secret:NEON_DATABASE_URL"
-          elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
-            echo "Using DATABASE_URL_PREVIEW secret"
-            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
-            SRC="secret:DATABASE_URL_PREVIEW"
+          elif [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+            echo "Using DATABASE_URL_MAIN secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL_MAIN"
           elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
             echo "Using DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
@@ -338,9 +338,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   ci-unit-tests:
@@ -399,9 +399,9 @@ jobs:
       - name: Build (smoke)
         run: pnpm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   ci-e2e-tests:
@@ -503,25 +503,25 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
-          # For fast preview PRs: use preview secrets (no Neon dependency)
+          # For fast preview PRs: use main secrets (no Neon dependency)
           # Fallback hierarchy for maximum compatibility
           POOLED_URL=""
-          if [ -n "$DATABASE_URL_PREVIEW" ]; then
-            POOLED_URL="$DATABASE_URL_PREVIEW"
-            echo "Using preview database URL"
+          if [ -n "$DATABASE_URL_MAIN" ]; then
+            POOLED_URL="$DATABASE_URL_MAIN"
+            echo "Using main database URL"
           elif [ -n "$DATABASE_URL" ]; then
             POOLED_URL="$DATABASE_URL"
             echo "Using fallback database URL"
           else
             # Provide cheap stub for UI-only deployments that might not need DB
-            POOLED_URL="postgresql://stub:stub@localhost:5432/preview_stub"
+            POOLED_URL="postgresql://stub:stub@localhost:5432/main_stub"
             echo "Using stub database URL for UI-only deployment"
           fi
 
@@ -536,19 +536,19 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          # Use preview secrets - no Neon dependency for fast deployments
-          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
+          # Use main secrets - no Neon dependency for fast deployments
+          DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   deploy:
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy of main
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: Preview
-      url: https://preview.jov.ie
+      name: Main Staging
+      url: https://main.jov.ie
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
@@ -556,17 +556,17 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
       - uses: ./.github/actions/setup-node-pnpm
-      - name: DB migrate (preview - Drizzle)
-        run: pnpm run drizzle:migrate:preview
+      - name: DB migrate (main - Drizzle)
+        run: pnpm run drizzle:migrate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
-          GIT_BRANCH: preview
-      - name: DB seed (preview)
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
+          GIT_BRANCH: main
+      - name: DB seed (main)
         run: pnpm run db:seed
         env:
-          GIT_BRANCH: preview
+          GIT_BRANCH: main
         continue-on-error: false
-      - name: Pull env (preview)
+      - name: Pull env (main)
         run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -576,9 +576,9 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       - name: Deploy (prebuilt)
         id: deploy
@@ -589,9 +589,9 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Canary health check (Preview deployment for main)
+      - name: Canary health check (Main deployment)
         run: |
-          echo "Running canary health check on preview deployment..."
+          echo "Running canary health check on main deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
 
           # Wait a moment for deployment to be ready
@@ -612,7 +612,7 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Canary passed: Preview deployment healthy"
+          echo "✅ Canary passed: Main deployment healthy"
         continue-on-error: false
 
   promote:
@@ -651,7 +651,7 @@ jobs:
           - [ ] **Rollback plan documented** (feature flags, DB, etc.)
 
           ### Release QA
-          - [ ] **Smoke tests passed** in preview/main environment
+          - [ ] **Smoke tests passed** in main environment
           - [ ] **Key user journeys verified** manually
           - [ ] **Mobile/responsive tested** (if UI changes)
           - [ ] **Cross-browser compatibility** verified (if applicable)
