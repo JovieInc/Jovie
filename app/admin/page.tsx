@@ -5,11 +5,40 @@ import { KpiCards } from '@/components/admin/kpi-cards';
 import { MetricsChart } from '@/components/admin/metrics-chart';
 import { ReliabilityCard } from '@/components/admin/reliability-card';
 
+interface AdminOverviewMetrics {
+  mrrUsd: number;
+  activeSubscribers: number;
+}
+
 export const metadata: Metadata = {
   title: 'Admin dashboard',
 };
 
-export default function AdminPage() {
+async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
+  try {
+    const response = await fetch('/api/admin/overview', {
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      return { mrrUsd: 0, activeSubscribers: 0 };
+    }
+
+    const json = (await response.json()) as Partial<AdminOverviewMetrics>;
+
+    return {
+      mrrUsd: typeof json.mrrUsd === 'number' ? json.mrrUsd : 0,
+      activeSubscribers:
+        typeof json.activeSubscribers === 'number' ? json.activeSubscribers : 0,
+    };
+  } catch {
+    return { mrrUsd: 0, activeSubscribers: 0 };
+  }
+}
+
+export default async function AdminPage() {
+  const metrics = await getAdminOverviewMetrics();
+
   return (
     <div className='space-y-8'>
       <header className='space-y-2'>
@@ -21,12 +50,15 @@ export default function AdminPage() {
         </h1>
         <p className='text-sm text-secondary-token'>
           High-level KPIs, usage trends, and operational signals for Jovie.
-          (Public preview — no auth or gating enabled.)
+          Admin-only access.
         </p>
       </header>
 
       <section id='users'>
-        <KpiCards />
+        <KpiCards
+          mrrUsd={metrics.mrrUsd}
+          activeSubscribers={metrics.activeSubscribers}
+        />
       </section>
 
       <section id='usage' className='grid gap-6 lg:grid-cols-3'>

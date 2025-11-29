@@ -3,13 +3,25 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/stripe/webhooks/route';
 
 // Hoisted mocks
-const { mockConstructEvent, mockInsert, mockRetrieve, mockUpdateBilling } =
-  vi.hoisted(() => ({
+const {
+  mockConstructEvent,
+  mockInsert,
+  mockRetrieve,
+  mockUpdateBilling,
+  mockGetPlanFromPriceId,
+} = vi.hoisted(() => {
+  const mockGetPlan = vi.fn<(priceId: string) => string | null>(
+    () => 'pro_lite'
+  );
+
+  return {
     mockConstructEvent: vi.fn(),
     mockInsert: vi.fn(),
     mockRetrieve: vi.fn(),
     mockUpdateBilling: vi.fn(),
-  }));
+    mockGetPlanFromPriceId: mockGetPlan,
+  };
+});
 
 vi.mock('@/lib/stripe/client', () => ({
   stripe: {
@@ -32,6 +44,13 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mockUpdateBilling,
+}));
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: mockGetPlanFromPriceId,
+}));
+
+vi.mock('next/cache', () => ({
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -116,6 +135,63 @@ describe('/api/stripe/webhooks', () => {
     expect(mockInsert).toHaveBeenCalled();
     expect(mockConstructEvent).toHaveBeenCalled();
     expect(mockUpdateBilling).toHaveBeenCalled();
+    expect(mockGetPlanFromPriceId).toHaveBeenCalledWith('price_123');
+  });
+
+  it('returns 500 when subscription price ID is unknown', async () => {
+    vi.mocked(headers).mockResolvedValue(
+      new Map([['stripe-signature', 'sig_test']]) as any
+    );
+
+    const event = {
+      id: 'evt_unknown',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_unknown',
+          customer: 'cus_123',
+          subscription: 'sub_unknown',
+          metadata: { clerk_user_id: 'user_123' },
+        },
+      },
+    } as any;
+
+    mockConstructEvent.mockReturnValue(event);
+    mockInsert.mockReturnValue({
+      values: () => ({
+        onConflictDoNothing: () => ({
+          returning: () => Promise.resolve([{ id: 'webhook_row_id' }]),
+        }),
+      }),
+    });
+
+    mockRetrieve.mockResolvedValue({
+      id: 'sub_unknown',
+      status: 'active',
+      customer: 'cus_123',
+      items: { data: [{ price: { id: 'price_unknown' } }] },
+      metadata: { clerk_user_id: 'user_123' },
+    } as any);
+
+    mockGetPlanFromPriceId.mockReturnValueOnce(null);
+
+    const request = new NextRequest(
+      'http://localhost:3000/api/stripe/webhooks',
+      {
+        method: 'POST',
+        body: 'test-body',
+      }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe('Webhook processing failed');
+
+    expect(mockInsert).toHaveBeenCalled();
+    expect(mockConstructEvent).toHaveBeenCalled();
+    expect(mockRetrieve).toHaveBeenCalled();
+    expect(mockGetPlanFromPriceId).toHaveBeenCalledWith('price_unknown');
   });
 
   it('skips processing for duplicate events', async () => {

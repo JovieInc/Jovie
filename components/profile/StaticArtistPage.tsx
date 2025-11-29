@@ -100,7 +100,7 @@ function renderContent(
             prefetch
             className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold text-white bg-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 rounded-xl transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2'
           >
-            🎧 Listen Now
+            Listen Now
           </Link>
         </div>
       );
@@ -122,6 +122,7 @@ export function StaticArtistPage({
         artist={artist}
         socialLinks={socialLinks}
         subtitle={subtitle}
+        showSocialBar={mode !== 'listen'}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
       >

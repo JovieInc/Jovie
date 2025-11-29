@@ -6,11 +6,13 @@ import {
   Cog6ToothIcon,
   HomeIcon,
   LinkIcon,
+  ShieldCheckIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { Divider } from '@/components/atoms/Divider';
 import { cn } from '@/lib/utils';
 
@@ -58,7 +60,7 @@ const navShortcuts: Record<string, string> = {
 };
 
 // Secondary Navigation - Additional features
-const secondaryNavigation = [
+const secondaryNavigation: typeof primaryNavigation = [
   {
     name: 'Earnings',
     href: '/dashboard/tipping',
@@ -80,7 +82,20 @@ interface DashboardNavProps {
 }
 
 export function DashboardNav({ collapsed = false }: DashboardNavProps) {
+  const { isAdmin } = useDashboardData();
   const pathname = usePathname();
+
+  const adminNavItem: (typeof primaryNavigation)[number] = {
+    name: 'Admin',
+    href: '/admin',
+    id: 'admin',
+    icon: ShieldCheckIcon,
+    description: 'Internal metrics and operations',
+  };
+
+  const secondaryNavWithAdmin: typeof primaryNavigation = isAdmin
+    ? [...secondaryNavigation, adminNavItem]
+    : secondaryNavigation;
 
   const renderNavSection = (
     items: typeof primaryNavigation,
@@ -190,7 +205,9 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       <Divider className='mb-6' inset={!collapsed} />
 
       {/* Secondary Navigation Block */}
-      <div className='mb-4'>{renderNavSection(secondaryNavigation, false)}</div>
+      <div className='mb-4'>
+        {renderNavSection(secondaryNavWithAdmin, false)}
+      </div>
     </nav>
   );
 }

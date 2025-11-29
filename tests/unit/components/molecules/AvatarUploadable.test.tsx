@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { track } from '@/lib/analytics';
@@ -117,9 +116,7 @@ describe('AvatarUploadable Component', () => {
   });
 
   describe('File Upload Interactions', () => {
-    it('triggers file input click when avatar is clicked', async () => {
-      const user = userEvent.setup();
-
+    it('triggers file input click when avatar is clicked', () => {
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -131,15 +128,13 @@ describe('AvatarUploadable Component', () => {
       );
 
       const container = screen.getByRole('button');
-      await user.click(container);
+      fireEvent.click(container);
 
       // File input should have been triggered (can't test actual file dialog opening)
       expect(container).toBeInTheDocument();
     });
 
-    it('handles keyboard interaction (Enter and Space)', async () => {
-      const user = userEvent.setup();
-
+    it('handles keyboard interaction (Enter and Space)', () => {
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -154,10 +149,10 @@ describe('AvatarUploadable Component', () => {
 
       // Test Enter key
       container.focus();
-      await user.keyboard('{Enter}');
+      fireEvent.keyDown(container, { key: 'Enter' });
 
       // Test Space key
-      await user.keyboard(' ');
+      fireEvent.keyDown(container, { key: ' ' });
 
       expect(container).toBeInTheDocument();
     });
@@ -179,7 +174,7 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile('avatar.jpg', 'image/jpeg', 2048);
 
-      await userEvent.upload(fileInput, file);
+      fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
         expect(mockOnUpload).toHaveBeenCalledWith(file);
@@ -207,7 +202,7 @@ describe('AvatarUploadable Component', () => {
         1024
       );
 
-      await userEvent.upload(fileInput, invalidFile, { applyAccept: false });
+      fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
       await waitFor(() => {
         expect(mockOnError).toHaveBeenCalledWith(
@@ -238,7 +233,7 @@ describe('AvatarUploadable Component', () => {
         6 * 1024 * 1024
       ); // 6MB
 
-      await userEvent.upload(fileInput, largeFile);
+      fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
       await waitFor(() => {
         expect(mockOnError).toHaveBeenCalledWith(
@@ -271,7 +266,7 @@ describe('AvatarUploadable Component', () => {
           1024
         );
 
-        await userEvent.upload(fileInput, validFile);
+        fireEvent.change(fileInput, { target: { files: [validFile] } });
 
         await waitFor(() => {
           expect(mockOnUpload).toHaveBeenCalledWith(validFile);
@@ -416,7 +411,7 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile();
 
-      await userEvent.upload(fileInput, file);
+      fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
         expect(mockOnSuccess).toHaveBeenCalled();
@@ -440,7 +435,7 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile();
 
-      await userEvent.upload(fileInput, file);
+      fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
         expect(mockOnError).toHaveBeenCalledWith('Upload failed');
@@ -465,7 +460,7 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile('test.jpg', 'image/jpeg', 2048);
 
-      await userEvent.upload(fileInput, file);
+      fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
         expect(track).toHaveBeenCalledWith('avatar_upload_start', {
@@ -500,7 +495,7 @@ describe('AvatarUploadable Component', () => {
         1024
       );
 
-      await userEvent.upload(fileInput, invalidFile);
+      fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
       await waitFor(() => {
         expect(track).toHaveBeenCalledWith(
@@ -552,7 +547,7 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile();
 
-      await userEvent.upload(fileInput, file);
+      fireEvent.change(fileInput, { target: { files: [file] } });
 
       await waitFor(() => {
         const successAnnouncement = screen.getByText(
