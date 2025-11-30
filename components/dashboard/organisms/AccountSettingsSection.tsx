@@ -382,7 +382,7 @@ export function AccountSettingsSection() {
                       <Button
                         variant='ghost'
                         size='sm'
-                        className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                        className='text-destructive hover:bg-surface-2'
                         disabled={syncingEmailId === email.id}
                         onClick={() => handleRemoveEmail(email)}
                       >
@@ -436,7 +436,7 @@ export function AccountSettingsSection() {
               )}
 
               {emailError && (
-                <p className='text-sm text-red-500'>{emailError}</p>
+                <p className='text-sm text-destructive'>{emailError}</p>
               )}
 
               <div className='flex flex-wrap gap-2'>
@@ -532,7 +532,7 @@ export function AccountSettingsSection() {
           </label>
 
           {passwordError && (
-            <p className='text-sm text-red-500'>{passwordError}</p>
+            <p className='text-sm text-destructive'>{passwordError}</p>
           )}
 
           <div className='flex justify-end gap-2'>
@@ -563,7 +563,7 @@ export function AccountSettingsSection() {
             <LoadingSkeleton height='h-12' />
           </div>
         ) : sessionsError ? (
-          <div className='mt-6 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600'>
+          <div className='mt-6 rounded-lg border border-subtle bg-surface-2 px-4 py-3 text-sm text-destructive'>
             {sessionsError}
           </div>
         ) : sessions.length === 0 ? (
@@ -607,7 +607,7 @@ export function AccountSettingsSection() {
                     <Button
                       variant='ghost'
                       size='sm'
-                      className='text-red-500 hover:text-red-600 hover:bg-red-50'
+                      className='text-destructive hover:bg-surface-2'
                       disabled={endingSessionId === session.id}
                       onClick={() => handleEndSession(session)}
                     >

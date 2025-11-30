@@ -296,6 +296,7 @@ export function ProfileSettings({
                 Email Notifications
               </legend>
               <div className='mt-6 space-y-6'>
+                {/* Weekly Analytics */}
                 <div className='flex gap-3'>
                   <div className='flex h-6 shrink-0 items-center'>
                     <div className='group grid size-4 grid-cols-1'>
@@ -305,7 +306,7 @@ export function ProfileSettings({
                         name='analytics'
                         type='checkbox'
                         aria-describedby='analytics-description'
-                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:checked:border-indigo-500 dark:checked:bg-indigo-500 dark:indeterminate:border-indigo-500 dark:indeterminate:bg-indigo-500 dark:focus-visible:outline-indigo-500 dark:disabled:border-white/5 dark:disabled:bg-white/10 dark:disabled:checked:bg-white/10 forced-colors:appearance-auto'
+                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-subtle bg-surface-0 checked:border-accent checked:bg-accent indeterminate:border-accent indeterminate:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed forced-colors:appearance-auto'
                       />
                       <svg
                         fill='none'
@@ -342,6 +343,8 @@ export function ProfileSettings({
                     </p>
                   </div>
                 </div>
+
+                {/* New Tips */}
                 <div className='flex gap-3'>
                   <div className='flex h-6 shrink-0 items-center'>
                     <div className='group grid size-4 grid-cols-1'>
@@ -350,7 +353,7 @@ export function ProfileSettings({
                         name='tips'
                         type='checkbox'
                         aria-describedby='tips-description'
-                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:checked:border-indigo-500 dark:checked:bg-indigo-500 dark:indeterminate:border-indigo-500 dark:indeterminate:bg-indigo-500 dark:focus-visible:outline-indigo-500 dark:disabled:border-white/5 dark:disabled:bg-white/10 dark:disabled:checked:bg-white/10 forced-colors:appearance-auto'
+                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-subtle bg-surface-0 checked:border-accent checked:bg-accent indeterminate:border-accent indeterminate:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed forced-colors:appearance-auto'
                       />
                       <svg
                         fill='none'
@@ -383,6 +386,8 @@ export function ProfileSettings({
                     </p>
                   </div>
                 </div>
+
+                {/* Marketing Updates */}
                 <div className='flex gap-3'>
                   <div className='flex h-6 shrink-0 items-center'>
                     <div className='group grid size-4 grid-cols-1'>
@@ -391,7 +396,7 @@ export function ProfileSettings({
                         name='marketing'
                         type='checkbox'
                         aria-describedby='marketing-description'
-                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:checked:border-indigo-500 dark:checked:bg-indigo-500 dark:indeterminate:border-indigo-500 dark:indeterminate:bg-indigo-500 dark:focus-visible:outline-indigo-500 dark:disabled:border-white/5 dark:disabled:bg-white/10 dark:disabled:checked:bg-white/10 forced-colors:appearance-auto'
+                        className='col-start-1 row-start-1 appearance-none rounded-sm border border-subtle bg-surface-0 checked:border-accent checked:bg-accent indeterminate:border-accent indeterminate:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed forced-colors:appearance-auto'
                       />
                       <svg
                         fill='none'
@@ -403,14 +408,14 @@ export function ProfileSettings({
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:checked]:opacity-100'
+                          className='opacity-0 group-has-checked:opacity-100'
                         />
                         <path
                           d='M3 7H11'
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:indeterminate]:opacity-100'
+                          className='opacity-0 group-has-indeterminate:opacity-100'
                         />
                       </svg>
                     </div>
@@ -443,8 +448,7 @@ export function ProfileSettings({
         <button
           type='submit'
           disabled={isLoading}
-          className='rounded-md px-3 py-2 text-sm font-medium text-white shadow-lg hover:shadow-xl hover:shadow-accent/25 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 ring-accent disabled:opacity-50 disabled:cursor-not-allowed'
-          style={{ backgroundColor: 'var(--color-accent)' }}
+          className='btn btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {isLoading ? 'Saving...' : 'Save'}
         </button>

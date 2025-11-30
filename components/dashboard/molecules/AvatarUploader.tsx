@@ -218,8 +218,8 @@ export default function AvatarUploader({
               <div className='w-20 h-20 rounded-full bg-surface-2 border border-subtle' />
             )}
             {isLoading && (
-              <div className='absolute inset-0 flex items-center justify-center rounded-full bg-black/50'>
-                <div className='w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin' />
+              <div className='absolute inset-0 flex items-center justify-center rounded-full bg-surface-3/80'>
+                <div className='w-6 h-6 border-2 border-surface-0 border-t-transparent rounded-full animate-spin' />
               </div>
             )}
           </div>
@@ -235,8 +235,8 @@ export default function AvatarUploader({
               <p
                 className={`text-xs mt-1 ${
                   error || uploadResult?.status === 'failed'
-                    ? 'text-red-600 dark:text-red-400'
-                    : 'text-blue-600 dark:text-blue-400'
+                    ? 'text-destructive'
+                    : 'text-secondary-token'
                 }`}
               >
                 {getStatusMessage()}
@@ -270,7 +270,7 @@ export default function AvatarUploader({
             border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
             ${
               isDragActive
-                ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                ? 'border-accent bg-surface-2'
                 : 'border-subtle hover:border-default'
             }
             ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
@@ -287,13 +287,11 @@ export default function AvatarUploader({
           <div className='space-y-2'>
             <div className='text-2xl'>📸</div>
             {isDragActive ? (
-              <p className='text-sm text-blue-600 dark:text-blue-400'>
-                Drop your image here
-              </p>
+              <p className='text-sm text-accent-token'>Drop your image here</p>
             ) : (
               <div>
                 <p className='text-sm text-secondary-token'>
-                  <span className='font-medium text-blue-600 dark:text-blue-400'>
+                  <span className='font-medium text-accent-token'>
                     Click to upload
                   </span>{' '}
                   or drag and drop

@@ -506,14 +506,14 @@ export function AppleStyleOnboardingForm({
 
                 <div className='min-h-[24px] flex items-center px-1'>
                   {handleValidation.error && (
-                    <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
+                    <div className='text-destructive text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
                       {handleValidation.error}
                     </div>
                   )}
                   {handleValidation.available &&
                     handleValidation.clientValid && (
-                      <div className='flex items-center gap-2 text-green-600 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                        <span className='inline-flex h-3 w-3 rounded-full bg-green-500' />
+                      <div className='flex items-center gap-2 text-accent-token text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                        <span className='inline-flex h-3 w-3 rounded-full bg-accent' />
                         <span className='font-medium'>Handle is available</span>
                       </div>
                     )}
@@ -606,7 +606,7 @@ export function AppleStyleOnboardingForm({
               </div>
 
               {state.error && (
-                <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
+                <div className='p-3 bg-surface-2 border border-subtle rounded-xl text-destructive text-sm text-center'>
                   {state.error}
                 </div>
               )}

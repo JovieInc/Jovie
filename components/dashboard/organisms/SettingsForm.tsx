@@ -72,7 +72,7 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
                 onChange={e => handleMarketingOptOutChange(e.target.checked)}
                 disabled={isUpdating}
                 aria-label='Opt out of marketing materials'
-                className='w-5 h-5 text-indigo-600 bg-surface-1 border-subtle rounded focus-visible:ring-indigo-500 dark:focus-visible:ring-indigo-600 dark:ring-offset-gray-800 focus-visible:ring-2 disabled:opacity-50'
+                className='w-5 h-5 text-accent bg-surface-1 border-subtle rounded focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50'
               />
             </div>
             <div className='text-sm'>
@@ -91,7 +91,7 @@ export function SettingsForm({ artist, onUpdate }: SettingsFormProps) {
           </div>
 
           {showSuccess && (
-            <div className='flex items-center space-x-2 text-sm text-green-600 dark:text-green-400'>
+            <div className='flex items-center space-x-2 text-sm text-primary-token'>
               <svg className='w-4 h-4' fill='currentColor' viewBox='0 0 20 20'>
                 <path
                   fillRule='evenodd'

@@ -285,7 +285,7 @@ export function LinkCard({
                         variant='ghost'
                         size='sm'
                         onClick={() => onDelete(id)}
-                        className='text-red-500 hover:bg-red-500/10'
+                        className='text-destructive hover:bg-surface-2'
                       >
                         Delete
                       </Button>

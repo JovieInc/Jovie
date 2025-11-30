@@ -503,8 +503,7 @@ export function SettingsPolished({
           <button
             type='submit'
             disabled={isLoading}
-            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            className='btn btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
@@ -678,7 +677,7 @@ export function SettingsPolished({
             >
               <span
                 className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                  'inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform',
                   hideBranding ? 'translate-x-6' : 'translate-x-1'
                 )}
               />
@@ -687,14 +686,14 @@ export function SettingsPolished({
         </div>
 
         {hideBranding && (
-          <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
+          <div className='mt-4 p-4 bg-surface-2 border border-subtle rounded-lg'>
             <div className='flex items-start gap-3'>
-              <SparklesIcon className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0' />
+              <SparklesIcon className='h-5 w-5 text-accent-token mt-0.5 shrink-0' />
               <div>
-                <p className='text-sm font-medium text-green-800 dark:text-green-200'>
+                <p className='text-sm font-medium text-primary'>
                   Branding Hidden
                 </p>
-                <p className='text-xs text-green-600 dark:text-green-400 mt-1'>
+                <p className='text-xs text-secondary mt-1'>
                   Your profile now shows a completely custom experience without
                   Jovie branding.
                 </p>
@@ -797,8 +796,7 @@ export function SettingsPolished({
         <button
           type='submit'
           disabled={isPixelSaving}
-          className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-          style={{ backgroundColor: 'var(--color-accent)' }}
+          className='btn btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {isPixelSaving ? 'Saving...' : 'Save Pixels'}
         </button>
@@ -835,7 +833,7 @@ export function SettingsPolished({
           >
             <span
               className={cn(
-                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                'inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform',
                 marketingEmails ? 'translate-x-6' : 'translate-x-1'
               )}
             />
@@ -858,8 +856,7 @@ export function SettingsPolished({
         <button
           onClick={handleBilling}
           disabled={isBillingLoading || billingStatus.loading}
-          className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
-          style={{ backgroundColor: 'var(--color-accent)' }}
+          className='btn btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {billingStatus.loading
             ? 'Loading...'
@@ -886,8 +883,7 @@ export function SettingsPolished({
           <button
             onClick={handleBilling}
             disabled={isBillingLoading || billingStatus.loading}
-            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            className='btn btn-primary btn-md disabled:opacity-50 disabled:cursor-not-allowed'
           >
             {isBillingLoading || billingStatus.loading
               ? 'Loading...'
@@ -934,7 +930,7 @@ export function SettingsPolished({
                   <Icon className='h-5 w-5 shrink-0' />
                   <span className='flex-1'>{item.name}</span>
                   {isLocked && (
-                    <ShieldCheckIcon className='h-4 w-4 text-orange-400' />
+                    <ShieldCheckIcon className='h-4 w-4 text-accent-token' />
                   )}
                 </button>
               );

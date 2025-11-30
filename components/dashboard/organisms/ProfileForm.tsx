@@ -264,8 +264,8 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
                   hide_branding: !formData.hide_branding,
                 })
               }
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
-                formData.hide_branding ? 'bg-surface-3' : 'bg-indigo-600'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
+                formData.hide_branding ? 'bg-surface-3' : 'bg-accent'
               }`}
               disabled={loading}
               aria-pressed={!formData.hide_branding}
@@ -276,7 +276,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-surface-0 transition-transform ${
                   formData.hide_branding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'

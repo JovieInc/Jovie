@@ -470,7 +470,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   {section === 'earnings' && tippingEnabled && (
                     <span
                       className={cn(
-                        'ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25',
+                        'ml-2 inline-flex items-center rounded-full bg-accent/10 text-accent-token px-2 py-0.5 text-[10px] font-medium ring-1 ring-accent/25',
                         tippingJustEnabled && 'animate-pulse'
                       )}
                     >

@@ -142,15 +142,23 @@ export function DashboardLinks({
       el.textContent = success ? '✅ Updated' : '❌ Error';
       // IMPORTANT: Don't overwrite base positioning/transition classes.
       // Only toggle variant styles to prevent layout shift.
-      el.classList.remove('bg-green-500', 'bg-red-500');
-      el.classList.add(
-        success ? 'bg-green-500' : 'bg-red-500',
+      el.classList.remove(
+        'bg-green-500',
+        'bg-red-500',
         'text-white',
+        'text-destructive',
+        'text-primary-token'
+      );
+      el.classList.add(
+        'bg-surface-2',
+        success ? 'text-primary-token' : 'text-destructive',
         'px-3',
         'py-1',
         'rounded-full',
         'text-xs',
-        'font-medium'
+        'font-medium',
+        'border',
+        'border-subtle'
       );
 
       setTimeout(() => {

@@ -48,7 +48,7 @@ export default clerkMiddleware(async (auth, req) => {
     const isSensitiveAPI = pathname.startsWith('/api/link/');
 
     // Allow sidebar demo to bypass authentication
-    if (pathname === '/sidebar-demo') {
+    if (pathname === '/sidebar-demo' && process.env.NODE_ENV !== 'production') {
       return NextResponse.next();
     }
 

@@ -235,7 +235,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
                 type='button'
                 variant='secondary'
                 onClick={() => removeSocialLink(index)}
-                className='text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300'
+                className='text-destructive hover:bg-surface-2'
               >
                 Remove
               </Button>
@@ -254,14 +254,14 @@ export function SocialsForm({ artist }: SocialsFormProps) {
       )}
 
       {error && (
-        <div className='bg-red-500/10 border border-red-500/20 rounded-lg p-3'>
-          <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
+        <div className='bg-surface-2 border border-subtle rounded-lg p-3'>
+          <p className='text-sm text-destructive'>{error}</p>
         </div>
       )}
 
       {success && (
-        <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
-          <p className='text-sm text-green-600 dark:text-green-400'>
+        <div className='bg-surface-2 border border-subtle rounded-lg p-3'>
+          <p className='text-sm text-primary-token'>
             Social links saved successfully!
           </p>
         </div>

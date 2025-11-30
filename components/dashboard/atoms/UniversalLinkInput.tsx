@@ -239,10 +239,10 @@ export const UniversalLinkInput = forwardRef<
           <div
             className={`p-3 rounded-lg border transition-all duration-200 ${
               isPlatformDuplicate
-                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20'
+                ? 'border-subtle bg-surface-2'
                 : detectedLink.isValid
                   ? 'border-surface-2 bg-surface-1'
-                  : 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/10'
+                  : 'border-subtle bg-surface-2'
             }`}
             style={
               detectedLink.isValid && !isPlatformDuplicate
@@ -321,7 +321,7 @@ export const UniversalLinkInput = forwardRef<
                 {/* Duplicate platform warning */}
                 {isPlatformDuplicate && (
                   <div
-                    className='text-xs text-red-600 dark:text-red-400 mt-1 p-2 bg-red-50 dark:bg-red-950/20 rounded border border-red-200 dark:border-red-800'
+                    className='text-xs text-destructive mt-1 p-2 bg-surface-2 rounded border border-subtle'
                     role='alert'
                   >
                     <div className='font-medium mb-1'>
@@ -339,10 +339,7 @@ export const UniversalLinkInput = forwardRef<
 
                 {/* Validation error */}
                 {!detectedLink.isValid && detectedLink.error && (
-                  <div
-                    className='text-xs text-red-600 dark:text-red-400 mt-1'
-                    role='alert'
-                  >
+                  <div className='text-xs text-destructive mt-1' role='alert'>
                     {detectedLink.error}
                   </div>
                 )}
