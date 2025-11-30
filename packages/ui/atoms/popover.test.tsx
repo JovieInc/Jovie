@@ -1,4 +1,5 @@
 import { fireEvent, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -51,7 +52,9 @@ describe('Popover', () => {
       expect(screen.getByText('Test popover content')).toBeInTheDocument();
     });
 
-    it('closes on outside click', () => {
+    it('closes on outside click', async () => {
+      const user = userEvent.setup();
+
       fastRender(
         <div>
           <TestPopover />
@@ -60,13 +63,13 @@ describe('Popover', () => {
       );
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
-      eventUtils.fastClick(trigger);
+      await user.click(trigger);
 
       // Verify popover is open
       expect(screen.getByText('Test popover content')).toBeInTheDocument();
 
       // Click outside
-      eventUtils.fastClick(screen.getByTestId('outside'));
+      await user.click(screen.getByTestId('outside'));
 
       // Popover should close
       expect(
@@ -173,20 +176,24 @@ describe('Popover', () => {
       expect(internalButton).toHaveFocus();
     });
 
-    it('returns focus to trigger when closed with escape', () => {
+    it('returns focus to trigger when closed with escape', async () => {
+      const user = userEvent.setup();
+
       fastRender(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
-      eventUtils.fastClick(trigger);
+      await user.click(trigger);
 
       // Press escape to close
-      eventUtils.fastKeyPress(trigger, 'Escape');
+      await user.keyboard('{Escape}');
 
       // Focus should return to trigger
       expect(trigger).toHaveFocus();
     });
 
-    it('supports keyboard navigation', () => {
+    it('supports keyboard navigation', async () => {
+      const user = userEvent.setup();
+
       fastRender(<TestPopover />);
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
@@ -196,11 +203,11 @@ describe('Popover', () => {
       expect(trigger).toHaveFocus();
 
       // Open with Enter key
-      eventUtils.fastKeyPress(trigger, 'Enter');
+      await user.keyboard('{Enter}');
       expect(screen.getByText('Test popover content')).toBeInTheDocument();
 
       // Close with Escape
-      eventUtils.fastKeyPress(trigger, 'Escape');
+      await user.keyboard('{Escape}');
       expect(
         screen.queryByText('Test popover content')
       ).not.toBeInTheDocument();

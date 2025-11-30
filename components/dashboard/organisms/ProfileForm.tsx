@@ -86,9 +86,9 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         body: JSON.stringify({
           profileId: artist.id,
           updates: {
-            display_name: formData.name,
+            displayName: formData.name,
             bio: formData.tagline,
-            avatar_url: formData.image_url || null,
+            avatarUrl: formData.image_url || null,
           },
         }),
       });

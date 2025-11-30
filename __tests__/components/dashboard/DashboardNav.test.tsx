@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
@@ -26,32 +29,62 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
+const baseDashboardData: DashboardData = {
+  user: { id: 'user_123' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  isAdmin: false,
+};
+
+function renderWithDashboardData(overrides: Partial<DashboardData> = {}) {
+  const value: DashboardData = { ...baseDashboardData, ...overrides };
+
+  return render(
+    <DashboardDataProvider value={value}>
+      <SidebarProvider>
+        <DashboardNav />
+      </SidebarProvider>
+    </DashboardDataProvider>
+  );
+}
+
 describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
-    expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('Links')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Audience')).toBeInTheDocument();
+    const overviewLink = screen.getByRole('link', { name: 'Overview' });
+    const linksLink = screen.getByRole('link', { name: 'Links' });
+    const analyticsLink = screen.getByRole('link', { name: 'Analytics' });
+    const audienceLink = screen.getByRole('link', { name: 'Audience' });
+
+    expect(overviewLink).toBeInTheDocument();
+    expect(linksLink).toBeInTheDocument();
+    expect(analyticsLink).toBeInTheDocument();
+    expect(audienceLink).toBeInTheDocument();
   });
 
   it('renders secondary navigation items', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
-    expect(screen.getByText('Earnings')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    const earningsLink = screen.getByRole('link', { name: 'Earnings' });
+    const settingsLink = screen.getByRole('link', { name: 'Settings' });
+
+    expect(earningsLink).toBeInTheDocument();
+    expect(settingsLink).toBeInTheDocument();
   });
 
   it('applies active state to current page', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
     const overviewLink = screen.getByRole('link', { name: /overview/i });
     expect(overviewLink).toHaveAttribute('data-active', 'true');
   });
 
   it('shows different styling for primary vs secondary nav', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
     const overviewLink = screen.getByRole('link', { name: /overview/i });
     const settingsLink = screen.getByRole('link', { name: /settings/i });

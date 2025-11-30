@@ -7,43 +7,12 @@ import { isAdminEmail } from '@/lib/admin/roles';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { validateAvatarUrl } from '@/lib/images/avatar';
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
     super(message);
     this.name = 'AdminUnauthorizedError';
-  }
-}
-
-function isAllowedAvatarHost(hostname: string): boolean {
-  const allowedHosts = [
-    'res.cloudinary.com',
-    'images.clerk.dev',
-    'img.clerk.com',
-    'images.unsplash.com',
-    'blob.vercel-storage.com',
-  ];
-
-  return allowedHosts.includes(hostname);
-}
-
-function validateAvatarUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-
-    if (parsed.protocol !== 'https:') {
-      throw new Error('Avatar URL must use https');
-    }
-
-    if (!isAllowedAvatarHost(parsed.hostname)) {
-      throw new Error('Avatar URL host is not allowed');
-    }
-
-    return parsed.toString();
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Invalid avatar URL provided';
-    throw new Error(message);
   }
 }
 

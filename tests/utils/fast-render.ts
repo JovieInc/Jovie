@@ -5,7 +5,7 @@
  * Provides minimal setup for component testing without heavy mocking overhead.
  */
 
-import { type RenderOptions, render } from '@testing-library/react';
+import { fireEvent, type RenderOptions, render } from '@testing-library/react';
 import React, { type ReactElement } from 'react';
 import { vi } from 'vitest';
 import {
@@ -202,20 +202,47 @@ export const eventUtils = {
    * Fast click simulation without full event propagation
    */
   fastClick: (element: HTMLElement) => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // Simulate a realistic click sequence so libraries like Radix
+    // that rely on pointer/mouse events behave correctly.
+    fireEvent.pointerDown(element);
+    fireEvent.mouseDown(element);
+    // Clicking should focus the element
+    if (element.focus) {
+      element.focus();
+    }
+    fireEvent.mouseUp(element);
+    fireEvent.pointerUp(element);
+    fireEvent.click(element);
   },
 
   /**
    * Fast keyboard event simulation
    */
   fastKeyPress: (element: HTMLElement, key: string) => {
-    element.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    // Ensure the element has focus before key events
+    if (element.focus) {
+      element.focus();
+    }
+
+    fireEvent.keyDown(element, { key });
+
+    // For Enter/Space, browsers fire a click on buttons.
+    if (key === 'Enter' || key === ' ') {
+      fireEvent.keyUp(element, { key });
+      fireEvent.click(element);
+      return;
+    }
+
+    fireEvent.keyUp(element, { key });
   },
 
   /**
    * Fast focus simulation
    */
   fastFocus: (element: HTMLElement) => {
-    element.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+    if (element.focus) {
+      element.focus();
+    }
+    fireEvent.focus(element);
   },
 };

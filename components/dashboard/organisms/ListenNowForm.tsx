@@ -65,9 +65,9 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
         body: JSON.stringify({
           profileId: artist.id,
           updates: {
-            spotify_url: formData.spotify_url || null,
-            apple_music_url: formData.apple_music_url || null,
-            youtube_url: formData.youtube_url || null,
+            spotifyUrl: formData.spotify_url || null,
+            appleMusicUrl: formData.apple_music_url || null,
+            youtubeUrl: formData.youtube_url || null,
           },
         }),
       });

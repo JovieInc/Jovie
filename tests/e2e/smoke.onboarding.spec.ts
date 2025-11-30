@@ -107,6 +107,15 @@ test.describe('Onboarding smoke', () => {
         waitUntil: 'domcontentloaded',
       });
 
+      // Deep link directly to dashboard overview should also be gated
+      await page.goto('/dashboard/overview', {
+        waitUntil: 'domcontentloaded',
+      });
+      await page.waitForURL('**/onboarding', {
+        timeout: 10_000,
+        waitUntil: 'domcontentloaded',
+      });
+
       // 4) Fill the onboarding form (handle)
       const handleInput = page.getByLabel('Enter your desired handle');
       await expect(handleInput).toBeVisible({ timeout: 5_000 });

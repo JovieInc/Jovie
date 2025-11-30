@@ -66,24 +66,26 @@ describe('DashboardOverview', () => {
 
     // Task titles (use regex to ignore numeric prefixes like "1. ").
     // Some labels may appear both as list text and as button text; allow multiple.
-    expect(screen.getByText(/Claim your handle/i)).toBeInTheDocument();
-    expect(screen.getByText(/Add a music link/i)).toBeInTheDocument();
+    expect(screen.getByText(/Set up your profile basics/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Add a music link/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Add social links/i).length).toBeGreaterThan(0);
 
-    // CTA links (styled buttons) for incomplete items
-    expect(
-      screen.getByRole('link', { name: /Claim handle/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Add music link/i })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Add social links/i })
-    ).toBeInTheDocument();
+    // CTA links (styled buttons) for incomplete items.
+    // In this scenario profile basics are already complete, so we only
+    // expect CTAs for music and social links.
+    const musicCtas = screen.getAllByRole('link', {
+      name: /Add music link/i,
+    });
+    expect(musicCtas.length).toBeGreaterThan(0);
 
-    // Progress indicator
+    const socialLinksCtas = screen.getAllByRole('link', {
+      name: /Add social links/i,
+    });
+    expect(socialLinksCtas.length).toBeGreaterThan(0);
+
+    // Progress indicator (profile basics count as completed when username exists)
     expect(
-      screen.getByLabelText('Setup progress: 0 of 3 steps completed')
+      screen.getByLabelText('Setup progress: 1 of 3 steps completed')
     ).toBeInTheDocument();
   });
 
@@ -97,7 +99,7 @@ describe('DashboardOverview', () => {
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
     // Completed labels for first two tasks
-    expect(screen.getByText('Handle claimed')).toBeInTheDocument();
+    expect(screen.getByText('Profile basics saved')).toBeInTheDocument();
     expect(screen.getByText('Music link added')).toBeInTheDocument();
 
     // Third task still incomplete
@@ -105,15 +107,20 @@ describe('DashboardOverview', () => {
       screen.getByText('Connect Instagram, TikTok, Twitter, etc.')
     ).toBeInTheDocument();
 
-    // CTA link for remaining social links
-    expect(
-      screen.getByRole('link', { name: /Add social links/i })
-    ).toBeInTheDocument();
+    // CTA link for remaining social links (may appear in multiple places)
+    const remainingSocialLinksCtas = screen.getAllByRole('link', {
+      name: /Add social links/i,
+    });
+    expect(remainingSocialLinksCtas.length).toBeGreaterThan(0);
 
     // Progress indicator reflects 2/3
     expect(
       screen.getByLabelText('Setup progress: 2 of 3 steps completed')
     ).toBeInTheDocument();
+
+    // Next-step card should point to remaining social links action
+    expect(screen.getByText('Next step')).toBeInTheDocument();
+    expect(screen.getByText(/Add your social links/i)).toBeInTheDocument();
   });
 
   it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {

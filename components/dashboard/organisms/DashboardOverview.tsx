@@ -29,15 +29,58 @@ export function DashboardOverview({
     );
   }
 
-  const isHandleClaimed = Boolean(artist.owner_user_id);
+  const hasDisplayName = Boolean(artist.name && artist.name.trim());
+  const hasHandle = Boolean(artist.handle && artist.handle.trim());
+  const profileBasicsComplete = hasDisplayName && hasHandle;
+
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
+  const allTasksComplete =
+    profileBasicsComplete && hasMusicLink && hasSocialLinks;
   const totalSteps = 3;
-  const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
-    Boolean
-  ).length;
+  const completedCount = [
+    profileBasicsComplete,
+    hasMusicLink,
+    hasSocialLinks,
+  ].filter(Boolean).length;
+  const remainingSteps = Math.max(totalSteps - completedCount, 0);
+
+  const getNextStep = () => {
+    if (!profileBasicsComplete) {
+      return {
+        title: 'Set up your profile basics',
+        description:
+          'Set your display name and Jovie handle so fans know it is really you.',
+        href: '/dashboard/settings',
+        cta: 'Update profile basics',
+      } as const;
+    }
+
+    if (!hasMusicLink) {
+      return {
+        title: 'Connect a music platform',
+        description:
+          'Link Spotify, Apple Music, or YouTube so fans can listen right away from your Jovie profile.',
+        href: '/dashboard/links',
+        cta: 'Add a music link',
+      } as const;
+    }
+
+    if (!hasSocialLinks) {
+      return {
+        title: 'Add your social links',
+        description:
+          'Connect Instagram, TikTok, and more so fans can follow you everywhere you show up.',
+        href: '/dashboard/links',
+        cta: 'Add social links',
+      } as const;
+    }
+
+    return null;
+  };
+
+  const nextStep = allTasksComplete ? null : getNextStep();
 
   return (
     <div>
@@ -146,18 +189,48 @@ export function DashboardOverview({
                   style={{ width: `${(completedCount / totalSteps) * 100}%` }}
                 />
               </div>
+              {!allTasksComplete && remainingSteps > 0 && (
+                <p className='mt-2 text-xs text-secondary-token'>
+                  {remainingSteps === 1
+                    ? "You're 1 step away from a complete Jovie profile."
+                    : `You're ${remainingSteps} steps away from a complete Jovie profile.`}
+                </p>
+              )}
             </div>
+
+            {nextStep && (
+              <div className='mb-4'>
+                <div className='flex flex-col gap-3 rounded-xl border border-subtle bg-surface-1 p-4 sm:flex-row sm:items-center sm:justify-between'>
+                  <div>
+                    <p className='text-xs font-semibold uppercase tracking-wide text-secondary-token'>
+                      Next step
+                    </p>
+                    <h4 className='mt-1 text-base font-medium text-primary-token'>
+                      {nextStep.title}
+                    </h4>
+                    <p className='mt-1 text-sm text-secondary-token'>
+                      {nextStep.description}
+                    </p>
+                  </div>
+                  <div className='shrink-0'>
+                    <Button asChild size='sm' variant='primary'>
+                      <Link href={nextStep.href}>{nextStep.cta}</Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <ol className='space-y-3 list-none pl-0'>
               <SetupTaskItem
                 index={1}
-                title='Claim your handle'
-                complete={isHandleClaimed}
-                completeLabel='Handle claimed'
-                incompleteLabel='Secure your unique profile URL'
+                title='Set up your profile basics'
+                complete={profileBasicsComplete}
+                completeLabel='Profile basics saved'
+                incompleteLabel='Add your display name and @handle'
                 action={
                   <Button asChild size='sm' variant='primary'>
-                    <Link href='/dashboard/settings'>Claim handle</Link>
+                    <Link href='/dashboard/settings'>Edit profile basics</Link>
                   </Button>
                 }
               />
