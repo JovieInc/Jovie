@@ -20,7 +20,7 @@ export function OtpSignUpForm() {
                 </Clerk.Label>
                 <Clerk.Input
                   type='email'
-                  className='w-full px-3 py-2 rounded-lg border border-subtle bg-(--bg) text-primary-token focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent'
+                  className='w-full px-3 py-2 rounded-lg border border-input bg-background text-primary-token focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
                 />
                 <Clerk.FieldError className='mt-1 text-sm text-destructive' />
               </Clerk.Field>
@@ -55,7 +55,7 @@ export function OtpSignUpForm() {
                 </Clerk.Label>
                 <Clerk.Input
                   type='text'
-                  className='w-full px-3 py-2 rounded-lg border border-subtle bg-(--bg) text-primary-token tracking-[0.3em] text-center focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent'
+                  className='w-full px-3 py-2 rounded-lg border border-input bg-background text-primary-token tracking-[0.3em] text-center focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
                 />
                 <Clerk.FieldError className='mt-1 text-sm text-destructive' />
               </Clerk.Field>

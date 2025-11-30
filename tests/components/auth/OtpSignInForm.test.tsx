@@ -164,10 +164,10 @@ describe('OtpSignInForm', () => {
     const inputs = screen.getAllByTestId('input');
     const emailInput = inputs[0];
 
-    expect(emailInput).toHaveClass('bg-(--bg)');
+    expect(emailInput).toHaveClass('bg-background');
     expect(emailInput).toHaveClass('text-primary-token');
-    expect(emailInput).toHaveClass('border-subtle');
-    expect(emailInput).toHaveClass('focus:ring-accent');
+    expect(emailInput).toHaveClass('border-input');
+    expect(emailInput).toHaveClass('focus:ring-ring');
   });
 
   it('applies correct styling to code input with centered text', () => {
