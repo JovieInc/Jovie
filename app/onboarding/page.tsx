@@ -1,6 +1,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/dashboard/actions';
+import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { ThemeToggle } from '@/components/site/ThemeToggle';
 
@@ -38,19 +39,29 @@ export default async function OnboardingPage({
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   return (
-    <div className='min-h-screen bg-[var(--bg)] transition-colors'>
-      {/* Theme Toggle */}
-      <div className='absolute top-4 right-4 z-20'>
-        <ThemeToggle />
-      </div>
+    <AuthLayout
+      brandingTitle='Finish setting up your Jovie profile'
+      brandingDescription='Choose your name and Jovie handle so your profile is ready to share.'
+      formTitle='Finish onboarding'
+      gradientFrom='purple-600'
+      gradientVia='cyan-600'
+      gradientTo='blue-600'
+      textColorClass='text-purple-100'
+    >
+      <div className='relative min-h-[500px]'>
+        {/* Theme Toggle */}
+        <div className='absolute top-4 right-4 z-20'>
+          <ThemeToggle />
+        </div>
 
-      {/* Unified onboarding form */}
-      <OnboardingFormWrapper
-        initialDisplayName={initialDisplayName}
-        initialHandle={initialHandle}
-        userEmail={userEmail}
-        userId={userId}
-      />
-    </div>
+        {/* Unified onboarding form */}
+        <OnboardingFormWrapper
+          initialDisplayName={initialDisplayName}
+          initialHandle={initialHandle}
+          userEmail={userEmail}
+          userId={userId}
+        />
+      </div>
+    </AuthLayout>
   );
 }

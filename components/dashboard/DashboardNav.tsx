@@ -14,6 +14,9 @@ import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { Divider } from '@/components/atoms/Divider';
 import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -86,22 +89,22 @@ const secondaryNavigation: typeof primaryNavigation = [
 
 const adminNavigation: typeof primaryNavigation = [
   {
-    name: 'Admin overview',
+    name: 'Overview',
     href: '/admin',
     id: 'admin_overview',
     icon: ShieldCheckIcon,
     description: 'Internal metrics and operations',
   },
   {
-    name: 'Admin users',
-    href: '/admin#users',
+    name: 'Users',
+    href: '/admin/users',
     id: 'admin_users',
     icon: UsersIcon,
     description: 'Manage creator profiles and verification',
   },
   {
-    name: 'Admin activity',
-    href: '/admin#activity',
+    name: 'Activity',
+    href: '/admin/activity',
     id: 'admin_activity',
     icon: ChartPieIcon,
     description: 'Review recent system and creator activity',
@@ -161,8 +164,15 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
         <div className='mt-2'>
-          <Divider className='mb-6' inset={!collapsed} />
-          <div className='mb-2'>{renderSection(adminNavigation)}</div>
+          <Divider className='mb-3' inset={!collapsed} />
+          <SidebarGroup>
+            <SidebarGroupLabel className='px-2 text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+              Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent className='mt-1'>
+              {renderSection(adminNavigation)}
+            </SidebarGroupContent>
+          </SidebarGroup>
         </div>
       )}
     </nav>
