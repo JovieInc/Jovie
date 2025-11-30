@@ -1,4 +1,3 @@
-import { buildSpotifyArtistUrl } from '@/lib/spotify';
 import { Artist, Release } from '@/types/db';
 
 export interface DSPConfig {
@@ -6,6 +5,10 @@ export interface DSPConfig {
   color: string;
   textColor: string;
   logoSvg: string;
+}
+
+function buildSpotifyArtistUrl(artistId: string): string {
+  return `https://open.spotify.com/artist/${artistId}`;
 }
 
 export const DSP_CONFIGS: Record<string, DSPConfig> = {

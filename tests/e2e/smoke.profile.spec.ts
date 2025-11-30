@@ -102,6 +102,34 @@ test.describe('Profile smoke tests', () => {
     await expect(tipInterface.first()).toBeVisible({ timeout: 10000 });
   });
 
+  // Test tip mode back button behavior
+  test('tip mode back button returns to profile', async ({ page }) => {
+    // Navigate directly to tip mode
+    await page.goto('/taylorswift?mode=tip', {
+      waitUntil: 'domcontentloaded',
+    });
+
+    // Confirm we are in tip mode
+    await expect(page).toHaveURL(/\/taylorswift\?mode=tip/);
+
+    const backButton = page
+      .locator('button[aria-label="Back to profile"]')
+      .first();
+
+    await expect(backButton).toBeVisible({ timeout: 10000 });
+
+    // Click back button
+    await backButton.click();
+
+    // Should navigate back to the base profile URL
+    await expect(page).toHaveURL(/\/taylorswift$/);
+
+    // Back button should no longer be present once profile mode is active
+    await expect(
+      page.locator('button[aria-label="Back to profile"]')
+    ).toHaveCount(0);
+  });
+
   // Test mode switching via buttons
   test('can switch between profile modes', async ({ page }) => {
     // Start at profile page
