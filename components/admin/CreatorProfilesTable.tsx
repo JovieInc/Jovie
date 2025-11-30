@@ -58,7 +58,7 @@ export function CreatorProfilesTable({
   const clearHref = buildHref(1, false);
 
   return (
-    <Card className='border-subtle bg-surface-1/80 backdrop-blur-sm'>
+    <Card className='border-subtle bg-surface-1/80 backdrop-blur-sm overflow-hidden'>
       <CardHeader className='space-y-1'>
         <CardTitle className='text-lg'>Creator profiles</CardTitle>
         <p className='text-xs text-secondary-token'>
@@ -85,7 +85,7 @@ export function CreatorProfilesTable({
                 <select
                   name='sort'
                   defaultValue={sort}
-                  className='h-8 rounded-md border border-subtle bg-surface-1 px-2 text-xs'
+                  className='h-8 rounded-md border border-input bg-background px-2 text-xs text-primary-token shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   <option value='created_desc'>Newest</option>
                   <option value='created_asc'>Oldest</option>
@@ -100,7 +100,7 @@ export function CreatorProfilesTable({
                 <select
                   name='pageSize'
                   defaultValue={String(pageSize)}
-                  className='h-8 rounded-md border border-subtle bg-surface-1 px-2 text-xs'
+                  className='h-8 rounded-md border border-input bg-background px-2 text-xs text-primary-token shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   <option value='10'>10</option>
                   <option value='20'>20</option>
@@ -157,7 +157,12 @@ export function CreatorProfilesTable({
                       />
                     </td>
                     <td className='px-2 py-3 font-medium text-primary-token'>
-                      @{profile.username}
+                      <Link
+                        href={`/${profile.username}`}
+                        className='hover:underline'
+                      >
+                        @{profile.username}
+                      </Link>
                     </td>
                     <td className='px-2 py-3 text-secondary-token'>
                       {profile.createdAt

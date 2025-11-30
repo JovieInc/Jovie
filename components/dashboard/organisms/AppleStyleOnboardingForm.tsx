@@ -39,11 +39,6 @@ interface HandleValidationState {
 
 const ONBOARDING_STEPS = [
   {
-    id: 'welcome',
-    title: "Let's get you live.",
-    prompt: 'Create your profile in minutes.',
-  },
-  {
     id: 'name',
     title: "What's your name?",
     prompt: 'This will show on your Jovie profile.',
@@ -408,20 +403,52 @@ export function AppleStyleOnboardingForm({
     switch (currentStepIndex) {
       case 0:
         return (
-          <div className='flex flex-col items-center justify-center h-full text-center space-y-8'>
-            <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-              {ONBOARDING_STEPS[0].title}
-            </h1>
-            <p className='text-[var(--muted)] text-xl'>
-              {ONBOARDING_STEPS[0].prompt}
-            </p>
-            <Button
-              onClick={goToNextStep}
-              variant='primary'
-              className='w-full py-4 text-lg rounded-xl'
-            >
-              Start
-            </Button>
+          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+            <div className='text-center space-y-3'>
+              <h1 className='text-4xl font-bold text-(--fg) transition-colors'>
+                {ONBOARDING_STEPS[0].title}
+              </h1>
+              <p className='text-(--muted) text-xl'>
+                {ONBOARDING_STEPS[0].prompt}
+              </p>
+            </div>
+
+            <div className='w-full max-w-md space-y-6'>
+              <div className='space-y-4'>
+                <label
+                  className='text-sm font-medium text-(--muted)'
+                  htmlFor='display-name'
+                >
+                  Your name
+                </label>
+                <input
+                  id='display-name'
+                  type='text'
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder='Your full name'
+                  className='w-full px-4 py-4 text-lg bg-(--panel) border-2 border-(--border) rounded-xl focus-ring text-(--fg) transition-all'
+                  maxLength={50}
+                  autoComplete='name'
+                />
+
+                <Button
+                  onClick={goToNextStep}
+                  disabled={!fullName.trim()}
+                  variant='primary'
+                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
+                >
+                  Continue
+                </Button>
+              </div>
+
+              <button
+                onClick={goToPreviousStep}
+                className='w-full text-center text-(--muted) hover:text-(--fg) py-2 text-sm transition-colors'
+              >
+                Back
+              </button>
+            </div>
           </div>
         );
 
@@ -441,57 +468,6 @@ export function AppleStyleOnboardingForm({
               <div className='space-y-4'>
                 <label
                   className='text-sm font-medium text-[var(--muted)]'
-                  htmlFor='display-name'
-                >
-                  Your name
-                </label>
-                <input
-                  id='display-name'
-                  type='text'
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  placeholder='Your full name'
-                  className='w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 border-[var(--border)] rounded-xl focus-ring text-[var(--fg)] transition-all'
-                  maxLength={50}
-                  autoComplete='name'
-                />
-
-                <Button
-                  onClick={goToNextStep}
-                  disabled={!fullName.trim()}
-                  variant='primary'
-                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
-                >
-                  Continue
-                </Button>
-              </div>
-
-              <button
-                onClick={goToPreviousStep}
-                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
-              >
-                Back
-              </button>
-            </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
-            <div className='text-center space-y-3'>
-              <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-                {ONBOARDING_STEPS[2].title}
-              </h1>
-              <p className='text-[var(--muted)] text-xl'>
-                {ONBOARDING_STEPS[2].prompt}
-              </p>
-            </div>
-
-            <div className='w-full max-w-md space-y-6'>
-              <div className='space-y-4'>
-                <label
-                  className='text-sm font-medium text-[var(--muted)]'
                   htmlFor='handle-input'
                 >
                   Enter your desired handle
@@ -504,13 +480,13 @@ export function AppleStyleOnboardingForm({
                     value={handleInput}
                     onChange={e => setHandleInput(e.target.value.toLowerCase())}
                     placeholder='yourhandle'
-                    className={`w-full px-4 py-4 text-lg bg-[var(--panel)] border-2 rounded-xl transition-all ${
+                    className={`w-full px-4 py-4 text-lg bg-(--panel) border-2 rounded-xl transition-all ${
                       handleValidation.error
                         ? 'border-red-500'
                         : handleValidation.available
                           ? 'border-green-500'
-                          : 'border-[var(--border)]'
-                    } focus-ring text-[var(--fg)]`}
+                          : 'border-(--border)'
+                    } focus-ring text-(--fg)`}
                     autoComplete='username'
                   />
                   {handleValidation.checking && (
@@ -520,11 +496,9 @@ export function AppleStyleOnboardingForm({
                   )}
                 </div>
 
-                <div className='text-center p-3 bg-[var(--panel)] rounded-xl border border-[var(--border)]'>
-                  <p className='text-[var(--muted)] text-sm'>
-                    Your profile link
-                  </p>
-                  <p className='font-mono text-[var(--fg)]'>
+                <div className='text-center p-3 bg-(--panel) rounded-xl border border-(--border)'>
+                  <p className='text-(--muted) text-sm'>Your profile link</p>
+                  <p className='font-mono text-(--fg)'>
                     {displayDomain}/{handleInput || 'yourhandle'}
                   </p>
                 </div>
@@ -585,7 +559,7 @@ export function AppleStyleOnboardingForm({
 
               <button
                 onClick={goToPreviousStep}
-                className='w-full text-center text-[var(--muted)] hover:text-[var(--fg)] py-2 text-sm transition-colors'
+                className='w-full text-center text-(--muted) hover:text-(--fg) py-2 text-sm transition-colors'
               >
                 Back
               </button>
@@ -593,21 +567,21 @@ export function AppleStyleOnboardingForm({
           </div>
         );
 
-      case 3:
+      case 2:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3'>
               <h1 className='text-4xl font-bold text-[var(--fg)] transition-colors'>
-                {ONBOARDING_STEPS[3].title}
+                {ONBOARDING_STEPS[2].title}
               </h1>
               <p className='text-[var(--muted)] text-xl'>
-                {ONBOARDING_STEPS[3].prompt}
+                {ONBOARDING_STEPS[2].prompt}
               </p>
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='text-center p-4 bg-[var(--panel)] border border-[var(--border)] rounded-xl'>
-                <p className='font-mono text-lg text-[var(--fg)]'>
+              <div className='text-center p-4 bg-(--panel) border border-(--border) rounded-xl'>
+                <p className='font-mono text-lg text-(--fg)'>
                   {displayDomain}/{profileReadyHandle || handle}
                 </p>
               </div>
@@ -646,9 +620,9 @@ export function AppleStyleOnboardingForm({
   const ProgressIndicator = () => {
     return (
       <div className='fixed top-0 left-0 right-0 z-50'>
-        <div className='h-1 bg-[var(--border)]'>
+        <div className='h-1 bg-(--border)'>
           <div
-            className='h-full bg-[var(--accent-pro)] transition-all duration-500 ease-in-out'
+            className='h-full bg-(--accent-pro) transition-all duration-500 ease-in-out'
             style={{
               width: `${((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100}%`,
             }}

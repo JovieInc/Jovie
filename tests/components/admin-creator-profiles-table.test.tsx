@@ -47,6 +47,11 @@ describe('CreatorProfilesTable', () => {
 
     expect(screen.getByText('Creator profiles')).toBeInTheDocument();
     expect(screen.getByText('@alice')).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', {
+        name: '@alice',
+      })
+    ).toHaveAttribute('href', '/alice');
     expect(screen.getAllByText('Claimed').length).toBeGreaterThan(0);
     expect(screen.getByText('Not verified')).toBeInTheDocument();
     expect(screen.getByText(/Showing 1.*1 of 1 profiles/)).toBeInTheDocument();
