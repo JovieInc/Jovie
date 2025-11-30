@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { z } from 'zod';
+import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
@@ -161,14 +162,14 @@ export default function NotificationsPage() {
             <label htmlFor='email' className='block text-sm font-medium mb-1'>
               Email
             </label>
-            <input
+            <Input
               type='email'
               id='email'
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className='w-full px-4 py-2 border rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500'
               placeholder='your@email.com'
               required
+              inputClassName='w-full px-4 py-2 border rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500'
             />
           </div>
 

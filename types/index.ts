@@ -14,6 +14,12 @@ import type {
   SubscriptionStatus,
 } from './db';
 
+// Contact / CRM types
+export type {
+  Contact,
+  ContactSidebarMode,
+  ContactSocialLink,
+} from './contact';
 // Re-export shared enums and types from db.ts
 export type {
   // Core interfaces

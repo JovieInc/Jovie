@@ -9,6 +9,11 @@ import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
 } from '@/lib/admin/creator-profiles';
+import {
+  getAdminActivityFeed,
+  getAdminReliabilitySummary,
+  getAdminUsageSeries,
+} from '@/lib/admin/overview';
 
 interface AdminOverviewMetrics {
   mrrUsd: number;
@@ -52,6 +57,12 @@ async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
 
 export default async function AdminPage({ searchParams }: AdminPageProps) {
   const metrics = await getAdminOverviewMetrics();
+
+  const [usageSeries, reliabilitySummary, activityItems] = await Promise.all([
+    getAdminUsageSeries(14),
+    getAdminReliabilitySummary(),
+    getAdminActivityFeed(20),
+  ]);
 
   const pageParam = searchParams?.page
     ? Number.parseInt(searchParams.page, 10)
@@ -121,15 +132,15 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
 
       <section id='usage' className='grid gap-6 lg:grid-cols-3'>
         <div className='lg:col-span-2'>
-          <MetricsChart />
+          <MetricsChart points={usageSeries} />
         </div>
         <div id='errors' className='h-full'>
-          <ReliabilityCard />
+          <ReliabilityCard summary={reliabilitySummary} />
         </div>
       </section>
 
       <section id='activity'>
-        <ActivityTable />
+        <ActivityTable items={activityItems} />
       </section>
     </div>
   );

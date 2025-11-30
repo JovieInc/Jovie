@@ -18,9 +18,9 @@ export function DashboardTopBar({
   actions,
 }: DashboardTopBarProps) {
   return (
-    <header className='sticky top-0 z-20 border-b border-subtle bg-surface-0 backdrop-blur supports-[backdrop-filter]:bg-surface-0'>
+    <header className='sticky top-0 z-20 border-b border-subtle bg-surface-0 backdrop-blur supports-backdrop-filter:bg-surface-0'>
       <div className='mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8'>
-        <SidebarCollapseButton className='-ml-1' />
+        <SidebarCollapseButton className='-ml-1 lg:hidden' />
         <div className='hidden h-5 border-l border-subtle sm:block' />
         <nav
           aria-label='Breadcrumb'

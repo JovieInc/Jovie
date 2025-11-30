@@ -1,6 +1,8 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { publishProfileBasics } from '@/app/dashboard/actions';
+import { Input } from '@/components/atoms/Input';
+import { Textarea } from '@/components/atoms/Textarea';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
@@ -62,12 +64,11 @@ export function DashboardOverview({
             >
               Display name
             </label>
-            <input
+            <Input
               id='displayName'
               name='displayName'
-              defaultValue={artist.name}
+              defaultValue={artist.name ?? ''}
               required
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-secondary-token shadow-sm focus:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             />
           </div>
           <div className='space-y-2'>
@@ -77,12 +78,11 @@ export function DashboardOverview({
             >
               Bio (optional)
             </label>
-            <textarea
+            <Textarea
               id='bio'
               name='bio'
-              defaultValue={artist.tagline}
+              defaultValue={artist.tagline ?? ''}
               rows={3}
-              className='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-secondary-token shadow-sm focus:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             />
           </div>
           <div className='flex flex-wrap gap-3'>

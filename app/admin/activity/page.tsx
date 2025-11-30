@@ -1,12 +1,15 @@
 import type { Metadata } from 'next';
 
 import { ActivityTable } from '@/components/admin/activity-table';
+import { getAdminActivityFeed } from '@/lib/admin/overview';
 
 export const metadata: Metadata = {
   title: 'Admin activity',
 };
 
-export default function AdminActivityPage() {
+export default async function AdminActivityPage() {
+  const items = await getAdminActivityFeed(50);
+
   return (
     <div className='space-y-8'>
       <header className='space-y-2'>
@@ -19,7 +22,7 @@ export default function AdminActivityPage() {
         </p>
       </header>
 
-      <ActivityTable />
+      <ActivityTable items={items} />
     </div>
   );
 }
