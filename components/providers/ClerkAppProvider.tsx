@@ -37,7 +37,6 @@ export function ClerkAppProvider({ children }: ClerkAppProviderProps) {
 
   return (
     <ClerkProvider
-      clerkJSVersion='latest'
       publishableKey={publishableKey}
       appearance={
         {

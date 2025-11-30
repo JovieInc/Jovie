@@ -12,7 +12,6 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
-import { Divider } from '@/components/atoms/Divider';
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -21,10 +20,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
-
-interface DashboardNavProps {
-  collapsed?: boolean;
-}
 
 // Primary Navigation - Core features
 const primaryNavigation = [
@@ -111,7 +106,7 @@ const adminNavigation: typeof primaryNavigation = [
   },
 ];
 
-export function DashboardNav({ collapsed = false }: DashboardNavProps) {
+export function DashboardNav() {
   const { isAdmin } = useDashboardData();
   const pathname = usePathname();
 
@@ -139,7 +134,10 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
         return (
           <SidebarMenuItem key={item.id}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-              <Link href={item.href} className='flex items-center gap-2'>
+              <Link
+                href={item.href}
+                className='flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+              >
                 <item.icon className='size-4' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
                   {item.name}
@@ -155,18 +153,14 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
   return (
     <nav className='flex flex-1 flex-col'>
       {/* Primary Navigation Block */}
-      <div className='mb-6'>{renderSection(primaryNavigation)}</div>
-
-      {/* Divider */}
-      <Divider className='mb-6' inset={!collapsed} />
+      <div className='mb-4'>{renderSection(primaryNavigation)}</div>
 
       {/* Secondary Navigation Block */}
-      <div className='mb-4'>{renderSection(secondaryNavigation)}</div>
+      <div className='mb-2'>{renderSection(secondaryNavigation)}</div>
 
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
         <div className='mt-2'>
-          <Divider className='mb-3' inset={!collapsed} />
           <SidebarGroup>
             <SidebarGroupLabel className='px-2 text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
               Admin

@@ -5,7 +5,7 @@ name: 'Code Quality Rules'
 description: 'Enforces code quality standards including linting, testing, and formatting'
 target:
   repository:
-    - 'itstimwhite/Jovie'
+    - 'JovieInc/Jovie'
 rules:
   - name: 'Require code quality checks to pass'
     enforcement: 'active'

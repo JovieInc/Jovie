@@ -131,13 +131,13 @@ export function EnhancedThemeToggle({
             disabled={isUpdating}
             onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
             className={cn(
-              'w-8 h-8 p-0 group items-center justify-center rounded-md border border-subtle bg-surface-2 text-primary-token hover:bg-accent hover:text-accent-foreground',
-              isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'
+              'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
+              isUpdating && 'opacity-70'
             )}
           >
             {isDark ? (
               <svg
-                className='h-4 w-4 mx-auto my-auto text-blue-400 group-hover:text-blue-300 transition-colors duration-200'
+                className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >
@@ -149,7 +149,7 @@ export function EnhancedThemeToggle({
               </svg>
             ) : (
               <svg
-                className='h-4 w-4 mx-auto my-auto text-amber-500 group-hover:text-amber-400 transition-colors duration-200'
+                className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >

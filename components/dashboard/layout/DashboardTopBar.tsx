@@ -1,8 +1,6 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { SidebarCollapseButton } from '@/components/atoms/SidebarCollapseButton';
-
 export interface DashboardBreadcrumbItem {
   label: string;
   href?: string;
@@ -20,8 +18,6 @@ export function DashboardTopBar({
   return (
     <header className='sticky top-0 z-20 border-b border-subtle bg-surface-0 backdrop-blur supports-backdrop-filter:bg-surface-0'>
       <div className='mx-auto flex h-16 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8'>
-        <SidebarCollapseButton className='-ml-1 lg:hidden' />
-        <div className='hidden h-5 border-l border-subtle sm:block' />
         <nav
           aria-label='Breadcrumb'
           className='flex items-center gap-1 text-sm text-secondary-token'
@@ -38,12 +34,14 @@ export function DashboardTopBar({
                     href={crumb.href}
                     className='transition-colors hover:text-primary-token'
                   >
-                    {crumb.label}
+                    <span className='text-xs text-tertiary-token'>
+                      {crumb.label}
+                    </span>
                   </Link>
                 ) : (
                   <span className='text-primary-token'>{crumb.label}</span>
                 )}
-                {!isLast && <span className='text-secondary-token'>/</span>}
+                {!isLast && <span className='text-tertiary-token'>›</span>}
               </span>
             );
           })}

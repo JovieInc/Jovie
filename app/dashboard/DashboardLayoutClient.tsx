@@ -103,7 +103,8 @@ export default function DashboardLayoutClient({
         onOpenChange={handleOpenChange}
         style={
           {
-            '--sidebar-width-icon': '4.25rem',
+            '--sidebar-width': '14rem',
+            '--sidebar-width-icon': '3.25rem',
           } as CSSProperties
         }
       >

@@ -9,7 +9,7 @@ export function OtpSignInForm() {
   return (
     <SignIn.Root routing='path' path='/signin'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-6 p-0'>
+        <CardContent className='space-y-6 p-0 min-h-[260px]'>
           <Clerk.GlobalError className='text-sm text-destructive' />
 
           <SignIn.Step name='start' aria-label='Enter your email address'>
@@ -55,7 +55,10 @@ export function OtpSignInForm() {
                 </Clerk.Label>
                 <Clerk.Input
                   type='text'
-                  className='w-full px-3 py-2 rounded-lg border border-input bg-background text-primary-token tracking-[0.3em] text-center focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
+                  inputMode='numeric'
+                  autoComplete='one-time-code'
+                  maxLength={6}
+                  className='w-full px-3 py-3 rounded-lg border border-input bg-background text-primary-token text-2xl tracking-[0.6em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
                 />
                 <Clerk.FieldError className='mt-1 text-sm text-destructive' />
               </Clerk.Field>

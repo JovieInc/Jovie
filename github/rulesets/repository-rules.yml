@@ -2,7 +2,7 @@ name: 'Repository Rules'
 description: 'General repository rules for security and code quality'
 target:
   repository:
-    - 'itstimwhite/Jovie'
+    - 'JovieInc/Jovie'
 rules:
   - name: 'Require pull request reviews before merging'
     enforcement: 'active'

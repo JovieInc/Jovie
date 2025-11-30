@@ -29,34 +29,21 @@ export function SidebarCollapseButton({
             size='icon'
             onClick={toggleSidebar}
             className={cn(
-              'relative h-9 w-9 rounded-lg transition-all duration-300 ease-out',
-              'bg-surface-1 hover:bg-surface-2 active:bg-surface-3',
-              'border border-subtle hover:border-default',
-              'shadow-sm hover:shadow-md dark:shadow-black/20',
-              'transform hover:scale-105 active:scale-95',
-              'group overflow-hidden',
+              'h-8 w-8 rounded-full border border-subtle bg-surface-1 text-secondary-token',
+              'hover:bg-surface-2 hover:text-primary-token shadow-sm',
+              'transition-colors duration-150 ease-out',
               className
             )}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {/* Sophisticated background effects */}
-            <div className='absolute inset-0 bg-gradient-to-br from-transparent via-surface-2/30 to-surface-3/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300' />
-            <div className='absolute inset-0 bg-gradient-to-t from-transparent to-surface-1/50 opacity-0 group-active:opacity-100 transition-opacity duration-150' />
-
-            {/* Linear-inspired glow effect */}
-            <div className='absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300'>
-              <div className='absolute inset-0 bg-gradient-to-r from-transparent via-text-primary/5 to-transparent' />
+            <span className='sr-only'>
+              {isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            </span>
+            <div className='flex flex-col items-center justify-center gap-[3px]'>
+              <span className='block h-0.5 w-3 rounded-full bg-current' />
+              <span className='block h-0.5 w-3 rounded-full bg-current' />
+              <span className='block h-0.5 w-3 rounded-full bg-current' />
             </div>
-
-            {/* ChatGPT-style hamburger icon with enhanced styling */}
-            <div className='relative z-10 flex flex-col items-center justify-center w-4 h-4 group-hover:scale-110 transition-transform duration-300 ease-out'>
-              <div className='w-3 h-0.5 bg-text-primary rounded-full mb-1 transition-all duration-300 group-hover:bg-text-primary group-active:scale-95' />
-              <div className='w-3 h-0.5 bg-text-primary rounded-full mb-1 transition-all duration-300 group-hover:bg-text-primary group-active:scale-95' />
-              <div className='w-3 h-0.5 bg-text-primary rounded-full transition-all duration-300 group-hover:bg-text-primary group-active:scale-95' />
-            </div>
-
-            {/* Subtle focus ring enhancement */}
-            <div className='absolute inset-0 rounded-lg ring-2 ring-transparent group-focus-visible:ring-interactive/50 transition-all duration-200' />
           </Button>
         </TooltipTrigger>
         <TooltipContent side='right' className='font-medium'>
