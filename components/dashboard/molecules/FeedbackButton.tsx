@@ -33,7 +33,7 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
       onClick={handleFeedbackClick}
       className={cn(
         'group flex transition-all duration-200 ease-in-out',
-        'rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
+        'rounded-md border border-subtle bg-surface-2 text-primary-token hover:bg-surface-3 hover:text-primary-token',
         collapsed
           ? 'items-center justify-center w-8 h-8 p-0 gap-0'
           : 'items-center w-full px-3 gap-2',

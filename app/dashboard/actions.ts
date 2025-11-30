@@ -344,6 +344,9 @@ export async function updateCreatorProfile(
       }
 
       revalidateTag('dashboard-data');
+      if (updatedProfile.usernameNormalized) {
+        revalidatePath(`/${updatedProfile.usernameNormalized}`);
+      }
 
       return updatedProfile;
     } catch (error) {

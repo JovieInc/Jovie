@@ -1,7 +1,7 @@
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 
 export const APP_NAME = 'Jovie';
-export const APP_URL = env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie';
+export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie';
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
 export const DSPS = {

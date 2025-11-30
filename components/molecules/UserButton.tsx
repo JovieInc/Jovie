@@ -11,9 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { useBillingStatus } from '@/hooks/use-billing-status';
@@ -104,14 +104,14 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   if (!isLoaded || !user) {
     return showUserInfo ? (
       <div className='flex w-full items-center gap-3 p-2'>
-        <div className='h-8 w-8 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+        <div className='h-8 w-8 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
         <div className='flex-1 space-y-1'>
           <div className='h-4 w-24 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
           <div className='h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
         </div>
       </div>
     ) : (
-      <div className='h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+      <div className='h-9 w-9 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
     );
   }
 
@@ -296,19 +296,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
             )}
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
-            {userImageUrl ? (
-              <Image
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                width={32}
-                height={32}
-                className='w-8 h-8 rounded-full object-cover flex-shrink-0'
-              />
-            ) : (
-              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
-                {userInitials}
-              </div>
-            )}
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='sm'
+              className='shrink-0'
+            />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2 truncate'>
                 <p className='text-sm font-medium truncate'>{displayName}</p>
@@ -339,19 +333,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
             className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
-            {userImageUrl ? (
-              <Image
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                width={20}
-                height={20}
-                className='w-5 h-5 rounded-full object-cover'
-              />
-            ) : (
-              <div className='flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500 text-xs font-medium text-white'>
-                {userInitials}
-              </div>
-            )}
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='xs'
+              className='h-5 w-5 shrink-0 ring-0 shadow-none'
+            />
             <span className='sr-only'>Open user menu</span>
           </Button>
         )}
@@ -359,19 +347,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
       <DropdownMenuContent align='end' className='w-64'>
         <DropdownMenuLabel>
           <div className='flex items-center gap-3'>
-            {userImageUrl ? (
-              <Image
-                src={userImageUrl}
-                alt={displayName || 'User avatar'}
-                width={32}
-                height={32}
-                className='w-8 h-8 rounded-full object-cover'
-              />
-            ) : (
-              <div className='w-8 h-8 rounded-full bg-indigo-500 text-white text-sm flex items-center justify-center font-medium'>
-                {userInitials}
-              </div>
-            )}
+            <Avatar
+              src={userImageUrl}
+              alt={displayName || 'User avatar'}
+              name={displayName || userInitials}
+              size='sm'
+              className='shrink-0'
+            />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
                 <span className='truncate text-sm font-medium'>

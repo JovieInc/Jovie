@@ -4,13 +4,13 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { page, setAnalyticsEnabled } from '@/lib/analytics';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 export function Analytics() {
   const pathname = usePathname();
   const analyticsGate = useFeatureGate(STATSIG_FLAGS.ANALYTICS);
-  const hasStatsigKey = Boolean(env.NEXT_PUBLIC_STATSIG_CLIENT_KEY);
+  const hasStatsigKey = Boolean(publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
