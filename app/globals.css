@@ -235,10 +235,12 @@ body {
 }
 
 @utility text-destructive {
-  color: #dc2626; /* red-600 */
+  color: #dc2626;
+  /* red-600 */
 
   &:is(.dark *) {
-    color: #f87171; /* red-400 */
+    color: #f87171;
+    /* red-400 */
   }
 }
 
@@ -262,6 +264,7 @@ body {
     opacity: 0;
     transform: translateY(-4px) scale(0.99);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -277,46 +280,67 @@ body {
 @layer base {
   /* Enhanced Linear-style dashboard tokens (light) */
   :root {
-    --color-bg-base: #ffffff; /* app background */
-    --color-bg-surface-0: #fafbfc; /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8; /* cards/panels */
-    --color-bg-surface-2: #eef0f2; /* interactive/hover */
-    --color-bg-surface-3: #e5e7eb; /* pressed/active */
+    --color-bg-base: #ffffff;
+    /* app background */
+    --color-bg-surface-0: #fafbfc;
+    /* elevated backgrounds */
+    --color-bg-surface-1: #f6f7f8;
+    /* cards/panels */
+    --color-bg-surface-2: #eef0f2;
+    /* interactive/hover */
+    --color-bg-surface-3: #e5e7eb;
+    /* pressed/active */
     --color-border-subtle: #e5e7eb;
     --color-border-default: #d1d5db;
     --color-text-primary-token: #0c0c0c;
     --color-text-secondary-token: #6b7280;
     --color-text-tertiary-token: #9ca3af;
-    --color-accent: #7c3aed; /* accent */
-    --color-accent-foreground: #fff; /* accent text */
-    --color-btn-primary-bg: #000; /* primary button background */
-    --color-btn-primary-fg: #fff; /* primary button text */
+    --color-accent: #7c3aed;
+    /* accent */
+    --color-accent-foreground: #fff;
+    /* accent text */
+    --color-btn-primary-bg: #000;
+    /* primary button background */
+    --color-btn-primary-fg: #fff;
+    /* primary button text */
 
     /* Loading/skeleton colors */
     --color-skeleton-base: #f3f4f6;
     --color-skeleton-shimmer: #ffffff;
 
     /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
-    --focus-ring: 124 58 237; /* approx. #7c3aed */
+    --focus-ring: 124 58 237;
+    /* approx. #7c3aed */
   }
 
   /* Dark mode overrides — ensure this block comes AFTER light tokens */
   :root.dark {
     /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0a0a0a; /* deepest app background */
-    --color-bg-surface-0: #111111; /* elevated backgrounds (sidebars) */
-    --color-bg-surface-1: #171717; /* cards/panels */
-    --color-bg-surface-2: #1f1f1f; /* interactive/hover */
-    --color-bg-surface-3: #262626; /* pressed/active */
-    --color-border-subtle: #262626; /* subtle borders */
-    --color-border-default: #404040; /* default borders */
+    --color-bg-base: #0a0a0a;
+    /* deepest app background */
+    --color-bg-surface-0: #111111;
+    /* elevated backgrounds (sidebars) */
+    --color-bg-surface-1: #171717;
+    /* cards/panels */
+    --color-bg-surface-2: #1f1f1f;
+    /* interactive/hover */
+    --color-bg-surface-3: #262626;
+    /* pressed/active */
+    --color-border-subtle: #262626;
+    /* subtle borders */
+    --color-border-default: #404040;
+    /* default borders */
     --color-text-primary-token: #f5f5f5;
     --color-text-secondary-token: #a3a3a3;
     --color-text-tertiary-token: #737373;
-    --color-accent: #7c3aed; /* accent */
-    --color-accent-foreground: #fff; /* accent text */
-    --color-btn-primary-bg: #fff; /* primary button background */
-    --color-btn-primary-fg: #000; /* primary button text */
+    --color-accent: #7c3aed;
+    /* accent */
+    --color-accent-foreground: #fff;
+    /* accent text */
+    --color-btn-primary-bg: #fff;
+    /* primary button background */
+    --color-btn-primary-fg: #000;
+    /* primary button text */
 
     /* Loading/skeleton colors for dark mode */
     --color-skeleton-base: #1a1a1a;
@@ -406,6 +430,7 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
@@ -414,6 +439,22 @@ body {
 /* Preview update animation */
 @utility animate-shimmer {
   animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out;
 }
 
 /* Micro-animations */

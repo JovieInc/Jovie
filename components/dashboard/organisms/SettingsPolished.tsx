@@ -13,6 +13,7 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/AccountSettingsSection';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
@@ -716,7 +717,7 @@ export function SettingsPolished({
             >
               Facebook Pixel ID
             </label>
-            <input
+            <Input
               type='text'
               id='facebookPixel'
               value={pixelData.facebookPixel}
@@ -724,7 +725,7 @@ export function SettingsPolished({
                 handlePixelInputChange('facebookPixel', e.target.value)
               }
               placeholder='1234567890'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
@@ -735,7 +736,7 @@ export function SettingsPolished({
             >
               Google Ads Conversion ID
             </label>
-            <input
+            <Input
               type='text'
               id='googleAdsConversion'
               value={pixelData.googleAdsConversion}
@@ -743,7 +744,7 @@ export function SettingsPolished({
                 handlePixelInputChange('googleAdsConversion', e.target.value)
               }
               placeholder='AW-123456789'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
@@ -754,7 +755,7 @@ export function SettingsPolished({
             >
               TikTok Pixel ID
             </label>
-            <input
+            <Input
               type='text'
               id='tiktokPixel'
               value={pixelData.tiktokPixel}
@@ -762,7 +763,7 @@ export function SettingsPolished({
                 handlePixelInputChange('tiktokPixel', e.target.value)
               }
               placeholder='ABCDEF1234567890'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 

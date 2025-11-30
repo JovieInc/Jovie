@@ -3,11 +3,11 @@ import { Container } from '@/components/site/Container';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0D0E12] transition-colors'>
+    <div className='min-h-screen bg-white dark:bg-[#0D0E12] transition-colors grid-bg dark:grid-bg-dark'>
       <Container className='flex min-h-screen items-center justify-center'>
-        <div className='w-full max-w-xl mx-auto text-center px-4 py-24'>
+        <div className='w-full max-w-xl mx-auto text-center px-4 py-24 animate-fade-in-up'>
           <div className='mb-10 relative'>
-            <div className='absolute -inset-1 rounded-full bg-gradient-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
+            <div className='absolute -inset-1 rounded-full bg-linear-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
             <div className='relative inline-flex items-baseline gap-3'>
               <span className='text-6xl md:text-8xl font-semibold tracking-tight text-gray-900 dark:text-white'>
                 404

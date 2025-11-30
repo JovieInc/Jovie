@@ -74,13 +74,18 @@ export async function toggleCreatorVerifiedAction(
   const isVerified =
     typeof nextVerified === 'string' ? nextVerified === 'true' : true;
 
-  await db
+  const [updatedProfile] = await db
     .update(creatorProfiles)
     .set({
       isVerified,
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profileId));
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  if (updatedProfile?.usernameNormalized) {
+    revalidatePath(`/${updatedProfile.usernameNormalized}`);
+  }
 
   revalidatePath('/admin');
 }
@@ -97,13 +102,18 @@ export async function updateCreatorAvatarAsAdmin(
 
   const sanitizedAvatarUrl = validateAvatarUrl(avatarUrl);
 
-  await db
+  const [updatedProfile] = await db
     .update(creatorProfiles)
     .set({
       avatarUrl: sanitizedAvatarUrl,
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profileId));
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  if (updatedProfile?.usernameNormalized) {
+    revalidatePath(`/${updatedProfile.usernameNormalized}`);
+  }
 
   revalidatePath('/admin');
 }

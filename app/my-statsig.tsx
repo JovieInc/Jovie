@@ -4,7 +4,7 @@ import { LogLevel, StatsigProvider } from '@statsig/react-bindings';
 import { StatsigSessionReplayPlugin } from '@statsig/session-replay';
 import { usePathname } from 'next/navigation';
 import React from 'react';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 
 export interface MyStatsigProps {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ export interface MyStatsigProps {
 }
 
 export function MyStatsig({ children, userId }: MyStatsigProps) {
-  const sdkKey = env.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
+  const sdkKey = publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY;
   const pathname = usePathname();
 
   const user = React.useMemo(

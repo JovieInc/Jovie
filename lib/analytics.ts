@@ -1,6 +1,6 @@
 'use client';
 
-import { env as publicEnv } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import { logger } from '@/lib/utils/logger';
 
 type AnalyticsKind = 'event' | 'page' | 'identify';

@@ -15,12 +15,8 @@ export default function ClerkAuth() {
   return (
     <>
       <SignedOut>
-        <SignInButton mode='redirect'>
-          Sign In
-        </SignInButton>
-        <SignUpButton mode='redirect'>
-          Sign Up
-        </SignUpButton>
+        <SignInButton mode='redirect'>Sign In</SignInButton>
+        <SignUpButton mode='redirect'>Sign Up</SignUpButton>
       </SignedOut>
       <SignedIn>
         <UserButton />

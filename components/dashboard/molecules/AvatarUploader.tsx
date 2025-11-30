@@ -22,6 +22,11 @@ interface AvatarUploaderProps {
   onStatusChange?: (result: UploadResult) => void;
   className?: string;
   initialUrl?: string;
+  /**
+   * Optional file provided by a parent component to kick off an upload
+   * programmatically (e.g. dropping a file on an avatar thumbnail).
+   */
+  autoStartFile?: File | null;
 }
 
 export default function AvatarUploader({
@@ -29,6 +34,7 @@ export default function AvatarUploader({
   onStatusChange,
   className = '',
   initialUrl,
+  autoStartFile,
 }: AvatarUploaderProps) {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [preview, setPreview] = useState<string | null>(initialUrl || null);
@@ -121,6 +127,14 @@ export default function AvatarUploader({
     },
     [onUploaded, initialUrl, startStatusPolling]
   );
+
+  // When a parent provides a file (for example via drag-and-drop on an
+  // avatar), automatically start the upload flow using the same logic as the
+  // internal file input.
+  useEffect(() => {
+    if (!autoStartFile) return;
+    void handleFileSelect(autoStartFile);
+  }, [autoStartFile, handleFileSelect]);
 
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

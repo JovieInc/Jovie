@@ -81,6 +81,22 @@ const nextConfig = {
         value: 'origin-when-cross-origin',
       },
     ];
+
+    const isProdLike =
+      process.env.NODE_ENV === 'production' ||
+      process.env.VERCEL_ENV === 'production';
+
+    if (isProdLike) {
+      securityHeaders.push({
+        key: 'Strict-Transport-Security',
+        value: 'max-age=31536000; includeSubDomains; preload',
+      });
+    }
+
+    securityHeaders.push({
+      key: 'Permissions-Policy',
+      value: 'camera=(), microphone=(), geolocation=()',
+    });
     return [
       {
         // Ensure internal flags endpoint is never cached

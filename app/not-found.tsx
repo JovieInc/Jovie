@@ -5,12 +5,12 @@ import { Header } from '@/components/site/Header';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-white dark:bg-gray-900'>
+    <div className='min-h-screen bg-white dark:bg-gray-900 grid-bg dark:grid-bg-dark'>
       <Header />
 
       <main>
         <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
-          <div className='w-full max-w-xl mx-auto text-center px-4 py-16'>
+          <div className='w-full max-w-xl mx-auto text-center px-4 py-16 animate-fade-in-up'>
             <div className='mb-10 relative'>
               <div className='absolute -inset-1 rounded-full bg-gradient-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
               <div className='relative inline-flex items-baseline gap-3'>

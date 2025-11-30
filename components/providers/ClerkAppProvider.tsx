@@ -2,7 +2,7 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import React, { type ComponentProps } from 'react';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import { logger } from '@/lib/utils/logger';
 
 export interface ClerkAppProviderProps {
@@ -10,7 +10,7 @@ export interface ClerkAppProviderProps {
 }
 
 export function ClerkAppProvider({ children }: ClerkAppProviderProps) {
-  const publishableKey = env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   if (!publishableKey) {
     if (

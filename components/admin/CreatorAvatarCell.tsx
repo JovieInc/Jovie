@@ -8,10 +8,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@jovie/ui';
-import Image from 'next/image';
-import Link from 'next/link';
+import { Pencil } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
+import { Avatar } from '@/components/atoms/Avatar';
 import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
 
 export interface CreatorAvatarCellProps {
@@ -29,6 +29,7 @@ export function CreatorAvatarCell({
     avatarUrl ?? null
   );
   const [isOpen, setIsOpen] = useState(false);
+  const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -45,43 +46,50 @@ export function CreatorAvatarCell({
     });
   };
 
+  const handleAvatarDrop = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+
+    setDroppedFile(file);
+    setIsOpen(true);
+  };
+
+  const handleAvatarDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+  };
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    setIsOpen(nextOpen);
+    if (!nextOpen) {
+      setDroppedFile(null);
+    }
+  };
+
   return (
     <div className='flex items-center gap-2'>
-      <Link
-        href={`/${username}`}
-        aria-label={`Open profile for @${username}`}
-        className='inline-flex items-center justify-center'
-      >
-        <div className='relative h-8 w-8 overflow-hidden rounded-full border border-subtle bg-surface-2'>
-          {previewUrl ? (
-            <Image
+      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+        <DialogTrigger asChild>
+          <button
+            type='button'
+            aria-label={`Change avatar for @${username}`}
+            onDragOver={handleAvatarDragOver}
+            onDrop={handleAvatarDrop}
+            className='group relative inline-flex items-center justify-center focus-ring-transparent-offset'
+          >
+            <Avatar
               src={previewUrl}
               alt={`Avatar for @${username}`}
-              fill
-              sizes='32px'
-              className='object-cover'
+              name={username}
+              size='sm'
+              className='border border-subtle bg-surface-2'
             />
-          ) : (
-            <Image
-              src='/avatars/default-user.png'
-              alt={`Avatar for @${username}`}
-              fill
-              sizes='32px'
-              className='object-cover'
-            />
-          )}
-        </div>
-      </Link>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            aria-label={`Change avatar for @${username}`}
-          >
-            Edit
-          </Button>
+            <div className='pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100'>
+              <Pencil className='h-3 w-3 text-white' aria-hidden='true' />
+            </div>
+          </button>
         </DialogTrigger>
         <DialogContent className='max-w-md'>
           <DialogHeader>
@@ -89,6 +97,7 @@ export function CreatorAvatarCell({
           </DialogHeader>
           <AvatarUploader
             initialUrl={previewUrl ?? undefined}
+            autoStartFile={droppedFile}
             onStatusChange={result => {
               if (result.status === 'completed') {
                 const url = result.mediumUrl || result.blobUrl;
@@ -106,7 +115,7 @@ export function CreatorAvatarCell({
               type='button'
               variant='secondary'
               size='sm'
-              onClick={() => setIsOpen(false)}
+              onClick={() => handleOpenChange(false)}
               loading={isPending}
             >
               Close
