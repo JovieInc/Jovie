@@ -495,12 +495,20 @@ const MockedComponents = {
     return React.createElement('p', { ...props, ref });
   }),
 
-  // Input component (missing from previous mock)
+  // Input component
   Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
     (props, ref) => {
       return React.createElement('input', { ...props, ref });
     }
   ),
+
+  // Textarea component
+  Textarea: React.forwardRef<
+    HTMLTextAreaElement,
+    React.ComponentProps<'textarea'>
+  >((props, ref) => {
+    return React.createElement('textarea', { ...props, ref });
+  }),
 };
 
 // Add display names to all mocked components
@@ -549,6 +557,7 @@ MockedComponents.TransitionChild.displayName = 'MockedTransitionChild';
 MockedComponents.Description.displayName = 'MockedDescription';
 
 MockedComponents.Input.displayName = 'MockedInput';
+MockedComponents.Textarea.displayName = 'MockedTextarea';
 
 vi.mock('@headlessui/react', () => MockedComponents);
 

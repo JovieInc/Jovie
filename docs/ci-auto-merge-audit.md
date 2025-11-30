@@ -96,12 +96,12 @@ Updated `ci.yml` to be smarter about branch updates:
 1. **Enable GitHub Merge Queue** (when available):
 
    ```bash
-   # Would eliminate need for branch updating entirely
-   gh api repos/itstimwhite/Jovie/rulesets/7152953 \
-     --method PATCH \
-     --field rules[5].type=merge_queue \
-     --field rules[5].parameters.merge_method=squash
-   ```
+  # Would eliminate need for branch updating entirely
+  gh api repos/JovieInc/Jovie/rulesets/7152953 \
+    --method PATCH \
+    --field rules[5].type=merge_queue \
+    --field rules[5].parameters.merge_method=squash
+  ```
 
 2. **Add Auto-merge Labels Automatically**:
    - Dependabot PRs: Auto-labeled

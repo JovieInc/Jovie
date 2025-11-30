@@ -639,7 +639,7 @@ export function AppleStyleOnboardingForm({
 
       <a
         href='#main-content'
-        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 bg-black text-white dark:bg-white dark:text-black'
+        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
       >
         Skip to main content
       </a>

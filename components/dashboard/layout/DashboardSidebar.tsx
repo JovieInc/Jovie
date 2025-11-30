@@ -2,7 +2,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import type { ComponentPropsWithoutRef } from 'react';
 
-import { SidebarCollapseButton } from '@/components/atoms/SidebarCollapseButton';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import { EnhancedThemeToggle } from '@/components/dashboard/molecules/EnhancedThemeToggle';
@@ -12,6 +11,8 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -33,24 +34,26 @@ export function DashboardSidebar({
 
   return (
     <Sidebar
-      variant='inset'
+      variant='sidebar'
       collapsible='icon'
       className={className}
       {...props}
     >
       <SidebarHeader className='relative'>
-        <SidebarCollapseButton className='absolute right-2 top-3 hidden lg:inline-flex group-data-[collapsible=icon]:left-1/2 group-data-[collapsible=icon]:-translate-x-1/2 group-data-[collapsible=icon]:right-auto' />
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size='lg' asChild>
-              <Link href='/dashboard/overview'>
-                <div className='flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground'>
+              <Link
+                href='/dashboard/overview'
+                className='flex items-center gap-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+              >
+                <div className='flex items-center justify-center group-data-[collapsible=icon]:mx-auto'>
                   <Image
                     src='/brand/Jovie-Logo-Icon.svg'
                     alt='Jovie'
-                    width={16}
-                    height={16}
-                    className='size-4'
+                    width={20}
+                    height={20}
+                    className='h-6 w-6'
                   />
                 </div>
                 <div className='grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden'>
@@ -64,7 +67,11 @@ export function DashboardSidebar({
       </SidebarHeader>
 
       <SidebarContent>
-        <DashboardNav />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <DashboardNav />
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>

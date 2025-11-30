@@ -38,7 +38,7 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/itstimwhite/Jovie.git
+   git clone https://github.com/JovieInc/Jovie.git
    cd Jovie
    ```
 

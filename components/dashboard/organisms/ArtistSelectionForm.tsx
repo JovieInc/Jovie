@@ -185,10 +185,10 @@ export function ArtistSelectionForm() {
           <div className='w-full max-w-md'>
             {/* Header */}
             <div className='text-center mb-8'>
-              <h1 className='text-3xl font-semibold text-gray-900 dark:text-white mb-2 transition-colors'>
+              <h1 className='text-3xl font-semibold text-primary-token mb-2 transition-colors'>
                 Select Your Artist
               </h1>
-              <p className='text-gray-600 dark:text-white/70 text-lg transition-colors'>
+              <p className='text-secondary-token text-lg transition-colors'>
                 {pendingClaim
                   ? `We found "${pendingClaim.artistName}" in your Spotify. Is this you?`
                   : 'Search for your artist profile on Spotify to get started.'}
@@ -197,11 +197,9 @@ export function ArtistSelectionForm() {
 
             {/* Error display */}
             {state.error && (
-              <div className='bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6'>
+              <div className='bg-surface-2 border border-subtle rounded-lg p-4 mb-6'>
                 <div className='flex items-center justify-between'>
-                  <p className='text-red-800 dark:text-red-200 text-sm'>
-                    {state.error}
-                  </p>
+                  <p className='text-sm text-destructive'>{state.error}</p>
                   <Button
                     onClick={retryOperation}
                     variant='secondary'
@@ -215,7 +213,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='bg-white/80 dark:bg-white/5 backdrop-blur-sm border border-gray-200/50 dark:border-white/10 rounded-xl p-6 shadow-xl transition-colors'>
+            <div className='bg-surface-1 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-xl transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox
@@ -263,7 +261,7 @@ export function ArtistSelectionForm() {
 
             {/* Footer */}
             <div className='text-center mt-8'>
-              <p className='text-sm text-gray-500 dark:text-white/50 transition-colors'>
+              <p className='text-sm text-secondary-token transition-colors'>
                 You can always update your artist profile later
               </p>
             </div>

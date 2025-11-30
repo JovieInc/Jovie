@@ -17,10 +17,8 @@ export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
     <DashboardCard variant='default' data-testid='profile-link-card'>
       <div className='flex items-center justify-between'>
         <div>
-          <h3 className='font-medium'>Your Profile Link</h3>
-          <p className='mt-1 text-sm text-gray-500 dark:text-gray-400'>
-            {profileUrl}
-          </p>
+          <h3 className='font-medium text-primary-token'>Your Profile Link</h3>
+          <p className='mt-1 text-sm text-secondary-token'>{profileUrl}</p>
         </div>
         <div className='flex space-x-2'>
           <CopyToClipboardButton

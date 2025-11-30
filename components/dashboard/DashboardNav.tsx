@@ -139,7 +139,10 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
         return (
           <SidebarMenuItem key={item.id}>
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
-              <Link href={item.href} className='flex items-center gap-2'>
+              <Link
+                href={item.href}
+                className='flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+              >
                 <item.icon className='size-4' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
                   {item.name}
