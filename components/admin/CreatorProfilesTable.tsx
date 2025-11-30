@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { toggleCreatorVerifiedAction } from '@/app/admin/actions';
 
+import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
 import type {
   AdminCreatorProfileRow,
@@ -79,35 +80,10 @@ export function CreatorProfilesTable({
               className='max-w-xs'
             />
             <input type='hidden' name='page' value='1' />
-            <div className='flex items-center gap-2 text-xs text-secondary-token'>
-              <label className='flex items-center gap-1'>
-                <span>Sort</span>
-                <select
-                  name='sort'
-                  defaultValue={sort}
-                  className='h-8 rounded-md border border-input bg-background px-2 text-xs text-primary-token shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
-                >
-                  <option value='created_desc'>Newest</option>
-                  <option value='created_asc'>Oldest</option>
-                  <option value='verified_desc'>Verified first</option>
-                  <option value='verified_asc'>Unverified first</option>
-                  <option value='claimed_desc'>Claimed first</option>
-                  <option value='claimed_asc'>Unclaimed first</option>
-                </select>
-              </label>
-              <label className='flex items-center gap-1'>
-                <span>Per page</span>
-                <select
-                  name='pageSize'
-                  defaultValue={String(pageSize)}
-                  className='h-8 rounded-md border border-input bg-background px-2 text-xs text-primary-token shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
-                >
-                  <option value='10'>10</option>
-                  <option value='20'>20</option>
-                  <option value='50'>50</option>
-                </select>
-              </label>
-            </div>
+            <AdminCreatorFilters
+              initialSort={sort}
+              initialPageSize={pageSize}
+            />
             <Button type='submit' size='sm' variant='secondary'>
               Search
             </Button>
