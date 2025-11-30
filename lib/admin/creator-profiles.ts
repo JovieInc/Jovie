@@ -9,6 +9,7 @@ export interface AdminCreatorProfileRow {
   id: string;
   username: string;
   avatarUrl: string | null;
+  displayName?: string | null;
   isVerified: boolean;
   isClaimed: boolean;
   createdAt: Date | null;
@@ -108,6 +109,7 @@ export async function getAdminCreatorProfiles(
         id: creatorProfiles.id,
         username: creatorProfiles.username,
         avatarUrl: creatorProfiles.avatarUrl,
+        displayName: creatorProfiles.displayName,
         isVerified: creatorProfiles.isVerified,
         isClaimed: creatorProfiles.isClaimed,
         createdAt: creatorProfiles.createdAt,
@@ -131,6 +133,8 @@ export async function getAdminCreatorProfiles(
       id: row.id,
       username: row.username,
       avatarUrl: row.avatarUrl ?? null,
+      // displayName is optional in the admin listing but useful for detail views
+      displayName: (row as { displayName?: string | null }).displayName ?? null,
       isVerified: row.isVerified ?? false,
       isClaimed: row.isClaimed ?? false,
       createdAt: row.createdAt ?? null,

@@ -4,6 +4,7 @@ import { WalletIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { Input } from '@/components/atoms/Input';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -105,14 +106,15 @@ export function DashboardTipping() {
               </label>
               <div className='flex items-center'>
                 <span className='text-sm text-secondary-token mr-1'>@</span>
-                <input
+                <Input
                   type='text'
                   id='venmo-handle'
                   value={venmoHandle}
                   onChange={e => setVenmoHandle(e.target.value)}
                   placeholder='your-username'
-                  className='flex-1 rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-0'
                   autoFocus
+                  className='flex-1'
+                  inputClassName='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-0'
                 />
               </div>
               <p className='text-xs text-secondary-token mt-2'>

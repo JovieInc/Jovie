@@ -6,35 +6,12 @@ import {
   CardTitle,
 } from '@jovie/ui';
 import { ArrowUpRight } from 'lucide-react';
+import type { AdminUsagePoint } from '@/lib/admin/overview';
 
 type ChartPoint = {
   label: string;
   value: number;
 };
-
-// TODO: replace static chart data with real timeseries from analytics.
-const chartData: ChartPoint[] = [
-  { label: 'Day 1', value: 31000 },
-  { label: 'Day 2', value: 33840 },
-  { label: 'Day 3', value: 35520 },
-  { label: 'Day 4', value: 33210 },
-  { label: 'Day 5', value: 36880 },
-  { label: 'Day 6', value: 37440 },
-  { label: 'Day 7', value: 39220 },
-  { label: 'Day 8', value: 40110 },
-  { label: 'Day 9', value: 39540 },
-  { label: 'Day 10', value: 40880 },
-  { label: 'Day 11', value: 42200 },
-  { label: 'Day 12', value: 43120 },
-  { label: 'Day 13', value: 43950 },
-  { label: 'Day 14', value: 44780 },
-];
-
-const maxValue = Math.max(...chartData.map(point => point.value));
-const valueRange = Math.max(
-  maxValue - Math.min(...chartData.map(point => point.value)),
-  1
-);
 
 function buildPolyline(
   points: ChartPoint[],
@@ -52,20 +29,53 @@ function buildPolyline(
     .join(' ');
 }
 
-const polylinePoints = buildPolyline(chartData, maxValue, valueRange);
+interface MetricsChartProps {
+  points: AdminUsagePoint[];
+}
 
-export function MetricsChart() {
+export function MetricsChart({ points }: MetricsChartProps) {
+  const chartData: ChartPoint[] = points.map(point => ({
+    label: point.label,
+    value: point.value,
+  }));
+
+  if (chartData.length === 0) {
+    return (
+      <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
+        <CardHeader className='flex flex-row items-start justify-between'>
+          <div>
+            <CardTitle className='text-lg'>Daily active users</CardTitle>
+            <CardDescription>Last 14 days</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className='space-y-4'>
+          <p className='text-sm text-secondary-token'>
+            No usage data available yet.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const maxValue = Math.max(...chartData.map(point => point.value));
+  const valueRange = Math.max(
+    maxValue - Math.min(...chartData.map(point => point.value)),
+    1
+  );
+
+  const polylinePoints = buildPolyline(chartData, maxValue, valueRange);
+
   const latest = chartData[chartData.length - 1];
   const start = chartData[0];
   const delta = latest.value - start.value;
-  const deltaPct = (delta / start.value) * 100;
+  const deltaPct = start.value > 0 ? (delta / start.value) * 100 : 0;
 
   return (
     <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
       <CardHeader className='flex flex-row items-start justify-between'>
         <div>
           <CardTitle className='text-lg'>Daily active users</CardTitle>
-          <CardDescription>Last 14 days · mock data</CardDescription>
+          <CardDescription>Last 14 days</CardDescription>
         </div>
         <div className='flex items-center gap-2 rounded-full border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-300'>
           <ArrowUpRight className='size-4' aria-hidden />

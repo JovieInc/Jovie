@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import React from 'react';
+import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
@@ -75,7 +75,7 @@ function renderContent(
       );
 
     default: // 'profile' mode
-      // Only show the Listen Now button if the artist has streaming platforms configured
+      // Only show the Listen Now / notifications CTA if the artist has streaming platforms configured
       const hasStreamingPlatforms =
         artist.spotify_url || artist.apple_music_url || artist.youtube_url;
 
@@ -95,13 +95,7 @@ function renderContent(
 
       return (
         <div className='space-y-4'>
-          <Link
-            href={`/${artist.handle}?mode=listen`}
-            prefetch
-            className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold text-white bg-black hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-100 rounded-xl transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black dark:focus-visible:ring-white focus-visible:ring-offset-2'
-          >
-            Listen Now
-          </Link>
+          <ArtistNotificationsCTA artist={artist} variant='link' />
         </div>
       );
   }

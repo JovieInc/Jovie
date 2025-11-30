@@ -55,6 +55,34 @@ test.describe('Profile smoke tests', () => {
     await expect(dspButtons.first()).toBeVisible({ timeout: 10000 });
   });
 
+  // Test listen mode back button behavior
+  test('listen mode back button returns to profile', async ({ page }) => {
+    // Navigate directly to listen mode
+    await page.goto('/taylorswift?mode=listen', {
+      waitUntil: 'domcontentloaded',
+    });
+
+    // Confirm we are in listen mode
+    await expect(page).toHaveURL(/\/taylorswift\?mode=listen/);
+
+    const backButton = page
+      .locator('button[aria-label="Back to profile"]')
+      .first();
+
+    await expect(backButton).toBeVisible({ timeout: 10000 });
+
+    // Click back button
+    await backButton.click();
+
+    // Should navigate back to the base profile URL
+    await expect(page).toHaveURL(/\/taylorswift$/);
+
+    // Back button should no longer be present once profile mode is active
+    await expect(
+      page.locator('button[aria-label="Back to profile"]')
+    ).toHaveCount(0);
+  });
+
   // Test tip mode functionality
   test('tip mode displays tipping interface', async ({ page }) => {
     // Navigate directly to tip mode

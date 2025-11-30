@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { CreatorProfilesTable } from '@/components/admin/CreatorProfilesTable';
+import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
 import {
   type AdminCreatorProfilesSort,
   getAdminCreatorProfiles,
@@ -70,7 +70,7 @@ export default async function AdminUsersPage({
         </p>
       </header>
 
-      <CreatorProfilesTable
+      <AdminCreatorProfilesWithSidebar
         profiles={profiles}
         page={currentPage}
         pageSize={resolvedPageSize}

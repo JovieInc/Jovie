@@ -5,8 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
+import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
-import { CTAButton } from '@/components/ui/CTAButton';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { Artist, LegacySocialLink } from '@/types/db';
@@ -152,16 +152,7 @@ function renderContent(
           }
         >
           <div className='space-y-4'>
-            <CTAButton
-              href={`/${artist.handle}?mode=listen`}
-              variant='primary'
-              size='lg'
-              className='w-full'
-              isLoading={isNavigating}
-              onClick={() => setIsNavigating(true)}
-            >
-              Listen Now
-            </CTAButton>
+            <ArtistNotificationsCTA artist={artist} variant='button' />
           </div>
         </motion.div>
       );

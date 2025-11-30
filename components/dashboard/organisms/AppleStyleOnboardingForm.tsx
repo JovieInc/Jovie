@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
+import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { identify, track } from '@/lib/analytics';
@@ -421,13 +422,13 @@ export function AppleStyleOnboardingForm({
                 >
                   Your name
                 </label>
-                <input
+                <Input
                   id='display-name'
                   type='text'
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   placeholder='Your full name'
-                  className='w-full px-4 py-4 text-lg bg-(--panel) border-2 border-(--border) rounded-xl focus-ring text-(--fg) transition-all'
+                  inputClassName='w-full px-4 py-4 text-lg bg-(--panel) border-2 border-(--border) rounded-xl focus-ring text-(--fg) transition-all'
                   maxLength={50}
                   autoComplete='name'
                 />
@@ -473,21 +474,21 @@ export function AppleStyleOnboardingForm({
                   Enter your desired handle
                 </label>
                 <div className='relative'>
-                  <input
+                  <Input
                     id='handle-input'
                     aria-label='Enter your desired handle'
                     type='text'
                     value={handleInput}
                     onChange={e => setHandleInput(e.target.value.toLowerCase())}
                     placeholder='yourhandle'
-                    className={`w-full px-4 py-4 text-lg bg-(--panel) border-2 rounded-xl transition-all ${
+                    autoComplete='username'
+                    inputClassName={`w-full px-4 py-4 text-lg bg-(--panel) border-2 rounded-xl transition-all ${
                       handleValidation.error
                         ? 'border-red-500'
                         : handleValidation.available
                           ? 'border-green-500'
                           : 'border-(--border)'
                     } focus-ring text-(--fg)`}
-                    autoComplete='username'
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>

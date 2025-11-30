@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { type CSSProperties, useEffect, useState, useTransition } from 'react';
 
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
@@ -98,7 +98,15 @@ export default function DashboardLayoutClient({
       <PendingClaimRunner />
       <PendingClaimHandler />
 
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
+      <SidebarProvider
+        open={sidebarOpen}
+        onOpenChange={handleOpenChange}
+        style={
+          {
+            '--sidebar-width-icon': '4.25rem',
+          } as CSSProperties
+        }
+      >
         <div className='flex min-h-screen w-full overflow-hidden bg-base'>
           <DashboardSidebar />
           <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
