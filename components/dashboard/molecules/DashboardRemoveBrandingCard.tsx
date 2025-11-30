@@ -19,7 +19,6 @@ export function DashboardRemoveBrandingCard({
       <div className='pointer-events-none absolute inset-0'>
         <div className='absolute inset-0 bg-linear-to-br from-transparent via-sidebar-accent/5 to-sidebar-accent/10' />
       </div>
-
       <div className='relative space-y-3'>
         <div className='flex items-start justify-between gap-2'>
           <div className='space-y-1'>
