@@ -1,0 +1,83 @@
+name: Neon Ephemeral Branch Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neon-branch-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  delete-neon-branch:
+    name: Delete Neon branch for closed PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+
+    steps:
+      - name: Validate Neon configuration
+        id: validate
+        run: |
+          if [ -z "${NEON_API_KEY}" ] || [ -z "${NEON_PROJECT_ID}" ]; then
+            echo "Neon API credentials missing; skipping cleanup." \
+              "(NEON_API_KEY/NEON_PROJECT_ID)" >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Compute sanitized Neon branch name
+        id: sanitize
+        if: steps.validate.outputs.skip != 'true'
+        run: |
+          RAW="${{ github.event.pull_request.head.ref }}"
+          # Reuse the same sanitization logic as the neon-db job in ci.yml
+          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+
+          if [ -z "$SANITIZED" ]; then
+            echo "No sanitized branch name derived from '$RAW'; skipping." >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Neon branch candidate: $SANITIZED"
+            echo "name=$SANITIZED" >> "$GITHUB_OUTPUT"
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Guard against deleting long-lived Neon branches
+        id: guard
+        if: steps.sanitize.outputs.skip != 'true'
+        run: |
+          NAME="${{ steps.sanitize.outputs.name }}"
+          case "$NAME" in
+            production|main)
+              echo "Protected Neon branch '$NAME'; skipping delete." >&2
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "Ephemeral Neon branch '$NAME' eligible for cleanup."
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Setup pnpm
+        if: steps.guard.outputs.skip != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Delete Neon branch
+        if: steps.guard.outputs.skip != 'true'
+        run: |
+          BRANCH_NAME="${{ steps.sanitize.outputs.name }}"
+          echo "Attempting to delete Neon branch '$BRANCH_NAME' in project '$NEON_PROJECT_ID'..."
+          # Use neonctl for branch deletion; ignore if branch does not exist
+          pnpm dlx neonctl branches delete "$BRANCH_NAME" --project-id "$NEON_PROJECT_ID" || {
+            echo "Neon branch '$BRANCH_NAME' not found or already deleted; ignoring." >&2
+          }

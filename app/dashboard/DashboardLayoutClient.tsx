@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { type CSSProperties, useEffect, useState, useTransition } from 'react';
 
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
@@ -10,12 +10,10 @@ import {
   DashboardTopBar,
 } from '@/components/dashboard/layout/DashboardTopBar';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
-// import { Button } from '@/components/ui/Button';
-// import { Logo } from '@/components/ui/Logo';
-import { SidebarInset, SidebarProvider } from '@/components/ui/Sidebar';
-// Dropdown menu imports removed until used
+import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import type { DashboardData } from './actions';
+import { DashboardDataProvider } from './DashboardDataContext';
 
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
@@ -96,24 +94,30 @@ export default function DashboardLayoutClient({
   }, [dashboardData.sidebarCollapsed]);
 
   return (
-    <>
+    <DashboardDataProvider value={dashboardData}>
       <PendingClaimRunner />
       <PendingClaimHandler />
 
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className='min-h-screen bg-base'>
+      <SidebarProvider
+        open={sidebarOpen}
+        onOpenChange={handleOpenChange}
+        style={
+          {
+            '--sidebar-width': '14rem',
+            '--sidebar-width-icon': '3.25rem',
+          } as CSSProperties
+        }
+      >
+        <div className='flex min-h-screen w-full overflow-hidden bg-base'>
           <DashboardSidebar />
-
-          <SidebarInset>
+          <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
             <DashboardTopBar breadcrumbs={crumbs} />
-            <div className='flex flex-1 flex-col gap-4 p-4 lg:p-6'>
-              <div className='container mx-auto w-full max-w-5xl px-0'>
-                {children}
-              </div>
-            </div>
+            <main className='flex-1 min-h-0 overflow-auto'>
+              <div className='container mx-auto max-w-7xl p-6'>{children}</div>
+            </main>
           </SidebarInset>
         </div>
       </SidebarProvider>
-    </>
+    </DashboardDataProvider>
   );
 }

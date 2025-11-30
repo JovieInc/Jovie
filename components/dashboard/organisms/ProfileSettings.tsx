@@ -3,6 +3,8 @@
 import { ChevronDownIcon } from '@heroicons/react/16/solid';
 import { PhotoIcon, UserCircleIcon } from '@heroicons/react/24/solid';
 import { useState } from 'react';
+import { Input } from '@/components/atoms/Input';
+import { Textarea } from '@/components/atoms/Textarea';
 import { APP_URL } from '@/constants/app';
 import type { Artist } from '@/types/db';
 
@@ -100,7 +102,7 @@ export function ProfileSettings({
                   <div className='shrink-0 text-base text-secondary select-none sm:text-sm/6'>
                     {appDomain}/
                   </div>
-                  <input
+                  <Input
                     id='username'
                     name='username'
                     type='text'
@@ -109,7 +111,7 @@ export function ProfileSettings({
                     onChange={e =>
                       handleInputChange('username', e.target.value)
                     }
-                    className='block min-w-0 grow bg-transparent py-1.5 pr-3 pl-1 text-base text-primary placeholder:text-secondary focus-visible:outline-none sm:text-sm/6'
+                    inputClassName='block min-w-0 grow bg-transparent py-1.5 pr-3 pl-1 text-base text-primary placeholder:text-secondary focus-visible:outline-none sm:text-sm/6'
                   />
                 </div>
               </div>
@@ -123,7 +125,7 @@ export function ProfileSettings({
                 Bio
               </label>
               <div className='mt-2'>
-                <textarea
+                <Textarea
                   id='about'
                   name='about'
                   rows={3}
@@ -215,7 +217,7 @@ export function ProfileSettings({
                 Display name
               </label>
               <div className='mt-2'>
-                <input
+                <Input
                   id='first-name'
                   name='first-name'
                   type='text'
@@ -224,7 +226,7 @@ export function ProfileSettings({
                   onChange={e =>
                     handleInputChange('displayName', e.target.value)
                   }
-                  className='block w-full rounded-md bg-surface-1 px-3 py-1.5 text-base text-primary placeholder:text-secondary border border-subtle focus-visible:outline-none focus-visible:ring-2 ring-accent sm:text-sm/6'
+                  inputClassName='block w-full rounded-md bg-surface-1 px-3 py-1.5 text-base text-primary placeholder:text-secondary border border-subtle focus-visible:outline-none focus-visible:ring-2 ring-accent sm:text-sm/6'
                 />
               </div>
             </div>
@@ -237,12 +239,11 @@ export function ProfileSettings({
                 Email address
               </label>
               <div className='mt-2'>
-                <input
+                <Input
                   id='email'
                   name='email'
                   type='email'
                   autoComplete='email'
-                  className='block w-full rounded-md bg-surface-1 px-3 py-1.5 text-base text-primary placeholder:text-secondary border border-subtle focus-visible:outline-none focus-visible:ring-2 ring-accent sm:text-sm/6'
                 />
               </div>
             </div>
@@ -316,14 +317,14 @@ export function ProfileSettings({
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:checked]:opacity-100'
+                          className='opacity-0 group-has-checked:opacity-100'
                         />
                         <path
                           d='M3 7H11'
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:indeterminate]:opacity-100'
+                          className='opacity-0 group-has-indeterminate:opacity-100'
                         />
                       </svg>
                     </div>
@@ -361,14 +362,14 @@ export function ProfileSettings({
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:checked]:opacity-100'
+                          className='opacity-0 group-has-checked:opacity-100'
                         />
                         <path
                           d='M3 7H11'
                           strokeWidth={2}
                           strokeLinecap='round'
                           strokeLinejoin='round'
-                          className='opacity-0 group-has-[:indeterminate]:opacity-100'
+                          className='opacity-0 group-has-indeterminate:opacity-100'
                         />
                       </svg>
                     </div>

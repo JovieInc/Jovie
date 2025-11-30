@@ -11,11 +11,11 @@ export function ParallaxGrid() {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!grid) return;
-      
+
       const { left, top, width, height } = grid.getBoundingClientRect();
       const x = (e.clientX - left) / width;
       const y = (e.clientY - top) / height;
-      
+
       grid.style.setProperty('--mouse-x', x.toString());
       grid.style.setProperty('--mouse-y', y.toString());
     };
@@ -25,9 +25,9 @@ export function ParallaxGrid() {
   }, []);
 
   return (
-    <div 
+    <div
       ref={gridRef}
-      className="fixed inset-0 -z-10 overflow-hidden pointer-events-none"
+      className='fixed inset-0 -z-10 overflow-hidden pointer-events-none'
       style={{
         backgroundImage: `
           linear-gradient(to right, rgba(200, 200, 200, 0.03) 1px, transparent 1px),
@@ -38,8 +38,8 @@ export function ParallaxGrid() {
         transformStyle: 'preserve-3d',
       }}
     >
-      <div 
-        className="absolute inset-0 transition-transform duration-300"
+      <div
+        className='absolute inset-0 transition-transform duration-300'
         style={{
           backgroundImage: `
             radial-gradient(

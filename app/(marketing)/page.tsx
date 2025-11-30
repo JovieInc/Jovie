@@ -1,21 +1,23 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
 import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
+import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 // Use a client wrapper for the Featured Artists carousel to avoid ssr:false in a Server Component
-const NewFeaturesSection = dynamic(
-  () => import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
+const NewFeaturesSection = dynamic(() =>
+  import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
 );
-const NewUpgradeTeaser = dynamic(
-  () => import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
+const NewUpgradeTeaser = dynamic(() =>
+  import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
 );
-const NewHowItWorks = dynamic(
-  () => import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
+const NewHowItWorks = dynamic(() =>
+  import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
 );
-const NewPreFooterCTA = dynamic(
-  () => import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
+const NewPreFooterCTA = dynamic(() =>
+  import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
 );
 
 // Root layout handles dynamic rendering
@@ -151,7 +153,24 @@ export default function HomePage() {
         <NewHomeHero />
 
         {/* 2. Artist carousel (visual proof, not endorsement) */}
-        <FeaturedArtistsClient />
+        <Suspense
+          fallback={
+            <section className='py-10 bg-white dark:bg-black'>
+              <Container>
+                <div className='text-center mb-6'>
+                  <p className='text-sm font-medium text-gray-600 dark:text-gray-400'>
+                    Explore example Jovie profiles
+                  </p>
+                </div>
+                <div className='flex items-center justify-center py-6'>
+                  <div className='h-6 w-6 rounded-full border-2 border-gray-300 border-t-transparent animate-spin' />
+                </div>
+              </Container>
+            </section>
+          }
+        >
+          <FeaturedArtistsClient />
+        </Suspense>
 
         {/* 3. Features (what Free includes, forever) */}
         <NewFeaturesSection />

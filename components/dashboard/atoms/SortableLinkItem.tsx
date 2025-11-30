@@ -4,8 +4,8 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import React, { forwardRef, KeyboardEvent, useCallback, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { Input } from '@/components/ui/Input';
 import type { LinkItem } from '@/types/links';
 
 interface SortableLinkItemProps {
@@ -199,7 +199,7 @@ export const SortableLinkItem = forwardRef<
             disabled={disabled}
             className={`
             cursor-grab active:cursor-grabbing flex items-center justify-center
-            w-5 h-5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300
+            w-5 h-5 text-tertiary-token hover:text-secondary-token
             transition-opacity duration-200
             ${isHovered ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
           `}
@@ -258,7 +258,7 @@ export const SortableLinkItem = forwardRef<
               <button
                 onClick={handleTitleClick}
                 disabled={disabled}
-                className='text-left text-sm font-medium text-gray-900 dark:text-gray-100 hover:text-gray-700 dark:hover:text-gray-300 transition-colors truncate w-full'
+                className='text-left text-sm font-medium text-primary-token hover:text-secondary-token transition-colors truncate w-full'
                 aria-label={`Edit ${link.title}`}
               >
                 {link.title}
@@ -267,13 +267,11 @@ export const SortableLinkItem = forwardRef<
 
             {/* Platform and URL */}
             <div className='flex items-center gap-2 mt-1' aria-hidden='true'>
-              <span className='text-xs text-gray-500 dark:text-gray-400'>
+              <span className='text-xs text-secondary-token'>
                 {link.platform.name}
               </span>
-              <span className='text-xs text-gray-400 dark:text-gray-500'>
-                •
-              </span>
-              <span className='text-xs text-gray-400 dark:text-gray-500 truncate'>
+              <span className='text-xs text-tertiary-token'>•</span>
+              <span className='text-xs text-tertiary-token truncate'>
                 {link.normalizedUrl.replace(/^https?:\/\//, '')}
               </span>
             </div>

@@ -9,14 +9,18 @@ import {
   SparklesIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
+import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useCallback, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
+import { Textarea } from '@/components/atoms/Textarea';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/AccountSettingsSection';
-import { AvatarUpload } from '@/components/ui/AvatarUpload';
-import { useToast } from '@/components/ui/ToastContainer';
+import { useToast } from '@/components/molecules/ToastContainer';
+import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
@@ -85,6 +89,9 @@ export function SettingsPolished({
 
   const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
   const [isMarketingSaving, setIsMarketingSaving] = useState(false);
+
+  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+  const notificationsEnabled = notificationsGate.value;
 
   const [pixelData, setPixelData] = useState({
     facebookPixel: '',
@@ -454,7 +461,7 @@ export function SettingsPolished({
                   <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary text-sm select-none'>
                     {appDomain}/
                   </span>
-                  <input
+                  <Input
                     type='text'
                     name='username'
                     id='username'
@@ -462,8 +469,9 @@ export function SettingsPolished({
                     onChange={e =>
                       handleInputChange('username', e.target.value)
                     }
-                    className='flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm transition-colors'
                     placeholder='yourname'
+                    className='flex-1 min-w-0'
+                    inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm transition-colors'
                   />
                 </div>
               </div>
@@ -477,14 +485,14 @@ export function SettingsPolished({
               >
                 Display Name
               </label>
-              <input
+              <Input
                 type='text'
                 name='displayName'
                 id='displayName'
                 value={formData.displayName}
                 onChange={e => handleInputChange('displayName', e.target.value)}
-                className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
                 placeholder='The name your fans will see'
+                inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
               />
             </div>
           </div>
@@ -681,7 +689,7 @@ export function SettingsPolished({
         {hideBranding && (
           <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
             <div className='flex items-start gap-3'>
-              <SparklesIcon className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0' />
+              <SparklesIcon className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0' />
               <div>
                 <p className='text-sm font-medium text-green-800 dark:text-green-200'>
                   Branding Hidden
@@ -711,7 +719,7 @@ export function SettingsPolished({
             >
               Facebook Pixel ID
             </label>
-            <input
+            <Input
               type='text'
               id='facebookPixel'
               value={pixelData.facebookPixel}
@@ -719,7 +727,7 @@ export function SettingsPolished({
                 handlePixelInputChange('facebookPixel', e.target.value)
               }
               placeholder='1234567890'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
@@ -730,7 +738,7 @@ export function SettingsPolished({
             >
               Google Ads Conversion ID
             </label>
-            <input
+            <Input
               type='text'
               id='googleAdsConversion'
               value={pixelData.googleAdsConversion}
@@ -738,7 +746,7 @@ export function SettingsPolished({
                 handlePixelInputChange('googleAdsConversion', e.target.value)
               }
               placeholder='AW-123456789'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
@@ -749,7 +757,7 @@ export function SettingsPolished({
             >
               TikTok Pixel ID
             </label>
-            <input
+            <Input
               type='text'
               id='tiktokPixel'
               value={pixelData.tiktokPixel}
@@ -757,7 +765,7 @@ export function SettingsPolished({
                 handlePixelInputChange('tiktokPixel', e.target.value)
               }
               placeholder='ABCDEF1234567890'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
@@ -768,7 +776,7 @@ export function SettingsPolished({
             >
               Additional Snippet
             </label>
-            <textarea
+            <Textarea
               id='customPixel'
               rows={4}
               value={pixelData.customPixel}
@@ -893,13 +901,17 @@ export function SettingsPolished({
   return (
     <div className='flex gap-8'>
       {/* Apple-style Navigation Sidebar */}
-      <div className='w-64 flex-shrink-0'>
+      <div className='w-64 shrink-0'>
         <div className='sticky top-8'>
           <nav className='space-y-1'>
             {settingsNavigation.map(item => {
               const Icon = item.icon;
               const isActive = currentSection === item.id;
               const isLocked = item.isPro && !isPro;
+
+              if (item.id === 'notifications' && !notificationsEnabled) {
+                return null;
+              }
 
               return (
                 <button
@@ -919,7 +931,7 @@ export function SettingsPolished({
                     isLocked && 'opacity-60'
                   )}
                 >
-                  <Icon className='h-5 w-5 flex-shrink-0' />
+                  <Icon className='h-5 w-5 shrink-0' />
                   <span className='flex-1'>{item.name}</span>
                   {isLocked && (
                     <ShieldCheckIcon className='h-4 w-4 text-orange-400' />
@@ -983,7 +995,21 @@ export function SettingsPolished({
                 Manage your email preferences and communication settings.
               </p>
             </div>
-            {renderNotificationsSection()}
+            {notificationsEnabled ? (
+              renderNotificationsSection()
+            ) : (
+              <DashboardCard variant='settings'>
+                <div className='text-center py-4'>
+                  <h3 className='text-lg font-medium text-primary mb-2'>
+                    Notifications are not available yet
+                  </h3>
+                  <p className='text-sm text-secondary'>
+                    We&apos;re focused on getting the core Jovie profile
+                    experience right before launching notifications.
+                  </p>
+                </div>
+              </DashboardCard>
+            )}
           </section>
 
           {/* Pro Features */}

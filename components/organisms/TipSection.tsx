@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { LoadingButton } from '@/components/molecules/LoadingButton';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { useToast } from '@/components/ui/ToastContainer';
+import { useToast } from '@/components/molecules/ToastContainer';
 
 interface TipSectionProps {
   handle: string;

@@ -4,7 +4,7 @@
 
 ### Preview Deployment Workflow
 
-The `consolidated-vercel-preview.yml` workflow handles Vercel preview deployments for pull requests and feature branches.
+Vercel preview deployments for pull requests and feature branches are handled by the `ci.yml` workflow via the `ci-pr-vercel-preview` and `deploy` jobs.
 
 #### Features:
 
@@ -16,7 +16,7 @@ The `consolidated-vercel-preview.yml` workflow handles Vercel preview deployment
 #### Triggers:
 
 - Pull request events (opened, reopened, synchronize)
-- Push events to non-production, non-preview branches
+- Push events to non-production, non-main branches
 - Manual workflow dispatch with PR number input
 
 #### Secrets:
@@ -28,4 +28,4 @@ The `consolidated-vercel-preview.yml` workflow handles Vercel preview deployment
 
 ## CI and Merge Queue
 
-The main CI workflow `ci.yml` is the gatekeeper for PRs to `preview` and `production`. It includes fast checks (typecheck, lint) and full CI (build, unit, E2E). To support GitHub Merge Queue, `ci.yml` listens to the `merge_group` event so required status checks re-run in-queue before merging.
+The main CI workflow `ci.yml` is the gatekeeper for PRs to `main` and `production`. It includes fast checks (typecheck, lint) and full CI (build, unit, E2E). To support GitHub Merge Queue, `ci.yml` listens to the `merge_group` event so required status checks re-run in-queue before merging.

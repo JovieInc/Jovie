@@ -1,5 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
+import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
 
 /**
  * E2E Test: Onboarding Happy Path
@@ -44,11 +45,13 @@ test.describe('Onboarding Happy Path', () => {
     }
   });
 
-  test('programmatic sign-in → onboarding → dashboard', async ({ page }) => {
+  test('programmatic session → onboarding (name → handle → done) → dashboard', async ({
+    page,
+  }) => {
     // Set timeout to 60 seconds as per requirement
     test.setTimeout(60_000);
 
-    // Setup Clerk testing token for programmatic authentication
+    // Setup Clerk testing token for programmatic authentication (bypasses bot protection)
     await setupClerkTestingToken({ page });
 
     // Step 1: Load homepage to initialize ClerkProvider
@@ -63,58 +66,13 @@ test.describe('Onboarding Happy Path', () => {
       { timeout: 10_000 }
     );
 
-    // Step 2: Programmatically sign in using Clerk's test mode
+    // Step 2: Create or reuse a test user session in Clerk test mode.
+    // In test mode, Clerk allows creating users/sessions without real OTP/password flows.
     const testEmail =
-      process.env.E2E_TEST_EMAIL || `playwright+${Date.now()}@example.com`;
-    const testPassword = process.env.E2E_TEST_PASSWORD || 'TestPassword123!';
+      process.env.E2E_TEST_EMAIL ||
+      `playwright+${Date.now().toString(36)}@example.com`;
 
-    await page.evaluate(
-      async ({ email, password }) => {
-        const clerk = (window as unknown as { Clerk: any }).Clerk;
-        if (!clerk) throw new Error('Clerk not initialized');
-
-        try {
-          // Try to sign in first (in case user already exists)
-          const signIn = await clerk.signIn?.create({
-            identifier: email,
-            password: password,
-          });
-
-          // If sign-in requires further steps, complete them
-          if (signIn?.status === 'needs_first_factor') {
-            await clerk.signIn?.attemptFirstFactor({
-              strategy: 'password',
-              password: password,
-            });
-          }
-
-          // Set the session as active
-          await clerk.setActive({
-            session:
-              signIn?.createdSessionId ||
-              clerk.client?.lastActiveSessionId ||
-              null,
-          });
-        } catch (signInError) {
-          // If sign-in fails, try to create a new user
-          console.log('Sign-in failed, attempting sign-up:', signInError);
-
-          const signUp = await clerk.signUp?.create({
-            emailAddress: email,
-            password: password,
-          });
-
-          // Complete sign-up and set session as active
-          await clerk.setActive({
-            session:
-              signUp?.createdSessionId ||
-              clerk.client?.lastActiveSessionId ||
-              null,
-          });
-        }
-      },
-      { email: testEmail, password: testPassword }
-    );
+    await createOrReuseTestUserSession(page, testEmail);
 
     // Verify authentication completed
     await page.waitForFunction(
@@ -134,7 +92,18 @@ test.describe('Onboarding Happy Path', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    // Step 4: Fill the onboarding form with a unique handle
+    // Step 4a: Name step - fill display name and continue
+    const nameInput = page.getByLabel('Your name');
+    await expect(nameInput).toBeVisible({ timeout: 5_000 });
+
+    const displayName = `Playwright User ${Date.now().toString(36)}`;
+    await nameInput.fill(displayName);
+
+    const continueButton = page.getByRole('button', { name: 'Continue' });
+    await expect(continueButton).toBeVisible({ timeout: 5_000 });
+    await continueButton.click();
+
+    // Step 4b: Handle step - claim an available handle
     const handleInput = page.getByLabel('Enter your desired handle');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
@@ -167,9 +136,9 @@ test.describe('Onboarding Happy Path', () => {
       )
       .toBe(true);
 
-    // Step 5: Submit form and wait for redirect to dashboard
+    // Step 5: Submit form and wait for redirect to dashboard overview
     await Promise.all([
-      page.waitForURL('**/dashboard', {
+      page.waitForURL('**/dashboard/overview', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       }),
@@ -199,7 +168,26 @@ test.describe('Onboarding Happy Path', () => {
       timeout: 5_000,
     });
 
-    // Optional: Verify we can access the profile page with the new handle
+    // Verify we can navigate to the Links page from the dashboard nav
+    const linksNav = page.getByRole('link', { name: 'Links' });
+    await expect(linksNav).toBeVisible({ timeout: 5_000 });
+
+    await Promise.all([
+      page.waitForURL('**/dashboard/links', {
+        timeout: 10_000,
+        waitUntil: 'domcontentloaded',
+      }),
+      linksNav.click(),
+    ]);
+
+    await expect(
+      page
+        .locator('h1, h2')
+        .filter({ hasText: /manage links/i })
+        .first()
+    ).toBeVisible({ timeout: 5_000 });
+
+    // Optional: Verify we can access the public profile page with the new handle
     await page.goto(`/${uniqueHandle}`, { waitUntil: 'domcontentloaded' });
     await expect(page).toHaveURL(new RegExp(`/${uniqueHandle}$`));
 
@@ -234,42 +222,12 @@ test.describe('Onboarding Happy Path', () => {
       { timeout: 10_000 }
     );
 
-    // Sign in with a test user that has already completed onboarding
-    // This assumes E2E_EXISTING_USER_EMAIL and E2E_EXISTING_USER_PASSWORD are set
-    const existingEmail = process.env.E2E_EXISTING_USER_EMAIL;
-    const existingPassword = process.env.E2E_EXISTING_USER_PASSWORD;
+    // Sign in with a test user that has already completed onboarding.
+    // We rely on backend data seeding so this user is treated as fully onboarded.
+    const existingEmail =
+      process.env.E2E_EXISTING_USER_EMAIL || 'existing-onboarded@example.com';
 
-    if (!existingEmail || !existingPassword) {
-      test.skip();
-      return;
-    }
-
-    await page.evaluate(
-      async ({ email, password }) => {
-        const clerk = (window as unknown as { Clerk: any }).Clerk;
-        if (!clerk) throw new Error('Clerk not initialized');
-
-        const signIn = await clerk.signIn?.create({
-          identifier: email,
-          password: password,
-        });
-
-        if (signIn?.status === 'needs_first_factor') {
-          await clerk.signIn?.attemptFirstFactor({
-            strategy: 'password',
-            password: password,
-          });
-        }
-
-        await clerk.setActive({
-          session:
-            signIn?.createdSessionId ||
-            clerk.client?.lastActiveSessionId ||
-            null,
-        });
-      },
-      { email: existingEmail, password: existingPassword }
-    );
+    await createOrReuseTestUserSession(page, existingEmail);
 
     // Verify authentication
     await page.waitForFunction(

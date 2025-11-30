@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { useRef, useState } from 'react';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
+import { FormField } from '@/components/molecules/FormField';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
   Artist,

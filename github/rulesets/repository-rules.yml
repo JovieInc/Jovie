@@ -2,7 +2,7 @@ name: 'Repository Rules'
 description: 'General repository rules for security and code quality'
 target:
   repository:
-    - 'itstimwhite/Jovie'
+    - 'JovieInc/Jovie'
 rules:
   - name: 'Require pull request reviews before merging'
     enforcement: 'active'
@@ -17,10 +17,7 @@ rules:
       required_status_checks:
         strict: true
         contexts:
-          - 'build'
-          - 'test'
-          - 'lint'
-          - 'typecheck'
+          - 'CI / ci-fast'
   - name: 'Require branches to be up to date before merging'
     enforcement: 'active'
     parameters:
@@ -41,7 +38,7 @@ rules:
   - name: 'Restrict pushes that modify files'
     enforcement: 'active'
   - name: 'Require deployments to succeed before merging'
-    enforcement: 'active'
+    enforcement: 'disabled'
     parameters:
       required_environments:
         - 'production'

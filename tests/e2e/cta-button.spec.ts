@@ -4,7 +4,7 @@ test.describe('CTAButton Component', () => {
   test('should render correctly and handle state changes', async ({ page }) => {
     // Navigate to the Storybook page for CTAButton
     await page.goto(
-      '/storybook/iframe.html?id=atoms-ctabutton--state-transitions'
+      '/storybook/iframe.html?id=ui-ctabutton--state-transitions'
     );
 
     // Wait for the component to be visible
@@ -34,7 +34,7 @@ test.describe('CTAButton Component', () => {
   }) => {
     // Navigate to the Storybook page for CTAButton
     await page.goto(
-      '/storybook/iframe.html?id=atoms-ctabutton--state-transitions'
+      '/storybook/iframe.html?id=ui-ctabutton--state-transitions'
     );
 
     // Get dimensions of idle button
@@ -70,7 +70,7 @@ test.describe('CTAButton Component', () => {
 
   test('should be keyboard navigable', async ({ page }) => {
     // Navigate to the Storybook page for CTAButton
-    await page.goto('/storybook/iframe.html?id=atoms-ctabutton--all-variants');
+    await page.goto('/storybook/iframe.html?id=ui-ctabutton--all-variants');
 
     // Focus the first button using keyboard navigation
     await page.keyboard.press('Tab');
@@ -102,19 +102,16 @@ test.describe('CTAButton Component', () => {
 
     // Navigate to the Storybook page for CTAButton
     await page.goto(
-      '/storybook/iframe.html?id=atoms-ctabutton--reduced-motion'
+      '/storybook/iframe.html?id=ui-ctabutton--state-transitions'
     );
 
-    // Check that the button has the reduced motion attribute
-    const button = await page.$('a[data-reduced-motion="true"]');
+    const button = await page.$('[data-reduced-motion="true"]');
     expect(button).not.toBeNull();
   });
 
   test('should handle theme changes correctly', async ({ page }) => {
     // Navigate to the Storybook page for CTAButton
-    await page.goto(
-      '/storybook/iframe.html?id=atoms-ctabutton--theme-comparison'
-    );
+    await page.goto('/storybook/iframe.html?id=ui-ctabutton--theme-comparison');
 
     // Check light theme button
     const lightThemeSection = await page.$('.bg-white');

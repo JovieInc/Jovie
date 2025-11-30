@@ -1,0 +1,518 @@
+/**
+ * 🔒 CRITICAL IMPORTS - DO NOT MODIFY ORDER OR PATHS
+ *
+ * ❌ DO NOT CHANGE:
+ * - Import order (tailwindcss must be first)
+ * - Theme path: "../styles/theme.css" (NOT "./theme.css")
+ * - Import syntax
+ *
+ * ⚠️  CHANGING THESE WILL BREAK ALL STYLING
+ */
+
+@import "tailwindcss";
+@import "../styles/theme.css";
+/* @import "tw-animate-css"; */
+
+@custom-variant dark (&:is(.dark *));
+
+/* Base document sizing and immediate dark-aware fallback colors */
+html,
+body {
+  height: 100%;
+  overflow-x: hidden;
+}
+
+/* Fallback colors before token CSS finishes loading */
+body {
+  background: #0a0a0b;
+  color: #eaeaea;
+}
+
+.dark body {
+  background: #000;
+  color: #fff;
+}
+
+@layer base {
+  :root {
+    --font-inter: "Inter";
+  }
+}
+
+@theme {
+  --font-sans:
+    var(--font-inter), -apple-system, BlinkMacSystemFont, "SF Pro Text",
+    "SF Pro Display", "Segoe UI", Roboto, Arial, sans-serif;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f3f4f6;
+  --color-gray-200: #e5e7eb;
+  --color-gray-300: #d1d5db;
+  --color-gray-400: #9ca3af;
+  --color-gray-500: #6b7280;
+  --color-gray-600: #4b5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1f2937;
+  --color-gray-900: #111827;
+
+  --tracking-tighter: -0.02em;
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.01em;
+  --tracking-wider: 0.02em;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
+
+  /* Map app-level button tokens to Tailwind v4 color tokens so classes like bg-btn-primary work */
+  --color-btn-primary: var(--color-btn-primary-bg);
+  --color-btn-primary-foreground: var(--color-btn-primary-fg);
+}
+
+@utility grid-bg {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+@utility grid-bg-dark {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* Standard focus ring utility for all interactive elements */
+@utility focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
+}
+
+/* Standard focus ring utility with transparent offset (for elements with white backgrounds) */
+@utility focus-ring-transparent-offset {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-transparent focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-ring disabled:opacity-50 disabled:pointer-events-none;
+}
+
+@utility btn-primary {
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+}
+
+@utility bg-btn-primary {
+  background-color: var(--color-btn-primary-bg);
+}
+
+@utility text-btn-primary-foreground {
+  color: var(--color-btn-primary-fg);
+}
+
+@utility btn-secondary {
+  @apply bg-surface-2 text-primary-token hover:bg-surface-3;
+}
+
+@utility btn-ghost {
+  @apply hover:bg-surface-2;
+}
+
+@utility btn-sm {
+  @apply h-8 px-3 text-xs;
+}
+
+@utility btn-md {
+  @apply h-10 px-4 py-2;
+}
+
+@utility btn-lg {
+  @apply h-12 px-8 text-base;
+}
+
+@utility text-accent {
+  color: var(--color-accent);
+}
+
+/* Menu/Dropdown utilities */
+@utility menu-background {
+  background-color: rgb(var(--menu-background));
+}
+
+@utility menu-border {
+  border-color: rgb(var(--menu-border));
+}
+
+@utility menu-shadow {
+  box-shadow:
+    0 10px 15px -3px rgb(var(--menu-shadow)),
+    0 4px 6px -2px rgb(var(--menu-shadow));
+}
+
+@utility menu-item-hover {
+  background-color: rgb(var(--menu-item-hover));
+}
+
+@utility menu-separator {
+  border-color: rgb(var(--menu-separator));
+}
+
+/* Enhanced surface utilities */
+@utility bg-surface-0 {
+  background-color: var(--color-bg-surface-0);
+}
+
+@utility bg-surface-1 {
+  background-color: var(--color-bg-surface-1);
+}
+
+@utility bg-surface-2 {
+  background-color: var(--color-bg-surface-2);
+}
+
+@utility bg-surface-3 {
+  background-color: var(--color-bg-surface-3);
+}
+
+/* Legacy surface utilities (map to new system) */
+@utility surface {
+  background-color: var(--color-bg-surface-1);
+}
+
+@utility surface-hover {
+  background-color: var(--color-bg-surface-2);
+}
+
+@utility surface-pressed {
+  background-color: var(--color-bg-surface-3);
+}
+
+/* Text utilities */
+@utility text-primary {
+  color: var(--color-text-primary-token);
+}
+
+@utility text-secondary {
+  color: var(--color-text-secondary-token);
+}
+
+@utility text-tertiary {
+  color: var(--color-text-tertiary-token);
+}
+
+/* Dashboard token utilities for consistency */
+@utility text-primary-token {
+  color: var(--color-text-primary-token);
+}
+
+@utility text-secondary-token {
+  color: var(--color-text-secondary-token);
+}
+
+@utility text-tertiary-token {
+  color: var(--color-text-tertiary-token);
+}
+
+@utility text-destructive {
+  color: #dc2626;
+  /* red-600 */
+
+  &:is(.dark *) {
+    color: #f87171;
+    /* red-400 */
+  }
+}
+
+/* Interactive state utilities */
+@utility interactive-hover {
+  background-color: rgb(var(--interactive-hover));
+}
+
+@utility interactive-pressed {
+  background-color: rgb(var(--interactive-pressed));
+}
+
+@utility focus-ring-themed {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+  --tw-ring-color: rgb(var(--focus-ring));
+}
+
+/* Menu animations */
+@keyframes user-menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.99);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@layer base {
+  /* Enhanced Linear-style dashboard tokens (light) */
+  :root {
+    --color-bg-base: #ffffff;
+    /* app background */
+    --color-bg-surface-0: #fafbfc;
+    /* elevated backgrounds */
+    --color-bg-surface-1: #f6f7f8;
+    /* cards/panels */
+    --color-bg-surface-2: #eef0f2;
+    /* interactive/hover */
+    --color-bg-surface-3: #e5e7eb;
+    /* pressed/active */
+    --color-border-subtle: #e5e7eb;
+    --color-border-default: #d1d5db;
+    --color-text-primary-token: #0c0c0c;
+    --color-text-secondary-token: #6b7280;
+    --color-text-tertiary-token: #9ca3af;
+    --color-accent: #7c3aed;
+    /* accent */
+    --color-accent-foreground: #fff;
+    /* accent text */
+    --color-btn-primary-bg: #000;
+    /* primary button background */
+    --color-btn-primary-fg: #fff;
+    /* primary button text */
+
+    /* Loading/skeleton colors */
+    --color-skeleton-base: #f3f4f6;
+    --color-skeleton-shimmer: #ffffff;
+
+    /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
+    --focus-ring: 124 58 237;
+    /* approx. #7c3aed */
+  }
+
+  /* Dark mode overrides — ensure this block comes AFTER light tokens */
+  :root.dark {
+    /* Enhanced Linear-style dashboard tokens (dark) */
+    --color-bg-base: #0a0a0a;
+    /* deepest app background */
+    --color-bg-surface-0: #111111;
+    /* elevated backgrounds (sidebars) */
+    --color-bg-surface-1: #171717;
+    /* cards/panels */
+    --color-bg-surface-2: #1f1f1f;
+    /* interactive/hover */
+    --color-bg-surface-3: #262626;
+    /* pressed/active */
+    --color-border-subtle: #262626;
+    /* subtle borders */
+    --color-border-default: #404040;
+    /* default borders */
+    --color-text-primary-token: #f5f5f5;
+    --color-text-secondary-token: #a3a3a3;
+    --color-text-tertiary-token: #737373;
+    --color-accent: #7c3aed;
+    /* accent */
+    --color-accent-foreground: #fff;
+    /* accent text */
+    --color-btn-primary-bg: #fff;
+    /* primary button background */
+    --color-btn-primary-fg: #000;
+    /* primary button text */
+
+    /* Loading/skeleton colors for dark mode */
+    --color-skeleton-base: #1a1a1a;
+    --color-skeleton-shimmer: #2a2a2a;
+
+    --focus-ring: 124 58 237;
+  }
+
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--color-text-primary-token);
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-4xl lg:text-5xl;
+  }
+
+  h2 {
+    @apply text-3xl lg:text-4xl;
+  }
+
+  h3 {
+    @apply text-2xl lg:text-3xl;
+  }
+
+  h4 {
+    @apply text-xl lg:text-2xl;
+  }
+
+  h5 {
+    @apply text-lg lg:text-xl;
+  }
+
+  h6 {
+    @apply text-base lg:text-lg;
+  }
+}
+
+/* Utility bridges for Linear-style tokens */
+@utility bg-base {
+  background-color: var(--color-bg-base);
+}
+
+/* Enhanced border utilities */
+@utility border-subtle {
+  border-color: var(--color-border-subtle);
+}
+
+@utility border-default {
+  border-color: var(--color-border-default);
+}
+
+@utility text-accent-token {
+  color: var(--color-accent);
+}
+
+@utility ring-accent {
+  --tw-ring-color: var(--color-accent);
+}
+
+/* Skeleton loading utilities */
+@utility skeleton {
+  background-color: var(--color-skeleton-base);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    var(--color-skeleton-shimmer),
+    transparent
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Preview update animation */
+@utility animate-shimmer {
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out;
+}
+
+/* Micro-animations */
+@utility card-hover {
+  @apply transform transition-all duration-200 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-gray-200/25 dark:hover:shadow-gray-900/25;
+}
+
+@utility input-focus-glow {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:shadow-lg transition-all duration-200;
+}
+
+@utility btn-press {
+  @apply transform transition-transform duration-100 ease-out active:scale-95;
+}
+
+/* Motion preference utility for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .transition-all,
+  .transform,
+  [data-state] {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+:root {
+  --sidebar: hsl(0 0% 98%);
+  --sidebar-foreground: hsl(240 5.3% 26.1%);
+  --sidebar-primary: hsl(240 5.9% 10%);
+  --sidebar-primary-foreground: hsl(0 0% 98%);
+  --sidebar-accent: hsl(240 4.8% 95.9%);
+  --sidebar-accent-foreground: hsl(240 5.9% 10%);
+  --sidebar-border: hsl(220 13% 91%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+.dark {
+  --sidebar: hsl(240 5.9% 10%);
+  --sidebar-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-primary: hsl(224.3 76.3% 48%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(240 3.7% 15.9%);
+  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
+  --sidebar-border: hsl(240 3.7% 15.9%);
+  --sidebar-ring: hsl(217.2 91.2% 59.8%);
+}
+
+@theme inline {
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Additional semantic tokens for shadcn components */
+  --color-foreground: var(--color-text-primary-token);
+  --color-muted-foreground: var(--color-text-secondary-token);
+}

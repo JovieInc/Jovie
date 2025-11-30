@@ -4,9 +4,9 @@ import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ErrorSummary } from '@/components/ui/ErrorSummary';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
+import { FormField } from '@/components/molecules/FormField';
+import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { APP_URL } from '@/constants/app';
 
@@ -54,6 +54,14 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   useEffect(() => {
     if (onHandleChange) {
       onHandleChange(handle);
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('jovie-hero-handle-change', {
+          detail: { handle },
+        })
+      );
     }
   }, [handle, onHandleChange]);
 

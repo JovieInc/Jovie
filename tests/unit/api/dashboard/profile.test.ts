@@ -11,6 +11,22 @@ const hoisted = vi.hoisted(() => {
   return { returning, where, from, set, update };
 });
 
+const syncHoisted = vi.hoisted(() => {
+  class UsernameValidationError extends Error {
+    code: string;
+
+    constructor(message: string) {
+      super(message);
+      this.code = 'USERNAME_TAKEN';
+    }
+  }
+
+  return {
+    syncCanonicalUsernameFromApp: vi.fn().mockResolvedValue(undefined),
+    UsernameValidationError,
+  };
+});
+
 const clerkClientMock = vi.hoisted(() => ({
   users: {
     updateUser: vi.fn(),
@@ -19,7 +35,7 @@ const clerkClientMock = vi.hoisted(() => ({
 }));
 
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkClient: clerkClientMock,
+  clerkClient: async () => clerkClientMock,
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -41,11 +57,14 @@ vi.mock('@/lib/db', () => ({
   users: {},
 }));
 
+vi.mock('@/lib/username/sync', () => syncHoisted);
+
 describe('PUT /api/dashboard/profile', () => {
   const mockUpdateUser = clerkClientMock.users.updateUser;
   const mockUpdateUserProfileImage =
     clerkClientMock.users.updateUserProfileImage;
   const { returning } = hoisted;
+  const { syncCanonicalUsernameFromApp } = syncHoisted;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,8 +94,11 @@ describe('PUT /api/dashboard/profile', () => {
     const response = await PUT(request);
 
     expect(response.status).toBe(200);
+    expect(syncCanonicalUsernameFromApp).toHaveBeenCalledWith(
+      'user_123',
+      'new-handle'
+    );
     expect(mockUpdateUser).toHaveBeenCalledWith('user_123', {
-      username: 'new-handle',
       firstName: 'Taylor',
       lastName: 'Swift',
     });

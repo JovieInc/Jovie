@@ -44,9 +44,8 @@ export function AnalyticsCard({
           cardTokens.base,
           cardTokens.padding.default,
           cardTokens.shadow.default,
-          cardTokens.shadow.hover,
           cardTokens.border.default,
-          cardTokens.border.hover,
+          cardTokens.interactive.hover,
           'group'
         )}
       >

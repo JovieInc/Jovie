@@ -1,18 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-interface DashboardSettingsProps {
-  initialData: DashboardData;
-}
-
-export function DashboardSettings({ initialData }: DashboardSettingsProps) {
+export function DashboardSettings() {
+  const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
   // Note: Profile switching functionality will be implemented in the future

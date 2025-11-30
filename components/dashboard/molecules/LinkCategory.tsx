@@ -69,18 +69,16 @@ export function LinkCategory({
           type='button'
           onClick={() => setIsExpanded(!isExpanded)}
           className={cn(
-            'group flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 rounded-md',
+            'group flex items-center gap-2 rounded-md text-sm font-medium text-primary-token',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0',
             'transition-colors duration-200'
           )}
         >
           <div
             className={cn(
-              'p-1.5 rounded-lg',
-              'bg-primary-50 dark:bg-primary-900/30',
-              'text-primary-600 dark:text-primary-400',
-              'group-hover:bg-primary-100 dark:group-hover:bg-primary-800/30',
-              'transition-colors duration-200'
+              'rounded-lg p-1.5 transition-colors duration-200',
+              'bg-surface-2 text-primary-token',
+              'group-hover:bg-surface-3'
             )}
           >
             <Icon name={iconName} className='w-4 h-4' />
@@ -89,11 +87,11 @@ export function LinkCategory({
           <Icon
             name='ChevronDown'
             className={cn(
-              'w-4 h-4 text-gray-400 transition-transform duration-200',
+              'w-4 h-4 text-tertiary-token transition-transform duration-200',
               isExpanded ? 'rotate-0' : '-rotate-90'
             )}
           />
-          <span className='ml-1 text-xs font-normal text-gray-500 dark:text-gray-400'>
+          <span className='ml-1 text-xs font-normal text-secondary-token'>
             {links.length} {links.length === 1 ? 'link' : 'links'}
           </span>
         </button>
@@ -102,7 +100,7 @@ export function LinkCategory({
           variant='ghost'
           size='sm'
           onClick={onAddLink}
-          className='text-sm whitespace-nowrap text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300'
+          className='whitespace-nowrap text-sm text-primary-token hover:text-accent'
         >
           <Icon name='Plus' className='w-4 h-4 mr-1' />
           Add Link

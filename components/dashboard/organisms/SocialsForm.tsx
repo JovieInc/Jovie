@@ -1,10 +1,17 @@
 'use client';
 
-import { Button, Select } from '@jovie/ui';
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
+import { Input } from '@/components/atoms/Input';
+import { FormField } from '@/components/molecules/FormField';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import { track } from '@/lib/analytics';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';
@@ -141,10 +148,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
     return (
       <div className='space-y-4'>
         {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className='h-16 bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse'
-          />
+          <div key={i} className='h-16 bg-surface-2 rounded-lg animate-pulse' />
         ))}
       </div>
     );
@@ -153,7 +157,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
   return (
     <div className='space-y-4'>
       <div className='flex items-center justify-between'>
-        <h3 className='text-lg font-semibold text-gray-900 dark:text-white'>
+        <h3 className='text-lg font-semibold text-primary-token'>
           Social Media Links
         </h3>
         <Button
@@ -191,19 +195,23 @@ export function SocialsForm({ artist }: SocialsFormProps) {
               <FormField label='Platform' className='w-32'>
                 <Select
                   value={link.platform}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                    updateSocialLink(index, 'platform', e.target.value)
+                  onValueChange={value =>
+                    updateSocialLink(index, 'platform', value)
                   }
-                  options={[
-                    { value: 'instagram', label: 'Instagram' },
-                    { value: 'twitter', label: 'Twitter' },
-                    { value: 'tiktok', label: 'TikTok' },
-                    { value: 'youtube', label: 'YouTube' },
-                    { value: 'facebook', label: 'Facebook' },
-                    { value: 'linkedin', label: 'LinkedIn' },
-                    { value: 'website', label: 'Website' },
-                  ]}
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder='Select platform' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='instagram'>Instagram</SelectItem>
+                    <SelectItem value='twitter'>Twitter</SelectItem>
+                    <SelectItem value='tiktok'>TikTok</SelectItem>
+                    <SelectItem value='youtube'>YouTube</SelectItem>
+                    <SelectItem value='facebook'>Facebook</SelectItem>
+                    <SelectItem value='linkedin'>LinkedIn</SelectItem>
+                    <SelectItem value='website'>Website</SelectItem>
+                  </SelectContent>
+                </Select>
               </FormField>
 
               <Input

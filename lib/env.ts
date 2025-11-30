@@ -18,9 +18,7 @@ const EnvSchema = z.object({
     .string()
     .min(1, 'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY'),
   NEXT_PUBLIC_APP_URL: z.string().url().default('https://jov.ie'),
-  NEXT_PUBLIC_SEGMENT_WRITE_KEY: z.string().optional(),
-  NEXT_PUBLIC_POSTHOG_KEY: z.string().optional(),
-  NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+  NEXT_PUBLIC_STATSIG_CLIENT_KEY: z.string().optional(),
 
   // Stripe public keys
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -56,9 +54,7 @@ const rawEnv = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie',
-  NEXT_PUBLIC_SEGMENT_WRITE_KEY: process.env.NEXT_PUBLIC_SEGMENT_WRITE_KEY,
-  NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,
-  NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  NEXT_PUBLIC_STATSIG_CLIENT_KEY: process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:
@@ -95,15 +91,9 @@ export const env = {
   NEXT_PUBLIC_APP_URL: parsed.success
     ? parsed.data.NEXT_PUBLIC_APP_URL
     : (process.env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie'),
-  NEXT_PUBLIC_SEGMENT_WRITE_KEY: parsed.success
-    ? parsed.data.NEXT_PUBLIC_SEGMENT_WRITE_KEY
-    : process.env.NEXT_PUBLIC_SEGMENT_WRITE_KEY,
-  NEXT_PUBLIC_POSTHOG_KEY: parsed.success
-    ? parsed.data.NEXT_PUBLIC_POSTHOG_KEY
-    : process.env.NEXT_PUBLIC_POSTHOG_KEY,
-  NEXT_PUBLIC_POSTHOG_HOST: parsed.success
-    ? parsed.data.NEXT_PUBLIC_POSTHOG_HOST
-    : process.env.NEXT_PUBLIC_POSTHOG_HOST,
+  NEXT_PUBLIC_STATSIG_CLIENT_KEY: parsed.success
+    ? parsed.data.NEXT_PUBLIC_STATSIG_CLIENT_KEY
+    : process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: parsed.success
     ? parsed.data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
@@ -150,9 +140,7 @@ export const env = {
     ? parsed.data.STRIPE_PRICE_STANDARD_YEARLY
     : process.env.STRIPE_PRICE_STANDARD_YEARLY,
 } as const;
-
-// Feature flags removed - pre-launch, will add PostHog flags in future
-
+// Feature flags now handled via Statsig; see lib/statsig/*
 // Environment validation utilities
 export interface EnvironmentValidationResult {
   valid: boolean;

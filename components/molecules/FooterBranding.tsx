@@ -7,6 +7,7 @@ interface FooterBrandingProps {
   variant?: 'light' | 'dark';
   className?: string;
   showCTA?: boolean;
+  size?: 'sm' | 'md';
 }
 
 export function FooterBranding({
@@ -14,6 +15,7 @@ export function FooterBranding({
   variant = 'light',
   className = '',
   showCTA = true,
+  size = 'md',
 }: FooterBrandingProps) {
   const signUpLink = artistHandle
     ? `/sign-up?utm_source=profile&utm_artist=${artistHandle}`
@@ -26,12 +28,12 @@ export function FooterBranding({
         className
       )}
     >
-      <JovieLogo artistHandle={artistHandle} variant={variant} />
+      <JovieLogo artistHandle={artistHandle} variant={variant} size={size} />
 
       {showCTA && (
         <Link
           href={signUpLink}
-          className='text-[11px] uppercase tracking-[0.08em] text-gray-500 hover:text-indigo-500 dark:text-gray-400 dark:hover:text-indigo-400 font-medium transition-colors'
+          className='text-[10px] leading-snug uppercase tracking-[0.08em] text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 font-medium transition-colors text-center'
         >
           Claim your profile now
         </Link>

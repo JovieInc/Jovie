@@ -1,134 +1,70 @@
 'use client';
 
-import { clsx } from 'clsx';
-import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { cn } from '@/lib/utils';
 
-interface LoadingSpinnerProps {
+export type LoadingSpinnerTone = 'primary' | 'muted' | 'inverse';
+
+export interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';
+  tone?: LoadingSpinnerTone;
   className?: string;
-  variant?: 'auto' | 'light' | 'dark';
+  label?: string;
 }
+
+const sizeClasses: Record<NonNullable<LoadingSpinnerProps['size']>, string> = {
+  sm: 'h-4 w-4',
+  md: 'h-6 w-6',
+  lg: 'h-8 w-8',
+};
+
+const toneClasses: Record<LoadingSpinnerTone, string> = {
+  primary: 'text-primary-token',
+  muted: 'text-muted-foreground',
+  inverse: 'text-white',
+};
 
 export function LoadingSpinner({
   size = 'md',
+  tone = 'primary',
   className,
-  variant = 'auto',
+  label = 'Loading',
 }: LoadingSpinnerProps) {
-  const { theme, systemTheme } = useTheme();
-  const [isVisible, setIsVisible] = useState(false);
-
-  // Debounce visibility to avoid flicker
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(true);
-    }, 200); // 200ms debounce as specified (150-250ms range)
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Determine the effective theme for coloring
-  const getEffectiveTheme = () => {
-    if (variant === 'light') return 'light';
-    if (variant === 'dark') return 'dark';
-
-    // For 'auto', use the current theme
-    const currentTheme = theme === 'system' ? systemTheme : theme;
-    return currentTheme === 'dark' ? 'dark' : 'light';
-  };
-
-  const effectiveTheme = getEffectiveTheme();
-
-  // Size classes for the spinner container
-  const sizeClasses = {
-    sm: 'h-4 w-4',
-    md: 'h-6 w-6',
-    lg: 'h-8 w-8',
-  };
-
-  // Stroke width based on size
-  const strokeWidth = {
-    sm: 2,
-    md: 2.5,
-    lg: 3,
-  };
-
-  // Colors based on theme
-  const getColors = () => {
-    if (effectiveTheme === 'light') {
-      return {
-        primary: 'text-gray-900',
-        secondary: 'text-gray-200',
-      };
-    } else {
-      return {
-        primary: 'text-white',
-        secondary: 'text-gray-700',
-      };
-    }
-  };
-
-  const colors = getColors();
-
-  if (!isVisible) {
-    return (
-      <div
-        className={clsx(sizeClasses[size], className)}
-        role='status'
-        aria-label='Loading'
-        data-testid='spinner'
-        data-size={size}
-        data-variant={variant}
-        data-theme={effectiveTheme}
-      >
-        {/* Invisible placeholder to prevent layout shift */}
-      </div>
-    );
-  }
+  const dimension = sizeClasses[size];
+  const toneClass = toneClasses[tone];
 
   return (
-    <div
-      className={clsx(
-        'inline-flex items-center justify-center',
-        sizeClasses[size],
-        className
-      )}
+    <span
       role='status'
-      aria-label='Loading'
+      aria-label={label}
       data-testid='spinner'
       data-size={size}
-      data-variant={variant}
-      data-theme={effectiveTheme}
+      data-tone={tone}
+      className={cn(
+        'inline-flex items-center justify-center align-middle text-current',
+        'motion-reduce:transition-none motion-reduce:animate-none',
+        dimension,
+        toneClass,
+        className
+      )}
     >
-      <svg
-        className={clsx(
-          'animate-spin motion-reduce:animate-[spin_1.5s_linear_infinite]',
-          'h-full w-full'
-        )}
-        viewBox='0 0 24 24'
-        xmlns='http://www.w3.org/2000/svg'
-        fill='none'
-      >
-        {/* Background circle (lighter color) */}
-        <circle
-          className={colors.secondary}
-          cx='12'
-          cy='12'
-          r='10'
-          stroke='currentColor'
-          strokeWidth={strokeWidth[size]}
-          strokeLinecap='round'
-          strokeDasharray='1, 1'
+      <span className='relative block h-full w-full' aria-hidden='true'>
+        <span
+          className={cn(
+            'absolute inset-0 rounded-full border-2 border-current/20',
+            'transition-transform duration-200 ease-out motion-reduce:transition-none'
+          )}
         />
-        {/* Foreground arc (primary color) */}
-        <path
-          className={colors.primary}
-          stroke='currentColor'
-          strokeWidth={strokeWidth[size]}
-          strokeLinecap='round'
-          d='M12 2a10 10 0 0 1 10 10'
+        <span
+          className={cn(
+            'absolute inset-0 rounded-full border-2 border-current border-t-transparent',
+            'animate-spin motion-reduce:animate-[spin_1.2s_linear_infinite]',
+            'will-change-transform'
+          )}
         />
-      </svg>
-    </div>
+      </span>
+    </span>
   );
 }
+
+export const Spinner = LoadingSpinner;

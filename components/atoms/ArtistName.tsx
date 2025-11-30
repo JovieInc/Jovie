@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
 
 /**

@@ -22,6 +22,8 @@ module.exports = [
       'test-results/**',
       '**/*.d.ts',
       '**/*.tsbuildinfo',
+      '**/*.config.js',
+      '**/*.config.ts',
       '**/.cache/**',
       '**/.temp/**',
       '**/.tmp/**',
@@ -88,28 +90,42 @@ module.exports = [
             },
             // Enforce using shared UI package
             {
-              name: '@/components/ui/Select',
-              message: "Use Select from '@jovie/ui' instead of local UI.",
+              name: '@/components/atoms/Select',
+              message: "Use Select from '@jovie/ui' instead of local atoms.",
             },
             {
-              name: '@/components/ui/sheet',
-              message:
-                "Use Sheet components from '@jovie/ui' instead of local UI.",
+              name: '@/components/atoms/Button',
+              message: "Use Button from '@jovie/ui' instead of local atoms.",
             },
             {
-              name: '@/components/ui/tooltip',
+              name: '@/components/atoms/Sheet',
               message:
-                "Use Tooltip components from '@jovie/ui' instead of local UI.",
+                "Use Sheet components from '@jovie/ui' instead of local atoms.",
             },
             {
-              name: '@/components/ui/popover',
+              name: '@/components/atoms/Tooltip',
               message:
-                "Use Popover components from '@jovie/ui' instead of local UI.",
+                "Use Tooltip components from '@jovie/ui' instead of local atoms.",
             },
             {
-              name: '@/components/ui/dropdown-menu',
+              name: '@/components/atoms/Popover',
               message:
-                "Use DropdownMenu components from '@jovie/ui' instead of local UI.",
+                "Use Popover components from '@jovie/ui' instead of local atoms.",
+            },
+            {
+              name: '@/components/atoms/DropdownMenu',
+              message:
+                "Use DropdownMenu components from '@jovie/ui' instead of local atoms.",
+            },
+          ],
+          patterns: [
+            {
+              group: [
+                '../components/atoms/Button',
+                './components/atoms/Button',
+                'components/atoms/Button',
+              ],
+              message: "Use Button from '@jovie/ui' instead of local atoms.",
             },
           ],
         },

@@ -2,9 +2,15 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { and, asc, count, eq } from 'drizzle-orm';
-import { unstable_noStore as noStore } from 'next/cache';
-import { withDbSession } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import {
+  unstable_noStore as noStore,
+  revalidatePath,
+  revalidateTag,
+} from 'next/cache';
+import { redirect } from 'next/navigation';
+import { isAdminEmail } from '@/lib/admin/roles';
+import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import { type DbType, db } from '@/lib/db';
 import {
   type CreatorProfile,
   creatorProfiles,
@@ -12,6 +18,7 @@ import {
   userSettings,
   users,
 } from '@/lib/db/schema';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export interface DashboardData {
   user: { id: string } | null;
@@ -20,6 +27,21 @@ export interface DashboardData {
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
+  isAdmin: boolean;
+}
+
+function profileIsPublishable(profile: CreatorProfile | null): boolean {
+  if (!profile) return false;
+
+  // A minimum viable profile must have a claimed handle, a display name,
+  // be public, and have completed onboarding at least once.
+  const hasHandle =
+    Boolean(profile.usernameNormalized) && Boolean(profile.username);
+  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const isPublic = profile.isPublic !== false;
+  const hasCompleted = Boolean(profile.onboardingCompletedAt);
+
+  return hasHandle && hasName && isPublic && hasCompleted;
 }
 
 // Minimal link shape for initializing DashboardLinks client from the server
@@ -32,10 +54,120 @@ export interface ProfileSocialLink {
   isActive: boolean | null;
   displayText?: string | null;
 }
+async function fetchDashboardDataWithSession(
+  dbClient: DbType,
+  clerkUserId: string
+): Promise<Omit<DashboardData, 'isAdmin'>> {
+  // All queries run inside a transaction to keep the RLS session variable set
+  try {
+    // First check if user exists in users table
+    const [userData] = await dbClient
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!userData?.id) {
+      // No user row yet — send to onboarding to create user/artist
+      return {
+        user: null,
+        creatorProfiles: [],
+        selectedProfile: null,
+        needsOnboarding: true,
+        sidebarCollapsed: false,
+        hasSocialLinks: false,
+      };
+    }
+
+    // Now that we know user exists, get creator profiles
+    const creatorData = await dbClient
+      .select()
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.userId, userData.id))
+      .orderBy(asc(creatorProfiles.createdAt));
+
+    if (!creatorData || creatorData.length === 0) {
+      // No creator profiles yet — onboarding
+      return {
+        user: userData,
+        creatorProfiles: [],
+        selectedProfile: null,
+        needsOnboarding: true,
+        sidebarCollapsed: false,
+        hasSocialLinks: false,
+      };
+    }
+
+    const selected = creatorData[0];
+
+    // Load user settings for UI preferences and social links presence in parallel;
+    // tolerate missing user_settings column/table during migrations.
+    const [settings, hasLinks] = await Promise.all([
+      (async () => {
+        try {
+          const result = await dbClient
+            .select()
+            .from(userSettings)
+            .where(eq(userSettings.userId, userData.id))
+            .limit(1);
+          return result?.[0] as { sidebarCollapsed: boolean } | undefined;
+        } catch {
+          console.warn(
+            'user_settings not available yet, defaulting sidebarCollapsed=false'
+          );
+          return undefined;
+        }
+      })(),
+      (async () => {
+        try {
+          const result = await dbClient
+            .select({ c: count() })
+            .from(socialLinks)
+            .where(
+              and(
+                eq(socialLinks.creatorProfileId, selected.id),
+                eq(socialLinks.isActive, true)
+              )
+            );
+          const total = Number(result?.[0]?.c ?? 0);
+          return total > 0;
+        } catch {
+          // On query error, default to false without failing dashboard load
+          console.warn('Error counting social links, defaulting to false');
+          return false;
+        }
+      })(),
+    ]);
+
+    // Return data with first profile selected by default
+    return {
+      user: userData,
+      creatorProfiles: creatorData,
+      selectedProfile: selected,
+      needsOnboarding: !profileIsPublishable(selected),
+      sidebarCollapsed: settings?.sidebarCollapsed ?? false,
+      hasSocialLinks: hasLinks,
+    };
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    // On error, treat as needs onboarding to be safe
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+    };
+  }
+}
 
 export async function getDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
+
+  const entitlements = await getCurrentUserEntitlements();
+  const isAdmin = isAdminEmail(entitlements.email);
 
   const { userId } = await auth();
 
@@ -47,108 +179,25 @@ export async function getDashboardData(): Promise<DashboardData> {
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      isAdmin,
     };
   }
 
-  return await withDbSession(async clerkUserId => {
-    try {
-      // First check if user exists in users table
-      const [userData] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1);
-
-      if (!userData?.id) {
-        // No user row yet → send to onboarding to create user/artist
-        return {
-          user: null,
-          creatorProfiles: [],
-          selectedProfile: null,
-          needsOnboarding: true,
-          sidebarCollapsed: false,
-          hasSocialLinks: false,
-        };
-      }
-
-      // Now that we know user exists, get creator profiles
-      const creatorData = await db
-        .select()
-        .from(creatorProfiles)
-        .where(eq(creatorProfiles.userId, userData.id))
-        .orderBy(asc(creatorProfiles.createdAt));
-
-      if (!creatorData || creatorData.length === 0) {
-        // No creator profiles yet → onboarding
-        return {
-          user: userData,
-          creatorProfiles: [],
-          selectedProfile: null,
-          needsOnboarding: true,
-          sidebarCollapsed: false,
-          hasSocialLinks: false,
-        };
-      }
-
-      // Load user settings for UI preferences; tolerate missing column/table during migrations
-      let settings: { sidebarCollapsed: boolean } | undefined;
-      try {
-        const result = await db
-          .select()
-          .from(userSettings)
-          .where(eq(userSettings.userId, userData.id))
-          .limit(1);
-        settings = result?.[0];
-      } catch {
-        console.warn(
-          'user_settings not available yet, defaulting sidebarCollapsed=false'
-        );
-        settings = undefined;
-      }
-
-      // Compute presence of active social links for the selected profile
-      const selected = creatorData[0];
-      let hasLinks = false;
-      try {
-        const result = await db
-          .select({ c: count() })
-          .from(socialLinks)
-          .where(
-            and(
-              eq(socialLinks.creatorProfileId, selected.id),
-              eq(socialLinks.isActive, true)
-            )
-          );
-        const total = Number(result?.[0]?.c ?? 0);
-        hasLinks = total > 0;
-      } catch {
-        // On query error, default to false without failing dashboard load
-        console.warn('Error counting social links, defaulting to false');
-        hasLinks = false;
-      }
-
-      // Return data with first profile selected by default
-      return {
-        user: userData,
-        creatorProfiles: creatorData,
-        selectedProfile: selected,
-        needsOnboarding: false,
-        sidebarCollapsed: settings?.sidebarCollapsed ?? false,
-        hasSocialLinks: hasLinks,
-      };
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      // On error, treat as needs onboarding to be safe
-      return {
-        user: null,
-        creatorProfiles: [],
-        selectedProfile: null,
-        needsOnboarding: true,
-        sidebarCollapsed: false,
-        hasSocialLinks: false,
-      };
-    }
+  const base = await withDbSessionTx(async (tx, clerkUserId) => {
+    return fetchDashboardDataWithSession(tx, clerkUserId);
   });
+
+  return {
+    ...base,
+    isAdmin,
+  };
+}
+
+export async function getDashboardDataCached(): Promise<DashboardData> {
+  // Disable caching for now to follow YC "do things that don't scale" principle
+  // The unstable_cache API was causing issues with server components and auth()
+  // We'll add proper caching (e.g., Redis) when performance becomes a bottleneck
+  return getDashboardData();
 }
 
 // Fetch social links for a given profile owned by the current user
@@ -236,6 +285,7 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
         set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
       });
   });
+  revalidateTag('dashboard-data');
 }
 
 export async function updateCreatorProfile(
@@ -245,6 +295,10 @@ export async function updateCreatorProfile(
     displayName: string;
     bio: string;
     avatarUrl: string;
+    onboardingCompletedAt: Date | null;
+    isPublic: boolean;
+    username: string;
+    usernameNormalized: string;
     // Add other updatable fields as needed
   }>
 ): Promise<CreatorProfile> {
@@ -289,10 +343,52 @@ export async function updateCreatorProfile(
         throw new Error('Profile not found or unauthorized');
       }
 
+      revalidateTag('dashboard-data');
+      if (updatedProfile.usernameNormalized) {
+        revalidatePath(`/${updatedProfile.usernameNormalized}`);
+      }
+
       return updatedProfile;
     } catch (error) {
       console.error('Error updating creator profile:', error);
       throw error;
     }
   });
+}
+
+export async function publishProfileBasics(formData: FormData): Promise<void> {
+  'use server';
+  noStore();
+
+  const profileId = formData.get('profileId');
+  const displayNameRaw = formData.get('displayName');
+  const bioRaw = formData.get('bio');
+
+  if (!profileId || typeof profileId !== 'string') {
+    throw new Error('Profile ID is required');
+  }
+
+  const displayName =
+    typeof displayNameRaw === 'string' ? displayNameRaw.trim() : '';
+  if (!displayName) {
+    throw new Error('Display name is required');
+  }
+
+  const bio =
+    typeof bioRaw === 'string' && bioRaw.trim().length > 0
+      ? bioRaw.trim()
+      : undefined;
+
+  await updateCreatorProfile(profileId, {
+    displayName,
+    bio,
+    onboardingCompletedAt: new Date(),
+    isPublic: true,
+  });
+
+  revalidateTag('dashboard-data');
+  revalidatePath('/dashboard/overview');
+
+  // Ensure the page reflects the latest data after publishing
+  redirect('/dashboard/overview?published=1');
 }

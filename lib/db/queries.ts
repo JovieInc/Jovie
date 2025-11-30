@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from './index';
 import { creatorProfiles, socialLinks, users } from './schema';
 
@@ -21,9 +21,36 @@ export async function getCreatorProfileByUsername(username: string) {
 }
 
 export async function getCreatorProfileWithLinks(username: string) {
-  // First get the profile
+  // First get the profile with only the columns needed for public rendering
   const [profile] = await db
-    .select()
+    .select({
+      id: creatorProfiles.id,
+      userId: creatorProfiles.userId,
+      creatorType: creatorProfiles.creatorType,
+      username: creatorProfiles.username,
+      displayName: creatorProfiles.displayName,
+      bio: creatorProfiles.bio,
+      avatarUrl: creatorProfiles.avatarUrl,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      spotifyId: creatorProfiles.spotifyId,
+      isPublic: creatorProfiles.isPublic,
+      isVerified: creatorProfiles.isVerified,
+      isClaimed: creatorProfiles.isClaimed,
+      claimToken: creatorProfiles.claimToken,
+      claimedAt: creatorProfiles.claimedAt,
+      lastLoginAt: creatorProfiles.lastLoginAt,
+      isFeatured: creatorProfiles.isFeatured,
+      marketingOptOut: creatorProfiles.marketingOptOut,
+      settings: creatorProfiles.settings,
+      theme: creatorProfiles.theme,
+      profileViews: creatorProfiles.profileViews,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      createdAt: creatorProfiles.createdAt,
+      updatedAt: creatorProfiles.updatedAt,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
@@ -32,7 +59,19 @@ export async function getCreatorProfileWithLinks(username: string) {
 
   // Then get all social links for this profile
   const profileSocialLinks = await db
-    .select()
+    .select({
+      id: socialLinks.id,
+      creatorProfileId: socialLinks.creatorProfileId,
+      platform: socialLinks.platform,
+      platformType: socialLinks.platformType,
+      url: socialLinks.url,
+      displayText: socialLinks.displayText,
+      clicks: socialLinks.clicks,
+      isActive: socialLinks.isActive,
+      createdAt: socialLinks.createdAt,
+      updatedAt: socialLinks.updatedAt,
+      sortOrder: socialLinks.sortOrder,
+    })
     .from(socialLinks)
     .where(eq(socialLinks.creatorProfileId, profile.id))
     .orderBy(socialLinks.sortOrder);
@@ -88,4 +127,23 @@ export async function deleteSocialLink(linkId: string) {
     .where(eq(socialLinks.id, linkId))
     .returning();
   return deleted || null;
+}
+
+/**
+ * Increment profile view count atomically
+ * Used for analytics tracking on public profile pages
+ */
+export async function incrementProfileViews(username: string) {
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        profileViews: drizzleSql`${creatorProfiles.profileViews} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()));
+  } catch (error) {
+    // Fail silently to avoid blocking page load
+    console.error('Failed to increment profile views:', error);
+  }
 }

@@ -1,5 +1,8 @@
 import { Button, type ButtonProps } from '@jovie/ui';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import {
+  LoadingSpinner,
+  type LoadingSpinnerTone,
+} from '@/components/ui/LoadingSpinner';
 
 // Trigger CI run to resolve check suite failures - updated
 
@@ -24,9 +27,15 @@ export function LoadingButton({
   // Determine spinner variant based on button variant if not explicitly provided
   // For dark buttons, use light spinner (white)
   // For light buttons, use dark spinner (indigo)
-  const defaultSpinnerVariant = variant === 'primary' ? 'light' : 'dark';
+  const defaultSpinnerTone: LoadingSpinnerTone =
+    variant === 'primary' ? 'inverse' : 'primary';
 
-  const effectiveSpinnerVariant = spinnerVariant || defaultSpinnerVariant;
+  const effectiveTone: LoadingSpinnerTone =
+    spinnerVariant === 'light'
+      ? 'inverse'
+      : spinnerVariant === 'dark'
+        ? 'primary'
+        : defaultSpinnerTone;
   const normalizedSpinnerSize: 'sm' | 'md' | 'lg' =
     spinnerSize === 'xs' ? 'sm' : (spinnerSize ?? 'sm');
 
@@ -43,10 +52,7 @@ export function LoadingButton({
           className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${isLoading ? 'opacity-100' : 'opacity-0'}`}
         >
           <span className='inline-flex items-center gap-2'>
-            <LoadingSpinner
-              size={normalizedSpinnerSize}
-              variant={effectiveSpinnerVariant}
-            />
+            <LoadingSpinner size={normalizedSpinnerSize} tone={effectiveTone} />
             <span>{loadingText || 'Loading...'}</span>
           </span>
         </span>

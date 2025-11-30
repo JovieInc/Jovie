@@ -25,11 +25,7 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 20
-      - name: Install Octokit (runtime)
-        run: npm i octokit@latest --no-save --silent
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Sync plan to issues and assign Copilot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

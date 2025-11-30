@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+
+// Bundle analyzer for performance optimization
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig = {
   turbopack: {},
   typescript: {
@@ -75,6 +81,22 @@ const nextConfig = {
         value: 'origin-when-cross-origin',
       },
     ];
+
+    const isProdLike =
+      process.env.NODE_ENV === 'production' ||
+      process.env.VERCEL_ENV === 'production';
+
+    if (isProdLike) {
+      securityHeaders.push({
+        key: 'Strict-Transport-Security',
+        value: 'max-age=31536000; includeSubDomains; preload',
+      });
+    }
+
+    securityHeaders.push({
+      key: 'Permissions-Policy',
+      value: 'camera=(), microphone=(), geolocation=()',
+    });
     return [
       {
         // Ensure internal flags endpoint is never cached
@@ -184,4 +206,5 @@ const nextConfig = {
 // Enable Vercel Toolbar in Next.js (local/dev)
 const withVercelToolbar = require('@vercel/toolbar/plugins/next')();
 
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));

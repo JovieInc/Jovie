@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { searchSpotifyArtists } from '@/lib/spotify';
 
 interface SearchResult {
   id: string;
@@ -10,6 +9,14 @@ interface SearchResult {
   popularity: number;
   followers?: number;
   spotifyUrl: string;
+}
+
+interface SpotifyArtistApi {
+  id: string;
+  name: string;
+  images?: Array<{ url: string }>;
+  popularity: number;
+  followers?: { total: number };
 }
 
 interface UseArtistSearchReturn {
@@ -36,7 +43,15 @@ export function useArtistSearch(): UseArtistSearchReturn {
     setError(null);
 
     try {
-      const spotifyArtists = await searchSpotifyArtists(query, 10);
+      const response = await fetch(
+        `/api/spotify/search?q=${encodeURIComponent(query)}`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to search artists');
+      }
+
+      const spotifyArtists = (await response.json()) as SpotifyArtistApi[];
 
       const results: SearchResult[] = spotifyArtists.map(artist => ({
         id: artist.id,

@@ -77,7 +77,7 @@ async function verifyArtistImages() {
       console.log('🎉 All artists have proper images and Spotify IDs!');
     } else {
       console.log('⚠️ Some artists need image updates. Run the update script:');
-      console.log('   npm run update-artist-images');
+      console.log('   pnpm run update-artist-images');
     }
   } catch (error) {
     console.error('❌ Verification failed:', error);

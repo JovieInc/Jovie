@@ -26,8 +26,9 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 Run these commands in order for a fresh repository clone:
 
 ```bash
-# 1. Install exact pnpm version globally
-npm install -g pnpm@8.15.9
+# 1. Ensure exact pnpm version via Corepack (Node 20+)
+corepack enable pnpm
+corepack prepare pnpm@8.15.9 --activate
 
 # 2. Install dependencies (TIMING: ~60-90 seconds)
 # NOTE: Use --no-frozen-lockfile due to lockfile sync issues

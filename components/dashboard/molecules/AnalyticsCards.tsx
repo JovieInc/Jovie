@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { SkeletonCard } from '@/components/molecules/SkeletonCard';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
 interface AnalyticsData {

@@ -138,7 +138,7 @@ const RESERVED_USERNAMES = [
 // Username validation rules
 const USERNAME_MIN_LENGTH = 3;
 const USERNAME_MAX_LENGTH = 30;
-const USERNAME_PATTERN = /^[a-zA-Z0-9_]+$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9-]+$/;
 
 export interface UsernameValidationResult {
   isValid: boolean;
@@ -175,35 +175,35 @@ export function validateUsername(username: string): UsernameValidationResult {
     };
   }
 
-  // Check pattern (alphanumeric and underscore only)
+  // Check pattern (alphanumeric and hyphen only)
   if (!USERNAME_PATTERN.test(normalized)) {
     return {
       isValid: false,
-      error: 'Username can only contain letters, numbers, and underscores',
+      error: 'Username can only contain letters, numbers, and hyphens',
     };
   }
 
-  // Check if starts with number or underscore
-  if (/^[0-9_]/.test(normalized)) {
+  // Check if starts with number or hyphen
+  if (/^[0-9-]/.test(normalized)) {
     return {
       isValid: false,
       error: 'Username must start with a letter',
     };
   }
 
-  // Check if ends with underscore
-  if (/_$/.test(normalized)) {
+  // Check if ends with hyphen
+  if (/-$/.test(normalized)) {
     return {
       isValid: false,
-      error: 'Username cannot end with an underscore',
+      error: 'Username cannot end with a hyphen',
     };
   }
 
-  // Check for consecutive underscores
-  if (/__/.test(normalized)) {
+  // Check for consecutive hyphens
+  if (/--/.test(normalized)) {
     return {
       isValid: false,
-      error: 'Username cannot contain consecutive underscores',
+      error: 'Username cannot contain consecutive hyphens',
     };
   }
 

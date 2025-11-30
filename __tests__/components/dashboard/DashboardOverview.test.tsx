@@ -1,8 +1,8 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/dashboard/actions';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
+import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 function makeProfile(
   partial: Partial<DrizzleCreatorProfile> = {}
@@ -39,19 +39,14 @@ function makeProfile(
   } as DrizzleCreatorProfile;
 }
 
-function makeData(
+function renderDashboard(
   profile: DrizzleCreatorProfile,
-  overrides: Partial<DashboardData> = {}
-): DashboardData {
-  return {
-    user: { id: 'db-user-1' },
-    creatorProfiles: [profile],
-    selectedProfile: profile,
-    needsOnboarding: false,
-    sidebarCollapsed: false,
-    hasSocialLinks: false,
-    ...overrides,
-  } satisfies DashboardData;
+  hasSocialLinks = false
+) {
+  const artist = convertDrizzleCreatorProfileToArtist(profile);
+  return render(
+    <DashboardOverview artist={artist} hasSocialLinks={hasSocialLinks} />
+  );
 }
 
 describe('DashboardOverview', () => {
@@ -64,9 +59,8 @@ describe('DashboardOverview', () => {
 
   it('renders setup tasks when incomplete', () => {
     const profile = makeProfile({ userId: null });
-    const data = makeData(profile, { hasSocialLinks: false });
 
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(profile, false);
 
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
@@ -98,9 +92,7 @@ describe('DashboardOverview', () => {
       userId: 'db-user-123',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
-    const data = makeData(profile, { hasSocialLinks: false });
-
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(profile, false);
 
     expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
 
@@ -134,9 +126,7 @@ describe('DashboardOverview', () => {
       userId: 'db-user-123',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
-    const data = makeData(profile, { hasSocialLinks: true });
-
-    render(<DashboardOverview initialData={data} />);
+    renderDashboard(profile, true);
 
     // Completion UI
     expect(screen.getByText('Profile Ready!')).toBeInTheDocument();

@@ -1,9 +1,13 @@
-import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
-import { cache } from 'react';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
-import { getCreatorProfileWithLinks } from '@/lib/db/queries';
+import {
+  getCreatorProfileWithLinks,
+  incrementProfileViews,
+} from '@/lib/db/queries';
 import {
   CreatorProfile,
   convertCreatorProfileToArtist,
@@ -16,80 +20,74 @@ import {
 
 // Using CreatorProfile type and convertCreatorProfileToArtist utility from types/db.ts
 
-// Cache the database query to prevent duplicate calls during page + metadata generation
-const getCreatorProfile = cache(
-  async (username: string): Promise<CreatorProfile | null> => {
+// Cache the database query across requests with a short TTL to keep hot profiles sub-100ms.
+// This helper returns both the legacy CreatorProfile and LegacySocialLink[] in one DB call.
+const getProfileAndLinks = unstable_cache(
+  async (
+    username: string
+  ): Promise<{
+    profile: CreatorProfile | null;
+    links: LegacySocialLink[];
+    status: 'ok' | 'not_found' | 'error';
+  }> => {
     try {
-      const profile = await getCreatorProfileWithLinks(username);
+      const result = await getCreatorProfileWithLinks(username);
 
-      if (!profile || !profile.isPublic) {
-        return null;
+      if (!result || !result.isPublic) {
+        return { profile: null, links: [], status: 'not_found' };
       }
 
-      // Convert Drizzle result to legacy format for compatibility
-      return {
-        id: profile.id,
-        user_id: profile.userId,
-        creator_type: profile.creatorType,
-        username: profile.username,
-        display_name: profile.displayName,
-        bio: profile.bio,
-        avatar_url: profile.avatarUrl,
-        spotify_url: profile.spotifyUrl,
-        apple_music_url: profile.appleMusicUrl,
-        youtube_url: profile.youtubeUrl,
-        spotify_id: profile.spotifyId,
-        is_public: profile.isPublic,
-        is_verified: profile.isVerified,
-        is_claimed: profile.isClaimed,
-        claim_token: profile.claimToken,
-        claimed_at: profile.claimedAt?.toISOString() || null,
-        settings: profile.settings,
-        theme: profile.theme,
-        is_featured: profile.isFeatured || false,
-        marketing_opt_out: profile.marketingOptOut || false,
-        profile_views: profile.profileViews || 0,
-        username_normalized: profile.usernameNormalized,
+      const profile: CreatorProfile = {
+        id: result.id,
+        user_id: result.userId,
+        creator_type: result.creatorType,
+        username: result.username,
+        display_name: result.displayName,
+        bio: result.bio,
+        avatar_url: result.avatarUrl,
+        spotify_url: result.spotifyUrl,
+        apple_music_url: result.appleMusicUrl,
+        youtube_url: result.youtubeUrl,
+        spotify_id: result.spotifyId,
+        is_public: !!result.isPublic,
+        is_verified: !!result.isVerified,
+        is_claimed: !!result.isClaimed,
+        claim_token: result.claimToken,
+        claimed_at: result.claimedAt?.toISOString() || null,
+        settings: result.settings,
+        theme: result.theme,
+        is_featured: result.isFeatured || false,
+        marketing_opt_out: result.marketingOptOut || false,
+        profile_views: result.profileViews || 0,
+        username_normalized: result.usernameNormalized,
         search_text:
-          `${profile.displayName || ''} ${profile.username} ${profile.bio || ''}`
+          `${result.displayName || ''} ${result.username} ${result.bio || ''}`
             .toLowerCase()
             .trim(),
-        display_title: profile.displayName || profile.username,
+        display_title: result.displayName || result.username,
         profile_completion_pct: 80, // Calculate based on filled fields
-        created_at: profile.createdAt.toISOString(),
-        updated_at: profile.updatedAt.toISOString(),
-      } as CreatorProfile;
+        created_at: result.createdAt.toISOString(),
+        updated_at: result.updatedAt.toISOString(),
+      };
+
+      const links: LegacySocialLink[] =
+        result.socialLinks?.map(link => ({
+          id: link.id,
+          artist_id: result.id,
+          platform: link.platform.toLowerCase(),
+          url: link.url,
+          clicks: link.clicks || 0,
+          created_at: link.createdAt.toISOString(),
+        })) ?? [];
+
+      return { profile, links, status: 'ok' };
     } catch (error) {
       console.error('Error fetching creator profile:', error);
-      return null;
+      return { profile: null, links: [], status: 'error' };
     }
-  }
-);
-
-// Cache function for social links from database
-const getSocialLinks = cache(
-  async (username: string): Promise<LegacySocialLink[]> => {
-    try {
-      const profile = await getCreatorProfileWithLinks(username);
-
-      if (!profile || !profile.socialLinks) {
-        return [];
-      }
-
-      // Convert Drizzle social links to legacy format
-      return profile.socialLinks.map(link => ({
-        id: link.id,
-        artist_id: profile.id,
-        platform: link.platform.toLowerCase(),
-        url: link.url,
-        clicks: link.clicks || 0,
-        created_at: link.createdAt.toISOString(),
-      }));
-    } catch (error) {
-      console.error('Error fetching social links:', error);
-      return [];
-    }
-  }
+  },
+  ['public-profile-v1'],
+  { revalidate: 60 }
 );
 
 interface Props {
@@ -106,18 +104,40 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const resolvedSearchParams = await searchParams;
   const { mode = 'profile' } = resolvedSearchParams || {};
 
-  // Parallel data fetching - profile first, then social links
-  const profile = await getCreatorProfile(username);
+  const normalizedUsername = username.toLowerCase();
+  const { profile, links, status } =
+    await getProfileAndLinks(normalizedUsername);
+
+  if (status === 'error') {
+    return (
+      <div className='px-4 py-8'>
+        <ErrorBanner
+          title='Profile is temporarily unavailable'
+          description='We could not load this Jovie profile right now. Please refresh or try again in a few minutes.'
+          actions={[
+            { label: 'Try again', href: `/${normalizedUsername}` },
+            { label: 'Go home', href: '/' },
+          ]}
+          testId='public-profile-error'
+        />
+      </div>
+    );
+  }
 
   if (!profile) {
     notFound();
   }
 
+  // Track profile view (fire-and-forget, non-blocking)
+  incrementProfileViews(normalizedUsername).catch(() => {
+    // Fail silently, don't block page render
+  });
+
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  // Fetch social links from database
-  const socialLinks = await getSocialLinks(username);
+  // Social links loaded together with profile in a single cached helper
+  const socialLinks = links;
 
   // Determine subtitle based on mode
   const getSubtitle = (mode: string) => {
@@ -154,7 +174,14 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 // Generate metadata for the page
 export async function generateMetadata({ params }: Props) {
   const { username } = await params;
-  const profile = await getCreatorProfile(username);
+  const { profile, status } = await getProfileAndLinks(username.toLowerCase());
+
+  if (status === 'error') {
+    return {
+      title: 'Profile temporarily unavailable',
+      description: 'We are working to restore this profile. Please try again.',
+    };
+  }
 
   if (!profile) {
     return {
@@ -198,8 +225,7 @@ export async function generateMetadata({ params }: Props) {
 // Note: generateStaticParams removed to allow edge runtime
 // Edge runtime provides better performance for dynamic profile pages
 
-// Enable ISR with 30 minute revalidation for fresher content
-export const revalidate = 1800;
-
-// Temporarily disable edge runtime for debugging
-// export const runtime = 'edge';
+// Always render dynamically to ensure 404s return correct status
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+export const runtime = 'edge';

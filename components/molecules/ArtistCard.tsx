@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
-import { OptimizedAvatar } from '@/components/ui/OptimizedAvatar';
+import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 
 export interface ArtistCardProps {
   handle: string;

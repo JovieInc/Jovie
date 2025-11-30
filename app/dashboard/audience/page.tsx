@@ -21,7 +21,7 @@ export default async function AudiencePage() {
     }
 
     // Pass server-fetched data to client component
-    return <DashboardAudience initialData={dashboardData} />;
+    return <DashboardAudience />;
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
@@ -33,13 +33,15 @@ export default async function AudiencePage() {
 
     // On actual error, show a simple error message
     return (
-      <div className='text-center'>
-        <h1 className='text-2xl font-semibold text-gray-900 dark:text-white mb-4'>
-          Something went wrong
-        </h1>
-        <p className='text-gray-600 dark:text-white/70 mb-4'>
-          Failed to load audience data. Please refresh the page.
-        </p>
+      <div className='flex items-center justify-center'>
+        <div className='w-full max-w-lg rounded-xl border border-subtle bg-surface-1 p-6 text-center shadow-sm'>
+          <h1 className='mb-3 text-2xl font-semibold text-primary-token'>
+            Something went wrong
+          </h1>
+          <p className='mb-4 text-secondary-token'>
+            Failed to load audience data. Please refresh the page.
+          </p>
+        </div>
       </div>
     );
   }

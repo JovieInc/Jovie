@@ -1,32 +1,40 @@
-'use client';
-
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { publishProfileBasics } from '@/app/dashboard/actions';
+import { Input } from '@/components/atoms/Input';
+import { Textarea } from '@/components/atoms/Textarea';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
+import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
-  initialData: DashboardData;
+  artist: Artist | null;
+  hasSocialLinks: boolean;
 }
 
-export function DashboardOverview({ initialData }: DashboardOverviewProps) {
-  const artist: Artist | null = initialData.selectedProfile
-    ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
-    : null;
-
+export function DashboardOverview({
+  artist,
+  hasSocialLinks,
+}: DashboardOverviewProps) {
   if (!artist) {
-    return null; // Safety: server should always provide a selected profile
+    return (
+      <StarterEmptyState
+        title='We could not load your profile'
+        description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
+        primaryAction={{ label: 'Refresh dashboard', href: '/dashboard' }}
+        secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
+        testId='dashboard-missing-profile'
+      />
+    );
   }
 
   const isHandleClaimed = Boolean(artist.owner_user_id);
   const hasMusicLink = Boolean(
     artist.spotify_url || artist.apple_music_url || artist.youtube_url
   );
-  const hasSocialLinks = initialData.hasSocialLinks;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
   const totalSteps = 3;
   const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
@@ -41,6 +49,58 @@ export function DashboardOverview({ initialData }: DashboardOverviewProps) {
           Welcome back, {artist.name || 'Artist'}
         </p>
       </div>
+
+      <DashboardCard variant='settings' className='mb-6'>
+        <form
+          action={publishProfileBasics}
+          className='space-y-4'
+          data-testid='profile-publish-form'
+        >
+          <input type='hidden' name='profileId' value={artist.id} />
+          <div className='space-y-2'>
+            <label
+              className='text-sm font-medium text-secondary-token'
+              htmlFor='displayName'
+            >
+              Display name
+            </label>
+            <Input
+              id='displayName'
+              name='displayName'
+              defaultValue={artist.name ?? ''}
+              required
+            />
+          </div>
+          <div className='space-y-2'>
+            <label
+              className='text-sm font-medium text-secondary-token'
+              htmlFor='bio'
+            >
+              Bio (optional)
+            </label>
+            <Textarea
+              id='bio'
+              name='bio'
+              defaultValue={artist.tagline ?? ''}
+              rows={3}
+            />
+          </div>
+          <div className='flex flex-wrap gap-3'>
+            <Button type='submit' size='sm' variant='primary'>
+              Save &amp; Publish
+            </Button>
+            <Button asChild size='sm' variant='secondary'>
+              <Link
+                href={`/${artist.handle}`}
+                target='_blank'
+                rel='noopener noreferrer'
+              >
+                Preview live profile
+              </Link>
+            </Button>
+          </div>
+        </form>
+      </DashboardCard>
 
       <DashboardCard variant='settings'>
         <h3 className='text-lg font-medium text-primary-token mb-4'>

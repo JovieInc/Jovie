@@ -1,16 +1,37 @@
-import { type NeonQueryFunction, neon } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
+import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
 import { env } from '@/lib/env';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
 
+declare const EdgeRuntime: string | undefined;
+
+const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
+const isWebSocketAvailable = typeof WebSocket !== 'undefined';
+
+// Configure WebSocket for Node runtimes only, preferring the built-in WebSocket
+// to avoid bundling issues with `ws` in serverless/preview environments.
+const webSocketConstructor = !isEdgeRuntime
+  ? isWebSocketAvailable
+    ? (WebSocket as unknown as typeof ws)
+    : ws
+  : undefined;
+
+if (webSocketConstructor) {
+  neonConfig.webSocketConstructor = webSocketConstructor;
+}
+// Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
+// but ensure firewall rules allow it if WS performance is required.
+
 declare global {
-  var db: NeonHttpDatabase<typeof schema> | undefined;
+  var db: NeonDatabase<typeof schema> | undefined;
+  var pool: Pool | undefined;
 }
 
 // Create the database client with schema
-export type DbType = NeonHttpDatabase<typeof schema>;
+export type DbType = NeonDatabase<typeof schema>;
 export type TransactionType = Parameters<DbType['transaction']>[0] extends (
   tx: infer T
 ) => unknown
@@ -140,7 +161,8 @@ function isRetryableError(error: unknown): boolean {
 
 // Lazy initialization of database connection
 let _db: DbType | undefined;
-let _sql: NeonQueryFunction<false, false> | undefined;
+let _pool: Pool | undefined;
+let cleanupRegistered = false;
 
 function initializeDb(): DbType {
   // Validate the database URL at runtime
@@ -152,22 +174,57 @@ function initializeDb(): DbType {
     );
   }
 
-  logDbInfo('db_init', 'Initializing database connection', {
-    environment: process.env.NODE_ENV,
-    hasUrl: !!databaseUrl,
-  });
+  logDbInfo(
+    'db_init',
+    'Initializing database connection with transaction support',
+    {
+      environment: process.env.NODE_ENV,
+      hasUrl: !!databaseUrl,
+      transactionSupport: !isEdgeRuntime, // WebSocket/transactions not available in Edge
+      isEdge: isEdgeRuntime,
+    }
+  );
 
-  // Create the database connection with enhanced configuration
-  if (!_sql) {
-    _sql = neon(databaseUrl);
+  // Create the database connection pool
+  // Note: Pool works in both Edge and Node, but WebSocket (for transactions) is Node-only
+  if (!_pool) {
+    _pool = new Pool({ connectionString: databaseUrl });
+
+    // In development, clean up pools created during hot reloads to avoid leaks
+    if (
+      process.env.NODE_ENV !== 'production' &&
+      !cleanupRegistered &&
+      typeof process !== 'undefined' &&
+      'once' in process &&
+      typeof process.once === 'function'
+    ) {
+      cleanupRegistered = true;
+      const cleanup = () => {
+        if (_pool) {
+          _pool.end().catch(() => {});
+          _pool = undefined;
+        }
+      };
+
+      process.once('beforeExit', cleanup);
+      process.once('SIGINT', () => {
+        cleanup();
+        process.exit(0);
+      });
+      process.once('SIGTERM', () => {
+        cleanup();
+        process.exit(0);
+      });
+    }
   }
 
   // Use a single connection in development to avoid connection pool exhaustion
   if (process.env.NODE_ENV === 'production') {
-    return drizzle(_sql, { schema, logger: false });
+    return drizzle(_pool, { schema, logger: false });
   } else {
     if (!global.db) {
-      global.db = drizzle(_sql, {
+      global.pool = _pool;
+      global.db = drizzle(_pool, {
         schema,
         logger: {
           logQuery: (query, params) => {
@@ -230,6 +287,9 @@ export async function setSessionUser(userId: string) {
       if (!_db) {
         _db = initializeDb();
       }
+      // Primary session variable for RLS policies
+      await _db.execute(drizzleSql`SET LOCAL app.user_id = ${userId}`);
+      // Backwards-compatible session variable for legacy policies and tooling
       await _db.execute(drizzleSql`SET LOCAL app.clerk_user_id = ${userId}`);
     }, 'setSessionUser');
 

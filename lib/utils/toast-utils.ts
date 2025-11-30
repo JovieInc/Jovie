@@ -1,6 +1,6 @@
 'use client';
 
-import type { ToastOptions } from '@/components/ui/ToastContainer';
+import type { ToastOptions } from '@/components/molecules/ToastContainer';
 
 /**
  * Utility functions for common toast patterns

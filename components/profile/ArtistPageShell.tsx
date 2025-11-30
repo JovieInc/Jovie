@@ -35,7 +35,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       showTipButton={showTipButton}
       showBackButton={showBackButton}
       showFooter={showFooter}
-      showNotificationButton={process.env.NODE_ENV === 'development'}
+      showNotificationButton
       maxWidthClass={maxWidthClass}
       backgroundPattern='gradient'
       showGradientBlurs={true}

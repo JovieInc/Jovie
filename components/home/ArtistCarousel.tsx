@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { OptimizedImage } from '@/components/ui/OptimizedImage';
+import { OptimizedImage } from '@/components/atoms/OptimizedImage';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 interface Artist {
@@ -44,6 +44,8 @@ export function ArtistCarousel({ artists }: ArtistCarouselProps) {
                     size='2xl'
                     shape='circle'
                     className='w-full h-full object-cover'
+                    aspectRatio='square'
+                    sizes='(max-width: 640px) 96px, (max-width: 1024px) 128px, 128px'
                   />
                 </div>
 

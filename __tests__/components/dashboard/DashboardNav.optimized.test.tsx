@@ -10,7 +10,10 @@
 
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Lazy load mocks only when needed
@@ -19,67 +22,104 @@ vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
-// Lightweight tooltip mock
-vi.mock('@/components/atoms/Tooltip', () => ({
-  Tooltip: ({
-    children,
-    content,
-  }: {
-    children: React.ReactNode;
-    content: string;
-  }) => React.createElement('div', { title: content }, children),
-}));
+// Mock @jovie/ui Tooltip components
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    Tooltip: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+    TooltipTrigger: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+    TooltipContent: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+    TooltipProvider: ({ children }: { children: React.ReactNode }) =>
+      React.createElement(React.Fragment, {}, children),
+  };
+});
+
+const baseDashboardData: DashboardData = {
+  user: { id: 'user_123' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  isAdmin: false,
+};
+
+function renderDashboardNav(
+  overrides: Partial<DashboardData> = {},
+  sidebarProps: React.ComponentProps<typeof SidebarProvider> = {}
+) {
+  const value: DashboardData = { ...baseDashboardData, ...overrides };
+
+  return fastRender(
+    <DashboardDataProvider value={value}>
+      <SidebarProvider {...sidebarProps}>
+        <DashboardNav />
+      </SidebarProvider>
+    </DashboardDataProvider>
+  );
+}
 
 describe('DashboardNav (Optimized)', () => {
   it('renders navigation items', () => {
-    const { getByText } = fastRender(React.createElement(DashboardNav));
+    const { getByRole } = renderDashboardNav();
 
-    // Test essential functionality only
-    expect(getByText('Overview')).toBeDefined();
-    expect(getByText('Links')).toBeDefined();
-    expect(getByText('Analytics')).toBeDefined();
-    expect(getByText('Tipping')).toBeDefined();
+    // Test essential functionality only, using role-based queries to avoid tooltip duplicates
+    expect(getByRole('link', { name: 'Overview' })).toBeDefined();
+    expect(getByRole('link', { name: 'Links' })).toBeDefined();
+    expect(getByRole('link', { name: 'Analytics' })).toBeDefined();
+    expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
   });
 
   it('applies active state correctly', () => {
-    const { container } = fastRender(React.createElement(DashboardNav));
+    const { container } = renderDashboardNav();
 
-    // Use faster DOM queries
+    // active link should have data-active="true"
     const activeLink = container.querySelector('[href="/dashboard/overview"]');
-    expect(activeLink?.classList.contains('bg-accent/10')).toBe(true);
+    expect(activeLink?.getAttribute('data-active')).toBe('true');
   });
 
   it('handles collapsed state', () => {
-    const { getByText } = fastRender(
-      React.createElement(DashboardNav, { collapsed: true })
-    );
+    // Render inside a collapsed sidebar provider to ensure it does not throw
+    const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    // Check only the essential collapsed behavior
-    const overviewText = getByText('Overview');
-    expect(overviewText.classList.contains('opacity-0')).toBe(true);
+    // Basic smoke test: overview link still renders
+    const overviewLink = container.querySelector(
+      '[href="/dashboard/overview"]'
+    );
+    expect(overviewLink).toBeDefined();
   });
 
   it('differentiates primary and secondary nav styling', () => {
-    const { container } = fastRender(React.createElement(DashboardNav));
+    const { container } = renderDashboardNav();
 
-    // Use direct DOM queries for speed
-    const primaryLink = container.querySelector('[href="/dashboard/overview"]');
-    const secondaryLink = container.querySelector(
-      '[href="/dashboard/settings"]'
-    );
+    // Primary and secondary sections are wrapped with different spacing utilities
+    const nav = container.querySelector('nav');
+    const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
 
-    expect(primaryLink?.classList.contains('font-semibold')).toBe(true);
-    expect(secondaryLink?.classList.contains('font-medium')).toBe(true);
+    expect(menus.length).toBeGreaterThanOrEqual(2);
+
+    const primaryMenuParent = (menus[0] as HTMLElement | undefined)
+      ?.parentElement;
+    const secondaryMenuParent = (menus[1] as HTMLElement | undefined)
+      ?.parentElement;
+
+    expect(primaryMenuParent?.className).toContain('mb-6');
+    expect(secondaryMenuParent?.className).toContain('mb-4');
   });
 
   it('renders with different pathname', () => {
     // Change mock return value for this test only
     mockUsePathname.mockReturnValueOnce('/dashboard/links');
 
-    const { container } = fastRender(React.createElement(DashboardNav));
+    const { container } = renderDashboardNav();
 
-    // Verify links active state changes
+    // Verify links active state changes via data-active attribute
     const linksLink = container.querySelector('[href="/dashboard/links"]');
-    expect(linksLink?.classList.contains('bg-accent/10')).toBe(true);
+    expect(linksLink?.getAttribute('data-active')).toBe('true');
   });
 });

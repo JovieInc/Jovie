@@ -5,7 +5,8 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { DashboardData, ProfileSocialLink } from '@/app/dashboard/actions';
+import type { ProfileSocialLink } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { debounce } from '@/lib/utils';
@@ -57,17 +58,17 @@ interface SaveStatus {
 }
 
 export function EnhancedDashboardLinks({
-  initialData,
   initialLinks,
 }: {
-  initialData: DashboardData;
   initialLinks: ProfileSocialLink[];
 }) {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
+  const profileId = dashboardData.selectedProfile?.id;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
     saving: false,
@@ -207,24 +208,27 @@ export function EnhancedDashboardLinks({
             displayText: l.title,
           }));
 
-          const response = await fetch('/api/links', {
-            method: 'POST',
+          if (!profileId) {
+            setSaveStatus({
+              saving: false,
+              success: false,
+              error:
+                'Missing profile id; please refresh the page and try again.',
+              lastSaved: null,
+            });
+            toast.error('Unable to save links. Please refresh and try again.');
+            return;
+          }
+
+          const response = await fetch('/api/dashboard/social-links', {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ links: payload }),
+            body: JSON.stringify({ profileId, links: payload }),
           });
           if (!response.ok) throw new Error('Failed to save links');
 
-          const data: { links: Array<{ id: string; url: string }> } =
-            await response.json();
-
-          const updatedLinks: LinkItem[] = data.links.map((link, index) => {
-            const existing = normalized.find(
-              l => l.normalizedUrl === link.url
-            )!;
-            return { ...existing, id: link.id, order: index };
-          });
-
-          setLinks(updatedLinks);
+          // Keep normalized links locally; server IDs will be applied on next load
+          setLinks(normalized);
 
           const now = new Date();
           setSaveStatus({
@@ -248,7 +252,7 @@ export function EnhancedDashboardLinks({
           toast.error('Failed to save links. Please try again.');
         }
       }, 500),
-    []
+    [profileId]
   );
 
   // Handle adding a new link
@@ -413,10 +417,10 @@ export function EnhancedDashboardLinks({
           {/* Preview Container */}
           <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
             <div className='mb-4 flex items-center justify-between'>
-              <h2 className='text-lg font-semibold text-gray-900 dark:text-white'>
+              <h2 className='text-lg font-semibold text-primary-token'>
                 Live Preview
               </h2>
-              <div className='text-sm text-gray-500 dark:text-gray-400'>
+              <div className='text-sm text-secondary-token'>
                 Last saved:{' '}
                 {saveStatus.lastSaved
                   ? saveStatus.lastSaved.toLocaleTimeString()
@@ -435,11 +439,11 @@ export function EnhancedDashboardLinks({
 
           {/* URL Preview */}
           <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-white mb-3'>
+            <h3 className='text-sm font-medium text-primary-token mb-3'>
               Your Profile URL
             </h3>
             <div className='flex flex-col sm:flex-row gap-2'>
-              <div className='flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 font-mono truncate'>
+              <div className='flex-1 bg-surface-2 rounded-lg px-3 py-2 text-sm text-primary-token font-mono truncate'>
                 {typeof window !== 'undefined'
                   ? `${window.location.origin}${profilePath}`
                   : 'Loading...'}
@@ -467,7 +471,7 @@ export function EnhancedDashboardLinks({
                 </Button>
               </div>
             </div>
-            <p className='mt-2 text-xs text-gray-500 dark:text-gray-400'>
+            <p className='mt-2 text-xs text-secondary-token'>
               Share this link with your audience
             </p>
           </div>

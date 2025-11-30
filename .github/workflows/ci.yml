@@ -2,18 +2,18 @@ name: CI
 
 on:
   pull_request:
-    branches: [preview, production]
+    branches: [main, production]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
       - '.vscode/**'
   push:
-    branches: [preview, production, 'codegen-bot/**']
+    branches: [main, production, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
   merge_group:
-    branches: [preview, production]
+    branches: [main, production]
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache TS build info
@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }  # Optimized: no git history needed
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache ESLint cache
@@ -72,7 +72,7 @@ jobs:
   neon-db:
     name: Neon DB
     # Only run for push/merge_group and PRs to production (or full-ci label)
-    # Skip for preview PRs to keep fast lane truly fast (UI-only changes don't need DB)
+    # Skip for PRs to main to keep the fast lane truly fast (UI-only changes don't need DB)
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -80,7 +80,7 @@ jobs:
       db_url: ${{ steps.finalize-urls.outputs.db_url }}
       db_url_pooled: ${{ steps.finalize-urls.outputs.db_url_pooled }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 1
       - name: Determine sanitized branch name
@@ -110,8 +110,8 @@ jobs:
             echo "Neon branch creation did not return db_url; falling back to repository secrets."
             if [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.NEON_DATABASE_URL }}"
-            elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
-              DB_URL="${{ secrets.DATABASE_URL_PREVIEW }}"
+            elif [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+              DB_URL="${{ secrets.DATABASE_URL_MAIN }}"
             elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
               DB_URL="${{ secrets.DATABASE_URL }}"
             fi
@@ -126,7 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Run Migration Guard
@@ -146,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -163,10 +163,10 @@ jobs:
             echo "Using NEON_DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
             SRC="secret:NEON_DATABASE_URL"
-          elif [ -n "${{ secrets.DATABASE_URL_PREVIEW }}" ]; then
-            echo "Using DATABASE_URL_PREVIEW secret"
-            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PREVIEW }}" >> $GITHUB_ENV
-            SRC="secret:DATABASE_URL_PREVIEW"
+          elif [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+            echo "Using DATABASE_URL_MAIN secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL_MAIN"
           elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
             echo "Using DATABASE_URL secret"
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -282,9 +282,9 @@ jobs:
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          # For push events to production/preview, always run full CI
-          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/preview") ]]; then
-            echo "Running full CI for push to production/preview branch"
+          # For push events to production/main, always run full CI
+          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/main") ]]; then
+            echo "Running full CI for push to production/main branch"
             echo "run_full_ci=true" >> $GITHUB_OUTPUT
             exit 0
           fi
@@ -338,9 +338,9 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: pnpm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   ci-unit-tests:
@@ -350,7 +350,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -392,16 +392,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Build (smoke)
         run: pnpm run build
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
   ci-e2e-tests:
@@ -417,7 +417,7 @@ jobs:
       # Increase Node.js memory limit for tests
       NODE_OPTIONS: '--max_old_space_size=4096'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -463,8 +463,8 @@ jobs:
         run: pnpm run e2e:smoke --trace=retain-on-failure
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
-      - name: E2E Full (Preview Branch)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/preview' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+      - name: E2E Full (Main Branch)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: pnpm run test:e2e --reporter=line
 
       - name: Upload Playwright Artifacts on Failure
@@ -481,13 +481,13 @@ jobs:
     name: Preview Deploy (PR)
     # Only needs build - no DB dependencies for fast UI-only PRs
     needs: [ci-build]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'preview' && github.event.pull_request.head.repo.fork == false }}
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with: { node-version: 20 }
       - name: Install Vercel CLI
@@ -503,25 +503,25 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       - name: Deploy (PR preview, fast deployment for UI-only changes)
         id: pr_deploy
         run: |
-          # For fast preview PRs: use preview secrets (no Neon dependency)
+          # For fast preview PRs: use main secrets (no Neon dependency)
           # Fallback hierarchy for maximum compatibility
           POOLED_URL=""
-          if [ -n "$DATABASE_URL_PREVIEW" ]; then
-            POOLED_URL="$DATABASE_URL_PREVIEW"
-            echo "Using preview database URL"
+          if [ -n "$DATABASE_URL_MAIN" ]; then
+            POOLED_URL="$DATABASE_URL_MAIN"
+            echo "Using main database URL"
           elif [ -n "$DATABASE_URL" ]; then
             POOLED_URL="$DATABASE_URL"
             echo "Using fallback database URL"
           else
             # Provide cheap stub for UI-only deployments that might not need DB
-            POOLED_URL="postgresql://stub:stub@localhost:5432/preview_stub"
+            POOLED_URL="postgresql://stub:stub@localhost:5432/main_stub"
             echo "Using stub database URL for UI-only deployment"
           fi
 
@@ -536,38 +536,36 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          # Use preview secrets - no Neon dependency for fast deployments
-          DATABASE_URL_PREVIEW: ${{ secrets.DATABASE_URL_PREVIEW }}
+          # Use main secrets - no Neon dependency for fast deployments
+          DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
   deploy:
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before preview deploy
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
-      name: Preview
-      url: https://preview.jov.ie
+      name: Main Staging
+      url: https://main.jov.ie
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v5
-        with: { node-version: 20 }
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: DB migrate (preview - Drizzle)
-        run: pnpm run drizzle:migrate:preview
+      - name: DB migrate (main - Drizzle)
+        run: pnpm run drizzle:migrate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_PREVIEW }}
-          GIT_BRANCH: preview
-        continue-on-error: true
-      - name: DB seed (preview)
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
+          GIT_BRANCH: main
+          ALLOW_PROD_MIGRATIONS: 'true'  # Allow automated migrations on main (staging environment)
+      - name: DB seed (main)
         run: pnpm run db:seed
         env:
-          GIT_BRANCH: preview
+          GIT_BRANCH: main
         continue-on-error: false
-      - name: Pull env (preview)
+      - name: Pull env (main)
         run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -577,9 +575,9 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
       - name: Deploy (prebuilt)
         id: deploy
@@ -590,9 +588,9 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Canary health check
+      - name: Canary health check (Main deployment)
         run: |
-          echo "Running canary health check on preview deployment..."
+          echo "Running canary health check on main deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
 
           # Wait a moment for deployment to be ready
@@ -613,33 +611,33 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Canary passed: Preview deployment healthy"
+          echo "✅ Canary passed: Main deployment healthy"
         continue-on-error: false
 
   promote:
     name: Auto Promote to Production (Primary)
-    # PRIMARY: Automatic promotion path - creates/updates preview → production PR
+    # PRIMARY: Automatic promotion path - creates/updates main → production PR
     # Fallback: Manual promotion available via auto-promote.yml workflow
     needs: [deploy]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/preview' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 2 }
-      - name: Create/Update PR preview → production (manual review required)
+      - name: Create/Update PR main → production (manual review required)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Create PR body with QA checklist
-          pr_body="## Release Promotion: preview → production
+          pr_body="## Release Promotion: main → production
 
           **⚠️ Manual Review Required**
 
-          This PR promotes changes from \`preview\` to \`production\` for production release.
+          This PR promotes changes from `main` to `production` for production release.
 
           ### Pre-merge Checklist
           - [ ] **Full CI passed** (ci-full job completed successfully)
@@ -652,7 +650,7 @@ jobs:
           - [ ] **Rollback plan documented** (feature flags, DB, etc.)
 
           ### Release QA
-          - [ ] **Smoke tests passed** in preview environment
+          - [ ] **Smoke tests passed** in main environment
           - [ ] **Key user journeys verified** manually
           - [ ] **Mobile/responsive tested** (if UI changes)
           - [ ] **Cross-browser compatibility** verified (if applicable)
@@ -666,13 +664,13 @@ jobs:
           **🚨 Do not merge until all checks pass and manual QA is complete.**"
 
           # Check if PR already exists
-          existing_pr=$(gh pr list --head preview --base production --json number --jq '.[0].number // empty')
+          existing_pr=$(gh pr list --head main --base production --json number --jq '.[0].number // empty')
           if [ -z "$existing_pr" ]; then
-            echo "Creating new PR: preview → production"
-            gh pr create --base production --head preview --title "🚀 Release: Promote preview → production" --body "$pr_body"
+            echo "Creating new PR: main → production"
+            gh pr create --base production --head main --title "🚀 Release: Promote main → production" --body "$pr_body"
           else
             echo "PR already exists: #$existing_pr (updating with latest checklist)"
-            gh pr edit "$existing_pr" --title "🚀 Release: Promote preview → production" --body "$pr_body"
+            gh pr edit "$existing_pr" --title "🚀 Release: Promote main → production" --body "$pr_body"
           fi
 
   ai-review-gate:
@@ -777,7 +775,7 @@ jobs:
       name: Production
       url: https://jov.ie
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
         with:
           node-version: 20
@@ -810,3 +808,15 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  lighthouse-ci-production:
+    name: Lighthouse CI (Production)
+    needs: [deploy-prod]
+    if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run Lighthouse CI against production
+        run: npx lhci autorun --config=.lighthouserc.json

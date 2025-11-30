@@ -5,7 +5,7 @@ name: 'Security Rules'
 description: 'Security-focused rules for vulnerability scanning and code security'
 target:
   repository:
-    - 'itstimwhite/Jovie'
+    - 'JovieInc/Jovie'
 rules:
   - name: 'Require security analysis to pass before merging'
     enforcement: 'active'

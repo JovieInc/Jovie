@@ -35,8 +35,8 @@ export function EnhancedThemeToggle({
     ) : (
       <div className='flex items-center space-x-3'>
         <span className='text-sm text-secondary-token'>Light</span>
-        <div className='relative inline-flex h-6 w-11 flex-shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
-          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'></span>
+        <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
+          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out'></span>
         </div>
         <span className='text-sm text-secondary-token'>Dark</span>
       </div>
@@ -131,13 +131,13 @@ export function EnhancedThemeToggle({
             disabled={isUpdating}
             onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
             className={cn(
-              'w-8 h-8 p-0 group items-center justify-center rounded-md border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground',
-              isUpdating ? 'animate-pulse' : 'hover:scale-105 active:scale-95'
+              'flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token transition-colors duration-150',
+              isUpdating && 'opacity-70'
             )}
           >
             {isDark ? (
               <svg
-                className='h-4 w-4 mx-auto my-auto text-blue-400 group-hover:text-blue-300 transition-colors duration-200'
+                className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >
@@ -149,7 +149,7 @@ export function EnhancedThemeToggle({
               </svg>
             ) : (
               <svg
-                className='h-4 w-4 mx-auto my-auto text-amber-500 group-hover:text-amber-400 transition-colors duration-200'
+                className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >
@@ -176,7 +176,7 @@ export function EnhancedThemeToggle({
           type='button'
           disabled={isUpdating}
           onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-          className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
+          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
             isDark ? 'bg-accent' : 'bg-surface-hover-token'
           } p-0.5`}
           role='switch'
@@ -189,7 +189,7 @@ export function EnhancedThemeToggle({
           </span>
           <span
             aria-hidden='true'
-            className={`flex h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
+            className={`flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
               isDark ? 'translate-x-5' : 'translate-x-0'
             } ${isUpdating ? 'animate-pulse' : ''}`}
           >
@@ -207,7 +207,7 @@ export function EnhancedThemeToggle({
               </svg>
             ) : (
               <svg
-                className='h-3 w-3 text-yellow-500'
+                className='h-3 w-3 text-accent-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >

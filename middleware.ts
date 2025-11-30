@@ -84,11 +84,25 @@ export default clerkMiddleware(async (auth, req) => {
 
     let res: NextResponse;
 
-    // Handle auth route redirects (normalize to non-hyphenated versions)
-    if (pathname === '/sign-in') {
-      res = NextResponse.redirect(new URL('/signin', req.url));
-    } else if (pathname === '/sign-up') {
-      res = NextResponse.redirect(new URL('/signup', req.url));
+    const isAuthPath =
+      pathname === '/signin' ||
+      pathname === '/sign-in' ||
+      pathname === '/signup' ||
+      pathname === '/sign-up';
+
+    if (userId && isAuthPath) {
+      // If the user is already signed in and hits any auth page, send them to the dashboard
+      res = NextResponse.redirect(new URL('/dashboard', req.url));
+    } else if (!userId && pathname === '/sign-in') {
+      // Normalize legacy /sign-in to /signin
+      const url = req.nextUrl.clone();
+      url.pathname = '/signin';
+      res = NextResponse.redirect(url);
+    } else if (!userId && pathname === '/sign-up') {
+      // Normalize legacy /sign-up to /signup
+      const url = req.nextUrl.clone();
+      url.pathname = '/signup';
+      res = NextResponse.redirect(url);
     } else if (userId) {
       // Handle authenticated user redirects
       if (req.nextUrl.pathname === '/') {
@@ -98,7 +112,11 @@ export default clerkMiddleware(async (auth, req) => {
       }
     } else {
       // Handle unauthenticated users
-      if (req.nextUrl.pathname.startsWith('/dashboard')) {
+      if (
+        pathname.startsWith('/dashboard') ||
+        pathname.startsWith('/account') ||
+        pathname.startsWith('/billing')
+      ) {
         // Redirect unauthenticated users to sign-in
         const signInUrl = new URL('/signin', req.url);
         signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);

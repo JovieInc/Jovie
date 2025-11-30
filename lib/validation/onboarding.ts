@@ -12,8 +12,9 @@ export const onboardingSchema = z.object({
     .string()
     .min(1, { message: 'Full name is required' })
     .max(50, { message: 'Must be no more than 50 characters' })
-    .regex(/^[a-zA-Z0-9\s\-'\.]+$/, {
-      message: 'Only letters, numbers, spaces, hyphens, apostrophes, and periods are allowed',
+    .regex(/^[\p{L}0-9\s\-'\.]+$/u, {
+      message:
+        'Only letters, numbers, spaces, hyphens, apostrophes, and periods are allowed',
     }),
 });
 

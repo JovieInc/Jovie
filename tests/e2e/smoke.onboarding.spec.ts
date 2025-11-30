@@ -138,11 +138,11 @@ test.describe('Onboarding smoke', () => {
         )
         .toBe(true);
 
-      // 5) Submit and expect redirect to dashboard
+      // 5) Submit and expect redirect to dashboard overview
       await submit.click();
 
-      // Wait for URL change to dashboard
-      await page.waitForURL('**/dashboard', {
+      // Wait for URL change to dashboard overview
+      await page.waitForURL('**/dashboard/overview', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       });

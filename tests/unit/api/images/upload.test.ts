@@ -2,56 +2,85 @@ import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@/app/api/images/upload/route';
 
+// Hoist mocks before they're used
+const { mockAuth, mockInsert, mockUpdate, mockEq } = vi.hoisted(() => ({
+  mockAuth: vi.fn(),
+  mockInsert: vi.fn(),
+  mockUpdate: vi.fn(),
+  mockEq: vi.fn(),
+}));
+
 // Mock dependencies
 vi.mock('@clerk/nextjs/server', () => ({
-  auth: vi.fn(),
+  auth: mockAuth,
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    insert: vi.fn(),
-    update: vi.fn(),
+    insert: mockInsert,
+    update: mockUpdate,
   },
   profilePhotos: {},
 }));
 
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn(),
+  eq: mockEq,
 }));
 
-const { auth } = vi.hoisted(() => ({
-  auth: vi.fn(),
+vi.mock('@/lib/rate-limit', () => ({
+  avatarUploadRateLimit: null, // Disabled in tests
 }));
 
-vi.hoisted(() => ({
-  db: {
-    insert: vi.fn().mockReturnValue({
+function createMultipartRequest(formData: FormData): NextRequest {
+  const request = new NextRequest('http://localhost:3000/api/images/upload', {
+    method: 'POST',
+  });
+
+  // Explicitly mock formData resolution instead of relying on NextRequest's
+  // internal body handling in the Vitest environment.
+  const requestWithFormData = request as NextRequest & {
+    formData: () => Promise<FormData>;
+  };
+  requestWithFormData.formData = async () => formData;
+
+  request.headers.set(
+    'content-type',
+    'multipart/form-data; boundary=----vitest-test-boundary'
+  );
+
+  return request;
+}
+
+describe('/api/images/upload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Setup default mock implementations
+    mockInsert.mockReturnValue({
       values: vi.fn().mockReturnValue({
         returning: vi.fn().mockResolvedValue([
           {
             id: 'test-photo-id',
             userId: 'test-user-id',
             status: 'uploading',
+            originalFilename: 'test.jpg',
+            mimeType: 'image/jpeg',
+            fileSize: 1024,
           },
         ]),
       }),
-    }),
-    update: vi.fn().mockReturnValue({
+    });
+
+    mockUpdate.mockReturnValue({
       set: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue(undefined),
       }),
-    }),
-  },
-}));
-
-describe('/api/images/upload', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+    });
   });
 
   it('should reject requests without authentication', async () => {
     // Mock no user
-    auth.mockResolvedValue({ userId: null });
+    mockAuth.mockResolvedValue({ userId: null });
 
     const request = new NextRequest('http://localhost:3000/api/images/upload', {
       method: 'POST',
@@ -66,15 +95,12 @@ describe('/api/images/upload', () => {
 
   it('should reject requests without files', async () => {
     // Mock authenticated user
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     // Create form data without file
     const formData = new FormData();
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -85,17 +111,14 @@ describe('/api/images/upload', () => {
 
   it('should reject non-image files', async () => {
     // Mock authenticated user
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     // Create form data with non-image file
     const formData = new FormData();
     const file = new File(['test'], 'test.txt', { type: 'text/plain' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -106,18 +129,16 @@ describe('/api/images/upload', () => {
 
   it('should reject files larger than 4MB', async () => {
     // Mock authenticated user
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
-    // Create large file (5MB)
-    const largeContent = new Array(5 * 1024 * 1024).fill('a').join('');
     const formData = new FormData();
-    const file = new File([largeContent], 'large.jpg', { type: 'image/jpeg' });
+    const file = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(file, 'size', {
+      value: 5 * 1024 * 1024 + 1,
+    });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(400);
@@ -128,7 +149,7 @@ describe('/api/images/upload', () => {
 
   it('should successfully process valid image upload', async () => {
     // Mock authenticated user
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     // Create valid image file
     const formData = new FormData();
@@ -137,10 +158,7 @@ describe('/api/images/upload', () => {
     });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
@@ -152,48 +170,39 @@ describe('/api/images/upload', () => {
   });
 
   it('should accept JPEG images', async () => {
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
     const file = new File(['fake-jpeg'], 'test.jpeg', { type: 'image/jpeg' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
   });
 
   it('should accept PNG images', async () => {
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
     const file = new File(['fake-png'], 'test.png', { type: 'image/png' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);
   });
 
   it('should accept WebP images', async () => {
-    auth.mockResolvedValue({ userId: 'test-user-id' });
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
     const file = new File(['fake-webp'], 'test.webp', { type: 'image/webp' });
     formData.append('file', file);
 
-    const request = new NextRequest('http://localhost:3000/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const request = createMultipartRequest(formData);
 
     const response = await POST(request);
     expect(response.status).toBe(201);

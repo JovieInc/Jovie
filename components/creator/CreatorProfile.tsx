@@ -2,9 +2,9 @@
 
 import { Button } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
-import { Card, CardContent, CardHeader } from '@/components/ui/Card';
-import { LoadingSkeleton as Skeleton } from '@/components/ui/LoadingSkeleton';
-import { OptimizedAvatar as Avatar } from '@/components/ui/OptimizedAvatar';
+import { Card, CardContent, CardHeader } from '@/components/molecules/Card';
+import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkeleton';
+import { OptimizedAvatar as Avatar } from '@/components/molecules/OptimizedAvatar';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import { useCreator } from '@/hooks/useCreator';
 

@@ -2,20 +2,20 @@
 
 ## ⚠️ CRITICAL: BRANCH PROTECTION RULES
 
-### **NEVER PUSH TO PREVIEW OR MAIN**
+### **NEVER PUSH TO MAIN OR PRODUCTION**
 
-- **ONLY push to `develop` branch**
-- **NEVER push directly to `preview` or `main` branches**
-- The CI/CD pipeline handles all promotions automatically
-- If pipeline is stuck, fix issues on `develop` and let CI handle the rest
+- **ONLY push to feature branches derived from `main`** (for example: `feat/...`, `fix/...`, `chore/...`)
+- **NEVER push directly to `main` or `production` branches**
+- The CI/CD pipeline handles all promotions from `main` → `production`
+- If the pipeline is stuck, fix issues on your feature branch or `main` and let CI handle the rest
 - Direct pushes to protected branches will be rejected and can break the pipeline
 
 ### **Branch Protection**
 
-- `preview` and `main` are protected branches
-- All changes must go through the CI/CD pipeline
-- Auto-promote workflows handle `develop → preview → main` progression
-- Manual intervention should only be done on `develop` branch
+- `main` and `production` are protected branches
+- All changes must go through pull requests targeting `main`
+- Auto-promote workflows handle `main` → `production` progression once `main` is healthy
+- Manual promotion to `production` is done via dedicated release PRs from `main`
 
 ## Development Workflow
 
@@ -27,10 +27,10 @@
    # or
    git checkout -b fix/your-bug-fix
    ```
-2. Make sure your local develop branch is up to date:
+2. Make sure your local `main` branch is up to date:
    ```bash
-   git checkout develop
-   git pull upstream develop
+   git checkout main
+   git pull upstream main
    ```
 
 ### Making Changes
@@ -39,17 +39,17 @@
 2. Add tests for new functionality
 3. Ensure all tests pass:
    ```bash
-   npm run test
-   npm run test:e2e
+   pnpm test
+   pnpm run test:e2e
    ```
 4. Run linting and type checking:
    ```bash
-   npm run lint
-   npm run typecheck
+   pnpm run lint
+   pnpm run typecheck
    ```
 5. Format your code:
    ```bash
-   npm run format
+   pnpm run format
    ```
 
 ### Submitting Changes
@@ -63,7 +63,7 @@
    ```bash
    git push origin feature/your-feature-name
    ```
-3. Create a Pull Request on GitHub targeting the `develop` branch
+3. Create a Pull Request on GitHub targeting the `main` branch
 
 ## Coding Standards
 
@@ -194,6 +194,17 @@ This project includes comprehensive guidelines for AI coding tools:
 - Test both success and error scenarios
 - Mock Supabase calls appropriately
 - Test RLS policy compliance
+
+#### Vitest & jsdom environment
+
+- Tests run under Vitest with a jsdom environment.
+- `parse5` is pinned via `pnpm.overrides` to a 7.x CommonJS release to avoid `ERR_REQUIRE_ESM` errors from jsdom. If you update jsdom or parse5, rerun `pnpm test` and adjust the override only once the suite is green.
+- If you see `Error: require() of ES Module ...parse5...`, run `pnpm install` to ensure overrides are applied before debugging further.
+
+#### Drizzle migrations & indexes
+
+- Drizzle's SQL migrator runs inside a transaction; PostgreSQL does not allow `CREATE INDEX CONCURRENTLY` inside a transaction block.
+- In migrations, use `CREATE INDEX IF NOT EXISTS ...` and, if a concurrent build is ever required operationally, run `CREATE INDEX CONCURRENTLY` manually outside of Drizzle. See `db_indexes.md` for details.
 
 ### E2E Tests
 

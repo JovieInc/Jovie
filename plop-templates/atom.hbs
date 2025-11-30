@@ -1,0 +1,35 @@
+import { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
+
+export interface {{name}}Props {
+  children?: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * {{name}} - A reusable atomic component
+ * 
+ * TODO: Add accessibility notes and usage guidelines
+ */
+export const {{name}} = forwardRef<HTMLDivElement, {{name}}Props>(
+  ({ children, className, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          // Add base styles here
+          '',
+          className
+        )}
+        data-testid="{{kebabCase name}}"
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+
+{{name}}.displayName = '{{name}}';
+
+export default {{name}};

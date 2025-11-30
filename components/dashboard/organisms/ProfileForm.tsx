@@ -4,10 +4,10 @@ import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
 import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
-import { ErrorSummary } from '@/components/ui/ErrorSummary';
-import { FormField } from '@/components/ui/FormField';
-import { Input } from '@/components/ui/Input';
+import { FormField } from '@/components/molecules/FormField';
+import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 // flags import removed - pre-launch
 import {
   Artist,
@@ -179,7 +179,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               />
             ) : (
               <div
-                className='w-16 h-16 rounded-full bg-neutral-200 dark:bg-neutral-800'
+                className='w-16 h-16 rounded-full bg-surface-2'
                 aria-label='No profile image'
               />
             )}
@@ -249,10 +249,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         >
           <div className='flex items-center justify-between'>
             <div className='flex flex-col'>
-              <span className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+              <span className='text-sm font-medium text-primary-token'>
                 Show Jovie branding
               </span>
-              <span className='text-xs text-gray-500 dark:text-gray-400'>
+              <span className='text-xs text-secondary-token'>
                 Display Jovie branding on your profile
               </span>
             </div>
@@ -265,9 +265,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
                 })
               }
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
-                formData.hide_branding
-                  ? 'bg-gray-200 dark:bg-gray-700'
-                  : 'bg-indigo-600'
+                formData.hide_branding ? 'bg-surface-3' : 'bg-indigo-600'
               }`}
               disabled={loading}
               aria-pressed={!formData.hide_branding}

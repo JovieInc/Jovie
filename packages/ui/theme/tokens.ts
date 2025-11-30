@@ -13,7 +13,7 @@ export const colors = {
   'accent-foreground': 'var(--color-accent-foreground)',
   'btn-primary': 'var(--color-btn-primary-bg)',
   'btn-primary-foreground': 'var(--color-btn-primary-fg)',
-  
+
   // Sidebar colors
   sidebar: 'rgb(var(--sidebar-background))',
   'sidebar-foreground': 'rgb(var(--sidebar-foreground))',

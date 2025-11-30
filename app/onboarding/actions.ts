@@ -1,30 +1,43 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { db } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { creatorProfiles, users } from '@/lib/db/schema';
 import {
   createOnboardingError,
-  mapDatabaseError,
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
-import {
-  checkUserHasProfile,
-  checkUsernameAvailability,
-} from '@/lib/username/availability';
+import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+
+function profileIsPublishable(
+  profile: typeof creatorProfiles.$inferSelect | null
+) {
+  if (!profile) return false;
+  const hasHandle =
+    Boolean(profile.username) && Boolean(profile.usernameNormalized);
+  const hasName = Boolean(profile.displayName && profile.displayName.trim());
+  const isPublic = profile.isPublic !== false;
+  const hasCompleted = Boolean(profile.onboardingCompletedAt);
+
+  return hasHandle && hasName && isPublic && hasCompleted;
+}
 
 export async function completeOnboarding({
   username,
   displayName,
   email,
+  redirectToDashboard = true,
 }: {
   username: string;
   displayName?: string;
   email?: string | null;
+  redirectToDashboard?: boolean;
 }) {
   try {
     // Step 1: Authentication check
@@ -57,33 +70,12 @@ export async function completeOnboarding({
 
     // Step 3: Rate limiting check
     const headersList = await headers();
-    const forwarded = headersList.get('x-forwarded-for');
-    const realIP = headersList.get('x-real-ip');
+    const clientIP = extractClientIP(headersList);
 
-    // Extract and validate IP address with fallback chain
-    let clientIP = 'unknown';
-    if (forwarded) {
-      const firstIP = forwarded.split(',')[0].trim();
-      // Basic IP validation (IPv4 and IPv6)
-      if (
-        /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
-          firstIP
-        ) ||
-        /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/.test(firstIP)
-      ) {
-        clientIP = firstIP;
-      }
-    } else if (
-      realIP &&
-      /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(
-        realIP
-      )
-    ) {
-      clientIP = realIP;
-    }
-
-    // Skip IP rate limiting for unknown IPs to avoid shared limits
-    const shouldCheckIP = clientIP !== 'unknown';
+    // IMPORTANT: Always check IP-based rate limiting, even for 'unknown' IPs
+    // The 'unknown' bucket acts as a shared rate limit to prevent abuse
+    // from users behind proxies or with missing/invalid headers
+    const shouldCheckIP = true;
 
     await enforceOnboardingRateLimit({
       userId,
@@ -94,55 +86,120 @@ export async function completeOnboarding({
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
 
-    // Run checks in parallel to reduce total operation time
-    const [hasExistingProfile, availabilityResult] = await Promise.all([
-      checkUserHasProfile(userId),
-      checkUsernameAvailability(normalizedUsername),
-    ]);
-
-    // Early exit if user already has profile
-    if (hasExistingProfile) {
-      redirect('/dashboard');
-    }
-
-    // Check username availability
-    if (!availabilityResult.available) {
-      const errorCode = availabilityResult.validationError
-        ? OnboardingErrorCode.INVALID_USERNAME
-        : OnboardingErrorCode.USERNAME_TAKEN;
-
-      const error = createOnboardingError(
-        errorCode,
-        availabilityResult.error ||
-          availabilityResult.validationError ||
-          'Username not available'
-      );
-      throw new Error(error.message);
-    }
-
-    // Step 7: Prepare user data for database operations
+    const trimmedDisplayName = displayName?.trim() || normalizedUsername;
     const userEmail = email ?? null;
 
-    // Step 8: Create user and profile via stored function in a single DB call (RLS-safe on neon-http)
-    try {
-      await db.execute(
-        drizzleSql`
-          SELECT onboarding_create_profile(
-            ${userId},
-            ${userEmail ?? null},
-            ${normalizedUsername},
-            ${displayName?.trim() || normalizedUsername}
-          ) AS profile_id
-        `
-      );
-    } catch (error) {
-      console.error('Error creating user and profile via function:', error);
-      const mappedError = mapDatabaseError(error);
-      throw new Error(mappedError.message);
+    const completion = await withDbSessionTx(
+      async (tx, clerkUserId: string) => {
+        const ensureHandleAvailable = async (profileId?: string | null) => {
+          const [conflict] = await tx
+            .select({ id: creatorProfiles.id })
+            .from(creatorProfiles)
+            .where(eq(creatorProfiles.usernameNormalized, normalizedUsername))
+            .limit(1);
+
+          if (conflict && (!profileId || conflict.id !== profileId)) {
+            const error = createOnboardingError(
+              OnboardingErrorCode.USERNAME_TAKEN,
+              'Handle already taken'
+            );
+            throw new Error(error.message);
+          }
+        };
+
+        const [existingUser] = await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, clerkUserId))
+          .limit(1);
+
+        // If the user record does not exist, the stored function will create both user + profile
+        if (!existingUser) {
+          await ensureHandleAvailable(null);
+          await tx.execute(
+            drizzleSql`
+              SELECT onboarding_create_profile(
+                ${clerkUserId},
+                ${userEmail ?? null},
+                ${normalizedUsername},
+                ${trimmedDisplayName}
+              ) AS profile_id
+            `
+          );
+
+          return { username: normalizedUsername, status: 'created' as const };
+        }
+
+        const [existingProfile] = await tx
+          .select()
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, existingUser.id))
+          .limit(1);
+
+        // If a profile already exists, ensure the handle is either the same or available
+        const handleChanged =
+          existingProfile?.usernameNormalized !== normalizedUsername;
+
+        if (handleChanged) {
+          await ensureHandleAvailable(existingProfile?.id);
+        }
+
+        const needsPublish = !profileIsPublishable(existingProfile);
+
+        if (existingProfile && (needsPublish || handleChanged)) {
+          const nextDisplayName =
+            trimmedDisplayName || existingProfile.displayName || username;
+
+          const [updated] = await tx
+            .update(creatorProfiles)
+            .set({
+              username: normalizedUsername,
+              usernameNormalized: normalizedUsername,
+              displayName: nextDisplayName,
+              onboardingCompletedAt:
+                existingProfile.onboardingCompletedAt ?? new Date(),
+              isPublic: true,
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, existingProfile.id))
+            .returning();
+
+          return {
+            username: updated?.usernameNormalized || normalizedUsername,
+            status: 'updated' as const,
+          };
+        }
+
+        if (existingProfile) {
+          return {
+            username: existingProfile.usernameNormalized,
+            status: 'complete' as const,
+          };
+        }
+
+        // Fallback: user exists but no profile yet
+        await ensureHandleAvailable(null);
+        await tx.execute(
+          drizzleSql`
+            SELECT onboarding_create_profile(
+              ${clerkUserId},
+              ${userEmail ?? null},
+              ${normalizedUsername},
+              ${trimmedDisplayName}
+            ) AS profile_id
+          `
+        );
+        return { username: normalizedUsername, status: 'created' as const };
+      }
+    );
+
+    await syncCanonicalUsernameFromApp(userId, completion.username);
+
+    if (redirectToDashboard) {
+      redirect('/dashboard/overview');
     }
 
-    // Success - redirect to dashboard
-    redirect('/dashboard');
+    return completion;
   } catch (error) {
     console.error('🔴 ONBOARDING ERROR:', error);
     console.error(

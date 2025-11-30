@@ -55,12 +55,20 @@ const config: StorybookConfig = {
         'next/cache': require.resolve('./empty-module.js'),
         'next/headers': require.resolve('./empty-module.js'),
         // Mock server actions that shouldn't run in Storybook
-        '@/app/dashboard/actions': require.resolve('./dashboard-actions-mock.ts'),
+        '@/app/dashboard/actions': require.resolve(
+          './dashboard-actions-mock.ts'
+        ),
         '@/app/onboarding/actions': require.resolve('./empty-module.js'),
         // Also handle absolute imports without alias
-        '../../../app/dashboard/actions': require.resolve('./dashboard-actions-mock.ts'),
-        '../../app/dashboard/actions': require.resolve('./dashboard-actions-mock.ts'),
-        '../app/dashboard/actions': require.resolve('./dashboard-actions-mock.ts'),
+        '../../../app/dashboard/actions': require.resolve(
+          './dashboard-actions-mock.ts'
+        ),
+        '../../app/dashboard/actions': require.resolve(
+          './dashboard-actions-mock.ts'
+        ),
+        '../app/dashboard/actions': require.resolve(
+          './dashboard-actions-mock.ts'
+        ),
         '../../../app/onboarding/actions': require.resolve('./empty-module.js'),
         '../../app/onboarding/actions': require.resolve('./empty-module.js'),
         '../app/onboarding/actions': require.resolve('./empty-module.js'),
@@ -70,8 +78,14 @@ const config: StorybookConfig = {
         '@clerk/nextjs': path.resolve(__dirname, 'clerk-mock.jsx'),
         '@clerk/nextjs/server': path.resolve(__dirname, 'clerk-server-mock.js'),
         // Also handle any nested imports from server path
-        '@clerk/nextjs/server/auth': path.resolve(__dirname, 'clerk-server-mock.js'),
-        '@clerk/nextjs/server/currentUser': path.resolve(__dirname, 'clerk-server-mock.js'),
+        '@clerk/nextjs/server/auth': path.resolve(
+          __dirname,
+          'clerk-server-mock.js'
+        ),
+        '@clerk/nextjs/server/currentUser': path.resolve(
+          __dirname,
+          'clerk-server-mock.js'
+        ),
       },
     };
 

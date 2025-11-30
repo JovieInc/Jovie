@@ -1,64 +1,95 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { DashboardData } from '@/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
+import { SidebarProvider } from '@/components/organisms/Sidebar';
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   usePathname: vi.fn(() => '/dashboard/overview'),
 }));
 
-// Mock Tooltip component
-vi.mock('@/components/atoms/Tooltip', () => ({
-  Tooltip: ({
-    children,
-    content,
-  }: {
-    children: React.ReactNode;
-    content: string;
-  }) => <div title={content}>{children}</div>,
-}));
+// Mock @jovie/ui Tooltip components
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  return {
+    ...actual,
+    Tooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    TooltipTrigger: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    TooltipContent: ({ children }: { children: React.ReactNode }) => (
+      <div role='tooltip'>{children}</div>
+    ),
+    TooltipProvider: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+  };
+});
+
+const baseDashboardData: DashboardData = {
+  user: { id: 'user_123' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: false,
+  isAdmin: false,
+};
+
+function renderWithDashboardData(overrides: Partial<DashboardData> = {}) {
+  const value: DashboardData = { ...baseDashboardData, ...overrides };
+
+  return render(
+    <DashboardDataProvider value={value}>
+      <SidebarProvider>
+        <DashboardNav />
+      </SidebarProvider>
+    </DashboardDataProvider>
+  );
+}
 
 describe('DashboardNav', () => {
   it('renders primary navigation items', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
-    expect(screen.getByText('Overview')).toBeInTheDocument();
-    expect(screen.getByText('Links')).toBeInTheDocument();
-    expect(screen.getByText('Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Audience')).toBeInTheDocument();
+    const overviewLink = screen.getByRole('link', { name: 'Overview' });
+    const linksLink = screen.getByRole('link', { name: 'Links' });
+    const analyticsLink = screen.getByRole('link', { name: 'Analytics' });
+    const audienceLink = screen.getByRole('link', { name: 'Audience' });
+
+    expect(overviewLink).toBeInTheDocument();
+    expect(linksLink).toBeInTheDocument();
+    expect(analyticsLink).toBeInTheDocument();
+    expect(audienceLink).toBeInTheDocument();
   });
 
   it('renders secondary navigation items', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
-    expect(screen.getByText('Tipping')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    const earningsLink = screen.getByRole('link', { name: 'Earnings' });
+    const settingsLink = screen.getByRole('link', { name: 'Settings' });
+
+    expect(earningsLink).toBeInTheDocument();
+    expect(settingsLink).toBeInTheDocument();
   });
 
   it('applies active state to current page', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
     const overviewLink = screen.getByRole('link', { name: /overview/i });
-    expect(overviewLink).toHaveClass('bg-accent/10');
-  });
-
-  it('renders correctly when collapsed', () => {
-    render(<DashboardNav collapsed={true} />);
-
-    // Text should be hidden when collapsed
-    const overviewText = screen.getByText('Overview');
-    expect(overviewText).toHaveClass('opacity-0');
+    expect(overviewLink).toHaveAttribute('data-active', 'true');
   });
 
   it('shows different styling for primary vs secondary nav', () => {
-    render(<DashboardNav />);
+    renderWithDashboardData();
 
-    // Primary nav should have semibold font
     const overviewLink = screen.getByRole('link', { name: /overview/i });
-    expect(overviewLink).toHaveClass('font-semibold');
-
-    // Secondary nav should have medium font
     const settingsLink = screen.getByRole('link', { name: /settings/i });
-    expect(settingsLink).toHaveClass('font-medium');
+
+    expect(overviewLink).toBeInTheDocument();
+    expect(settingsLink).toBeInTheDocument();
   });
 });

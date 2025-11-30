@@ -206,7 +206,7 @@ async function runMigrations() {
   if (!checkMigrationsExist()) {
     log.warning('No migrations found in drizzle/migrations directory');
     log.info(
-      'Run "npm run drizzle:generate" to generate migrations from schema'
+      'Run "pnpm run drizzle:generate" to generate migrations from schema'
     );
     process.exit(0);
   }

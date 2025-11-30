@@ -177,36 +177,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       } as DetectedLink['platform'];
     }
     const section = sectionOf(enriched as T);
-
-    // Dedupe by canonical identity across all sections
-    const newId = canonicalIdentity({
-      platform: (enriched as DetectedLink).platform,
-      normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-    });
-    const dupAt = links.findIndex(
-      l =>
-        canonicalIdentity({
-          platform: (l as DetectedLink).platform,
-          normalizedUrl: (l as DetectedLink).normalizedUrl,
-        }) === newId
-    );
-    if (dupAt !== -1) {
-      const merged = {
-        ...links[dupAt],
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-      } as T;
-      const next = links.map((l, i) => (i === dupAt ? merged : l));
-      setLinks(next);
-      onLinkAdded?.([merged]);
-      onLinksChange?.(next);
-      return;
-    }
+    const otherSection: 'social' | 'dsp' | null =
+      section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
     const sameSectionHas = links.some(
       l => l.platform.id === enriched.platform.id && sectionOf(l) === section
     );
-    const otherSection: 'social' | 'dsp' | null =
-      section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
     const otherSectionHas = otherSection
       ? links.some(
           l =>
@@ -215,25 +190,76 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         )
       : false;
 
-    // Allow YouTube to exist in both sections; dedupe within same section
+    const canonicalId = canonicalIdentity({
+      platform: (enriched as DetectedLink).platform,
+      normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+    });
+    const dupAt = links.findIndex(
+      l =>
+        canonicalIdentity({
+          platform: (l as DetectedLink).platform,
+          normalizedUrl: (l as DetectedLink).normalizedUrl,
+        }) === canonicalId
+    );
+    const duplicate = dupAt !== -1 ? links[dupAt] : null;
+    const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
+    const hasCrossSectionDuplicate =
+      enriched.platform.id === 'youtube' &&
+      duplicateSection !== null &&
+      duplicateSection !== section;
+
+    // Allow YouTube cross-category flow before generic dedupe so we can show the prompt
+    if (
+      enriched.platform.id === 'youtube' &&
+      sameSectionHas &&
+      !otherSectionHas &&
+      otherSection
+    ) {
+      setYtPrompt({ candidate: enriched, target: otherSection });
+      return;
+    }
+
+    if (
+      enriched.platform.id === 'youtube' &&
+      dupAt !== -1 &&
+      duplicateSection === section
+    ) {
+      const merged = {
+        ...links[dupAt],
+        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
+      } as T;
+      const next = links.map((l, i) => (i === dupAt ? merged : l));
+      setLinks(next);
+      onLinkAdded?.([merged]);
+      return;
+    }
+
+    // Dedupe across the board except for YouTube cross-section cases
+    if (dupAt !== -1 && !hasCrossSectionDuplicate) {
+      const merged = {
+        ...links[dupAt],
+        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
+      } as T;
+      const next = links.map((l, i) => (i === dupAt ? merged : l));
+      setLinks(next);
+      onLinkAdded?.([merged]);
+      return;
+    }
+
     if (enriched.platform.id === 'youtube') {
-      if (sameSectionHas && !otherSectionHas && otherSection) {
-        // Prompt to add as the other category instead
-        setYtPrompt({ candidate: enriched, target: otherSection });
-        return;
-      }
       if (sameSectionHas && otherSectionHas) {
         // Already exists in both sections; ignore duplicate add
         return;
       }
-    } else {
+    } else if (sameSectionHas) {
       // For non-YouTube, block duplicate in same section
-      if (sameSectionHas) return;
+      return;
     }
     const next = [...links, enriched];
     setLinks(next);
     onLinkAdded?.([enriched as T]);
-    onLinksChange?.(next);
 
     // If this section was previously empty (and likely collapsed), auto-expand it
     const sec = sectionOf(enriched as T);
@@ -257,7 +283,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         ...next[idx],
         isVisible: !(curr?.isVisible ?? true),
       } as unknown as T;
-      onLinksChange?.(next);
       return next;
     });
   }
@@ -265,7 +290,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   function handleRemove(idx: number) {
     setLinks(prev => {
       const next = prev.filter((_, i) => i !== idx);
-      onLinksChange?.(next);
       return next;
     });
   }
@@ -348,8 +372,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           <div className='text-primary-token'>
             You already added{' '}
             {ytPrompt.candidate.platform.name || ytPrompt.candidate.platform.id}{' '}
-            in this section. Do you also want to add it under{' '}
-            {labelFor(ytPrompt.target)}?
+            in this section. Do you also want to add it as{' '}
+            {ytPrompt.target === 'dsp'
+              ? 'a music service'
+              : labelFor(ytPrompt.target)}
+            ?
           </div>
           <div className='shrink-0 flex items-center gap-2'>
             <Button
@@ -368,7 +395,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 setLinks(next);
                 setYtPrompt(null);
                 onLinkAdded?.([adjusted]);
-                onLinksChange?.(next);
               }}
             >
               Add as {labelFor(ytPrompt.target)}

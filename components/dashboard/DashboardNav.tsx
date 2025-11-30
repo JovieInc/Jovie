@@ -6,13 +6,25 @@ import {
   Cog6ToothIcon,
   HomeIcon,
   LinkIcon,
+  ShieldCheckIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { Divider } from '@/components/atoms/Divider';
-import { cn } from '@/lib/utils';
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from '@/components/organisms/Sidebar';
+
+interface DashboardNavProps {
+  collapsed?: boolean;
+}
 
 // Primary Navigation - Core features
 const primaryNavigation = [
@@ -46,7 +58,7 @@ const primaryNavigation = [
   },
 ];
 
-// Keyboard shortcut hints shown in tooltips (collapsed sidebar)
+// Keyboard shortcut hints shown in tooltips when the sidebar is collapsed.
 // Display-only for now; actual hotkeys can be wired separately.
 const navShortcuts: Record<string, string> = {
   overview: '1',
@@ -58,7 +70,7 @@ const navShortcuts: Record<string, string> = {
 };
 
 // Secondary Navigation - Additional features
-const secondaryNavigation = [
+const secondaryNavigation: typeof primaryNavigation = [
   {
     name: 'Earnings',
     href: '/dashboard/tipping',
@@ -75,122 +87,99 @@ const secondaryNavigation = [
   },
 ];
 
-interface DashboardNavProps {
-  collapsed?: boolean;
-}
+const adminNavigation: typeof primaryNavigation = [
+  {
+    name: 'Overview',
+    href: '/admin',
+    id: 'admin_overview',
+    icon: ShieldCheckIcon,
+    description: 'Internal metrics and operations',
+  },
+  {
+    name: 'Users',
+    href: '/admin/users',
+    id: 'admin_users',
+    icon: UsersIcon,
+    description: 'Manage creator profiles and verification',
+  },
+  {
+    name: 'Activity',
+    href: '/admin/activity',
+    id: 'admin_activity',
+    icon: ChartPieIcon,
+    description: 'Review recent system and creator activity',
+  },
+];
 
 export function DashboardNav({ collapsed = false }: DashboardNavProps) {
+  const { isAdmin } = useDashboardData();
   const pathname = usePathname();
 
-  const renderNavSection = (
-    items: typeof primaryNavigation,
-    isPrimary: boolean
-  ) => (
-    <ul
-      role='list'
-      className={cn('-mx-2', collapsed ? 'space-y-1.5' : 'space-y-1')}
-    >
+  const renderSection = (items: typeof primaryNavigation) => (
+    <SidebarMenu>
       {items.map(item => {
         const isActive =
           pathname === item.href ||
           (pathname === '/dashboard' && item.id === 'overview');
 
-        const linkContent = (
-          <Button
-            asChild
-            variant='ghost'
-            className={cn(
-              // Apple-style active state - solid pill highlight
-              isActive
-                ? 'bg-accent/10 text-primary-token shadow-sm border border-subtle'
-                : 'text-secondary-token hover:text-primary-token hover:bg-surface-2/80',
-              // Base styles with perfect alignment
-              'group w-full justify-start rounded-lg transition-all duration-200 ease-in-out relative',
-              // Focus states
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-              // Responsive padding and spacing
-              collapsed ? 'p-2.5 justify-center' : 'px-3 py-2.5 gap-3',
-              // Typography hierarchy
-              isPrimary ? 'font-semibold text-sm' : 'font-medium text-sm',
-              // Hover animations
-              'hover:scale-[1.02] active:scale-[0.98]'
-            )}
-          >
-            <Link href={item.href}>
-              {/* Active state glow/halo effect */}
-              {isActive && (
-                <div className='absolute inset-0 bg-accent/5 rounded-lg animate-pulse' />
-              )}
-
-              <item.icon
-                className={cn(
-                  isActive
-                    ? 'text-accent'
-                    : isPrimary
-                      ? 'text-secondary-token group-hover:text-primary-token'
-                      : 'text-tertiary-token group-hover:text-secondary-token',
-                  'h-5 w-5 shrink-0 transition-all duration-200',
-                  // Hover scale animation
-                  'group-hover:scale-110 group-active:scale-95'
-                )}
-                aria-hidden='true'
-              />
-
-              <span
-                className={cn(
-                  'transition-all duration-200 ease-in-out truncate',
-                  collapsed
-                    ? 'opacity-0 w-0 overflow-hidden'
-                    : 'opacity-100 w-auto',
-                  // Typography colors
-                  isActive
-                    ? 'text-primary-token'
-                    : isPrimary
-                      ? 'text-primary-token'
-                      : 'text-secondary-token'
-                )}
-              >
-                {item.name}
-              </span>
-            </Link>
-          </Button>
-        );
+        const shortcut = navShortcuts[item.id];
+        const tooltip = shortcut
+          ? {
+              children: (
+                <div className='flex items-center gap-2'>
+                  <span>{item.name}</span>
+                  <kbd className='text-xs text-tertiary-token border rounded px-1'>
+                    {shortcut}
+                  </kbd>
+                </div>
+              ),
+            }
+          : item.name;
 
         return (
-          <li key={item.name}>
-            {collapsed ? (
-              <Tooltip>
-                <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
-                <TooltipContent side='right'>
-                  <div className='flex items-center gap-2'>
-                    <span>{item.name}</span>
-                    {navShortcuts[item.id] && (
-                      <kbd className='text-xs text-tertiary-token border rounded px-1'>
-                        {navShortcuts[item.id]}
-                      </kbd>
-                    )}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              linkContent
-            )}
-          </li>
+          <SidebarMenuItem key={item.id}>
+            <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
+              <Link
+                href={item.href}
+                className='flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+              >
+                <item.icon className='size-4' aria-hidden='true' />
+                <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  {item.name}
+                </span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
         );
       })}
-    </ul>
+    </SidebarMenu>
   );
 
   return (
     <nav className='flex flex-1 flex-col'>
       {/* Primary Navigation Block */}
-      <div className='mb-6'>{renderNavSection(primaryNavigation, true)}</div>
+      <div className='mb-6'>{renderSection(primaryNavigation)}</div>
 
       {/* Divider */}
       <Divider className='mb-6' inset={!collapsed} />
 
       {/* Secondary Navigation Block */}
-      <div className='mb-4'>{renderNavSection(secondaryNavigation, false)}</div>
+      <div className='mb-4'>{renderSection(secondaryNavigation)}</div>
+
+      {/* Admin Navigation Block (admins only) */}
+      {isAdmin && (
+        <div className='mt-2'>
+          <Divider className='mb-3' inset={!collapsed} />
+          <SidebarGroup>
+            <SidebarGroupLabel className='px-2 text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+              Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent className='mt-1'>
+              {renderSection(adminNavigation)}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </div>
+      )}
     </nav>
   );
 }

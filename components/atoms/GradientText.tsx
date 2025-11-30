@@ -33,7 +33,7 @@ export function GradientText({
   return (
     <Component
       className={cn(
-        'text-transparent bg-gradient-to-r',
+        'text-transparent bg-clip-text bg-gradient-to-r',
         variantClasses[variant],
         className
       )}

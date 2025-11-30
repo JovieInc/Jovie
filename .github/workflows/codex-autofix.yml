@@ -1,0 +1,164 @@
+name: Codex Auto-Fix on CI Failure
+
+on:
+  workflow_run:
+    # Trigger after any run of the primary CI workflow completes
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: codex-autofix-${{ github.event.workflow_run.head_branch }}-${{ github.event.workflow_run.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  auto-fix:
+    # Only run when the referenced workflow concluded with a failure
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      FAILED_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+      FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
+      FAILED_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      FAILED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
+    steps:
+      - name: Check eligibility (failed CI on main PR from same repo)
+        id: eligibility
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+
+            if (run.event !== 'pull_request') {
+              core.info(`Workflow run event is ${run.event}; skipping Codex auto-fix.`);
+              core.setOutput('eligible', 'false');
+              return;
+            }
+
+            if (!run.pull_requests || run.pull_requests.length === 0) {
+              core.info('No PR associated with this workflow run; skipping.');
+              core.setOutput('eligible', 'false');
+              return;
+            }
+
+            const prNumber = run.pull_requests[0].number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            if (pr.base.ref !== 'main') {
+              core.info(`PR base is ${pr.base.ref}; Codex auto-fix only runs for main PRs.`);
+              core.setOutput('eligible', 'false');
+              return;
+            }
+
+            if (pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.info('PR is from a fork; skipping auto-fix to avoid pushing to external repos.');
+              core.setOutput('eligible', 'false');
+              return;
+            }
+
+            core.info(`Codex auto-fix eligible for PR #${pr.number} (${pr.head.ref} -> ${pr.base.ref}).`);
+            core.setOutput('eligible', 'true');
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('base_ref', pr.base.ref);
+
+      - name: Check OpenAI API Key
+        if: steps.eligibility.outputs.eligible == 'true'
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY secret is not set. Skipping auto-fix." >&2
+            exit 1
+          fi
+
+      - name: Checkout failing ref
+        if: steps.eligibility.outputs.eligible == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FAILED_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Setup Node.js and pnpm
+        if: steps.eligibility.outputs.eligible == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Prepare Codex prerequisites
+        if: steps.eligibility.outputs.eligible == 'true'
+        shell: bash
+        run: |
+          # Ensure python3 exists for Codex login helper
+          if ! command -v python3 >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y python3
+          fi
+
+          # Ensure Codex config dir exists and is writable
+          mkdir -p "$HOME/.codex"
+          echo "CODEX_HOME=$HOME/.codex" >> "$GITHUB_ENV"
+
+      - name: Install Codex CLI
+        if: steps.eligibility.outputs.eligible == 'true'
+        run: pnpm add -g @openai/codex
+
+      - name: Authenticate Codex (non-interactive)
+        if: steps.eligibility.outputs.eligible == 'true'
+        env:
+          CODEX_HOME: ${{ env.CODEX_HOME }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: codex login --api-key "$OPENAI_API_KEY"
+
+      - name: Run Codex to fix CI failure
+        if: steps.eligibility.outputs.eligible == 'true'
+        shell: bash
+        run: |
+          codex exec --full-auto --sandbox workspace-write "
+          The primary GitHub Actions workflow 'CI' failed for branch '${FAILED_HEAD_BRANCH}'.
+          The failed run URL is '${FAILED_RUN_URL}'.
+
+          You are working in a TypeScript Next.js monorepo that uses:
+          - pnpm for package management
+          - vitest for unit tests (pnpm test)
+          - eslint for linting (pnpm lint)
+          - tsc for typechecking (pnpm typecheck)
+
+          Read the repository, understand why CI failed, and make the minimal code changes needed so that:
+          - pnpm typecheck
+          - pnpm lint
+          - pnpm test
+
+          all succeed locally.
+
+          Do not refactor unrelated code, do not change CI workflows or repository configuration, and keep changes as small and surgical as possible.
+          "
+
+      - name: Verify typecheck, lint, and tests
+        if: steps.eligibility.outputs.eligible == 'true'
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          pnpm typecheck
+          pnpm lint
+          pnpm test
+
+      - name: Create pull request with fixes
+        if: success() && steps.eligibility.outputs.eligible == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "fix(ci): auto-fix failing CI via Codex"
+          branch: codex/auto-fix-${{ github.event.workflow_run.run_id }}
+          base: ${{ env.FAILED_HEAD_BRANCH }}
+          title: "Auto-fix failing CI via Codex"
+          body: |
+            Codex automatically generated this PR in response to a CI failure on workflow `${{ env.FAILED_WORKFLOW_NAME }}`.
+            Failed run: ${{ env.FAILED_RUN_URL }}
+            Head branch: `${{ env.FAILED_HEAD_BRANCH }}`
+            This PR contains minimal changes intended solely to make the CI pass.

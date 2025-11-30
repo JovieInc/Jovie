@@ -118,7 +118,7 @@ Continued use constitutes acceptance of updated terms.
 
 ## Governing Law
 
-These terms are governed by the laws of [Your Jurisdiction]. Disputes will be resolved through binding arbitration.
+These terms are governed by the laws of the State of California, United States. Disputes will be resolved through binding arbitration.
 
 ## Contact Information
 

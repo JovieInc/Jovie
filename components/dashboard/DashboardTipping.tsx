@@ -1,20 +1,19 @@
 'use client';
 
 import { WalletIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import { useCallback, useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { Input } from '@/components/atoms/Input';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-interface DashboardTippingProps {
-  initialData: DashboardData;
-}
-
-export function DashboardTipping({ initialData }: DashboardTippingProps) {
+export function DashboardTipping() {
+  const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
   const [venmoHandle, setVenmoHandle] = useState(artist?.venmo_handle || '');
@@ -79,11 +78,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
       </div>
 
       {/* Venmo Handle Setup - Always Visible — border tokens normalized to border-subtle for consistency with dashboard */}
-      <div
-        className={cn(
-          'mb-6 bg-surface-1 backdrop-blur-sm rounded-lg border p-6 transition-all duration-300 relative z-20 border-subtle hover:shadow-md'
-        )}
-      >
+      <div className='relative z-20 mb-6 rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
         <SectionHeader
           className='mb-4 px-0 py-0 border-0'
           title='Venmo Handle'
@@ -111,14 +106,15 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               </label>
               <div className='flex items-center'>
                 <span className='text-sm text-secondary-token mr-1'>@</span>
-                <input
+                <Input
                   type='text'
                   id='venmo-handle'
                   value={venmoHandle}
                   onChange={e => setVenmoHandle(e.target.value)}
                   placeholder='your-username'
-                  className='flex-1 px-3 py-2 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder:text-tertiary focus:ring-2 focus:ring-accent focus:border-accent transition-colors'
                   autoFocus
+                  className='flex-1'
+                  inputClassName='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-0'
                 />
               </div>
               <p className='text-xs text-secondary-token mt-2'>
@@ -127,26 +123,28 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               </p>
             </div>
             <div className='flex gap-3'>
-              <button
+              <Button
                 onClick={handleSaveVenmo}
                 disabled={isSaving || !venmoHandle.trim()}
-                className='px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
+                variant='primary'
+                size='sm'
               >
                 {isSaving ? 'Saving...' : hasVenmoHandle ? 'Update' : 'Connect'}
-              </button>
+              </Button>
               {hasVenmoHandle ? (
-                <button
+                <Button
                   onClick={handleCancel}
                   disabled={isSaving}
-                  className='px-4 py-2 bg-surface-2 text-primary-token rounded-lg hover:bg-surface-3 transition-colors focus:ring-2 focus:ring-accent focus:ring-offset-2'
+                  variant='ghost'
+                  size='sm'
                 >
                   Cancel
-                </button>
+                </Button>
               ) : null}
             </div>
             {saveSuccess && (
               <div
-                className='text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-md px-3 py-2'
+                className='rounded-md border border-subtle bg-surface-2 px-3 py-2 text-sm text-primary-token'
                 role='status'
                 aria-live='polite'
               >
@@ -160,16 +158,16 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
               <span className='text-sm font-mono bg-surface-2 px-3 py-1 rounded-md text-primary-token'>
                 @{artist.venmo_handle}
               </span>
-              <span className='text-xs text-green-700 dark:text-green-400'>
-                ✓ Connected
-              </span>
+              <span className='text-xs text-secondary-token'>Connected</span>
             </div>
-            <button
+            <Button
               onClick={() => setIsEditing(true)}
-              className='text-sm text-accent hover:text-accent/80 font-medium transition-colors'
+              variant='ghost'
+              size='sm'
+              className='text-accent hover:text-accent/80'
             >
               Edit
-            </button>
+            </Button>
           </div>
         ) : null}
       </div>
@@ -182,21 +180,21 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         )}
       >
         {/* Earnings Summary */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-md transition-all duration-300 relative z-10'>
+        <div className='relative z-10 rounded-xl border border-subtle bg-surface-1 p-6 transition-all duration-300 hover:border-default hover:shadow-md'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Earnings Summary'
           />
           <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-            <div className='bg-surface-2/50 rounded-lg p-4'>
+            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
               <p className='text-sm text-secondary-token'>Total Received</p>
               <p className='text-2xl font-bold text-primary-token'>$0.00</p>
             </div>
-            <div className='bg-surface-2/50 rounded-lg p-4'>
+            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
               <p className='text-sm text-secondary-token'>This Month</p>
               <p className='text-2xl font-bold text-primary-token'>$0.00</p>
             </div>
-            <div className='bg-surface-2/50 rounded-lg p-4'>
+            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
               <p className='text-sm text-secondary-token'>Tip Count</p>
               <p className='text-2xl font-bold text-primary-token'>0</p>
             </div>
@@ -204,7 +202,7 @@ export function DashboardTipping({ initialData }: DashboardTippingProps) {
         </div>
 
         {/* Recent Earnings */}
-        <div className='bg-surface-1 backdrop-blur-sm rounded-lg border border-subtle p-6 hover:shadow-lg hover:border-accent/10 transition-all duration-300 relative z-10'>
+        <div className='relative z-10 rounded-xl border border-subtle bg-surface-1 p-6 transition-all duration-300 hover:border-default hover:shadow-md'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Recent Earnings'

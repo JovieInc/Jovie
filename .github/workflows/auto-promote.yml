@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   open-promotion-pr:
-    name: Manual promotion PR (preview -> production)
+    name: Manual promotion PR (main -> production)
     runs-on: ubuntu-latest
     steps:
       - name: Ensure not from bot loop
@@ -37,7 +37,7 @@ jobs:
               repo: context.repo.repo,
               state: 'open',
               base: 'production',
-              head: `${context.repo.owner}:preview`,
+              head: `${context.repo.owner}:main`,
               per_page: 10
             });
             if (prs.length > 0) {
@@ -54,12 +54,12 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const title = 'chore(release): promote preview to production';
+            const title = 'chore(release): promote main to production';
             const body = [
-              'This PR promotes the latest changes from `preview` to `production`. ',
+              'This PR promotes the latest changes from `main` to `production`. ',
               '',
               '- This PR was opened via the manual fallback workflow (workflow_dispatch).',
-              '- Primary path for promotion is CI-gated in `.github/workflows/ci.yml` after a successful preview deploy.',
+              '- Primary path for promotion is CI-gated in `.github/workflows/ci.yml` after a successful main deploy.',
               '- The auto-merge workflow will wait for full checks (Build, Unit Tests, E2E Tests, Drizzle Check).',
               '',
               'If anything looks off, close this PR to halt promotion.'
@@ -69,7 +69,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title,
-              head: 'preview',
+              head: 'main',
               base: 'production',
               body,
               maintainer_can_modify: true

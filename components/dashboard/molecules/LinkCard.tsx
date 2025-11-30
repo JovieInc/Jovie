@@ -102,17 +102,17 @@ export function LinkCard({
     >
       <Card
         className={cn(
-          'relative group transition-all duration-200 overflow-hidden',
-          'hover:shadow-md'
+          'relative group overflow-hidden transition-all duration-200',
+          'border border-subtle bg-surface-1 hover:border-default hover:shadow-md'
         )}
       >
         <div className='p-4 relative'>
           {/* Loading overlay */}
           {isSaving && (
-            <div className='absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center z-10'>
+            <div className='absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-surface-1/90'>
               <Icon
                 name='Loader2'
-                className='h-6 w-6 text-primary-500 animate-spin'
+                className='h-6 w-6 animate-spin text-accent'
               />
             </div>
           )}
@@ -124,11 +124,11 @@ export function LinkCard({
               type='button'
               onPointerDown={handlePointerDown}
               className={cn(
-                'flex-shrink-0 p-1.5 -ml-1.5 rounded-md transition-colors',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
+                'flex-shrink-0 -ml-1.5 rounded-md p-1.5 transition-colors',
+                'text-tertiary-token hover:text-secondary-token',
+                'hover:bg-surface-2',
                 'cursor-grab active:cursor-grabbing',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50'
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0'
               )}
               aria-label='Drag to reorder'
             >
@@ -142,16 +142,16 @@ export function LinkCard({
               className={cn(
                 'flex-1 flex items-center gap-3 min-w-0',
                 'text-left focus:outline-none',
-                'group-hover:text-primary-600 dark:group-hover:text-primary-400',
+                'group-hover:text-primary-token',
                 'transition-colors duration-200'
               )}
             >
               <div
                 className={cn(
                   'flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center',
-                  'bg-white dark:bg-gray-700/80 shadow-sm',
-                  'border border-gray-100 dark:border-gray-600/50',
-                  'text-gray-700 dark:text-gray-200',
+                  'bg-surface-0 shadow-sm',
+                  'border border-subtle',
+                  'text-primary-token',
                   'group-hover:shadow-md group-hover:scale-105',
                   'transition-all duration-200'
                 )}
@@ -166,10 +166,10 @@ export function LinkCard({
               </div>
 
               <div className='min-w-0'>
-                <h3 className='text-sm font-medium text-gray-900 dark:text-white truncate'>
+                <h3 className='text-sm font-medium text-primary-token truncate'>
                   {title || platformName}
                 </h3>
-                <p className='text-xs text-gray-500 dark:text-gray-400 truncate'>
+                <p className='text-xs text-secondary-token truncate'>
                   {displayUrl}
                 </p>
               </div>
@@ -183,9 +183,9 @@ export function LinkCard({
                   onClick={handleEditClick}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                    'text-tertiary-token hover:text-secondary-token',
+                    'hover:bg-surface-2',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0',
                     'group-hover:opacity-100 transition-opacity',
                     isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
                   )}
@@ -205,10 +205,10 @@ export function LinkCard({
                   onClick={() => onToggleVisibility(id)}
                   className={cn(
                     'flex-shrink-0 p-1.5 rounded-md transition-colors',
-                    'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                    'hover:bg-gray-100 dark:hover:bg-gray-700/50',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
-                    isVisible && 'text-primary-600 dark:text-primary-400',
+                    'text-tertiary-token hover:text-secondary-token',
+                    'hover:bg-surface-2',
+                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0',
+                    isVisible && 'text-accent',
                     'group-hover:opacity-100 transition-opacity',
                     isExpanded ? 'opacity-100' : 'opacity-0 md:opacity-0'
                   )}
@@ -232,9 +232,9 @@ export function LinkCard({
               onClick={toggleExpanded}
               className={cn(
                 'flex-shrink-0 p-1.5 -mr-1.5 rounded-md transition-all',
-                'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300',
-                'hover:bg-gray-100 dark:hover:bg-gray-700/50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                'text-tertiary-token hover:text-secondary-token',
+                'hover:bg-surface-2',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0',
                 'transition-transform duration-200',
                 isExpanded ? 'rotate-180' : 'rotate-0'
               )}
@@ -256,15 +256,15 @@ export function LinkCard({
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className='overflow-hidden'
               >
-                <div className='mt-4 pt-4 border-t border-gray-100 dark:border-gray-700/50'>
+                <div className='mt-4 pt-4 border-t border-subtle'>
                   <div className='flex items-center justify-between'>
                     <a
                       href={url}
                       target='_blank'
                       rel='noopener noreferrer'
                       className={cn(
-                        'inline-flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400',
-                        'hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
+                        'inline-flex items-center gap-1.5 text-sm text-primary-token',
+                        'hover:text-accent hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0',
                         'transition-colors duration-200'
                       )}
                     >
@@ -285,7 +285,7 @@ export function LinkCard({
                         variant='ghost'
                         size='sm'
                         onClick={() => onDelete(id)}
-                        className='text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20'
+                        className='text-red-500 hover:bg-red-500/10'
                       >
                         Delete
                       </Button>
@@ -301,9 +301,8 @@ export function LinkCard({
         <div
           className={cn(
             'absolute inset-0 -z-10 rounded-xl opacity-0 group-hover:opacity-100',
-            'bg-gradient-to-r from-primary-500/5 to-primary-400/5',
-            'transition-opacity duration-200',
-            'dark:from-primary-500/10 dark:to-primary-400/10'
+            'bg-gradient-to-r from-accent/5 to-accent/10',
+            'transition-opacity duration-200'
           )}
         />
       </Card>

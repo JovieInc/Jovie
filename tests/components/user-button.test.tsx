@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import {
   afterAll,
   beforeEach,
@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
 
 const showToastMock = vi.fn();
 
-vi.mock('@/components/ui/ToastContainer', () => ({
+vi.mock('@/components/molecules/ToastContainer', () => ({
   __esModule: true,
   useToast: () => ({
     showToast: showToastMock,
@@ -38,6 +38,13 @@ import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/molecules/UserButton';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
+
+const flushMicrotasks = async () => {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
 
 const mockUseBillingStatus = vi.mocked(useBillingStatus);
 const mockUseUser = vi.mocked(useUser);
@@ -126,33 +133,29 @@ describe('UserButton billing actions', () => {
 
     fireEvent.click(screen.getByText('Adele Adkins'));
 
-    const upgradeItem = await screen.findByText('Upgrade to Pro');
-    fireEvent.click(upgradeItem);
+    fireEvent.click(screen.getByText('Upgrade to Pro'));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenNthCalledWith(
-        1,
-        '/api/stripe/pricing-options'
-      );
-      expect(fetchMock).toHaveBeenNthCalledWith(
-        2,
-        '/api/stripe/checkout',
-        expect.objectContaining({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ priceId: 'price_month' }),
-        })
-      );
-      expect(window.location.href).toBe(checkoutUrl);
-      expect(track).toHaveBeenCalledWith(
-        'billing_upgrade_clicked',
-        expect.objectContaining({ surface: 'sidebar_user_menu' })
-      );
-      expect(track).toHaveBeenCalledWith(
-        'billing_upgrade_checkout_redirected',
-        expect.objectContaining({ interval: 'month' })
-      );
-    });
+    await flushMicrotasks();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/stripe/pricing-options');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/stripe/checkout',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_month' }),
+      })
+    );
+    expect(window.location.href).toBe(checkoutUrl);
+    expect(track).toHaveBeenCalledWith(
+      'billing_upgrade_clicked',
+      expect.objectContaining({ surface: 'sidebar_user_menu' })
+    );
+    expect(track).toHaveBeenCalledWith(
+      'billing_upgrade_checkout_redirected',
+      expect.objectContaining({ interval: 'month' })
+    );
   });
 
   it('opens the Stripe billing portal for Pro users', async () => {
@@ -175,23 +178,22 @@ describe('UserButton billing actions', () => {
 
     fireEvent.click(screen.getByText('Adele Adkins'));
 
-    const manageBilling = await screen.findByText('Manage Billing');
-    fireEvent.click(manageBilling);
+    fireEvent.click(screen.getByText('Manage Billing'));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      expect(window.location.href).toBe(portalUrl);
-      expect(track).toHaveBeenCalledWith(
-        'billing_manage_billing_clicked',
-        expect.objectContaining({ surface: 'sidebar_user_menu' })
-      );
-      expect(track).toHaveBeenCalledWith(
-        'billing_manage_billing_redirected',
-        expect.any(Object)
-      );
+    await flushMicrotasks();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/stripe/portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     });
+    expect(window.location.href).toBe(portalUrl);
+    expect(track).toHaveBeenCalledWith(
+      'billing_manage_billing_clicked',
+      expect.objectContaining({ surface: 'sidebar_user_menu' })
+    );
+    expect(track).toHaveBeenCalledWith(
+      'billing_manage_billing_redirected',
+      expect.any(Object)
+    );
   });
 });

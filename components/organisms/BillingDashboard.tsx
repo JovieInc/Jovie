@@ -4,9 +4,11 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { getActivePriceIds } from '@/lib/stripe/config';
 
 interface BillingInfo {
@@ -18,36 +20,36 @@ interface BillingInfo {
 export function BillingDashboard() {
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { error: notifyError } = useNotifications();
+
+  const fetchBillingInfo = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const response = await fetch('/api/billing/status');
+      if (!response.ok) {
+        throw new Error('Failed to fetch billing status');
+      }
+
+      const data = await response.json();
+      setBillingInfo(data);
+    } catch (err) {
+      console.error('Error fetching billing info:', err);
+      setBillingInfo(null);
+      setErrorMessage(
+        'We could not load your billing details. Please retry or visit the portal once the connection is restored.'
+      );
+      notifyError('Billing is temporarily unavailable.');
+    } finally {
+      setLoading(false);
+    }
+  }, [notifyError]);
 
   useEffect(() => {
-    const fetchBillingInfo = async () => {
-      try {
-        const response = await fetch('/api/billing/status');
-        if (response.ok) {
-          const data = await response.json();
-          setBillingInfo(data);
-        } else {
-          // If billing status endpoint doesn't exist or fails, assume no subscription
-          setBillingInfo({
-            isPro: false,
-            stripeCustomerId: null,
-            stripeSubscriptionId: null,
-          });
-        }
-      } catch (err) {
-        console.error('Error fetching billing info:', err);
-        setBillingInfo({
-          isPro: false,
-          stripeCustomerId: null,
-          stripeSubscriptionId: null,
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchBillingInfo();
-  }, []);
+  }, [fetchBillingInfo]);
 
   if (loading) {
     return (
@@ -56,6 +58,20 @@ export function BillingDashboard() {
         <div className='h-32 bg-gray-200 dark:bg-gray-700 rounded mb-4'></div>
         <div className='h-10 bg-gray-200 dark:bg-gray-700 rounded'></div>
       </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <ErrorBanner
+        title='Billing is temporarily unavailable'
+        description={errorMessage}
+        actions={[
+          { label: 'Retry', onClick: fetchBillingInfo },
+          { label: 'Contact support', href: '/support' },
+        ]}
+        testId='billing-error-state'
+      />
     );
   }
 

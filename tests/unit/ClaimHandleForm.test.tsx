@@ -60,10 +60,16 @@ describe('ClaimHandleForm', () => {
     render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    expect(input).toHaveAttribute('aria-describedby', 'handle-input-help');
+    // Input should have aria-required for required fields
     expect(input).toHaveAttribute('aria-required', 'true');
 
-    // Check aria-live region exists
+    // Check that help text exists and is visible (accessibility through visible text)
+    const helpText = screen.getByText(
+      /your unique identifier for your profile url/i
+    );
+    expect(helpText).toBeInTheDocument();
+
+    // Check aria-live region exists for dynamic announcements
     const liveRegion = document.querySelector('[aria-live="assertive"]');
     expect(liveRegion).not.toBeNull();
     expect(liveRegion).toHaveAttribute('aria-live', 'assertive');

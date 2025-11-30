@@ -1,12 +1,14 @@
 'use client';
 
+import { useFeatureGate } from '@statsig/react-bindings';
 import { AnimatePresence, motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
-import { CTAButton } from '@/components/atoms/CTAButton';
+import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazily load heavy profile sub-components to keep initial bundle lean
@@ -39,7 +41,8 @@ function renderContent(
   router: ReturnType<typeof useRouter>,
   isNavigating: boolean,
   prefersReducedMotion: boolean,
-  setIsNavigating: (value: boolean) => void
+  setIsNavigating: (value: boolean) => void,
+  tippingEnabled: boolean
 ) {
   switch (mode) {
     case 'listen':
@@ -50,6 +53,32 @@ function renderContent(
       );
 
     case 'tip':
+      if (!tippingEnabled) {
+        return (
+          <motion.div
+            initial={
+              prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }
+            }
+            animate={
+              prefersReducedMotion ? { opacity: 1 } : { opacity: 1, y: 0 }
+            }
+            transition={
+              prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
+            }
+          >
+            <div className='space-y-4 text-center'>
+              <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5'>
+                <p className='text-gray-600 dark:text-gray-400' role='alert'>
+                  Tipping is not available yet. We&apos;re focused on getting
+                  the core Jovie profile experience right before launching
+                  tipping.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        );
+      }
+
       // Extract Venmo link from social links
       const venmoLink =
         socialLinks.find(l => l.platform === 'venmo')?.url || null;
@@ -123,16 +152,7 @@ function renderContent(
           }
         >
           <div className='space-y-4'>
-            <CTAButton
-              href={`/${artist.handle}?mode=listen`}
-              variant='primary'
-              size='lg'
-              className='w-full'
-              isLoading={isNavigating}
-              onClick={() => setIsNavigating(true)}
-            >
-              Listen Now
-            </CTAButton>
+            <ArtistNotificationsCTA artist={artist} variant='button' />
           </div>
         </motion.div>
       );
@@ -150,6 +170,9 @@ export function AnimatedArtistPage({
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const tippingGate = useFeatureGate(STATSIG_FLAGS.TIPPING);
+
+  const tippingEnabled = tippingGate.value;
 
   // Page-level animation variants with Apple-style easing
   const pageVariants = {
@@ -188,7 +211,7 @@ export function AnimatedArtistPage({
         artist={artist}
         socialLinks={socialLinks}
         subtitle={subtitle}
-        showTipButton={showTipButton}
+        showTipButton={showTipButton && tippingEnabled}
         showBackButton={showBackButton}
       >
         {/* Content pane with AnimatePresence for mode transitions */}
@@ -216,7 +239,8 @@ export function AnimatedArtistPage({
                 router,
                 isNavigating,
                 prefersReducedMotion,
-                setIsNavigating
+                setIsNavigating,
+                tippingEnabled
               )}
             </motion.div>
           </AnimatePresence>

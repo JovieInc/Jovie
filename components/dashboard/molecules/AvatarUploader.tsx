@@ -22,6 +22,11 @@ interface AvatarUploaderProps {
   onStatusChange?: (result: UploadResult) => void;
   className?: string;
   initialUrl?: string;
+  /**
+   * Optional file provided by a parent component to kick off an upload
+   * programmatically (e.g. dropping a file on an avatar thumbnail).
+   */
+  autoStartFile?: File | null;
 }
 
 export default function AvatarUploader({
@@ -29,6 +34,7 @@ export default function AvatarUploader({
   onStatusChange,
   className = '',
   initialUrl,
+  autoStartFile,
 }: AvatarUploaderProps) {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [preview, setPreview] = useState<string | null>(initialUrl || null);
@@ -122,6 +128,14 @@ export default function AvatarUploader({
     [onUploaded, initialUrl, startStatusPolling]
   );
 
+  // When a parent provides a file (for example via drag-and-drop on an
+  // avatar), automatically start the upload flow using the same logic as the
+  // internal file input.
+  useEffect(() => {
+    if (!autoStartFile) return;
+    void handleFileSelect(autoStartFile);
+  }, [autoStartFile, handleFileSelect]);
+
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -198,10 +212,10 @@ export default function AvatarUploader({
                 alt='Profile photo'
                 width={80}
                 height={80}
-                className='rounded-full object-cover border border-gray-200 dark:border-gray-700'
+                className='rounded-full object-cover border border-subtle'
               />
             ) : (
-              <div className='w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-800 border border-gray-200 dark:border-gray-700' />
+              <div className='w-20 h-20 rounded-full bg-surface-2 border border-subtle' />
             )}
             {isLoading && (
               <div className='absolute inset-0 flex items-center justify-center rounded-full bg-black/50'>
@@ -211,10 +225,10 @@ export default function AvatarUploader({
           </div>
 
           <div className='flex-1'>
-            <h3 className='text-sm font-medium text-gray-900 dark:text-gray-100'>
+            <h3 className='text-sm font-medium text-primary-token'>
               Profile Photo
             </h3>
-            <p className='text-xs text-gray-500 dark:text-gray-400'>
+            <p className='text-xs text-secondary-token'>
               JPG, PNG, or WebP. Max 4MB.
             </p>
             {getStatusMessage() && (
@@ -257,7 +271,7 @@ export default function AvatarUploader({
             ${
               isDragActive
                 ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+                : 'border-subtle hover:border-default'
             }
             ${uploading ? 'opacity-50 cursor-not-allowed' : ''}
           `}
@@ -278,13 +292,13 @@ export default function AvatarUploader({
               </p>
             ) : (
               <div>
-                <p className='text-sm text-gray-600 dark:text-gray-300'>
+                <p className='text-sm text-secondary-token'>
                   <span className='font-medium text-blue-600 dark:text-blue-400'>
                     Click to upload
                   </span>{' '}
                   or drag and drop
                 </p>
-                <p className='text-xs text-gray-500 dark:text-gray-400'>
+                <p className='text-xs text-secondary-token'>
                   Your image will be automatically resized
                 </p>
               </div>

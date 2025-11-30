@@ -15,19 +15,68 @@ export class ClerkTestError extends Error {
 }
 
 /**
+ * Creates or reuses a Clerk test user session for the given email.
+ *
+ * Assumes the page has already loaded the app and Clerk has been initialized.
+ */
+export async function createOrReuseTestUserSession(page: Page, email: string) {
+  if (!email) {
+    throw new ClerkTestError(
+      'E2E test user email not configured. Set E2E_CLERK_USER_USERNAME.',
+      'MISSING_CREDENTIALS'
+    );
+  }
+
+  await page.evaluate(
+    async ({ email: targetEmail }) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const clerk = (window as any).Clerk;
+      if (!clerk) throw new Error('Clerk not initialized');
+
+      // Reuse existing session if one is already active
+      if (clerk.user && clerk.session) {
+        return;
+      }
+
+      try {
+        // Prefer signing in an existing user for this email
+        const signIn = await clerk.signIn?.create({ identifier: targetEmail });
+
+        await clerk.setActive({
+          session:
+            signIn?.createdSessionId ||
+            clerk.client?.lastActiveSessionId ||
+            null,
+        });
+      } catch {
+        // If sign-in fails (e.g., user does not exist), create a new user
+        const signUp = await clerk.signUp?.create({
+          emailAddress: targetEmail,
+        });
+
+        await clerk.setActive({
+          session:
+            signUp?.createdSessionId ||
+            clerk.client?.lastActiveSessionId ||
+            null,
+        });
+      }
+    },
+    { email }
+  );
+}
+
+/**
  * Authenticates a user in Clerk for E2E tests
  * This function handles the complete sign-in flow
  */
 export async function signInUser(
   page: Page,
-  {
-    username = process.env.E2E_CLERK_USER_USERNAME,
-    password = process.env.E2E_CLERK_USER_PASSWORD,
-  } = {}
+  { username = process.env.E2E_CLERK_USER_USERNAME } = {}
 ) {
-  if (!username || !password) {
+  if (!username) {
     throw new ClerkTestError(
-      'E2E test user credentials not configured. Set E2E_CLERK_USER_USERNAME and E2E_CLERK_USER_PASSWORD.',
+      'E2E test user credentials not configured. Set E2E_CLERK_USER_USERNAME.',
       'MISSING_CREDENTIALS'
     );
   }
@@ -35,36 +84,19 @@ export async function signInUser(
   // Set up Clerk testing token to bypass bot detection
   await setupClerkTestingToken({ page });
 
-  // Navigate to sign-in page
-  await page.goto('/sign-in');
+  // Initialize app and Clerk on the page
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  // Wait for sign-in form to load - look for the heading and form elements
-  await expect(page.locator('h1:has-text("Sign in")')).toBeVisible({
-    timeout: 10000,
-  });
+  await page.waitForFunction(
+    () => {
+      // @ts-expect-error - Clerk is attached to window at runtime
+      return window.Clerk && window.Clerk.isReady();
+    },
+    { timeout: 10000 }
+  );
 
-  // Fill in email address
-  const emailInput = page
-    .locator('input[name="identifier"]')
-    .or(page.getByLabel('Email address'));
-  await emailInput.waitFor({ state: 'visible' });
-  await emailInput.fill(username);
-
-  // Fill in password
-  const passwordInput = page
-    .locator('input[name="password"]')
-    .or(page.getByLabel('Password'));
-  await passwordInput.waitFor({ state: 'visible' });
-  await passwordInput.fill(password);
-
-  // Submit the form
-  const submitButton = page.locator('button:has-text("Continue")');
-  await submitButton.click();
-
-  // Wait for successful authentication (redirect away from sign-in)
-  await page.waitForURL(url => !url.pathname.includes('/sign-in'), {
-    timeout: 15000,
-  });
+  // Create or reuse a session for the configured test user
+  await createOrReuseTestUserSession(page, username);
 
   // Verify we're authenticated by checking for user button or dashboard
   await expect(

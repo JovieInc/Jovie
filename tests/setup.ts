@@ -1,12 +1,16 @@
-import '../styles/globals.css';
-import { neon } from '@neondatabase/serverless';
+import '../app/globals.css';
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { migrate } from 'drizzle-orm/neon-http/migrator';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import React from 'react';
 import { afterEach, beforeAll, expect, vi } from 'vitest';
+import ws from 'ws';
 import * as schema from '@/lib/db/schema';
+
+// Configure WebSocket for transaction support in tests
+neonConfig.webSocketConstructor = ws;
 
 // Setup test database
 if (process.env.NODE_ENV === 'test') {
@@ -15,12 +19,12 @@ if (process.env.NODE_ENV === 'test') {
   if (!databaseUrl) {
     console.warn('DATABASE_URL is not set. Database tests will be skipped.');
   } else {
-    const sql = neon(databaseUrl);
-    const db = drizzle(sql, { schema });
+    const pool = new Pool({ connectionString: databaseUrl });
+    const db = drizzle(pool, { schema });
 
     beforeAll(async () => {
       try {
-        await migrate(db, { migrationsFolder: './drizzle' });
+        await migrate(db, { migrationsFolder: './drizzle/migrations' });
       } catch (error) {
         console.error('Failed to run migrations:', error);
         throw error;
@@ -294,49 +298,9 @@ vi.mock('next/image', () => ({
   },
 }));
 
-// Mock OptimizedImage component
-vi.mock('@/components/ui/OptimizedImage', () => ({
-  OptimizedImage: ({
-    src,
-    alt,
-    width,
-    height,
-    className,
-    ...props
-  }: React.ComponentProps<'img'>) => {
-    // If src is null or empty, render a placeholder div
-    if (!src) {
-      return React.createElement('div', {
-        className: `bg-gray-200 animate-pulse ${className || ''}`,
-        style: { width, height },
-        'data-testid': 'placeholder-image',
-        ...props,
-      });
-    }
-
-    // For valid images, render the image directly
-    return React.createElement('img', {
-      src,
-      alt,
-      width,
-      height,
-      className: `${className || ''} opacity-100`,
-      'data-testid': 'optimized-image',
-      ...props,
-    });
-  },
-}));
-
-// Mock PlaceholderImage component
-vi.mock('@/components/ui/PlaceholderImage', () => ({
-  PlaceholderImage: ({ className, ...props }: React.ComponentProps<'div'>) => {
-    return React.createElement('div', {
-      className: `bg-gray-200 animate-pulse ${className || ''}`,
-      'data-testid': 'placeholder-image',
-      ...props,
-    });
-  },
-}));
+// Note: OptimizedImage and PlaceholderImage are no longer globally mocked here.
+// Individual tests can mock them as needed, while unit tests for these atoms
+// exercise the real implementations.
 
 // Mock @headlessui/react properly with all components
 const MockedComponents = {
@@ -531,12 +495,20 @@ const MockedComponents = {
     return React.createElement('p', { ...props, ref });
   }),
 
-  // Input component (missing from previous mock)
+  // Input component
   Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
     (props, ref) => {
       return React.createElement('input', { ...props, ref });
     }
   ),
+
+  // Textarea component
+  Textarea: React.forwardRef<
+    HTMLTextAreaElement,
+    React.ComponentProps<'textarea'>
+  >((props, ref) => {
+    return React.createElement('textarea', { ...props, ref });
+  }),
 };
 
 // Add display names to all mocked components
@@ -585,101 +557,52 @@ MockedComponents.TransitionChild.displayName = 'MockedTransitionChild';
 MockedComponents.Description.displayName = 'MockedDescription';
 
 MockedComponents.Input.displayName = 'MockedInput';
+MockedComponents.Textarea.displayName = 'MockedTextarea';
 
 vi.mock('@headlessui/react', () => MockedComponents);
 
-// Mock @dnd-kit/core
-vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'dnd-context' }, children),
-  useDraggable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: vi.fn(),
-    transform: null,
-    isDragging: false,
-  }),
-  useDroppable: () => ({
-    setNodeRef: vi.fn(),
-    isOver: false,
-  }),
-  useSensor: vi.fn(),
-  useSensors: vi.fn(() => []),
-  PointerSensor: vi.fn(),
-  KeyboardSensor: vi.fn(),
-  DragOverlay: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'drag-overlay' }, children),
-  MouseSensor: vi.fn(),
-  TouchSensor: vi.fn(),
-}));
+// Mock @jovie/ui Tooltip components (Radix UI)
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
 
-// Mock @dnd-kit/sortable
-vi.mock('@dnd-kit/sortable', () => ({
-  SortableContext: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'sortable-context' }, children),
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: vi.fn(),
-    transform: null,
-    transition: null,
-    isDragging: false,
-  }),
-  arrayMove: (array: unknown[], oldIndex: number, newIndex: number) => {
-    const newArray = [...array];
-    const [moved] = newArray.splice(oldIndex, 1);
-    newArray.splice(newIndex, 0, moved);
-    return newArray;
-  },
-  sortableKeyboardCoordinates: vi.fn(),
-  verticalListSortingStrategy: 'vertical',
-  horizontalListSortingStrategy: 'horizontal',
-}));
+  // Create a mock TooltipProvider that passes through children
+  const MockTooltipProvider = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(React.Fragment, {}, children);
+  };
 
-// Mock @dnd-kit/utilities
-vi.mock('@dnd-kit/utilities', () => ({
-  CSS: {
-    Transform: {
-      toString: (transform: { x: number; y: number } | null) =>
-        transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : '',
-    },
-  },
-}));
+  // Create mock Tooltip that doesn't require provider
+  const MockTooltip = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(
+      'div',
+      { 'data-testid': 'tooltip-wrapper' },
+      children
+    );
+  };
 
-// Mock @jovie/ui components
-vi.mock('@jovie/ui', () => ({
-  Tooltip: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'tooltip' }, children),
-  TooltipTrigger: ({ children }: { children: React.ReactNode }) => children,
-  TooltipContent: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'tooltip-content' }, children),
-  TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
-  Button: React.forwardRef<HTMLButtonElement, React.ComponentProps<'button'>>(
-    function MockButton(props, ref) {
-      return React.createElement('button', { ...props, ref });
+  const MockTooltipTrigger = React.forwardRef<
+    HTMLElement,
+    { asChild?: boolean; children: React.ReactNode }
+  >(({ children, asChild }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement, { ref });
     }
-  ),
-  DropdownMenu: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'dropdown-menu' }, children),
-  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) =>
-    children,
-  DropdownMenuContent: ({ children }: { children: React.ReactNode }) =>
-    React.createElement(
+    return React.createElement('div', { ref }, children);
+  });
+  MockTooltipTrigger.displayName = 'MockTooltipTrigger';
+
+  const MockTooltipContent = ({ children }: { children: React.ReactNode }) => {
+    return React.createElement(
       'div',
-      { 'data-testid': 'dropdown-menu-content' },
+      { 'data-testid': 'tooltip-content', role: 'tooltip' },
       children
-    ),
-  DropdownMenuItem: ({ children }: { children: React.ReactNode }) =>
-    React.createElement(
-      'div',
-      { 'data-testid': 'dropdown-menu-item' },
-      children
-    ),
-  DropdownMenuSeparator: () =>
-    React.createElement('div', { 'data-testid': 'dropdown-menu-separator' }),
-  Popover: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'popover' }, children),
-  PopoverTrigger: ({ children }: { children: React.ReactNode }) => children,
-  PopoverContent: ({ children }: { children: React.ReactNode }) =>
-    React.createElement('div', { 'data-testid': 'popover-content' }, children),
-}));
+    );
+  };
+
+  return {
+    ...actual,
+    TooltipProvider: MockTooltipProvider,
+    Tooltip: MockTooltip,
+    TooltipTrigger: MockTooltipTrigger,
+    TooltipContent: MockTooltipContent,
+  };
+});

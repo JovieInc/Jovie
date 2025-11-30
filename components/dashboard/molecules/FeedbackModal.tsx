@@ -3,28 +3,23 @@
 import { Button } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { Textarea } from '@/components/atoms/Textarea';
+import { FormField } from '@/components/molecules/FormField';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/components/ui/Dialog';
-import { FormField } from '@/components/ui/FormField';
-import { Textarea } from '@/components/ui/Textarea';
+} from '@/components/organisms/Dialog';
 import { track } from '@/lib/analytics';
 
 interface FeedbackModalProps {
   isOpen: boolean;
   onClose: () => void;
-  id?: string;
 }
 
-export function FeedbackModal({
-  isOpen,
-  onClose,
-  id = 'feedback-modal',
-}: FeedbackModalProps) {
+export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   const [feedback, setFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -86,7 +81,7 @@ export function FeedbackModal({
   );
 
   return (
-    <Dialog open={isOpen} onClose={handleClose} id={id} size='sm'>
+    <Dialog open={isOpen} onClose={handleClose} size='sm'>
       {isSubmitted ? (
         <div className='px-6 py-8 text-center'>
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'>

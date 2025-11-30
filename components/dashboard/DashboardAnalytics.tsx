@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { DashboardData } from '@/app/dashboard/actions';
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-
-interface DashboardAnalyticsProps {
-  initialData: DashboardData;
-}
 
 type Range = '1d' | '7d' | '30d';
 
@@ -20,10 +17,11 @@ type ApiPayload = {
   top_referrers: { referrer: string; count: number }[];
 };
 
-export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
+export function DashboardAnalytics() {
+  const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
-    initialData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(initialData.selectedProfile)
+    dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
 
@@ -76,7 +74,7 @@ export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
       </div>
 
       {/* Main card: Profile Views */}
-      <section className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm hover:shadow-md transition-all'>
+      <DashboardCard variant='analytics' className='p-6'>
         <div className='flex items-center justify-between'>
           <div>
             <h2 className='text-lg font-semibold text-primary-token'>
@@ -93,16 +91,12 @@ export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
         {loading && (
           <div className='mt-6 h-8 w-40 bg-surface-2 rounded animate-pulse' />
         )}
-        {error && (
-          <p className='mt-4 text-sm text-orange-600 dark:text-orange-400'>
-            {error}
-          </p>
-        )}
-      </section>
+        {error && <p className='mt-4 text-sm text-destructive'>{error}</p>}
+      </DashboardCard>
 
       {/* Secondary cards */}
       <section className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-        <div className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm'>
+        <DashboardCard variant='analytics' className='p-6'>
           <h3 className='text-sm font-medium text-primary-token mb-4'>
             Top Countries
           </h3>
@@ -137,9 +131,9 @@ export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
               )}
             </ul>
           )}
-        </div>
+        </DashboardCard>
 
-        <div className='bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm'>
+        <DashboardCard variant='analytics' className='p-6'>
           <h3 className='text-sm font-medium text-primary-token mb-4'>
             Top Referrers
           </h3>
@@ -174,7 +168,7 @@ export function DashboardAnalytics({ initialData }: DashboardAnalyticsProps) {
               )}
             </ul>
           )}
-        </div>
+        </DashboardCard>
       </section>
     </div>
   );
@@ -207,7 +201,7 @@ function RangeToggle({
             role='tab'
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`relative px-3 py-1.5 text-sm rounded-full transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            className={`relative rounded-full px-3 py-1.5 text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               active
                 ? 'bg-accent text-white'
                 : 'text-secondary-token hover:bg-surface-2'

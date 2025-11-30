@@ -1,8 +1,8 @@
 'use client';
 
-import { Artist } from '@/types/db';
-import { cn } from '@/lib/utils';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import { cn } from '@/lib/utils';
+import { Artist } from '@/types/db';
 
 export interface ProfilePreviewProps {
   username: string;
@@ -63,12 +63,12 @@ export function ProfilePreview({
 
   return (
     <div className={cn('w-full h-full overflow-hidden rounded-2xl', className)}>
-      <div className="relative h-full w-full">
+      <div className='relative h-full w-full'>
         <StaticArtistPage
-          mode="profile"
+          mode='profile'
           artist={mockArtist}
           socialLinks={socialLinks}
-          subtitle=""
+          subtitle=''
           showTipButton={false}
           showBackButton={false}
         />

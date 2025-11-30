@@ -8,7 +8,7 @@ set -e
 
 # Configuration
 MIGRATIONS_DIR="drizzle/migrations"
-BASE_BRANCH=${1:-"origin/preview"}
+BASE_BRANCH=${1:-"origin/main"}
 BULK_LABEL_MARKER="schema:bulk"
 
 # Colors for output
@@ -101,6 +101,29 @@ while IFS=$'\t' read -r status file; do
             ;;
     esac
 done <<< "$CHANGED_FILES"
+
+# Filter out migrations that already exist on the base branch.
+# These may appear as added in the symmetric diff (BASE...HEAD),
+# but they are not new migrations introduced by this branch.
+if [ $ADDED_COUNT -gt 0 ]; then
+    FILTERED_ADDED_FILES=()
+    FILTERED_ADDED_COUNT=0
+
+    for file in "${ADDED_FILES[@]}"; do
+        BASE_MATCHES=$(git ls-tree -r --name-only "$BASE_BRANCH" -- "$file" || echo "")
+
+        if [ -n "$BASE_MATCHES" ]; then
+            # File already exists on the base branch; treat as existing, not new
+            continue
+        fi
+
+        FILTERED_ADDED_FILES+=("$file")
+        FILTERED_ADDED_COUNT=$((FILTERED_ADDED_COUNT + 1))
+    done
+
+    ADDED_FILES=("${FILTERED_ADDED_FILES[@]}")
+    ADDED_COUNT=$FILTERED_ADDED_COUNT
+fi
 
 # Check for violations
 VIOLATIONS=0

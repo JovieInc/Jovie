@@ -1,50 +1,39 @@
 import Link from 'next/link';
-import { Suspense } from 'react';
-import { FeaturedArtists } from '@/components/home/FeaturedArtists';
 import { Container } from '@/components/site/Container';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0D0E12] transition-colors'>
-      <Container className='py-16'>
-        <div className='max-w-md mx-auto text-center'>
-          <div className='mb-8'>
-            <div className='text-6xl font-bold text-gray-300 dark:text-gray-700 mb-4'>
-              404
+    <div className='min-h-screen bg-white dark:bg-[#0D0E12] transition-colors grid-bg dark:grid-bg-dark'>
+      <Container className='flex min-h-screen items-center justify-center'>
+        <div className='w-full max-w-xl mx-auto text-center px-4 py-24 animate-fade-in-up'>
+          <div className='mb-10 relative'>
+            <div className='absolute -inset-1 rounded-full bg-linear-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
+            <div className='relative inline-flex items-baseline gap-3'>
+              <span className='text-6xl md:text-8xl font-semibold tracking-tight text-gray-900 dark:text-white'>
+                404
+              </span>
+              <span className='hidden md:inline text-xs font-medium tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400'>
+                Not found
+              </span>
             </div>
-            <h1 className='text-2xl font-semibold text-gray-900 dark:text-white mb-2'>
-              Profile not found
-            </h1>
-            <p className='text-gray-600 dark:text-gray-400'>
-              The profile you&apos;re looking for doesn&apos;t exist or
-              isn&apos;t public.
-            </p>
           </div>
 
-          <Link
-            href='/'
-            className='inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors mb-12'
-          >
-            Go home
-          </Link>
-        </div>
+          <h1 className='text-2xl md:text-3xl font-medium text-gray-900 dark:text-white tracking-tight mb-3'>
+            Profile not found
+          </h1>
+          <p className='text-base text-gray-600 dark:text-gray-300 leading-relaxed mb-8'>
+            The profile you&apos;re looking for doesn&apos;t exist or isn&apos;t
+            public.
+          </p>
 
-        {/* Featured Creators Section */}
-        <div className='mt-16 pt-16 border-t border-gray-200 dark:border-gray-800'>
-          <h2 className='text-xl font-semibold text-gray-900 dark:text-white text-center mb-8'>
-            Check out these creators
-          </h2>
-          <Suspense
-            fallback={
-              <div className='flex items-center justify-center py-8'>
-                <div className='animate-pulse text-gray-600 dark:text-white/60'>
-                  Loading creators...
-                </div>
-              </div>
-            }
-          >
-            <FeaturedArtists />
-          </Suspense>
+          <div className='flex items-center justify-center gap-3'>
+            <Link
+              href='/'
+              className='inline-flex items-center justify-center rounded-full font-medium transition-all duration-200 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100 focus-visible:ring-gray-500/50 px-6 py-3 text-base'
+            >
+              Go home
+            </Link>
+          </div>
         </div>
       </Container>
     </div>

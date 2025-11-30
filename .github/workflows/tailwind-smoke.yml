@@ -2,7 +2,7 @@ name: Tailwind v4 Smoke
 
 on:
   pull_request:
-    branches: [preview]
+    branches: [main]
     paths:
       - 'styles/**'
       - 'app/**'
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
 
       - uses: ./.github/actions/setup-node-pnpm
@@ -37,16 +37,22 @@ jobs:
       - name: Assert Tailwind CSS emitted
         run: |
           set -e
-          # Find a CSS file under .next/static and assert it contains any --tw- token
-          css_file=$(find .next/static -type f -name "*.css" | head -n 1 || true)
+          # Find the largest CSS file (Tailwind CSS will be in the larger file, not the font file)
+          css_file=$(find .next/static -type f -name "*.css" -exec ls -l {} \; | sort -k5 -nr | head -n 1 | awk '{print $NF}' || true)
+
           if [ -z "$css_file" ]; then
-            echo "No built CSS found under .next/static. Failing." >&2
+            echo "❌ No built CSS found under .next/static. Failing." >&2
             exit 1
           fi
 
-          if grep -q "--tw-" "$css_file"; then
+          echo "📄 Checking largest CSS file: $css_file"
+          echo "📊 File size: $(wc -c < "$css_file") bytes"
+
+          if grep -q -- "--tw-" "$css_file"; then
             echo "✅ Tailwind tokens detected in $css_file"
           else
-            echo "❌ Tailwind tokens not detected. Check Tailwind v4 setup (@import 'tailwindcss' and @source)." >&2
+            echo "❌ Tailwind tokens not detected in $css_file" >&2
+            echo "🔍 First 1000 chars of CSS:"
+            head -c 1000 "$css_file"
             exit 1
           fi

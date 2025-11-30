@@ -2,21 +2,14 @@ import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import React from 'react';
+import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
-import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator';
-import '@/styles/globals.css';
-import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
-import { cookies, headers } from 'next/headers';
+// import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
+import './globals.css';
+import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
-import { userSettings, users } from '@/lib/db';
-import { db } from '@/lib/db/client';
-import type { ThemeMode } from '@/types';
-
-// Import performance monitoring
-// import { initWebVitals } from '@/lib/monitoring/web-vitals'; // Currently unused
 
 // Configure Inter font
 const inter = Inter({
@@ -25,9 +18,6 @@ const inter = Inter({
   display: 'swap',
   variable: '--font-inter',
 });
-
-// Bypass static rendering for now to fix build issues
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: {
@@ -116,63 +106,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Run environment validation at startup (server-side only)
-  await runStartupEnvironmentValidation();
-
-  // Fetch feature flags server-side
-  // Feature flags removed - pre-launch
-  const shouldInjectToolbar = process.env.NODE_ENV === 'development';
-
   // Extract domain from APP_URL for analytics
   const analyticsDomain = APP_URL.replace(/^https?:\/\//, '');
 
   // Check if cookie banner should be shown
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
-
-  // Resolve initial theme mode (server)
-  let initialThemeMode: ThemeMode = 'system';
-  try {
-    const { userId: clerkId } = await auth();
-    if (clerkId) {
-      // Find app user by Clerk ID
-      const found = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.clerkId, clerkId))
-        .limit(1);
-      const appUserId = found?.[0]?.id;
-      if (appUserId) {
-        const prefs = await db
-          .select({ themeMode: userSettings.themeMode })
-          .from(userSettings)
-          .where(eq(userSettings.userId, appUserId))
-          .limit(1);
-        const mode = prefs?.[0]?.themeMode as ThemeMode | undefined;
-        if (mode) initialThemeMode = mode;
-      }
-    } else {
-      // Signed-out: use cookie fallback
-      const cookieStore = await cookies();
-      const cookieTheme = cookieStore.get('jovie-theme')?.value as
-        | ThemeMode
-        | undefined;
-      if (
-        cookieTheme === 'light' ||
-        cookieTheme === 'dark' ||
-        cookieTheme === 'system'
-      ) {
-        initialThemeMode = cookieTheme;
-      }
-    }
-  } catch {}
+  const shouldInjectToolbar = process.env.NODE_ENV === 'development';
 
   return (
-    <html
-      lang='en'
-      suppressHydrationWarning
-      className={initialThemeMode === 'dark' ? 'dark' : undefined}
-    >
+    <html lang='en' suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -235,9 +178,9 @@ export default async function RootLayout({
       <body
         className={`${inter.variable} font-sans bg-base text-primary-token`}
       >
-        <ClientProviders initialThemeMode={initialThemeMode}>
-          {children}
-        </ClientProviders>
+        <ClerkAppProvider>
+          <ClientProviders>{children}</ClientProviders>
+        </ClerkAppProvider>
         {showCookieBanner && <CookieBannerSection />}
         {/* <SpeedInsights /> */}
         {shouldInjectToolbar && (

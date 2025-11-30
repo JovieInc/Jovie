@@ -14,6 +14,12 @@ import type {
   SubscriptionStatus,
 } from './db';
 
+// Contact / CRM types
+export type {
+  Contact,
+  ContactSidebarMode,
+  ContactSocialLink,
+} from './contact';
 // Re-export shared enums and types from db.ts
 export type {
   // Core interfaces
@@ -295,4 +301,13 @@ export function getSocialPlatformLabel(platform: SocialPlatform): string {
     labels[platform] ||
     platform.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
   );
+}
+
+export interface UserEntitlements {
+  userId: string | null;
+  email: string | null;
+  isAuthenticated: boolean;
+  isPro: boolean;
+  hasAdvancedFeatures: boolean;
+  canRemoveBranding: boolean;
 }

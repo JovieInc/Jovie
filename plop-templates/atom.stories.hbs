@@ -1,0 +1,32 @@
+import type { Meta, StoryObj } from '@storybook/react';
+import { {{name}} } from './{{name}}';
+
+const meta: Meta<typeof {{name}}> = {
+  title: 'Atoms/{{name}}',
+  component: {{name}},
+  parameters: {
+    layout: 'centered',
+  },
+  tags: ['autodocs'],
+  argTypes: {
+    children: {
+      control: 'text',
+    },
+  },
+};
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const Default: Story = {
+  args: {
+    children: '{{name}} content',
+  },
+};
+
+export const WithCustomClass: Story = {
+  args: {
+    children: '{{name}} with custom styling',
+    className: 'border-2 border-blue-500 p-4',
+  },
+};
