@@ -1,6 +1,7 @@
 'use client';
 import { Button } from '@jovie/ui';
-import { useRouter } from 'next/navigation';
+import { useFeatureGate } from '@statsig/react-bindings';
+import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
@@ -8,6 +9,7 @@ import { SocialLink as SocialLinkComponent } from '@/components/molecules/Social
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { Container } from '@/components/site/Container';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type ProfileShellProps = {
@@ -42,10 +44,14 @@ export function ProfileShell({
   const router = useRouter();
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const [isBackNavigating, setIsBackNavigating] = useState(false);
+  const searchParams = useSearchParams();
+  const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+  const forceNotifications = searchParams?.get('preview') === '1';
+  const notificationsEnabled = notificationsGate.value || forceNotifications;
 
   return (
     <div
-      className='min-h-screen bg-white dark:bg-gray-900 transition-colors duration-200 relative overflow-hidden'
+      className='min-h-screen bg-white dark:bg-black transition-colors duration-200 relative overflow-hidden'
       data-test='public-profile-root'
     >
       {/* Background Effects */}
@@ -97,7 +103,7 @@ export function ProfileShell({
         )}
 
         {/* Top right controls */}
-        {showNotificationButton && process.env.NODE_ENV === 'development' && (
+        {showNotificationButton && notificationsEnabled && (
           <div className='absolute top-4 right-4 z-10 flex items-center gap-3'>
             <Button
               className='rounded-full'
@@ -122,7 +128,7 @@ export function ProfileShell({
         )}
 
         <div className='flex min-h-screen flex-col py-12 relative z-10'>
-          <div className='flex-1 flex flex-col items-center justify-center px-4'>
+          <div className='flex-1 flex flex-col items-center justify-start px-4'>
             <div className={`${maxWidthClass} space-y-8`}>
               <ArtistInfo artist={artist} subtitle={subtitle} />
               {children}

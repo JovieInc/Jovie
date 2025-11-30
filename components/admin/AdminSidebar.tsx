@@ -26,10 +26,10 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { label: 'Users', href: '/admin#users', icon: Users },
+  { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Usage', href: '/admin#usage', icon: BarChart2 },
   { label: 'Reliability', href: '/admin#errors', icon: ShieldCheck },
-  { label: 'Activity', href: '/admin#activity', icon: Activity },
+  { label: 'Activity', href: '/admin/activity', icon: Activity },
 ];
 
 interface AdminSidebarProps {
@@ -40,7 +40,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <Sidebar variant='inset' className={className}>
+    <Sidebar variant='sidebar' className={className}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

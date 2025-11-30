@@ -165,3 +165,7 @@ export function getUserFriendlyMessage(code: OnboardingErrorCode): string {
       return 'An unexpected error occurred. Please try again';
   }
 }
+
+export function onboardingErrorToError(error: OnboardingError): Error {
+  return new Error(`[${error.code}] ${error.message}`);
+}

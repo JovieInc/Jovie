@@ -15,6 +15,51 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - Do **not** add or reintroduce PostHog, Segment, RudderStack, or any other analytics/flags SDKs.
 - Use Statsig feature gates/experiments for non-essential flows; leave MVP-critical flows ungated unless explicitly flagged.
 
+### Feature Gate Workflow
+
+**When creating a new feature flag:**
+
+1. **Add to code constants** (`lib/statsig/flags.ts`):
+   ```typescript
+   export const STATSIG_FLAGS = {
+     // ... existing flags
+     NEW_FEATURE: 'feature_new_feature',
+   } as const;
+   ```
+
+2. **Create gate in Statsig** using one of these methods:
+   - **Recommended**: Use the Statsig MCP server (configured in `.claude.json`)
+     - Ask Claude Code to create the gate via MCP
+     - Provide: gate name, description, default value, expiry (if temporary)
+   - **Manual**: Create via [Statsig Console](https://console.statsig.com)
+     - Navigate to Feature Gates → Create New Gate
+     - Use exact name from `STATSIG_FLAGS` constant
+
+3. **Document the gate** in `docs/STATSIG_FEATURE_GATES.md`:
+   - Add entry with status, default, description, expiry, and usage locations
+   - Update migration checklist if applicable
+
+4. **Use in code**:
+   ```typescript
+   import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+
+   // Client-side
+   const isEnabled = statsig.checkGate(STATSIG_FLAGS.NEW_FEATURE);
+
+   // Server-side
+   const isEnabled = await statsig.checkGateForUser(user, STATSIG_FLAGS.NEW_FEATURE);
+   ```
+
+### Statsig MCP Server
+
+The Statsig MCP server is configured for Claude Code and enables:
+- Programmatic gate creation and management
+- Gate status checking and updates
+- Experiment configuration
+- Analytics event tracking
+
+Configuration location: `.claude.json` (project-specific)
+
 ## 1. Branch & Environment Model
 
 - **Feature branches**
@@ -225,6 +270,27 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - Wrap the app with `<ClerkProvider>` in `app/layout.tsx`.
 - Import server helpers (e.g., `auth`) from `@clerk/nextjs/server` and client hooks/components from `@clerk/nextjs`.
 - Ensure Clerk environment and allowed frontend URLs are configured for preview and production domains.
+
+#### 9.2.1 Auth + Onboarding Flow (Current Baseline)
+
+- **Authentication model:**
+  - **Email-only OTP** using Clerk Elements; **no passwords** and **no OAuth/social providers** in the UI.
+  - Sign-in and sign-up live under the App Router:
+    - `GET /signin` → `OtpSignInForm` (Clerk Elements + shadcn UI) inside `AuthLayout`.
+    - `GET /signup` → `OtpSignUpForm` (Clerk Elements + shadcn UI) inside `AuthLayout`.
+- **Onboarding integration:**
+  - New users are taken through `/onboarding` immediately after sign-up (configure Clerk **after sign-up redirect** to `/onboarding` in the Dashboard).
+  - `/onboarding` is a **protected route** that:
+    - Requires a valid Clerk session (`auth()`), otherwise redirects to `/signin?redirect_url=/onboarding`.
+    - Uses the same `AuthLayout` shell as `/signin` and `/signup` for a unified experience.
+    - Renders the Apple-style multi-step onboarding organism (name → handle → done) backed by `completeOnboarding` server actions.
+- **Onboarding steps (streamlined):**
+  1. **Name** – collect the artist display name.
+  2. **Handle** – pick and validate the Jovie handle (with availability checks and profile URL preview).
+  3. **Done** – confirm the public profile URL and offer CTAs (go to Dashboard, copy link).
+- **Testing expectations:**
+  - E2E tests should authenticate via **Clerk test-mode tokens / programmatic sessions**, not password-based flows.
+  - Do **not** reintroduce password fields or OAuth buttons in new auth or onboarding UI.
 
 ### 9.3 Database (Neon + Drizzle)
 - Use the transaction-capable client: `@neondatabase/serverless` + `drizzle-orm/neon-serverless`.

@@ -8,6 +8,7 @@ import {
   revalidateTag,
 } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
 import {
@@ -17,6 +18,7 @@ import {
   userSettings,
   users,
 } from '@/lib/db/schema';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export interface DashboardData {
   user: { id: string } | null;
@@ -25,6 +27,7 @@ export interface DashboardData {
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
+  isAdmin: boolean;
 }
 
 function profileIsPublishable(profile: CreatorProfile | null): boolean {
@@ -54,7 +57,7 @@ export interface ProfileSocialLink {
 async function fetchDashboardDataWithSession(
   dbClient: DbType,
   clerkUserId: string
-): Promise<DashboardData> {
+): Promise<Omit<DashboardData, 'isAdmin'>> {
   // All queries run inside a transaction to keep the RLS session variable set
   try {
     // First check if user exists in users table
@@ -163,6 +166,9 @@ export async function getDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
 
+  const entitlements = await getCurrentUserEntitlements();
+  const isAdmin = isAdminEmail(entitlements.email);
+
   const { userId } = await auth();
 
   if (!userId) {
@@ -173,12 +179,18 @@ export async function getDashboardData(): Promise<DashboardData> {
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      isAdmin,
     };
   }
 
-  return await withDbSessionTx(async (tx, clerkUserId) => {
+  const base = await withDbSessionTx(async (tx, clerkUserId) => {
     return fetchDashboardDataWithSession(tx, clerkUserId);
   });
+
+  return {
+    ...base,
+    isAdmin,
+  };
 }
 
 export async function getDashboardDataCached(): Promise<DashboardData> {

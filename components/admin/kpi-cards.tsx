@@ -13,43 +13,11 @@ interface KpiCard {
 }
 
 // TODO: replace mock KPI data with real admin metrics.
-const kpiData: KpiCard[] = [
-  {
-    id: 'total-users',
-    label: 'Total users',
-    value: '184,920',
-    trend: '+12.3% vs last month',
-    direction: 'up',
-  },
-  {
-    id: 'new-users',
-    label: 'New users (7d)',
-    value: '4,281',
-    trend: '+6.1% vs prior week',
-    direction: 'up',
-  },
-  {
-    id: 'dau',
-    label: 'Daily active users',
-    value: '38,442',
-    trend: '+3.4% vs yesterday',
-    direction: 'up',
-  },
-  {
-    id: 'sessions',
-    label: 'Sessions completed',
-    value: '212,908',
-    trend: '-1.8% vs last week',
-    direction: 'down',
-  },
-  {
-    id: 'error-rate',
-    label: 'Error rate',
-    value: '0.34%',
-    trend: 'Flat vs last week',
-    direction: 'flat',
-  },
-];
+
+interface KpiCardsProps {
+  mrrUsd: number;
+  activeSubscribers: number;
+}
 
 function TrendIcon({ direction }: { direction: TrendDirection }) {
   if (direction === 'up') {
@@ -61,7 +29,28 @@ function TrendIcon({ direction }: { direction: TrendDirection }) {
   return <Minus className='size-4 text-secondary-token' aria-hidden />;
 }
 
-export function KpiCards() {
+export function KpiCards({ mrrUsd, activeSubscribers }: KpiCardsProps) {
+  const kpiData: KpiCard[] = [
+    {
+      id: 'mrr',
+      label: 'Monthly recurring revenue',
+      value: mrrUsd.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: mrrUsd >= 1000 ? 0 : 2,
+      }),
+      trend: '— vs prior period',
+      direction: 'flat',
+    },
+    {
+      id: 'active-subscribers',
+      label: 'Active subscribers',
+      value: activeSubscribers.toLocaleString('en-US'),
+      trend: '— vs prior period',
+      direction: 'flat',
+    },
+  ];
+
   return (
     <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-5'>
       {kpiData.map(kpi => (
@@ -90,8 +79,9 @@ export function KpiCards() {
             <p
               className={cn(
                 'text-sm font-medium',
-                kpi.direction === 'up' &&
-                  'text-emerald-600 dark:text-emerald-300',
+                kpi.direction === 'up'
+                  ? 'text-emerald-600 dark:text-emerald-300'
+                  : null,
                 kpi.direction === 'down' && 'text-red-600 dark:text-red-300',
                 kpi.direction === 'flat' && 'text-secondary-token'
               )}

@@ -11,6 +11,7 @@ interface JovieLogoProps {
   ariaLabel?: string;
   target?: React.AnchorHTMLAttributes<HTMLAnchorElement>['target'];
   title?: string;
+  size?: 'sm' | 'md';
 }
 
 export function JovieLogo({
@@ -22,6 +23,7 @@ export function JovieLogo({
   ariaLabel,
   target,
   title,
+  size = 'md',
 }: JovieLogoProps) {
   const finalHref = artistHandle
     ? `${href}?utm_source=profile&utm_artist=${artistHandle}`
@@ -33,6 +35,7 @@ export function JovieLogo({
       : 'text-white hover:text-white/80';
 
   const wrapperClasses = cn('flex items-center gap-2', className);
+  const sizeClass = size === 'sm' ? 'h-4' : 'h-6';
 
   const logoContent = (
     <>
@@ -40,7 +43,7 @@ export function JovieLogo({
         xmlns='http://www.w3.org/2000/svg'
         xmlnsXlink='http://www.w3.org/1999/xlink'
         viewBox='0 0 136 39'
-        className={cn('h-6 w-auto transition-colors', colorClass)}
+        className={cn('w-auto transition-colors', colorClass, sizeClass)}
         fill='currentColor'
         aria-label={`${APP_NAME} logo`}
       >

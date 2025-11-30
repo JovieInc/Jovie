@@ -57,7 +57,7 @@ const statusVariant: Record<ActivityStatus, 'success' | 'warning' | 'error'> = {
 
 export function ActivityTable() {
   return (
-    <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
+    <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm overflow-hidden'>
       <CardHeader>
         <CardTitle className='text-lg'>Recent activity</CardTitle>
       </CardHeader>

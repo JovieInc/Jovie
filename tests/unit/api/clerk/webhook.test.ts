@@ -10,6 +10,10 @@ const mockClerkClient = {
   },
 };
 
+const syncMocks = vi.hoisted(() => ({
+  syncUsernameFromClerkEvent: vi.fn(),
+}));
+
 vi.mock('@clerk/nextjs/server', () => ({
   clerkClient: vi.fn(() => Promise.resolve(mockClerkClient)),
 }));
@@ -22,8 +26,11 @@ vi.mock('svix', () => ({
   Webhook: vi.fn(),
 }));
 
+vi.mock('@/lib/username/sync', () => syncMocks);
+
 const { headers } = await import('next/headers');
 const { Webhook } = await import('svix');
+const { syncUsernameFromClerkEvent } = syncMocks;
 
 describe('/api/clerk/webhook', () => {
   const mockWebhook = {
@@ -295,7 +302,7 @@ describe('/api/clerk/webhook', () => {
       const eventData = {
         data: {},
         object: 'event' as const,
-        type: 'user.updated' as const,
+        type: 'session.created' as const,
       };
 
       // Mock webhook verification to return the event data
@@ -314,7 +321,87 @@ describe('/api/clerk/webhook', () => {
 
       expect(response.status).toBe(200);
       expect(result.success).toBe(true);
+      expect(result.type).toBe('session.created');
+    });
+  });
+
+  describe('user.updated username sync', () => {
+    it('should call syncUsernameFromClerkEvent and return success', async () => {
+      const eventData = {
+        data: {
+          id: 'user_123',
+          username: 'new-handle',
+          email_addresses: [],
+          first_name: null,
+          last_name: null,
+          private_metadata: {},
+          public_metadata: {},
+        },
+        object: 'event' as const,
+        type: 'user.updated' as const,
+      };
+
+      mockWebhook.verify.mockReturnValue(eventData);
+      syncUsernameFromClerkEvent.mockResolvedValue(undefined);
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
+
+      const response = await POST(request);
+      const result = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(true);
       expect(result.type).toBe('user.updated');
+      expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
+        'user_123',
+        'new-handle',
+        {}
+      );
+    });
+
+    it('should handle sync errors gracefully', async () => {
+      const eventData = {
+        data: {
+          id: 'user_123',
+          username: 'new-handle',
+          email_addresses: [],
+          first_name: null,
+          last_name: null,
+          private_metadata: {},
+          public_metadata: {},
+        },
+        object: 'event' as const,
+        type: 'user.updated' as const,
+      };
+
+      mockWebhook.verify.mockReturnValue(eventData);
+      syncUsernameFromClerkEvent.mockRejectedValue(new Error('sync-failed'));
+
+      const request = new NextRequest(
+        'http://localhost:3000/api/clerk/webhook',
+        {
+          method: 'POST',
+          body: JSON.stringify(eventData),
+        }
+      );
+
+      const response = await POST(request);
+      const result = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Failed to sync username from Clerk');
+      expect(syncUsernameFromClerkEvent).toHaveBeenCalledWith(
+        'user_123',
+        'new-handle',
+        {}
+      );
     });
   });
 

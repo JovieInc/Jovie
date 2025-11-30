@@ -13,7 +13,6 @@ interface FeedbackButtonProps {
 
 export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const modalId = 'feedback-modal';
 
   const handleFeedbackClick = useCallback(() => {
     // Track via analytics wrapper (no direct posthog-js import)
@@ -44,7 +43,6 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
       aria-label={collapsed ? 'Send feedback' : undefined}
       aria-haspopup='dialog'
       aria-expanded={isModalOpen}
-      aria-controls={modalId}
     >
       <ChatBubbleBottomCenterTextIcon
         className={cn(
@@ -73,11 +71,7 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
           <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
           <TooltipContent side='right'>Send feedback</TooltipContent>
         </Tooltip>
-        <FeedbackModal
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          id={modalId}
-        />
+        <FeedbackModal isOpen={isModalOpen} onClose={handleModalClose} />
       </>
     );
   }
@@ -85,11 +79,7 @@ export function FeedbackButton({ collapsed = false }: FeedbackButtonProps) {
   return (
     <>
       {buttonContent}
-      <FeedbackModal
-        isOpen={isModalOpen}
-        onClose={handleModalClose}
-        id={modalId}
-      />
+      <FeedbackModal isOpen={isModalOpen} onClose={handleModalClose} />
     </>
   );
 }
