@@ -47,7 +47,7 @@ export default async function DashboardLayout({
 
     // On actual error, show a simple error page
     return (
-      <div className='min-h-screen bg-white dark:bg-[#0D0E12] flex items-center justify-center px-6'>
+      <div className='min-h-screen bg-base flex items-center justify-center px-6'>
         <div className='w-full max-w-lg space-y-4'>
           <ErrorBanner
             title='Dashboard failed to load'
@@ -58,15 +58,12 @@ export default async function DashboardLayout({
             ]}
             testId='dashboard-error'
           />
-          <p className='text-sm text-gray-600 dark:text-white/70 text-center'>
+          <p className='text-sm text-secondary-token text-center'>
             If this keeps happening, please reach out to support so we can help
             restore access.
           </p>
           <div className='flex justify-center'>
-            <Link
-              href='/'
-              className='inline-flex items-center justify-center rounded-md bg-black px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-            >
+            <Link href='/' className='btn btn-primary btn-md'>
               Back to home
             </Link>
           </div>

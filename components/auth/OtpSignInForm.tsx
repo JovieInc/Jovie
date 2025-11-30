@@ -58,7 +58,7 @@ export function OtpSignInForm() {
                   inputMode='numeric'
                   autoComplete='one-time-code'
                   maxLength={6}
-                  className='w-full px-3 py-3 rounded-lg border border-input bg-background text-primary-token text-2xl tracking-[0.6em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
+                  className='w-full px-3 py-3 rounded-lg border border-input bg-background text-primary-token text-2xl tracking-[0.3em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
                 />
                 <Clerk.FieldError className='mt-1 text-sm text-destructive' />
               </Clerk.Field>

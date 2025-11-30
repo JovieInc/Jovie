@@ -36,7 +36,7 @@ export function EnhancedThemeToggle({
       <div className='flex items-center space-x-3'>
         <span className='text-sm text-secondary-token'>Light</span>
         <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
-          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'></span>
+          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out'></span>
         </div>
         <span className='text-sm text-secondary-token'>Dark</span>
       </div>
@@ -189,7 +189,7 @@ export function EnhancedThemeToggle({
           </span>
           <span
             aria-hidden='true'
-            className={`flex h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
+            className={`flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
               isDark ? 'translate-x-5' : 'translate-x-0'
             } ${isUpdating ? 'animate-pulse' : ''}`}
           >
@@ -207,7 +207,7 @@ export function EnhancedThemeToggle({
               </svg>
             ) : (
               <svg
-                className='h-3 w-3 text-yellow-500'
+                className='h-3 w-3 text-accent-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
               >

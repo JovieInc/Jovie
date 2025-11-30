@@ -27,7 +27,7 @@ export function OtpSignUpForm() {
 
               <SignUp.Action
                 submit
-                className='w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
+                className='w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
               >
                 Send code
               </SignUp.Action>
@@ -58,14 +58,14 @@ export function OtpSignUpForm() {
                   inputMode='numeric'
                   autoComplete='one-time-code'
                   maxLength={6}
-                  className='w-full px-3 py-3 rounded-lg border border-input bg-background text-primary-token text-2xl tracking-[0.6em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
+                  className='w-full px-3 py-3 rounded-lg border border-input bg-background text-primary-token text-2xl tracking-[0.3em] text-center font-mono focus:outline-none focus:ring-2 focus:ring-ring focus:border-input'
                 />
                 <Clerk.FieldError className='mt-1 text-sm text-destructive' />
               </Clerk.Field>
 
               <SignUp.Action
                 submit
-                className='w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
+                className='w-full bg-purple-600 hover:bg-purple-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
               >
                 Continue
               </SignUp.Action>

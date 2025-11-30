@@ -91,11 +91,7 @@ export function DashboardAnalytics() {
         {loading && (
           <div className='mt-6 h-8 w-40 bg-surface-2 rounded animate-pulse' />
         )}
-        {error && (
-          <p className='mt-4 text-sm text-orange-600 dark:text-orange-400'>
-            {error}
-          </p>
-        )}
+        {error && <p className='mt-4 text-sm text-destructive'>{error}</p>}
       </DashboardCard>
 
       {/* Secondary cards */}
