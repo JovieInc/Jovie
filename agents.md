@@ -15,6 +15,51 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - Do **not** add or reintroduce PostHog, Segment, RudderStack, or any other analytics/flags SDKs.
 - Use Statsig feature gates/experiments for non-essential flows; leave MVP-critical flows ungated unless explicitly flagged.
 
+### Feature Gate Workflow
+
+**When creating a new feature flag:**
+
+1. **Add to code constants** (`lib/statsig/flags.ts`):
+   ```typescript
+   export const STATSIG_FLAGS = {
+     // ... existing flags
+     NEW_FEATURE: 'feature_new_feature',
+   } as const;
+   ```
+
+2. **Create gate in Statsig** using one of these methods:
+   - **Recommended**: Use the Statsig MCP server (configured in `.claude.json`)
+     - Ask Claude Code to create the gate via MCP
+     - Provide: gate name, description, default value, expiry (if temporary)
+   - **Manual**: Create via [Statsig Console](https://console.statsig.com)
+     - Navigate to Feature Gates → Create New Gate
+     - Use exact name from `STATSIG_FLAGS` constant
+
+3. **Document the gate** in `docs/STATSIG_FEATURE_GATES.md`:
+   - Add entry with status, default, description, expiry, and usage locations
+   - Update migration checklist if applicable
+
+4. **Use in code**:
+   ```typescript
+   import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+
+   // Client-side
+   const isEnabled = statsig.checkGate(STATSIG_FLAGS.NEW_FEATURE);
+
+   // Server-side
+   const isEnabled = await statsig.checkGateForUser(user, STATSIG_FLAGS.NEW_FEATURE);
+   ```
+
+### Statsig MCP Server
+
+The Statsig MCP server is configured for Claude Code and enables:
+- Programmatic gate creation and management
+- Gate status checking and updates
+- Experiment configuration
+- Analytics event tracking
+
+Configuration location: `.claude.json` (project-specific)
+
 ## 1. Branch & Environment Model
 
 - **Feature branches**

@@ -8,7 +8,7 @@ import { type DbType, db } from '@/lib/db';
  * Validates that a userId is a safe Clerk ID format
  * Clerk IDs follow the pattern: user_[a-zA-Z0-9]+
  */
-function validateClerkUserId(userId: string): void {
+export function validateClerkUserId(userId: string): void {
   // Clerk user IDs are alphanumeric with underscores, typically starting with 'user_'
   const clerkIdPattern = /^[a-zA-Z0-9_]+$/;
   if (!clerkIdPattern.test(userId)) {

@@ -40,7 +40,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname();
 
   return (
-    <Sidebar variant='inset' className={className}>
+    <Sidebar variant='sidebar' className={className}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

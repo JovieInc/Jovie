@@ -1,8 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { AdminShell } from '@/components/admin/AdminShell';
 import { isAdminEmail } from '@/lib/admin/roles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import {
+  getDashboardDataCached,
+  setSidebarCollapsed,
+} from '../dashboard/actions';
+import DashboardLayoutClient from '../dashboard/DashboardLayoutClient';
+import { MyStatsig } from '../my-statsig';
 
 export default async function AdminLayout({
   children,
@@ -11,7 +16,7 @@ export default async function AdminLayout({
 }) {
   const entitlements = await getCurrentUserEntitlements();
 
-  if (!entitlements.isAuthenticated) {
+  if (!entitlements.isAuthenticated || !entitlements.userId) {
     redirect('/signin?redirect_url=/admin');
   }
 
@@ -19,5 +24,16 @@ export default async function AdminLayout({
     notFound();
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  const dashboardData = await getDashboardDataCached();
+
+  return (
+    <MyStatsig userId={entitlements.userId}>
+      <DashboardLayoutClient
+        dashboardData={dashboardData}
+        persistSidebarCollapsed={setSidebarCollapsed}
+      >
+        {children}
+      </DashboardLayoutClient>
+    </MyStatsig>
+  );
 }
