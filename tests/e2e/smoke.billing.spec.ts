@@ -49,10 +49,7 @@ test.describe('Billing Smoke Tests', () => {
 
     // Verify no critical console errors
     const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('PostHog') &&
-        !error.includes('analytics')
+      error => !error.includes('Warning:') && !error.includes('analytics')
     );
 
     if (criticalErrors.length > 0) {
@@ -114,10 +111,7 @@ test.describe('Billing Smoke Tests', () => {
 
     // Verify no critical console errors
     const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('PostHog') &&
-        !error.includes('analytics')
+      error => !error.includes('Warning:') && !error.includes('analytics')
     );
 
     if (criticalErrors.length > 0) {
@@ -171,10 +165,7 @@ test.describe('Billing Smoke Tests', () => {
 
     // Verify no critical console errors
     const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('PostHog') &&
-        !error.includes('analytics')
+      error => !error.includes('Warning:') && !error.includes('analytics')
     );
 
     expect(criticalErrors.length).toBe(0);
@@ -215,10 +206,7 @@ test.describe('Billing Smoke Tests', () => {
 
     // Verify no critical console errors
     const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('PostHog') &&
-        !error.includes('analytics')
+      error => !error.includes('Warning:') && !error.includes('analytics')
     );
 
     expect(criticalErrors.length).toBe(0);
