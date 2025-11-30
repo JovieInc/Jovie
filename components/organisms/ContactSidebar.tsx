@@ -140,7 +140,7 @@ export function ContactSidebar({
   const handleRemoveLink = (index: number) => {
     handleFieldChange(current => ({
       ...current,
-      socialLinks: current.socialLinks.filter((_, i) => i !== index),
+      socialLinks: current.socialLinks.filter((_link, i) => i !== index),
     }));
   };
 
@@ -247,13 +247,13 @@ export function ContactSidebar({
                 {isEditable ? (
                   <Input
                     value={contact.firstName ?? ''}
-                    onChange={event =>
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                       handleNameChange('firstName', event.target.value)
                     }
                     placeholder='First name'
                   />
                 ) : (
-                  <div className='min-h-[2.25rem] flex items-center text-sm'>
+                  <div className='min-h-9 flex items-center text-sm'>
                     {contact.firstName ? (
                       <span>{contact.firstName}</span>
                     ) : (
@@ -270,13 +270,13 @@ export function ContactSidebar({
                 {isEditable ? (
                   <Input
                     value={contact.lastName ?? ''}
-                    onChange={event =>
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                       handleNameChange('lastName', event.target.value)
                     }
                     placeholder='Last name'
                   />
                 ) : (
-                  <div className='min-h-[2.25rem] flex items-center text-sm'>
+                  <div className='min-h-9 flex items-center text-sm'>
                     {contact.lastName ? (
                       <span>{contact.lastName}</span>
                     ) : (
@@ -293,11 +293,13 @@ export function ContactSidebar({
                 {isEditable ? (
                   <Input
                     value={formatUsername(contact.username)}
-                    onChange={event => handleUsernameChange(event.target.value)}
+                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                      handleUsernameChange(event.target.value)
+                    }
                     placeholder='@username'
                   />
                 ) : (
-                  <div className='min-h-[2.25rem] flex items-center text-sm'>
+                  <div className='min-h-9 flex items-center text-sm'>
                     {contact.username ? (
                       <span>{formatUsername(contact.username)}</span>
                     ) : (
@@ -388,7 +390,9 @@ export function ContactSidebar({
                     <Label className='text-xs text-tertiary-token'>Label</Label>
                     <Input
                       value={newLinkLabel}
-                      onChange={event => setNewLinkLabel(event.target.value)}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        setNewLinkLabel(event.target.value)
+                      }
                       onKeyDown={handleNewLinkKeyDown}
                       placeholder='Instagram'
                       autoFocus
@@ -399,7 +403,9 @@ export function ContactSidebar({
                     <Input
                       type='url'
                       value={newLinkUrl}
-                      onChange={event => setNewLinkUrl(event.target.value)}
+                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                        setNewLinkUrl(event.target.value)
+                      }
                       onKeyDown={handleNewLinkKeyDown}
                       placeholder='https://...'
                       inputMode='url'
@@ -443,7 +449,7 @@ export function ContactSidebar({
                   onClick={() => onSave(contact)}
                   disabled={isSaving}
                 >
-                  {isSaving ? 'Saving hellip;' : 'Save changes'}
+                  {isSaving ? 'Saving…' : 'Save changes'}
                 </Button>
               </div>
             )}
