@@ -133,7 +133,11 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           router.push('/signin');
         }}
       >
-        <Avatar name='User' size={showUserInfo ? 'sm' : 'xs'} />
+        <Avatar
+          name='User'
+          alt='User avatar'
+          size={showUserInfo ? 'sm' : 'xs'}
+        />
         {showUserInfo && (
           <div className='flex flex-1 items-center justify-between'>
             <span className='text-sm font-medium'>Sign in</span>
