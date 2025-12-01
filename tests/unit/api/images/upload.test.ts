@@ -15,13 +15,43 @@ vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    insert: mockInsert,
-    update: mockUpdate,
+vi.mock('@/lib/auth/session', () => ({
+  withDbSession: async (
+    operation: (userId: string) => Promise<unknown>
+  ): Promise<unknown> => {
+    const { userId } = await mockAuth();
+    if (!userId) {
+      throw new Error('Unauthorized');
+    }
+    return operation(userId);
   },
-  profilePhotos: {},
 }));
+
+vi.mock('@/lib/db', () => {
+  const select = vi.fn().mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([{ id: 'internal-user-id' }]),
+      }),
+    }),
+  });
+
+  return {
+    db: {
+      select,
+      insert: mockInsert,
+      update: mockUpdate,
+    },
+    profilePhotos: {
+      id: 'id',
+      userId: 'user_id',
+    },
+    users: {
+      id: 'id',
+      clerkId: 'clerk_id',
+    },
+  };
+});
 
 vi.mock('drizzle-orm', () => ({
   eq: mockEq,

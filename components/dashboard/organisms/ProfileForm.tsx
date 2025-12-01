@@ -2,10 +2,8 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
-import Image from 'next/image';
 import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
-import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 // flags import removed - pre-launch
@@ -163,40 +161,6 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       />
 
       {/* Avatar uploader (disabled by default) */}
-      {false && (
-        <FormField
-          label='Profile Image'
-          helpText='Upload a profile picture to personalize your profile'
-        >
-          <div className='flex items-center gap-4'>
-            {formData.image_url ? (
-              <Image
-                src={formData.image_url}
-                alt='Current avatar'
-                width={64}
-                height={64}
-                className='rounded-full object-cover'
-              />
-            ) : (
-              <div
-                className='w-16 h-16 rounded-full bg-surface-2'
-                aria-label='No profile image'
-              />
-            )}
-            <div className='flex-1'>
-              <AvatarUploader
-                onUploaded={res => {
-                  // Use mediumUrl for profile display, fallback to blobUrl
-                  const imageUrl = res.mediumUrl || res.blobUrl || '';
-                  setFormData(f => ({ ...f, image_url: imageUrl }));
-                }}
-                initialUrl={formData.image_url}
-              />
-            </div>
-          </div>
-        </FormField>
-      )}
-
       <FormField
         label='Artist Name'
         error={formSubmitted ? validationErrors.name : undefined}

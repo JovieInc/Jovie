@@ -1,0 +1,4 @@
+name: jovie-codeql-config
+
+paths-ignore:
+  - storybook-static/**

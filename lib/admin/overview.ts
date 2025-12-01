@@ -39,15 +39,21 @@ export async function getAdminUsageSeries(
   const now = new Date();
   const startDate = new Date(now.getTime() - (days - 1) * MS_PER_DAY);
 
-  const rows = await db
-    .select({
-      date: drizzleSql<string>`DATE(${clickEvents.createdAt})`,
-      activeUsers: drizzleSql<number>`COUNT(DISTINCT ${clickEvents.ipAddress})`,
-    })
-    .from(clickEvents)
-    .where(gte(clickEvents.createdAt, startDate))
-    .groupBy(drizzleSql`DATE(${clickEvents.createdAt})`)
-    .orderBy(drizzleSql`DATE(${clickEvents.createdAt})`);
+  let rows: { date: string; activeUsers: number | null }[] = [];
+  try {
+    rows = await db
+      .select({
+        date: drizzleSql<string>`DATE(${clickEvents.createdAt})`,
+        activeUsers: drizzleSql<number>`COUNT(DISTINCT ${clickEvents.ipAddress})`,
+      })
+      .from(clickEvents)
+      .where(gte(clickEvents.createdAt, startDate))
+      .groupBy(drizzleSql`DATE(${clickEvents.createdAt})`)
+      .orderBy(drizzleSql`DATE(${clickEvents.createdAt})`);
+  } catch (error) {
+    console.error('Error loading admin usage series', error);
+    // Fall through with empty rows, which will produce a zeroed series
+  }
 
   const countsByDate = new Map<string, number>();
   for (const row of rows) {
@@ -75,45 +81,66 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
   const now = new Date();
   const dayAgo = new Date(now.getTime() - MS_PER_DAY);
 
-  const [dbHealth, totalEventsRows, incidentRows] = await Promise.all([
-    checkDbHealth(),
-    db
-      .select({ count: count() })
-      .from(stripeWebhookEvents)
-      .where(gte(stripeWebhookEvents.createdAt, dayAgo)),
-    db
-      .select({
-        count: count(),
-        lastAt: drizzleSql<Date>`MAX(${stripeWebhookEvents.createdAt})`,
-      })
-      .from(stripeWebhookEvents)
-      .where(
-        and(
-          gte(stripeWebhookEvents.createdAt, dayAgo),
-          or(
-            // Payment failures are treated as incidents
-            eq(stripeWebhookEvents.type, 'invoice.payment_failed'),
-            // Subscription cancellations are also operationally important
-            eq(stripeWebhookEvents.type, 'customer.subscription.deleted')
+  try {
+    const [dbHealth, totalEventsRows, incidentRows] = await Promise.all([
+      checkDbHealth(),
+      db
+        .select({ count: count() })
+        .from(stripeWebhookEvents)
+        .where(gte(stripeWebhookEvents.createdAt, dayAgo)),
+      db
+        .select({
+          count: count(),
+          lastAt: drizzleSql<Date>`MAX(${stripeWebhookEvents.createdAt})`,
+        })
+        .from(stripeWebhookEvents)
+        .where(
+          and(
+            gte(stripeWebhookEvents.createdAt, dayAgo),
+            or(
+              // Payment failures are treated as incidents
+              eq(stripeWebhookEvents.type, 'invoice.payment_failed'),
+              // Subscription cancellations are also operationally important
+              eq(stripeWebhookEvents.type, 'customer.subscription.deleted')
+            )
           )
-        )
-      ),
-  ]);
+        ),
+    ]);
 
-  const totalEvents = totalEventsRows[0]?.count ?? 0;
-  const incidentCount = incidentRows[0]?.count ?? 0;
-  const lastIncidentAt =
-    (incidentRows[0] as { lastAt?: Date | null } | undefined)?.lastAt ?? null;
+    const totalEvents = totalEventsRows[0]?.count ?? 0;
+    const incidentCount = incidentRows[0]?.count ?? 0;
+    const lastIncidentAt =
+      (incidentRows[0] as { lastAt?: Date | null } | undefined)?.lastAt ?? null;
 
-  const errorRatePercent =
-    totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
+    const errorRatePercent =
+      totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
 
-  return {
-    errorRatePercent,
-    p95LatencyMs: dbHealth.latency ?? null,
-    incidents24h: Number(incidentCount),
-    lastIncidentAt,
-  };
+    return {
+      errorRatePercent,
+      p95LatencyMs: dbHealth.latency ?? null,
+      incidents24h: Number(incidentCount),
+      lastIncidentAt,
+    };
+  } catch (error) {
+    console.error('Error loading admin reliability summary', error);
+
+    try {
+      const dbHealth = await checkDbHealth();
+      return {
+        errorRatePercent: 0,
+        p95LatencyMs: dbHealth.latency ?? null,
+        incidents24h: 0,
+        lastIncidentAt: null,
+      };
+    } catch {
+      return {
+        errorRatePercent: 0,
+        p95LatencyMs: null,
+        incidents24h: 0,
+        lastIncidentAt: null,
+      };
+    }
+  }
 }
 
 function formatTimestamp(timestamp: Date): string {
@@ -170,48 +197,57 @@ export async function getAdminActivityFeed(
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
 
-  const [recentCreators, recentStripeEvents] = await Promise.all([
-    db
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        createdAt: creatorProfiles.createdAt,
-      })
-      .from(creatorProfiles)
-      .where(gte(creatorProfiles.createdAt, sevenDaysAgo))
-      .orderBy(desc(creatorProfiles.createdAt))
-      .limit(limit),
-    db
-      .select({
-        id: stripeWebhookEvents.id,
-        type: stripeWebhookEvents.type,
-        createdAt: stripeWebhookEvents.createdAt,
-      })
-      .from(stripeWebhookEvents)
-      .where(gte(stripeWebhookEvents.createdAt, sevenDaysAgo))
-      .orderBy(desc(stripeWebhookEvents.createdAt))
-      .limit(limit),
-  ]);
+  try {
+    const [recentCreators, recentStripeEvents] = await Promise.all([
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          createdAt: creatorProfiles.createdAt,
+        })
+        .from(creatorProfiles)
+        .where(gte(creatorProfiles.createdAt, sevenDaysAgo))
+        .orderBy(desc(creatorProfiles.createdAt))
+        .limit(limit),
+      db
+        .select({
+          id: stripeWebhookEvents.id,
+          type: stripeWebhookEvents.type,
+          createdAt: stripeWebhookEvents.createdAt,
+        })
+        .from(stripeWebhookEvents)
+        .where(gte(stripeWebhookEvents.createdAt, sevenDaysAgo))
+        .orderBy(desc(stripeWebhookEvents.createdAt))
+        .limit(limit),
+    ]);
 
-  const creatorItems: AdminActivityItem[] = recentCreators.map(row => ({
-    id: `creator-${row.id}`,
-    user: `@${row.username}`,
-    action: 'Creator profile created',
-    timestamp: formatTimestamp(row.createdAt ?? new Date()),
-    status: 'success',
-  }));
+    const creatorItems: AdminActivityItem[] = recentCreators.map(row => ({
+      id: `creator-${row.id}`,
+      user: `@${row.username}`,
+      action: 'Creator profile created',
+      timestamp: formatTimestamp(row.createdAt ?? new Date()),
+      status: 'success',
+    }));
 
-  const stripeItems: AdminActivityItem[] = recentStripeEvents.map(event =>
-    mapStripeEventToActivity(event)
-  );
+    const stripeItems: AdminActivityItem[] = recentStripeEvents.map(event =>
+      mapStripeEventToActivity(event)
+    );
 
-  const allItems = [...creatorItems, ...stripeItems];
+    const allItems = [...creatorItems, ...stripeItems];
 
-  allItems.sort((a, b) => {
-    const aTime = Date.parse(a.timestamp.replace(' UTC', '').replace(' ', 'T'));
-    const bTime = Date.parse(b.timestamp.replace(' UTC', '').replace(' ', 'T'));
-    return bTime - aTime;
-  });
+    allItems.sort((a, b) => {
+      const aTime = Date.parse(
+        a.timestamp.replace(' UTC', '').replace(' ', 'T')
+      );
+      const bTime = Date.parse(
+        b.timestamp.replace(' UTC', '').replace(' ', 'T')
+      );
+      return bTime - aTime;
+    });
 
-  return allItems.slice(0, limit);
+    return allItems.slice(0, limit);
+  } catch (error) {
+    console.error('Error loading admin activity feed', error);
+    return [];
+  }
 }

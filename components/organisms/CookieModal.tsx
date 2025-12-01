@@ -7,7 +7,8 @@ import {
   DialogBody,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { type Consent, saveConsent } from '@/lib/cookies/consent';
+import { type Consent } from '@/lib/cookies/consent';
+import { saveConsentClient } from '@/lib/cookies/consent-client';
 
 interface CookieModalProps {
   open: boolean;
@@ -32,7 +33,7 @@ export default function CookieModal({
   };
 
   const save = async () => {
-    await saveConsent(settings);
+    await saveConsentClient(settings);
     onSave?.(settings);
     onClose();
   };

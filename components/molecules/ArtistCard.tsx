@@ -2,7 +2,7 @@
 
 import { motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
-import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
+import { Avatar } from '@/components/atoms/Avatar';
 
 export interface ArtistCardProps {
   handle: string;
@@ -62,10 +62,10 @@ export function ArtistCard({
 
   const avatarSize = (
     {
-      sm: 64,
-      md: 128,
-      lg: 256,
-      xl: 384,
+      sm: 'lg',
+      md: 'display-md',
+      lg: 'display-xl',
+      xl: 'display-2xl',
     } as const
   )[size];
 
@@ -83,16 +83,17 @@ export function ArtistCard({
       >
         <div className='text-center'>
           <motion.div {...avatarAnimationProps}>
-            <OptimizedAvatar
+            <Avatar
               src={src}
               alt={alt ?? name}
+              name={name}
               size={avatarSize}
               className='mx-auto'
             />
           </motion.div>
           {showName && (
             <motion.p
-              className={`mt-2 font-medium text-gray-700 dark:text-gray-300 ${
+              className={`mt-2 font-medium text-primary-token ${
                 size === 'sm' ? 'text-xs' : 'text-sm'
               }`}
               whileHover={{

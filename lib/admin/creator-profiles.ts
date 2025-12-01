@@ -1,4 +1,4 @@
-'server only';
+import 'server-only';
 
 import { count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
@@ -101,46 +101,58 @@ export async function getAdminCreatorProfiles(
       )
     : undefined;
 
-  // Execute queries in parallel for better performance
-  const [rows, [{ value: total }]] = await Promise.all([
-    // Paginated data query
-    db
-      .select({
-        id: creatorProfiles.id,
-        username: creatorProfiles.username,
-        avatarUrl: creatorProfiles.avatarUrl,
-        displayName: creatorProfiles.displayName,
-        isVerified: creatorProfiles.isVerified,
-        isClaimed: creatorProfiles.isClaimed,
-        createdAt: creatorProfiles.createdAt,
-      })
-      .from(creatorProfiles)
-      .where(whereClause)
-      .orderBy(...orderByExpressions)
-      .limit(pageSize)
-      .offset(offset),
-    // Total count query
-    db
-      .select({ value: count() })
-      .from(creatorProfiles)
-      .where(whereClause),
-  ]);
+  try {
+    // Execute queries in parallel for better performance
+    const [rows, [{ value: total }]] = await Promise.all([
+      // Paginated data query
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          avatarUrl: creatorProfiles.avatarUrl,
+          displayName: creatorProfiles.displayName,
+          isVerified: creatorProfiles.isVerified,
+          isClaimed: creatorProfiles.isClaimed,
+          createdAt: creatorProfiles.createdAt,
+        })
+        .from(creatorProfiles)
+        .where(whereClause)
+        .orderBy(...orderByExpressions)
+        .limit(pageSize)
+        .offset(offset),
+      // Total count query
+      db
+        .select({ value: count() })
+        .from(creatorProfiles)
+        .where(whereClause),
+    ]);
 
-  const pageRows = rows;
+    const pageRows = rows;
 
-  return {
-    profiles: pageRows.map(row => ({
-      id: row.id,
-      username: row.username,
-      avatarUrl: row.avatarUrl ?? null,
-      // displayName is optional in the admin listing but useful for detail views
-      displayName: (row as { displayName?: string | null }).displayName ?? null,
-      isVerified: row.isVerified ?? false,
-      isClaimed: row.isClaimed ?? false,
-      createdAt: row.createdAt ?? null,
-    })),
-    page,
-    pageSize,
-    total,
-  };
+    return {
+      profiles: pageRows.map(row => ({
+        id: row.id,
+        username: row.username,
+        avatarUrl: row.avatarUrl ?? null,
+        // displayName is optional in the admin listing but useful for detail views
+        displayName:
+          (row as { displayName?: string | null }).displayName ?? null,
+        isVerified: row.isVerified ?? false,
+        isClaimed: row.isClaimed ?? false,
+        createdAt: row.createdAt ?? null,
+      })),
+      page,
+      pageSize,
+      total,
+    };
+  } catch (error) {
+    console.error('Error loading admin creator profiles', error);
+
+    return {
+      profiles: [],
+      page,
+      pageSize,
+      total: 0,
+    };
+  }
 }

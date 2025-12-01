@@ -74,8 +74,9 @@ describe('AvatarUploadable Component', () => {
         />
       );
 
-      // Hover overlay should not be present
-      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('avatar-uploadable-hover-overlay')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -279,7 +280,7 @@ describe('AvatarUploadable Component', () => {
   });
 
   describe('Drag and Drop', () => {
-    it('handles drag enter and shows drag overlay', () => {
+    it('handles drag enter and shows drag overlay', async () => {
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -298,8 +299,11 @@ describe('AvatarUploadable Component', () => {
         },
       });
 
-      // Should show drag active state
-      expect(container).toHaveClass('group');
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('avatar-uploadable-drag-overlay')
+        ).toBeInTheDocument();
+      });
     });
 
     it('handles file drop and triggers upload', async () => {
@@ -360,7 +364,9 @@ describe('AvatarUploadable Component', () => {
   });
 
   describe('Progress States', () => {
-    it('shows progress ring during upload', () => {
+    it('shows progress ring during upload', async () => {
+      mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
+
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -368,13 +374,17 @@ describe('AvatarUploadable Component', () => {
           name='John Doe'
           uploadable={true}
           onUpload={mockOnUpload}
-          progress={50}
         />
       );
 
-      // Progress ring SVG should be present with progress
-      const svg = document.querySelector('svg');
-      expect(svg).toBeInTheDocument();
+      const fileInput = screen.getByLabelText('Choose profile photo file');
+      fireEvent.change(fileInput, { target: { files: [createMockFile()] } });
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('avatar-uploadable-progress')
+        ).toBeInTheDocument();
+      });
     });
 
     it('announces progress to screen readers', () => {

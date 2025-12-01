@@ -11,6 +11,8 @@ jobs:
     name: Performance Guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -43,6 +45,8 @@ jobs:
     name: Fast Test Suite
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -76,6 +80,8 @@ jobs:
     timeout-minutes: 15
     # Only run on main branch to avoid excessive CI time
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
@@ -113,6 +119,10 @@ jobs:
     timeout-minutes: 8
     # Only run on main branch for performance tracking
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Checkout code

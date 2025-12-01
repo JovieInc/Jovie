@@ -1,40 +1,18 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
-import { ArtistAvatar } from '@/components/atoms/ArtistAvatar';
+import { describe, expect, it, vi } from 'vitest';
+import { Avatar } from '@/components/atoms/Avatar';
 
-describe('ArtistAvatar - Basic Functionality', () => {
-  it('should render with required props', () => {
+vi.mock('next/image', () => ({
+  default: vi.fn().mockImplementation(({ src, alt, ...props }: any) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} {...props} />
+  )),
+}));
+
+describe('Avatar (legacy ArtistAvatar coverage)', () => {
+  it('renders with required props', () => {
     render(
-      <ArtistAvatar
-        src='test-image.jpg'
-        alt='Test Artist'
-        name='Test Artist'
-        size='md'
-      />
-    );
-
-    // Check that the component renders without crashing
-    const avatarContainer = screen.getByRole('img', { hidden: true });
-    expect(avatarContainer).toBeInTheDocument();
-  });
-
-  it('should have proper accessibility attributes', () => {
-    render(
-      <ArtistAvatar
-        src='test-image.jpg'
-        alt='Test Artist Avatar'
-        name='Test Artist'
-        size='md'
-      />
-    );
-
-    const image = screen.getByRole('img', { hidden: true });
-    expect(image).toHaveAttribute('alt');
-  });
-
-  it('should pass through size prop correctly', () => {
-    render(
-      <ArtistAvatar
+      <Avatar
         src='test-image.jpg'
         alt='Test Artist'
         name='Test Artist'
@@ -42,8 +20,22 @@ describe('ArtistAvatar - Basic Functionality', () => {
       />
     );
 
-    // Component should render without errors with different sizes
-    const avatarContainer = screen.getByRole('img', { hidden: true });
+    const avatarContainer = screen.getByLabelText('Test Artist');
     expect(avatarContainer).toBeInTheDocument();
+  });
+
+  it('applies aria label and fallback initials when src is missing', () => {
+    render(
+      <Avatar
+        src={null}
+        alt='Test Artist Avatar'
+        name='Test Artist'
+        size='display-sm'
+      />
+    );
+
+    const avatarContainer = screen.getByLabelText('Test Artist Avatar');
+    expect(avatarContainer).toBeInTheDocument();
+    expect(screen.getByText('TA')).toBeInTheDocument();
   });
 });

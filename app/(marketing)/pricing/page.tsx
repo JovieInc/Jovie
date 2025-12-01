@@ -14,7 +14,7 @@ export default function PricingPage() {
   const { isSignedIn } = useAuth();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isYearly, setIsYearly] = useState(false);
+  const [, setIsYearly] = useState(false);
 
   const freeFeatures = [
     { title: 'Blazing-fast profiles, SEO-optimized' },
@@ -47,50 +47,15 @@ export default function PricingPage() {
 
     setIsLoading(true);
     try {
-      // Get available pricing options from server
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      const pricingData = await pricingResponse.json();
-
-      // Use the appropriate price based on billing interval
-      const priceOption = pricingData.options?.find(
-        (option: { interval: string; priceId: string }) =>
-          option.interval === (isYearly ? 'year' : 'month')
-      );
-
-      const priceId = priceOption?.priceId;
-
-      if (!priceId) {
-        console.error('No pricing options available');
-        return;
-      }
-
-      // Create Stripe checkout session
-      const response = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          priceId: priceId,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        console.error('No checkout URL returned');
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
+      // Route through server-side checkout flow for remove branding
+      router.push('/billing/remove-branding');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className='min-h-screen bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
+    <div className='min-h-screen bg-linear-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
       <Container size='md'>
         <motion.div
           className='py-24 sm:py-32'
@@ -105,10 +70,11 @@ export default function PricingPage() {
             transition={{ duration: 0.5, delay: 0.1 }}
           >
             <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl max-w-4xl mx-auto leading-tight'>
-              Free forever. Remove branding for $5.
+              <span className='block'>Free forever.</span>
+              <span className='block'>Remove branding for $5.</span>
             </h1>
             <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
-              The link in bio that actually converts. Beautiful, intelligent,
+              Your Jovie profile that actually converts. Beautiful, intelligent,
               impossibly fast.
             </p>
           </motion.div>
@@ -185,7 +151,7 @@ export default function PricingPage() {
                   <ul className='space-y-3'>
                     <li className='flex items-start'>
                       <svg
-                        className='h-5 w-5 flex-shrink-0 text-gray-900 dark:text-white mt-0.5'
+                        className='h-5 w-5 shrink-0 text-gray-900 dark:text-white mt-0.5'
                         fill='none'
                         viewBox='0 0 24 24'
                         stroke='currentColor'

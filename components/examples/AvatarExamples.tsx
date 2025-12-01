@@ -7,9 +7,11 @@
 
 'use client';
 
+import { useFeatureGate } from '@statsig/react-bindings';
 import { useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 // Example 1: Display-only avatar (for public profiles, featured creators, etc.)
 export function PublicProfileExample() {
@@ -24,7 +26,7 @@ export function PublicProfileExample() {
       />
       <div>
         <h3 className='text-lg font-semibold'>John Doe</h3>
-        <p className='text-gray-600'>Musician & Creator</p>
+        <p className='text-secondary-token'>Musician & Creator</p>
       </div>
     </div>
   );
@@ -113,16 +115,16 @@ export function DashboardAvatarExample() {
 
         <div className='flex-1 space-y-3'>
           <h3 className='text-lg font-medium'>Profile Photo</h3>
-          <p className='text-sm text-gray-600'>
+          <p className='text-sm text-secondary-token'>
             Upload a new profile photo. Drag and drop an image file or click to
             select.
           </p>
-          <p className='text-xs text-gray-500'>
+          <p className='text-xs text-tertiary-token'>
             Supported formats: JPG, PNG, WebP, HEIC. Maximum size: 10MB.
           </p>
 
           {isUploading && (
-            <div className='text-sm text-blue-600'>
+            <div className='text-sm text-accent-token'>
               Uploading... {Math.round(uploadProgress)}%
             </div>
           )}
@@ -161,15 +163,16 @@ export function FeaturedCreatorsExample() {
 // Example 4: Integration with feature flags
 export function ConditionalAvatarExample({
   userOwnsProfile,
-  featureFlags,
 }: {
   userOwnsProfile: boolean;
-  featureFlags: { avatarUploaderEnabled: boolean };
 }) {
+  const { value: avatarUploaderEnabled } = useFeatureGate(
+    STATSIG_FLAGS.AVATAR_UPLOADER
+  );
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   // Determine if upload should be enabled
-  const uploadEnabled = userOwnsProfile && featureFlags.avatarUploaderEnabled;
+  const uploadEnabled = userOwnsProfile && avatarUploaderEnabled;
 
   if (uploadEnabled) {
     return (

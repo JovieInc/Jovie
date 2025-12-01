@@ -1,10 +1,10 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
 import { Card, CardContent, CardHeader } from '@/components/molecules/Card';
 import { LoadingSkeleton as Skeleton } from '@/components/molecules/LoadingSkeleton';
-import { OptimizedAvatar as Avatar } from '@/components/molecules/OptimizedAvatar';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import { useCreator } from '@/hooks/useCreator';
 
@@ -40,7 +40,8 @@ export function CreatorProfile({ username }: { username: string }) {
         <Avatar
           src={creator.avatarUrl}
           alt={creator.displayName || creator.username}
-          size={128}
+          name={creator.displayName || creator.username}
+          size='display-md'
           className='h-24 w-24'
         />
         <div className='text-center sm:text-left'>

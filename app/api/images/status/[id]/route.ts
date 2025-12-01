@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { db, profilePhotos } from '@/lib/db';
+import { db, profilePhotos, users } from '@/lib/db';
 
 export const runtime = 'edge';
 
@@ -13,8 +13,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const { userId: clerkUserId } = await auth();
+    if (!clerkUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -23,14 +23,15 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Photo ID required' }, { status: 400 });
     }
 
-    // Get photo record - ensure user owns it
-    const [photo] = await db
-      .select()
+    // Get photo record - ensure user owns it by matching Clerk user to internal UUID
+    const [row] = await db
+      .select({ photo: profilePhotos })
       .from(profilePhotos)
-      .where(
-        and(eq(profilePhotos.id, photoId), eq(profilePhotos.userId, userId))
-      )
+      .innerJoin(users, eq(users.id, profilePhotos.userId))
+      .where(and(eq(profilePhotos.id, photoId), eq(users.clerkId, clerkUserId)))
       .limit(1);
+
+    const photo = row?.photo;
 
     if (!photo) {
       return NextResponse.json({ error: 'Photo not found' }, { status: 404 });

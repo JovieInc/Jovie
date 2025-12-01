@@ -10,7 +10,14 @@ import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import { Input } from '@/components/atoms/Input';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
 import { popularityIndex } from '@/constants/app';
@@ -65,6 +72,30 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     target: 'social' | 'dsp';
   } | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const matchesSearch = useCallback(
+    (l: T): boolean => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const suggestedTitle = (
+        (l as unknown as { suggestedTitle?: string }).suggestedTitle ||
+        (l.platform.name ?? '')
+      ).toLowerCase();
+      const url = (
+        (l as unknown as { normalizedUrl?: string }).normalizedUrl ||
+        (l as unknown as { originalUrl?: string }).originalUrl ||
+        ''
+      ).toLowerCase();
+      const platformId = (l.platform.id ?? '').toLowerCase();
+
+      return (
+        suggestedTitle.includes(q) || url.includes(q) || platformId.includes(q)
+      );
+    },
+    [searchQuery]
+  );
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -345,6 +376,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   // (deprecated) renderLinkGroup removed — groups are rendered inline below.
 
+  const filteredCount = useMemo(
+    () =>
+      searchQuery.trim() ? links.filter(matchesSearch).length : links.length,
+    [links, searchQuery, matchesSearch]
+  );
+
   return (
     <section
       className={cn('space-y-4', className)}
@@ -409,6 +446,31 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           </div>
         </div>
       )}
+      <div className='space-y-2'>
+        <div className='relative'>
+          <Input
+            type='text'
+            placeholder='Search links...'
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className='pr-16 text-sm'
+          />
+          {searchQuery && (
+            <button
+              type='button'
+              onClick={() => setSearchQuery('')}
+              className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-tertiary-token transition-colors hover:text-secondary-token'
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <div className='flex items-center justify-between text-xs text-secondary-token'>
+          <span>
+            {filteredCount} {filteredCount === 1 ? 'link' : 'links'} found
+          </span>
+        </div>
+      </div>
       {/* Add new link */}
       <UniversalLinkInput
         onAdd={handleAdd}
@@ -427,10 +489,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-          const items = [...groups[section]].sort(
-            (a, b) =>
-              popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
-          );
+          const items = [...groups[section]]
+            .filter(matchesSearch)
+            .sort(
+              (a, b) =>
+                popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
+            );
           return (
             <div key={section} className='space-y-3'>
               <header className='flex items-center justify-between'>

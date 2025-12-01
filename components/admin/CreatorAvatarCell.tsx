@@ -12,7 +12,7 @@ import { Pencil } from 'lucide-react';
 import { useState, useTransition } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { Avatar } from '@/components/atoms/Avatar';
-import AvatarUploader from '@/components/dashboard/molecules/AvatarUploader';
+import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 
 export interface CreatorAvatarCellProps {
   profileId: string;
@@ -30,8 +30,29 @@ export function CreatorAvatarCell({
   );
   const [isOpen, setIsOpen] = useState(false);
   const [droppedFile, setDroppedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const uploadImage = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/images/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        (errorData as { error?: string }).error || 'Upload failed'
+      );
+    }
+
+    const data = (await response.json()) as { blobUrl: string };
+    return data.blobUrl;
+  };
 
   const handleUploaded = (url: string) => {
     setError(null);
@@ -55,6 +76,17 @@ export function CreatorAvatarCell({
 
     setDroppedFile(file);
     setIsOpen(true);
+    setIsUploading(true);
+    uploadImage(file)
+      .then(handleUploaded)
+      .catch(err => {
+        console.error(err);
+        setError('Failed to upload avatar. Please try again.');
+      })
+      .finally(() => {
+        setIsUploading(false);
+        setDroppedFile(null);
+      });
   };
 
   const handleAvatarDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
@@ -78,6 +110,7 @@ export function CreatorAvatarCell({
             onDragOver={handleAvatarDragOver}
             onDrop={handleAvatarDrop}
             className='group relative inline-flex items-center justify-center focus-ring-transparent-offset'
+            aria-busy={isUploading || isPending}
           >
             <Avatar
               src={previewUrl}
@@ -95,17 +128,20 @@ export function CreatorAvatarCell({
           <DialogHeader>
             <DialogTitle>Update avatar</DialogTitle>
           </DialogHeader>
-          <AvatarUploader
-            initialUrl={previewUrl ?? undefined}
-            autoStartFile={droppedFile}
-            onStatusChange={result => {
-              if (result.status === 'completed') {
-                const url = result.mediumUrl || result.blobUrl;
-                if (url) {
-                  handleUploaded(url);
-                }
-              }
+          <AvatarUploadable
+            src={previewUrl}
+            alt={`Avatar for @${username}`}
+            name={username}
+            size='xl'
+            uploadable
+            showHoverOverlay
+            onUpload={uploadImage}
+            onSuccess={handleUploaded}
+            onError={message => {
+              setError(message);
             }}
+            maxFileSize={4 * 1024 * 1024}
+            acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
           />
           {error && (
             <p className='mt-2 text-sm text-destructive-token'>{error}</p>

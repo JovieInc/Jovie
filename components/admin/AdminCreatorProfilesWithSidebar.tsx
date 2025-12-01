@@ -194,13 +194,14 @@ export function AdminCreatorProfilesWithSidebar({
                     <th className='px-2 py-2'>Created</th>
                     <th className='px-2 py-2'>Claimed</th>
                     <th className='px-2 py-2'>Verified</th>
+                    <th className='px-2 py-2 text-right'>Action</th>
                   </tr>
                 </thead>
                 <tbody className='divide-y divide-subtle'>
                   {profiles.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className='px-2 py-6 text-center text-sm text-secondary-token'
                       >
                         No creator profiles found.
@@ -249,6 +250,33 @@ export function AdminCreatorProfilesWithSidebar({
                           </td>
                           <td className='px-2 py-3 text-xs text-secondary-token'>
                             {profile.isVerified ? 'Verified' : 'Not verified'}
+                          </td>
+                          <td className='px-2 py-3 text-right'>
+                            <form
+                              method='post'
+                              action='/admin/users/toggle-verify'
+                              onClick={event => event.stopPropagation()}
+                            >
+                              <input
+                                type='hidden'
+                                name='profileId'
+                                value={profile.id}
+                              />
+                              <input
+                                type='hidden'
+                                name='nextVerified'
+                                value={(!profile.isVerified).toString()}
+                              />
+                              <Button
+                                type='submit'
+                                size='sm'
+                                variant={
+                                  profile.isVerified ? 'secondary' : 'primary'
+                                }
+                              >
+                                {profile.isVerified ? 'Unverify' : 'Verify'}
+                              </Button>
+                            </form>
                           </td>
                         </tr>
                       );

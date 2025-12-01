@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
 import CookieModal from '@/components/organisms/CookieModal';
-import { saveConsent } from '@/lib/cookies/consent';
+import { saveConsentClient } from '@/lib/cookies/consent-client';
 
 declare global {
   interface Window {
@@ -35,14 +35,14 @@ export function CookieBannerSection() {
 
   const acceptAll = async () => {
     const consent = { essential: true, analytics: true, marketing: true };
-    await saveConsent(consent);
+    await saveConsentClient(consent);
     window.JVConsent?._emit(consent);
     setVisible(false);
   };
 
   const reject = async () => {
     const consent = { essential: true, analytics: false, marketing: false };
-    await saveConsent(consent);
+    await saveConsentClient(consent);
     window.JVConsent?._emit(consent);
     setVisible(false);
   };

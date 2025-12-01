@@ -16,8 +16,8 @@ import { useCallback, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/AccountSettingsSection';
+import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
-import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
@@ -107,6 +107,28 @@ export function SettingsPolished({
   );
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const { showToast } = useToast();
+  const maxAvatarSize = 4 * 1024 * 1024;
+  const acceptedAvatarTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+  const handleAvatarUpload = useCallback(async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch('/api/images/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        (errorData as { error?: string }).error || 'Upload failed'
+      );
+    }
+
+    const data = (await response.json()) as { blobUrl: string };
+    return data.blobUrl;
+  }, []);
 
   const handleAvatarUpdate = useCallback(
     async (imageUrl: string) => {
@@ -269,45 +291,7 @@ export function SettingsPolished({
         window.location.href = url;
       } else {
         // User doesn't have a subscription - get default Pro plan price ID and redirect to checkout
-        try {
-          const pricingResponse = await fetch('/api/stripe/pricing-options');
-          if (!pricingResponse.ok) {
-            throw new Error('Failed to fetch pricing options');
-          }
-
-          const { pricingOptions } = await pricingResponse.json();
-          // Get the monthly Pro plan (cheapest option for quick upgrade)
-          const defaultPlan =
-            pricingOptions.find(
-              (option: { interval: string }) => option.interval === 'month'
-            ) || pricingOptions[0];
-
-          if (!defaultPlan?.priceId) {
-            throw new Error('No pricing options available');
-          }
-
-          // Create checkout session for the default Pro plan
-          const checkoutResponse = await fetch('/api/stripe/checkout', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              priceId: defaultPlan.priceId,
-            }),
-          });
-
-          if (!checkoutResponse.ok) {
-            throw new Error('Failed to create checkout session');
-          }
-
-          const { url } = await checkoutResponse.json();
-          window.location.href = url;
-        } catch (checkoutError) {
-          console.error('Error creating checkout session:', checkoutError);
-          // Fallback to pricing page
-          router.push('/pricing');
-        }
+        router.push('/billing/remove-branding');
       }
     } catch (error) {
       console.error('Error handling billing:', error);
@@ -434,10 +418,18 @@ export function SettingsPolished({
             <h3 className='text-lg font-medium text-primary'>Profile Photo</h3>
           </div>
 
-          <AvatarUpload
-            currentAvatarUrl={artist.image_url}
-            artistName={artist.name}
-            onUploadSuccess={handleAvatarUpdate}
+          <AvatarUploadable
+            src={artist.image_url}
+            alt={artist.name || 'Profile photo'}
+            name={artist.name || artist.handle}
+            size='xl'
+            uploadable
+            showHoverOverlay
+            onUpload={handleAvatarUpload}
+            onSuccess={handleAvatarUpdate}
+            onError={message => showToast({ type: 'error', message })}
+            maxFileSize={maxAvatarSize}
+            acceptedTypes={acceptedAvatarTypes}
           />
         </DashboardCard>
 

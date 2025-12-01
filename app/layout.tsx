@@ -1,8 +1,8 @@
+import { ClerkProvider } from '@clerk/nextjs';
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import React from 'react';
-import { ClerkAppProvider } from '@/components/providers/ClerkAppProvider';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
@@ -10,6 +10,8 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 import './globals.css';
 import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import { publicEnv } from '@/lib/env-public';
+import { logger } from '@/lib/utils/logger';
 
 // Configure Inter font
 const inter = Inter({
@@ -113,8 +115,9 @@ export default async function RootLayout({
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
   const shouldInjectToolbar = process.env.NODE_ENV === 'development';
+  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  return (
+  const content = (
     <html lang='en' suppressHydrationWarning>
       <head>
         <script
@@ -178,9 +181,7 @@ export default async function RootLayout({
       <body
         className={`${inter.variable} font-sans bg-base text-primary-token`}
       >
-        <ClerkAppProvider>
-          <ClientProviders>{children}</ClientProviders>
-        </ClerkAppProvider>
+        <ClientProviders>{children}</ClientProviders>
         {showCookieBanner && <CookieBannerSection />}
         {/* <SpeedInsights /> */}
         {shouldInjectToolbar && (
@@ -190,5 +191,56 @@ export default async function RootLayout({
         )}
       </body>
     </html>
+  );
+
+  if (!publishableKey) {
+    if (
+      process.env.NODE_ENV === 'test' ||
+      process.env.NODE_ENV === 'development'
+    ) {
+      logger.debug('Bypassing Clerk authentication (no keys provided)');
+      return content;
+    }
+
+    return (
+      <html lang='en' suppressHydrationWarning>
+        <body
+          className={`${inter.variable} font-sans bg-base text-primary-token`}
+        >
+          <div className='flex items-center justify-center min-h-screen'>
+            <div className='text-center'>
+              <h1 className='text-2xl font-bold text-red-600 mb-4'>
+                Configuration Error
+              </h1>
+              <p className='text-gray-600'>
+                Clerk publishable key is not configured.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    );
+  }
+
+  return (
+    <ClerkProvider
+      publishableKey={publishableKey}
+      appearance={{
+        elements: {
+          rootBox: 'bg-base text-primary',
+          card: 'bg-surface-1 border border-subtle dark:border-default',
+          headerTitle: 'text-primary',
+          headerSubtitle: 'text-secondary',
+          formFieldInput:
+            'bg-surface-0 border border-default focus-ring-themed',
+          formButtonPrimary: 'btn btn-primary btn-md',
+          socialButtonsBlockButton: 'btn btn-secondary btn-md',
+          footerActionText: 'text-secondary',
+          footerActionLink: 'text-accent-token',
+        },
+      }}
+    >
+      {content}
+    </ClerkProvider>
   );
 }
