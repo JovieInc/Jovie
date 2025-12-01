@@ -92,6 +92,9 @@ describe('DashboardNav (Optimized)', () => {
       '[href="/dashboard/overview"]'
     );
     expect(overviewLink).toBeDefined();
+
+    // Icons should be centered by applying collapsed width/justify classes
+    expect(overviewLink?.className).toContain('justify-center');
   });
 
   it('differentiates primary and secondary nav styling', () => {

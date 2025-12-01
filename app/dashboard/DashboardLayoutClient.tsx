@@ -103,12 +103,12 @@ export default function DashboardLayoutClient({
         onOpenChange={handleOpenChange}
         style={
           {
-            '--sidebar-width': '14rem',
-            '--sidebar-width-icon': '3.25rem',
+            '--sidebar-width': '260px',
+            '--sidebar-width-icon': '64px',
           } as CSSProperties
         }
       >
-        <div className='flex min-h-screen w-full overflow-hidden bg-base'>
+        <div className='flex h-svh w-full overflow-hidden bg-base'>
           <DashboardSidebar />
           <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
             <DashboardTopBar breadcrumbs={crumbs} />

@@ -99,6 +99,7 @@ function ProfilePage({ userOwnsProfile }) {
 **Guardrails:**
 - Use Statsig gates (`STATSIG_FLAGS.AVATAR_UPLOADER`) instead of custom providers.
 - Keep Avatar display-only when the gate is off; do not introduce alternate analytics SDKs.
+- AvatarUploadable defaults to JPEG/PNG/WebP and a 4MB max size to match `/api/images/upload`; extend the API before allowing other formats or larger uploads.
 - Use semantic tokens (e.g., `bg-surface-*`, `text-primary-token`) and avoid raw hex/RGB.
 
 ## Size Mapping
@@ -144,7 +145,7 @@ The system gracefully degrades:
 - [ ] Test feature flag integration
 - [ ] Verify analytics tracking
 - [ ] Test accessibility with screen readers
-- [ ] Add deprecation warnings to old components
+- [x] Add deprecation warnings to old components
 - [ ] Update component documentation
 
 ## Rollback Plan

@@ -12,9 +12,11 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
+import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
@@ -49,11 +51,13 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   const { isLoaded, user } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const router = useRouter();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
   const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const billingStatus = useBillingStatus();
   const billingErrorNotifiedRef = useRef(false);
 
@@ -103,15 +107,40 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
   // Handle loading state
   if (!isLoaded || !user) {
     return showUserInfo ? (
-      <div className='flex w-full items-center gap-3 p-2'>
-        <div className='h-8 w-8 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+      <div className='flex w-full items-center gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2'>
+        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2 animate-pulse' />
         <div className='flex-1 space-y-1'>
-          <div className='h-4 w-24 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
-          <div className='h-3 w-16 rounded-sm bg-gray-200 dark:bg-gray-700 animate-pulse' />
+          <div className='h-4 w-24 rounded-sm bg-surface-2 animate-pulse' />
+          <div className='h-3 w-16 rounded-sm bg-surface-2/80 animate-pulse' />
         </div>
       </div>
     ) : (
-      <div className='h-9 w-9 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse' />
+      <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse' />
+    );
+  }
+
+  // Fallback if user failed to load but Clerk is ready
+  if (!user) {
+    return (
+      <Button
+        variant='ghost'
+        size={showUserInfo ? 'default' : 'icon'}
+        className={cn(
+          'w-full justify-start gap-3 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2',
+          !showUserInfo && 'h-10 w-10 justify-center'
+        )}
+        onClick={() => {
+          router.push('/signin');
+        }}
+      >
+        <Avatar name='User' size={showUserInfo ? 'sm' : 'xs'} />
+        {showUserInfo && (
+          <div className='flex flex-1 items-center justify-between'>
+            <span className='text-sm font-medium'>Sign in</span>
+            <Icon name='ChevronRight' className='h-4 w-4 text-tertiary-token' />
+          </div>
+        )}
+      </Button>
     );
   }
 
@@ -290,9 +319,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
         {showUserInfo ? (
-          <div
+          <button
+            type='button'
             className={cn(
-              'flex w-full items-center gap-3 p-2 rounded-md border border-subtle bg-surface-1 hover:bg-surface-2 transition-colors'
+              'flex w-full items-center gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
             )}
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
@@ -325,12 +355,12 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
               className='w-4 h-4 text-tertiary-token'
               aria-hidden='true'
             />
-          </div>
+          </button>
         ) : (
           <Button
             variant='ghost'
             size='icon'
-            className='rounded-full border border-subtle bg-surface-1 hover:bg-surface-2'
+            className='h-10 w-10 rounded-full border border-subtle bg-surface-1 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent'
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
             <Avatar
@@ -416,6 +446,66 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuLabel className='text-xs text-tertiary-token'>
+          Appearance
+        </DropdownMenuLabel>
+        {(['light', 'dark', 'system'] as const).map(option => {
+          const isActive =
+            (option === 'system' && theme === 'system') ||
+            (option !== 'system' && resolvedTheme === option);
+          const label =
+            option === 'light'
+              ? 'Light'
+              : option === 'dark'
+                ? 'Dark'
+                : 'System';
+
+          return (
+            <DropdownMenuItem
+              key={option}
+              onClick={() => {
+                setTheme(option);
+                setIsMenuOpen(false);
+              }}
+              aria-checked={isActive}
+              role='menuitemradio'
+              className={cn(
+                'cursor-pointer',
+                isActive && 'bg-surface-2 text-primary-token'
+              )}
+            >
+              <Icon
+                name={
+                  option === 'dark'
+                    ? 'Moon'
+                    : option === 'light'
+                      ? 'Sun'
+                      : 'Monitor'
+                }
+                className='mr-2 h-4 w-4 text-tertiary-token'
+              />
+              <span className='flex-1'>{label}</span>
+              {isActive && (
+                <Icon name='Check' className='h-4 w-4 text-primary-token' />
+              )}
+            </DropdownMenuItem>
+          );
+        })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => {
+            setIsMenuOpen(false);
+            setIsFeedbackOpen(true);
+          }}
+          className='cursor-pointer'
+        >
+          <Icon
+            name='MessageSquare'
+            className='w-4 h-4 mr-2 text-tertiary-token'
+          />{' '}
+          Send feedback
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
@@ -425,6 +515,10 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           {isLoading ? 'Signing out…' : 'Sign out'}
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+      />
     </DropdownMenu>
   );
 }

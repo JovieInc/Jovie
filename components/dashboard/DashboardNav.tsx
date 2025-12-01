@@ -141,7 +141,8 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
             <SidebarMenuButton asChild isActive={isActive} tooltip={tooltip}>
               <Link
                 href={item.href}
-                className='flex items-center gap-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
+                aria-current={isActive ? 'page' : undefined}
+                className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               >
                 <item.icon className='size-4' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
@@ -156,7 +157,11 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
   );
 
   return (
-    <nav className='flex flex-1 flex-col'>
+    <nav
+      className='flex flex-1 flex-col'
+      aria-label='Dashboard navigation'
+      role='navigation'
+    >
       {/* Primary Navigation Block */}
       <div className='mb-6'>{renderSection(primaryNavigation)}</div>
 
