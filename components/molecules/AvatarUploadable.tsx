@@ -26,7 +26,7 @@ export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   onError?: (error: string) => void;
   /** Success callback with new image URL */
   onSuccess?: (imageUrl: string) => void;
-  /** Maximum file size in bytes (default: 10MB) */
+  /** Maximum file size in bytes (default: 4MB, aligned with /api/images/upload) */
   maxFileSize?: number;
   /** Accepted file types */
   acceptedTypes?: string[];
@@ -56,14 +56,8 @@ const SIZE_MAP = {
 };
 
 // File validation
-const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const DEFAULT_ACCEPTED_TYPES = [
-  'image/jpeg',
-  'image/jpg',
-  'image/png',
-  'image/webp',
-  'image/heic',
-];
+const DEFAULT_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB (API enforced)
+const DEFAULT_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const STATUS_COLORS = {
   uploading: 'text-accent-token',
@@ -217,6 +211,7 @@ export const AvatarUploadable = React.memo(
     >('idle');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const statusResetTimeoutRef = useRef<number | null>(null);
     const mergedRef = useMemo(
       () => mergeRefs<HTMLDivElement>(containerRef, forwardedRef),
       [forwardedRef]
@@ -229,14 +224,29 @@ export const AvatarUploadable = React.memo(
       [acceptedTypes]
     );
 
-    const resetStatus = useCallback((delay: number) => {
-      window.setTimeout(() => setUploadStatus('idle'), delay);
+    const clearStatusReset = useCallback(() => {
+      if (statusResetTimeoutRef.current) {
+        window.clearTimeout(statusResetTimeoutRef.current);
+        statusResetTimeoutRef.current = null;
+      }
     }, []);
+
+    const resetStatus = useCallback(
+      (delay: number) => {
+        clearStatusReset();
+        statusResetTimeoutRef.current = window.setTimeout(() => {
+          setUploadStatus('idle');
+          statusResetTimeoutRef.current = null;
+        }, delay);
+      },
+      [clearStatusReset]
+    );
 
     const handleFileUpload = useCallback(
       async (file: File) => {
         if (!onUpload) return;
 
+        clearStatusReset();
         const validationError = validateFile(file, maxFileSize, acceptedTypes);
         if (validationError) {
           onError?.(validationError);
@@ -276,7 +286,15 @@ export const AvatarUploadable = React.memo(
           setIsUploading(false);
         }
       },
-      [acceptedTypes, maxFileSize, onError, onSuccess, onUpload, resetStatus]
+      [
+        acceptedTypes,
+        clearStatusReset,
+        maxFileSize,
+        onError,
+        onSuccess,
+        onUpload,
+        resetStatus,
+      ]
     );
 
     const handleFileSelect = useCallback(
@@ -355,6 +373,8 @@ export const AvatarUploadable = React.memo(
         track('avatar_upload_progress', { progress });
       }
     }, [isUploading, progress]);
+
+    useEffect(() => clearStatusReset, [clearStatusReset]);
 
     const canUpload = uploadable && Boolean(onUpload);
     const isInteractive = canUpload && !isUploading;
@@ -465,3 +485,5 @@ export const AvatarUploadable = React.memo(
     );
   })
 );
+
+AvatarUploadable.displayName = 'AvatarUploadable';

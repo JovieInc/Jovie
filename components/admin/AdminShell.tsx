@@ -39,7 +39,7 @@ export function AdminShell({ children }: AdminShellProps) {
 
   return (
     <SidebarProvider>
-      <div className='flex min-h-screen w-full overflow-hidden bg-base text-primary-token'>
+      <div className='flex h-svh w-full overflow-hidden bg-base text-primary-token'>
         <AdminSidebar />
         <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
           <DashboardTopBar breadcrumbs={breadcrumbs} />

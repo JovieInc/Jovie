@@ -68,26 +68,37 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarMenu>
-          {navItems.map(item => {
-            const isActive = item.href === '/admin' && pathname === '/admin';
+        <nav
+          aria-label='Admin navigation'
+          role='navigation'
+          className='flex flex-1 flex-col overflow-hidden'
+        >
+          <SidebarMenu>
+            {navItems.map(item => {
+              const targetPath = item.href.split('#')[0] ?? item.href;
+              const isActive = pathname === targetPath;
 
-            return (
-              <SidebarMenuItem key={item.label}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={isActive}
-                  className='font-medium text-secondary-token hover:text-primary-token'
-                >
-                  <Link href={item.href} className='flex items-center gap-3'>
-                    <item.icon className='size-4 text-secondary-token' />
-                    <span className={cn('truncate')}>{item.label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
-        </SidebarMenu>
+              return (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    className='font-medium text-secondary-token hover:text-primary-token'
+                  >
+                    <Link
+                      href={item.href}
+                      aria-current={isActive ? 'page' : undefined}
+                      className='flex w-full min-w-0 items-center gap-3'
+                    >
+                      <item.icon className='size-4 text-secondary-token' />
+                      <span className={cn('truncate')}>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              );
+            })}
+          </SidebarMenu>
+        </nav>
       </SidebarContent>
 
       <SidebarFooter>

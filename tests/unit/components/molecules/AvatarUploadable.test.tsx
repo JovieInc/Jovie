@@ -277,6 +277,60 @@ describe('AvatarUploadable Component', () => {
         vi.clearAllMocks();
       }
     });
+
+    it('rejects HEIC by default to match API constraints', async () => {
+      render(
+        <AvatarUploadable
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          uploadable={true}
+          onUpload={mockOnUpload}
+          onError={mockOnError}
+        />
+      );
+
+      const fileInput = screen.getByLabelText('Choose profile photo file');
+      const heicFile = createMockFile('photo.heic', 'image/heic', 2048);
+
+      fireEvent.change(fileInput, { target: { files: [heicFile] } });
+
+      await waitFor(() => {
+        expect(mockOnError).toHaveBeenCalledWith(
+          expect.stringContaining('Invalid file type')
+        );
+      });
+      expect(mockOnUpload).not.toHaveBeenCalled();
+    });
+
+    it('enforces 4MB default max file size', async () => {
+      render(
+        <AvatarUploadable
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          uploadable={true}
+          onUpload={mockOnUpload}
+          onError={mockOnError}
+        />
+      );
+
+      const fileInput = screen.getByLabelText('Choose profile photo file');
+      const largeFile = createMockFile(
+        'large.jpg',
+        'image/jpeg',
+        5 * 1024 * 1024
+      );
+
+      fireEvent.change(fileInput, { target: { files: [largeFile] } });
+
+      await waitFor(() => {
+        expect(mockOnError).toHaveBeenCalledWith(
+          expect.stringContaining('File too large')
+        );
+      });
+      expect(mockOnUpload).not.toHaveBeenCalled();
+    });
   });
 
   describe('Drag and Drop', () => {
