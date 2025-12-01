@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import React, { useState } from 'react';
+import React, { forwardRef, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AvatarProps {
@@ -12,7 +12,20 @@ export interface AvatarProps {
   /** Display name for fallback initials */
   name?: string;
   /** Avatar size */
-  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  size?:
+    | 'xs'
+    | 'sm'
+    | 'md'
+    | 'lg'
+    | 'xl'
+    | '2xl'
+    | 'display-sm'
+    | 'display-md'
+    | 'display-lg'
+    | 'display-xl'
+    | 'display-2xl'
+    | 'display-3xl'
+    | 'display-4xl';
   /** Border radius style */
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
   /** Loading priority for Next.js Image */
@@ -35,6 +48,48 @@ const SIZE_MAP = {
   lg: { width: 64, height: 64, className: 'size-16', textSize: 'text-lg' },
   xl: { width: 80, height: 80, className: 'size-20', textSize: 'text-xl' },
   '2xl': { width: 96, height: 96, className: 'size-24', textSize: 'text-2xl' },
+  'display-sm': {
+    width: 112,
+    height: 112,
+    className: 'size-28',
+    textSize: 'text-xl',
+  },
+  'display-md': {
+    width: 128,
+    height: 128,
+    className: 'size-32',
+    textSize: 'text-2xl',
+  },
+  'display-lg': {
+    width: 160,
+    height: 160,
+    className: 'size-40',
+    textSize: 'text-3xl',
+  },
+  'display-xl': {
+    width: 192,
+    height: 192,
+    className: 'size-48',
+    textSize: 'text-3xl',
+  },
+  'display-2xl': {
+    width: 224,
+    height: 224,
+    className: 'size-56',
+    textSize: 'text-4xl',
+  },
+  'display-3xl': {
+    width: 256,
+    height: 256,
+    className: 'size-64',
+    textSize: 'text-4xl',
+  },
+  'display-4xl': {
+    width: 384,
+    height: 384,
+    className: 'size-96',
+    textSize: 'text-5xl',
+  },
 } as const;
 
 // Rounded corner mappings
@@ -80,26 +135,36 @@ function generateInitials(name?: string): string {
  * - Accessibility support with proper ARIA attributes
  * - Dark mode support
  */
-export const Avatar = React.memo(function Avatar({
-  src,
-  alt,
-  name,
-  size = 'md',
-  rounded = 'full',
-  priority = false,
-  quality = 85,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
-  className,
-  style,
-}: AvatarProps) {
+const BORDER_RING = 'ring-1 ring-[color:var(--color-border-subtle)]';
+
+const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
+  {
+    src,
+    alt,
+    name,
+    size = 'md',
+    rounded = 'full',
+    priority = false,
+    quality = 85,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
+    className,
+    style,
+  },
+  ref
+) {
   const [hasError, setHasError] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const { width, height, className: sizeClass, textSize } = SIZE_MAP[size];
   const roundedClass = ROUNDED_MAP[rounded];
-  const blurDataURL =
-    BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS] || BLUR_DATA_URLS[48];
+  const blurDataURL = useMemo(() => {
+    if (BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS]) {
+      return BLUR_DATA_URLS[width as keyof typeof BLUR_DATA_URLS];
+    }
+    // Fallback to the largest available blur placeholder
+    return BLUR_DATA_URLS[96] || BLUR_DATA_URLS[48];
+  }, [width]);
   const initials = generateInitials(name);
 
   // Show fallback if no src or error occurred
@@ -108,19 +173,21 @@ export const Avatar = React.memo(function Avatar({
   if (shouldShowFallback) {
     return (
       <div
+        ref={ref}
         className={cn(
           sizeClass,
           roundedClass,
-          'flex items-center justify-center bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
-          'ring-1 ring-black/10 dark:ring-white/15 shadow-sm',
-          'transition-colors duration-200',
+          'flex items-center justify-center bg-surface-2 text-secondary-token',
+          BORDER_RING,
+          'shadow-sm transition-colors duration-200',
           className
         )}
         style={style}
         role='img'
         aria-label={alt}
+        aria-busy='false'
       >
-        <span className={cn('font-medium select-none', textSize)}>
+        <span className={cn('font-medium leading-none select-none', textSize)}>
           {initials}
         </span>
       </div>
@@ -129,16 +196,19 @@ export const Avatar = React.memo(function Avatar({
 
   return (
     <div
+      ref={ref}
       className={cn(
         sizeClass,
         roundedClass,
-        'relative overflow-hidden bg-gray-100 dark:bg-gray-800',
-        'ring-1 ring-black/10 dark:ring-white/15 shadow-sm',
+        'relative overflow-hidden bg-surface-1 text-primary-token',
+        BORDER_RING,
+        'shadow-sm transition-colors duration-200',
         className
       )}
       style={style}
       role='img'
       aria-label={alt}
+      aria-busy={!isLoaded}
     >
       <Image
         src={src}
@@ -152,7 +222,7 @@ export const Avatar = React.memo(function Avatar({
         blurDataURL={blurDataURL}
         sizes={`${width}px`}
         className={cn(
-          'object-cover object-center transition-opacity duration-300',
+          'object-cover object-center transition-opacity duration-300 ease-out',
           isLoaded ? 'opacity-100' : 'opacity-0'
         )}
         onLoad={() => setIsLoaded(true)}
@@ -164,11 +234,12 @@ export const Avatar = React.memo(function Avatar({
 
       {/* Loading shimmer effect */}
       {!isLoaded && !hasError && (
-        <div className='absolute inset-0 animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700' />
+        <div className='absolute inset-0 skeleton' aria-hidden='true' />
       )}
     </div>
   );
 });
 
-// Export named component (no default exports per architecture guidelines)
-export { Avatar as default };
+AvatarComponent.displayName = 'Avatar';
+
+export const Avatar = React.memo(AvatarComponent);

@@ -1,5 +1,5 @@
-import { ArtistAvatar } from '@/components/atoms/ArtistAvatar';
 import { ArtistName } from '@/components/atoms/ArtistName';
+import { Avatar } from '@/components/atoms/Avatar';
 import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
 import { Artist } from '@/types/db';
 
@@ -18,15 +18,22 @@ export function ArtistInfo({
   nameSize = 'lg',
   className = '',
 }: ArtistInfoProps) {
+  const avatarSizeMap = {
+    sm: 'display-sm',
+    md: 'display-lg',
+    lg: 'display-xl',
+    xl: 'display-2xl',
+  } as const;
+
   return (
     <div
       className={`flex flex-col items-center space-y-3 sm:space-y-4 text-center ${className}`}
     >
-      <ArtistAvatar
+      <Avatar
         src={artist.image_url || ''}
         alt={artist.name}
         name={artist.name}
-        size={avatarSize}
+        size={avatarSizeMap[avatarSize]}
         priority
       />
 
@@ -39,7 +46,7 @@ export function ArtistInfo({
         />
 
         <p
-          className='text-base sm:text-lg leading-snug text-gray-600 dark:text-gray-400 line-clamp-2'
+          className='text-base sm:text-lg leading-snug text-secondary-token line-clamp-2'
           itemProp='description'
         >
           {subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE}

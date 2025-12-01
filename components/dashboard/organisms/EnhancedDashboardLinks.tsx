@@ -10,9 +10,10 @@ import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { debounce } from '@/lib/utils';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
-import { EnhancedDashboardLayout } from './EnhancedDashboardLayout';
+import { GroupedLinksManager } from './GroupedLinksManager';
 
 // Define platform types
 type PlatformType = 'social' | 'dsp' | 'custom';
@@ -39,16 +40,6 @@ interface LinkItem {
   suggestedTitle: string;
   isValid: boolean;
 }
-
-// Minimal shape sometimes received back from EnhancedDashboardLayout before normalization
-type ExternalLayoutLink = {
-  id?: string;
-  title?: string;
-  url: string;
-  platform: string; // platform id
-  category?: 'music' | 'social' | 'commerce' | 'other';
-  isVisible?: boolean;
-};
 
 interface SaveStatus {
   saving: boolean;
@@ -160,41 +151,20 @@ export function EnhancedDashboardLinks({
   const debouncedSave = useMemo(
     () =>
       debounce(async (...args: unknown[]) => {
-        const input = Array.isArray(args[0])
-          ? (args[0] as Array<LinkItem | ExternalLayoutLink>)
-          : ([] as Array<LinkItem | ExternalLayoutLink>);
-        // Normalize into LinkItem[]
-        const normalized: LinkItem[] = input.map(item => {
-          if (typeof (item as ExternalLayoutLink).platform === 'string') {
-            const e = item as ExternalLayoutLink;
-            const mappedCategory: PlatformType =
-              e.category === 'music'
-                ? 'dsp'
-                : e.category === 'social'
-                  ? 'social'
-                  : 'custom';
-            return {
-              id: e.id ?? `temp-${Date.now()}`,
-              title: e.title ?? 'Custom Link',
-              url: e.url,
-              platform: {
-                id: e.platform,
-                name: e.title ?? 'Custom Link',
-                category: mappedCategory,
-                icon: e.platform,
-                color: '#000000',
-                placeholder: 'https://example.com',
-              },
-              isVisible: e.isVisible ?? true,
-              order: 0,
-              category: mappedCategory,
-              normalizedUrl: e.url,
-              originalUrl: e.url,
-              suggestedTitle: e.title ?? 'Custom Link',
-              isValid: true,
-            };
-          }
-          return item as LinkItem;
+        const [input] = args as [LinkItem[]];
+
+        const normalized: LinkItem[] = input.map((item, index) => {
+          const rawCategory = item.platform.category;
+          const category: PlatformType =
+            rawCategory === 'dsp' || rawCategory === 'social'
+              ? rawCategory
+              : 'custom';
+
+          return {
+            ...item,
+            category,
+            order: typeof item.order === 'number' ? item.order : index,
+          };
         });
 
         try {
@@ -255,97 +225,44 @@ export function EnhancedDashboardLinks({
     [profileId]
   );
 
-  // Handle adding a new link
-  const handleAddLink = useCallback(() => {
-    const newLink: LinkItem = {
-      id: `temp-${Date.now()}`,
-      title: 'New Link',
-      platform: {
-        id: 'custom',
-        name: 'Custom Link',
-        category: 'custom',
-        icon: 'link',
-        color: '#000000',
-        placeholder: 'https://example.com',
-      },
-      isVisible: true,
-      order: links.length,
-      category: 'custom',
-      normalizedUrl: '',
-      originalUrl: '',
-      suggestedTitle: 'New Link',
-      isValid: false,
-      url: '',
-    };
+  const handleManagerLinksChange = useCallback(
+    (updated: DetectedLink[]) => {
+      const mapped: LinkItem[] = updated.map((link, index) => {
+        const rawVisibility = (link as unknown as { isVisible?: boolean })
+          .isVisible;
+        const isVisible = rawVisibility ?? true;
+        const rawCategory = link.platform.category;
+        const category: PlatformType =
+          rawCategory === 'dsp' || rawCategory === 'social'
+            ? rawCategory
+            : 'custom';
 
-    const updatedLinks = [...links, newLink];
-    setLinks(updatedLinks);
-    debouncedSave(updatedLinks);
-  }, [links, debouncedSave]);
+        const idBase = link.normalizedUrl || link.originalUrl;
 
-  // Handle editing a link
-  const handleEditLink = useCallback((id: string) => {
-    // In a real implementation, this would open an edit modal or form
-    console.log('Edit link:', id);
-    toast.info('Edit link functionality will be implemented in the next phase');
-  }, []);
-
-  // Handle deleting a link
-  const handleDeleteLink = useCallback(
-    (id: string) => {
-      const updatedLinks = links.filter(link => link.id !== id);
-      setLinks(updatedLinks);
-      debouncedSave(updatedLinks);
-      toast.success('Link removed');
-    },
-    [links, debouncedSave]
-  );
-
-  // Handle toggling link visibility
-  const handleToggleVisibility = useCallback(
-    (id: string) => {
-      const updatedLinks = links.map(link =>
-        link.id === id ? { ...link, isVisible: !link.isVisible } : link
-      );
-      setLinks(updatedLinks);
-      debouncedSave(updatedLinks);
-    },
-    [links, debouncedSave]
-  );
-
-  // Handle reordering links
-  const handleReorderLinks = useCallback(
-    (items: Array<LinkItem | ExternalLayoutLink>) => {
-      // Convert back to our internal LinkItem type if needed
-      const reorderedLinks = items.map(item => {
-        if ('platform' in item && typeof item.platform === 'string') {
-          // This is coming from EnhancedDashboardLayout
-          return {
-            ...item,
-            platform: {
-              id: item.platform,
-              name: item.title || 'Custom Link',
-              category:
-                item.category === 'music'
-                  ? 'dsp'
-                  : item.category === 'social'
-                    ? 'social'
-                    : 'custom',
-              icon: item.platform,
-              color: '#000000',
-              placeholder: 'https://example.com',
-            },
-            normalizedUrl: item.url,
-            originalUrl: item.url,
-            suggestedTitle: item.title,
-            isValid: true,
-          } as LinkItem;
-        }
-        return item as LinkItem;
+        return {
+          id: `${link.platform.id}::${category}::${idBase}`,
+          title: link.suggestedTitle || link.platform.name,
+          url: link.normalizedUrl,
+          platform: {
+            id: link.platform.id,
+            name: link.platform.name,
+            category,
+            icon: link.platform.icon,
+            color: `#${link.platform.color}`,
+            placeholder: link.platform.placeholder,
+          },
+          isVisible,
+          order: index,
+          category,
+          normalizedUrl: link.normalizedUrl,
+          originalUrl: link.originalUrl,
+          suggestedTitle: link.suggestedTitle,
+          isValid: link.isValid,
+        };
       });
 
-      setLinks(reorderedLinks);
-      debouncedSave(reorderedLinks);
+      setLinks(mapped);
+      debouncedSave(mapped);
     },
     [debouncedSave]
   );
@@ -401,14 +318,30 @@ export function EnhancedDashboardLinks({
   return (
     <div className='grid grid-cols-1 xl:grid-cols-[1fr_24rem] gap-6'>
       <div className='w-full'>
-        <EnhancedDashboardLayout
-          links={dashboardLinks}
-          onAddLink={handleAddLink}
-          onEditLink={handleEditLink}
-          onDeleteLink={handleDeleteLink}
-          onToggleVisibility={handleToggleVisibility}
-          onReorderLinks={handleReorderLinks}
-        />
+        <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
+          <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+            <div>
+              <h1 className='text-2xl font-bold text-primary-token'>
+                Manage Links
+              </h1>
+              <p className='mt-1 text-sm text-secondary-token'>
+                Add and manage your social and streaming links. Changes save
+                automatically.
+                {saveStatus.lastSaved && (
+                  <span className='ml-2 text-xs text-secondary-token'>
+                    Last saved: {saveStatus.lastSaved.toLocaleTimeString()}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+
+          <GroupedLinksManager
+            initialLinks={links as unknown as DetectedLink[]}
+            onLinksChange={handleManagerLinksChange}
+            creatorName={artist?.name ?? undefined}
+          />
+        </div>
       </div>
 
       {/* Right column: Live Preview (only on Links page) */}

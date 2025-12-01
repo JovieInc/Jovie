@@ -35,7 +35,7 @@ export function DashboardRemoveBrandingCard({
         </div>
 
         <Link
-          href='/pricing'
+          href='/billing/remove-branding'
           className='inline-flex w-full items-center justify-between rounded-lg border border-sidebar-border/60 bg-sidebar/80 px-3 py-1.5 text-xs font-medium text-sidebar-foreground hover:bg-sidebar-foreground/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar'
         >
           <span>Upgrade to remove branding</span>

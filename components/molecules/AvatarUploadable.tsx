@@ -1,7 +1,14 @@
 'use client';
 
 import { Check, Upload, X } from 'lucide-react';
-import React, { useCallback, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -32,6 +39,21 @@ const STROKE_WIDTH = 3;
 // const RING_SIZE = 100; // Percentage of avatar size (unused for now)
 const RADIUS = 50 - STROKE_WIDTH / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const SIZE_MAP = {
+  xs: 24,
+  sm: 32,
+  md: 48,
+  lg: 64,
+  xl: 80,
+  '2xl': 96,
+  'display-sm': 112,
+  'display-md': 128,
+  'display-lg': 160,
+  'display-xl': 192,
+  'display-2xl': 224,
+  'display-3xl': 256,
+  'display-4xl': 384,
+};
 
 // File validation
 const DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -42,6 +64,25 @@ const DEFAULT_ACCEPTED_TYPES = [
   'image/webp',
   'image/heic',
 ];
+
+const STATUS_COLORS = {
+  uploading: 'text-accent-token',
+  success: 'text-primary-token',
+  error: 'text-destructive',
+  idle: 'text-secondary-token',
+} as const;
+
+function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
+  return (node: T) => {
+    refs.forEach(ref => {
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref) {
+        (ref as React.MutableRefObject<T | null>).current = node;
+      }
+    });
+  };
+}
 
 /**
  * Validates a file for upload
@@ -76,20 +117,19 @@ function ProgressRing({
   status: 'uploading' | 'success' | 'error' | 'idle';
 }) {
   const strokeDasharray = `${(progress / 100) * CIRCUMFERENCE} ${CIRCUMFERENCE}`;
-  const ringColor =
-    status === 'error'
-      ? 'stroke-red-500'
-      : status === 'success'
-        ? 'stroke-green-500'
-        : 'stroke-blue-500';
+  const ringColor = STATUS_COLORS[status];
 
   return (
-    <div className='absolute inset-0 flex items-center justify-center'>
+    <div
+      className='pointer-events-none absolute inset-0 flex items-center justify-center'
+      aria-hidden='true'
+      data-testid='avatar-uploadable-progress'
+    >
       <svg
         width={size}
         height={size}
         viewBox='0 0 100 100'
-        className='transform -rotate-90'
+        className='-rotate-90'
       >
         {/* Background ring */}
         <circle
@@ -99,7 +139,7 @@ function ProgressRing({
           fill='none'
           stroke='currentColor'
           strokeWidth={STROKE_WIDTH}
-          className='text-gray-300 dark:text-gray-600'
+          className='text-border-subtle'
         />
         {/* Progress ring */}
         <circle
@@ -107,28 +147,32 @@ function ProgressRing({
           cy='50'
           r={RADIUS}
           fill='none'
+          stroke='currentColor'
           strokeWidth={STROKE_WIDTH}
           strokeDasharray={strokeDasharray}
           strokeLinecap='round'
-          className={cn('transition-all duration-300 ease-out', ringColor)}
+          className={cn(
+            'stroke-current transition-all duration-300 ease-out',
+            ringColor
+          )}
         />
       </svg>
 
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='bg-green-500 rounded-full p-1 text-white'>
-            <Check size={size * 0.15} />
+          <div className='rounded-full bg-surface-0 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] shadow-sm'>
+            <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='bg-red-500 rounded-full p-1 text-white'>
-            <X size={size * 0.15} />
+          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-[color:var(--color-border-subtle)] shadow-sm'>
+            <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'uploading' && (
-          <div className='bg-blue-500 rounded-full p-1 text-white animate-pulse'>
-            <Upload size={size * 0.15} />
+          <div className='rounded-full bg-[color:var(--color-accent)] text-[color:var(--color-accent-foreground)] ring-1 ring-[color:var(--color-accent)] shadow-sm animate-pulse'>
+            <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
       </div>
@@ -149,287 +193,275 @@ function ProgressRing({
  * - Analytics tracking
  * - Feature flag controlled
  */
-export const AvatarUploadable = React.memo(function AvatarUploadable({
-  src,
-  uploadable = false,
-  onUpload,
-  progress = 0,
-  onError,
-  onSuccess,
-  maxFileSize = DEFAULT_MAX_FILE_SIZE,
-  acceptedTypes = DEFAULT_ACCEPTED_TYPES,
-  showHoverOverlay = true,
-  className,
-  ...avatarProps
-}: AvatarUploadableProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<
-    'idle' | 'uploading' | 'success' | 'error'
-  >('idle');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+export const AvatarUploadable = React.memo(
+  forwardRef<HTMLDivElement, AvatarUploadableProps>(function AvatarUploadable(
+    {
+      src,
+      uploadable = false,
+      onUpload,
+      progress = 0,
+      onError,
+      onSuccess,
+      maxFileSize = DEFAULT_MAX_FILE_SIZE,
+      acceptedTypes = DEFAULT_ACCEPTED_TYPES,
+      showHoverOverlay = true,
+      className,
+      ...avatarProps
+    },
+    forwardedRef
+  ) {
+    const [isDragOver, setIsDragOver] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState<
+      'idle' | 'uploading' | 'success' | 'error'
+    >('idle');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const mergedRef = useMemo(
+      () => mergeRefs<HTMLDivElement>(containerRef, forwardedRef),
+      [forwardedRef]
+    );
 
-  // Get size for progress ring
-  const avatarSize = avatarProps.size || 'md';
-  const sizeMap = { xs: 24, sm: 32, md: 48, lg: 64, xl: 80, '2xl': 96 };
-  const numericSize = sizeMap[avatarSize];
+    const avatarSize = avatarProps.size || 'md';
+    const numericSize = SIZE_MAP[avatarSize];
+    const acceptedTypeList = useMemo(
+      () => acceptedTypes.join(','),
+      [acceptedTypes]
+    );
 
-  /**
-   * Handle file upload
-   */
-  const handleFileUpload = useCallback(
-    async (file: File) => {
-      if (!onUpload) return;
+    const resetStatus = useCallback((delay: number) => {
+      window.setTimeout(() => setUploadStatus('idle'), delay);
+    }, []);
 
-      // Validate file
-      const validationError = validateFile(file, maxFileSize, acceptedTypes);
-      if (validationError) {
-        onError?.(validationError);
-        setUploadStatus('error');
-        track('avatar_upload_error', {
-          error: 'validation_failed',
-          message: validationError,
-        });
-        return;
-      }
+    const handleFileUpload = useCallback(
+      async (file: File) => {
+        if (!onUpload) return;
 
-      setIsUploading(true);
-      setUploadStatus('uploading');
-      track('avatar_upload_start', {
-        file_size: file.size,
-        file_type: file.type,
-      });
+        const validationError = validateFile(file, maxFileSize, acceptedTypes);
+        if (validationError) {
+          onError?.(validationError);
+          setUploadStatus('error');
+          track('avatar_upload_error', {
+            error: 'validation_failed',
+            message: validationError,
+          });
+          resetStatus(3000);
+          return;
+        }
 
-      try {
-        const imageUrl = await onUpload(file);
-        setUploadStatus('success');
-        onSuccess?.(imageUrl);
-        track('avatar_upload_success', { file_size: file.size });
-
-        // Auto-reset success state after animation
-        setTimeout(() => {
-          setUploadStatus('idle');
-        }, 2000);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : 'Upload failed';
-        setUploadStatus('error');
-        onError?.(errorMessage);
-        track('avatar_upload_error', {
-          error: 'upload_failed',
-          message: errorMessage,
+        setIsUploading(true);
+        setUploadStatus('uploading');
+        track('avatar_upload_start', {
+          file_size: file.size,
+          file_type: file.type,
         });
 
-        // Auto-reset error state
-        setTimeout(() => {
-          setUploadStatus('idle');
-        }, 3000);
-      } finally {
-        setIsUploading(false);
-      }
-    },
-    [onUpload, maxFileSize, acceptedTypes, onError, onSuccess]
-  );
+        try {
+          const imageUrl = await onUpload(file);
+          setUploadStatus('success');
+          onSuccess?.(imageUrl);
+          track('avatar_upload_success', { file_size: file.size });
+          resetStatus(2000);
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : 'Upload failed';
+          setUploadStatus('error');
+          onError?.(errorMessage);
+          track('avatar_upload_error', {
+            error: 'upload_failed',
+            message: errorMessage,
+          });
+          resetStatus(3000);
+        } finally {
+          setIsUploading(false);
+        }
+      },
+      [acceptedTypes, maxFileSize, onError, onSuccess, onUpload, resetStatus]
+    );
 
-  /**
-   * Handle file selection from input
-   */
-  const handleFileSelect = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file) {
-        handleFileUpload(file);
-      }
-    },
-    [handleFileUpload]
-  );
+    const handleFileSelect = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+          handleFileUpload(file);
+        }
+      },
+      [handleFileUpload]
+    );
 
-  /**
-   * Handle drag events
-   */
-  const handleDragEnter = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (uploadable && !isUploading) {
-        setIsDragOver(true);
-      }
-    },
-    [uploadable, isUploading]
-  );
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only reset if leaving the entire container
-    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragOver(false);
-
-      if (!uploadable || isUploading) return;
-
-      const file = e.dataTransfer.files?.[0];
-      if (file) {
-        handleFileUpload(file);
-      }
-    },
-    [uploadable, isUploading, handleFileUpload]
-  );
-
-  /**
-   * Handle click to upload
-   */
-  const handleClick = useCallback(() => {
-    if (uploadable && !isUploading) {
-      fileInputRef.current?.click();
-    }
-  }, [uploadable, isUploading]);
-
-  /**
-   * Handle keyboard interaction
-   */
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (uploadable && !isUploading && (e.key === 'Enter' || e.key === ' ')) {
+    const handleDragEnter = useCallback(
+      (e: React.DragEvent) => {
         e.preventDefault();
+        e.stopPropagation();
+        if (uploadable && onUpload && !isUploading) {
+          setIsDragOver(true);
+        }
+      },
+      [uploadable, onUpload, isUploading]
+    );
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+        setIsDragOver(false);
+      }
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    }, []);
+
+    const handleDrop = useCallback(
+      (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragOver(false);
+
+        if (!uploadable || !onUpload || isUploading) return;
+
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+          handleFileUpload(file);
+        }
+      },
+      [uploadable, onUpload, isUploading, handleFileUpload]
+    );
+
+    const handleClick = useCallback(() => {
+      if (uploadable && onUpload && !isUploading) {
         fileInputRef.current?.click();
       }
-    },
-    [uploadable, isUploading]
-  );
+    }, [uploadable, onUpload, isUploading]);
 
-  // Report progress to analytics
-  React.useEffect(() => {
-    if (isUploading && progress > 0) {
-      track('avatar_upload_progress', { progress });
-    }
-  }, [isUploading, progress]);
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (
+          uploadable &&
+          onUpload &&
+          !isUploading &&
+          (e.key === 'Enter' || e.key === ' ')
+        ) {
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }
+      },
+      [uploadable, onUpload, isUploading]
+    );
 
-  const isInteractive = uploadable && !isUploading;
-  const showProgress =
-    isUploading || uploadStatus === 'success' || uploadStatus === 'error';
-  const currentProgress =
-    uploadStatus === 'success'
-      ? 100
-      : uploadStatus === 'error'
-        ? 100
-        : progress;
+    useEffect(() => {
+      if (isUploading && progress > 0) {
+        track('avatar_upload_progress', { progress });
+      }
+    }, [isUploading, progress]);
 
-  return (
-    <div
-      ref={containerRef}
-      className={cn(
-        'relative group',
-        isInteractive && 'cursor-pointer',
-        className
-      )}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onClick={handleClick}
-      onKeyDown={handleKeyDown}
-      tabIndex={isInteractive ? 0 : undefined}
-      role={isInteractive ? 'button' : undefined}
-      aria-label={isInteractive ? 'Upload profile photo' : undefined}
-    >
-      {/* Base Avatar */}
-      <Avatar
-        src={src}
+    const canUpload = uploadable && Boolean(onUpload);
+    const isInteractive = canUpload && !isUploading;
+    const showProgress =
+      isUploading || uploadStatus === 'success' || uploadStatus === 'error';
+    const currentProgress =
+      uploadStatus === 'success' || uploadStatus === 'error' ? 100 : progress;
+
+    return (
+      <div
+        ref={mergedRef}
         className={cn(
-          'transition-all duration-200',
-          isInteractive &&
-            'group-hover:brightness-90 group-focus-visible:ring-2 group-focus-visible:ring-blue-500 group-focus-visible:ring-offset-2',
-          isDragOver && 'brightness-75 scale-105',
-          isUploading && 'brightness-90'
+          'relative group outline-none',
+          isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
+          className
         )}
-        {...avatarProps}
-      />
-
-      {/* Hover overlay for upload affordance */}
-      {isInteractive && showHoverOverlay && (
-        <div
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        tabIndex={isInteractive ? 0 : undefined}
+        role={isInteractive ? 'button' : undefined}
+        aria-label={isInteractive ? 'Upload profile photo' : undefined}
+        aria-disabled={!isInteractive}
+        aria-busy={isUploading}
+      >
+        <Avatar
+          src={src}
           className={cn(
-            'absolute inset-0 flex items-center justify-center',
-            'bg-black/40 text-white rounded-full',
-            'opacity-0 group-hover:opacity-100 transition-opacity duration-200',
-            avatarProps.rounded !== 'full' && 'rounded-lg'
+            'transition-all duration-200 ease-out',
+            isInteractive &&
+              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-[color:var(--color-accent)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[color:var(--color-bg-base)]',
+            isDragOver && 'scale-105',
+            isUploading && 'opacity-80'
           )}
-        >
-          <Upload size={numericSize * 0.3} />
-        </div>
-      )}
-
-      {/* Drag overlay */}
-      {isDragOver && (
-        <div
-          className={cn(
-            'absolute inset-0 flex items-center justify-center',
-            'bg-blue-500/80 text-white rounded-full border-2 border-blue-300 border-dashed',
-            'animate-pulse',
-            avatarProps.rounded !== 'full' && 'rounded-lg'
-          )}
-        >
-          <Upload size={numericSize * 0.4} />
-        </div>
-      )}
-
-      {/* Progress ring */}
-      {showProgress && (
-        <ProgressRing
-          progress={currentProgress}
-          size={numericSize}
-          status={uploadStatus}
+          {...avatarProps}
         />
-      )}
 
-      {/* Hidden file input */}
-      {uploadable && (
-        <input
-          ref={fileInputRef}
-          type='file'
-          accept={acceptedTypes.join(',')}
-          onChange={handleFileSelect}
-          className='sr-only'
-          aria-label='Choose profile photo file'
-        />
-      )}
+        {isInteractive && showHoverOverlay && (
+          <div
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-full',
+              'bg-surface-3/80 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] backdrop-blur',
+              'opacity-0 transition-opacity duration-200 group-hover:opacity-100',
+              avatarProps.rounded !== 'full' && 'rounded-lg'
+            )}
+            aria-hidden='true'
+            data-testid='avatar-uploadable-hover-overlay'
+          >
+            <Upload size={numericSize * 0.3} />
+          </div>
+        )}
 
-      {/* Progress announcer for screen readers */}
-      {progress > 0 && (
-        <div className='sr-only' aria-live='polite' aria-atomic='true'>
-          Uploading profile photo: {Math.round(progress)}% complete
-        </div>
-      )}
+        {isDragOver && (
+          <div
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-full',
+              'bg-[color:var(--color-accent)]/90 text-[color:var(--color-accent-foreground)]',
+              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200',
+              avatarProps.rounded !== 'full' && 'rounded-lg'
+            )}
+            aria-hidden='true'
+            data-testid='avatar-uploadable-drag-overlay'
+          >
+            <Upload size={numericSize * 0.4} />
+          </div>
+        )}
 
-      {/* Status announcer for screen readers */}
-      {uploadStatus === 'success' && (
-        <div className='sr-only' aria-live='polite'>
-          Profile photo uploaded successfully
-        </div>
-      )}
+        {showProgress && (
+          <ProgressRing
+            progress={Math.min(100, Math.max(0, currentProgress))}
+            size={numericSize}
+            status={uploadStatus}
+          />
+        )}
 
-      {uploadStatus === 'error' && (
-        <div className='sr-only' aria-live='assertive'>
-          Profile photo upload failed
-        </div>
-      )}
-    </div>
-  );
-});
+        {canUpload && (
+          <input
+            ref={fileInputRef}
+            type='file'
+            accept={acceptedTypeList}
+            onChange={handleFileSelect}
+            className='sr-only'
+            aria-label='Choose profile photo file'
+          />
+        )}
 
-// Export named component (no default exports per architecture guidelines)
-export { AvatarUploadable as default };
+        {progress > 0 && (
+          <div className='sr-only' aria-live='polite' aria-atomic='true'>
+            Uploading profile photo: {Math.round(progress)}% complete
+          </div>
+        )}
+
+        {uploadStatus === 'success' && (
+          <div className='sr-only' aria-live='polite'>
+            Profile photo uploaded successfully
+          </div>
+        )}
+
+        {uploadStatus === 'error' && (
+          <div className='sr-only' aria-live='assertive'>
+            Profile photo upload failed
+          </div>
+        )}
+      </div>
+    );
+  })
+);

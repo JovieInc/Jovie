@@ -7,17 +7,20 @@ const { auth } = vi.hoisted(() => ({
   auth: vi.fn(),
 }));
 
-const { db } = vi.hoisted(() => ({
-  db: {
-    select: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn(),
-        }),
-      }),
-    }),
-  },
-}));
+const { db } = vi.hoisted(() => {
+  const limit = vi.fn();
+  const whereResult = { limit };
+  const where = vi.fn(() => whereResult);
+  const innerJoin = vi.fn(() => ({ where }));
+  const from = vi.fn(() => ({ where, innerJoin }));
+  const select = vi.fn(() => ({ from }));
+
+  return {
+    db: {
+      select,
+    },
+  };
+});
 
 // Module mocks use the same hoisted instances the tests manipulate
 vi.mock('@clerk/nextjs/server', () => ({
@@ -26,7 +29,14 @@ vi.mock('@clerk/nextjs/server', () => ({
 
 vi.mock('@/lib/db', () => ({
   db,
-  profilePhotos: {},
+  profilePhotos: {
+    id: 'id',
+    userId: 'user_id',
+  },
+  users: {
+    id: 'id',
+    clerkId: 'clerk_id',
+  },
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -84,7 +94,10 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+    db.select()
+      .from()
+      .where()
+      .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'
@@ -115,7 +128,10 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+    db.select()
+      .from()
+      .where()
+      .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'
@@ -144,7 +160,10 @@ describe('/api/images/status/[id]', () => {
       updatedAt: new Date(),
     };
 
-    db.select().from().where().limit.mockResolvedValue([mockPhoto]);
+    db.select()
+      .from()
+      .where()
+      .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'

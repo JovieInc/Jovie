@@ -1,4 +1,5 @@
 import { clerkClient } from '@clerk/nextjs/server';
+import { randomBytes } from 'crypto';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
@@ -21,6 +22,12 @@ type WebhookEvent = {
   type: 'user.created' | 'user.updated' | string;
 };
 
+function generateRandomSuffix(length: number): string {
+  return randomBytes(Math.ceil(length / 2))
+    .toString('hex')
+    .slice(0, length);
+}
+
 function generateUsernameFromName(firstName: string | null): string {
   if (!firstName) return '';
 
@@ -29,7 +36,7 @@ function generateUsernameFromName(firstName: string | null): string {
 
   // Ensure minimum length of 3 characters
   if (cleaned.length < 3) {
-    return cleaned + Math.random().toString(36).substring(2, 5);
+    return cleaned + generateRandomSuffix(3);
   }
 
   // Truncate to max 20 characters to leave room for potential suffixes
@@ -41,7 +48,7 @@ function generateUsernameFromEmail(email: string): string {
   const cleaned = localPart.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   if (cleaned.length < 3) {
-    return 'user' + Math.random().toString(36).substring(2, 5);
+    return 'user' + generateRandomSuffix(3);
   }
 
   return cleaned.substring(0, 20);
@@ -104,8 +111,7 @@ export async function POST(request: NextRequest) {
             user.email_addresses[0].email_address
           );
         } else {
-          suggestedUsername =
-            'user' + Math.random().toString(36).substring(2, 8);
+          suggestedUsername = 'user' + generateRandomSuffix(6);
         }
 
         // Create full name from first + last name

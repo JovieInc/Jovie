@@ -7,6 +7,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode, ContactSocialLink } from '@/types';
 
@@ -98,8 +99,10 @@ export function ContactSidebar({
       if (!contact || !onAvatarUpload || !onContactChange) {
         return contact?.avatarUrl ?? '';
       }
+      track('contact_avatar_upload_start', { contactId: contact.id });
       const newUrl = await onAvatarUpload(file, contact);
       onContactChange({ ...contact, avatarUrl: newUrl });
+      track('contact_avatar_upload_success', { contactId: contact.id });
       return newUrl;
     },
     [contact, onAvatarUpload, onContactChange]
@@ -173,6 +176,7 @@ export function ContactSidebar({
     <aside
       aria-label='Contact details'
       aria-hidden={!isOpen}
+      data-testid='contact-sidebar'
       className={cn(
         'relative flex h-full flex-col border-l border-subtle bg-surface-1/80 text-sm text-primary-token shadow-sm transition-[width,opacity,transform] duration-200 ease-out overflow-hidden',
         'w-0 opacity-0 translate-x-4 pointer-events-none',
@@ -212,15 +216,19 @@ export function ContactSidebar({
         ) : (
           <>
             {/* Avatar section */}
-            <div className='flex items-center gap-3'>
+            <div
+              className='flex items-center gap-3'
+              data-testid='contact-avatar'
+            >
               {canUploadAvatar ? (
                 <AvatarUploadable
                   src={contact.avatarUrl ?? null}
                   alt={fullName ? `${fullName}'s avatar` : 'Contact avatar'}
                   name={fullName || contact.username}
                   size='lg'
-                  uploadable
-                  onUpload={handleAvatarUpload}
+                  uploadable={canUploadAvatar}
+                  onUpload={canUploadAvatar ? handleAvatarUpload : undefined}
+                  showHoverOverlay
                 />
               ) : (
                 <Avatar

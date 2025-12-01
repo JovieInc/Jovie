@@ -11,7 +11,7 @@ export function NewUpgradeTeaser() {
         <div className='max-w-md mx-auto'>
           <div className='relative group'>
             {/* Subtle glow effect on hover */}
-            <div className='absolute -inset-1 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
+            <div className='absolute -inset-1 bg-linear-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
 
             {/* Card content */}
             <div className='relative p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-300'>
@@ -32,7 +32,9 @@ export function NewUpgradeTeaser() {
                   variant='primary'
                   className='w-full justify-center'
                 >
-                  <Link href='/pricing'>Upgrade → Remove Branding</Link>
+                  <Link href='/billing/remove-branding'>
+                    Upgrade → Remove Branding
+                  </Link>
                 </Button>
               </div>
             </div>

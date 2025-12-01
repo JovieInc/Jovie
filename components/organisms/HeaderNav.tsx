@@ -6,10 +6,23 @@ import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
 import { NavLink } from '@/components/ui/NavLink';
 import { FEATURES } from '@/lib/features';
+import { cn } from '@/lib/utils';
 
-export function HeaderNav() {
+export interface HeaderNavProps {
+  sticky?: boolean;
+  className?: string;
+}
+
+export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
   return (
-    <header className='sticky top-0 z-50 w-full border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#0D0E12] backdrop-blur-sm supports-backdrop-filter:bg-white/80 dark:supports-backdrop-filter:bg-[#0D0E12]/80'>
+    <header
+      data-testid='header-nav'
+      className={cn(
+        'z-50 w-full border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#0D0E12] backdrop-blur-sm supports-backdrop-filter:bg-white/80 dark:supports-backdrop-filter:bg-[#0D0E12]/80',
+        sticky && 'sticky top-0',
+        className
+      )}
+    >
       <Container>
         <div className='flex h-16 items-center'>
           {/* Logo - Left side */}
@@ -19,7 +32,10 @@ export function HeaderNav() {
 
           {/* Navigation - Center (hidden on mobile) */}
           <div className='hidden md:flex flex-1 justify-center'>
-            <nav className='flex items-center space-x-6'>
+            <nav
+              className='flex items-center space-x-6'
+              aria-label='Primary navigation'
+            >
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -66,7 +82,10 @@ export function HeaderNav() {
 
           {/* Mobile Navigation */}
           <div className='md:hidden flex-1 justify-center flex'>
-            <nav className='flex items-center space-x-4'>
+            <nav
+              className='flex items-center space-x-4'
+              aria-label='Primary navigation'
+            >
               <Popover>
                 <PopoverTrigger asChild>
                   <Button

@@ -263,7 +263,7 @@ describe('Avatar Component', () => {
       );
 
       // Before onLoad is triggered, shimmer should be visible
-      const shimmer = document.querySelector('.animate-pulse');
+      const shimmer = document.querySelector('.skeleton');
       expect(shimmer).toBeInTheDocument();
     });
 
@@ -282,6 +282,9 @@ describe('Avatar Component', () => {
 
       // After load, image should have opacity-100 class
       expect(image).toHaveClass('opacity-100');
+
+      const container = screen.getByLabelText('User avatar');
+      expect(container).toHaveAttribute('aria-busy', 'false');
     });
   });
 });

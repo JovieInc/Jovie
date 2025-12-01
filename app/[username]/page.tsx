@@ -228,4 +228,4 @@ export async function generateMetadata({ params }: Props) {
 // Always render dynamically to ensure 404s return correct status
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
-export const runtime = 'edge';
+export const runtime = 'nodejs';

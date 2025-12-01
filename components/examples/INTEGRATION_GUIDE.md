@@ -75,11 +75,14 @@ import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 ### 3. Feature Flag Integration
 
 ```tsx
-import { useFeatureFlags } from '@/components/providers/FeatureFlagsProvider';
+import { useFeatureGate } from '@statsig/react-bindings';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 function ProfilePage({ userOwnsProfile }) {
-  const { flags } = useFeatureFlags();
-  const canUpload = userOwnsProfile && flags.avatarUploaderEnabled;
+  const { value: avatarUploaderEnabled } = useFeatureGate(
+    STATSIG_FLAGS.AVATAR_UPLOADER
+  );
+  const canUpload = userOwnsProfile && avatarUploaderEnabled;
   
   return (
     <AvatarUploadable
@@ -92,6 +95,11 @@ function ProfilePage({ userOwnsProfile }) {
   );
 }
 ```
+
+**Guardrails:**
+- Use Statsig gates (`STATSIG_FLAGS.AVATAR_UPLOADER`) instead of custom providers.
+- Keep Avatar display-only when the gate is off; do not introduce alternate analytics SDKs.
+- Use semantic tokens (e.g., `bg-surface-*`, `text-primary-token`) and avoid raw hex/RGB.
 
 ## Size Mapping
 
@@ -146,3 +154,77 @@ If issues arise:
 2. Components gracefully fall back to display-only mode
 3. Existing upload functionality remains available
 4. No data loss or breaking changes
+
+# Unified Links Manager Integration Guide
+
+This section describes how to integrate the canonical Links Manager used on the dashboard Links page.
+
+## Components Overview
+
+### `EnhancedDashboardLinks` (Organism)
+- **Purpose**: Dashboard wrapper for managing a creator's links at `/dashboard/links`.
+- **Responsibilities**:
+  - Reads `initialLinks: ProfileSocialLink[]` from the server.
+  - Maps database links into an internal `LinkItem[]` model.
+  - Persists changes to `/api/dashboard/social-links` using a debounced save.
+  - Renders the right-hand live preview via `ProfilePreview` and the profile URL + copy controls.
+- **Location**: `components/dashboard/organisms/EnhancedDashboardLinks.tsx`.
+
+### `GroupedLinksManager` (Organism / Engine)
+- **Purpose**: Canonical editing surface for links inside the dashboard.
+- **Responsibilities**:
+  - Groups links into `social`, `dsp`, `earnings`, and `custom` sections.
+  - Uses `UniversalLinkInput` for platform detection and smart defaults.
+  - Supports drag-and-drop reordering within and across sections (with constraints).
+  - Handles YouTube cross-section logic and Venmo/tipping enablement.
+  - Emits `onLinksChange(links: DetectedLink[])` and optional `onLinkAdded` callbacks.
+- **Location**: `components/dashboard/organisms/GroupedLinksManager.tsx`.
+
+### Supporting Atoms/Molecules
+- `UniversalLinkInput` (atom): URL input with platform detection and title editing.
+- `LinkActions` (atom): Per-row controls for hide/show, delete, and drag handle.
+- `ProfilePreview` (molecule): Uses `StaticArtistPage` to render a live profile preview.
+
+## Dashboard Route Wiring
+
+The dashboard Links page is implemented at `app/dashboard/links/page.tsx`.
+
+- Authenticates the user with Clerk (`auth()` from `@clerk/nextjs/server`).
+- Loads dashboard data via `getDashboardDataCached()`.
+- Redirects to onboarding if `needsOnboarding` is true.
+- Fetches `initialLinks` with `getProfileSocialLinks(profileId)`.
+- Renders `<EnhancedDashboardLinks initialLinks={initialLinks} />`.
+
+All link editing happens client-side inside `EnhancedDashboardLinks` + `GroupedLinksManager`; the route remains a server component.
+
+## Data Flow
+
+1. **Server → Client**
+   - `ProfileSocialLink[]` (from `getProfileSocialLinks`) is passed into `EnhancedDashboardLinks` as `initialLinks`.
+   - `EnhancedDashboardLinks` converts these into `LinkItem[]` with normalized URLs, platform metadata, and visibility flags.
+2. **Client Editing**
+   - `EnhancedDashboardLinks` passes the current `LinkItem[]` (as `DetectedLink[]`) to `GroupedLinksManager` via `initialLinks`.
+   - Users add, hide/show, reorder, and remove links inside `GroupedLinksManager`.
+   - `GroupedLinksManager` calls `onLinksChange(updatedLinks)` whenever the underlying list changes.
+3. **Persistence**
+   - `EnhancedDashboardLinks` maps `DetectedLink[]` back into a payload compatible with the dashboard API:
+     - `platform.id` → `platform` string in the payload.
+     - `normalizedUrl` → `url`.
+     - Index position → `sortOrder`.
+     - Visibility flag → `isActive`.
+   - A debounced save function performs `PUT /api/dashboard/social-links` with `{ profileId, links }`.
+   - Success/failure is surfaced via `saveStatus` state and toast notifications.
+
+## Migration Notes
+
+- The dashboard should use **only** `EnhancedDashboardLinks` on the `/dashboard/links` route.
+- `GroupedLinksManager` is the single canonical engine for link management; avoid introducing new ad-hoc link editors.
+- Any future templates (for example, a reusable `LinksManager` under `packages/ui/templates`) should be built by extracting logic from `GroupedLinksManager` rather than duplicating it.
+
+## Checklist
+
+- [ ] Route `/dashboard/links` renders `EnhancedDashboardLinks` with server-fetched `initialLinks`.
+- [ ] `GroupedLinksManager` is the only component responsible for link editing UX.
+- [ ] All saves go through `/api/dashboard/social-links` with the normalized payload.
+- [ ] Live preview (`ProfilePreview`) reflects the same set of links as the manager.
+- [ ] Legacy link managers are no longer imported by dashboard routes.
