@@ -150,7 +150,9 @@ export function EnhancedDashboardLinks({
   // Save links to database (debounced)
   const debouncedSave = useMemo(
     () =>
-      debounce(async (input: LinkItem[]) => {
+      debounce(async (...args: unknown[]) => {
+        const [input] = args as [LinkItem[]];
+
         const normalized: LinkItem[] = input.map((item, index) => {
           const rawCategory = item.platform.category;
           const category: PlatformType =
