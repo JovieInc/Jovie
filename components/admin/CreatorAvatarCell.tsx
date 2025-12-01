@@ -29,7 +29,6 @@ export function CreatorAvatarCell({
     avatarUrl ?? null
   );
   const [isOpen, setIsOpen] = useState(false);
-  const [droppedFile, setDroppedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +73,6 @@ export function CreatorAvatarCell({
     const file = event.dataTransfer.files?.[0];
     if (!file) return;
 
-    setDroppedFile(file);
     setIsOpen(true);
     setIsUploading(true);
     uploadImage(file)
@@ -85,7 +83,6 @@ export function CreatorAvatarCell({
       })
       .finally(() => {
         setIsUploading(false);
-        setDroppedFile(null);
       });
   };
 
@@ -95,9 +92,6 @@ export function CreatorAvatarCell({
 
   const handleOpenChange = (nextOpen: boolean) => {
     setIsOpen(nextOpen);
-    if (!nextOpen) {
-      setDroppedFile(null);
-    }
   };
 
   return (
