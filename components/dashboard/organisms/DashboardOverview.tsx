@@ -87,7 +87,7 @@ export function DashboardOverview({
           </div>
           <div className='flex flex-wrap gap-3'>
             <Button type='submit' size='sm' variant='primary'>
-              Save &amp; Publish
+              Save profile
             </Button>
             <Button asChild size='sm' variant='secondary'>
               <Link

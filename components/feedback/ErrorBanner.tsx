@@ -1,4 +1,5 @@
 import { ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
 
@@ -25,10 +26,25 @@ export function ErrorBanner({
 }: ErrorBannerProps) {
   const renderAction = (action: ErrorBannerAction, index: number) => {
     if (action.href) {
+      const isInternal = action.href.startsWith('/');
+
+      if (isInternal && !action.onClick) {
+        return (
+          <Link
+            key={`${action.label}-${index}`}
+            href={action.href}
+            className='inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 dark:bg-red-800/30 dark:text-red-50 dark:ring-red-700 dark:hover:bg-red-800/50'
+          >
+            {action.label}
+          </Link>
+        );
+      }
+
       return (
         <a
           key={`${action.label}-${index}`}
           href={action.href}
+          onClick={action.onClick}
           className='inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 dark:bg-red-800/30 dark:text-red-50 dark:ring-red-700 dark:hover:bg-red-800/50'
         >
           {action.label}

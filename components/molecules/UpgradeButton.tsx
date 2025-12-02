@@ -2,6 +2,7 @@
 
 import { RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { Button, type ButtonProps } from '@jovie/ui';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
 
@@ -20,6 +21,7 @@ export function UpgradeButton({
   size = 'md',
   priceId,
 }: UpgradeButtonProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +92,7 @@ export function UpgradeButton({
         track('pricing_page_redirect', {
           flow_type: 'traditional',
         });
-        window.location.href = '/pricing';
+        router.push('/pricing');
       }
     } catch (err) {
       console.error('Error starting upgrade flow:', err);

@@ -3,6 +3,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Utilities
+import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 // Helper factories
@@ -20,6 +21,21 @@ const ytSocial = (overrides: Partial<DetectedLink> = {}): DetectedLink => ({
   suggestedTitle: 'YouTube',
   isValid: true,
   ...overrides,
+});
+
+const makeSocial = (id: string): DetectedLink => ({
+  platform: {
+    id,
+    name: id,
+    category: 'social',
+    icon: id,
+    color: '#000000',
+    placeholder: `https://${id}.com/user`,
+  },
+  normalizedUrl: `https://${id}.com/user`,
+  originalUrl: `https://${id}.com/user`,
+  suggestedTitle: id,
+  isValid: true,
 });
 
 // Note: DSP variant factory omitted until directly needed in tests
@@ -178,5 +194,45 @@ describe('GroupedLinksManager', () => {
     // Expect isVisible false for the first link
     const vis = (updated[0] as unknown as { isVisible?: boolean }).isVisible;
     expect(vis).toBe(false);
+  });
+
+  it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', () => {
+    const onLinksChange = vi.fn();
+
+    const initial = Array.from({ length: MAX_SOCIAL_LINKS }, (_, i) =>
+      makeSocial(`social-${i}`)
+    );
+
+    render(
+      <GroupedLinksManager
+        initialLinks={initial}
+        onLinksChange={onLinksChange}
+      />
+    );
+
+    // ignore initial mount call
+    onLinksChange.mockClear();
+
+    nextAddPayload = makeSocial('social-extra');
+    fireEvent.click(screen.getByText('mock-add'));
+
+    expect(onLinksChange).toHaveBeenCalled();
+    const latest = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
+
+    // Should have MAX_SOCIAL_LINKS + 1 total links
+    expect(latest).toHaveLength(MAX_SOCIAL_LINKS + 1);
+
+    const socialVisible = latest.filter(l => {
+      const category = l.platform.category;
+      const visible = (l as unknown as { isVisible?: boolean }).isVisible;
+      return category === 'social' && (visible ?? true);
+    });
+
+    expect(socialVisible).toHaveLength(MAX_SOCIAL_LINKS);
+
+    const extra = latest.find(l => l.platform.id === 'social-extra');
+    const extraVisible =
+      (extra as unknown as { isVisible?: boolean }).isVisible ?? true;
+    expect(extraVisible).toBe(false);
   });
 });

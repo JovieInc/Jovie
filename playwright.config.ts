@@ -32,7 +32,7 @@ export default defineConfig({
     : {
         webServer: {
           // Use PORT env var to avoid CLI flag parsing issues
-          command: 'PORT=3100 pnpm run dev',
+          command: 'PORT=3100 NEXT_DISABLE_TOOLBAR=1 pnpm run dev',
           url: 'http://localhost:3100',
           reuseExistingServer: !process.env.CI,
           timeout: 120000, // Increase timeout to 2 minutes

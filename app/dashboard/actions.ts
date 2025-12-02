@@ -7,7 +7,6 @@ import {
   revalidatePath,
   revalidateTag,
 } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
@@ -388,7 +387,4 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
 
   revalidateTag('dashboard-data');
   revalidatePath('/dashboard/overview');
-
-  // Ensure the page reflects the latest data after publishing
-  redirect('/dashboard/overview?published=1');
 }

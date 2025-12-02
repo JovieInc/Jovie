@@ -7,6 +7,9 @@
 
 import { env } from '@/lib/env';
 
+const INTRO_MONTHLY_PRICE_ID =
+  env.STRIPE_PRICE_INTRO_MONTHLY || process.env.STRIPE_PRICE_PRO || '';
+
 // Plan types supported by the application
 export type PlanType = 'pro_lite' | 'pro';
 
@@ -25,8 +28,8 @@ interface PriceMapping {
 // These will be updated when switching from intro to standard pricing
 export const PRICE_MAPPINGS: Record<string, PriceMapping> = {
   // Introductory pricing (currently active)
-  [env.STRIPE_PRICE_INTRO_MONTHLY || '']: {
-    priceId: env.STRIPE_PRICE_INTRO_MONTHLY || '',
+  [INTRO_MONTHLY_PRICE_ID]: {
+    priceId: INTRO_MONTHLY_PRICE_ID,
     plan: 'pro_lite',
     amount: 500, // $5.00 in cents
     currency: 'usd',

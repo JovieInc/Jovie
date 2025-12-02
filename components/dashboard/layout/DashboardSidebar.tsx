@@ -44,7 +44,7 @@ export function DashboardSidebar({
             aria-label='Go to dashboard'
             className={cn(
               'flex flex-1 items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-sidebar-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-              'group-data-[state=closed]:group-hover/toggle:hidden group-data-[state=closed]:group-focus-within/toggle:hidden'
+              'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0'
             )}
           >
             <div className='flex items-center justify-center'>
@@ -60,11 +60,12 @@ export function DashboardSidebar({
               Dashboard
             </span>
           </Link>
+
           <SidebarTrigger
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'h-9 w-9 shrink-0 border border-sidebar-border/60 bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-              'group-data-[state=closed]:hidden group-data-[state=closed]:group-hover/toggle:flex group-data-[state=closed]:group-focus-within/toggle:flex'
+              'h-9 w-9 shrink-0 border border-subtle bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'group-data-[state=closed]:hidden'
             )}
           />
         </div>

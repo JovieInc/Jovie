@@ -204,7 +204,10 @@ const nextConfig = {
 };
 
 // Enable Vercel Toolbar in Next.js (local/dev)
-const withVercelToolbar = require('@vercel/toolbar/plugins/next')();
+const enableVercelToolbar = !process.env.NEXT_DISABLE_TOOLBAR;
+const withVercelToolbar = enableVercelToolbar
+  ? require('@vercel/toolbar/plugins/next')()
+  : config => config;
 
 // Apply plugins in order: bundle analyzer -> vercel toolbar
 module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));

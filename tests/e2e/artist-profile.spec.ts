@@ -1,6 +1,14 @@
 import { expect, test } from './setup';
 
-test.describe('Artist Profile Pages', () => {
+const runArtistProfileTests =
+  process.env.E2E_ARTIST_PROFILE === '1' ||
+  !!(process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy'));
+
+const describeArtist = runArtistProfileTests
+  ? test.describe
+  : test.describe.skip;
+
+describeArtist('Artist Profile Pages', () => {
   test.describe('Valid Artist Profile', () => {
     test.beforeEach(async ({ page }) => {
       // Use a known artist handle from our seeded data

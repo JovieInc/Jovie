@@ -1,8 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { isValidSocialPlatform } from '@/types';
 // flags import removed - pre-launch
 
 export async function GET(req: Request) {
@@ -92,24 +94,52 @@ export async function GET(req: Request) {
   }
 }
 
+const updateSocialLinksSchema = z.object({
+  profileId: z.string().min(1),
+  links: z
+    .array(
+      z.object({
+        platform: z
+          .string()
+          .min(1)
+          .refine(isValidSocialPlatform, { message: 'Invalid platform' }),
+        platformType: z.string().min(1).optional(),
+        url: z.string().min(1).max(2048),
+        sortOrder: z.number().int().min(0).optional(),
+        isActive: z.boolean().optional(),
+        displayText: z.string().max(256).optional(),
+      })
+    )
+    .max(100)
+    .optional(),
+});
+
 export async function PUT(req: Request) {
   // Feature flag check removed - social links enabled by default
   try {
     return await withDbSession(async clerkUserId => {
-      const body = (await req.json().catch(() => null)) as {
-        profileId?: string;
-        links?: Array<{
-          platform: string;
-          platformType?: string;
-          url: string;
-          sortOrder?: number;
-          isActive?: boolean;
-          displayText?: string;
-        }>;
-      } | null;
+      const rawBody = await req.json().catch(() => null);
+      if (rawBody == null || typeof rawBody !== 'object') {
+        return NextResponse.json(
+          { error: 'Invalid request body' },
+          { status: 400 }
+        );
+      }
 
-      const profileId = body?.profileId;
-      const links = body?.links ?? [];
+      const parsed = updateSocialLinksSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        const issues = parsed.error.issues;
+        const hasInvalidPlatform = issues.some(
+          issue => issue.message === 'Invalid platform'
+        );
+        const message = hasInvalidPlatform
+          ? 'Invalid platform'
+          : 'Invalid request body';
+        return NextResponse.json({ error: message }, { status: 400 });
+      }
+
+      const { profileId, links: parsedLinks } = parsed.data;
+      const links = parsedLinks ?? [];
       if (!profileId) {
         return NextResponse.json(
           { error: 'Missing profileId' },
