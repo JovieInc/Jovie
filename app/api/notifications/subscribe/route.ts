@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
+import { db } from '@/lib/db';
+import { notificationSubscriptions } from '@/lib/db/schema';
 
 // Schema for subscription request validation
-const subscribeSchema = z.object({
-  artist_id: z.string().uuid(),
-  email: z.string().email(),
-  source: z.string().default('profile_bell'),
-});
+const subscribeSchema = z
+  .object({
+    artist_id: z.string().uuid(),
+    channel: z.enum(['email', 'phone']).default('email'),
+    email: z.string().email().optional(),
+    phone: z
+      .string()
+      .regex(/^\+?[0-9]{7,20}$/, 'Please provide a valid phone number')
+      .optional(),
+    country_code: z.string().min(2).max(2).optional(),
+    source: z.string().default('profile_bell'),
+  })
+  .refine(
+    data =>
+      (data.channel === 'email' && Boolean(data.email)) ||
+      (data.channel === 'phone' && Boolean(data.phone)),
+    {
+      message: 'Email or phone is required for the selected channel',
+      path: ['channel'],
+    }
+  );
 
 /**
  * POST handler for notification subscriptions
@@ -22,7 +40,9 @@ export async function POST(request: NextRequest) {
     // Track subscription attempt with analytics
     await trackServerEvent('notifications_subscribe_attempt', {
       artist_id: body.artist_id,
+      channel: body.channel || 'email',
       email_length: body.email?.length || 0,
+      phone_length: body.phone?.length || 0,
       source: body.source || 'unknown',
     });
 
@@ -46,22 +66,57 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { artist_id, email, source } = result.data;
+    const { artist_id, email, phone, channel, source, country_code } =
+      result.data;
 
-    // In a real implementation, we would:
-    // 1. Hash the email
-    // 2. Check if the contact already exists
-    // 3. Create or update the contact
-    // 4. Create the subscription
-    // 5. Add to category list based on artist type
+    const ipAddress =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
-    // For now, we'll just simulate success
-    // This would be replaced with actual database operations
+    const geoCountry =
+      request.headers.get('x-vercel-ip-country') ||
+      request.headers.get('cf-ipcountry') ||
+      null;
+
+    const countryCode =
+      (geoCountry || country_code)?.slice(0, 2)?.toUpperCase() || null;
+
+    const normalizedEmail =
+      channel === 'email' && email ? email.trim().toLowerCase() : null;
+
+    const normalizedPhone =
+      channel === 'phone' && phone ? phone.replace(/[\s-]/g, '') : null;
+
+    const conflictTarget =
+      channel === 'email'
+        ? [
+            notificationSubscriptions.creatorProfileId,
+            notificationSubscriptions.email,
+          ]
+        : [
+            notificationSubscriptions.creatorProfileId,
+            notificationSubscriptions.phone,
+          ];
+
+    await db
+      .insert(notificationSubscriptions)
+      .values({
+        creatorProfileId: artist_id,
+        channel,
+        email: normalizedEmail,
+        phone: channel === 'phone' ? normalizedPhone : null,
+        countryCode,
+        ipAddress,
+        source,
+      })
+      .onConflictDoNothing({ target: conflictTarget });
 
     // Track successful subscription
     await trackServerEvent('notifications_subscribe_success', {
       artist_id,
-      email_domain: email.split('@')[1],
+      channel,
+      email_domain: normalizedEmail ? normalizedEmail.split('@')[1] : undefined,
+      phone_present: Boolean(normalizedPhone),
+      country_code: countryCode ?? undefined,
       source,
     });
 

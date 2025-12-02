@@ -1,137 +1,206 @@
 'use client';
 
-import { UserGroupIcon } from '@heroicons/react/24/outline';
-import { Button } from '@jovie/ui';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
+type SubscriberRow = {
+  id: string;
+  email: string | null;
+  phone: string | null;
+  countryCode: string | null;
+  createdAt: string;
+  channel: 'email' | 'phone';
+};
+
+function formatDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(parsed);
+}
+
+function flagFromCountry(code: string | null): string {
+  if (!code || code.length < 2) return '🏳️';
+  const upper = code.slice(0, 2).toUpperCase();
+
+  const first = upper.codePointAt(0);
+  const second = upper.codePointAt(1);
+
+  if (
+    !first ||
+    !second ||
+    first < 65 ||
+    second < 65 ||
+    first > 90 ||
+    second > 90
+  ) {
+    return '🏳️';
+  }
+
+  return String.fromCodePoint(0x1f1e6 + (first - 65), 0x1f1e6 + (second - 65));
+}
+
+function formatCountryLabel(code: string | null): string {
+  if (!code || code.length < 2) return 'Unknown';
+
+  const upper = code.slice(0, 2).toUpperCase();
+  return /^[A-Z]{2}$/.test(upper) ? upper : 'Unknown';
+}
+
 export function DashboardAudience() {
   const dashboardData = useDashboardData();
-  const [artist] = useState<Artist | null>(
-    dashboardData.selectedProfile
-      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
-      : null
+  const artist = useMemo<Artist | null>(
+    () =>
+      dashboardData.selectedProfile
+        ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
+        : null,
+    [dashboardData.selectedProfile]
   );
-  // Note: Profile switching functionality will be implemented in the future
+
+  const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    if (!artist?.id) {
+      setSubscribers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    const loadSubscribers = async () => {
+      try {
+        const response = await fetch(
+          `/api/dashboard/audience/subscribers?profileId=${artist.id}`
+        );
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+          subscribers?: SubscriberRow[];
+        } | null;
+
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Unable to load subscribers');
+        }
+
+        if (!isActive) return;
+        setSubscribers(payload?.subscribers ?? []);
+      } catch (err) {
+        if (!isActive) return;
+        const message =
+          err instanceof Error ? err.message : 'Failed to load subscribers';
+        setError(message);
+      } finally {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadSubscribers();
+
+    return () => {
+      isActive = false;
+    };
+  }, [artist?.id]);
 
   if (!artist) {
-    return null; // This shouldn't happen given the server-side logic
+    return null;
   }
 
   return (
-    <div>
-      <div className='mb-8'>
+    <div className='space-y-6'>
+      <div>
         <h1 className='text-2xl font-bold text-primary-token'>Audience CRM</h1>
         <p className='text-secondary-token mt-1'>
-          Manage your fans and build lasting relationships
+          People who tapped notifications on your profile
         </p>
       </div>
 
-      {/* CRM Coming Soon */}
-      <div className='relative'>
-        {/* Blurred placeholder table */}
-        <div className='pointer-events-none select-none filter blur-sm'>
-          <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1 backdrop-blur-sm'>
-            <SectionHeader
-              title='Fan Contacts'
-              right={
-                <div className='flex items-center gap-2'>
-                  <Button variant='outline' size='sm'>
-                    Export
-                  </Button>
-                  <Button variant='primary' size='sm'>
-                    Add Contact
-                  </Button>
-                </div>
-              }
-            />
+      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-sm'>
+        <SectionHeader
+          title='Notification signups'
+          description='Contacts captured from your notification input'
+          right={
+            <span className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-secondary-token'>
+              {subscribers.length}{' '}
+              {subscribers.length === 1 ? 'signup' : 'signups'}
+            </span>
+          }
+        />
 
-            <table className='w-full'>
+        {error ? (
+          <div className='px-6 py-4 text-sm text-red-500 bg-surface-2/60'>
+            {error}
+          </div>
+        ) : null}
+
+        {isLoading ? (
+          <div className='px-6 py-10 text-sm text-secondary-token'>
+            Loading notification signups...
+          </div>
+        ) : subscribers.length === 0 ? (
+          <div className='px-6 py-10 text-sm text-secondary-token'>
+            No one has subscribed yet. Share your profile and prompt fans to tap
+            the bell.
+          </div>
+        ) : (
+          <div className='overflow-x-auto'>
+            <table className='min-w-full divide-y divide-subtle'>
               <thead className='bg-surface-2/50'>
                 <tr>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
-                    Name
-                  </th>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
+                  <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-secondary-token'>
                     Email
                   </th>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
-                    Location
+                  <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-secondary-token'>
+                    Phone
                   </th>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
-                    Last Interaction
+                  <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-secondary-token'>
+                    Country
                   </th>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
-                    Tags
-                  </th>
-                  <th className='px-6 py-3 text-left text-xs font-medium text-secondary-token uppercase tracking-wider'>
-                    Actions
+                  <th className='px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-secondary-token'>
+                    Signed up
                   </th>
                 </tr>
               </thead>
               <tbody className='divide-y divide-subtle'>
-                {[...Array(8)].map((_, i) => (
-                  <tr key={i} className='hover:bg-surface-2/30'>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='flex items-center'>
-                        <div className='h-8 w-8 rounded-full bg-gradient-to-br from-purple-400 to-blue-500'></div>
-                        <div className='ml-3'>
-                          <div className='text-sm font-medium text-primary-token'>
-                            Fan Name {i + 1}
-                          </div>
-                        </div>
-                      </div>
+                {subscribers.map(subscriber => (
+                  <tr key={subscriber.id} className='hover:bg-surface-2/30'>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-primary-token'>
+                      {subscriber.email ?? '—'}
                     </td>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='text-sm text-secondary-token'>
-                        fan{i + 1}@email.com
-                      </div>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-primary-token'>
+                      {subscriber.phone ?? '—'}
                     </td>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='text-sm text-secondary-token'>
-                        Los Angeles, CA
-                      </div>
-                    </td>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='text-sm text-secondary-token'>
-                        2 days ago
-                      </div>
-                    </td>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <span className='rounded-full bg-surface-2 px-2 py-1 text-xs text-primary-token'>
-                        VIP
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-primary-token'>
+                      <span className='inline-flex items-center gap-2'>
+                        <span aria-hidden='true' className='text-lg'>
+                          {flagFromCountry(subscriber.countryCode)}
+                        </span>
+                        <span className='text-sm text-secondary-token'>
+                          {formatCountryLabel(subscriber.countryCode)}
+                        </span>
                       </span>
                     </td>
-                    <td className='px-6 py-4 whitespace-nowrap text-sm'>
-                      <button className='text-accent hover:text-accent/80'>
-                        View
-                      </button>
+                    <td className='px-6 py-4 whitespace-nowrap text-sm text-primary-token'>
+                      {formatDate(subscriber.createdAt)}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* Coming Soon Overlay */}
-        <div className='absolute inset-0 flex items-center justify-center'>
-          <div className='max-w-md rounded-2xl border border-subtle bg-surface-1/95 p-8 text-center shadow-2xl backdrop-blur-md'>
-            <div className='mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
-              <UserGroupIcon className='h-8 w-8 text-primary-token' />
-            </div>
-
-            <h2 className='text-2xl font-bold text-primary-token mb-2'>
-              Coming Soon
-            </h2>
-
-            <p className='text-secondary-token'>
-              We&apos;re working on this feature.
-            </p>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

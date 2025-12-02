@@ -12,6 +12,7 @@ import {
   boolean,
   integer,
   jsonb,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -19,7 +20,13 @@ import {
 } from 'drizzle-orm/pg-core';
 import {
   creatorTypeEnum,
+  ingestionJobStatusEnum,
+  ingestionSourceTypeEnum,
+  ingestionStatusEnum,
   photoStatusEnum,
+  scraperStrategyEnum,
+  socialAccountStatusEnum,
+  socialLinkStateEnum,
   themeModeEnum,
 } from '../../lib/db/schema';
 
@@ -66,6 +73,11 @@ export const creatorProfiles = pgTable('creator_profiles', {
   isClaimed: boolean('is_claimed').default(false),
   claimToken: text('claim_token'),
   claimedAt: timestamp('claimed_at'),
+  avatarLockedByUser: boolean('avatar_locked_by_user').default(false).notNull(),
+  displayNameLocked: boolean('display_name_locked').default(false).notNull(),
+  ingestionStatus: ingestionStatusEnum('ingestion_status')
+    .default('idle')
+    .notNull(),
   lastLoginAt: timestamp('last_login_at'),
   profileViews: integer('profile_views').default(0),
   onboardingCompletedAt: timestamp('onboarding_completed_at'),
@@ -87,6 +99,17 @@ export const socialLinks = pgTable('social_links', {
   sortOrder: integer('sort_order').default(0),
   clicks: integer('clicks').default(0),
   isActive: boolean('is_active').default(true),
+  state: socialLinkStateEnum('state').default('active').notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 })
+    .default('1.00')
+    .notNull(),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('manual')
+    .notNull(),
+  evidence: jsonb('evidence')
+    .$type<{ sources?: string[]; signals?: string[] }>()
+    .default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -99,11 +122,23 @@ export const profilePhotos = pgTable('profile_photos', {
   userId: uuid('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
+    () => users.id,
+    { onDelete: 'set null' }
+  ),
   creatorProfileId: uuid('creator_profile_id').references(
     () => creatorProfiles.id,
     { onDelete: 'cascade' }
   ),
   status: photoStatusEnum('status').notNull().default('uploading'),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('manual')
+    .notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 })
+    .default('1.00')
+    .notNull(),
+  lockedByUser: boolean('locked_by_user').default(false).notNull(),
 
   // Vercel Blob URLs for different sizes
   blobUrl: text('blob_url'), // Original uploaded image
@@ -126,11 +161,62 @@ export const profilePhotos = pgTable('profile_photos', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const socialAccounts = pgTable('social_accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  handle: text('handle'),
+  url: text('url'),
+  status: socialAccountStatusEnum('status').default('suspected').notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 }).default('0.00'),
+  isVerifiedFlag: boolean('is_verified_flag').default(false),
+  paidFlag: boolean('paid_flag').default(false),
+  rawData: jsonb('raw_data').$type<Record<string, unknown>>(),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('ingested')
+    .notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const ingestionJobs = pgTable('ingestion_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  jobType: text('job_type').notNull(),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  status: ingestionJobStatusEnum('status').default('pending').notNull(),
+  error: text('error'),
+  attempts: integer('attempts').default(0).notNull(),
+  runAt: timestamp('run_at').defaultNow().notNull(),
+  priority: integer('priority').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const scraperConfigs = pgTable('scraper_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  network: text('network').notNull(),
+  strategy: scraperStrategyEnum('strategy').default('http').notNull(),
+  maxConcurrency: integer('max_concurrency').default(1).notNull(),
+  maxJobsPerMinute: integer('max_jobs_per_minute').default(30).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Re-export enums from main schema
 export {
   creatorTypeEnum,
+  ingestionJobStatusEnum,
+  ingestionSourceTypeEnum,
+  ingestionStatusEnum,
   linkTypeEnum,
   photoStatusEnum,
+  scraperStrategyEnum,
+  socialAccountStatusEnum,
+  socialLinkStateEnum,
   themeModeEnum,
 } from '../../lib/db/schema';
 
@@ -141,4 +227,7 @@ export const schemas = {
   socialLinks,
   userSettings,
   profilePhotos,
+  socialAccounts,
+  ingestionJobs,
+  scraperConfigs,
 };

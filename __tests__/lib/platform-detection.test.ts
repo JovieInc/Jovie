@@ -108,4 +108,14 @@ describe('Platform Detection', () => {
       });
     });
   });
+
+  describe('Linktree detection', () => {
+    it('detects linktree hosts and normalizes URL', () => {
+      const url = 'linktr.ee/example';
+      const detected = detectPlatform(url);
+      expect(detected.platform.id).toBe('linktree');
+      expect(detected.normalizedUrl).toContain('https://linktr.ee/example');
+      expect(detected.isValid).toBe(true);
+    });
+  });
 });

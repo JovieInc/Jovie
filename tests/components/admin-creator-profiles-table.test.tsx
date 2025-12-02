@@ -28,6 +28,7 @@ describe('CreatorProfilesTable', () => {
     avatarUrl: null,
     isVerified: false,
     isClaimed: true,
+    claimToken: null,
     createdAt: new Date('2024-01-01T00:00:00Z'),
   };
 
@@ -71,5 +72,30 @@ describe('CreatorProfilesTable', () => {
     );
 
     expect(screen.getByText('No creator profiles found.')).toBeInTheDocument();
+  });
+
+  it('shows Copy claim link button for unclaimed profiles with a claim token', () => {
+    const unclaimedProfile: AdminCreatorProfileRow = {
+      ...baseProfile,
+      id: 'profile-2',
+      username: 'bob',
+      isClaimed: false,
+      claimToken: 'test-claim-token',
+    };
+
+    render(
+      <CreatorProfilesTable
+        profiles={[unclaimedProfile]}
+        page={1}
+        pageSize={20}
+        total={1}
+        search=''
+        sort={defaultSort}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Copy claim link' })
+    ).toBeInTheDocument();
   });
 });

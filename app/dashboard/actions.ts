@@ -52,6 +52,11 @@ export interface ProfileSocialLink {
   sortOrder: number | null;
   isActive: boolean | null;
   displayText?: string | null;
+  state?: 'active' | 'suggested' | 'rejected';
+  confidence?: number | null;
+  sourcePlatform?: string | null;
+  sourceType?: 'manual' | 'admin' | 'ingested' | null;
+  evidence?: { sources?: string[]; signals?: string[] } | null;
 }
 async function fetchDashboardDataWithSession(
   dbClient: DbType,
@@ -125,7 +130,7 @@ async function fetchDashboardDataWithSession(
             .where(
               and(
                 eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.isActive, true)
+                eq(socialLinks.state, 'active')
               )
             );
           const total = Number(result?.[0]?.c ?? 0);
@@ -223,6 +228,11 @@ export async function getProfileSocialLinks(
         sortOrder: socialLinks.sortOrder,
         isActive: socialLinks.isActive,
         displayText: socialLinks.displayText,
+        state: socialLinks.state,
+        confidence: socialLinks.confidence,
+        sourcePlatform: socialLinks.sourcePlatform,
+        sourceType: socialLinks.sourceType,
+        evidence: socialLinks.evidence,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -239,15 +249,35 @@ export async function getProfileSocialLinks(
     // Map only existing link rows (filter out null linkId from left join)
     const links: ProfileSocialLink[] = rows
       .filter(r => r.linkId !== null)
-      .map(r => ({
-        id: r.linkId!,
-        platform: r.platform!,
-        platformType: r.platformType ?? null,
-        url: r.url!,
-        sortOrder: r.sortOrder ?? 0,
-        isActive: r.isActive ?? true,
-        displayText: r.displayText ?? null,
-      }));
+      .map(r => {
+        const state =
+          (r.state as 'active' | 'suggested' | 'rejected' | null) ??
+          (r.isActive ? 'active' : 'suggested');
+        if (state === 'rejected') return null;
+        const parsedConfidence =
+          typeof r.confidence === 'number'
+            ? r.confidence
+            : Number.parseFloat(String(r.confidence ?? '0'));
+
+        return {
+          id: r.linkId!,
+          platform: r.platform!,
+          platformType: r.platformType ?? null,
+          url: r.url!,
+          sortOrder: r.sortOrder ?? 0,
+          isActive: state === 'active',
+          displayText: r.displayText ?? null,
+          state,
+          confidence: Number.isFinite(parsedConfidence) ? parsedConfidence : 0,
+          sourcePlatform: r.sourcePlatform,
+          sourceType: r.sourceType ?? null,
+          evidence: r.evidence as {
+            sources?: string[];
+            signals?: string[];
+          } | null,
+        };
+      })
+      .filter((link): link is NonNullable<typeof link> => Boolean(link));
 
     return links;
   });

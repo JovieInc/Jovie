@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
 
 export interface AvatarProps {
@@ -28,6 +29,8 @@ export interface AvatarProps {
     | 'display-4xl';
   /** Border radius style */
   rounded?: 'none' | 'sm' | 'md' | 'lg' | 'full';
+  /** Whether this avatar represents a verified profile */
+  verified?: boolean;
   /** Loading priority for Next.js Image */
   priority?: boolean;
   /** Image quality */
@@ -144,6 +147,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     name,
     size = 'md',
     rounded = 'full',
+    verified = false,
     priority = false,
     quality = 85,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -167,6 +171,14 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   }, [width]);
   const initials = generateInitials(name);
 
+  // Map avatar size to a sensible badge size
+  const badgeSize: 'sm' | 'md' | 'lg' =
+    size === 'xs' || size === 'sm'
+      ? 'sm'
+      : size === 'md' || size === 'lg' || size === 'xl' || size === '2xl'
+        ? 'md'
+        : 'lg';
+
   // Show fallback if no src or error occurred
   const shouldShowFallback = !src || hasError;
 
@@ -177,7 +189,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         className={cn(
           sizeClass,
           roundedClass,
-          'flex items-center justify-center bg-surface-2 text-secondary-token',
+          'relative flex items-center justify-center bg-surface-2 text-secondary-token',
           BORDER_RING,
           'shadow-sm transition-colors duration-200',
           className
@@ -190,6 +202,11 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
         <span className={cn('font-medium leading-none select-none', textSize)}>
           {initials}
         </span>
+        {verified && (
+          <span className='absolute -bottom-0.5 -right-0.5 rounded-full bg-black/80 dark:bg-black/80 px-0.5 py-0.5 shadow-sm'>
+            <VerifiedBadge size={badgeSize} />
+          </span>
+        )}
       </div>
     );
   }
@@ -235,6 +252,12 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
       {/* Loading shimmer effect */}
       {!isLoaded && !hasError && (
         <div className='absolute inset-0 skeleton' aria-hidden='true' />
+      )}
+
+      {verified && (
+        <span className='absolute -bottom-0.5 -right-0.5 rounded-full bg-black/80 dark:bg-black/80 px-0.5 py-0.5 shadow-sm'>
+          <VerifiedBadge size={badgeSize} />
+        </span>
       )}
     </div>
   );

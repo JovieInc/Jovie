@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazy load the animated version
@@ -22,6 +23,7 @@ interface ProgressiveArtistPageProps {
   mode: string;
   artist: Artist;
   socialLinks: LegacySocialLink[];
+  contacts: PublicContact[];
   subtitle: string;
   showTipButton: boolean;
   showBackButton: boolean;

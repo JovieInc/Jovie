@@ -1,9 +1,13 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { computeLinkConfidence } from '@/lib/ingestion/confidence';
+import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
+import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import { isValidSocialPlatform } from '@/types';
 // flags import removed - pre-launch
 
@@ -22,7 +26,10 @@ export async function GET(req: Request) {
 
       // Verify the profile belongs to the authenticated user before checking cache
       const [profile] = await db
-        .select({ id: creatorProfiles.id })
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(
@@ -46,6 +53,11 @@ export async function GET(req: Request) {
           sortOrder: socialLinks.sortOrder,
           isActive: socialLinks.isActive,
           displayText: socialLinks.displayText,
+          state: socialLinks.state,
+          confidence: socialLinks.confidence,
+          sourcePlatform: socialLinks.sourcePlatform,
+          sourceType: socialLinks.sourceType,
+          evidence: socialLinks.evidence,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -67,15 +79,34 @@ export async function GET(req: Request) {
 
       const links = rows
         .filter(r => r.linkId !== null)
-        .map(r => ({
-          id: r.linkId!,
-          platform: r.platform!,
-          platformType: r.platformType!,
-          url: r.url!,
-          sortOrder: r.sortOrder!,
-          isActive: r.isActive!,
-          displayText: r.displayText,
-        }));
+        .map(r => {
+          const state =
+            (r.state as 'active' | 'suggested' | 'rejected' | null) ??
+            (r.isActive ? 'active' : 'suggested');
+          if (state === 'rejected') return null;
+
+          const parsedConfidence =
+            typeof r.confidence === 'number'
+              ? r.confidence
+              : Number.parseFloat(String(r.confidence ?? '0'));
+          return {
+            id: r.linkId!,
+            platform: r.platform!,
+            platformType: r.platformType!,
+            url: r.url!,
+            sortOrder: r.sortOrder!,
+            isActive: state === 'active',
+            displayText: r.displayText,
+            state,
+            confidence: Number.isFinite(parsedConfidence)
+              ? parsedConfidence
+              : 0,
+            sourcePlatform: r.sourcePlatform,
+            sourceType: r.sourceType ?? 'manual',
+            evidence: r.evidence,
+          };
+        })
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
 
       return NextResponse.json(
         { links },
@@ -108,10 +139,26 @@ const updateSocialLinksSchema = z.object({
         sortOrder: z.number().int().min(0).optional(),
         isActive: z.boolean().optional(),
         displayText: z.string().max(256).optional(),
+        state: z.enum(['active', 'suggested', 'rejected']).optional(),
+        confidence: z.number().min(0).max(1).optional(),
+        sourcePlatform: z.string().max(128).optional(),
+        sourceType: z.enum(['manual', 'admin', 'ingested']).optional(),
+        evidence: z
+          .object({
+            sources: z.array(z.string()).optional(),
+            signals: z.array(z.string()).optional(),
+          })
+          .optional(),
       })
     )
     .max(100)
     .optional(),
+});
+
+const updateLinkStateSchema = z.object({
+  profileId: z.string().min(1),
+  linkId: z.string().min(1),
+  action: z.enum(['accept', 'dismiss']),
 });
 
 export async function PUT(req: Request) {
@@ -149,7 +196,10 @@ export async function PUT(req: Request) {
 
       // Verify the profile belongs to the authenticated user
       const [profile] = await db
-        .select({ id: creatorProfiles.id })
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
         .where(
@@ -196,24 +246,96 @@ export async function PUT(req: Request) {
         }
       }
 
-      // Delete existing links
-      await db
-        .delete(socialLinks)
+      // Delete only manual/admin links to preserve ingested suggestions
+      const existingLinks = await db
+        .select({
+          id: socialLinks.id,
+          sourceType: socialLinks.sourceType,
+        })
+        .from(socialLinks)
         .where(eq(socialLinks.creatorProfileId, profileId));
+
+      const removableIds = existingLinks
+        .filter(link => (link.sourceType ?? 'manual') !== 'ingested')
+        .map(link => link.id);
+
+      if (removableIds.length > 0) {
+        await db
+          .delete(socialLinks)
+          .where(inArray(socialLinks.id, removableIds));
+      }
 
       // Insert new links
       if (links.length > 0) {
-        const insertPayload = links.map((l, idx) => ({
-          creatorProfileId: profileId,
-          platform: l.platform,
-          platformType: l.platformType ?? l.platform,
-          url: l.url,
-          sortOrder: l.sortOrder ?? idx,
-          isActive: l.isActive ?? true,
-          displayText: l.displayText || null,
-        }));
+        const insertPayload: Array<typeof socialLinks.$inferInsert> = links.map(
+          (l, idx) => {
+            const detected = detectPlatform(l.url);
+            const normalizedUrl = detected.normalizedUrl;
+            const evidence = {
+              sources: l.evidence?.sources ?? [],
+              signals: l.evidence?.signals ?? [],
+            };
+            const scored = computeLinkConfidence({
+              sourceType: l.sourceType ?? 'manual',
+              signals: evidence.signals,
+              sources: [...evidence.sources, 'dashboard'],
+              usernameNormalized: profile.usernameNormalized ?? null,
+              url: normalizedUrl,
+              existingConfidence:
+                typeof l.confidence === 'number' ? l.confidence : null,
+            });
+            const state =
+              l.state ??
+              (l.isActive === false || l.state === 'suggested'
+                ? 'suggested'
+                : scored.state);
+            const confidence =
+              typeof l.confidence === 'number'
+                ? Number(l.confidence.toFixed(2))
+                : scored.confidence;
+
+            return {
+              creatorProfileId: profileId,
+              platform: l.platform,
+              platformType: l.platformType ?? l.platform,
+              url: normalizedUrl,
+              sortOrder: l.sortOrder ?? idx,
+              state,
+              isActive: state === 'active',
+              // Drizzle numeric columns use string representations; keep the
+              // computed numeric value only in memory.
+              confidence: confidence.toFixed(2),
+              sourcePlatform: l.sourcePlatform,
+              sourceType: l.sourceType ?? 'manual',
+              evidence: {
+                ...evidence,
+                sources: Array.from(new Set(evidence.sources)),
+                signals: Array.from(new Set(evidence.signals)),
+              },
+              displayText: l.displayText || null,
+            };
+          }
+        );
 
         await db.insert(socialLinks).values(insertPayload);
+      }
+
+      const linktreeTargets = links.filter(
+        link => link.platform === 'linktree' || isLinktreeUrl(link.url)
+      );
+
+      if (linktreeTargets.length > 0) {
+        await Promise.all(
+          linktreeTargets.map(link =>
+            enqueueLinktreeIngestionJob({
+              creatorProfileId: profileId,
+              sourceUrl: link.url,
+            }).catch(err => {
+              console.error('Failed to enqueue linktree ingestion job', err);
+              return null;
+            })
+          )
+        );
       }
 
       return NextResponse.json(
@@ -223,6 +345,152 @@ export async function PUT(req: Request) {
     });
   } catch (error) {
     console.error('Error updating social links:', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    return await withDbSession(async clerkUserId => {
+      const rawBody = await req.json().catch(() => null);
+      if (rawBody == null || typeof rawBody !== 'object') {
+        return NextResponse.json(
+          { error: 'Invalid request body' },
+          { status: 400 }
+        );
+      }
+
+      const parsed = updateLinkStateSchema.safeParse(rawBody);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: 'Invalid request body' },
+          { status: 400 }
+        );
+      }
+
+      const { profileId, linkId, action } = parsed.data;
+
+      const [profile] = await db
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+        })
+        .from(creatorProfiles)
+        .innerJoin(users, eq(users.id, creatorProfiles.userId))
+        .where(
+          and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
+        )
+        .limit(1);
+
+      if (!profile) {
+        return NextResponse.json(
+          { error: 'Profile not found' },
+          { status: 404 }
+        );
+      }
+
+      const [link] = await db
+        .select({
+          id: socialLinks.id,
+          creatorProfileId: socialLinks.creatorProfileId,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          sortOrder: socialLinks.sortOrder,
+          isActive: socialLinks.isActive,
+          displayText: socialLinks.displayText,
+          state: socialLinks.state,
+          confidence: socialLinks.confidence,
+          sourcePlatform: socialLinks.sourcePlatform,
+          sourceType: socialLinks.sourceType,
+          evidence: socialLinks.evidence,
+        })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.id, linkId),
+            eq(socialLinks.creatorProfileId, profile.id)
+          )
+        )
+        .limit(1);
+
+      if (!link) {
+        return NextResponse.json({ error: 'Link not found' }, { status: 404 });
+      }
+
+      const evidenceRaw =
+        (link.evidence as { sources?: string[]; signals?: string[] }) || {};
+      const nextEvidence = {
+        sources: Array.from(
+          new Set([...(evidenceRaw.sources ?? []), 'dashboard'])
+        ),
+        signals: Array.from(
+          new Set(
+            [
+              ...(evidenceRaw.signals ?? []),
+              action === 'accept' ? 'kept_after_claim' : undefined,
+            ].filter(Boolean) as string[]
+          )
+        ),
+      };
+
+      const existingConfidence =
+        typeof link.confidence === 'number'
+          ? link.confidence
+          : Number.parseFloat(String(link.confidence ?? '0'));
+
+      const scored = computeLinkConfidence({
+        sourceType: link.sourceType ?? 'manual',
+        signals: nextEvidence.signals,
+        sources: nextEvidence.sources,
+        usernameNormalized: profile.usernameNormalized ?? null,
+        url: link.url,
+        existingConfidence,
+      });
+
+      const nextState = action === 'accept' ? 'active' : 'rejected';
+      const nextConfidence =
+        action === 'accept' ? Math.max(scored.confidence, 0.7) : 0;
+
+      const [updated] = await db
+        .update(socialLinks)
+        .set({
+          state: nextState,
+          isActive: action === 'accept',
+          // Persist confidence as a fixed-point string to match the numeric column type
+          confidence: nextConfidence.toFixed(2),
+          evidence: nextEvidence,
+          updatedAt: new Date(),
+        })
+        .where(eq(socialLinks.id, link.id))
+        .returning({
+          id: socialLinks.id,
+          platform: socialLinks.platform,
+          platformType: socialLinks.platformType,
+          url: socialLinks.url,
+          sortOrder: socialLinks.sortOrder,
+          isActive: socialLinks.isActive,
+          displayText: socialLinks.displayText,
+          state: socialLinks.state,
+          confidence: socialLinks.confidence,
+          sourcePlatform: socialLinks.sourcePlatform,
+          sourceType: socialLinks.sourceType,
+          evidence: socialLinks.evidence,
+        });
+
+      return NextResponse.json(
+        { ok: true, link: updated },
+        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      );
+    });
+  } catch (error) {
+    console.error('Error updating social link state:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

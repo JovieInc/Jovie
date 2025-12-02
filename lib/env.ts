@@ -48,6 +48,7 @@ const EnvSchema = z.object({
   // Stripe price IDs for standard pricing (inactive)
   STRIPE_PRICE_STANDARD_MONTHLY: z.string().optional(),
   STRIPE_PRICE_STANDARD_YEARLY: z.string().optional(),
+  INGESTION_CRON_SECRET: z.string().optional(),
 });
 // Safe-parse to avoid hard crashes in production; surface clear errors in dev.
 const rawEnv = {
@@ -72,6 +73,7 @@ const rawEnv = {
   STRIPE_PRICE_INTRO_YEARLY: process.env.STRIPE_PRICE_INTRO_YEARLY,
   STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY,
   STRIPE_PRICE_STANDARD_YEARLY: process.env.STRIPE_PRICE_STANDARD_YEARLY,
+  INGESTION_CRON_SECRET: process.env.INGESTION_CRON_SECRET,
 };
 
 const parsed = EnvSchema.safeParse(rawEnv);
@@ -139,6 +141,9 @@ export const env = {
   STRIPE_PRICE_STANDARD_YEARLY: parsed.success
     ? parsed.data.STRIPE_PRICE_STANDARD_YEARLY
     : process.env.STRIPE_PRICE_STANDARD_YEARLY,
+  INGESTION_CRON_SECRET: parsed.success
+    ? parsed.data.INGESTION_CRON_SECRET
+    : process.env.INGESTION_CRON_SECRET,
 } as const;
 // Feature flags now handled via Statsig; see lib/statsig/*
 // Environment validation utilities

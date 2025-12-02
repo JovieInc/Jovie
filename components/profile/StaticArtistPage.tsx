@@ -3,15 +3,18 @@ import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotifications
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
+import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 interface StaticArtistPageProps {
   mode: string;
   artist: Artist;
   socialLinks: LegacySocialLink[];
+  contacts: PublicContact[];
   subtitle: string;
   showTipButton: boolean;
   showBackButton: boolean;
+  showFooter?: boolean;
 }
 
 function renderContent(
@@ -106,19 +109,23 @@ export function StaticArtistPage({
   mode,
   artist,
   socialLinks,
+  contacts,
   subtitle,
   showTipButton,
   showBackButton,
+  showFooter = true,
 }: StaticArtistPageProps) {
   return (
     <div className='w-full'>
       <ArtistPageShell
         artist={artist}
         socialLinks={socialLinks}
+        contacts={contacts}
         subtitle={subtitle}
         showSocialBar={mode !== 'listen'}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
+        showFooter={showFooter}
       >
         <div>{renderContent(mode, artist, socialLinks)}</div>
       </ArtistPageShell>

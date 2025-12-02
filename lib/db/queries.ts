@@ -1,6 +1,6 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from './index';
-import { creatorProfiles, socialLinks, users } from './schema';
+import { creatorContacts, creatorProfiles, socialLinks, users } from './schema';
 
 export async function getUserByClerkId(clerkId: string) {
   const [user] = await db
@@ -76,9 +76,36 @@ export async function getCreatorProfileWithLinks(username: string) {
     .where(eq(socialLinks.creatorProfileId, profile.id))
     .orderBy(socialLinks.sortOrder);
 
+  const profileContacts = await db
+    .select({
+      id: creatorContacts.id,
+      creatorProfileId: creatorContacts.creatorProfileId,
+      role: creatorContacts.role,
+      customLabel: creatorContacts.customLabel,
+      personName: creatorContacts.personName,
+      companyName: creatorContacts.companyName,
+      territories: creatorContacts.territories,
+      email: creatorContacts.email,
+      phone: creatorContacts.phone,
+      preferredChannel: creatorContacts.preferredChannel,
+      isActive: creatorContacts.isActive,
+      sortOrder: creatorContacts.sortOrder,
+      createdAt: creatorContacts.createdAt,
+      updatedAt: creatorContacts.updatedAt,
+    })
+    .from(creatorContacts)
+    .where(
+      and(
+        eq(creatorContacts.creatorProfileId, profile.id),
+        eq(creatorContacts.isActive, true)
+      )
+    )
+    .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt);
+
   return {
     ...profile,
     socialLinks: profileSocialLinks,
+    contacts: profileContacts,
   };
 }
 

@@ -2,11 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { fetchCreatorProfile } from '@/lib/actions/creator';
-import type { CreatorProfile, SocialLink } from '@/lib/db/schema';
 
-type CreatorWithSocialLinks = CreatorProfile & {
-  socialLinks: SocialLink[];
-};
+type CreatorWithSocialLinks = Awaited<ReturnType<typeof fetchCreatorProfile>>;
 
 export function useCreator(username: string) {
   const [creator, setCreator] = useState<CreatorWithSocialLinks | null>(null);

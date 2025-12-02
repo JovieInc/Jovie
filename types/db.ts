@@ -20,6 +20,22 @@ export type SubscriptionStatus =
   | 'incomplete_expired'
   | 'unpaid';
 
+export type IngestionStatus = 'idle' | 'pending' | 'processing' | 'failed';
+
+export type IngestionSourceType = 'manual' | 'admin' | 'ingested';
+
+export type SocialLinkState = 'active' | 'suggested' | 'rejected';
+
+export type SocialAccountStatus = 'suspected' | 'confirmed' | 'rejected';
+
+export type IngestionJobStatus =
+  | 'pending'
+  | 'processing'
+  | 'succeeded'
+  | 'failed';
+
+export type ScraperStrategy = 'http' | 'browser' | 'api';
+
 // Currency codes that match database enum
 export type CurrencyCode =
   | 'USD'
@@ -96,6 +112,16 @@ export type SocialPlatform =
   // Other
   | 'other';
 
+export type ContactRole =
+  | 'bookings'
+  | 'management'
+  | 'press_pr'
+  | 'brand_partnerships'
+  | 'fan_general'
+  | 'other';
+
+export type ContactChannel = 'email' | 'phone';
+
 // =====================================
 // CORE INTERFACES
 // =====================================
@@ -118,6 +144,9 @@ export interface CreatorProfile {
   creator_type: CreatorType;
   username: string;
   display_name: string | null;
+  avatar_locked_by_user?: boolean;
+  display_name_locked?: boolean;
+  ingestion_status?: IngestionStatus;
   bio: string | null;
   avatar_url: string | null;
   // Music platform URLs (for artists)
@@ -192,15 +221,81 @@ export interface SocialLink {
   id: string;
   creator_profile_id: string; // References creator_profiles.id (matches actual DB column name)
   platform: string; // Free-form platform name (for backwards compatibility)
-  platform_type: SocialPlatform; // Validated platform enum
+  platform_type: string; // Validated platform enum or category
   url: string;
   display_text?: string; // Optional custom display text (e.g., "@username")
   sort_order: number; // For custom ordering of links
   clicks: number;
   is_active: boolean; // Allow creators to hide/show links temporarily
+  state?: SocialLinkState;
+  confidence?: number;
+  source_platform?: string | null;
+  source_type?: IngestionSourceType;
+  evidence?: {
+    sources?: string[];
+    signals?: string[];
+  } | null;
   // Audit fields
   created_by?: string; // User ID who created this record
   updated_by?: string; // User ID who last updated this record
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SocialAccount {
+  id: string;
+  creator_profile_id: string;
+  platform: string;
+  handle?: string | null;
+  url?: string | null;
+  status: SocialAccountStatus;
+  confidence?: number | null;
+  is_verified_flag?: boolean;
+  paid_flag?: boolean;
+  raw_data?: Record<string, unknown> | null;
+  source_platform?: string | null;
+  source_type?: IngestionSourceType;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IngestionJob {
+  id: string;
+  job_type: string;
+  payload: Record<string, unknown>;
+  status: IngestionJobStatus;
+  error?: string | null;
+  attempts: number;
+  run_at: string;
+  priority: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ScraperConfig {
+  id: string;
+  network: string;
+  strategy: ScraperStrategy;
+  max_concurrency: number;
+  max_jobs_per_minute: number;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatorContact {
+  id: string;
+  creator_profile_id: string;
+  role: ContactRole;
+  custom_label?: string | null;
+  person_name?: string | null;
+  company_name?: string | null;
+  territories: string[];
+  email?: string | null;
+  phone?: string | null;
+  preferred_channel?: ContactChannel | null;
+  is_active: boolean;
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }

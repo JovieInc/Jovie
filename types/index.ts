@@ -20,6 +20,14 @@ export type {
   ContactSidebarMode,
   ContactSocialLink,
 } from './contact';
+export type {
+  ContactChannel,
+  ContactRole,
+  DashboardContact,
+  DashboardContactInput,
+  PublicContact,
+  PublicContactChannel,
+} from './contacts';
 // Re-export shared enums and types from db.ts
 export type {
   // Core interfaces
@@ -30,10 +38,15 @@ export type {
   ArtistProfile,
   // Analytics interfaces
   ClickEvent,
+  CreatorContact,
   CreatorProfile,
   // Enums
   CreatorType,
   CurrencyCode,
+  IngestionJob,
+  IngestionJobStatus,
+  IngestionSourceType,
+  IngestionStatus,
   LegacySocialLink,
   LinkType,
   PodcasterProfile,
@@ -41,7 +54,12 @@ export type {
   RateLimitResult,
   // Content interfaces
   Release,
+  ScraperConfig,
+  ScraperStrategy,
+  SocialAccount,
+  SocialAccountStatus,
   SocialLink,
+  SocialLinkState,
   SocialPlatform,
   // Billing interfaces
   Subscription,

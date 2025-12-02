@@ -128,7 +128,7 @@ const SidebarProvider = React.forwardRef<
             style={
               {
                 '--sidebar-width': '260px',
-                '--sidebar-width-icon': '64px',
+                '--sidebar-width-icon': '56px',
                 ...style,
               } as React.CSSProperties
             }

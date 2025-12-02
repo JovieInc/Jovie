@@ -105,6 +105,8 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
                   subtitle=''
                   showTipButton={false}
                   showBackButton={false}
+                  contacts={[]}
+                  showFooter={false}
                 />
               </div>
             </div>

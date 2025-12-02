@@ -1,6 +1,7 @@
 import 'server-only';
 
-import { count, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { randomUUID } from 'crypto';
+import { count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
@@ -12,6 +13,7 @@ export interface AdminCreatorProfileRow {
   displayName?: string | null;
   isVerified: boolean;
   isClaimed: boolean;
+  claimToken: string | null;
   createdAt: Date | null;
 }
 
@@ -113,6 +115,7 @@ export async function getAdminCreatorProfiles(
           displayName: creatorProfiles.displayName,
           isVerified: creatorProfiles.isVerified,
           isClaimed: creatorProfiles.isClaimed,
+          claimToken: creatorProfiles.claimToken,
           createdAt: creatorProfiles.createdAt,
         })
         .from(creatorProfiles)
@@ -129,6 +132,38 @@ export async function getAdminCreatorProfiles(
 
     const pageRows = rows;
 
+    // Ensure unclaimed profiles have a claim token so admins can generate claim links.
+    const needsToken = pageRows.filter(
+      row => !row.isClaimed && !row.claimToken
+    );
+
+    if (needsToken.length > 0) {
+      const tokensById = new Map<string, string>();
+
+      await Promise.all(
+        needsToken.map(async row => {
+          const token = randomUUID();
+          tokensById.set(row.id, token);
+
+          await db
+            .update(creatorProfiles)
+            .set({
+              claimToken: token,
+              updatedAt: new Date(),
+            })
+            .where(eq(creatorProfiles.id, row.id));
+        })
+      );
+
+      // Update in-memory rows so callers immediately see the new tokens.
+      for (const row of pageRows) {
+        const token = tokensById.get(row.id);
+        if (token) {
+          (row as { claimToken?: string | null }).claimToken = token;
+        }
+      }
+    }
+
     return {
       profiles: pageRows.map(row => ({
         id: row.id,
@@ -139,6 +174,7 @@ export async function getAdminCreatorProfiles(
           (row as { displayName?: string | null }).displayName ?? null,
         isVerified: row.isVerified ?? false,
         isClaimed: row.isClaimed ?? false,
+        claimToken: row.claimToken ?? null,
         createdAt: row.createdAt ?? null,
       })),
       page,

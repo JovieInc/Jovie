@@ -135,6 +135,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: '6B7280',
     placeholder: 'https://your-website.com',
   },
+  linktree: {
+    id: 'linktree',
+    name: 'Linktree',
+    category: 'custom',
+    icon: 'linktree',
+    color: '39E09B',
+    placeholder: 'https://linktr.ee/username',
+  },
   // Additional social platforms
   telegram: {
     id: 'telegram',
@@ -255,6 +263,7 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
+  { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
 ];
 
 /**
@@ -676,6 +685,9 @@ export function canonicalIdentity(
       case 'soundcloud':
       case 'bandcamp':
         if (parts[0]) return `${link.platform.id}:${parts[0].toLowerCase()}`;
+        break;
+      case 'linktree':
+        if (parts[0]) return `linktree:${parts[0].toLowerCase()}`;
         break;
       default:
         break;

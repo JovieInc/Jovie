@@ -136,6 +136,16 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Used in**:
   - `components/molecules/AvatarUploadable.tsx`
 
+#### `feature_contacts`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Gate the artist contacts manager and public contacts menu
+- **Expiry**: Review after pilot rollout
+- **Used in**:
+  - `app/dashboard/contacts/page.tsx`
+  - `components/dashboard/organisms/ContactsManager.tsx`
+  - `components/profile/ArtistContactsButton.tsx`
+
 ### Backend Features
 
 #### `feature_universal_notifications`
@@ -151,6 +161,16 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Description**: Gate new anonymous click logging via SECURITY DEFINER RPC
 - **Expiry**: None (security feature)
 - **Used in**: Analytics RPC functions
+
+#### `feature_link_ingestion`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Gate link ingestion workers and suggestion surfacing (Linktree phase 1)
+- **Expiry**: Review after initial rollout
+- **Used in**:
+  - `app/api/ingestion/jobs/route.ts`
+  - `app/api/dashboard/social-links/route.ts`
+  - `lib/ingestion/*`
 
 ### Integration Features
 

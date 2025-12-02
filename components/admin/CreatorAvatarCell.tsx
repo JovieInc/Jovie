@@ -1,18 +1,9 @@
 'use client';
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@jovie/ui';
-import { Pencil } from 'lucide-react';
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
-import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { useToast } from '@/components/molecules/ToastContainer';
 
 export interface CreatorAvatarCellProps {
   profileId: string;
@@ -28,12 +19,9 @@ export function CreatorAvatarCell({
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
   );
-  const [isOpen, setIsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isPending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-  const uploadImage = async (file: File) => {
+  const uploadImage = async (file: File): Promise<string> => {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -44,115 +32,56 @@ export function CreatorAvatarCell({
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        (errorData as { error?: string }).error || 'Upload failed'
-      );
+      const message =
+        (errorData as { error?: string }).error || 'Upload failed';
+      throw new Error(message);
     }
 
     const data = (await response.json()) as { blobUrl: string };
     return data.blobUrl;
   };
 
-  const handleUploaded = (url: string) => {
-    setError(null);
-    startTransition(async () => {
-      try {
-        await updateCreatorAvatarAsAdmin(profileId, url);
-        setPreviewUrl(url);
-      } catch (err) {
-        console.error('Failed to update creator avatar as admin', err);
-        setError('Failed to update avatar. Please try again.');
-      }
-    });
-  };
+  const handleUpload = async (file: File): Promise<string> => {
+    const url = await uploadImage(file);
 
-  const handleAvatarDrop = (event: React.DragEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const file = event.dataTransfer.files?.[0];
-    if (!file) return;
-
-    setIsOpen(true);
-    setIsUploading(true);
-    uploadImage(file)
-      .then(handleUploaded)
-      .catch(err => {
-        console.error(err);
-        setError('Failed to upload avatar. Please try again.');
-      })
-      .finally(() => {
-        setIsUploading(false);
+    try {
+      await updateCreatorAvatarAsAdmin(profileId, url);
+      setPreviewUrl(url);
+      showToast({ type: 'success', message: 'Avatar updated' });
+    } catch (error) {
+      console.error('Failed to update creator avatar as admin', error);
+      showToast({
+        type: 'error',
+        message: 'Failed to update avatar. Please try again.',
       });
-  };
+      // Re-throw so AvatarUploadable can show error state
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to update avatar');
+    }
 
-  const handleAvatarDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-  };
-
-  const handleOpenChange = (nextOpen: boolean) => {
-    setIsOpen(nextOpen);
+    return url;
   };
 
   return (
     <div className='flex items-center gap-2'>
-      <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-        <DialogTrigger asChild>
-          <button
-            type='button'
-            aria-label={`Change avatar for @${username}`}
-            onDragOver={handleAvatarDragOver}
-            onDrop={handleAvatarDrop}
-            className='group relative inline-flex items-center justify-center focus-ring-transparent-offset'
-            aria-busy={isUploading || isPending}
-          >
-            <Avatar
-              src={previewUrl}
-              alt={`Avatar for @${username}`}
-              name={username}
-              size='sm'
-              className='border border-subtle bg-surface-2'
-            />
-            <div className='pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100'>
-              <Pencil className='h-3 w-3 text-white' aria-hidden='true' />
-            </div>
-          </button>
-        </DialogTrigger>
-        <DialogContent className='max-w-md'>
-          <DialogHeader>
-            <DialogTitle>Update avatar</DialogTitle>
-          </DialogHeader>
-          <AvatarUploadable
-            src={previewUrl}
-            alt={`Avatar for @${username}`}
-            name={username}
-            size='xl'
-            uploadable
-            showHoverOverlay
-            onUpload={uploadImage}
-            onSuccess={handleUploaded}
-            onError={message => {
-              setError(message);
-            }}
-            maxFileSize={4 * 1024 * 1024}
-            acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
-          />
-          {error && (
-            <p className='mt-2 text-sm text-destructive-token'>{error}</p>
-          )}
-          <div className='mt-4 flex justify-end'>
-            <Button
-              type='button'
-              variant='secondary'
-              size='sm'
-              onClick={() => handleOpenChange(false)}
-              loading={isPending}
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <AvatarUploadable
+        src={previewUrl}
+        alt={`Avatar for @${username}`}
+        name={username}
+        size='sm'
+        uploadable
+        onUpload={handleUpload}
+        onError={message => {
+          showToast({
+            type: 'error',
+            message: message || 'Failed to upload avatar. Please try again.',
+          });
+        }}
+        maxFileSize={4 * 1024 * 1024}
+        acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+        showHoverOverlay
+      />
     </div>
   );
 }

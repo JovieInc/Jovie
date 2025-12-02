@@ -2,6 +2,7 @@ import {
   boolean,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -38,6 +39,60 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'incomplete',
   'incomplete_expired',
   'unpaid',
+]);
+
+export const ingestionStatusEnum = pgEnum('ingestion_status', [
+  'idle',
+  'pending',
+  'processing',
+  'failed',
+]);
+
+export const ingestionSourceTypeEnum = pgEnum('ingestion_source_type', [
+  'manual',
+  'admin',
+  'ingested',
+]);
+
+export const socialLinkStateEnum = pgEnum('social_link_state', [
+  'active',
+  'suggested',
+  'rejected',
+]);
+
+export const socialAccountStatusEnum = pgEnum('social_account_status', [
+  'suspected',
+  'confirmed',
+  'rejected',
+]);
+
+export const contactRoleEnum = pgEnum('contact_role', [
+  'bookings',
+  'management',
+  'press_pr',
+  'brand_partnerships',
+  'fan_general',
+  'other',
+]);
+
+export const contactChannelEnum = pgEnum('contact_channel', ['email', 'phone']);
+
+export const ingestionJobStatusEnum = pgEnum('ingestion_job_status', [
+  'pending',
+  'processing',
+  'succeeded',
+  'failed',
+]);
+
+export const scraperStrategyEnum = pgEnum('scraper_strategy', [
+  'http',
+  'browser',
+  'api',
+]);
+
+export const notificationChannelEnum = pgEnum('notification_channel', [
+  'email',
+  'phone',
 ]);
 
 // Theme preference enum for users
@@ -107,6 +162,11 @@ export const creatorProfiles = pgTable('creator_profiles', {
   isClaimed: boolean('is_claimed').default(false),
   claimToken: text('claim_token'),
   claimedAt: timestamp('claimed_at'),
+  avatarLockedByUser: boolean('avatar_locked_by_user').default(false).notNull(),
+  displayNameLocked: boolean('display_name_locked').default(false).notNull(),
+  ingestionStatus: ingestionStatusEnum('ingestion_status')
+    .default('idle')
+    .notNull(),
   lastLoginAt: timestamp('last_login_at'),
   profileViews: integer('profile_views').default(0),
   onboardingCompletedAt: timestamp('onboarding_completed_at'),
@@ -128,6 +188,38 @@ export const socialLinks = pgTable('social_links', {
   sortOrder: integer('sort_order').default(0),
   clicks: integer('clicks').default(0),
   isActive: boolean('is_active').default(true),
+  state: socialLinkStateEnum('state').default('active').notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 })
+    .default('1.00')
+    .notNull(),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('manual')
+    .notNull(),
+  evidence: jsonb('evidence')
+    .$type<{ sources?: string[]; signals?: string[] }>()
+    .default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const socialAccounts = pgTable('social_accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  platform: text('platform').notNull(),
+  handle: text('handle'),
+  url: text('url'),
+  status: socialAccountStatusEnum('status').default('suspected').notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 }).default('0.00'),
+  isVerifiedFlag: boolean('is_verified_flag').default(false),
+  paidFlag: boolean('paid_flag').default(false),
+  rawData: jsonb('raw_data').$type<Record<string, unknown>>().default({}),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('ingested')
+    .notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -152,6 +244,39 @@ export const clickEvents = pgTable('click_events', {
   isBot: boolean('is_bot').default(false),
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const notificationSubscriptions = pgTable('notification_subscriptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  channel: notificationChannelEnum('channel').notNull(),
+  email: text('email'),
+  phone: text('phone'),
+  countryCode: text('country_code'),
+  ipAddress: text('ip_address'),
+  source: text('source'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+export const creatorContacts = pgTable('creator_contacts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  role: contactRoleEnum('role').notNull(),
+  customLabel: text('custom_label'),
+  personName: text('person_name'),
+  companyName: text('company_name'),
+  territories: jsonb('territories').$type<string[]>().notNull().default([]),
+  email: text('email'),
+  phone: text('phone'),
+  preferredChannel: contactChannelEnum('preferred_channel'),
+  isActive: boolean('is_active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 export const tips = pgTable('tips', {
@@ -216,7 +341,19 @@ export const profilePhotos = pgTable('profile_photos', {
     () => creatorProfiles.id,
     { onDelete: 'cascade' }
   ),
+  ingestionOwnerUserId: uuid('ingestion_owner_user_id').references(
+    () => users.id,
+    { onDelete: 'set null' }
+  ),
   status: photoStatusEnum('status').notNull().default('uploading'),
+  sourcePlatform: text('source_platform'),
+  sourceType: ingestionSourceTypeEnum('source_type')
+    .default('manual')
+    .notNull(),
+  confidence: numeric('confidence', { precision: 3, scale: 2 })
+    .default('1.00')
+    .notNull(),
+  lockedByUser: boolean('locked_by_user').default(false).notNull(),
 
   // Vercel Blob URLs for different sizes
   blobUrl: text('blob_url'), // Original uploaded image
@@ -239,6 +376,30 @@ export const profilePhotos = pgTable('profile_photos', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const ingestionJobs = pgTable('ingestion_jobs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  jobType: text('job_type').notNull(),
+  payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+  status: ingestionJobStatusEnum('status').default('pending').notNull(),
+  error: text('error'),
+  attempts: integer('attempts').default(0).notNull(),
+  runAt: timestamp('run_at').defaultNow().notNull(),
+  priority: integer('priority').default(0).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const scraperConfigs = pgTable('scraper_configs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  network: text('network').notNull(),
+  strategy: scraperStrategyEnum('strategy').default('http').notNull(),
+  maxConcurrency: integer('max_concurrency').default(1).notNull(),
+  maxJobsPerMinute: integer('max_jobs_per_minute').default(30).notNull(),
+  enabled: boolean('enabled').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -250,9 +411,20 @@ export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
 export const insertSocialLinkSchema = createInsertSchema(socialLinks);
 export const selectSocialLinkSchema = createSelectSchema(socialLinks);
 
+export const insertCreatorContactSchema = createInsertSchema(creatorContacts);
+export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
+
 export const insertClickEventSchema = createInsertSchema(clickEvents);
 
 export const selectClickEventSchema = createSelectSchema(clickEvents);
+
+export const insertNotificationSubscriptionSchema = createInsertSchema(
+  notificationSubscriptions
+);
+
+export const selectNotificationSubscriptionSchema = createSelectSchema(
+  notificationSubscriptions
+);
 
 export const insertTipSchema = createInsertSchema(tips);
 
@@ -274,6 +446,15 @@ export const selectStripeWebhookEventSchema =
 export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
 export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 
+export const insertSocialAccountSchema = createInsertSchema(socialAccounts);
+export const selectSocialAccountSchema = createSelectSchema(socialAccounts);
+
+export const insertIngestionJobSchema = createInsertSchema(ingestionJobs);
+export const selectIngestionJobSchema = createSelectSchema(ingestionJobs);
+
+export const insertScraperConfigSchema = createInsertSchema(scraperConfigs);
+export const selectScraperConfigSchema = createSelectSchema(scraperConfigs);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -284,8 +465,16 @@ export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
 export type SocialLink = typeof socialLinks.$inferSelect;
 export type NewSocialLink = typeof socialLinks.$inferInsert;
 
+export type CreatorContact = typeof creatorContacts.$inferSelect;
+export type NewCreatorContact = typeof creatorContacts.$inferInsert;
+
 export type ClickEvent = typeof clickEvents.$inferSelect;
 export type NewClickEvent = typeof clickEvents.$inferInsert;
+
+export type NotificationSubscription =
+  typeof notificationSubscriptions.$inferSelect;
+export type NewNotificationSubscription =
+  typeof notificationSubscriptions.$inferInsert;
 
 export type Tip = typeof tips.$inferSelect;
 export type NewTip = typeof tips.$inferInsert;
@@ -304,3 +493,12 @@ export type NewUserSettings = typeof userSettings.$inferInsert;
 
 export type ProfilePhoto = typeof profilePhotos.$inferSelect;
 export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
+
+export type SocialAccount = typeof socialAccounts.$inferSelect;
+export type NewSocialAccount = typeof socialAccounts.$inferInsert;
+
+export type IngestionJob = typeof ingestionJobs.$inferSelect;
+export type NewIngestionJob = typeof ingestionJobs.$inferInsert;
+
+export type ScraperConfig = typeof scraperConfigs.$inferSelect;
+export type NewScraperConfig = typeof scraperConfigs.$inferInsert;

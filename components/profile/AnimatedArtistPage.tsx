@@ -9,6 +9,7 @@ import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotifications
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazily load heavy profile sub-components to keep initial bundle lean
@@ -29,6 +30,7 @@ interface AnimatedArtistPageProps {
   mode: string;
   artist: Artist;
   socialLinks: LegacySocialLink[];
+  contacts: PublicContact[];
   subtitle: string;
   showTipButton: boolean;
   showBackButton: boolean;
@@ -163,6 +165,7 @@ export function AnimatedArtistPage({
   mode,
   artist,
   socialLinks,
+  contacts,
   subtitle,
   showTipButton,
   showBackButton,
@@ -210,6 +213,7 @@ export function AnimatedArtistPage({
       <ArtistPageShell
         artist={artist}
         socialLinks={socialLinks}
+        contacts={contacts}
         subtitle={subtitle}
         showTipButton={showTipButton && tippingEnabled}
         showBackButton={showBackButton}

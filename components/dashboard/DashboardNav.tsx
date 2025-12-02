@@ -5,10 +5,12 @@ import {
   ChartPieIcon,
   Cog6ToothIcon,
   HomeIcon,
+  IdentificationIcon,
   LinkIcon,
   ShieldCheckIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
@@ -21,6 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 interface DashboardNavProps {
   collapsed?: boolean;
@@ -43,6 +46,13 @@ const primaryNavigation = [
     description: 'Manage your social and streaming links',
   },
   {
+    name: 'Contacts',
+    href: '/dashboard/contacts',
+    id: 'contacts',
+    icon: IdentificationIcon,
+    description: 'Manage your team and contact routes',
+  },
+  {
     name: 'Analytics',
     href: '/dashboard/analytics',
     id: 'analytics',
@@ -63,10 +73,11 @@ const primaryNavigation = [
 const navShortcuts: Record<string, string> = {
   overview: '1',
   links: '2',
-  analytics: '3',
-  audience: '4',
-  tipping: '5',
-  settings: '6',
+  contacts: '3',
+  analytics: '4',
+  audience: '5',
+  tipping: '6',
+  settings: '7',
 };
 
 // Secondary Navigation - Additional features
@@ -114,6 +125,10 @@ const adminNavigation: typeof primaryNavigation = [
 export function DashboardNav({ collapsed = false }: DashboardNavProps) {
   const { isAdmin } = useDashboardData();
   const pathname = usePathname();
+  const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+  const primaryItems = contactsGate.value
+    ? primaryNavigation
+    : primaryNavigation.filter(item => item.id !== 'contacts');
 
   const renderSection = (items: typeof primaryNavigation) => (
     <SidebarMenu>
@@ -163,7 +178,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       role='navigation'
     >
       {/* Primary Navigation Block */}
-      <div className='mb-6'>{renderSection(primaryNavigation)}</div>
+      <div className='mb-6'>{renderSection(primaryItems)}</div>
 
       {/* Divider */}
       <Divider className='mb-6' inset={!collapsed} />
