@@ -14,8 +14,12 @@ export default async function OnboardingPage({
 }: OnboardingPageProps) {
   const { userId } = await auth();
   if (!userId) {
-    // Require auth for onboarding; preserve destination
-    redirect('/sign-in?redirect_url=/onboarding');
+    // Require auth for onboarding; preserve destination including handle param
+    const handleParam = searchParams?.handle
+      ? `?handle=${encodeURIComponent(searchParams.handle)}`
+      : '';
+    const redirectTarget = `/onboarding${handleParam}`;
+    redirect(`/sign-in?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
   const dashboardData = await getDashboardData();

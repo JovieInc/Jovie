@@ -59,6 +59,8 @@ export function EnhancedDashboardLinks({
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
+  const isMusicProfile =
+    dashboardData.selectedProfile?.creatorType === 'artist';
   const profileId = dashboardData.selectedProfile?.id;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
@@ -195,7 +197,20 @@ export function EnhancedDashboardLinks({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ profileId, links: payload }),
           });
-          if (!response.ok) throw new Error('Failed to save links');
+          if (!response.ok) {
+            let message = 'Failed to save links';
+            try {
+              const data = (await response.json().catch(() => null)) as {
+                error?: string;
+              } | null;
+              if (data?.error && typeof data.error === 'string') {
+                message = data.error;
+              }
+            } catch {
+              // swallow JSON parse errors and fall back to default message
+            }
+            throw new Error(message);
+          }
 
           // Keep normalized links locally; server IDs will be applied on next load
           setLinks(normalized);
@@ -212,14 +227,15 @@ export function EnhancedDashboardLinks({
           );
         } catch (error) {
           console.error('Error saving links:', error);
+          const message =
+            error instanceof Error ? error.message : 'Failed to save links';
           setSaveStatus({
             saving: false,
             success: false,
-            error:
-              error instanceof Error ? error.message : 'Failed to save links',
+            error: message,
             lastSaved: null,
           });
-          toast.error('Failed to save links. Please try again.');
+          toast.error(message || 'Failed to save links. Please try again.');
         }
       }, 500),
     [profileId]
@@ -340,6 +356,7 @@ export function EnhancedDashboardLinks({
             initialLinks={links as unknown as DetectedLink[]}
             onLinksChange={handleManagerLinksChange}
             creatorName={artist?.name ?? undefined}
+            isMusicProfile={isMusicProfile}
           />
         </div>
       </div>

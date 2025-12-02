@@ -47,12 +47,43 @@ test.describe('Onboarding Flow', () => {
     expect(redirectUrl).toContain(`handle=${handle}`);
   });
 
+  test('unauthenticated /onboarding redirects to signin with redirect_url', async ({
+    page,
+  }) => {
+    // Navigate directly to onboarding while unauthenticated
+    await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+
+    // Should redirect to canonical /signin route
+    await expect(page).toHaveURL(/\/signin/);
+
+    const url = new URL(page.url());
+    const redirectUrl = url.searchParams.get('redirect_url');
+    expect(redirectUrl).toBe('/onboarding');
+  });
+
+  test('unauthenticated /onboarding?handle preserves handle in redirect_url', async ({
+    page,
+  }) => {
+    const handle = `e2e-deeplink-${Date.now().toString(36)}`;
+
+    await page.goto(`/onboarding?handle=${handle}`, {
+      waitUntil: 'domcontentloaded',
+    });
+
+    // Final destination should be the canonical /signin page
+    await expect(page).toHaveURL(/\/signin/);
+
+    const url = new URL(page.url());
+    const redirectUrl = url.searchParams.get('redirect_url');
+    expect(redirectUrl).toBe(`/onboarding?handle=${handle}`);
+  });
+
   test('complete onboarding flow with handle validation', async ({ page }) => {
     // Navigate to onboarding (requires authentication first)
     await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
 
-    // Should redirect to sign-in if not authenticated
-    await expect(page).toHaveURL(/sign-in/);
+    // Should redirect to canonical /signin if not authenticated
+    await expect(page).toHaveURL(/\/signin/);
 
     // For now, just test the onboarding page loads for authenticated users
     // This test will be expanded when we have test auth setup
@@ -160,12 +191,19 @@ test.describe('Onboarding Flow', () => {
     expect(data1.available).toBe(data2.available);
   });
 
-  test('database connection and RLS policies work', async ({ page }) => {
-    // Test that the database is accessible and RLS is working
-    const response = await page.request.get('/api/health/db');
-    expect(response.ok()).toBeTruthy();
+  const runDbHealthCheck =
+    process.env.E2E_DB_HEALTH === '1' ||
+    !!(process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy'));
 
-    const health = await response.json();
-    expect(health.status).toBe('ok');
-  });
+  (runDbHealthCheck ? test : test.skip)(
+    'database connection and RLS policies work',
+    async ({ page }) => {
+      // Test that the database is accessible and RLS is working
+      const response = await page.request.get('/api/health/db');
+      expect(response.ok()).toBeTruthy();
+
+      const health = await response.json();
+      expect(health.status).toBe('ok');
+    }
+  );
 });

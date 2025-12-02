@@ -12,6 +12,7 @@ import React, {
 } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { MAX_SOCIAL_LINKS } from '@/constants/app';
 import {
   type DetectedLink,
   detectPlatform,
@@ -45,7 +46,7 @@ export const UniversalLinkInput = forwardRef<
       disabled = false,
       existingPlatforms = [],
       socialVisibleCount = 0,
-      socialVisibleLimit = 6,
+      socialVisibleLimit = MAX_SOCIAL_LINKS,
       prefillUrl,
       onPrefillConsumed,
     },

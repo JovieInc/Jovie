@@ -1,30 +1,55 @@
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
+import {
+  ButtonSkeleton,
+  ProfileSkeleton as ProfileHeaderSkeleton,
+  SocialBarSkeleton,
+} from '@/components/molecules/LoadingSkeleton';
+import { Container } from '@/components/site/Container';
 
 export function ProfileSkeleton() {
   return (
-    <div className='relative min-h-screen flex items-center justify-center bg-white dark:bg-gray-900'>
+    <div
+      className='min-h-screen bg-white dark:bg-black transition-colors duration-200 relative overflow-hidden'
+      role='status'
+      aria-busy='true'
+      aria-label='Loading Jovie profile'
+    >
       <BackgroundPattern variant='gradient' />
-      <div className='relative z-10 w-full max-w-md mx-auto px-4'>
-        {/* Profile Shell Skeleton */}
-        <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-3xl p-8 shadow-xl shadow-black/5'>
-          {/* Avatar */}
-          <div className='text-center mb-6'>
-            <div className='w-24 h-24 rounded-full skeleton motion-reduce:animate-none mx-auto mb-4'></div>
-            {/* Name */}
-            <div className='h-6 w-32 rounded-lg skeleton motion-reduce:animate-none mx-auto mb-2'></div>
-            {/* Bio */}
-            <div className='h-4 w-48 rounded-lg skeleton motion-reduce:animate-none mx-auto'></div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className='space-y-4'>
-            {/* Listen Now Button */}
-            <div className='h-12 w-full rounded-xl skeleton motion-reduce:animate-none'></div>
-            {/* Optional Tip Button */}
-            <div className='h-12 w-full rounded-xl skeleton motion-reduce:animate-none'></div>
+      <div className='absolute top-1/4 left-1/4 w-96 h-96 bg-linear-to-r from-blue-400/10 to-purple-400/10 dark:from-blue-400/20 dark:to-purple-400/20 rounded-full blur-3xl opacity-50' />
+      <div className='absolute bottom-1/4 right-1/4 w-96 h-96 bg-linear-to-r from-purple-400/10 to-cyan-400/10 dark:from-purple-400/20 dark:to-cyan-400/20 rounded-full blur-3xl opacity-50' />
+      <Container>
+        <div className='flex min-h-screen flex-col py-12 relative z-10'>
+          <div className='flex-1 flex flex-col items-center justify-start px-4'>
+            <div className='w-full max-w-md space-y-8'>
+              {/* Profile Shell Skeleton */}
+              <div className='flex flex-col items-center space-y-3 sm:space-y-4 text-center'>
+                {/* Avatar */}
+                {/* Name */}
+                {/* Bio */}
+                <ProfileHeaderSkeleton />
+              </div>
+              <div className='space-y-4 w-full'>
+                {/* Action Buttons */}
+                {/* Listen Now Button */}
+                <ButtonSkeleton />
+                {/* Optional Tip Button */}
+                <ButtonSkeleton />
+              </div>
+              <div className='flex justify-between items-center'>
+                <div className='flex-1 flex justify-start'>
+                  <SocialBarSkeleton />
+                </div>
+                <div className='shrink-0 w-32'>
+                  <ButtonSkeleton />
+                </div>
+              </div>
+              <div className='flex justify-center pt-4'>
+                <div className='h-4 w-40 rounded-full skeleton motion-reduce:animate-none' />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      </Container>
     </div>
   );
 }

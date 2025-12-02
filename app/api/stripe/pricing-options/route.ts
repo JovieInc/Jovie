@@ -10,15 +10,18 @@ export async function GET() {
   try {
     const options = getAvailablePricing();
 
+    const pricingOptions = options.map(option => ({
+      priceId: option.priceId,
+      amount: option.amount,
+      currency: option.currency,
+      interval: option.interval,
+      description: option.description,
+      isIntroductory: option.isIntroductory,
+    }));
+
     return NextResponse.json({
-      options: options.map(option => ({
-        priceId: option.priceId,
-        amount: option.amount,
-        currency: option.currency,
-        interval: option.interval,
-        description: option.description,
-        isIntroductory: option.isIntroductory,
-      })),
+      pricingOptions,
+      options: pricingOptions,
     });
   } catch (error) {
     console.error('Error getting pricing options:', error);

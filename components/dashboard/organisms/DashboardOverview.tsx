@@ -5,6 +5,7 @@ import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { DashboardProfileSaveButton } from '@/components/dashboard/atoms/DashboardProfileSaveButton';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
@@ -86,9 +87,7 @@ export function DashboardOverview({
             />
           </div>
           <div className='flex flex-wrap gap-3'>
-            <Button type='submit' size='sm' variant='primary'>
-              Save &amp; Publish
-            </Button>
+            <DashboardProfileSaveButton />
             <Button asChild size='sm' variant='secondary'>
               <Link
                 href={`/${artist.handle}`}
