@@ -584,7 +584,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   <SocialIcon
                     platform={pill.simpleIconId}
                     className='h-3.5 w-3.5'
-                    aria-hidden='true'
                   />
                 </span>
                 <span>{pill.label}</span>
