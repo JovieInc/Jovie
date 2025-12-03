@@ -381,7 +381,7 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
         set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
       });
   });
-  revalidateTag('dashboard-data');
+  revalidateTag('dashboard-data', 'default');
 }
 
 export async function updateCreatorProfile(
@@ -439,7 +439,7 @@ export async function updateCreatorProfile(
         throw new Error('Profile not found or unauthorized');
       }
 
-      revalidateTag('dashboard-data');
+      revalidateTag('dashboard-data', 'default');
       if (updatedProfile.usernameNormalized) {
         revalidatePath(`/${updatedProfile.usernameNormalized}`);
       }
@@ -482,6 +482,6 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
     isPublic: true,
   });
 
-  revalidateTag('dashboard-data');
+  revalidateTag('dashboard-data', 'default');
   revalidatePath('/dashboard/overview');
 }

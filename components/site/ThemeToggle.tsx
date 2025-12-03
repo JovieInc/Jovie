@@ -201,12 +201,18 @@ export function ThemeToggle({
     );
   }
 
+  const isDarkUi = resolvedTheme === 'dark';
+
   return (
     <Button
       variant='ghost'
       size='sm'
       onClick={cycleTheme}
-      className={`h-8 w-8 p-0 flex items-center justify-center ${className}`}
+      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+        isDarkUi
+          ? 'bg-white/10 text-white ring-white/30 hover:bg-white/20'
+          : 'bg-white text-black ring-black/10 hover:bg-gray-50'
+      } ${className}`}
       title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}`}
     >
       <span className='sr-only'>

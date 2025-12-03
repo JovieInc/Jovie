@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { username: string } }
+  request: NextRequest,
+  _context: { params: Promise<{}> }
 ) {
   try {
-    const username = params.username;
+    void _context;
+    const url = new URL(request.url);
+    const username = url.searchParams.get('username');
     if (!username) {
       return NextResponse.json(
         { error: 'Username is required' },

@@ -46,11 +46,12 @@ export default async function OnboardingPage({
     <AuthLayout
       brandingTitle='Finish setting up your Jovie profile'
       brandingDescription='Choose your name and Jovie handle so your profile is ready to share.'
-      formTitle='Finish onboarding'
+      formTitle='Pick your @handle'
       gradientFrom='purple-600'
       gradientVia='cyan-600'
       gradientTo='blue-600'
       textColorClass='text-purple-100'
+      brandingShowText={false}
     >
       <div className='relative min-h-[500px]'>
         {/* Theme Toggle */}

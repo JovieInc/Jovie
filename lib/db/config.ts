@@ -18,6 +18,7 @@ export const PERFORMANCE_THRESHOLDS = {
 // Table names for schema operations
 export const TABLE_NAMES = {
   creatorProfiles: 'creator_profiles',
+  stripeWebhookEvents: 'stripe_webhook_events',
   // Add other table names as they're added to the schema
 } as const;
 

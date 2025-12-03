@@ -13,6 +13,7 @@ interface AuthLayoutProps {
   gradientVia?: string;
   gradientTo?: string;
   textColorClass?: string;
+  brandingShowText?: boolean;
 }
 
 export function AuthLayout({
@@ -24,6 +25,7 @@ export function AuthLayout({
   gradientVia = 'purple-600',
   gradientTo = 'cyan-600',
   textColorClass = 'text-blue-100',
+  brandingShowText = true,
 }: AuthLayoutProps) {
   // Map the gradient props to the correct variant
   const getGradientVariant = () => {
@@ -52,6 +54,7 @@ export function AuthLayout({
         description={brandingDescription}
         gradientVariant={getGradientVariant()}
         textColorClass={textColorClass}
+        showText={brandingShowText}
       />
       <AuthFormContainer title={formTitle}>{children}</AuthFormContainer>
     </div>

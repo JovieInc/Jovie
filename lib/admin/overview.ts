@@ -2,7 +2,7 @@ import 'server-only';
 
 import { and, count, desc, sql as drizzleSql, eq, gte, or } from 'drizzle-orm';
 
-import { checkDbHealth, db } from '@/lib/db';
+import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import {
   clickEvents,
   creatorProfiles,
@@ -80,6 +80,17 @@ export async function getAdminUsageSeries(
 export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - MS_PER_DAY);
+  const hasStripeEvents = await doesTableExist(TABLE_NAMES.stripeWebhookEvents);
+
+  if (!hasStripeEvents) {
+    const dbHealth = await checkDbHealth();
+    return {
+      errorRatePercent: 0,
+      p95LatencyMs: dbHealth.latency ?? null,
+      incidents24h: 0,
+      lastIncidentAt: null,
+    };
+  }
 
   try {
     const [dbHealth, totalEventsRows, incidentRows] = await Promise.all([
@@ -191,34 +202,58 @@ function mapStripeEventToActivity(event: {
   };
 }
 
+type CreatorActivityRow = {
+  id: string;
+  username: string;
+  createdAt: Date | null;
+};
+
+type StripeActivityRow = {
+  id: string;
+  type: string;
+  createdAt: Date;
+};
+
 export async function getAdminActivityFeed(
   limit: number = 10
 ): Promise<AdminActivityItem[]> {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
+  const [hasCreatorProfiles, hasStripeEvents] = await Promise.all([
+    doesTableExist(TABLE_NAMES.creatorProfiles),
+    doesTableExist(TABLE_NAMES.stripeWebhookEvents),
+  ]);
 
   try {
+    const creatorPromise: Promise<CreatorActivityRow[]> = hasCreatorProfiles
+      ? db
+          .select({
+            id: creatorProfiles.id,
+            username: creatorProfiles.username,
+            createdAt: creatorProfiles.createdAt,
+          })
+          .from(creatorProfiles)
+          .where(gte(creatorProfiles.createdAt, sevenDaysAgo))
+          .orderBy(desc(creatorProfiles.createdAt))
+          .limit(limit)
+      : Promise.resolve([] as CreatorActivityRow[]);
+
+    const stripePromise: Promise<StripeActivityRow[]> = hasStripeEvents
+      ? db
+          .select({
+            id: stripeWebhookEvents.id,
+            type: stripeWebhookEvents.type,
+            createdAt: stripeWebhookEvents.createdAt,
+          })
+          .from(stripeWebhookEvents)
+          .where(gte(stripeWebhookEvents.createdAt, sevenDaysAgo))
+          .orderBy(desc(stripeWebhookEvents.createdAt))
+          .limit(limit)
+      : Promise.resolve([] as StripeActivityRow[]);
+
     const [recentCreators, recentStripeEvents] = await Promise.all([
-      db
-        .select({
-          id: creatorProfiles.id,
-          username: creatorProfiles.username,
-          createdAt: creatorProfiles.createdAt,
-        })
-        .from(creatorProfiles)
-        .where(gte(creatorProfiles.createdAt, sevenDaysAgo))
-        .orderBy(desc(creatorProfiles.createdAt))
-        .limit(limit),
-      db
-        .select({
-          id: stripeWebhookEvents.id,
-          type: stripeWebhookEvents.type,
-          createdAt: stripeWebhookEvents.createdAt,
-        })
-        .from(stripeWebhookEvents)
-        .where(gte(stripeWebhookEvents.createdAt, sevenDaysAgo))
-        .orderBy(desc(stripeWebhookEvents.createdAt))
-        .limit(limit),
+      creatorPromise,
+      stripePromise,
     ]);
 
     const creatorItems: AdminActivityItem[] = recentCreators.map(row => ({
