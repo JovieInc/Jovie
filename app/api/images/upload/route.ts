@@ -17,6 +17,9 @@ export const runtime = 'nodejs'; // Required for file upload processing
 
 type BlobPut = typeof import('@vercel/blob').put;
 type SharpModule = typeof import('sharp');
+type SharpConstructor = SharpModule extends { default: infer D }
+  ? D
+  : SharpModule;
 const WEBP_MIME_TYPE = 'image/webp';
 
 // Dynamically import Vercel Blob when needed
@@ -30,9 +33,13 @@ async function getVercelBlobUploader(): Promise<BlobPut | null> {
   }
 }
 
-async function getSharp(): Promise<SharpModule> {
+async function getSharp(): Promise<SharpConstructor> {
   const sharpModule = (await import('sharp')) as unknown as SharpModule;
-  return sharpModule;
+  const factory = (sharpModule as SharpModule & { default?: unknown }).default;
+  if (factory) {
+    return factory as SharpConstructor;
+  }
+  return sharpModule as unknown as SharpConstructor;
 }
 
 const uploadSchema = z.object({
