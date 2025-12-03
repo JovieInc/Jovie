@@ -15,8 +15,7 @@ import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { Artist } from '@/types/db';
-
-export type ContactChannel = 'phone' | 'email';
+import type { NotificationChannel } from '@/types/notifications';
 
 interface CountryOption {
   code: string;
@@ -63,9 +62,13 @@ export function ArtistNotificationsCTA({
     state: notificationsState,
     setState: setNotificationsState,
     notificationsEnabled,
+    channel,
+    setChannel,
+    subscribedChannels,
+    setSubscribedChannels,
+    setSubscriptionDetails,
   } = useProfileNotifications();
 
-  const [channel, setChannel] = useState<ContactChannel>('phone');
   const [country, setCountry] = useState<CountryOption>(COUNTRY_OPTIONS[0]);
   const [phoneInput, setPhoneInput] = useState<string>('');
   const [emailInput, setEmailInput] = useState<string>('');
@@ -82,9 +85,12 @@ export function ArtistNotificationsCTA({
     setCountry(detectDefaultCountry());
   }, []);
 
-  const isSubscribed = notificationsState === 'success';
+  const hasSubscriptions = Boolean(
+    subscribedChannels.email || subscribedChannels.phone
+  );
+  const isSubscribed = notificationsState === 'success' && hasSubscriptions;
 
-  const handleChannelChange = (next: ContactChannel) => {
+  const handleChannelChange = (next: NotificationChannel) => {
     if (isSubmitting) return;
     setChannel(next);
     setError(null);
@@ -191,6 +197,9 @@ export function ArtistNotificationsCTA({
     setError(null);
 
     try {
+      const trimmedEmail = channel === 'email' ? emailInput.trim() : undefined;
+      const phoneE164 = channel === 'phone' ? buildPhoneE164() : undefined;
+
       const body: Record<string, unknown> = {
         artist_id: artist.id,
         artist_handle: artist.handle,
@@ -200,10 +209,10 @@ export function ArtistNotificationsCTA({
       };
 
       if (channel === 'phone') {
-        body.phone = buildPhoneE164();
+        body.phone = phoneE164;
         body.country_code = country.code;
       } else {
-        body.email = emailInput.trim();
+        body.email = trimmedEmail;
       }
 
       const response = await fetch('/api/notifications/subscribe', {
@@ -226,8 +235,20 @@ export function ArtistNotificationsCTA({
         handle: artist.handle,
       });
 
-      showSuccess("You'll receive updates from this artist.");
+      setSubscribedChannels(prev => ({ ...prev, [channel]: true }));
+
+      setSubscriptionDetails(prev => ({
+        ...prev,
+        [channel]:
+          channel === 'phone' ? (phoneE164 ?? '') : (trimmedEmail ?? ''),
+      }));
+
       setNotificationsState('success');
+      showSuccess(
+        channel === 'phone'
+          ? "You'll receive SMS updates from this artist."
+          : "You'll receive email updates from this artist."
+      );
       setIsConfirmOpen(false);
     } catch (error) {
       const message =
@@ -298,7 +319,8 @@ export function ArtistNotificationsCTA({
           <span className='font-semibold'>Subscribed to notifications</span>
         </div>
         <p className='text-xs text-center text-gray-600 dark:text-gray-400'>
-          You&apos;ll now receive updates from this artist.
+          You&apos;ll now receive updates from this artist. Tap the bell to add
+          another channel or unsubscribe.
         </p>
       </div>
     );
@@ -428,8 +450,8 @@ export function ArtistNotificationsCTA({
 }
 
 interface ContactMethodToggleProps {
-  channel: ContactChannel;
-  onChange: (channel: ContactChannel) => void;
+  channel: NotificationChannel;
+  onChange: (channel: NotificationChannel) => void;
   disabled?: boolean;
 }
 

@@ -30,6 +30,7 @@ export const STATSIG_FLAGS = {
   PROFILE_SETTINGS: 'feature_profile_settings',
   AVATAR_UPLOAD: 'feature_avatar_upload',
   AVATAR_UPLOADER: 'feature_avatar_uploader',
+  CONTACTS: 'feature_contacts',
 
   // Backend Features
   UNIVERSAL_NOTIFICATIONS: 'feature_universal_notifications',
@@ -37,6 +38,7 @@ export const STATSIG_FLAGS = {
 
   // Integration Features
   PRICING_USE_CLERK: 'feature_pricing_use_clerk',
+  LINK_INGESTION: 'feature_link_ingestion',
 } as const;
 
 export type StatsigFlagName =

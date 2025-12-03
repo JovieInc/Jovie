@@ -46,7 +46,9 @@ export function UpgradeButton({
       // Track upgrade button click
       track('upgrade_button_clicked', {
         flow_type:
-          directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',
+          directUpgradeEnabled && priceId
+            ? 'direct_checkout'
+            : 'billing_remove_branding',
         price_id: priceId || null,
         feature_flag_enabled: directUpgradeEnabled,
       });
@@ -88,11 +90,11 @@ export function UpgradeButton({
         // Redirect to Stripe checkout
         window.location.href = url;
       } else {
-        // Traditional flow - redirect to pricing page
+        // Traditional flow - redirect to billing remove-branding route
         track('pricing_page_redirect', {
           flow_type: 'traditional',
         });
-        router.push('/pricing');
+        router.push('/billing/remove-branding');
       }
     } catch (err) {
       console.error('Error starting upgrade flow:', err);

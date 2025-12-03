@@ -2,13 +2,15 @@
 
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
+import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/dashboard/actions';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
@@ -17,6 +19,42 @@ import { GroupedLinksManager } from './GroupedLinksManager';
 
 // Define platform types
 type PlatformType = 'social' | 'dsp' | 'custom';
+
+function getPlatformCategory(platform: string): PlatformType {
+  const dspPlatforms = new Set([
+    'spotify',
+    'apple_music',
+    'youtube_music',
+    'soundcloud',
+    'bandcamp',
+    'tidal',
+    'deezer',
+    'amazon_music',
+    'pandora',
+  ]);
+
+  const socialPlatforms = new Set([
+    'instagram',
+    'twitter',
+    'tiktok',
+    'youtube',
+    'facebook',
+    'twitch',
+    'shopify',
+    'etsy',
+    'amazon',
+    'patreon',
+    'buy_me_a_coffee',
+    'kofi',
+    'paypal',
+    'venmo',
+    'cashapp',
+  ]);
+
+  if (dspPlatforms.has(platform)) return 'dsp';
+  if (socialPlatforms.has(platform)) return 'social';
+  return 'custom';
+}
 
 interface Platform {
   id: string;
@@ -39,6 +77,20 @@ interface LinkItem {
   originalUrl: string;
   suggestedTitle: string;
   isValid: boolean;
+  state?: 'active' | 'suggested' | 'rejected';
+  confidence?: number | null;
+  sourcePlatform?: string | null;
+  sourceType?: 'manual' | 'admin' | 'ingested' | null;
+  evidence?: { sources?: string[]; signals?: string[] } | null;
+}
+
+interface SuggestedLink extends DetectedLink {
+  suggestionId: string;
+  state?: 'active' | 'suggested' | 'rejected';
+  confidence?: number | null;
+  sourcePlatform?: string | null;
+  sourceType?: 'manual' | 'admin' | 'ingested' | null;
+  evidence?: { sources?: string[]; signals?: string[] } | null;
 }
 
 interface SaveStatus {
@@ -46,6 +98,23 @@ interface SaveStatus {
   success: boolean | null;
   error: string | null;
   lastSaved: Date | null;
+}
+
+function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+    if (!right) return false;
+    if (left.id !== right.id) return false;
+    if (left.normalizedUrl !== right.normalizedUrl) return false;
+    if (left.originalUrl !== right.originalUrl) return false;
+    if (left.isVisible !== right.isVisible) return false;
+    if (left.category !== right.category) return false;
+    if (left.platform.id !== right.platform.id) return false;
+  }
+  return true;
 }
 
 export function EnhancedDashboardLinks({
@@ -69,85 +138,129 @@ export function EnhancedDashboardLinks({
     error: null,
     lastSaved: null,
   });
+  const linkIngestionGate = useFeatureGate(STATSIG_FLAGS.LINK_INGESTION);
+  const suggestionsEnabled = linkIngestionGate?.value ?? false;
 
-  // Categorize platforms
-  const getPlatformCategory = (
-    platform: string
-  ): 'social' | 'dsp' | 'custom' => {
-    const dspPlatforms = new Set([
-      'spotify',
-      'apple_music',
-      'youtube_music',
-      'soundcloud',
-      'bandcamp',
-      'tidal',
-      'deezer',
-      'amazon_music',
-      'pandora',
-    ]);
+  const buildPlatformMeta = useCallback((link: ProfileSocialLink): Platform => {
+    const displayName = getSocialPlatformLabel(link.platform as SocialPlatform);
+    const category = getPlatformCategory(link.platform);
+    return {
+      id: link.platform,
+      name: displayName,
+      category,
+      icon: link.platform,
+      color: '#000000',
+      placeholder: link.url,
+    };
+  }, []);
 
-    const socialPlatforms = new Set([
-      'instagram',
-      'twitter',
-      'tiktok',
-      'youtube',
-      'facebook',
-      'twitch',
-      'shopify',
-      'etsy',
-      'amazon',
-      'patreon',
-      'buy_me_a_coffee',
-      'kofi',
-      'paypal',
-      'venmo',
-      'cashapp',
-    ]);
-
-    if (dspPlatforms.has(platform)) return 'dsp';
-    if (socialPlatforms.has(platform)) return 'social';
-    return 'custom';
-  };
+  const convertDbLinkToDetected = useCallback(
+    (
+      link: ProfileSocialLink
+    ): DetectedLink & {
+      id: string;
+      state?: 'active' | 'suggested' | 'rejected';
+      confidence?: number | null;
+      sourcePlatform?: string | null;
+      sourceType?: 'manual' | 'admin' | 'ingested' | null;
+      evidence?: { sources?: string[]; signals?: string[] } | null;
+    } => {
+      const platform = buildPlatformMeta(link);
+      const title = link.displayText || platform.name;
+      return {
+        // DetectedLink fields
+        platform,
+        normalizedUrl: link.url,
+        originalUrl: link.url,
+        suggestedTitle: title,
+        isValid: true,
+        // Extended metadata
+        id: link.id,
+        state: link.state ?? 'active',
+        confidence:
+          typeof link.confidence === 'number'
+            ? link.confidence
+            : Number.parseFloat(String(link.confidence ?? '0')) || null,
+        sourcePlatform: link.sourcePlatform ?? null,
+        sourceType: link.sourceType ?? null,
+        evidence: link.evidence ?? null,
+      };
+    },
+    [buildPlatformMeta]
+  );
 
   // Convert database social links to LinkItem format
   const convertDbLinksToLinkItems = useCallback(
     (dbLinks: ProfileSocialLink[] = []): LinkItem[] => {
       return dbLinks.map((link, index) => {
-        const displayName = getSocialPlatformLabel(
-          link.platform as SocialPlatform
-        );
-        const category = getPlatformCategory(link.platform);
-        const platform: Platform = {
-          id: link.platform,
-          name: displayName,
+        const detected = convertDbLinkToDetected(link);
+        const platformMeta = buildPlatformMeta(link);
+        const order =
+          typeof link.sortOrder === 'number' ? link.sortOrder : index;
+        const isVisible = link.isActive ?? true;
+        const category = platformMeta.category;
+
+        const item: LinkItem = {
+          id: detected.id,
+          title: detected.suggestedTitle,
+          url: detected.normalizedUrl,
+          platform: platformMeta,
+          isVisible,
+          order,
           category,
-          icon: link.platform,
-          color: '#000000',
-          placeholder: link.url,
+          normalizedUrl: detected.normalizedUrl,
+          originalUrl: detected.originalUrl,
+          suggestedTitle: detected.suggestedTitle,
+          isValid: detected.isValid,
+          state: detected.state,
+          confidence: detected.confidence ?? null,
+          sourcePlatform: detected.sourcePlatform ?? null,
+          sourceType: detected.sourceType ?? null,
+          evidence: detected.evidence ?? null,
         };
 
+        return item;
+      });
+    },
+    [buildPlatformMeta, convertDbLinkToDetected]
+  );
+
+  const convertDbLinksToSuggestions = useCallback(
+    (dbLinks: ProfileSocialLink[] = []): SuggestedLink[] => {
+      return dbLinks.map(link => {
+        const detected = convertDbLinkToDetected(link);
         return {
-          id: link.id,
-          title: displayName,
-          platform,
-          normalizedUrl: link.url,
-          originalUrl: link.url,
-          suggestedTitle: displayName,
-          isValid: true,
-          isVisible: link.isActive ?? true,
-          order: typeof link.sortOrder === 'number' ? link.sortOrder : index,
-          category,
-          url: link.url,
+          ...detected,
+          suggestionId: link.id,
         };
       });
     },
-    []
+    [convertDbLinkToDetected]
+  );
+
+  const activeInitialLinks = useMemo(
+    () => (initialLinks || []).filter(l => l.state !== 'suggested'),
+    [initialLinks]
+  );
+  const suggestionInitialLinks = useMemo(
+    () => (initialLinks || []).filter(l => l.state === 'suggested'),
+    [initialLinks]
   );
 
   // Initialize links from server props
   const [links, setLinks] = useState<LinkItem[]>(() => {
-    return convertDbLinksToLinkItems(initialLinks || []);
+    return convertDbLinksToLinkItems(activeInitialLinks || []);
   });
+
+  const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
+    convertDbLinksToSuggestions(suggestionInitialLinks || [])
+  );
+
+  useEffect(() => {
+    setSuggestedLinks(
+      convertDbLinksToSuggestions(suggestionInitialLinks || [])
+    );
+  }, [convertDbLinksToSuggestions, suggestionInitialLinks]);
 
   // Save links to database (debounced)
   const debouncedSave = useMemo(
@@ -174,10 +287,19 @@ export function EnhancedDashboardLinks({
 
           const payload = normalized.map((l, index) => ({
             platform: l.platform.id,
+            platformType: l.platform.category,
             url: l.normalizedUrl,
             sortOrder: index,
             isActive: l.isVisible !== false,
             displayText: l.title,
+            state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
+            confidence:
+              typeof l.confidence === 'number'
+                ? Number(l.confidence.toFixed(2))
+                : undefined,
+            sourcePlatform: l.sourcePlatform ?? undefined,
+            sourceType: l.sourceType ?? undefined,
+            evidence: l.evidence ?? undefined,
           }));
 
           if (!profileId) {
@@ -244,6 +366,14 @@ export function EnhancedDashboardLinks({
   const handleManagerLinksChange = useCallback(
     (updated: DetectedLink[]) => {
       const mapped: LinkItem[] = updated.map((link, index) => {
+        const meta = link as unknown as {
+          id?: string;
+          state?: 'active' | 'suggested' | 'rejected';
+          confidence?: number | null;
+          sourcePlatform?: string | null;
+          sourceType?: 'manual' | 'admin' | 'ingested' | null;
+          evidence?: { sources?: string[]; signals?: string[] } | null;
+        };
         const rawVisibility = (link as unknown as { isVisible?: boolean })
           .isVisible;
         const isVisible = rawVisibility ?? true;
@@ -254,9 +384,10 @@ export function EnhancedDashboardLinks({
             : 'custom';
 
         const idBase = link.normalizedUrl || link.originalUrl;
+        const state = meta.state ?? (isVisible ? 'active' : 'suggested');
 
         return {
-          id: `${link.platform.id}::${category}::${idBase}`,
+          id: meta.id || `${link.platform.id}::${category}::${idBase}`,
           title: link.suggestedTitle || link.platform.name,
           url: link.normalizedUrl,
           platform: {
@@ -274,13 +405,129 @@ export function EnhancedDashboardLinks({
           originalUrl: link.originalUrl,
           suggestedTitle: link.suggestedTitle,
           isValid: link.isValid,
+          state,
+          confidence:
+            typeof meta.confidence === 'number' ? meta.confidence : null,
+          sourcePlatform: meta.sourcePlatform ?? null,
+          sourceType: meta.sourceType ?? null,
+          evidence: meta.evidence ?? null,
         };
       });
-
-      setLinks(mapped);
-      debouncedSave(mapped);
+      let shouldSave = false;
+      setLinks(prev => {
+        if (areLinkItemsEqual(prev, mapped)) {
+          return prev;
+        }
+        shouldSave = true;
+        return mapped;
+      });
+      if (shouldSave) {
+        debouncedSave(mapped);
+      }
     },
     [debouncedSave]
+  );
+
+  const handleAcceptSuggestion = useCallback(
+    async (
+      suggestion: DetectedLink & {
+        suggestionId?: string;
+      }
+    ) => {
+      if (!profileId) {
+        toast.error('Missing profile id; please refresh and try again.');
+        return null;
+      }
+
+      try {
+        const suggestionId = suggestion.suggestionId;
+        if (!suggestionId) {
+          return null;
+        }
+        const response = await fetch('/api/dashboard/social-links', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId,
+            linkId: suggestionId,
+            action: 'accept',
+          }),
+        });
+
+        if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(data?.error || 'Failed to accept link');
+        }
+
+        const data = (await response.json()) as {
+          link?: ProfileSocialLink;
+        };
+
+        if (data.link) {
+          const [detected] = convertDbLinksToLinkItems([data.link]);
+          setSuggestedLinks(prev =>
+            prev.filter(s => s.suggestionId !== suggestionId)
+          );
+          if (detected) {
+            setLinks(prev => [...prev, detected]);
+          }
+          toast.success('Link added to your list');
+          return detected;
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to accept link'
+        );
+      }
+      return null;
+    },
+    [convertDbLinksToLinkItems, profileId]
+  );
+
+  const handleDismissSuggestion = useCallback(
+    async (
+      suggestion: DetectedLink & {
+        suggestionId?: string;
+      }
+    ) => {
+      if (!profileId) {
+        toast.error('Missing profile id; please refresh and try again.');
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/dashboard/social-links', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            profileId,
+            linkId: suggestion.suggestionId,
+            action: 'dismiss',
+          }),
+        });
+
+        if (!response.ok) {
+          const data = (await response.json().catch(() => null)) as {
+            error?: string;
+          } | null;
+          throw new Error(data?.error || 'Failed to dismiss link');
+        }
+
+        setSuggestedLinks(prev =>
+          prev.filter(s => s.suggestionId !== suggestion.suggestionId)
+        );
+        toast.success('Suggestion dismissed');
+      } catch (error) {
+        console.error(error);
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to dismiss link'
+        );
+      }
+    },
+    [profileId]
   );
 
   // Get username and avatar for preview
@@ -357,6 +604,16 @@ export function EnhancedDashboardLinks({
             onLinksChange={handleManagerLinksChange}
             creatorName={artist?.name ?? undefined}
             isMusicProfile={isMusicProfile}
+            suggestedLinks={
+              suggestionsEnabled ? (suggestedLinks as DetectedLink[]) : []
+            }
+            onAcceptSuggestion={
+              suggestionsEnabled ? handleAcceptSuggestion : undefined
+            }
+            onDismissSuggestion={
+              suggestionsEnabled ? handleDismissSuggestion : undefined
+            }
+            suggestionsEnabled={suggestionsEnabled}
           />
         </div>
       </div>

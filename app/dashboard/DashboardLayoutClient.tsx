@@ -104,7 +104,7 @@ export default function DashboardLayoutClient({
         style={
           {
             '--sidebar-width': '260px',
-            '--sidebar-width-icon': '64px',
+            '--sidebar-width-icon': '56px',
           } as CSSProperties
         }
       >

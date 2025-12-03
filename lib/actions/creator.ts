@@ -3,11 +3,15 @@
 import { revalidatePath } from 'next/cache';
 import { updateCreatorProfile as updateProfile } from '@/app/dashboard/actions';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
-import type { CreatorProfile, SocialLink } from '@/lib/db/schema';
+import type { CreatorProfile } from '@/lib/db/schema';
+
+type CreatorProfileWithLinks = Awaited<
+  ReturnType<typeof getCreatorProfileWithLinks>
+>;
 
 export async function fetchCreatorProfile(
   username: string
-): Promise<(CreatorProfile & { socialLinks: SocialLink[] }) | null> {
+): Promise<CreatorProfileWithLinks> {
   try {
     return await getCreatorProfileWithLinks(username);
   } catch (error) {

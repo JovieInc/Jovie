@@ -43,6 +43,7 @@ export function CreatorProfile({ username }: { username: string }) {
           name={creator.displayName || creator.username}
           size='display-md'
           className='h-24 w-24'
+          verified={creator.isVerified ?? undefined}
         />
         <div className='text-center sm:text-left'>
           <h1 className='text-2xl font-bold'>

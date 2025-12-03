@@ -8,6 +8,31 @@ Jovie uses a unified toast notification system that provides consistent user fee
 
 > **Note**: This notification system was designed to replace direct calls to external toast libraries and provide a consistent user experience throughout the application.
 
+## Server-delivered notifications (email/push/in-app)
+
+- Send cross-channel notifications through `lib/notifications/service.ts` to avoid duplicating provider logic.
+- Email delivery is handled by Resend (`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_REPLY_TO_EMAIL`). Missing config skips sends gracefully.
+- Preferences are resolved from creator profile settings (`settings.marketing_emails` + `marketingOptOut`) and channel toggles under `settings.notifications.channels`.
+- Provide a stable `id`/`dedupKey` so `dismissNotification` can stop the same message from fanning out across channels (e.g., when a user dismisses an in-app toast).
+- Example:
+  ```ts
+  import { sendNotification, dismissNotification } from '@/lib/notifications/service';
+
+  await sendNotification(
+    {
+      id: `dashboard-alert-${userId}`,
+      category: 'product',
+      subject: 'New feature available',
+      text: 'Try the new dashboard filters.',
+      channels: ['email', 'in_app'],
+    },
+    { creatorProfileId, email }
+  );
+
+  // When user dismisses the in-app notification:
+  await dismissNotification(`dashboard-alert-${userId}`, { creatorProfileId });
+  ```
+
 ## When to Use Toasts vs Console Logging
 
 ### ✅ Use Toasts For:

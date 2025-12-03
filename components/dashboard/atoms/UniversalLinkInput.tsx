@@ -29,6 +29,7 @@ interface UniversalLinkInputProps {
   prefillUrl?: string; // optional prefill
   onPrefillConsumed?: () => void; // notify parent once we consume it
   creatorName?: string; // Creator's name for personalized link titles
+  onQueryChange?: (value: string) => void; // mirror URL value for filtering/search
 }
 
 export interface UniversalLinkInputRef {
@@ -49,12 +50,12 @@ export const UniversalLinkInput = forwardRef<
       socialVisibleLimit = MAX_SOCIAL_LINKS,
       prefillUrl,
       onPrefillConsumed,
+      creatorName,
+      onQueryChange,
     },
     forwardedRef
   ) => {
     const [url, setUrl] = useState('');
-    const [customTitle, setCustomTitle] = useState('');
-    const [isEditing, setIsEditing] = useState(false);
     const inputRef = useRef<HTMLDivElement>(null);
     const urlInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,6 +64,7 @@ export const UniversalLinkInput = forwardRef<
       if (prefillUrl && !url) {
         setUrl(prefillUrl);
         onPrefillConsumed?.();
+        onQueryChange?.(prefillUrl);
         // focus input so user can hit Enter quickly
         setTimeout(() => inputRef.current?.querySelector('input')?.focus(), 0);
       }
@@ -70,31 +72,20 @@ export const UniversalLinkInput = forwardRef<
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prefillUrl]);
 
-    // Real-time platform detection
+    // Real-time platform detection (uses creatorName for better SEO titles)
     const detectedLink = useMemo(() => {
       if (!url.trim()) return null;
-      return detectPlatform(url.trim());
-    }, [url]);
+      return detectPlatform(url.trim(), creatorName);
+    }, [url, creatorName]);
 
-    // Handle URL input changes
+    // Handle URL input changes (also used as combined search query)
     const handleUrlChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
-        setUrl(e.target.value);
-        // Reset custom title when URL changes
-        if (customTitle && !isEditing) {
-          setCustomTitle('');
-        }
+        const value = e.target.value;
+        setUrl(value);
+        onQueryChange?.(value);
       },
-      [customTitle, isEditing]
-    );
-
-    // Handle title editing
-    const handleTitleChange = useCallback(
-      (e: React.ChangeEvent<HTMLInputElement>) => {
-        setCustomTitle(e.target.value);
-        setIsEditing(true);
-      },
-      []
+      [onQueryChange]
     );
 
     // Add link handler
@@ -103,21 +94,19 @@ export const UniversalLinkInput = forwardRef<
 
       const linkToAdd = {
         ...detectedLink,
-        suggestedTitle: customTitle || detectedLink.suggestedTitle,
       };
 
       onAdd(linkToAdd);
 
       // Reset form
       setUrl('');
-      setCustomTitle('');
-      setIsEditing(false);
+      onQueryChange?.('');
 
       // Auto-focus the URL input after adding a link
       setTimeout(() => {
         inputRef.current?.querySelector('input')?.focus();
       }, 50);
-    }, [detectedLink, customTitle, onAdd]);
+    }, [detectedLink, onAdd, onQueryChange]);
 
     // Handle keyboard interactions
     const handleKeyDown = useCallback(
@@ -127,16 +116,15 @@ export const UniversalLinkInput = forwardRef<
           handleAdd();
         } else if (e.key === 'Escape') {
           e.preventDefault();
-          // Clear the input and reset state
+          // Clear the input
           setUrl('');
-          setCustomTitle('');
-          setIsEditing(false);
+          onQueryChange?.('');
         }
       },
-      [handleAdd, detectedLink, setUrl, setCustomTitle, setIsEditing]
+      [handleAdd, detectedLink, onQueryChange]
     );
 
-    const displayTitle = customTitle || detectedLink?.suggestedTitle || '';
+    const displayTitle = detectedLink?.suggestedTitle || '';
     const brandColor = detectedLink?.platform.color
       ? `#${detectedLink.platform.color}`
       : '#6b7280'; // fallback gray-500
@@ -228,7 +216,7 @@ export const UniversalLinkInput = forwardRef<
         <div id='link-detection-status' className='sr-only' aria-live='polite'>
           {detectedLink
             ? detectedLink.isValid
-              ? `${detectedLink.platform.name} link detected. You can now add a title and add this link.`
+              ? `${detectedLink.platform.name} link detected. Title set automatically based on your profile and URL. You can now add this link.`
               : `Invalid ${detectedLink.platform.name} link. ${detectedLink.error || 'Please check the URL.'}`
             : url
               ? 'No valid link detected. Please enter a valid URL.'
@@ -240,18 +228,15 @@ export const UniversalLinkInput = forwardRef<
           <div
             className={`p-3 rounded-lg border transition-all duration-200 ${
               isPlatformDuplicate
-                ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20'
+                ? 'border-red-200 bg-red-50 dark:border-red-500/70 dark:bg-surface-1/80'
                 : detectedLink.isValid
                   ? 'border-surface-2 bg-surface-1'
-                  : 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/10'
+                  : 'border-red-200 bg-red-50/50 dark:border-red-500/70 dark:bg-surface-1/80'
             }`}
             style={
               detectedLink.isValid && !isPlatformDuplicate
-                ? {
-                    borderColor: `${brandColor}30`,
-                    backgroundColor: `${brandColor}08`,
-                  }
-                : {}
+                ? { borderColor: `${brandColor}40` }
+                : undefined
             }
             role='region'
             aria-label='Link preview'
@@ -293,24 +278,24 @@ export const UniversalLinkInput = forwardRef<
                   </span>
                 </div>
 
-                {/* Title input */}
+                {/* Title (auto-generated, read-only) */}
                 <label htmlFor='link-title-input' className='sr-only'>
-                  Link title
+                  Link title (set automatically)
                 </label>
                 <Input
                   id='link-title-input'
                   type='text'
                   placeholder='Link title'
                   value={displayTitle}
-                  onChange={handleTitleChange}
-                  onKeyDown={handleKeyDown}
+                  readOnly
                   disabled={disabled}
                   inputMode='text'
                   autoCapitalize='words'
                   autoCorrect='on'
                   autoComplete='off'
                   className='text-sm mb-2'
-                  aria-required='true'
+                  aria-readonly='true'
+                  aria-required='false'
                   aria-invalid={!displayTitle.trim() ? 'true' : 'false'}
                 />
 

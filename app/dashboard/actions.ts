@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -12,8 +12,10 @@ import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
 import {
   type CreatorProfile,
+  clickEvents,
   creatorProfiles,
   socialLinks,
+  tips,
   userSettings,
   users,
 } from '@/lib/db/schema';
@@ -27,7 +29,20 @@ export interface DashboardData {
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
   isAdmin: boolean;
+  tippingStats: {
+    tipClicks: number;
+    tipsSubmitted: number;
+    totalReceivedCents: number;
+    monthReceivedCents: number;
+  };
 }
+
+const createEmptyTippingStats = () => ({
+  tipClicks: 0,
+  tipsSubmitted: 0,
+  totalReceivedCents: 0,
+  monthReceivedCents: 0,
+});
 
 function profileIsPublishable(profile: CreatorProfile | null): boolean {
   if (!profile) return false;
@@ -52,6 +67,11 @@ export interface ProfileSocialLink {
   sortOrder: number | null;
   isActive: boolean | null;
   displayText?: string | null;
+  state?: 'active' | 'suggested' | 'rejected';
+  confidence?: number | null;
+  sourcePlatform?: string | null;
+  sourceType?: 'manual' | 'admin' | 'ingested' | null;
+  evidence?: { sources?: string[]; signals?: string[] } | null;
 }
 async function fetchDashboardDataWithSession(
   dbClient: DbType,
@@ -59,6 +79,8 @@ async function fetchDashboardDataWithSession(
 ): Promise<Omit<DashboardData, 'isAdmin'>> {
   // All queries run inside a transaction to keep the RLS session variable set
   try {
+    const emptyTippingStats = createEmptyTippingStats();
+
     // First check if user exists in users table
     const [userData] = await dbClient
       .select({ id: users.id })
@@ -75,6 +97,7 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        tippingStats: emptyTippingStats,
       };
     }
 
@@ -94,6 +117,7 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        tippingStats: emptyTippingStats,
       };
     }
 
@@ -125,7 +149,7 @@ async function fetchDashboardDataWithSession(
             .where(
               and(
                 eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.isActive, true)
+                eq(socialLinks.state, 'active')
               )
             );
           const total = Number(result?.[0]?.c ?? 0);
@@ -138,6 +162,51 @@ async function fetchDashboardDataWithSession(
       })(),
     ]);
 
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const [tipTotalsRaw] = await dbClient
+      .select({
+        totalReceived: drizzleSql`
+          COALESCE(SUM(${tips.amountCents}), 0)
+        `,
+        monthReceived: drizzleSql`
+          COALESCE(
+            SUM(
+              CASE
+                WHEN ${tips.createdAt} >= ${startOfMonth}
+                THEN ${tips.amountCents}
+                ELSE 0
+              END
+            ),
+            0
+          )
+        `,
+        tipsSubmitted: drizzleSql`
+          COALESCE(COUNT(${tips.id}), 0)
+        `,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, selected.id));
+
+    const [clickStats] = await dbClient
+      .select({ c: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, selected.id),
+          eq(clickEvents.linkType, 'tip')
+        )
+      );
+
+    const tippingStats = {
+      tipClicks: Number(clickStats?.c ?? 0),
+      tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
+      totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
+      monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
+    };
+
     // Return data with first profile selected by default
     return {
       user: userData,
@@ -146,6 +215,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: !profileIsPublishable(selected),
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
+      tippingStats,
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
@@ -157,6 +227,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      tippingStats: createEmptyTippingStats(),
     };
   }
 }
@@ -179,6 +250,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       sidebarCollapsed: false,
       hasSocialLinks: false,
       isAdmin,
+      tippingStats: createEmptyTippingStats(),
     };
   }
 
@@ -223,6 +295,11 @@ export async function getProfileSocialLinks(
         sortOrder: socialLinks.sortOrder,
         isActive: socialLinks.isActive,
         displayText: socialLinks.displayText,
+        state: socialLinks.state,
+        confidence: socialLinks.confidence,
+        sourcePlatform: socialLinks.sourcePlatform,
+        sourceType: socialLinks.sourceType,
+        evidence: socialLinks.evidence,
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -239,15 +316,35 @@ export async function getProfileSocialLinks(
     // Map only existing link rows (filter out null linkId from left join)
     const links: ProfileSocialLink[] = rows
       .filter(r => r.linkId !== null)
-      .map(r => ({
-        id: r.linkId!,
-        platform: r.platform!,
-        platformType: r.platformType ?? null,
-        url: r.url!,
-        sortOrder: r.sortOrder ?? 0,
-        isActive: r.isActive ?? true,
-        displayText: r.displayText ?? null,
-      }));
+      .map(r => {
+        const state =
+          (r.state as 'active' | 'suggested' | 'rejected' | null) ??
+          (r.isActive ? 'active' : 'suggested');
+        if (state === 'rejected') return null;
+        const parsedConfidence =
+          typeof r.confidence === 'number'
+            ? r.confidence
+            : Number.parseFloat(String(r.confidence ?? '0'));
+
+        return {
+          id: r.linkId!,
+          platform: r.platform!,
+          platformType: r.platformType ?? null,
+          url: r.url!,
+          sortOrder: r.sortOrder ?? 0,
+          isActive: state === 'active',
+          displayText: r.displayText ?? null,
+          state,
+          confidence: Number.isFinite(parsedConfidence) ? parsedConfidence : 0,
+          sourcePlatform: r.sourcePlatform,
+          sourceType: r.sourceType ?? null,
+          evidence: r.evidence as {
+            sources?: string[];
+            signals?: string[];
+          } | null,
+        };
+      })
+      .filter((link): link is NonNullable<typeof link> => Boolean(link));
 
     return links;
   });

@@ -34,6 +34,7 @@ export function ArtistInfo({
         alt={artist.name}
         name={artist.name}
         size={avatarSizeMap[avatarSize]}
+        verified={artist.is_verified}
         priority
       />
 

@@ -11,6 +11,11 @@ import React, {
 } from 'react';
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
 import { track } from '@/lib/analytics';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  formatAcceptedImageTypes,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 import { cn } from '@/lib/utils';
 
 export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
@@ -29,7 +34,7 @@ export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   /** Maximum file size in bytes (default: 4MB, aligned with /api/images/upload) */
   maxFileSize?: number;
   /** Accepted file types */
-  acceptedTypes?: string[];
+  acceptedTypes?: readonly string[];
   /** Whether to show hover overlay when uploadable */
   showHoverOverlay?: boolean;
 }
@@ -56,8 +61,8 @@ const SIZE_MAP = {
 };
 
 // File validation
-const DEFAULT_MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB (API enforced)
-const DEFAULT_ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const DEFAULT_MAX_FILE_SIZE = AVATAR_MAX_FILE_SIZE_BYTES; // API enforced
+const DEFAULT_ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;
 
 const STATUS_COLORS = {
   uploading: 'text-accent-token',
@@ -84,10 +89,12 @@ function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
 function validateFile(
   file: File,
   maxFileSize: number = DEFAULT_MAX_FILE_SIZE,
-  acceptedTypes: string[] = DEFAULT_ACCEPTED_TYPES
+  acceptedTypes: readonly string[] = DEFAULT_ACCEPTED_TYPES
 ): string | null {
-  if (!acceptedTypes.includes(file.type)) {
-    return `Invalid file type. Please select ${acceptedTypes.map(t => t.split('/')[1].toUpperCase()).join(', ')} files only.`;
+  const normalizedType = file.type.toLowerCase?.() ?? file.type;
+  if (!acceptedTypes.includes(normalizedType)) {
+    const allowedTypes = formatAcceptedImageTypes(acceptedTypes);
+    return `Invalid file type. Please select ${allowedTypes.join(', ')} files only.`;
   }
 
   if (file.size > maxFileSize) {

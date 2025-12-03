@@ -4,10 +4,13 @@ import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
+import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
   getCreatorProfileWithLinks,
   incrementProfileViews,
 } from '@/lib/db/queries';
+import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
   convertCreatorProfileToArtist,
@@ -28,13 +31,14 @@ const getProfileAndLinks = unstable_cache(
   ): Promise<{
     profile: CreatorProfile | null;
     links: LegacySocialLink[];
+    contacts: DbCreatorContact[];
     status: 'ok' | 'not_found' | 'error';
   }> => {
     try {
       const result = await getCreatorProfileWithLinks(username);
 
       if (!result || !result.isPublic) {
-        return { profile: null, links: [], status: 'not_found' };
+        return { profile: null, links: [], contacts: [], status: 'not_found' };
       }
 
       const profile: CreatorProfile = {
@@ -80,10 +84,12 @@ const getProfileAndLinks = unstable_cache(
           created_at: link.createdAt.toISOString(),
         })) ?? [];
 
-      return { profile, links, status: 'ok' };
+      const contacts: DbCreatorContact[] = result.contacts ?? [];
+
+      return { profile, links, contacts, status: 'ok' };
     } catch (error) {
       console.error('Error fetching creator profile:', error);
-      return { profile: null, links: [], status: 'error' };
+      return { profile: null, links: [], contacts: [], status: 'error' };
     }
   },
   ['public-profile-v1'],
@@ -105,7 +111,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const { mode = 'profile' } = resolvedSearchParams || {};
 
   const normalizedUsername = username.toLowerCase();
-  const { profile, links, status } =
+  const { profile, links, contacts, status } =
     await getProfileAndLinks(normalizedUsername);
 
   if (status === 'error') {
@@ -138,6 +144,10 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   // Social links loaded together with profile in a single cached helper
   const socialLinks = links;
+  const publicContacts: PublicContact[] = toPublicContacts(
+    contacts,
+    artist.name
+  );
 
   // Determine subtitle based on mode
   const getSubtitle = (mode: string) => {
@@ -162,6 +172,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         mode={mode}
         artist={artist}
         socialLinks={socialLinks}
+        contacts={publicContacts}
         subtitle={getSubtitle(mode)}
         showTipButton={showTipButton}
         showBackButton={showBackButton}

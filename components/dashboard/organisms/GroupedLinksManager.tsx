@@ -17,7 +17,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
@@ -37,6 +36,27 @@ export interface GroupedLinksManagerProps<
   onLinkAdded?: (links: T[]) => void;
   creatorName?: string; // For personalized link titles
   isMusicProfile?: boolean; // Hint for DSP-forward suggestions
+  suggestedLinks?: Array<
+    T & {
+      suggestionId?: string;
+      state?: 'active' | 'suggested' | 'rejected';
+      confidence?: number | null;
+      sourcePlatform?: string | null;
+      sourceType?: string | null;
+      evidence?: { sources?: string[]; signals?: string[] } | null;
+    }
+  >;
+  onAcceptSuggestion?: (
+    suggestion: T & {
+      suggestionId?: string;
+    }
+  ) => Promise<DetectedLink | null> | DetectedLink | null | void;
+  onDismissSuggestion?: (
+    suggestion: T & {
+      suggestionId?: string;
+    }
+  ) => Promise<void> | void;
+  suggestionsEnabled?: boolean;
 }
 
 // Client Component scaffold for a single, grouped Links Manager
@@ -103,6 +123,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   onLinkAdded,
   creatorName,
   isMusicProfile = false,
+  suggestedLinks = [],
+  onAcceptSuggestion,
+  onDismissSuggestion,
+  suggestionsEnabled = false,
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
   const [collapsed, setCollapsed] = useState<
@@ -121,6 +145,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
+  const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
+
+  useEffect(() => {
+    setPendingSuggestions(suggestedLinks);
+  }, [suggestedLinks]);
 
   const matchesSearch = useCallback(
     (l: T): boolean => {
@@ -342,6 +371,53 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
   }
 
+  const suggestionKey = (s: T & { suggestionId?: string }) =>
+    s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`;
+
+  async function handleAcceptSuggestionClick(
+    suggestion: (typeof pendingSuggestions)[number]
+  ) {
+    if (!onAcceptSuggestion) return;
+    const accepted = await onAcceptSuggestion(suggestion);
+    setPendingSuggestions(prev =>
+      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
+    );
+    if (accepted) {
+      const nextLink = {
+        ...(accepted as T),
+        isVisible:
+          (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
+        state: (accepted as unknown as { state?: string }).state ?? 'active',
+      } as T;
+      const acceptedIdentity = canonicalIdentity({
+        platform: (nextLink as DetectedLink).platform,
+        normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
+      });
+      const hasDuplicate = links.some(
+        existing =>
+          canonicalIdentity({
+            platform: (existing as DetectedLink).platform,
+            normalizedUrl: (existing as DetectedLink).normalizedUrl,
+          }) === acceptedIdentity
+      );
+      if (!hasDuplicate) {
+        setLinks(prev => [...prev, nextLink]);
+      }
+      onLinkAdded?.([nextLink]);
+    }
+  }
+
+  async function handleDismissSuggestionClick(
+    suggestion: (typeof pendingSuggestions)[number]
+  ) {
+    if (onDismissSuggestion) {
+      await onDismissSuggestion(suggestion);
+    }
+    setPendingSuggestions(prev =>
+      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
+    );
+  }
+
   function handleToggle(idx: number) {
     setLinks(prev => {
       const next = [...prev];
@@ -430,6 +506,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [existingPlatforms, isMusicProfile]);
 
   const hasAnyLinks = links.length > 0;
+  const filteredCount = links.filter(matchesSearch).length;
 
   const COMPLETION_TARGET = 6;
   const completionPercent = hasAnyLinks
@@ -505,32 +582,33 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           </div>
         </div>
       )}
-      <div className='space-y-2'>
-        <div className='relative'>
-          <Input
-            type='text'
-            placeholder='Search links...'
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className='pr-16 text-sm'
-          />
-          {searchQuery && (
-            <button
-              type='button'
-              onClick={() => setSearchQuery('')}
-              className='absolute right-3 top-1/2 -translate-y-1/2 text-xs text-tertiary-token transition-colors hover:text-secondary-token'
-            >
-              Clear
-            </button>
-          )}
-        </div>
-        <div className='flex items-center justify-between text-xs text-secondary-token'>
+      {/* Combined search + add input */}
+      <UniversalLinkInput
+        onAdd={handleAdd}
+        existingPlatforms={links
+          .filter(l => l.platform.id !== 'youtube')
+          .map(l => l.platform.id)}
+        socialVisibleCount={
+          links.filter(
+            l => l.platform.category === 'social' && linkIsVisible(l)
+          ).length
+        }
+        socialVisibleLimit={MAX_SOCIAL_LINKS}
+        creatorName={creatorName}
+        prefillUrl={prefillUrl}
+        onPrefillConsumed={() => setPrefillUrl(undefined)}
+        onQueryChange={setSearchQuery}
+      />
+
+      {/* Links summary + completion indicator */}
+      <div className='mt-2 space-y-1 text-xs text-secondary-token'>
+        <div className='flex items-center justify-between'>
           <span>
-            {links.length} {links.length === 1 ? 'link' : 'links'} found
+            {filteredCount} {filteredCount === 1 ? 'link' : 'links'} found
           </span>
         </div>
         {hasAnyLinks && !searchQuery.trim() && (
-          <div className='mt-1 flex flex-col gap-1 text-xs text-secondary-token'>
+          <div className='mt-1 flex flex-col gap-1'>
             <div className='flex items-center justify-between'>
               <span>{`You're ${completionPercent}% done`}</span>
               <span>Most creators add 4–6 links.</span>
@@ -547,50 +625,124 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           </div>
         )}
       </div>
-      {/* Add new link */}
-      <UniversalLinkInput
-        onAdd={handleAdd}
-        existingPlatforms={links
-          .filter(l => l.platform.id !== 'youtube')
-          .map(l => l.platform.id)}
-        socialVisibleCount={
-          links.filter(
-            l => l.platform.category === 'social' && linkIsVisible(l)
-          ).length
-        }
-        socialVisibleLimit={MAX_SOCIAL_LINKS}
-        creatorName={creatorName}
-        prefillUrl={prefillUrl}
-        onPrefillConsumed={() => setPrefillUrl(undefined)}
-      />
+
+      {suggestionsEnabled && pendingSuggestions.length > 0 && (
+        <div className='mt-3 rounded-lg border border-subtle bg-surface-1 p-3 space-y-3'>
+          <div className='flex items-center justify-between'>
+            <div className='text-sm font-semibold text-primary-token'>
+              Suggested links
+            </div>
+            <span className='text-xs text-secondary-token'>
+              {pendingSuggestions.length} pending
+            </span>
+          </div>
+          <div className='grid gap-3 sm:grid-cols-2'>
+            {pendingSuggestions.map(suggestion => {
+              const iconMeta = getPlatformIcon(suggestion.platform.icon);
+              const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+              const rawConfidence = (suggestion as { confidence?: number })
+                .confidence;
+              const confidence: number | null =
+                typeof rawConfidence === 'number' ? rawConfidence : null;
+              return (
+                <div
+                  key={suggestionKey(suggestion)}
+                  className='rounded-lg border border-subtle bg-surface-2 p-3 flex flex-col gap-2'
+                >
+                  <div className='flex items-start gap-2'>
+                    <span
+                      className='flex h-8 w-8 items-center justify-center rounded-md'
+                      style={{
+                        backgroundColor: `${brandHex}22`,
+                        color: brandHex,
+                      }}
+                    >
+                      <SocialIcon
+                        platform={suggestion.platform.icon}
+                        className='h-4 w-4'
+                      />
+                    </span>
+                    <div className='min-w-0 flex-1'>
+                      <div className='text-sm font-medium text-primary-token truncate'>
+                        {suggestion.suggestedTitle}
+                      </div>
+                      <div className='text-xs text-tertiary-token truncate'>
+                        {suggestion.normalizedUrl}
+                      </div>
+                      {typeof confidence === 'number' && (
+                        <div className='mt-1 inline-flex items-center gap-1 rounded-full bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token ring-1 ring-subtle'>
+                          Confidence {Math.round(confidence * 100)}%
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      size='sm'
+                      className='flex-1'
+                      onClick={() =>
+                        void handleAcceptSuggestionClick(suggestion)
+                      }
+                    >
+                      Add
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='ghost'
+                      onClick={() =>
+                        void handleDismissSuggestionClick(suggestion)
+                      }
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {suggestionPills.length > 0 && !searchQuery.trim() && (
-        <div
-          className='mt-3 flex flex-wrap gap-2'
-          aria-label='Quick link suggestions'
-        >
-          {suggestionPills.map(pill => {
-            const iconMeta = getPlatformIcon(pill.simpleIconId);
-            const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-            return (
-              <button
-                key={pill.id}
-                type='button'
-                onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0'
-                style={{ borderColor: brandHex, color: brandHex }}
-              >
-                <span className='flex items-center justify-center rounded-full bg-surface-1/80 p-0.5'>
-                  <SocialIcon
-                    platform={pill.simpleIconId}
-                    className='h-3.5 w-3.5'
-                  />
-                </span>
-                <span>{pill.label}</span>
-                <span className='ml-0.5 text-[10px]'>+</span>
-              </button>
-            );
-          })}
+        <div className='mt-3 relative' aria-label='Quick link suggestions'>
+          <div
+            className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
+            style={{
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              WebkitMaskImage:
+                'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+              maskImage:
+                'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+            }}
+          >
+            {suggestionPills.map(pill => {
+              const iconMeta = getPlatformIcon(pill.simpleIconId);
+              const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+              return (
+                <button
+                  key={pill.id}
+                  type='button'
+                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
+                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-secondary-token bg-surface-1/80 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0'
+                  style={{ borderColor: brandHex }}
+                >
+                  <span
+                    className='flex items-center justify-center rounded-full bg-surface-2/80 p-0.5'
+                    style={{ color: brandHex }}
+                  >
+                    <SocialIcon
+                      platform={pill.simpleIconId}
+                      className='h-3.5 w-3.5'
+                    />
+                  </span>
+                  <span>{pill.label}</span>
+                  <span className='ml-0.5 text-[10px]'>+</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

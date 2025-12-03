@@ -144,11 +144,8 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    expect(
-      screen.getByText(
-        'JPG, PNG or WebP. Max size 4MB. Square images work best.'
-      )
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Auto-optimized to WebP/i)).toBeInTheDocument();
+    expect(screen.getByText(/Max size 4MB/i)).toBeInTheDocument();
     expect(
       screen.getByText(
         'If upload fails, a default avatar will be used automatically.'

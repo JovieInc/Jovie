@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 const qrCache = new Map<string, string>();
 const MAX_CACHE_SIZE = 100;
 
-function getQrUrl(data: string, size: number) {
+export function getQrCodeUrl(data: string, size: number) {
   const key = `${data}-${size}`;
 
   let url = qrCache.get(key);
@@ -41,7 +41,7 @@ export function QRCode({
   className,
 }: QRCodeProps) {
   const [hasError, setHasError] = useState(false);
-  const qrUrl = useMemo(() => getQrUrl(data, size), [data, size]);
+  const qrUrl = useMemo(() => getQrCodeUrl(data, size), [data, size]);
 
   // Reset error state when props change
   useEffect(() => {

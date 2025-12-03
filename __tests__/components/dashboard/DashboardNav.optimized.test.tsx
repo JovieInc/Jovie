@@ -47,6 +47,12 @@ const baseDashboardData: DashboardData = {
   sidebarCollapsed: false,
   hasSocialLinks: false,
   isAdmin: false,
+  tippingStats: {
+    tipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
 };
 
 function renderDashboardNav(

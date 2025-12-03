@@ -1,0 +1,32 @@
+import { type SocialLinkState } from '@/types/db';
+
+export interface IngestionJobPayload {
+  creatorProfileId: string;
+  sourceUrl: string;
+  dedupKey?: string;
+  depth?: number;
+}
+
+export interface ExtractedLink {
+  url: string;
+  platformId?: string;
+  title?: string;
+  sourcePlatform?: string;
+  evidence?: {
+    sources?: string[];
+    signals?: string[];
+  };
+}
+
+export interface ExtractionResult {
+  links: ExtractedLink[];
+  displayName?: string | null;
+  avatarUrl?: string | null;
+}
+
+export interface NormalizedLinkCandidate extends ExtractedLink {
+  normalizedUrl: string;
+  canonicalIdentity: string;
+  state: SocialLinkState;
+  confidence: number;
+}

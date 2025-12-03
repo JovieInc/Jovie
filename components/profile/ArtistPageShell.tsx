@@ -1,10 +1,12 @@
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/ProfileShell';
+import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 type ArtistPageShellProps = {
   artist: Artist;
   socialLinks: LegacySocialLink[];
+  contacts: PublicContact[];
   subtitle?: string;
   children?: React.ReactNode;
   showSocialBar?: boolean;
@@ -18,6 +20,7 @@ type ArtistPageShellProps = {
 const ArtistPageShell = React.memo(function ArtistPageShell({
   artist,
   socialLinks,
+  contacts,
   subtitle,
   children,
   showSocialBar = true,
@@ -30,6 +33,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
     <ProfileShell
       artist={artist}
       socialLinks={socialLinks}
+      contacts={contacts}
       subtitle={subtitle}
       showSocialBar={showSocialBar}
       showTipButton={showTipButton}

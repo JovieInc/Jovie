@@ -2,6 +2,7 @@
 
 import { Button, Input, Label } from '@jovie/ui';
 import { ExternalLink, Plus, X } from 'lucide-react';
+import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
@@ -9,6 +10,7 @@ import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { Contact, ContactSidebarMode, ContactSocialLink } from '@/types';
 
 export interface ContactSidebarProps {
@@ -72,7 +74,6 @@ export function ContactSidebar({
   onAvatarUpload,
 }: ContactSidebarProps) {
   const [isAddingLink, setIsAddingLink] = useState(false);
-  const [newLinkLabel, setNewLinkLabel] = useState('');
   const [newLinkUrl, setNewLinkUrl] = useState('');
 
   const isEditable = mode === 'admin';
@@ -122,12 +123,14 @@ export function ContactSidebar({
     const trimmedUrl = newLinkUrl.trim();
     if (!isValidUrl(trimmedUrl)) return;
 
-    const label = newLinkLabel.trim() || trimmedUrl.replace(/^https?:\/\//, '');
+    const detected = detectPlatform(trimmedUrl, fullName || contact.username);
+    if (!detected.isValid) return;
 
     const nextLink: ContactSocialLink = {
       id: undefined,
-      label,
-      url: trimmedUrl,
+      label: detected.suggestedTitle,
+      url: detected.normalizedUrl,
+      platformType: detected.platform.icon,
     };
 
     onContactChange({
@@ -136,7 +139,6 @@ export function ContactSidebar({
     });
 
     setIsAddingLink(false);
-    setNewLinkLabel('');
     setNewLinkUrl('');
   };
 
@@ -158,7 +160,6 @@ export function ContactSidebar({
     } else if (event.key === 'Escape') {
       event.preventDefault();
       setIsAddingLink(false);
-      setNewLinkLabel('');
       setNewLinkUrl('');
     }
   };
@@ -194,6 +195,27 @@ export function ContactSidebar({
           <h2 className='text-sm font-semibold text-primary-token'>
             {hasContact ? fullName || 'Unnamed contact' : 'No contact selected'}
           </h2>
+          {hasContact && contact?.username && (
+            <div className='mt-1'>
+              <Button
+                asChild
+                variant='ghost'
+                size='sm'
+                className='h-6 px-2 text-[11px] text-secondary-token hover:text-primary-token'
+              >
+                <Link
+                  href={`/${contact.username}`}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                >
+                  <span className='inline-flex items-center gap-1'>
+                    View profile
+                    <ExternalLink className='h-3 w-3' aria-hidden />
+                  </span>
+                </Link>
+              </Button>
+            </div>
+          )}
         </div>
         {onClose && (
           <Button
@@ -354,7 +376,12 @@ export function ContactSidebar({
               {contact.socialLinks.length > 0 && (
                 <div className='flex flex-wrap gap-2'>
                   {contact.socialLinks.map((link, index) => {
-                    const label = link.label || link.url;
+                    const label =
+                      link.label || link.url.replace(/^https?:\/\//, '');
+                    const platformId =
+                      (link.platformType as string | undefined) ||
+                      link.label ||
+                      'website';
                     return (
                       <a
                         key={link.id ?? `${link.url}-${index}`}
@@ -364,7 +391,7 @@ export function ContactSidebar({
                         className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-xs text-primary-token shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
                       >
                         <SocialIcon
-                          platform={link.label || 'link'}
+                          platform={platformId}
                           className='h-3.5 w-3.5'
                           aria-hidden
                         />
@@ -395,18 +422,6 @@ export function ContactSidebar({
               {isEditable && isAddingLink && (
                 <div className='mt-2 space-y-2 rounded-lg border border-dashed border-subtle bg-surface-0/60 p-3'>
                   <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-                    <Label className='text-xs text-tertiary-token'>Label</Label>
-                    <Input
-                      value={newLinkLabel}
-                      onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                        setNewLinkLabel(event.target.value)
-                      }
-                      onKeyDown={handleNewLinkKeyDown}
-                      placeholder='Instagram'
-                      autoFocus
-                    />
-                  </div>
-                  <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
                     <Label className='text-xs text-tertiary-token'>URL</Label>
                     <Input
                       type='url'
@@ -415,10 +430,11 @@ export function ContactSidebar({
                         setNewLinkUrl(event.target.value)
                       }
                       onKeyDown={handleNewLinkKeyDown}
-                      placeholder='https://...'
+                      placeholder='https://instagram.com/username'
                       inputMode='url'
                       autoCapitalize='none'
                       autoCorrect='off'
+                      autoFocus
                     />
                   </div>
                   <div className='flex justify-end gap-2 pt-1'>
@@ -428,7 +444,6 @@ export function ContactSidebar({
                       variant='ghost'
                       onClick={() => {
                         setIsAddingLink(false);
-                        setNewLinkLabel('');
                         setNewLinkUrl('');
                       }}
                     >

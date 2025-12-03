@@ -29,14 +29,14 @@ export function ActivityTable({ items }: ActivityTableProps) {
         <div className='overflow-x-auto'>
           <table className='w-full border-collapse text-sm'>
             <thead className='text-left text-secondary-token'>
-              <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
+              <tr className='border-b border-subtle/60 text-xs uppercase tracking-wide text-tertiary-token'>
                 <th className='px-2 py-2'>User</th>
                 <th className='px-2 py-2'>Action</th>
                 <th className='px-2 py-2'>Timestamp</th>
                 <th className='px-2 py-2 text-right'>Status</th>
               </tr>
             </thead>
-            <tbody className='divide-y divide-subtle'>
+            <tbody className='divide-y divide-subtle/60'>
               {items.length === 0 ? (
                 <tr>
                   <td

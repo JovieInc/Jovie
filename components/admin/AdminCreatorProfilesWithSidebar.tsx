@@ -99,6 +99,11 @@ export function AdminCreatorProfilesWithSidebar({
     [profiles, selectedId]
   );
 
+  const selectedIndex = useMemo(
+    () => profiles.findIndex(p => p.id === selectedId),
+    [profiles, selectedId]
+  );
+
   const effectiveContact = useMemo(() => {
     if (draftContact && draftContact.id === selectedId) return draftContact;
     return mapProfileToContact(selectedProfile);
@@ -106,14 +111,34 @@ export function AdminCreatorProfilesWithSidebar({
 
   const handleRowClick = useCallback((id: string) => {
     setSelectedId(id);
-    setSidebarOpen(false);
+    setSidebarOpen(true);
     setDraftContact(null);
   }, []);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isFormElement(event.target)) return;
 
-    if (event.key === ' ' || event.key === 'Spacebar') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (profiles.length === 0) return;
+
+      event.preventDefault();
+
+      if (event.key === 'ArrowDown') {
+        if (selectedIndex === -1) {
+          setSelectedId(profiles[0]?.id ?? null);
+        } else {
+          const nextIndex = Math.min(selectedIndex + 1, profiles.length - 1);
+          setSelectedId(profiles[nextIndex]?.id ?? null);
+        }
+      } else if (event.key === 'ArrowUp') {
+        if (selectedIndex === -1) {
+          setSelectedId(profiles[profiles.length - 1]?.id ?? null);
+        } else {
+          const prevIndex = Math.max(selectedIndex - 1, 0);
+          setSelectedId(profiles[prevIndex]?.id ?? null);
+        }
+      }
+    } else if (event.key === ' ' || event.key === 'Spacebar') {
       if (!selectedProfile) return;
       event.preventDefault();
       setSidebarOpen(open => !open);
@@ -133,8 +158,54 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(false);
   };
 
+  const handleAvatarUpload = useCallback(
+    async (file: File, contact: Contact): Promise<string> => {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const uploadResponse = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const uploadJson = (await uploadResponse.json().catch(() => ({}))) as {
+        blobUrl?: string;
+        error?: string;
+      };
+
+      if (!uploadResponse.ok || !uploadJson.blobUrl) {
+        const message = uploadJson.error || 'Failed to upload avatar';
+        throw new Error(message);
+      }
+
+      const blobUrl = uploadJson.blobUrl;
+
+      const adminResponse = await fetch('/api/admin/creator-avatar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: contact.id,
+          avatarUrl: blobUrl,
+        }),
+      });
+
+      if (!adminResponse.ok) {
+        const adminJson = (await adminResponse.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        const message = adminJson.error || 'Failed to update creator avatar';
+        throw new Error(message);
+      }
+
+      return blobUrl;
+    },
+    []
+  );
+
   return (
-    <div className='flex flex-col md:flex-row md:items-stretch gap-4'>
+    <div className='flex flex-col md:flex-row md:items-stretch gap-4 md:min-h-[calc(100vh-220px)]'>
       <div
         className={cn(
           'flex-1 outline-none',
@@ -220,7 +291,12 @@ export function AdminCreatorProfilesWithSidebar({
                           onClick={() => handleRowClick(profile.id)}
                           aria-selected={isSelected}
                         >
-                          <td className='px-2 py-3'>
+                          <td
+                            className={cn(
+                              'px-2 py-3 border-l border-transparent',
+                              isSelected && 'border-l-2 border-accent'
+                            )}
+                          >
                             <CreatorAvatarCell
                               profileId={profile.id}
                               username={profile.username}
@@ -309,7 +385,7 @@ export function AdminCreatorProfilesWithSidebar({
 
       <div
         className={cn(
-          'hidden md:flex md:shrink-0 transition-[width] duration-200 ease-out overflow-hidden',
+          'hidden md:flex md:shrink-0 md:h-full transition-[width] duration-200 ease-out overflow-hidden',
           sidebarOpen && effectiveContact
             ? 'md:w-[340px] lg:w-[360px]'
             : 'md:w-0 lg:w-0'
@@ -322,6 +398,7 @@ export function AdminCreatorProfilesWithSidebar({
           isOpen={sidebarOpen && Boolean(effectiveContact)}
           onClose={handleSidebarClose}
           onContactChange={handleContactChange}
+          onAvatarUpload={handleAvatarUpload}
         />
       </div>
     </div>

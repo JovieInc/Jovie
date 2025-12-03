@@ -492,7 +492,10 @@ export function AppleStyleOnboardingForm({
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-                      <LoadingSpinner size='sm' className='text-gray-400' />
+                      <LoadingSpinner
+                        size='sm'
+                        className='text-secondary-token'
+                      />
                     </div>
                   )}
                 </div>

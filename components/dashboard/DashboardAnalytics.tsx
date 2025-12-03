@@ -201,10 +201,10 @@ function RangeToggle({
             role='tab'
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`relative rounded-full px-3 py-1.5 text-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               active
-                ? 'bg-accent text-white'
-                : 'text-secondary-token hover:bg-surface-2'
+                ? 'bg-surface-3 text-primary-token shadow-sm'
+                : 'text-secondary-token hover:text-primary-token hover:bg-surface-2'
             }`}
           >
             {opt.label}

@@ -30,6 +30,11 @@ const EnvSchema = z.object({
   CLOUDINARY_UPLOAD_FOLDER: z.string().optional(),
   CLOUDINARY_UPLOAD_PRESET: z.string().optional(),
 
+  // Email / notifications
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(),
+  RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
+
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
 
@@ -48,6 +53,7 @@ const EnvSchema = z.object({
   // Stripe price IDs for standard pricing (inactive)
   STRIPE_PRICE_STANDARD_MONTHLY: z.string().optional(),
   STRIPE_PRICE_STANDARD_YEARLY: z.string().optional(),
+  INGESTION_CRON_SECRET: z.string().optional(),
 });
 // Safe-parse to avoid hard crashes in production; surface clear errors in dev.
 const rawEnv = {
@@ -63,6 +69,9 @@ const rawEnv = {
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   CLOUDINARY_UPLOAD_FOLDER: process.env.CLOUDINARY_UPLOAD_FOLDER,
   CLOUDINARY_UPLOAD_PRESET: process.env.CLOUDINARY_UPLOAD_PRESET,
+  RESEND_API_KEY: process.env.RESEND_API_KEY,
+  RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+  RESEND_REPLY_TO_EMAIL: process.env.RESEND_REPLY_TO_EMAIL,
   DATABASE_URL: process.env.DATABASE_URL,
   SPOTIFY_CLIENT_ID: process.env.SPOTIFY_CLIENT_ID,
   SPOTIFY_CLIENT_SECRET: process.env.SPOTIFY_CLIENT_SECRET,
@@ -72,6 +81,7 @@ const rawEnv = {
   STRIPE_PRICE_INTRO_YEARLY: process.env.STRIPE_PRICE_INTRO_YEARLY,
   STRIPE_PRICE_STANDARD_MONTHLY: process.env.STRIPE_PRICE_STANDARD_MONTHLY,
   STRIPE_PRICE_STANDARD_YEARLY: process.env.STRIPE_PRICE_STANDARD_YEARLY,
+  INGESTION_CRON_SECRET: process.env.INGESTION_CRON_SECRET,
 };
 
 const parsed = EnvSchema.safeParse(rawEnv);
@@ -112,6 +122,15 @@ export const env = {
   CLOUDINARY_UPLOAD_PRESET: parsed.success
     ? parsed.data.CLOUDINARY_UPLOAD_PRESET
     : process.env.CLOUDINARY_UPLOAD_PRESET,
+  RESEND_API_KEY: parsed.success
+    ? parsed.data.RESEND_API_KEY
+    : process.env.RESEND_API_KEY,
+  RESEND_FROM_EMAIL: parsed.success
+    ? parsed.data.RESEND_FROM_EMAIL
+    : process.env.RESEND_FROM_EMAIL,
+  RESEND_REPLY_TO_EMAIL: parsed.success
+    ? parsed.data.RESEND_REPLY_TO_EMAIL
+    : process.env.RESEND_REPLY_TO_EMAIL,
   DATABASE_URL: parsed.success
     ? parsed.data.DATABASE_URL
     : process.env.DATABASE_URL,
@@ -139,6 +158,9 @@ export const env = {
   STRIPE_PRICE_STANDARD_YEARLY: parsed.success
     ? parsed.data.STRIPE_PRICE_STANDARD_YEARLY
     : process.env.STRIPE_PRICE_STANDARD_YEARLY,
+  INGESTION_CRON_SECRET: parsed.success
+    ? parsed.data.INGESTION_CRON_SECRET
+    : process.env.INGESTION_CRON_SECRET,
 } as const;
 // Feature flags now handled via Statsig; see lib/statsig/*
 // Environment validation utilities

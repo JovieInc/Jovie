@@ -3,6 +3,11 @@
 import { useCallback, useRef } from 'react';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  formatAcceptedImageTypes,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 import { cn } from '@/lib/utils';
 
 interface AvatarUploadProps {
@@ -13,8 +18,9 @@ interface AvatarUploadProps {
   className?: string;
 }
 
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+const ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;
+const ACCEPTED_TYPE_LABEL = formatAcceptedImageTypes(ACCEPTED_TYPES).join(', ');
+const MAX_FILE_SIZE = AVATAR_MAX_FILE_SIZE_BYTES;
 
 export function AvatarUpload({
   currentAvatarUrl,
@@ -94,7 +100,8 @@ export function AvatarUpload({
         </button>
 
         <p className='text-sm text-secondary-token'>
-          JPG, PNG or WebP. Max size 4MB. Square images work best.
+          {ACCEPTED_TYPE_LABEL} accepted. Auto-optimized to WebP. Max size 4MB.
+          Square images work best.
         </p>
 
         <p className='text-xs text-tertiary-token'>

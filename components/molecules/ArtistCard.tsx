@@ -12,6 +12,7 @@ export interface ArtistCardProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   showName?: boolean;
   className?: string;
+  isVerified?: boolean;
 }
 
 export function ArtistCard({
@@ -22,6 +23,7 @@ export function ArtistCard({
   size = 'md',
   showName = true,
   className = '',
+  isVerified = false,
 }: ArtistCardProps) {
   // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
@@ -89,6 +91,7 @@ export function ArtistCard({
               name={name}
               size={avatarSize}
               className='mx-auto'
+              verified={isVerified}
             />
           </motion.div>
           {showName && (

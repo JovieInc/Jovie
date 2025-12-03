@@ -71,6 +71,8 @@ export function ProfilePreview({
           subtitle=''
           showTipButton={false}
           showBackButton={false}
+          contacts={[]}
+          showFooter={false}
         />
       </div>
     </div>

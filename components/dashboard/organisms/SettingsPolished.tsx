@@ -9,6 +9,7 @@ import {
   SparklesIcon,
   UserIcon,
 } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
@@ -20,6 +21,10 @@ import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -107,8 +112,8 @@ export function SettingsPolished({
   );
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const { showToast } = useToast();
-  const maxAvatarSize = 4 * 1024 * 1024;
-  const acceptedAvatarTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
+  const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     const formData = new FormData();
@@ -492,14 +497,14 @@ export function SettingsPolished({
 
         {/* Save Button */}
         <div className='flex justify-end pt-2'>
-          <button
+          <Button
             type='submit'
-            disabled={isLoading}
-            className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            loading={isLoading}
+            className='px-6 py-2.5 text-sm font-medium rounded-lg shadow-sm text-white btn-press'
+            variant='primary'
           >
-            {isLoading ? 'Saving...' : 'Save Changes'}
-          </button>
+            Save Changes
+          </Button>
         </div>
       </form>
     </div>
@@ -786,14 +791,14 @@ export function SettingsPolished({
       </DashboardCard>
 
       <div className='flex justify-end pt-2'>
-        <button
+        <Button
           type='submit'
-          disabled={isPixelSaving}
-          className='inline-flex items-center px-6 py-2.5 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-          style={{ backgroundColor: 'var(--color-accent)' }}
+          loading={isPixelSaving}
+          className='px-6 py-2.5 text-sm font-medium rounded-lg shadow-sm text-white btn-press'
+          variant='primary'
         >
-          {isPixelSaving ? 'Saving...' : 'Save Pixels'}
-        </button>
+          Save Pixels
+        </Button>
       </div>
     </form>
   );
@@ -847,18 +852,14 @@ export function SettingsPolished({
         <p className='text-sm text-secondary mb-4'>
           Update payment details, change plans, or view invoices.
         </p>
-        <button
+        <Button
           onClick={handleBilling}
-          disabled={isBillingLoading || billingStatus.loading}
-          className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 transition-colors btn-press'
-          style={{ backgroundColor: 'var(--color-accent)' }}
+          loading={isBillingLoading || billingStatus.loading}
+          className='px-4 py-2 text-sm font-medium rounded-lg text-white btn-press'
+          variant='primary'
         >
-          {billingStatus.loading
-            ? 'Loading...'
-            : billingStatus.isPro
-              ? 'Open Billing Portal'
-              : 'Upgrade to Pro'}
-        </button>
+          {billingStatus.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
+        </Button>
       </div>
     </DashboardCard>
   );
@@ -875,16 +876,14 @@ export function SettingsPolished({
           <Icon className='mx-auto h-12 w-12 text-secondary mb-4' />
           <h3 className='text-lg font-medium text-primary mb-2'>{title}</h3>
           <p className='text-sm text-secondary mb-4'>{description}</p>
-          <button
+          <Button
             onClick={handleBilling}
-            disabled={isBillingLoading || billingStatus.loading}
-            className='inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed transition-colors btn-press'
-            style={{ backgroundColor: 'var(--color-accent)' }}
+            loading={isBillingLoading || billingStatus.loading}
+            className='px-4 py-2 text-sm font-medium rounded-lg text-white btn-press'
+            variant='primary'
           >
-            {isBillingLoading || billingStatus.loading
-              ? 'Loading...'
-              : 'Upgrade to Pro'}
-          </button>
+            Upgrade to Pro
+          </Button>
         </div>
       </DashboardCard>
     );
@@ -935,8 +934,8 @@ export function SettingsPolished({
         </div>
       </div>
 
-      {/* Single Scrollable Settings Content */}
-      <div className='flex-1 min-w-0 max-h-[calc(100vh-6rem)] overflow-y-auto scrollbar-hide'>
+      {/* Settings Content (scroll handled by outer dashboard layout) */}
+      <div className='flex-1 min-w-0'>
         <div className='space-y-8 pb-8'>
           {/* Profile Section */}
           <section id='profile' className='scroll-mt-4'>

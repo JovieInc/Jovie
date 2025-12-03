@@ -1,10 +1,9 @@
-name: 'Fast-Track (temporary)'
+name: 'Main Branch Protection (fast lane)'
 enforcement: 'active'
 target:
   ref_name:
     include:
       - 'refs/heads/main'
-      - 'refs/heads/production'
     exclude: []
 rules:
   - type: 'pull_request'
@@ -17,5 +16,8 @@ rules:
     parameters:
       strict_required_status_checks_policy: true
       required_status_checks:
+        - context: 'CI / Typecheck'
+        - context: 'CI / Lint'
+        - context: 'CI / Migration Guard'
         - context: 'CI / ci-fast'
 bypass_actors: []
