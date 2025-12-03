@@ -200,7 +200,7 @@ export async function PUT(req: Request) {
       const parsedUpdatesResult = ProfileUpdateSchema.safeParse(validUpdates);
 
       if (!parsedUpdatesResult.success) {
-        const firstError = parsedUpdatesResult.error.errors[0]?.message;
+        const firstError = parsedUpdatesResult.error.issues[0]?.message;
         return NextResponse.json(
           { error: firstError || 'Invalid profile updates' },
           { status: 400 }

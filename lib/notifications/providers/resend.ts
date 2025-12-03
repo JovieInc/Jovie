@@ -6,7 +6,12 @@ import {
   NOTIFICATIONS_BRAND_NAME,
   RESEND_ENABLED,
 } from '@/lib/notifications/config';
-import type { EmailMessage, EmailProvider } from '@/types/notifications';
+import type {
+  EmailMessage,
+  EmailProvider,
+  NotificationChannelResult,
+  NotificationDeliveryChannel,
+} from '@/types/notifications';
 
 let client: Resend | null = null;
 
@@ -21,10 +26,10 @@ const getClient = () => {
 export class ResendEmailProvider implements EmailProvider {
   provider: EmailProvider['provider'] = 'resend';
 
-  async sendEmail(message: EmailMessage) {
+  async sendEmail(message: EmailMessage): Promise<NotificationChannelResult> {
     if (!RESEND_ENABLED || !env.RESEND_API_KEY) {
       return {
-        channel: 'email',
+        channel: 'email' as NotificationDeliveryChannel,
         status: 'skipped',
         provider: this.provider,
         detail: 'RESEND_API_KEY not configured',
@@ -40,7 +45,7 @@ export class ResendEmailProvider implements EmailProvider {
         subject: message.subject,
         text: message.text,
         html: message.html,
-        reply_to: message.replyTo ?? EMAIL_REPLY_TO,
+        replyTo: message.replyTo ?? EMAIL_REPLY_TO,
         headers: message.headers,
       });
 
@@ -49,7 +54,7 @@ export class ResendEmailProvider implements EmailProvider {
       }
 
       return {
-        channel: 'email',
+        channel: 'email' as NotificationDeliveryChannel,
         status: 'sent',
         provider: this.provider,
         detail: response.data?.id ?? 'resend',
@@ -61,7 +66,7 @@ export class ResendEmailProvider implements EmailProvider {
       console.error('[notifications] Resend sendEmail error', error);
 
       return {
-        channel: 'email',
+        channel: 'email' as NotificationDeliveryChannel,
         status: 'error',
         provider: this.provider,
         error: messageText,

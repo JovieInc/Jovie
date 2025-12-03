@@ -31,8 +31,8 @@ async function getVercelBlobUploader(): Promise<BlobPut | null> {
 }
 
 async function getSharp(): Promise<SharpModule> {
-  const sharpModule = await import('sharp');
-  return (sharpModule as { default?: SharpModule }).default ?? sharpModule;
+  const sharpModule = (await import('sharp')) as unknown as SharpModule;
+  return sharpModule;
 }
 
 const uploadSchema = z.object({

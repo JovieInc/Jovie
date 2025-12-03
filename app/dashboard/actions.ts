@@ -201,7 +201,7 @@ async function fetchDashboardDataWithSession(
       );
 
     const tippingStats = {
-      tipClicks: Number(clickStats?.[0]?.c ?? 0),
+      tipClicks: Number(clickStats?.c ?? 0),
       tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
       totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
@@ -227,7 +227,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
-      tippingStats: emptyTippingStats,
+      tippingStats: createEmptyTippingStats(),
     };
   }
 }

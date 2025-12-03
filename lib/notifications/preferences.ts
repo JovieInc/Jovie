@@ -114,7 +114,7 @@ const fetchStoredPreferences = async (target: NotificationTarget) => {
     };
   }
 
-  let query = db
+  const baseQuery = db
     .select({
       settings: creatorProfiles.settings,
       marketingOptOut: creatorProfiles.marketingOptOut,
@@ -124,13 +124,15 @@ const fetchStoredPreferences = async (target: NotificationTarget) => {
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId));
 
-  if (target.creatorProfileId) {
-    query = query.where(eq(creatorProfiles.id, target.creatorProfileId));
-  } else if (target.userId) {
-    query = query.where(eq(creatorProfiles.userId, target.userId));
-  } else if (target.clerkUserId) {
-    query = query.where(eq(users.clerkId, target.clerkUserId));
-  }
+  const whereCondition = target.creatorProfileId
+    ? eq(creatorProfiles.id, target.creatorProfileId)
+    : target.userId
+      ? eq(creatorProfiles.userId, target.userId)
+      : target.clerkUserId
+        ? eq(users.clerkId, target.clerkUserId)
+        : undefined;
+
+  const query = whereCondition ? baseQuery.where(whereCondition) : baseQuery;
 
   const [row] = await query.limit(1);
 
@@ -181,11 +183,8 @@ export const markNotificationDismissed = async (
   if (!storedPreferences || !creatorProfileId) return;
 
   const baseSettings = isRecord(settings) ? settings : {};
-  const existingNotifications = isRecord(
-    (baseSettings as NotificationSettings).notifications
-  )
-    ? (baseSettings as NotificationSettings).notifications
-    : {};
+  const existingNotifications =
+    (baseSettings as NotificationSettings).notifications ?? {};
 
   const dismissed = new Set([
     ...normalizeDismissed(existingNotifications),
