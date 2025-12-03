@@ -44,7 +44,8 @@ export async function enqueueLinktreeIngestionJob(params: {
     .where(
       and(
         eq(ingestionJobs.jobType, 'import_linktree'),
-        drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+        drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`,
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`
       )
     )
     .limit(1);

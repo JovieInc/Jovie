@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { ingestionJobs } from '@/lib/db';
+import { env } from '@/lib/env';
 import { claimPendingJobs, processJob } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
@@ -8,9 +9,13 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 function isAuthorized(request: NextRequest): boolean {
-  const secret =
-    process.env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET ?? '';
-  if (!secret) return true;
+  const secret = env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET;
+
+  if (!secret) {
+    logger.error('Ingestion cron secret is not configured');
+    return false;
+  }
+
   return request.headers.get('x-ingestion-secret') === secret;
 }
 

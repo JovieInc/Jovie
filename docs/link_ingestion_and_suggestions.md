@@ -133,3 +133,88 @@ Non-goals: adding non-Statsig analytics SDKs, running migrations from Edge, or b
 - Should we allow `profile_photos.user_id` nullable for ingested assets or store remote assets in a new table and mirror the winner into `avatar_url` only?
 - Preferred queue runtime (Vercel Cron hitting a worker route vs. a dedicated worker process); both require Node runtime and RLS session setup.
 - How long to retain `ingestion_jobs` history before pruning (30/90 days)?***
+
+## Smart link routing (geo/device/app-aware)
+- Outcome: route `/l/:slug` (or the existing public link endpoint) to the best destination for social/DSP links using geo + device + app-install hints, always with a safe web fallback.
+- Scope: server-side resolution plus optional client-side deep-link attempt for mobile; reuse existing link entities, avoid a parallel smart-link table unless needed for performance.
+- Constraints: Edge runtime for the read path; Node-only libs stay out of the handler; Statsig-only analytics/flags; no new SDKs.
+
+### Feature flag & rollout
+- Add Statsig gate `feature_smart_link_routing` (`lib/statsig/flags.ts` + `docs/STATSIG_FEATURE_GATES.md`).
+- Default off; enable on staging first; keep a kill switch for rollout.
+- Emit Statsig events via `lib/analytics.ts` only (`link_route_resolved` with slug, device, country, resolution_path, had_app_link, used_geo_override).
+
+### Data model (Drizzle-ready, append-only changes)
+- Extend link storage (either `social_links` or a focused `smart_link_routes` table keyed by slug/link id) with routing config columns:
+  - `default_url text` (required) and `web_fallback_url text` (defaults to `default_url`).
+  - `ios_url text`, `android_url text`, `desktop_url text` (device-specific overrides).
+  - `ios_app_link text`, `android_app_link text` (universal/intent/custom scheme deep links).
+  - `geo_overrides jsonb` shaped `{ countryCode: { default_url?, ios_url?, android_url?, desktop_url?, ios_app_link?, android_app_link? } }`.
+  - `utm_params jsonb` (key/value map merged onto the final destination; preserve existing query params).
+- Add indexes for lookup by slug and for geo/device queries if a dedicated table is used.
+- Keep migrations append-only; backfill existing links with `default_url` populated and other fields null.
+
+### Routing endpoint and selection logic
+- Handler: `app/api/l/[slug]/route.ts` with `export const runtime = 'edge'` to keep latency low.
+- Inputs: slug, `User-Agent`, `Accept-Language`, `x-vercel-ip-country` (or similar) for geo, optional query params passed through.
+- Selection priority:
+  1) Resolve slug to routing config; 404 on missing/disabled.
+  2) Determine `deviceClass = ios|android|desktop` from UA; determine `country` from header (fallback to none).
+  3) If `geo_overrides[country]` exists, merge it into the base routing config.
+  4) Choose destination: device-specific URL if present → else default; also note app link availability for deep-link attempt.
+  5) Merge UTMs onto the chosen URL without duplicating existing params; keep original query string intact.
+  6) Respond with 302 `Location` for pure web targets, or lightweight HTML for deep-link attempts on mobile (try app link, then meta-refresh/JS fallback to web URL after a short delay).
+- Headers: `Cache-Control` short TTL (e.g., `public, max-age=60`), `Vary: User-Agent, Accept-Language, x-vercel-ip-country`, `Referrer-Policy: no-referrer-when-downgrade`.
+
+### Deep link/app-installed handling
+- For mobile with `ios_app_link`/`android_app_link`, return an HTML shim that immediately tries the app link (via `<meta http-equiv>` or JS), with a timer fallback to the selected web URL.
+- Keep response size minimal; no external assets; avoid blocking scripts.
+- Skip the shim on desktop or when no app link is configured; use straight 302 instead.
+
+### Admin/editor UX
+- In the existing link editor, add optional device-specific URLs, app links, geo overrides (per ISO country code), and UTM key/values.
+- Validate URLs are absolute; warn on missing fallback and on overlapping geo + device overrides.
+- Show preview of effective destinations for a few sample contexts (ios/us, android/gb, desktop/any).
+
+### Testing expectations (routing)
+- Unit: destination selection matrix (device + country + overrides), UTM merge logic, query param preservation.
+- Integration: API route returns correct `Location` or deep-link HTML per config; 404 on unknown slug; header `Vary` set correctly.
+- E2E: mobile UA with app target falls back to web when app missing; geo override hit; desktop path uses default.
+
+## Sensitive link detection and bot-safe handling
+- Outcome: detect sensitive/NSFW destinations (e.g., OnlyFans, Fansly) and protect them from social crawlers (Instagram/Facebook/LinkedIn, etc.) that could trigger shadowbans while keeping normal users unaffected.
+- Guardrails: Statsig-only flagging/analytics; no new SDKs; do not expose sensitive URLs to bots; avoid per-user cloaking—behavior should be consistent for real human browsers vs. identified bots.
+
+### Feature flag & events
+- Add Statsig gate `feature_sensitive_link_protection` (`lib/statsig/flags.ts` + `docs/STATSIG_FEATURE_GATES.md`). Default off, stage first.
+- Emit Statsig event `sensitive_link_action` with { slug, sensitivity, bot_detected, action } for allow/blocked/safe_preview decisions via `lib/analytics.ts`.
+
+### Detection strategy (Node runtime)
+- Signals: domain/hostname allow/deny lists (e.g., `onlyfans.com`, `fansly.com`, `candfans.com`), path keywords (`/fans`, `/nsfw`, `/18+`), and user-supplied metadata (tags, manual toggle in UI).
+- Enforce detection during ingestion/save (Node path) and on background re-scan jobs; never rely solely on client.
+- Store evidence: `sensitivity_reasons text[]`, `last_sensitivity_scan_at timestamp`, `detected_by text[]` (e.g., `domain_blocklist`, `path_keyword`, `manual`). Keep payload compact; no raw HTML blobs.
+- Keep rules/config versioned in code or a small JSON config; no external network calls during Edge execution.
+
+### Data model (append-only changes)
+- `social_links` (or routing config table) gains:
+  - `sensitivity enum('normal','sensitive','restricted') default 'normal'`.
+  - `bot_visibility enum('allow','hide','safe_preview') default 'allow'`.
+  - `sensitivity_reasons text[]`, `last_sensitivity_scan_at timestamp`.
+- Index `(sensitivity, bot_visibility)` for quick filtering; backfill existing rows to `sensitivity='normal'`.
+
+### Runtime behavior (routing + previews)
+- Bot detection: check `User-Agent` for common crawlers (`facebookexternalhit`, `Instagram`, `LinkedInBot`, `TwitterBot`, `Slackbot`, `Discordbot`, `WhatsApp`, `TelegramBot`, etc.) and HEAD/OPTIONS requests commonly used for link unfurling. Keep logic in a shared helper to avoid drift.
+- If `sensitivity != 'normal'` and `bot_visibility='hide'` and UA is bot ⇒ return 404 or neutral 302 to a non-sensitive placeholder page (no sensitive URL leakage). Add `Vary: User-Agent` and short TTL caching.
+- If `bot_visibility='safe_preview'` ⇒ return minimal HTML/OG tags with generic copy (no sensitive URL), but do not redirect bots to the sensitive destination.
+- Human traffic (non-bot UA) continues through the normal routing flow (smart routing rules, app links, UTMs) even for sensitive links.
+- Ensure query params of the original request are preserved only for human flows; bots receive no sensitive params in responses.
+
+### UI/editor experience
+- Add an optional “Sensitive content” toggle when adding/editing links; auto-check if domain matches the deny list and surface a warning.
+- Show what bots will see (hidden vs safe preview) and allow admins to override between `hide` and `safe_preview` for flagged links.
+- Prevent saving `bot_visibility='allow'` when `sensitivity='sensitive'` unless admin explicitly confirms.
+
+### Testing expectations (sensitive handling)
+- Unit: detection heuristics per domain/path, bot UA parsing, and state machine for (`sensitivity`, `bot_visibility`, `isBotUa`) → action.
+- Integration: routing handler returns 404/placeholder for bots on sensitive links; normal redirect for human UA; `Vary` header set; Statsig events emitted.
+- E2E: social share unfurl for a sensitive link shows safe preview/404; direct human click still routes correctly with geo/device/UTM logic.

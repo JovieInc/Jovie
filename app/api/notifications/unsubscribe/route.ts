@@ -3,12 +3,32 @@ import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 
 // Schema for unsubscription request validation
-const unsubscribeSchema = z.object({
-  artist_id: z.string().uuid(),
-  email: z.string().email().optional(),
-  token: z.string().optional(),
-  method: z.enum(['email_link', 'dashboard', 'api']).default('api'),
-});
+const unsubscribeSchema = z
+  .object({
+    artist_id: z.string().uuid(),
+    channel: z.enum(['email', 'phone']).optional(),
+    email: z.string().email().optional(),
+    phone: z
+      .string()
+      .regex(/^\+?[0-9]{7,20}$/, 'Please provide a valid phone number')
+      .optional(),
+    token: z.string().optional(),
+    method: z
+      .enum(['email_link', 'dashboard', 'api', 'dropdown'])
+      .default('api'),
+  })
+  .refine(
+    data =>
+      Boolean(data.token) ||
+      Boolean(data.email) ||
+      Boolean(data.phone) ||
+      (data.channel === 'email' && Boolean(data.email)) ||
+      (data.channel === 'phone' && Boolean(data.phone)),
+    {
+      message: 'Either email, phone, or token must be provided',
+      path: ['channel'],
+    }
+  );
 
 /**
  * POST handler for notification unsubscriptions
@@ -24,6 +44,7 @@ export async function POST(request: NextRequest) {
     await trackServerEvent('notifications_unsubscribe_attempt', {
       artist_id: body.artist_id,
       method: body.method || 'api',
+      channel: body.channel || (body.phone ? 'phone' : 'email'),
     });
 
     // If validation fails, return error
@@ -33,6 +54,7 @@ export async function POST(request: NextRequest) {
         artist_id: body.artist_id,
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
+        channel: body.channel || (body.phone ? 'phone' : 'email'),
       });
 
       return NextResponse.json(
@@ -45,21 +67,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { artist_id, email, token, method } = result.data;
+    const { artist_id, email, phone, token, method, channel } = result.data;
 
     // Ensure at least one identifier is provided
-    if (!email && !token) {
+    if (!email && !phone && !token) {
       // Track error - missing identifiers
       await trackServerEvent('notifications_unsubscribe_error', {
         artist_id,
         error_type: 'missing_identifier',
         method,
+        channel: channel || (phone ? 'phone' : 'email'),
       });
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Either email or token must be provided',
+          error: 'Either email, phone, or token must be provided',
         },
         { status: 400 }
       );
@@ -67,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     // In a real implementation, we would:
     // 1. Verify the token if provided
-    // 2. Find the contact by email hash or token
+    // 2. Find the contact by email/phone hash or token
     // 3. Remove the subscription for the specified artist
     // 4. Return success or appropriate error
 
@@ -78,6 +101,7 @@ export async function POST(request: NextRequest) {
     await trackServerEvent('notifications_unsubscribe_success', {
       artist_id,
       method,
+      channel: channel || (phone ? 'phone' : 'email'),
     });
 
     return NextResponse.json({

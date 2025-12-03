@@ -11,6 +11,11 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import { useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  formatAcceptedImageTypes,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 // Example 1: Display-only avatar (for public profiles, featured creators, etc.)
@@ -104,13 +109,8 @@ export function DashboardAvatarExample() {
             console.error('Avatar upload failed:', error);
             // Show error toast notification
           }}
-          maxFileSize={10 * 1024 * 1024} // 10MB
-          acceptedTypes={[
-            'image/jpeg',
-            'image/png',
-            'image/webp',
-            'image/heic',
-          ]}
+          maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+          acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
         />
 
         <div className='flex-1 space-y-3'>
@@ -120,7 +120,8 @@ export function DashboardAvatarExample() {
             select.
           </p>
           <p className='text-xs text-tertiary-token'>
-            Supported formats: JPG, PNG, WebP, HEIC. Maximum size: 10MB.
+            Supported formats: {formatAcceptedImageTypes().join(', ')}. Maximum
+            size: {Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024))}MB.
           </p>
 
           {isUploading && (

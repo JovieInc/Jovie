@@ -4,6 +4,10 @@ import { useState } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 
 export interface CreatorAvatarCellProps {
   profileId: string;
@@ -78,8 +82,8 @@ export function CreatorAvatarCell({
             message: message || 'Failed to upload avatar. Please try again.',
           });
         }}
-        maxFileSize={4 * 1024 * 1024}
-        acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
+        maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+        acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
         showHoverOverlay
       />
     </div>

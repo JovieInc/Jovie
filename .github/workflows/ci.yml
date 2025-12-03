@@ -767,7 +767,7 @@ jobs:
             }
 
   deploy-prod:
-    needs: [ci-typecheck, ci-lint, ci-build, ci-unit-tests, ci-e2e-tests, ai-review-gate]
+    needs: [ci-typecheck, ci-lint, ci-build, ci-unit-tests, ci-e2e-tests]
     if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30

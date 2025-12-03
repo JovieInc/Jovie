@@ -21,6 +21,10 @@ import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
@@ -108,8 +112,8 @@ export function SettingsPolished({
   );
   const [isSavingBranding, setIsSavingBranding] = useState(false);
   const { showToast } = useToast();
-  const maxAvatarSize = 4 * 1024 * 1024;
-  const acceptedAvatarTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const maxAvatarSize = AVATAR_MAX_FILE_SIZE_BYTES;
+  const acceptedAvatarTypes = SUPPORTED_IMAGE_MIME_TYPES;
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     const formData = new FormData();

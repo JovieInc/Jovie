@@ -1,4 +1,5 @@
 import { clerkClient } from '@clerk/nextjs/server';
+import { Buffer } from 'buffer';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -10,26 +11,94 @@ import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
 } from '@/lib/username/sync';
+import { validateUsername } from '@/lib/validation/username';
 
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
 export const runtime = 'nodejs';
 
+const allowedUrlProtocols = new Set(['http:', 'https:']);
+
+const hasSafeHttpProtocol = (value: string) => {
+  try {
+    const url = new URL(value);
+    return allowedUrlProtocols.has(url.protocol);
+  } catch {
+    return false;
+  }
+};
+
+const httpUrlSchema = z
+  .string()
+  .trim()
+  .max(2048)
+  .refine(hasSafeHttpProtocol, 'URL must start with http or https');
+
+const settingsSchema = z
+  .object({
+    hide_branding: z.boolean().optional(),
+    marketing_emails: z.boolean().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const size = Buffer.byteLength(JSON.stringify(value), 'utf8');
+    if (size > 1024) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Settings payload is too large',
+      });
+    }
+  });
+
+const themeSchema = z
+  .union([
+    z
+      .object({
+        preference: z.enum(['light', 'dark', 'system']),
+      })
+      .strict(),
+    z
+      .object({
+        mode: z.enum(['light', 'dark', 'system']),
+      })
+      .strict(),
+  ])
+  .transform(value => {
+    const preference = 'preference' in value ? value.preference : value.mode;
+    return { preference, mode: preference };
+  });
+
 const ProfileUpdateSchema = z.object({
-  username: z.string().max(30).optional(),
-  displayName: z.string().max(50).optional(),
-  bio: z.string().max(512).optional(),
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(30)
+    .refine(
+      value => validateUsername(value).isValid,
+      'Username is invalid or reserved'
+    )
+    .optional(),
+  displayName: z
+    .string()
+    .trim()
+    .min(1, 'Display name cannot be empty')
+    .max(50)
+    .optional(),
+  bio: z.string().trim().max(512).optional(),
   creatorType: z
     .enum(['artist', 'podcaster', 'influencer', 'creator'])
     .optional(),
-  avatarUrl: z.string().url().max(2048).optional(),
-  spotifyUrl: z.string().url().max(2048).optional(),
-  appleMusicUrl: z.string().url().max(2048).optional(),
-  youtubeUrl: z.string().url().max(2048).optional(),
+  avatarUrl: httpUrlSchema.optional(),
+  spotifyUrl: httpUrlSchema.optional(),
+  appleMusicUrl: httpUrlSchema.optional(),
+  youtubeUrl: httpUrlSchema.optional(),
   isPublic: z.boolean().optional(),
-  settings: z.record(z.string(), z.unknown()).optional(),
-  theme: z.record(z.string(), z.unknown()).optional(),
+  marketingOptOut: z.boolean().optional(),
+  settings: settingsSchema.optional(),
+  theme: themeSchema.optional(),
   venmo_handle: z
     .string()
+    .trim()
     .regex(/^@[A-Za-z0-9_]{1,30}$/)
     .optional(),
 });
@@ -109,6 +178,7 @@ export async function PUT(req: Request) {
         'appleMusicUrl',
         'youtubeUrl',
         'isPublic',
+        'marketingOptOut',
         'settings',
         'theme',
         'venmo_handle',
@@ -130,8 +200,9 @@ export async function PUT(req: Request) {
       const parsedUpdatesResult = ProfileUpdateSchema.safeParse(validUpdates);
 
       if (!parsedUpdatesResult.success) {
+        const firstError = parsedUpdatesResult.error.errors[0]?.message;
         return NextResponse.json(
-          { error: 'Invalid profile updates' },
+          { error: firstError || 'Invalid profile updates' },
           { status: 400 }
         );
       }
@@ -140,6 +211,11 @@ export async function PUT(req: Request) {
 
       const { username: usernameFromUpdates, ...profileUpdates } =
         parsedUpdates;
+      const sanitizedProfileUpdates = Object.fromEntries(
+        Object.entries(profileUpdates).filter(
+          ([, value]) => value !== undefined
+        )
+      );
 
       const clerkUpdates: Record<string, unknown> = {};
 
@@ -214,7 +290,7 @@ export async function PUT(req: Request) {
 
       const [updatedProfile] = await db
         .update(creatorProfiles)
-        .set({ ...profileUpdates, updatedAt: new Date() })
+        .set({ ...sanitizedProfileUpdates, updatedAt: new Date() })
         .from(users)
         .where(
           and(

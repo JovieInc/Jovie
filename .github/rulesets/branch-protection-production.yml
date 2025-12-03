@@ -1,9 +1,9 @@
-name: 'Main Branch Protection (fast lane)'
+name: 'Production Branch Protection (full gate)'
 enforcement: 'active'
 target:
   ref_name:
     include:
-      - 'refs/heads/main'
+      - 'refs/heads/production'
     exclude: []
 rules:
   - type: 'pull_request'
@@ -19,5 +19,10 @@ rules:
         - context: 'CI / Typecheck'
         - context: 'CI / Lint'
         - context: 'CI / Migration Guard'
+        - context: 'CI / AI Review Gate'
+        - context: 'CI / Drizzle Check'
+        - context: 'CI / Build'
+        - context: 'CI / Unit Tests'
+        - context: 'CI / E2E Tests'
         - context: 'CI / ci-fast'
 bypass_actors: []
