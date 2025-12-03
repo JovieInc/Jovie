@@ -5,20 +5,20 @@ import { db, profilePhotos, users } from '@/lib/db';
 
 export const runtime = 'edge';
 
-interface RouteParams {
-  params: {
+interface RouteContext {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const photoId = params.id;
+    const { id: photoId } = await context.params;
     if (!photoId) {
       return NextResponse.json({ error: 'Photo ID required' }, { status: 400 });
     }
