@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useMemo, useState } from 'react';
