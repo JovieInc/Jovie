@@ -30,6 +30,9 @@ export interface NotificationMessage {
   subject: string;
   text: string;
   html?: string;
+  from?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
   ctaUrl?: string;
   channels?: NotificationDeliveryChannel[];
   metadata?: Record<string, unknown>;
@@ -60,6 +63,7 @@ export interface EmailMessage {
   html?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  from?: string;
 }
 
 export interface EmailProvider {

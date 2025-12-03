@@ -1,7 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
-import { and, asc, count, eq } from 'drizzle-orm';
+import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -12,8 +12,10 @@ import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
 import {
   type CreatorProfile,
+  clickEvents,
   creatorProfiles,
   socialLinks,
+  tips,
   userSettings,
   users,
 } from '@/lib/db/schema';
@@ -27,7 +29,20 @@ export interface DashboardData {
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
   isAdmin: boolean;
+  tippingStats: {
+    tipClicks: number;
+    tipsSubmitted: number;
+    totalReceivedCents: number;
+    monthReceivedCents: number;
+  };
 }
+
+const createEmptyTippingStats = () => ({
+  tipClicks: 0,
+  tipsSubmitted: 0,
+  totalReceivedCents: 0,
+  monthReceivedCents: 0,
+});
 
 function profileIsPublishable(profile: CreatorProfile | null): boolean {
   if (!profile) return false;
@@ -64,6 +79,8 @@ async function fetchDashboardDataWithSession(
 ): Promise<Omit<DashboardData, 'isAdmin'>> {
   // All queries run inside a transaction to keep the RLS session variable set
   try {
+    const emptyTippingStats = createEmptyTippingStats();
+
     // First check if user exists in users table
     const [userData] = await dbClient
       .select({ id: users.id })
@@ -80,6 +97,7 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        tippingStats: emptyTippingStats,
       };
     }
 
@@ -99,6 +117,7 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        tippingStats: emptyTippingStats,
       };
     }
 
@@ -143,6 +162,51 @@ async function fetchDashboardDataWithSession(
       })(),
     ]);
 
+    const startOfMonth = new Date();
+    startOfMonth.setUTCDate(1);
+    startOfMonth.setUTCHours(0, 0, 0, 0);
+
+    const [tipTotalsRaw] = await dbClient
+      .select({
+        totalReceived: drizzleSql`
+          COALESCE(SUM(${tips.amountCents}), 0)
+        `,
+        monthReceived: drizzleSql`
+          COALESCE(
+            SUM(
+              CASE
+                WHEN ${tips.createdAt} >= ${startOfMonth}
+                THEN ${tips.amountCents}
+                ELSE 0
+              END
+            ),
+            0
+          )
+        `,
+        tipsSubmitted: drizzleSql`
+          COALESCE(COUNT(${tips.id}), 0)
+        `,
+      })
+      .from(tips)
+      .where(eq(tips.creatorProfileId, selected.id));
+
+    const [clickStats] = await dbClient
+      .select({ c: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, selected.id),
+          eq(clickEvents.linkType, 'tip')
+        )
+      );
+
+    const tippingStats = {
+      tipClicks: Number(clickStats?.[0]?.c ?? 0),
+      tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
+      totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
+      monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),
+    };
+
     // Return data with first profile selected by default
     return {
       user: userData,
@@ -151,6 +215,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: !profileIsPublishable(selected),
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
+      tippingStats,
     };
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
@@ -162,6 +227,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      tippingStats: emptyTippingStats,
     };
   }
 }
@@ -184,6 +250,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       sidebarCollapsed: false,
       hasSocialLinks: false,
       isAdmin,
+      tippingStats: createEmptyTippingStats(),
     };
   }
 

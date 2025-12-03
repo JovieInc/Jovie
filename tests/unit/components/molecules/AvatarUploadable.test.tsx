@@ -278,7 +278,9 @@ describe('AvatarUploadable Component', () => {
       }
     });
 
-    it('rejects HEIC by default to match API constraints', async () => {
+    it('accepts HEIC by default to match API support', async () => {
+      mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
+
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -287,6 +289,30 @@ describe('AvatarUploadable Component', () => {
           uploadable={true}
           onUpload={mockOnUpload}
           onError={mockOnError}
+        />
+      );
+
+      const fileInput = screen.getByLabelText('Choose profile photo file');
+      const heicFile = createMockFile('photo.heic', 'image/heic', 2048);
+
+      fireEvent.change(fileInput, { target: { files: [heicFile] } });
+
+      await waitFor(() => {
+        expect(mockOnUpload).toHaveBeenCalledWith(heicFile);
+      });
+      expect(mockOnError).not.toHaveBeenCalled();
+    });
+
+    it('can be configured to reject HEIC when disabled upstream', async () => {
+      render(
+        <AvatarUploadable
+          src='https://example.com/avatar.jpg'
+          alt='User avatar'
+          name='John Doe'
+          uploadable={true}
+          onUpload={mockOnUpload}
+          onError={mockOnError}
+          acceptedTypes={['image/jpeg', 'image/png', 'image/webp']}
         />
       );
 

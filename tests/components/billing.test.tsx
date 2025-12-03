@@ -13,6 +13,16 @@ vi.mock('@/lib/analytics', () => ({
   },
 }));
 
+const { pushMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: pushMock,
+  }),
+}));
+
 // Mock fetch
 global.fetch = vi.fn();
 
@@ -29,6 +39,7 @@ describe('Billing Components', () => {
     vi.clearAllMocks();
     (global.fetch as any).mockClear();
     window.location.href = '';
+    pushMock.mockClear();
   });
 
   describe('BillingPortalLink Component', () => {
@@ -115,7 +126,7 @@ describe('Billing Components', () => {
       expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
     });
 
-    it('redirects to pricing page when feature flag is disabled', async () => {
+    it('redirects to the billing remove-branding flow when feature flag is disabled', async () => {
       mockUseFeatureFlag.mockReturnValue(false);
 
       render(<UpgradeButton />);
@@ -124,7 +135,7 @@ describe('Billing Components', () => {
       fireEvent.click(button);
 
       await waitFor(() => {
-        expect(window.location.href).toBe('/pricing');
+        expect(pushMock).toHaveBeenCalledWith('/billing/remove-branding');
       });
     });
 

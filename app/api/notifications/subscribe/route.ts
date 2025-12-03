@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { APP_URL } from '@/constants/app';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema';
+import { sendNotification } from '@/lib/notifications/service';
+
+// Resend + DB access requires Node runtime
+export const runtime = 'nodejs';
 
 // Schema for subscription request validation
 const subscribeSchema = z
@@ -33,6 +38,7 @@ const subscribeSchema = z
  */
 export async function POST(request: NextRequest) {
   try {
+    const runtimeStart = Date.now();
     // Parse and validate request body
     const body = await request.json();
     const result = subscribeSchema.safeParse(body);
@@ -69,6 +75,22 @@ export async function POST(request: NextRequest) {
     const { artist_id, email, phone, channel, source, country_code } =
       result.data;
 
+    const artistProfile = await db.query.creatorProfiles.findFirst({
+      columns: {
+        id: true,
+        displayName: true,
+        username: true,
+      },
+      where: (fields, { eq }) => eq(fields.id, artist_id),
+    });
+
+    if (!artistProfile) {
+      return NextResponse.json(
+        { success: false, error: 'Artist not found' },
+        { status: 404 }
+      );
+    }
+
     const ipAddress =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
 
@@ -97,7 +119,7 @@ export async function POST(request: NextRequest) {
             notificationSubscriptions.phone,
           ];
 
-    await db
+    const [insertedSubscription] = await db
       .insert(notificationSubscriptions)
       .values({
         creatorProfileId: artist_id,
@@ -108,7 +130,10 @@ export async function POST(request: NextRequest) {
         ipAddress,
         source,
       })
-      .onConflictDoNothing({ target: conflictTarget });
+      .onConflictDoNothing({ target: conflictTarget })
+      .returning({
+        id: notificationSubscriptions.id,
+      });
 
     // Track successful subscription
     await trackServerEvent('notifications_subscribe_success', {
@@ -120,9 +145,46 @@ export async function POST(request: NextRequest) {
       source,
     });
 
+    let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
+      null;
+
+    if (channel === 'email' && normalizedEmail && insertedSubscription?.id) {
+      const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
+      const artistName =
+        artistProfile.displayName || artistProfile.username || 'this artist';
+      const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;
+
+      dispatchResult = await sendNotification(
+        {
+          id: dedupKey,
+          dedupKey,
+          category: 'transactional',
+          subject: `You're subscribed to ${artistName} on Jovie`,
+          text: `Thanks for turning on notifications. We'll email you when ${artistName} drops new music.\n\nManage your notification settings anytime: ${profileUrl}/notifications`,
+          html: `
+            <p>Thanks for turning on notifications for <strong>${artistName}</strong>.</p>
+            <p>We'll email you when ${artistName} drops new music or updates their profile.</p>
+            <p style="margin:16px 0;">
+              <a href="${profileUrl}/notifications" style="padding:10px 16px;background:#000;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Manage notifications</a>
+            </p>
+            <p style="font-size:14px;color:#555;">If you didn't request this, you can ignore this email or unsubscribe from the artist page.</p>
+          `,
+          channels: ['email'],
+          respectUserPreferences: false,
+          dismissible: true,
+        },
+        {
+          email: normalizedEmail,
+          creatorProfileId: artist_id,
+        }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Subscription successful',
+      email_dispatched: dispatchResult?.delivered.includes('email') ?? false,
+      duration_ms: Math.round(Date.now() - runtimeStart),
     });
   } catch (error) {
     // Track unexpected error

@@ -39,6 +39,12 @@ export default function SidebarDemoPage() {
     sidebarCollapsed: false,
     hasSocialLinks: true,
     isAdmin: false,
+    tippingStats: {
+      tipClicks: 0,
+      tipsSubmitted: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    },
   };
 
   return (

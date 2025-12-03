@@ -1,6 +1,9 @@
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
+import { db } from '@/lib/db';
+import { notificationSubscriptions } from '@/lib/db/schema';
 
 // Schema for unsubscription request validation
 const unsubscribeSchema = z
@@ -88,25 +91,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // In a real implementation, we would:
-    // 1. Verify the token if provided
-    // 2. Find the contact by email/phone hash or token
-    // 3. Remove the subscription for the specified artist
-    // 4. Return success or appropriate error
+    // Normalize contact values
+    const normalizedEmail = email?.trim().toLowerCase() ?? null;
+    const normalizedPhone = phone ? phone.replace(/[\s-]/g, '') : null;
 
-    // For now, we'll just simulate success
-    // This would be replaced with actual database operations
+    const targetChannel: 'email' | 'phone' =
+      channel || (normalizedPhone ? 'phone' : 'email');
+
+    if (!normalizedEmail && !normalizedPhone) {
+      await trackServerEvent('notifications_unsubscribe_error', {
+        artist_id,
+        error_type: 'missing_identifier',
+        method,
+        channel: targetChannel,
+      });
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Contact required to unsubscribe',
+        },
+        { status: 400 }
+      );
+    }
+
+    const whereClauses = [
+      eq(notificationSubscriptions.creatorProfileId, artist_id),
+    ];
+
+    if (targetChannel === 'email' && normalizedEmail) {
+      whereClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
+      whereClauses.push(eq(notificationSubscriptions.channel, 'email'));
+    } else if (targetChannel === 'phone' && normalizedPhone) {
+      whereClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
+      whereClauses.push(eq(notificationSubscriptions.channel, 'phone'));
+    }
+
+    const deleted = await db
+      .delete(notificationSubscriptions)
+      .where(and(...whereClauses))
+      .returning({ id: notificationSubscriptions.id });
 
     // Track successful unsubscription
     await trackServerEvent('notifications_unsubscribe_success', {
       artist_id,
       method,
-      channel: channel || (phone ? 'phone' : 'email'),
+      channel: targetChannel,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'Unsubscription successful',
+      removed: deleted.length,
+      message:
+        deleted.length > 0
+          ? 'Unsubscription successful'
+          : 'No matching subscription found',
     });
   } catch (error) {
     // Track unexpected error

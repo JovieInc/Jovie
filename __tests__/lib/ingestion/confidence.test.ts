@@ -15,7 +15,7 @@ describe('computeLinkConfidence', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.75);
   });
 
-  it('keeps lightweight ingested linktree suggestions as suggested', () => {
+  it('keeps lightweight ingested linktree hints as low confidence', () => {
     const result = computeLinkConfidence({
       sourceType: 'ingested',
       signals: ['linktree_profile_link'],
@@ -23,9 +23,9 @@ describe('computeLinkConfidence', () => {
       url: 'https://linktr.ee/example',
     });
 
-    expect(result.state).toBe('suggested');
+    expect(result.state).toBe('rejected');
     expect(result.confidence).toBeGreaterThan(0.1);
-    expect(result.confidence).toBeLessThan(0.7);
+    expect(result.confidence).toBeLessThan(0.3);
   });
 
   it('promotes multi-signal ingested links to active when confidence is high', () => {

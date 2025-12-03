@@ -121,6 +121,7 @@ export function ProfileShell({
   const [channelBusy, setChannelBusy] = useState<
     Partial<Record<NotificationChannel, boolean>>
   >({});
+  const STORAGE_KEY = 'jovie:notification-contacts';
 
   const hasActiveSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.phone
@@ -155,6 +156,77 @@ export function ProfileShell({
     setSubscriptionDetails,
     openSubscription,
   };
+  const persistContacts = (next: NotificationContactValues) => {
+    if (typeof window === 'undefined') return;
+    try {
+      const hasAny = Boolean(next.email || next.phone);
+
+      if (!hasAny) {
+        window.localStorage.removeItem(STORAGE_KEY);
+        return;
+      }
+
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (error) {
+      console.error('Failed to persist notification contacts', error);
+    }
+  };
+
+  React.useEffect(() => {
+    persistContacts(subscriptionDetails);
+  }, [subscriptionDetails]);
+
+  React.useEffect(() => {
+    if (!notificationsEnabled) return;
+    if (typeof window === 'undefined') return;
+
+    const storedRaw = window.localStorage.getItem(STORAGE_KEY);
+    if (!storedRaw) return;
+
+    try {
+      const parsed = JSON.parse(storedRaw) as NotificationContactValues;
+      const hasStoredContact = Boolean(parsed.email || parsed.phone);
+      if (!hasStoredContact) return;
+
+      void (async () => {
+        try {
+          const response = await fetch('/api/notifications/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              artist_id: artist.id,
+              email: parsed.email,
+              phone: parsed.phone,
+            }),
+          });
+
+          if (!response.ok) return;
+
+          const data = (await response.json()) as {
+            channels?: NotificationSubscriptionState;
+            details?: NotificationContactValues;
+          };
+
+          if (data.channels) {
+            setSubscribedChannels(data.channels);
+            const hasAny = Object.values(data.channels).some(Boolean);
+
+            if (hasAny) {
+              setSubscriptionDetails(data.details ?? {});
+              setNotificationsState('success');
+            }
+          }
+        } catch (error) {
+          console.error(
+            'Unable to hydrate notification subscription state',
+            error
+          );
+        }
+      })();
+    } catch {
+      // Ignore parse failures
+    }
+  }, [artist.id, notificationsEnabled]);
   const socialNetworkLinks = socialLinks.filter(link =>
     SOCIAL_NETWORK_PLATFORMS.includes(
       link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]

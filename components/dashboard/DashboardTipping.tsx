@@ -5,9 +5,20 @@ import { Button } from '@jovie/ui';
 import { useCallback, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { Input } from '@/components/atoms/Input';
+import { getQrCodeUrl } from '@/components/atoms/QRCode';
+import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
+import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
+
+const formatCurrency = (cents: number) => currencyFormatter.format(cents / 100);
+const formatCount = (value: number) => value.toLocaleString();
 
 export function DashboardTipping() {
   const dashboardData = useDashboardData();
@@ -67,6 +78,15 @@ export function DashboardTipping() {
   }
 
   const hasVenmoHandle = Boolean(artist.venmo_handle);
+  const tipHandle = artist.handle ?? '';
+  const displayHandle = tipHandle || 'your-handle';
+  const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
+  const tipShareUrl = `https://jov.ie${tipRelativePath}`;
+  const qrDisplaySize = 180;
+  const qrDownloadSize = 420;
+  const qrDownloadUrl = getQrCodeUrl(tipShareUrl, qrDownloadSize);
+  const { totalReceivedCents, monthReceivedCents, tipClicks, tipsSubmitted } =
+    dashboardData.tippingStats;
 
   return (
     <div className='relative'>
@@ -179,37 +199,126 @@ export function DashboardTipping() {
           !hasVenmoHandle && 'filter blur-sm pointer-events-none select-none'
         )}
       >
-        {/* Earnings Summary */}
-        <div className='relative z-10 rounded-xl border border-subtle bg-surface-1 p-6 transition-all duration-300 hover:border-default hover:shadow-md'>
-          <SectionHeader
-            className='mb-4 px-0 py-0 border-0'
-            title='Earnings Summary'
-          />
-          <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-              <p className='text-sm text-secondary-token'>Total Received</p>
-              <p className='text-2xl font-bold text-primary-token'>$0.00</p>
+        <div className='grid gap-6 lg:grid-cols-[1.45fr_1fr]'>
+          <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
+            <SectionHeader
+              className='mb-4 px-0 py-0 border-0'
+              title='Earnings Summary'
+              description='Track what fans have contributed via Venmo tips.'
+            />
+            <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+              <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
+                <p className='text-sm text-secondary-token'>Total Received</p>
+                <p className='text-2xl font-bold text-primary-token'>
+                  {formatCurrency(totalReceivedCents)}
+                </p>
+              </div>
+              <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
+                <p className='text-sm text-secondary-token'>This Month</p>
+                <p className='text-2xl font-bold text-primary-token'>
+                  {formatCurrency(monthReceivedCents)}
+                </p>
+              </div>
+              <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
+                <p className='text-sm text-secondary-token'>Tips Received</p>
+                <p className='text-2xl font-bold text-primary-token'>
+                  {formatCount(tipsSubmitted)}
+                </p>
+              </div>
             </div>
-            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-              <p className='text-sm text-secondary-token'>This Month</p>
-              <p className='text-2xl font-bold text-primary-token'>$0.00</p>
+            <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
+              <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
+                <p className='text-sm text-secondary-token'>
+                  Tip link clicks &amp; QR scans
+                </p>
+                <p className='text-2xl font-bold text-primary-token'>
+                  {formatCount(tipClicks)}
+                </p>
+                <p className='text-xs text-secondary-token mt-1'>
+                  Shows how many times fans opened your tipping page.
+                </p>
+              </div>
+              <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
+                <p className='text-sm text-secondary-token'>Tips submitted</p>
+                <p className='text-2xl font-bold text-primary-token'>
+                  {formatCount(tipsSubmitted)}
+                </p>
+                <p className='text-xs text-secondary-token mt-1'>
+                  Venmo conversions captured on Jovie.
+                </p>
+              </div>
             </div>
-            <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-              <p className='text-sm text-secondary-token'>Tip Count</p>
-              <p className='text-2xl font-bold text-primary-token'>0</p>
+          </div>
+          <div className='space-y-6'>
+            <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
+              <SectionHeader
+                className='mb-4 px-0 py-0 border-0'
+                title='Share your tip link'
+                description='Send fans directly to jov.ie so they can tip instantly.'
+              />
+              <div className='space-y-3'>
+                <div className='flex flex-wrap items-center gap-3 rounded-xl border border-subtle bg-surface-2/60 px-4 py-2 text-sm font-mono text-primary-token'>
+                  <span className='min-w-0 flex-1 truncate'>{tipShareUrl}</span>
+                  <CopyToClipboardButton
+                    relativePath={tipRelativePath}
+                    idleLabel='Copy link'
+                    successLabel='✓ Copied!'
+                    errorLabel='Copy failed'
+                  />
+                </div>
+                <p className='text-xs text-secondary-token'>
+                  Fans can visit{' '}
+                  <strong className='font-semibold'>
+                    jov.ie/{displayHandle}/tip
+                  </strong>{' '}
+                  or scan the QR code below to tip you instantly.
+                </p>
+              </div>
+            </div>
+            <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
+              <SectionHeader
+                className='mb-4 px-0 py-0 border-0'
+                title='Downloadable QR'
+                description='Perfect for merch tables, receipts, or posters.'
+              />
+              <div className='flex flex-col items-center gap-3'>
+                <QRCodeCard
+                  data={tipShareUrl}
+                  qrSize={qrDisplaySize}
+                  title='Scan to tip'
+                  description='Opens your Jovie tip page.'
+                />
+                <div className='flex flex-wrap items-center justify-center gap-3'>
+                  <Button variant='secondary' size='sm' asChild>
+                    <a
+                      href={qrDownloadUrl}
+                      download={`jovie-tip-${displayHandle}.png`}
+                      target='_blank'
+                      rel='noreferrer'
+                    >
+                      Download QR
+                    </a>
+                  </Button>
+                  <p className='text-xs text-secondary-token'>
+                    Keep this on receipts or merch so fans can tip fast.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Recent Earnings */}
-        <div className='relative z-10 rounded-xl border border-subtle bg-surface-1 p-6 transition-all duration-300 hover:border-default hover:shadow-md'>
+        <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
           <SectionHeader
             className='mb-4 px-0 py-0 border-0'
             title='Recent Earnings'
           />
-          <div className='space-y-4'>
+          <div className='space-y-3'>
             <p className='text-secondary-token'>
               No earnings yet. When you receive tips, they&apos;ll appear here.
+            </p>
+            <p className='text-xs text-secondary-token'>
+              Soon you can forward Venmo receipts to us to tie every conversion
+              back to your dashboard.
             </p>
           </div>
         </div>

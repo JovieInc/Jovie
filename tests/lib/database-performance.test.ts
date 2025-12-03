@@ -144,8 +144,11 @@ describe('Database Performance Monitoring', () => {
 
       const slowest = databaseMonitor.getSlowestQueries(2);
       expect(slowest).toHaveLength(2);
-      expect(slowest[0].query).toBe('slow-query');
-      expect(slowest[1].query).toBe('medium-query');
+      expect(slowest.map(entry => entry.query)).toEqual(
+        expect.arrayContaining(['slow-query', 'medium-query'])
+      );
+      const sorted = [...slowest].sort((a, b) => b.duration - a.duration);
+      expect(slowest).toEqual(sorted);
     });
 
     it('should identify most frequent queries', async () => {

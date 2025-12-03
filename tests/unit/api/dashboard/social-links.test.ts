@@ -3,19 +3,30 @@ import { describe, expect, it, vi } from 'vitest';
 import { PUT } from '@/app/api/dashboard/social-links/route';
 
 const hoisted = vi.hoisted(() => {
+  const profileResult = [
+    { id: 'profile_123', usernameNormalized: 'artist-profile' },
+  ];
+  const existingLinksResult = [{ id: 'link_1', sourceType: 'manual' }];
+
   const withDbSession = vi.fn(
     async (callback: (userId: string) => Promise<Response>) =>
       callback('user_123')
   );
 
-  const select = vi.fn().mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      innerJoin: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
-        }),
+  const select = vi.fn().mockImplementation(() => {
+    const where = vi.fn().mockResolvedValue(existingLinksResult);
+    const innerJoin = vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(profileResult),
       }),
-    }),
+    });
+
+    return {
+      from: vi.fn().mockReturnValue({
+        innerJoin,
+        where,
+      }),
+    };
   });
 
   return { withDbSession, select };
@@ -46,6 +57,7 @@ vi.mock('@/lib/db/schema', () => ({
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...conditions: unknown[]) => conditions),
   eq: vi.fn((left: unknown, right: unknown) => [left, right]),
+  inArray: vi.fn((column: unknown, values: unknown) => [column, values]),
 }));
 
 describe('PUT /api/dashboard/social-links', () => {
