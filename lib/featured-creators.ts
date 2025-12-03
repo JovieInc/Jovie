@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
-import { db } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { transformImageUrl } from '@/lib/images/versioning';
 
@@ -31,6 +31,10 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 }
 
 async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
+  if (!(await doesTableExist(TABLE_NAMES.creatorProfiles))) {
+    return [];
+  }
+
   const data = await db
     .select({
       id: creatorProfiles.id,

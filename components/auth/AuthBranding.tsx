@@ -12,6 +12,7 @@ interface AuthBrandingProps {
     | 'green-blue-purple'
     | 'red-orange-yellow';
   textColorClass?: string;
+  showText?: boolean;
 }
 
 // Static gradient mappings to ensure Tailwind classes are preserved during build
@@ -33,6 +34,7 @@ export function AuthBranding({
   description,
   gradientVariant = 'blue-purple-cyan',
   textColorClass = 'text-blue-100',
+  showText = true,
 }: AuthBrandingProps) {
   const gradientClass = gradientVariants[gradientVariant];
 
@@ -40,15 +42,19 @@ export function AuthBranding({
     <div
       className={`hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-12 xl:px-16 ${gradientClass}`}
     >
-      <div className='mx-auto w-full max-w-sm'>
+      <div className='relative mx-auto w-full max-w-sm'>
         <div className='text-center'>
           <div className='mb-8'>
             <Logo size='xl' className='text-white mx-auto' />
           </div>
-          <h1 className='text-3xl font-bold text-white mb-4'>{title}</h1>
-          <p className={`${textColorClass} text-lg leading-relaxed`}>
-            {description}
-          </p>
+          {showText && (
+            <>
+              <h1 className='text-3xl font-bold text-white mb-4'>{title}</h1>
+              <p className={`${textColorClass} text-lg leading-relaxed`}>
+                {description}
+              </p>
+            </>
+          )}
         </div>
 
         {/* Decorative elements */}

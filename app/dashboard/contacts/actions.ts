@@ -144,7 +144,7 @@ export async function saveContact(
       throw new Error('Unable to save contact');
     }
 
-    revalidateTag('dashboard-data');
+    revalidateTag('dashboard-data', 'default');
     if (profile.usernameNormalized) {
       revalidatePath(`/${profile.usernameNormalized}`);
     }
@@ -184,7 +184,7 @@ export async function deleteContact(
 
     await tx.delete(creatorContacts).where(eq(creatorContacts.id, contactId));
 
-    revalidateTag('dashboard-data');
+    revalidateTag('dashboard-data', 'default');
     if (profile.usernameNormalized) {
       revalidatePath(`/${profile.usernameNormalized}`);
     }

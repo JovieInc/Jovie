@@ -1,13 +1,13 @@
-import { cookies, type UnsafeUnwrappedCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { LISTEN_COOKIE } from '@/constants/app';
 
-export function getListenPreference(): string | undefined {
-  const cookieStore = cookies() as unknown as UnsafeUnwrappedCookies;
+export async function getListenPreference(): Promise<string | undefined> {
+  const cookieStore = await cookies();
   return cookieStore.get(LISTEN_COOKIE)?.value;
 }
 
-export function setListenPreference(value: string): void {
-  const cookieStore = cookies() as unknown as UnsafeUnwrappedCookies;
+export async function setListenPreference(value: string): Promise<void> {
+  const cookieStore = await cookies();
   cookieStore.set(LISTEN_COOKIE, value, {
     maxAge: 60 * 60 * 24 * 365, // 1 year
     httpOnly: false,

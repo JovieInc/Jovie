@@ -45,6 +45,8 @@ const DB_CONFIG = {
   retryBackoffMultiplier: PERFORMANCE_THRESHOLDS.retryBackoffMultiplier,
 } as const;
 
+const positiveTableExistenceCache = new Set<string>();
+
 // Enhanced logging for database operations
 function logDbError(
   context: string,
@@ -251,6 +253,7 @@ export const db = new Proxy({} as DbType, {
 });
 
 export type { InferModel } from 'drizzle-orm';
+export { TABLE_NAMES } from './config';
 // Re-export schema and types
 export * from './schema';
 
@@ -326,6 +329,44 @@ export async function withTransaction<T>(
   } catch (error) {
     logDbError('withTransaction', error, { context });
     return { error: error as Error };
+  }
+}
+
+export async function doesTableExist(tableName: string): Promise<boolean> {
+  if (positiveTableExistenceCache.has(tableName)) {
+    return true;
+  }
+
+  if (!env.DATABASE_URL) {
+    return false;
+  }
+
+  try {
+    if (!_db) {
+      _db = initializeDb();
+    }
+
+    const result = await _db.execute(
+      drizzleSql<{ table_exists: boolean }>`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public'
+            AND table_name = ${tableName}
+        ) AS table_exists
+      `
+    );
+
+    const exists = Boolean(result.rows?.[0]?.table_exists ?? false);
+
+    if (exists) {
+      positiveTableExistenceCache.add(tableName);
+    }
+
+    return exists;
+  } catch (error) {
+    logDbError('tableExists', error, { tableName });
+    return false;
   }
 }
 
