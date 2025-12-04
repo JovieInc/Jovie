@@ -1,6 +1,7 @@
-type RemarkPlugin = (this: unknown, ...args: unknown[]) => unknown;
+import type { Root } from 'mdast';
+import type { Plugin } from 'unified';
 
 declare module 'remark-slug' {
-  const remarkSlug: RemarkPlugin;
+  const remarkSlug: Plugin<[], Root>;
   export default remarkSlug;
 }
