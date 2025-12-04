@@ -1,5 +1,3 @@
-'use server';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { toggleCreatorVerifiedAction } from '@/app/admin/actions';
 
