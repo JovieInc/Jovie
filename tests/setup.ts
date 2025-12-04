@@ -9,6 +9,14 @@ import { afterEach, beforeAll, expect, vi } from 'vitest';
 import ws from 'ws';
 import * as schema from '@/lib/db/schema';
 
+// Suppress noisy runtime warnings that depend on optional integrations in tests.
+global.console = {
+  ...console,
+  debug: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+};
+
 // Configure WebSocket for transaction support in tests
 neonConfig.webSocketConstructor = ws;
 
@@ -303,12 +311,6 @@ Object.defineProperty(window, 'scrollTo', {
 });
 
 // Mock console methods to reduce noise in tests
-global.console = {
-  ...console,
-  warn: vi.fn(),
-  error: vi.fn(),
-};
-
 // Mock Next.js Image component
 vi.mock('next/image', () => ({
   default: ({
