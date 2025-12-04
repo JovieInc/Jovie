@@ -108,9 +108,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Extract domain from APP_URL for analytics
-  const analyticsDomain = APP_URL.replace(/^https?:\/\//, '');
-
   // Check if cookie banner should be shown
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
@@ -149,13 +146,6 @@ export default async function RootLayout({
           rel='preconnect'
           href='https://images.unsplash.com'
           crossOrigin=''
-        />
-
-        {/* Vercel Page Speed Insights */}
-        <script
-          defer
-          data-domain={analyticsDomain}
-          src='https://vitals.vercel-insights.com/v1/vitals.js'
         />
 
         {/* Structured Data for Organization */}
