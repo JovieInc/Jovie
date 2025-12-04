@@ -31,17 +31,23 @@ export interface LegalDocument {
   toc: TocEntry[];
 }
 
-type HeadingData = {
-  hProperties?: {
-    id?: string;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
+const slugifyHeading = (value: string): string => {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 };
 
 type HeadingNode = {
   depth?: number;
-  data?: HeadingData;
+  data?: {
+    hProperties?: {
+      id?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
 };
 
 export async function getLegalDocument(
@@ -67,20 +73,16 @@ export async function getLegalDocument(
     if (!title) return;
     if (heading.depth > 3) return;
 
-    const slug = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    const headingId = slugifyHeading(title);
+    if (!headingId) return;
 
-    if (!slug) return;
-
-    const data: HeadingData = heading.data ?? {};
-    const hProperties: HeadingData['hProperties'] = data.hProperties ?? {};
-    hProperties.id = slug;
+    const data = heading.data ?? {};
+    const hProperties = data.hProperties ?? {};
+    hProperties.id = headingId;
     data.hProperties = hProperties;
     heading.data = data;
 
-    toc.push({ id: slug, title, level: heading.depth });
+    toc.push({ id: headingId, title, level: heading.depth });
   });
 
   const transformed = await processor.run(ast);

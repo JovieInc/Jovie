@@ -137,7 +137,6 @@
     "mdast-util-to-string": "^4.0.0",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1",
-    "remark-slug": "^8.0.0",
     "resend": "^6.5.2",
     "unist-util-visit": "^5.0.0",
     "server-only": "^0.0.1",

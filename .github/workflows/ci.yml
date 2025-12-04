@@ -28,17 +28,21 @@ concurrency:
 
 jobs:
 
-  ci-typecheck:
-    name: Typecheck
+  ci-fast-checks:
+    name: Fast checks (typecheck + lint)
     # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      matrix:
+        check: [typecheck, lint]
     steps:
       - uses: actions/checkout@v6
-        with: { fetch-depth: 1 }  # Optimized: no git history needed
+        with: { fetch-depth: 1 }
       - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache TS build info
+      - name: Cache TypeScript artifacts
+        if: ${{ matrix.check == 'typecheck' }}
         uses: actions/cache@v4
         with:
           path: .cache/tsbuildinfo
@@ -46,19 +50,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
-      - name: Typecheck
-        run: pnpm run typecheck
-
-  ci-lint:
-    name: Lint
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-        with: { fetch-depth: 1 }  # Optimized: no git history needed
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache ESLint cache
+      - name: Cache ESLint artifacts
+        if: ${{ matrix.check == 'lint' }}
         uses: actions/cache@v4
         with:
           path: .eslintcache
@@ -66,8 +59,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-eslint-${{ github.ref }}-
             ${{ runner.os }}-eslint-
-      - name: Lint (enforce zero warnings)
-        run: pnpm run lint
+      - name: Run fast/lint check
+        run: |
+          if [[ "${{ matrix.check }}" == "typecheck" ]]; then
+            pnpm run typecheck
+          else
+            pnpm run lint
+          fi
 
   neon-db:
     name: Neon DB
@@ -232,7 +230,7 @@ jobs:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group' }}
-    needs: [ci-typecheck, ci-lint]
+    needs: [ci-fast-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -242,7 +240,7 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [ci-typecheck, ci-lint]
+    needs: [ci-fast-checks]
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -254,62 +252,13 @@ jobs:
       # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
-        run: |
-          # Force run if full-ci label is present
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}" == "true" ]]; then
-            echo "Forcing full CI run due to 'full-ci' label"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Skip on fork PRs where repo secrets are unavailable
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
-            echo "Fork PR detected; skipping Build job to avoid missing secrets."
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # For PRs to production, always run full CI (skip path guards)
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.base.ref }}" == "production" ]]; then
-            echo "Running full CI for PR to production branch"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # For merge queue events, always run full CI
-          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
-            echo "Running full CI for merge queue"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          # For push events to production/main, always run full CI
-          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref }}" == "refs/heads/production" || "${{ github.ref }}" == "refs/heads/main") ]]; then
-            echo "Running full CI for push to production/main branch"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          # Determine changed files depending on event type
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            # For PRs, compare against the base ref from origin
-            git fetch origin "${{ github.base_ref }}"
-            CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-          else
-            # For push/merge_group, compare with previous commit
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-          fi
-
-          # Check if critical paths were modified
-          echo "Checking for changes in critical paths..."
-          if echo "$CHANGED_FILES" | grep -q -E '^(app/|components/|lib/|tests/|package.*\.json|next\.config\.js)'; then
-            echo "Critical paths changed, running full CI"
-            echo "run_full_ci=true" >> $GITHUB_OUTPUT
-          else
-            echo "No critical paths changed, skipping full CI"
-            echo "run_full_ci=false" >> $GITHUB_OUTPUT
-            echo "Changed files:"
-            echo "$CHANGED_FILES"
-          fi
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'build'
+          full-ci-label: ${{ contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
 
       # Skip remaining steps if no relevant changes
       - name: Skip notification
@@ -345,7 +294,7 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    needs: [ci-typecheck, ci-lint]
+    needs: [ci-fast-checks]
     if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -388,7 +337,7 @@ jobs:
   ci-merge-smoke:
     name: Merge Group Smoke
     if: ${{ github.event_name == 'merge_group' }}
-    needs: [ci-typecheck, ci-lint]
+    needs: [ci-fast-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
@@ -767,7 +716,7 @@ jobs:
             }
 
   deploy-prod:
-    needs: [ci-typecheck, ci-lint, ci-build, ci-unit-tests, ci-e2e-tests]
+    needs: [ci-fast-checks, ci-build, ci-unit-tests, ci-e2e-tests]
     if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
