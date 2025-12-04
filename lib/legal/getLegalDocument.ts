@@ -52,7 +52,7 @@ export async function getLegalDocument(
     if (!node.depth) return;
     const title = toString(node).trim();
     if (!title) return;
-    const headingId = node.data?.id as string | undefined;
+    const headingId = (node.data as { id?: string } | undefined)?.id;
     if (!headingId) return;
     if (node.depth > 3) return;
     toc.push({ id: headingId, title, level: node.depth });
