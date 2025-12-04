@@ -54,7 +54,11 @@ export async function fetchLinktreeDocument(
   }
 }
 
-export function extractLinktree(html: string): ExtractionResult {
+export function extractLinktree(
+  html: string,
+  sourceUrl?: string
+): ExtractionResult {
+  void sourceUrl;
   const links: ExtractionResult['links'] = [];
   const seen = new Set<string>();
   let match: RegExpExecArray | null;
@@ -107,4 +111,21 @@ export function extractLinktree(html: string): ExtractionResult {
     displayName,
     avatarUrl,
   };
+}
+
+export function extractLinktreeHandle(url: string): string | null {
+  try {
+    const normalized = normalizeUrl(url);
+    const parsed = new URL(normalized);
+    if (!LINKTREE_HOSTS.has(parsed.hostname.toLowerCase())) {
+      return null;
+    }
+
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    if (parts.length === 0) return null;
+
+    return parts[0].replace(/^@/, '');
+  } catch {
+    return null;
+  }
 }

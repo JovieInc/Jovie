@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ComponentPropsWithoutRef } from 'react';
-
+import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import { UserButton } from '@/components/molecules/UserButton';
@@ -29,6 +29,12 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const { state } = useSidebar();
   const isCollapsed = state === 'closed';
+
+  const dashboardData = useDashboardData();
+  const username =
+    dashboardData.selectedProfile?.usernameNormalized ??
+    dashboardData.selectedProfile?.username;
+  const profileHref = username ? `/${username}` : undefined;
 
   return (
     <Sidebar
@@ -93,7 +99,11 @@ export function DashboardSidebar({
                 : 'flex items-center'
             )}
           >
-            <UserButton showUserInfo={!isCollapsed} />
+            <UserButton
+              showUserInfo={!isCollapsed}
+              profileHref={profileHref}
+              settingsHref='/dashboard/settings'
+            />
           </div>
         </div>
       </SidebarFooter>

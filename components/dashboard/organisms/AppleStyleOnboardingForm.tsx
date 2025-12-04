@@ -405,11 +405,11 @@ export function AppleStyleOnboardingForm({
       case 0:
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
-            <div className='text-center space-y-3 max-w-xl px-4'>
-              <h1 className='text-3xl sm:text-4xl font-bold text-(--fg) transition-colors'>
+            <div className='text-center space-y-3 max-w-2xl px-4'>
+              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[0].title}
               </h1>
-              <p className='text-(--muted) text-base sm:text-xl'>
+              <p className='text-(--muted) text-sm sm:text-base'>
                 {ONBOARDING_STEPS[0].prompt}
               </p>
             </div>
@@ -457,10 +457,10 @@ export function AppleStyleOnboardingForm({
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3 max-w-xl px-4'>
-              <h1 className='text-3xl sm:text-4xl font-bold text-(--fg) transition-colors'>
+              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[1].title}
               </h1>
-              <p className='text-(--muted) text-base sm:text-xl'>
+              <p className='text-(--muted) text-sm sm:text-base'>
                 {ONBOARDING_STEPS[1].prompt}
               </p>
             </div>
@@ -575,10 +575,10 @@ export function AppleStyleOnboardingForm({
         return (
           <div className='flex flex-col items-center justify-center h-full space-y-8'>
             <div className='text-center space-y-3 max-w-xl px-4'>
-              <h1 className='text-3xl sm:text-4xl font-bold text-(--fg) transition-colors'>
+              <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[2].title}
               </h1>
-              <p className='text-(--muted) text-base sm:text-xl'>
+              <p className='text-(--muted) text-sm sm:text-base'>
                 {ONBOARDING_STEPS[2].prompt}
               </p>
             </div>
@@ -637,7 +637,7 @@ export function AppleStyleOnboardingForm({
   };
 
   return (
-    <div className='min-h-screen flex flex-col'>
+    <div className='min-h-screen flex flex-col bg-(--bg) text-(--fg)'>
       <ProgressIndicator />
 
       <a
@@ -653,7 +653,7 @@ export function AppleStyleOnboardingForm({
       </div>
 
       <main
-        className='flex-1 flex items-center justify-center px-4'
+        className='flex-1 flex items-center justify-center px-4 pt-6 pb-16 md:pt-10 md:pb-24'
         id='main-content'
         role='main'
         aria-labelledby='step-heading'

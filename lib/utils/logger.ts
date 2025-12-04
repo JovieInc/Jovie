@@ -10,7 +10,8 @@
 
 const nodeEnv = process.env.NODE_ENV;
 const vercelEnv = process.env.VERCEL_ENV;
-const isDev = nodeEnv !== 'production';
+const isTest = nodeEnv === 'test';
+const isDev = nodeEnv !== 'production' && !isTest;
 const isPreview = vercelEnv === 'preview';
 const active = isDev || isPreview;
 

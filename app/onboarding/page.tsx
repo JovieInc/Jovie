@@ -54,8 +54,8 @@ export default async function OnboardingPage({
       brandingShowText={false}
     >
       <div className='relative min-h-[500px]'>
-        {/* Theme Toggle */}
-        <div className='absolute top-4 right-4 z-20'>
+        {/* Theme Toggle pinned to viewport */}
+        <div className='fixed top-4 right-4 z-40'>
           <ThemeToggle />
         </div>
 

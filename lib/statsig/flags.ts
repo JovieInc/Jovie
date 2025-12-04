@@ -34,6 +34,7 @@ export const STATSIG_FLAGS = {
 
   // Backend Features
   UNIVERSAL_NOTIFICATIONS: 'feature_universal_notifications',
+  AUDIENCE_V2: 'feature_audience_v2',
   CLICK_ANALYTICS_RPC: 'feature_click_analytics_rpc',
 
   // Integration Features

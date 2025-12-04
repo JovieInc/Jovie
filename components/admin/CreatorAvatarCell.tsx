@@ -13,12 +13,14 @@ export interface CreatorAvatarCellProps {
   profileId: string;
   username: string;
   avatarUrl: string | null;
+  verified?: boolean;
 }
 
 export function CreatorAvatarCell({
   profileId,
   username,
   avatarUrl,
+  verified = false,
 }: CreatorAvatarCellProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
@@ -85,6 +87,7 @@ export function CreatorAvatarCell({
         maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
         acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
         showHoverOverlay
+        verified={verified}
       />
     </div>
   );

@@ -1,18 +1,19 @@
 'use client';
 
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-} from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
+import { CreatorVerificationToggleButton } from '@/components/admin/CreatorVerificationToggleButton';
+import {
+  getNextSort,
+  getSortDirection,
+  SORTABLE_COLUMNS,
+  SortableColumnKey,
+} from '@/components/admin/creator-sort-config';
+import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import type {
   AdminCreatorProfileRow,
@@ -58,8 +59,28 @@ function mapProfileToContact(
   };
 }
 
+function SortIndicator({ direction }: { direction?: 'asc' | 'desc' }) {
+  if (!direction) {
+    return (
+      <span className='text-xs text-secondary-token' aria-hidden='true'>
+        ⇅
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className='text-xs text-primary-token'
+      aria-hidden='true'
+      aria-label={direction === 'asc' ? 'Ascending' : 'Descending'}
+    >
+      {direction === 'asc' ? '▴' : '▾'}
+    </span>
+  );
+}
+
 export function AdminCreatorProfilesWithSidebar({
-  profiles,
+  profiles: initialProfiles,
   page,
   pageSize,
   total,
@@ -67,6 +88,12 @@ export function AdminCreatorProfilesWithSidebar({
   sort,
   mode = 'admin',
 }: AdminCreatorProfilesWithSidebarProps) {
+  const {
+    profiles,
+    statuses: verificationStatuses,
+    toggleVerification,
+  } = useCreatorVerification(initialProfiles);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
@@ -78,11 +105,15 @@ export function AdminCreatorProfilesWithSidebar({
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = total === 0 ? 0 : Math.min(page * pageSize, total);
 
-  const buildHref = (targetPage: number, includeSearch = true): string => {
+  const buildHref = (
+    targetPage: number,
+    overrideSort?: AdminCreatorProfilesSort,
+    includeSearch = true
+  ): string => {
     const params = new URLSearchParams();
     params.set('page', String(targetPage));
     params.set('pageSize', String(pageSize));
-    params.set('sort', sort);
+    params.set('sort', overrideSort ?? sort);
     if (includeSearch && search) {
       params.set('q', search);
     }
@@ -92,7 +123,25 @@ export function AdminCreatorProfilesWithSidebar({
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
   const nextHref = canNext ? buildHref(page + 1) : undefined;
-  const clearHref = buildHref(1, false);
+  const clearHref = buildHref(1, undefined, false);
+  const createSortHref = (column: SortableColumnKey) =>
+    buildHref(1, getNextSort(sort, column));
+
+  const renderSortHeader = (column: SortableColumnKey) => {
+    const columnConfig = SORTABLE_COLUMNS[column];
+    const direction = getSortDirection(sort, column);
+
+    return (
+      <Link
+        href={createSortHref(column)}
+        className='inline-flex items-center gap-1 text-xs uppercase tracking-wide font-semibold'
+        onClick={event => event.stopPropagation()}
+      >
+        {columnConfig.label}
+        <SortIndicator direction={direction} />
+      </Link>
+    );
+  };
 
   const selectedProfile = useMemo(
     () => profiles.find(p => p.id === selectedId) ?? null,
@@ -215,172 +264,177 @@ export function AdminCreatorProfilesWithSidebar({
         onKeyDown={handleKeyDown}
         aria-label='Creator profiles table'
       >
-        <Card className='border-subtle bg-surface-1/80 backdrop-blur-sm overflow-hidden'>
-          <CardHeader className='space-y-1'>
-            <CardTitle className='text-lg'>Creator profiles</CardTitle>
+        <div className='flex-1 w-full space-y-6 rounded-[28px] border border-subtle bg-surface-1/80 p-6 shadow-sm transition'>
+          <div className='space-y-1'>
+            <h2 className='text-lg font-semibold text-primary-token'>
+              Creator profiles
+            </h2>
             <p className='text-xs text-secondary-token'>
               View and manage creator verification and avatars.
             </p>
-          </CardHeader>
-          <CardContent className='space-y-4'>
-            <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-              <form
-                action='/admin/users'
-                method='get'
-                className='flex flex-wrap items-center gap-3'
-              >
-                <Input
-                  name='q'
-                  placeholder='Search by handle'
-                  defaultValue={search}
-                  className='max-w-xs'
-                />
-                <input type='hidden' name='page' value='1' />
-                <AdminCreatorFilters
-                  initialSort={sort}
-                  initialPageSize={pageSize}
-                />
-                <Button type='submit' size='sm' variant='secondary'>
-                  Search
+          </div>
+
+          <div className='space-y-3'>
+            <form
+              action='/admin/users'
+              method='get'
+              className='flex flex-wrap items-center gap-3'
+            >
+              <input type='hidden' name='sort' value={sort} />
+              <Input
+                name='q'
+                placeholder='Search by handle'
+                defaultValue={search}
+                className='max-w-xs'
+              />
+              <input type='hidden' name='page' value='1' />
+              <AdminCreatorFilters initialPageSize={pageSize} />
+              <Button type='submit' size='sm' variant='secondary'>
+                Search
+              </Button>
+              {search && search.length > 0 && (
+                <Button asChild size='sm' variant='ghost'>
+                  <Link href={clearHref}>Clear</Link>
                 </Button>
-                {search && search.length > 0 && (
-                  <Button asChild size='sm' variant='ghost'>
-                    <Link href={clearHref}>Clear</Link>
-                  </Button>
-                )}
-              </form>
+              )}
+            </form>
 
-              <div className='text-xs text-secondary-token'>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} profiles
-              </div>
+            <div className='text-xs text-secondary-token'>
+              Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()} profiles
             </div>
+          </div>
 
-            <div className='overflow-x-auto'>
-              <table className='w-full border-collapse text-sm'>
-                <thead className='text-left text-secondary-token'>
-                  <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
-                    <th className='px-2 py-2'>Avatar</th>
-                    <th className='px-2 py-2'>Handle</th>
-                    <th className='px-2 py-2'>Created</th>
-                    <th className='px-2 py-2'>Claimed</th>
-                    <th className='px-2 py-2'>Verified</th>
-                    <th className='px-2 py-2 text-right'>Action</th>
+          <div className='overflow-x-auto'>
+            <table className='w-full border-collapse text-sm'>
+              <thead className='text-left text-secondary-token'>
+                <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                    Avatar
+                  </th>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                    Handle
+                  </th>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                    {renderSortHeader('created')}
+                  </th>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                    {renderSortHeader('claimed')}
+                  </th>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                    {renderSortHeader('verified')}
+                  </th>
+                  <th className='px-2 py-2 text-right sticky top-0 z-10 bg-surface-1/80'>
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className='divide-y divide-subtle'>
+                {profiles.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className='px-2 py-6 text-center text-sm text-secondary-token'
+                    >
+                      No creator profiles found.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className='divide-y divide-subtle'>
-                  {profiles.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className='px-2 py-6 text-center text-sm text-secondary-token'
+                ) : (
+                  profiles.map(profile => {
+                    const isSelected = profile.id === selectedId;
+                    return (
+                      <tr
+                        key={profile.id}
+                        className={cn(
+                          'transition-colors duration-200 cursor-pointer',
+                          isSelected
+                            ? 'bg-gray-50 dark:bg-gray-900/60'
+                            : 'hover:bg-surface-2/60'
+                        )}
+                        onClick={() => handleRowClick(profile.id)}
+                        aria-selected={isSelected}
                       >
-                        No creator profiles found.
-                      </td>
-                    </tr>
-                  ) : (
-                    profiles.map(profile => {
-                      const isSelected = profile.id === selectedId;
-                      return (
-                        <tr
-                          key={profile.id}
+                        <td
                           className={cn(
-                            'hover:bg-surface-2/60 cursor-pointer',
-                            isSelected && 'bg-surface-2/80'
+                            'px-2 py-3 border-l border-transparent',
+                            isSelected && 'border-l-2 border-accent'
                           )}
-                          onClick={() => handleRowClick(profile.id)}
-                          aria-selected={isSelected}
                         >
-                          <td
-                            className={cn(
-                              'px-2 py-3 border-l border-transparent',
-                              isSelected && 'border-l-2 border-accent'
-                            )}
+                          <CreatorAvatarCell
+                            profileId={profile.id}
+                            username={profile.username}
+                            avatarUrl={profile.avatarUrl}
+                            verified={profile.isVerified}
+                          />
+                        </td>
+                        <td className='px-2 py-3 font-medium text-primary-token'>
+                          <Link
+                            href={`/${profile.username}`}
+                            className='hover:underline'
+                            onClick={event => event.stopPropagation()}
                           >
-                            <CreatorAvatarCell
-                              profileId={profile.id}
-                              username={profile.username}
-                              avatarUrl={profile.avatarUrl}
-                            />
-                          </td>
-                          <td className='px-2 py-3 font-medium text-primary-token'>
-                            <Link
-                              href={`/${profile.username}`}
-                              className='hover:underline'
-                              onClick={event => event.stopPropagation()}
-                            >
-                              @{profile.username}
-                            </Link>
-                          </td>
-                          <td className='px-2 py-3 text-secondary-token'>
-                            {profile.createdAt
-                              ? new Intl.DateTimeFormat('en-US', {
-                                  year: 'numeric',
-                                  month: 'short',
-                                  day: 'numeric',
-                                }).format(profile.createdAt)
-                              : '—'}
-                          </td>
-                          <td className='px-2 py-3 text-xs text-secondary-token'>
-                            {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
-                          </td>
-                          <td className='px-2 py-3 text-xs text-secondary-token'>
-                            {profile.isVerified ? 'Verified' : 'Not verified'}
-                          </td>
-                          <td className='px-2 py-3 text-right'>
-                            <form
-                              method='post'
-                              action='/admin/users/toggle-verify'
-                              onClick={event => event.stopPropagation()}
-                            >
-                              <input
-                                type='hidden'
-                                name='profileId'
-                                value={profile.id}
-                              />
-                              <input
-                                type='hidden'
-                                name='nextVerified'
-                                value={(!profile.isVerified).toString()}
-                              />
-                              <Button
-                                type='submit'
-                                size='sm'
-                                variant={
-                                  profile.isVerified ? 'secondary' : 'primary'
-                                }
-                              >
-                                {profile.isVerified ? 'Unverify' : 'Verify'}
-                              </Button>
-                            </form>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            @{profile.username}
+                          </Link>
+                        </td>
+                        <td className='px-2 py-3 text-secondary-token'>
+                          {profile.createdAt
+                            ? new Intl.DateTimeFormat('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              }).format(profile.createdAt)
+                            : '—'}
+                        </td>
+                        <td className='px-2 py-3 text-xs text-secondary-token'>
+                          {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+                        </td>
+                        <td className='px-2 py-3 text-xs text-secondary-token'>
+                          {profile.isVerified ? 'Verified' : 'Not verified'}
+                        </td>
+                        <td className='px-2 py-3 text-right'>
+                          <CreatorVerificationToggleButton
+                            profile={profile}
+                            status={verificationStatuses[profile.id] ?? 'idle'}
+                            onToggle={async () => {
+                              const result = await toggleVerification(
+                                profile.id,
+                                !profile.isVerified
+                              );
+                              if (!result.success) {
+                                console.error(
+                                  'Failed to toggle verification',
+                                  result.error
+                                );
+                              }
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
 
-            <div className='mt-4 flex items-center justify-between gap-2 text-xs text-secondary-token'>
-              <div>
-                Page {page} of {totalPages}
-              </div>
-              <div className='flex items-center gap-2'>
-                <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                  <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                    Previous
-                  </Link>
-                </Button>
-                <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                  <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                    Next
-                  </Link>
-                </Button>
-              </div>
+          <div className='mt-4 flex items-center justify-between gap-2 text-xs text-secondary-token'>
+            <div>
+              Page {page} of {totalPages}
             </div>
-          </CardContent>
-        </Card>
+            <div className='flex items-center gap-2'>
+              <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
+                <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+                  Previous
+                </Link>
+              </Button>
+              <Button asChild size='sm' variant='ghost' disabled={!canNext}>
+                <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+                  Next
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div

@@ -28,6 +28,7 @@ if (webSocketConstructor) {
 declare global {
   var db: NeonDatabase<typeof schema> | undefined;
   var pool: Pool | undefined;
+  var dbCleanupRegistered: boolean | undefined;
 }
 
 // Create the database client with schema
@@ -164,7 +165,6 @@ function isRetryableError(error: unknown): boolean {
 // Lazy initialization of database connection
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
-let cleanupRegistered = false;
 
 function initializeDb(): DbType {
   // Validate the database URL at runtime
@@ -192,15 +192,17 @@ function initializeDb(): DbType {
   if (!_pool) {
     _pool = new Pool({ connectionString: databaseUrl });
 
-    // In development, clean up pools created during hot reloads to avoid leaks
+    // In development, clean up pools created during hot reloads to avoid leaks.
+    // Use a process-global flag so we only register listeners once, even if this
+    // module is re-evaluated by Turbopack/Next dev server.
     if (
       process.env.NODE_ENV !== 'production' &&
-      !cleanupRegistered &&
       typeof process !== 'undefined' &&
       'once' in process &&
-      typeof process.once === 'function'
+      typeof process.once === 'function' &&
+      !global.dbCleanupRegistered
     ) {
-      cleanupRegistered = true;
+      global.dbCleanupRegistered = true;
       const cleanup = () => {
         if (_pool) {
           _pool.end().catch(() => {});

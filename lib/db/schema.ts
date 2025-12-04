@@ -95,6 +95,27 @@ export const notificationChannelEnum = pgEnum('notification_channel', [
   'phone',
 ]);
 
+export const audienceMemberTypeEnum = pgEnum('audience_member_type', [
+  'anonymous',
+  'email',
+  'sms',
+  'spotify',
+  'customer',
+]);
+
+export const audienceDeviceTypeEnum = pgEnum('audience_device_type', [
+  'mobile',
+  'desktop',
+  'tablet',
+  'unknown',
+]);
+
+export const audienceIntentLevelEnum = pgEnum('audience_intent_level', [
+  'high',
+  'medium',
+  'low',
+]);
+
 // Theme preference enum for users
 export const themeModeEnum = pgEnum('theme_mode', ['system', 'light', 'dark']);
 
@@ -224,6 +245,39 @@ export const socialAccounts = pgTable('social_accounts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const audienceMembers = pgTable('audience_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  type: audienceMemberTypeEnum('type').default('anonymous').notNull(),
+  displayName: text('display_name'),
+  firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+  lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+  visits: integer('visits').default(0).notNull(),
+  engagementScore: integer('engagement_score').default(0).notNull(),
+  intentLevel: audienceIntentLevelEnum('intent_level').default('low').notNull(),
+  geoCity: text('geo_city'),
+  geoCountry: text('geo_country'),
+  deviceType: audienceDeviceTypeEnum('device_type')
+    .default('unknown')
+    .notNull(),
+  referrerHistory: jsonb('referrer_history')
+    .$type<Record<string, unknown>[]>()
+    .default([]),
+  latestActions: jsonb('latest_actions')
+    .$type<Record<string, unknown>[]>()
+    .default([]),
+  email: text('email'),
+  phone: text('phone'),
+  spotifyConnected: boolean('spotify_connected').default(false).notNull(),
+  purchaseCount: integer('purchase_count').default(0).notNull(),
+  tags: jsonb('tags').$type<string[]>().default([]),
+  fingerprint: text('fingerprint'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const clickEvents = pgTable('click_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   creatorProfileId: uuid('creator_profile_id')
@@ -243,6 +297,12 @@ export const clickEvents = pgTable('click_events', {
   browser: text('browser'),
   isBot: boolean('is_bot').default(false),
   metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  audienceMemberId: uuid('audience_member_id').references(
+    () => audienceMembers.id,
+    {
+      onDelete: 'set null',
+    }
+  ),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

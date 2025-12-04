@@ -41,7 +41,7 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    className='h-auto px-0 py-0 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                   >
                     Product
                   </Button>
@@ -56,14 +56,14 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                       <FlyoutItem
                         key={feature.slug}
                         feature={feature}
-                        className='hover:bg-[var(--bg)] focus-visible:bg-[var(--bg)]'
+                        className='hover:bg-(--bg) focus-visible:bg-(--bg)'
                       />
                     ))}
                   </div>
-                  <div className='mt-4 border-t border-[var(--border)] pt-4'>
+                  <div className='mt-4 border-t border-(--border) pt-4'>
                     <Link
                       href='/changelog'
-                      className='group flex items-center justify-between rounded-lg p-2 text-sm text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--fg)]'
+                      className='group flex items-center justify-between rounded-lg p-2 text-sm text-(--muted) transition-colors hover:bg-(--bg) hover:text-(--fg)'
                       role='menuitem'
                     >
                       <span>View Changelog</span>
@@ -74,7 +74,10 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                   </div>
                 </PopoverContent>
               </Popover>
-              <NavLink href='/pricing' className='font-medium'>
+              <NavLink
+                href='/pricing'
+                className='font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              >
                 Pricing
               </NavLink>
             </nav>
@@ -106,14 +109,14 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                       <FlyoutItem
                         key={feature.slug}
                         feature={feature}
-                        className='min-h-[44px] hover:bg-[var(--bg)] focus-visible:bg-[var(--bg)]'
+                        className='min-h-[44px] hover:bg-(--bg) focus-visible:bg-(--bg)'
                       />
                     ))}
                   </div>
-                  <div className='mt-4 border-t border-[var(--border)] pt-4'>
+                  <div className='mt-4 border-t border-(--border) pt-4'>
                     <Link
                       href='/changelog'
-                      className='flex min-h-[44px] items-center justify-between rounded-lg p-3 text-sm text-[var(--muted)] transition-colors hover:bg-[var(--bg)] hover:text-[var(--fg)]'
+                      className='flex min-h-[44px] items-center justify-between rounded-lg p-3 text-sm text-(--muted) transition-colors hover:bg-(--bg) hover:text-(--fg)'
                       role='menuitem'
                     >
                       <span>View Changelog</span>

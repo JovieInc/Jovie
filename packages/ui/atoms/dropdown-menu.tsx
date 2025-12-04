@@ -6,18 +6,25 @@ import * as React from 'react';
 
 import { cn } from '../lib/utils';
 
-const contentBaseClasses =
-  'z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] overflow-y-auto overflow-x-hidden rounded-md border border-subtle bg-surface-1 p-1 text-primary-token shadow-md ' +
-  'data-[state=open]:animate-in data-[state=closed]:animate-out ' +
-  'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ' +
-  'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ' +
-  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ' +
+const glassBaseTransitions =
+  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 ';
+
+const glassPositioning =
+  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 ' +
+  'data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 ' +
   'origin-[--radix-dropdown-menu-content-transform-origin]';
 
+const contentBaseClasses =
+  'z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[10rem] overflow-y-auto overflow-x-hidden rounded-2xl border border-white/40 bg-white/70 p-2 text-primary-token shadow-[0_25px_70px_rgba(15,23,42,0.45)] backdrop-blur-[34px] ' +
+  'dark:border-white/10 dark:bg-[#020617]/70 ' +
+  glassBaseTransitions +
+  glassPositioning;
+
 const subContentBaseClasses =
-  'z-50 min-w-[8rem] overflow-hidden rounded-md border border-subtle bg-surface-1 p-1 text-primary-token shadow-lg ' +
-  'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 ' +
-  'data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 origin-[--radix-dropdown-menu-content-transform-origin]';
+  'z-50 min-w-[10rem] overflow-hidden rounded-xl border border-white/40 bg-white/60 p-2 text-primary-token shadow-[0_25px_70px_rgba(15,23,42,0.4)] backdrop-blur-[30px] ' +
+  'dark:border-white/10 dark:bg-[#020617]/65 ' +
+  glassBaseTransitions +
+  glassPositioning;
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
 
@@ -40,8 +47,8 @@ const DropdownMenuSubTrigger = React.forwardRef<
   <DropdownMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      'flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none text-primary-token hover:bg-surface-2 focus:bg-surface-2 data-[state=open]:bg-surface-2 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-      inset && 'pl-8',
+      'flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none text-primary-token transition-colors hover:bg-white/30 focus-visible:bg-white/40 dark:hover:bg-white/10 dark:focus-visible:bg-white/20 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      inset && 'pl-10',
       className
     )}
     {...props}
@@ -127,8 +134,8 @@ const DropdownMenuItem = React.forwardRef<
   <DropdownMenuPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors text-primary-token hover:bg-surface-2 focus:bg-surface-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
-      inset && 'pl-8',
+      'relative flex cursor-default select-none items-center gap-2 rounded-lg px-3 py-2 text-sm outline-none transition-colors text-primary-token hover:bg-white/30 focus-visible:bg-white/40 dark:hover:bg-white/10 dark:focus-visible:bg-white/20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+      inset && 'pl-10',
       className
     )}
     {...props}
@@ -143,7 +150,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
   <DropdownMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-surface-2 focus:bg-surface-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors hover:bg-white/30 focus-visible:bg-white/40 dark:hover:bg-white/10 dark:focus-visible:bg-white/20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
     checked={checked}
@@ -167,7 +174,7 @@ const DropdownMenuRadioItem = React.forwardRef<
   <DropdownMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      'relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-surface-2 focus:bg-surface-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'relative flex cursor-default select-none items-center rounded-lg py-1.5 pl-10 pr-3 text-sm outline-none transition-colors hover:bg-white/30 focus-visible:bg-white/40 dark:hover:bg-white/10 dark:focus-visible:bg-white/20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       className
     )}
     {...props}
@@ -191,8 +198,8 @@ const DropdownMenuLabel = React.forwardRef<
   <DropdownMenuPrimitive.Label
     ref={ref}
     className={cn(
-      'px-2 py-1.5 text-sm font-semibold text-secondary-token',
-      inset && 'pl-8',
+      'px-3 py-1 text-xs font-semibold uppercase tracking-wide text-tertiary-token/80',
+      inset && 'pl-10',
       className
     )}
     {...props}
@@ -206,7 +213,7 @@ const DropdownMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DropdownMenuPrimitive.Separator
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-surface-2/60', className)}
+    className={cn('-mx-1 my-1 h-px bg-white/30 dark:bg-white/10', className)}
     {...props}
   />
 ));
@@ -218,7 +225,10 @@ const DropdownMenuShortcut = ({
 }: React.HTMLAttributes<HTMLSpanElement>) => {
   return (
     <span
-      className={cn('ml-auto text-xs tracking-widest opacity-60', className)}
+      className={cn(
+        'ml-auto text-[10px] tracking-[0.35em] text-tertiary-token/70',
+        className
+      )}
       {...props}
     />
   );

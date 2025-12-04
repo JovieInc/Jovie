@@ -53,7 +53,7 @@ function mergeEvidence(
   };
 }
 
-async function normalizeAndMergeExtraction(
+export async function normalizeAndMergeExtraction(
   tx: DbType,
   profile: {
     id: string;

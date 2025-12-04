@@ -162,6 +162,17 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Expiry**: None (security feature)
 - **Used in**: Analytics RPC functions
 
+#### `feature_audience_v2`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Unlock the upgraded Audience CRM table plus the dashboard activity feed that surfaces anonymous and identified visitors.
+- **Expiry**: Review after 60 days
+- **Used in**:
+  - `components/dashboard/DashboardAudience.tsx`
+  - `components/dashboard/organisms/DashboardActivityFeed.tsx`
+  - `app/api/dashboard/audience/members/route.ts`
+  - `app/api/dashboard/activity/recent/route.ts`
+
 #### `feature_link_ingestion`
 - **Status**: Development
 - **Default**: `false`

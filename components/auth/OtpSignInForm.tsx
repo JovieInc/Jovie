@@ -27,7 +27,7 @@ export function OtpSignInForm() {
 
               <SignIn.Action
                 submit
-                className='w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
+                className='btn btn-primary w-full justify-center'
               >
                 Send code
               </SignIn.Action>
@@ -65,7 +65,7 @@ export function OtpSignInForm() {
 
               <SignIn.Action
                 submit
-                className='w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2.5 rounded-lg transition-colors text-center'
+                className='btn btn-primary w-full justify-center'
               >
                 Continue
               </SignIn.Action>
