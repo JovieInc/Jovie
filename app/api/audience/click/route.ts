@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
         fingerprint,
         audienceMemberId
       );
+
       if (!member) {
         const [inserted] = await tx
           .insert(audienceMembers)
@@ -179,6 +180,12 @@ export async function POST(request: NextRequest) {
             createdAt: now,
             updatedAt: now,
           })
+          .onConflictDoNothing({
+            target: [
+              audienceMembers.creatorProfileId,
+              audienceMembers.fingerprint,
+            ],
+          })
           .returning({
             id: audienceMembers.id,
             visits: audienceMembers.visits,
@@ -190,7 +197,12 @@ export async function POST(request: NextRequest) {
             spotifyConnected: audienceMembers.spotifyConnected,
           });
 
-        member = inserted ?? null;
+        if (inserted) {
+          member = inserted;
+        } else {
+          // Another transaction inserted the row first; load the existing record.
+          member = await findAudienceMember(tx, profileId, fingerprint);
+        }
       }
 
       if (!member) {
