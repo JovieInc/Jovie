@@ -44,7 +44,7 @@ describe('Atomic Design Structure', () => {
       const container = screen.getByRole('link', {
         name: 'Sign in',
       }).parentElement;
-      expect(container).toHaveClass('flex', 'items-center', 'space-x-4');
+      expect(container).toHaveClass('flex', 'items-center', 'space-x-3');
     });
   });
 

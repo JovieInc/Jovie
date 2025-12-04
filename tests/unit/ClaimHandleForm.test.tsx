@@ -50,23 +50,21 @@ describe('ClaimHandleForm', () => {
     const helperContainer = document.querySelector('[aria-live="assertive"]');
     expect(helperContainer).toBeInTheDocument();
 
-    // Check that preview container exists with min-height
-    const previewContainer = document.querySelector('#handle-preview-text');
-    expect(previewContainer).toBeInTheDocument();
-    expect(previewContainer).toHaveClass('min-h-[1.25rem]');
+    // The helper text should mention the profile URL preview and retain layout spacing
+    const helperText = screen.getByText(/Your Jovie profile will live at/i);
+    expect(helperText).toBeInTheDocument();
+    expect(helperText).toHaveClass('text-sm', 'leading-5');
   });
 
   test('has proper accessibility attributes', () => {
     render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
-    // Input should have aria-required for required fields
-    expect(input).toHaveAttribute('aria-required', 'true');
+    // Input should be marked as required
+    expect(input).toHaveAttribute('required');
 
     // Check that help text exists and is visible (accessibility through visible text)
-    const helpText = screen.getByText(
-      /your unique identifier for your profile url/i
-    );
+    const helpText = screen.getByText(/Your Jovie profile will live at/i);
     expect(helpText).toBeInTheDocument();
 
     // Check aria-live region exists for dynamic announcements

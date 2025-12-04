@@ -157,13 +157,10 @@ export default function HomePage() {
           fallback={
             <section className='py-10 bg-white dark:bg-black'>
               <Container>
-                <div className='text-center mb-6'>
+                <div className='text-center py-8'>
                   <p className='text-sm font-medium text-gray-600 dark:text-gray-400'>
                     Explore example Jovie profiles
                   </p>
-                </div>
-                <div className='flex items-center justify-center py-6'>
-                  <div className='h-6 w-6 rounded-full border-2 border-gray-300 border-t-transparent animate-spin' />
                 </div>
               </Container>
             </section>

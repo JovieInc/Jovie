@@ -5,7 +5,6 @@ import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
-import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { APP_URL } from '@/constants/app';
@@ -33,7 +32,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   const [availError, setAvailError] = useState<string | null>(null);
   // UI micro-interactions
   const [isShaking, setIsShaking] = useState(false);
-  const [copied, setCopied] = useState(false);
   const lastQueriedRef = useRef<string>('');
   // Form submission state
   const [formSubmitted, setFormSubmitted] = useState(false);
@@ -76,7 +74,6 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   // Debounced live availability check (350-500ms per requirements)
   useEffect(() => {
     setAvailError(null);
-    setCopied(false);
     if (!handle || handleError) {
       setAvailable(null);
       setCheckingAvail(false);
@@ -194,6 +191,9 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
   // Previously used a color prop to swap tones; now rely on variant styling only
   const btnDisabled = !canSubmit;
 
+  const fieldId = 'handle-input';
+  const helperId = `${fieldId}-hint`;
+
   // Collect all form errors for the error summary
   const formErrors = useMemo(() => {
     const errors: Record<string, string> = {};
@@ -257,29 +257,58 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
     return null;
   };
 
-  const previewTone = showChecking
-    ? 'text-gray-500 dark:text-gray-400'
-    : available === true
-      ? 'text-green-600 dark:text-green-500'
-      : unavailable
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-gray-500 dark:text-gray-400';
+  const helperState = useMemo(() => {
+    if (!handle) {
+      return {
+        tone: 'idle' as const,
+        text: `Your Jovie profile will live at ${displayDomain}/your-handle`,
+      };
+    }
 
-  const helperText = (() => {
-    if (handleError) return handleError;
-    if (availError) return availError;
-    if (available === false) return 'Handle already taken';
-    return undefined;
-  })();
+    if (handleError) {
+      return { tone: 'error' as const, text: handleError };
+    }
 
-  const onCopyPreview = async () => {
-    try {
-      await navigator.clipboard.writeText(`${displayDomain}/${handle}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1200);
-    } catch {}
-  };
+    if (checkingAvail) {
+      return { tone: 'pending' as const, text: 'Checking availability…' };
+    }
 
+    if (available === true) {
+      return {
+        tone: 'success' as const,
+        text: `@${handle} is available — tap the button to claim it.`,
+      };
+    }
+
+    if (available === false) {
+      return { tone: 'error' as const, text: 'Handle already taken' };
+    }
+
+    if (availError) {
+      return { tone: 'error' as const, text: availError };
+    }
+
+    return {
+      tone: 'idle' as const,
+      text: 'Use lowercase letters, numbers, or hyphens (3–30 chars).',
+    };
+  }, [
+    available,
+    availError,
+    checkingAvail,
+    displayDomain,
+    handle,
+    handleError,
+  ]);
+
+  const helperToneClass = {
+    idle: 'text-gray-600 dark:text-gray-300',
+    pending: 'text-gray-600 dark:text-gray-300',
+    success: 'text-emerald-600 dark:text-emerald-400',
+    error: 'text-red-600 dark:text-red-400',
+  }[helperState.tone];
+
+  const helperAriaLive = helperState.tone === 'error' ? 'assertive' : 'polite';
   return (
     <form ref={formRef} onSubmit={onSubmit} className='space-y-4' noValidate>
       {/* Screen reader announcements */}
@@ -300,45 +329,65 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         }}
       />
 
-      <FormField
-        label='Choose your handle'
-        error={formSubmitted ? helperText : undefined}
-        helpText='Your unique identifier for your profile URL'
-        id='handle-input'
-        required
-      >
-        <Input
-          ref={inputRef}
-          type='text'
-          value={handle}
-          onChange={e => setHandle(e.target.value.toLowerCase())}
-          placeholder='your-handle'
-          required
-          autoCapitalize='none'
-          autoCorrect='off'
-          validationState={
-            !handle
-              ? null
-              : unavailable
-                ? 'invalid'
-                : available === true
-                  ? 'valid'
-                  : checkingAvail
-                    ? 'pending'
-                    : null
-          }
-          className={`${isShaking ? 'jv-shake' : ''} ${available === true ? 'jv-available' : ''} transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`}
-          inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[48px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1'
-          statusIcon={<StatusIcon />}
-        />
-      </FormField>
+      <div className='space-y-2'>
+        <label
+          htmlFor={fieldId}
+          className='text-sm font-semibold text-gray-900 dark:text-white'
+        >
+          Choose your handle
+        </label>
+
+        <div className='relative'>
+          <span className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-700 dark:text-gray-200'>
+            {displayDomain}/
+          </span>
+          <Input
+            ref={inputRef}
+            id={fieldId}
+            type='text'
+            value={handle}
+            onChange={e => setHandle(e.target.value.toLowerCase())}
+            placeholder='your-handle'
+            required
+            autoCapitalize='none'
+            autoCorrect='off'
+            aria-describedby={helperState.text ? helperId : undefined}
+            validationState={
+              !handle
+                ? null
+                : unavailable
+                  ? 'invalid'
+                  : available === true
+                    ? 'valid'
+                    : checkingAvail
+                      ? 'pending'
+                      : null
+            }
+            className={`${isShaking ? 'jv-shake' : ''} ${
+              available === true ? 'jv-available' : ''
+            } transition-all duration-150 hover:shadow-lg focus-within:shadow-lg`}
+            inputClassName='text-[16px] leading-6 tracking-tight font-medium placeholder:text-zinc-400 dark:placeholder:text-zinc-500 pr-12 min-h-[54px] sm:min-h-[56px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 border-2 border-zinc-900/70 dark:border-white/60 bg-white/90 dark:bg-white/10 pl-24 sm:pl-28'
+            statusIcon={<StatusIcon />}
+          />
+        </div>
+
+        {helperState.text && (
+          <p
+            id={helperId}
+            className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
+            aria-live={helperAriaLive}
+          >
+            {helperState.text}
+          </p>
+        )}
+      </div>
 
       {/* Submit button - separate from input for clean UX */}
       <Button
         type='submit'
         variant='primary'
         size='lg'
-        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg active:scale-[0.98] transform-gpu group'
+        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group !h-[54px] !px-6 text-base font-semibold tracking-wide !bg-gradient-to-br !from-blue-600/95 !via-indigo-600/85 !to-cyan-500/90 !text-white shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
         disabled={btnDisabled || !handle}
       >
         <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
@@ -370,103 +419,10 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
               </svg>
             </>
           ) : (
-            'Enter your handle'
+            'Claim handle'
           )}
         </span>
       </Button>
-
-      {/* Compact URL preview under button */}
-      <div className='min-h-[1.25rem]' id='handle-preview-text'>
-        {handle ? (
-          <div className='flex items-center justify-between text-xs'>
-            <p
-              onClick={available ? onCopyPreview : undefined}
-              className={`${previewTone} select-none transition-colors duration-200 ${
-                available
-                  ? 'cursor-pointer hover:text-green-700 dark:hover:text-green-400 active:scale-[0.98] touch-manipulation'
-                  : ''
-              } truncate`}
-              title={
-                available ? (copied ? 'Copied!' : 'Click to copy') : undefined
-              }
-              role={available ? 'button' : undefined}
-              tabIndex={available ? 0 : undefined}
-              onKeyDown={
-                available
-                  ? e => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onCopyPreview();
-                      }
-                    }
-                  : undefined
-              }
-              aria-label={
-                available
-                  ? `Copy profile URL ${displayDomain}/${handle}`
-                  : undefined
-              }
-            >
-              <span className='text-gray-400 dark:text-gray-500'>
-                {displayDomain}/
-              </span>
-              <span className='font-semibold text-current'>{handle}</span>
-            </p>
-            {available && (
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all duration-200 ${
-                  available
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
-                    : ''
-                }`}
-              >
-                {copied ? (
-                  <>
-                    <svg
-                      className='w-3 h-3'
-                      fill='currentColor'
-                      viewBox='0 0 20 20'
-                      aria-hidden='true'
-                    >
-                      <path
-                        fillRule='evenodd'
-                        d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                        clipRule='evenodd'
-                      />
-                    </svg>
-                    Copied!
-                  </>
-                ) : (
-                  <>
-                    <svg
-                      className='w-3 h-3'
-                      fill='currentColor'
-                      viewBox='0 0 20 20'
-                      aria-hidden='true'
-                    >
-                      <path
-                        fillRule='evenodd'
-                        d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                        clipRule='evenodd'
-                      />
-                    </svg>
-                    Available
-                  </>
-                )}
-              </span>
-            )}
-          </div>
-        ) : (
-          <p className='text-xs text-gray-400 dark:text-gray-500'>
-            <span className='text-gray-400 dark:text-gray-500'>
-              {displayDomain}/
-            </span>
-            <span className='text-gray-400 dark:text-gray-500'>
-              your-handle
-            </span>
-          </p>
-        )}
-      </div>
 
       <style jsx>{`
         .jv-shake {

@@ -6,17 +6,18 @@ import { OnboardingFormWrapper } from '@/components/dashboard/organisms/Onboardi
 import { ThemeToggle } from '@/components/site/ThemeToggle';
 
 interface OnboardingPageProps {
-  searchParams?: { handle?: string };
+  searchParams?: Promise<{ handle?: string }>;
 }
 
 export default async function OnboardingPage({
   searchParams,
 }: OnboardingPageProps) {
+  const resolvedSearchParams = await searchParams;
   const { userId } = await auth();
   if (!userId) {
     // Require auth for onboarding; preserve destination including handle param
-    const handleParam = searchParams?.handle
-      ? `?handle=${encodeURIComponent(searchParams.handle)}`
+    const handleParam = resolvedSearchParams?.handle
+      ? `?handle=${encodeURIComponent(resolvedSearchParams.handle)}`
       : '';
     const redirectTarget = `/onboarding${handleParam}`;
     redirect(`/sign-in?redirect_url=${encodeURIComponent(redirectTarget)}`);
@@ -38,7 +39,10 @@ export default async function OnboardingPage({
     '';
 
   const initialHandle =
-    searchParams?.handle || existingProfile?.username || user?.username || '';
+    resolvedSearchParams?.handle ||
+    existingProfile?.username ||
+    user?.username ||
+    '';
 
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 

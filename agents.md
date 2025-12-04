@@ -353,3 +353,22 @@ Configuration location: `.claude.json` (project-specific)
   - Running migrations from Edge.
   - Tailwind v4 plugin/config drift.
   - Env/secret sprawl or mixing preview and production credentials.
+
+## 14. Next.js 16 Best Practices
+
+- Enable Cache Components with the `use cache` directive so caching is explicit and the compiler can generate consistent cache keys.
+- Default to request-time execution for dynamic server code unless Cache Components explicitly wrap it, matching the new “opt-in cache” mindset.
+- Combine Cache Components with Suspense-based Partial Prerendering to deliver static shells with targeted dynamic updates.
+- Pass a cacheLife profile (we recommend `'max'`) as the second argument to `revalidateTag()` to get SWR-style behavior instead of manually tracking expirations.
+- Call `updateTag()` inside Server Actions when mutations must show read-your-write data immediately within the same request.
+- Use the Server Actions-only `refresh()` when you need to refresh uncached data without touching cached page shells, complementing `router.refresh`.
+- Plug into Next.js DevTools MCP so agents and teammates can inspect routing, caching, and the unified log surface for faster debugging.
+- Replace `middleware.ts` with `proxy.ts`/`proxy` (Node runtime) handlers to keep the network boundary clear; keep Edge middleware only for legacy cases.
+- Monitor the enhanced dev/build logs that break out compile work vs. React rendering so you can spot time sinks faster.
+- Default to the stable Turbopack bundler in both dev and prod for the 2–5× faster builds and up to 10× speedier Fast Refresh, falling back to webpack only when absolutely necessary.
+- Turn on Turbopack filesystem caching so repeated restarts reuse artifacts and large repositories feel snappier.
+- Start new features from the refreshed `create-next-app` template (App Router, TypeScript-first, Tailwind, ESLint) to stay aligned with current defaults.
+- Use the Build Adapters API when you need to hook into the build flow for custom deployment hosts or infrastructure automation.
+- Gradually opt into `reactCompiler` once you’ve measured the build-time cost; it automatically memoizes components to cut redundant renders.
+- Lean on layout deduplication and incremental prefetching (built into Next.js 16) so shared layouts download once and cached chunks only refresh when invalidated.
+- Take advantage of React 19.2 additions (`View Transitions`, `useEffectEvent`, `<Activity />`) whenever you build new transitions or interaction patterns.

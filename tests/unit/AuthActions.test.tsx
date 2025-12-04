@@ -17,6 +17,6 @@ describe('AuthActions', () => {
 
     const signInLink = screen.getByRole('link', { name: /sign in/i });
     const container = signInLink.closest('div');
-    expect(container).toHaveClass('flex', 'items-center', 'space-x-4');
+    expect(container).toHaveClass('flex', 'items-center', 'space-x-3');
   });
 });
