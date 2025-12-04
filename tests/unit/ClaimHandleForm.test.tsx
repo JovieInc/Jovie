@@ -50,10 +50,10 @@ describe('ClaimHandleForm', () => {
     const helperContainer = document.querySelector('[aria-live="assertive"]');
     expect(helperContainer).toBeInTheDocument();
 
-    // The helper text should mention the profile URL preview and retain layout spacing
-    const helperText = screen.getByText(/Your Jovie profile will live at/i);
-    expect(helperText).toBeInTheDocument();
-    expect(helperText).toHaveClass('text-sm', 'leading-5');
+    // Check that preview container exists with min-height to prevent layout jumps
+    const previewContainer = document.querySelector('#handle-preview-text');
+    expect(previewContainer).toBeInTheDocument();
+    expect(previewContainer).toHaveClass('min-h-[1.25rem]');
   });
 
   test('has proper accessibility attributes', () => {

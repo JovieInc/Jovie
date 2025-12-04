@@ -127,22 +127,37 @@ async function fetchDashboardDataWithSession(
     // tolerate missing user_settings column/table during migrations.
     const [settings, hasLinks] = await Promise.all([
       (async () => {
+        const savepointName = 'sp_user_settings';
         try {
+          await dbClient.execute(drizzleSql.raw(`SAVEPOINT ${savepointName}`));
           const result = await dbClient
             .select()
             .from(userSettings)
             .where(eq(userSettings.userId, userData.id))
             .limit(1);
-          return result?.[0] as { sidebarCollapsed: boolean } | undefined;
-        } catch {
-          console.warn(
-            'user_settings not available yet, defaulting sidebarCollapsed=false'
+          await dbClient.execute(
+            drizzleSql.raw(`RELEASE SAVEPOINT ${savepointName}`)
           );
+          return result?.[0] as { sidebarCollapsed: boolean } | undefined;
+        } catch (error) {
+          console.warn(
+            'user_settings not available yet, defaulting sidebarCollapsed=false',
+            error
+          );
+          try {
+            await dbClient.execute(
+              drizzleSql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`)
+            );
+          } catch {
+            // Ignore rollback errors; transaction may already be cleaned up
+          }
           return undefined;
         }
       })(),
       (async () => {
+        const savepointName = 'sp_social_links';
         try {
+          await dbClient.execute(drizzleSql.raw(`SAVEPOINT ${savepointName}`));
           const result = await dbClient
             .select({ c: count() })
             .from(socialLinks)
@@ -152,11 +167,24 @@ async function fetchDashboardDataWithSession(
                 eq(socialLinks.state, 'active')
               )
             );
+          await dbClient.execute(
+            drizzleSql.raw(`RELEASE SAVEPOINT ${savepointName}`)
+          );
           const total = Number(result?.[0]?.c ?? 0);
           return total > 0;
-        } catch {
+        } catch (error) {
           // On query error, default to false without failing dashboard load
-          console.warn('Error counting social links, defaulting to false');
+          console.warn(
+            'Error counting social links, defaulting to false',
+            error
+          );
+          try {
+            await dbClient.execute(
+              drizzleSql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`)
+            );
+          } catch {
+            // Ignore rollback errors; transaction may already be cleaned up
+          }
           return false;
         }
       })(),

@@ -372,13 +372,15 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         </div>
 
         {helperState.text && (
-          <p
-            id={helperId}
-            className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
-            aria-live={helperAriaLive}
-          >
-            {helperState.text}
-          </p>
+          <div id='handle-preview-text' className='min-h-[1.25rem]'>
+            <p
+              id={helperId}
+              className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
+              aria-live={helperAriaLive}
+            >
+              {helperState.text}
+            </p>
+          </div>
         )}
       </div>
 

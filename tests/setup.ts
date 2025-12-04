@@ -4,6 +4,7 @@ import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
+import path from 'path';
 import React from 'react';
 import { afterEach, beforeAll, expect, vi } from 'vitest';
 import ws from 'ws';
@@ -32,7 +33,35 @@ if (process.env.NODE_ENV === 'test') {
 
     beforeAll(async () => {
       try {
-        await migrate(db, { migrationsFolder: './drizzle/migrations' });
+        const migrationsFolder = path.join(
+          process.cwd(),
+          'drizzle',
+          'migrations'
+        );
+        await migrate(db, { migrationsFolder });
+        await db.execute(`
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_status') THEN
+                CREATE TYPE ingestion_status AS ENUM ('idle', 'pending', 'processing', 'failed');
+              END IF;
+            END $$;
+          `);
+        await db.execute(
+          'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS avatar_locked_by_user boolean NOT NULL DEFAULT false'
+        );
+        await db.execute(
+          'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS display_name_locked boolean NOT NULL DEFAULT false'
+        );
+        await db.execute(
+          "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS ingestion_status ingestion_status NOT NULL DEFAULT 'idle'"
+        );
+        await db.execute(
+          'ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY'
+        );
+        await db.execute(
+          'ALTER TABLE creator_profiles FORCE ROW LEVEL SECURITY'
+        );
       } catch (error) {
         console.error('Failed to run migrations:', error);
         throw error;
