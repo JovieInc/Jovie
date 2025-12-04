@@ -7,6 +7,7 @@ import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipbo
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
+import { DashboardActivityFeed } from '@/components/dashboard/organisms/DashboardActivityFeed';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import type { Artist } from '@/types/db';
 
@@ -101,6 +102,8 @@ export function DashboardOverview({
           </div>
         </form>
       </DashboardCard>
+
+      <DashboardActivityFeed profileId={artist.id} />
 
       <DashboardCard variant='settings'>
         <h3 className='text-lg font-medium text-primary-token mb-4'>

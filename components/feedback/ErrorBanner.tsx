@@ -33,7 +33,7 @@ export function ErrorBanner({
           <Link
             key={`${action.label}-${index}`}
             href={action.href}
-            className='inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 dark:bg-red-800/30 dark:text-red-50 dark:ring-red-700 dark:hover:bg-red-800/50'
+            className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
           >
             {action.label}
           </Link>
@@ -45,7 +45,7 @@ export function ErrorBanner({
           key={`${action.label}-${index}`}
           href={action.href}
           onClick={action.onClick}
-          className='inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 dark:bg-red-800/30 dark:text-red-50 dark:ring-red-700 dark:hover:bg-red-800/50'
+          className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
         >
           {action.label}
         </a>
@@ -57,7 +57,7 @@ export function ErrorBanner({
         key={`${action.label}-${index}`}
         type='button'
         onClick={action.onClick}
-        className='inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700 ring-1 ring-inset ring-red-200 transition hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-red-500 dark:bg-red-800/30 dark:text-red-50 dark:ring-red-700 dark:hover:bg-red-800/50'
+        className='inline-flex w-full items-center justify-center rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-900 shadow-sm transition hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 dark:border-red-400/40 dark:bg-red-900/40 dark:text-red-50 dark:hover:bg-red-900/60 sm:w-auto'
       >
         {action.label}
       </button>
@@ -71,25 +71,27 @@ export function ErrorBanner({
       aria-label='Error'
       data-testid={testId ?? 'app-error-banner'}
       className={cn(
-        'rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-900 shadow-sm dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-50',
+        'rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3 text-red-900 shadow-sm dark:border-red-800/70 dark:bg-red-950/60 dark:text-red-50',
         className
       )}
     >
       <div className='flex gap-3'>
-        <span className='mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200'>
+        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-red-500/10 text-red-700 dark:bg-red-900/60 dark:text-red-200'>
           <ExclamationTriangleIcon className='h-5 w-5' aria-hidden='true' />
         </span>
 
-        <div className='flex-1 space-y-1'>
-          <p className='text-sm font-semibold leading-tight'>{title}</p>
+        <div className='flex-1 min-w-0 space-y-1'>
+          <p className='text-sm font-semibold leading-snug wrap-break-word'>
+            {title}
+          </p>
           {description ? (
-            <p className='text-sm text-red-800 dark:text-red-100/80'>
+            <p className='text-sm leading-snug text-red-800 dark:text-red-100/80'>
               {description}
             </p>
           ) : null}
 
           {actions.length > 0 ? (
-            <div className='mt-2 flex flex-wrap gap-2'>
+            <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
               {actions.map(renderAction)}
             </div>
           ) : null}

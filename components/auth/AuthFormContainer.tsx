@@ -16,7 +16,7 @@ export function AuthFormContainer({ children, title }: AuthFormContainerProps) {
         {/* Mobile header - only shown on mobile */}
         <div className='text-center mb-8 lg:hidden text-primary-token'>
           <div className='mb-4'>
-            <Logo size='lg' className='text-gray-900 dark:text-white mx-auto' />
+            <Logo size='lg' className='mx-auto' />
           </div>
           <h1 className='text-2xl font-bold'>{title}</h1>
         </div>

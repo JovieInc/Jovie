@@ -10,23 +10,34 @@ describe('Toast Component', () => {
       <Toast id='test-toast' message='Test message' onClose={onCloseMock} />
     );
 
+    const toast = screen.getByRole('status');
+
     expect(screen.getByText('Test message')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveClass('bg-gray-900');
+    expect(toast).toHaveClass('rounded-2xl');
+    expect(toast).toHaveClass('border');
+    expect(toast).toHaveClass('bg-white/70');
+    expect(toast).toHaveClass('text-slate-900');
   });
 
   it('renders with different types', () => {
     const { rerender } = render(
       <Toast id='test-toast' message='Success message' type='success' />
     );
-    expect(screen.getByRole('status')).toHaveClass('bg-green-600');
+    let toast = screen.getByTestId('toast');
+    let accent = toast.querySelector('span');
+    expect(accent).toHaveClass('from-emerald-400');
 
     rerender(
       <Toast id='test-toast' message='Warning message' type='warning' />
     );
-    expect(screen.getByRole('status')).toHaveClass('bg-amber-500');
+    toast = screen.getByTestId('toast');
+    accent = toast.querySelector('span');
+    expect(accent).toHaveClass('from-amber-400');
 
     rerender(<Toast id='test-toast' message='Error message' type='error' />);
-    expect(screen.getByRole('status')).toHaveClass('bg-red-600');
+    toast = screen.getByTestId('toast');
+    accent = toast.querySelector('span');
+    expect(accent).toHaveClass('from-rose-500');
   });
 
   it('renders with action button', () => {

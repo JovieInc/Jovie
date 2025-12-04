@@ -157,9 +157,9 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
               <Link
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
+                className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               >
-                <item.icon className='size-4' aria-hidden='true' />
+                <item.icon className='size-5' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
                   {item.name}
                 </span>

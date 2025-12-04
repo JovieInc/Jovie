@@ -25,6 +25,8 @@ import type { Artist } from '@/types/db';
 
 interface UserButtonProps {
   artist?: Artist | null;
+  profileHref?: string;
+  settingsHref?: string;
   showUserInfo?: boolean;
 }
 
@@ -47,9 +49,14 @@ const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
 
-export function UserButton({ showUserInfo = false }: UserButtonProps) {
+export function UserButton({
+  artist,
+  profileHref,
+  settingsHref,
+  showUserInfo = false,
+}: UserButtonProps) {
   const { isLoaded, user } = useUser();
-  const { signOut, openUserProfile } = useClerk();
+  const { signOut } = useClerk();
   const router = useRouter();
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { showToast } = useToast();
@@ -88,19 +95,23 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
 
   // User display info
   const userImageUrl = user?.imageUrl;
+  const contactEmail =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress;
   const displayName =
+    artist?.name ||
     user?.fullName ||
     user?.firstName ||
-    user?.emailAddresses[0]?.emailAddress ||
-    '';
+    contactEmail ||
+    'Artist';
   const userInitials = displayName
     ? displayName
         .split(' ')
-        .map(n => n[0])
+        .map((n: string) => n[0] ?? '')
         .join('')
         .toUpperCase()
         .slice(0, 2)
-    : 'U';
+    : 'A';
 
   // shadcn dropdown-menu handles focus/aria for us
 
@@ -163,10 +174,14 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     }
   };
 
-  // Handle profile click
-  const handleProfile = () => {
-    openUserProfile();
+  const profileUrl = profileHref ?? '/dashboard/settings';
+  const settingsUrl = settingsHref ?? '/dashboard/settings';
+  const navigateTo = (href: string) => {
+    setIsMenuOpen(false);
+    router.push(href);
   };
+  const handleProfile = () => navigateTo(profileUrl);
+  const handleSettings = () => navigateTo(settingsUrl);
 
   const handleManageBilling = async () => {
     if (isManageBillingLoading) return;
@@ -319,6 +334,12 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
     }
   };
 
+  const themeOptions = ['light', 'dark', 'system'] as const;
+  const rawIndex = themeOptions.findIndex(option =>
+    option === 'system' ? theme === 'system' : resolvedTheme === option
+  );
+  const activeIndex = rawIndex === -1 ? 0 : rawIndex;
+
   return (
     <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
@@ -350,9 +371,6 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                   </Badge>
                 )}
               </div>
-              <p className='text-xs text-secondary-token truncate'>
-                {user.primaryEmailAddress?.emailAddress}
-              </p>
             </div>
             <Icon
               name='ChevronRight'
@@ -378,9 +396,12 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' className='w-64'>
-        <DropdownMenuLabel>
-          <div className='flex items-center gap-3'>
+      <DropdownMenuContent
+        align='end'
+        className='w-64 rounded-[28px] border border-white/20 bg-white/90 p-1 shadow-[0_20px_60px_rgba(15,23,42,0.28)] backdrop-blur-[30px] dark:border-white/10 dark:bg-[#020611]/95'
+      >
+        <DropdownMenuLabel className='px-3 pt-2 pb-2'>
+          <div className='flex items-center gap-2 px-1.5 py-2'>
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
@@ -389,7 +410,7 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-2'>
+              <div className='flex items-center gap-2 truncate'>
                 <span className='truncate text-sm font-medium'>
                   {displayName}
                 </span>
@@ -403,21 +424,29 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
                   </Badge>
                 )}
               </div>
-              <p className='truncate text-xs text-secondary-token'>
-                {user.primaryEmailAddress?.emailAddress}
-              </p>
+              {contactEmail && (
+                <p className='truncate text-xs text-secondary-token'>
+                  {contactEmail}
+                </p>
+              )}
             </div>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleProfile} className='cursor-pointer'>
-          <Icon name='User' className='w-4 h-4 mr-2 text-tertiary-token' />{' '}
-          Profile
+        <DropdownMenuSeparator className='mx-0 my-2 h-px bg-white/30 dark:bg-white/10' />
+        <DropdownMenuItem
+          onClick={handleProfile}
+          className='group flex cursor-pointer items-center gap-1.5 rounded-2xl px-2.5 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-surface-2 dark:text-white'
+        >
+          <Icon
+            name='User'
+            className='h-4 w-4 text-slate-400 group-hover:text-primary-token dark:text-slate-200'
+          />
+          <span className='flex-1'>Profile</span>
         </DropdownMenuItem>
         {billingStatus.loading ? (
           <DropdownMenuItem
             disabled
-            className='cursor-default focus:bg-transparent focus:text-secondary-token'
+            className='cursor-default focus:bg-transparent focus:text-secondary-token px-2.5 py-1.5 text-sm'
           >
             <div className='flex w-full items-center gap-3'>
               <div className='h-6 w-6 animate-pulse rounded-full bg-surface-2' />
@@ -431,92 +460,134 @@ export function UserButton({ showUserInfo = false }: UserButtonProps) {
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='cursor-pointer'
+            className='group flex cursor-pointer items-center gap-1.5 rounded-2xl px-2.5 py-1.5 text-sm text-slate-600 dark:text-white'
           >
             <Icon
               name='CreditCard'
-              className='w-4 h-4 mr-2 text-tertiary-token'
+              className='h-4 w-4 text-tertiary-token group-hover:text-primary-token'
             />
-            {isManageBillingLoading ? 'Opening Stripe…' : 'Manage Billing'}
+            <span className='flex-1'>
+              {isManageBillingLoading ? 'Opening Stripe…' : 'Manage Billing'}
+            </span>
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem
             onClick={handleUpgrade}
             disabled={isUpgradeLoading}
-            className='cursor-pointer font-medium text-primary-token focus:text-primary-token'
+            className='group flex cursor-pointer items-center gap-2 rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/70 px-2.5 py-1.5 text-sm font-semibold text-primary-token shadow-[0_14px_40px_rgba(237,137,251,0.15)] transition hover:translate-y-0.5 hover:shadow-[0_20px_45px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/70 dark:border-white/10 dark:from-white/10 dark:to-white/10 dark:text-white dark:shadow-[0_15px_40px_rgba(255,255,255,0.08)]'
           >
-            <Icon name='Sparkles' className='w-4 h-4 mr-2 text-primary-token' />
-            {isUpgradeLoading ? 'Securing your upgrade…' : 'Upgrade to Pro'}
+            <Icon name='Sparkles' className='h-4 w-4 text-primary-token' />
+            <span className='flex-1 truncate'>
+              {isUpgradeLoading ? 'Securing your upgrade…' : 'Upgrade to Pro'}
+            </span>
+            <Icon name='ChevronRight' className='h-4 w-4 text-tertiary-token' />
           </DropdownMenuItem>
         )}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className='text-xs text-tertiary-token'>
-          Appearance
+        <DropdownMenuSeparator className='mx-1 my-2' />
+        <DropdownMenuLabel className='px-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-tertiary-token/70'>
+          Settings
         </DropdownMenuLabel>
-        {(['light', 'dark', 'system'] as const).map(option => {
-          const isActive =
-            (option === 'system' && theme === 'system') ||
-            (option !== 'system' && resolvedTheme === option);
-          const label =
-            option === 'light'
-              ? 'Light'
-              : option === 'dark'
-                ? 'Dark'
-                : 'System';
-
-          return (
-            <DropdownMenuItem
-              key={option}
-              onClick={() => {
-                setTheme(option);
-                setIsMenuOpen(false);
+        <DropdownMenuItem
+          onClick={handleSettings}
+          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-surface-2 dark:text-white'
+        >
+          <Icon
+            name='Settings'
+            className='h-4 w-4 text-tertiary-token group-hover:text-primary-token dark:text-slate-200'
+          />
+          <span className='flex-1'>Account settings</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className='mx-1 my-2' />
+        <div className='px-3'>
+          <div className='pb-1 text-[10px] font-semibold uppercase tracking-wide text-tertiary-token/70'>
+            Appearance
+          </div>
+          <div className='relative'>
+            <div className='pointer-events-none absolute inset-0 rounded-[28px] border border-white/15 dark:border-white/10 bg-transparent' />
+            <div
+              className='pointer-events-none absolute left-0 top-1/2 h-8 rounded-[20px] bg-white/90 transition-all duration-300 dark:bg-white/5'
+              style={{
+                transform: `translate(${activeIndex * 100}%, -50%)`,
+                width: 'calc(100% / 3)',
               }}
-              aria-checked={isActive}
-              role='menuitemradio'
-              className={cn(
-                'cursor-pointer',
-                isActive && 'bg-surface-2 text-primary-token'
-              )}
+            />
+            <div
+              role='radiogroup'
+              aria-label='Theme mode'
+              className='grid grid-cols-3 gap-1 rounded-[26px] bg-transparent p-1 backdrop-blur-[20px]'
             >
-              <Icon
-                name={
+              {themeOptions.map(option => {
+                const isActive =
+                  (option === 'system' && theme === 'system') ||
+                  (option !== 'system' && resolvedTheme === option);
+
+                const label =
+                  option === 'light'
+                    ? 'Light'
+                    : option === 'dark'
+                      ? 'Dark'
+                      : 'System';
+
+                const icon =
                   option === 'dark'
                     ? 'Moon'
                     : option === 'light'
                       ? 'Sun'
-                      : 'Monitor'
-                }
-                className='mr-2 h-4 w-4 text-tertiary-token'
-              />
-              <span className='flex-1'>{label}</span>
-              {isActive && (
-                <Icon name='Check' className='h-4 w-4 text-primary-token' />
-              )}
-            </DropdownMenuItem>
-          );
-        })}
-        <DropdownMenuSeparator />
+                      : 'Monitor';
+
+                return (
+                  <button
+                    key={option}
+                    type='button'
+                    role='radio'
+                    aria-checked={isActive}
+                    onClick={() => setTheme(option)}
+                    className={cn(
+                      'flex items-center justify-center gap-1 rounded-[18px] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] transition duration-300 ease-in-out focus-visible:outline-none',
+                      isActive
+                        ? 'text-primary-token dark:text-white'
+                        : 'text-tertiary-token hover:text-primary-token'
+                    )}
+                  >
+                    <Icon
+                      name={icon}
+                      className='h-3.5 w-3.5 text-current'
+                      aria-hidden='true'
+                    />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+        <DropdownMenuSeparator className='mx-1 my-2' />
         <DropdownMenuItem
           onClick={() => {
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='cursor-pointer'
+          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-sm text-slate-600 transition hover:bg-surface-2 dark:text-slate-200'
         >
           <Icon
             name='MessageSquare'
-            className='w-4 h-4 mr-2 text-tertiary-token'
-          />{' '}
-          Send feedback
+            className='h-4 w-4 text-tertiary-token group-hover:text-primary-token'
+          />
+          <span className='flex-1'>Send feedback</span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className='mx-1 my-3' />
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='cursor-pointer text-red-600 focus:text-red-600'
+          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/10 focus:bg-red-500/10 focus:text-red-600'
         >
-          <Icon name='LogOut' className='w-4 h-4 mr-2' />{' '}
-          {isLoading ? 'Signing out…' : 'Sign out'}
+          <Icon
+            name='LogOut'
+            className='h-4 w-4 text-red-600 group-hover:text-red-600'
+          />
+          <span className='flex-1'>
+            {isLoading ? 'Signing out…' : 'Sign out'}
+          </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
       <FeedbackModal

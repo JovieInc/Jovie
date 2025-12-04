@@ -18,6 +18,33 @@ export interface ToastProps {
   className?: string;
 }
 
+const baseToastClasses =
+  'relative w-full max-w-sm rounded-2xl border px-5 py-3 shadow-[0_18px_45px_rgba(15,15,25,0.45)] backdrop-blur-[18px] transition-all duration-300';
+
+const typeTextColors = {
+  info: 'text-slate-900 dark:text-white',
+  success: 'text-slate-900 dark:text-white',
+  warning: 'text-slate-900 dark:text-white',
+  error: 'text-slate-900 dark:text-white',
+};
+
+const accentStyles = {
+  info: 'from-sky-400 via-white/0 to-cyan-400',
+  success: 'from-emerald-400 via-white/0 to-lime-400',
+  warning: 'from-amber-400 via-white/0 to-orange-500',
+  error: 'from-rose-500 via-white/0 to-red-500',
+};
+
+const actionStyles = {
+  info: 'text-sky-600 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200',
+  success:
+    'text-emerald-600 hover:text-emerald-500 dark:text-emerald-300 dark:hover:text-emerald-200',
+  warning:
+    'text-amber-700 hover:text-amber-600 dark:text-amber-200 dark:hover:text-amber-100',
+  error:
+    'text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200',
+};
+
 export const Toast: React.FC<ToastProps> = ({
   message,
   type = 'info',
@@ -47,20 +74,6 @@ export const Toast: React.FC<ToastProps> = ({
     action?.onClick();
   };
 
-  const typeStyles = {
-    info: 'bg-gray-900 text-white',
-    success: 'bg-green-600 text-white',
-    warning: 'bg-amber-500 text-white',
-    error: 'bg-red-600 text-white',
-  };
-
-  const actionStyles = {
-    info: 'text-blue-400 hover:text-blue-300',
-    success: 'text-green-200 hover:text-green-100',
-    warning: 'text-amber-200 hover:text-amber-100',
-    error: 'text-red-200 hover:text-red-100',
-  };
-
   return (
     <div
       role='status'
@@ -68,19 +81,26 @@ export const Toast: React.FC<ToastProps> = ({
       aria-label={`${type} toast`}
       data-testid='toast'
       className={cn(
-        'px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50',
-        typeStyles[type],
+        baseToastClasses,
+        typeTextColors[type],
+        'border-white/60 bg-white/70 dark:border-white/10 dark:bg-[#020617]/70',
         isVisible
           ? 'animate-in slide-in-from-bottom-2'
           : 'animate-out slide-out-to-bottom-2',
         className
       )}
     >
+      <span
+        className={cn(
+          'pointer-events-none absolute inset-y-3 left-4 w-1.5 rounded-full bg-gradient-to-b blur-sm',
+          accentStyles[type]
+        )}
+      />
       <span className='text-sm'>{message}</span>
       {action && (
         <button
           onClick={handleActionClick}
-          className={cn('text-sm font-medium', actionStyles[type])}
+          className={cn('text-sm font-semibold', actionStyles[type])}
         >
           {action.label}
         </button>

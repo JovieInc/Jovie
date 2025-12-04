@@ -210,6 +210,16 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           next.custom = true;
         }
 
+        // Avoid triggering a render loop when nothing actually changed
+        if (
+          next.social === prev.social &&
+          next.dsp === prev.dsp &&
+          next.earnings === prev.earnings &&
+          next.custom === prev.custom
+        ) {
+          return prev;
+        }
+
         return next;
       });
     }

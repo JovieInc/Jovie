@@ -8,11 +8,11 @@ export default function NotFound() {
         <div className='w-full max-w-xl mx-auto text-center px-4 py-24 animate-fade-in-up'>
           <div className='mb-10 relative'>
             <div className='absolute -inset-1 rounded-full bg-linear-to-r from-gray-900/5 via-gray-500/10 to-gray-900/5 dark:from-white/10 dark:via-white/5 dark:to-white/10 blur-2xl' />
-            <div className='relative inline-flex items-baseline gap-3'>
+            <div className='relative flex flex-col items-center gap-1'>
               <span className='text-6xl md:text-8xl font-semibold tracking-tight text-gray-900 dark:text-white'>
                 404
               </span>
-              <span className='hidden md:inline text-xs font-medium tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400'>
+              <span className='text-xs font-medium tracking-[0.3em] uppercase text-gray-500 dark:text-gray-400'>
                 Not found
               </span>
             </div>

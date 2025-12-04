@@ -91,9 +91,42 @@ vi.mock('@/components/providers/FeatureFlagsProvider', () => ({
   }),
 }));
 
+// Mock notification hook to avoid needing actual toast provider
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => ({
+    showToast: vi.fn(),
+    hideToast: vi.fn(),
+    clearToasts: vi.fn(),
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    undo: vi.fn(),
+    retry: vi.fn(),
+    saveSuccess: vi.fn(),
+    saveError: vi.fn(),
+    uploadSuccess: vi.fn(),
+    uploadError: vi.fn(),
+    networkError: vi.fn(),
+    genericError: vi.fn(),
+    handleError: vi.fn(),
+    withLoadingToast: vi.fn(),
+  }),
+}));
+
 // Mock server-only modules
 vi.mock('server-only', () => ({
   default: vi.fn(),
+}));
+
+// Mock Next.js app router helpers to avoid needing actual routing context
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // Mock FeaturedArtists component to handle async component
@@ -561,48 +594,33 @@ MockedComponents.Textarea.displayName = 'MockedTextarea';
 
 vi.mock('@headlessui/react', () => MockedComponents);
 
-// Mock @jovie/ui Tooltip components (Radix UI)
-vi.mock('@jovie/ui', async () => {
-  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+// Mock framer-motion to avoid loading the full animation library in tests.
+// Components only rely on basic motion primitives, so a div wrapper is enough.
+vi.mock('framer-motion', () => {
+  const MockAnimatePresence = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
 
-  // Create a mock TooltipProvider that passes through children
-  const MockTooltipProvider = ({ children }: { children: React.ReactNode }) => {
-    return React.createElement(React.Fragment, {}, children);
-  };
+  const MockMotionComponent: React.FC<
+    React.HTMLAttributes<HTMLDivElement>
+  > = props => React.createElement('div', props);
 
-  // Create mock Tooltip that doesn't require provider
-  const MockTooltip = ({ children }: { children: React.ReactNode }) => {
-    return React.createElement(
-      'div',
-      { 'data-testid': 'tooltip-wrapper' },
-      children
-    );
-  };
-
-  const MockTooltipTrigger = React.forwardRef<
-    HTMLElement,
-    { asChild?: boolean; children: React.ReactNode }
-  >(({ children, asChild }, ref) => {
-    if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children as React.ReactElement, { ref });
-    }
-    return React.createElement('div', { ref }, children);
+  const motion = new Proxy(MockMotionComponent, {
+    get: () => MockMotionComponent,
   });
-  MockTooltipTrigger.displayName = 'MockTooltipTrigger';
-
-  const MockTooltipContent = ({ children }: { children: React.ReactNode }) => {
-    return React.createElement(
-      'div',
-      { 'data-testid': 'tooltip-content', role: 'tooltip' },
-      children
-    );
-  };
 
   return {
+    __esModule: true,
+    AnimatePresence: MockAnimatePresence,
+    motion,
+  };
+});
+
+// Mock @jovie/ui as a lightweight pass-through to the real module so tests
+// can stub specific components when needed without altering default behavior.
+vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+  return {
+    __esModule: true,
     ...actual,
-    TooltipProvider: MockTooltipProvider,
-    Tooltip: MockTooltip,
-    TooltipTrigger: MockTooltipTrigger,
-    TooltipContent: MockTooltipContent,
   };
 });

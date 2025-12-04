@@ -128,7 +128,7 @@ const SidebarProvider = React.forwardRef<
             style={
               {
                 '--sidebar-width': '260px',
-                '--sidebar-width-icon': '56px',
+                '--sidebar-width-icon': '52px',
                 ...style,
               } as React.CSSProperties
             }
@@ -173,7 +173,7 @@ const Sidebar = React.forwardRef<
       return (
         <div
           className={cn(
-            'flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground',
+            'flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground',
             className
           )}
           ref={ref}
@@ -190,7 +190,7 @@ const Sidebar = React.forwardRef<
           <SheetContent
             data-sidebar='sidebar'
             data-mobile='true'
-            className='w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
+            className='w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden'
             style={
               {
                 '--sidebar-width': '18rem',
@@ -217,14 +217,14 @@ const Sidebar = React.forwardRef<
       >
         <div
           className={cn(
-            'duration-200 relative h-svh w-[--sidebar-width] overflow-hidden transition-[width] ease-linear',
+            'duration-200 relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-linear',
             'group-data-[collapsible=offcanvas]:w-0',
             'group-data-[side=right]:rotate-180',
             variant === 'floating'
-              ? 'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]'
+              ? 'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
               : variant === 'inset'
-                ? 'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]'
-                : 'group-data-[collapsible=icon]:w-[--sidebar-width-icon] border-r border-subtle',
+                ? 'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
+                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) border-r border-subtle',
             className
           )}
           {...props}
@@ -287,11 +287,11 @@ const SidebarRail = React.forwardRef<
       title='Toggle Sidebar'
       className={cn(
         'absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex',
-        '[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize',
-        '[[data-side=left][data-state=closed]_&]:cursor-e-resize [[data-side=right][data-state=closed]_&]:cursor-w-resize',
+        'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
+        'in-data-[side=left][data-state=closed]:cursor-e-resize in-data-[side=right][data-state=closed]:cursor-w-resize',
         'group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar',
-        '[[data-side=left][data-collapsible=offcanvas]_&]:-right-2',
-        '[[data-side=right][data-collapsible=offcanvas]_&]:-left-2',
+        'in-data-[side=left][data-collapsible=offcanvas]:-right-2',
+        'in-data-[side=right][data-collapsible=offcanvas]:-left-2',
         className
       )}
       {...props}
@@ -309,7 +309,7 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         'relative flex min-h-0 flex-1 flex-col bg-base',
-        'peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] lg:peer-data-[state=closed]:peer-data-[variant=inset]:ml-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ml-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow',
+        'peer-data-[variant=inset]:min-h-[calc(100svh-(--spacing(4)))] lg:peer-data-[state=closed]:peer-data-[variant=inset]:ml-2 lg:peer-data-[variant=inset]:m-2 lg:peer-data-[variant=inset]:ml-0 lg:peer-data-[variant=inset]:rounded-xl lg:peer-data-[variant=inset]:shadow',
         className
       )}
       {...props}
@@ -359,7 +359,11 @@ const SidebarFooter = React.forwardRef<
     <div
       ref={ref}
       data-sidebar='footer'
-      className={cn('flex flex-col gap-2 overflow-hidden p-2', className)}
+      className={cn(
+        'flex flex-col gap-2 overflow-hidden p-2',
+        'group-data-[collapsible=icon]:px-0',
+        className
+      )}
       {...props}
     />
   );
@@ -405,7 +409,11 @@ const SidebarGroup = React.forwardRef<
     <div
       ref={ref}
       data-sidebar='group'
-      className={cn('relative flex w-full min-w-0 flex-col p-2', className)}
+      className={cn(
+        'relative flex w-full min-w-0 flex-col p-2',
+        'group-data-[collapsible=icon]:px-0',
+        className
+      )}
       {...props}
     />
   );
@@ -496,7 +504,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding,background,color] hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-ring data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 group-data-[collapsible=icon]:[&>svg]:size-5',
+  'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding,background,color] hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-sidebar-ring data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-(--sidebar-width-icon) group-data-[collapsible=icon]:!p-2 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 group-data-[collapsible=icon]:[&>svg]:size-5',
   {
     variants: {
       variant: {

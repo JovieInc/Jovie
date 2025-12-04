@@ -1,20 +1,31 @@
 import 'server-only';
 
 import { randomUUID } from 'crypto';
-import { count, desc, eq, ilike, or, type SQL } from 'drizzle-orm';
+import {
+  count,
+  desc,
+  sql as drizzleSql,
+  eq,
+  ilike,
+  inArray,
+  or,
+  type SQL,
+} from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema';
+import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 
 export interface AdminCreatorProfileRow {
   id: string;
   username: string;
+  usernameNormalized: string;
   avatarUrl: string | null;
   displayName?: string | null;
   isVerified: boolean;
   isClaimed: boolean;
   claimToken: string | null;
   createdAt: Date | null;
+  confidence?: number | null;
 }
 
 export type AdminCreatorProfilesSort =
@@ -111,6 +122,7 @@ export async function getAdminCreatorProfiles(
         .select({
           id: creatorProfiles.id,
           username: creatorProfiles.username,
+          usernameNormalized: creatorProfiles.usernameNormalized,
           avatarUrl: creatorProfiles.avatarUrl,
           displayName: creatorProfiles.displayName,
           isVerified: creatorProfiles.isVerified,
@@ -164,10 +176,40 @@ export async function getAdminCreatorProfiles(
       }
     }
 
+    const profileIds = pageRows.map(row => row.id);
+    const confidenceMap = new Map<string, number>();
+
+    if (profileIds.length > 0) {
+      const confidenceRows = await db
+        .select({
+          creatorProfileId: socialLinks.creatorProfileId,
+          averageConfidence: drizzleSql`AVG(${socialLinks.confidence})`,
+        })
+        .from(socialLinks)
+        .where(inArray(socialLinks.creatorProfileId, profileIds))
+        .groupBy(socialLinks.creatorProfileId);
+
+      for (const row of confidenceRows) {
+        const rawValue = row.averageConfidence;
+        const parsedValue =
+          typeof rawValue === 'number'
+            ? rawValue
+            : rawValue != null
+              ? Number(rawValue)
+              : NaN;
+
+        if (!Number.isNaN(parsedValue)) {
+          const clamped = Math.min(1, Math.max(0, parsedValue));
+          confidenceMap.set(row.creatorProfileId, clamped);
+        }
+      }
+    }
+
     return {
       profiles: pageRows.map(row => ({
         id: row.id,
         username: row.username,
+        usernameNormalized: row.usernameNormalized,
         avatarUrl: row.avatarUrl ?? null,
         // displayName is optional in the admin listing but useful for detail views
         displayName:
@@ -176,6 +218,7 @@ export async function getAdminCreatorProfiles(
         isClaimed: row.isClaimed ?? false,
         claimToken: row.claimToken ?? null,
         createdAt: row.createdAt ?? null,
+        confidence: confidenceMap.get(row.id) ?? null,
       })),
       page,
       pageSize,

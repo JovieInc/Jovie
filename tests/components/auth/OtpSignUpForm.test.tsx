@@ -203,8 +203,10 @@ describe('OtpSignUpForm', () => {
 
     const buttons = screen.getAllByTestId('signup-action');
     buttons.forEach(button => {
-      expect(button).toHaveClass('bg-purple-600');
-      expect(button).toHaveClass('hover:bg-purple-500');
+      expect(button).toHaveClass('btn');
+      expect(button).toHaveClass('btn-primary');
+      expect(button).toHaveClass('w-full');
+      expect(button).toHaveClass('justify-center');
     });
   });
 });

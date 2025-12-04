@@ -1,4 +1,6 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,16 +17,30 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 vi.mock('@/components/admin/CreatorAvatarCell', () => ({
   CreatorAvatarCell: ({ username }: { username: string }) => (
     <div data-testid='creator-avatar-cell'>avatar-{username}</div>
   ),
 }));
 
+const renderWithProviders = (ui: React.ReactElement) => {
+  return render(<TooltipProvider>{ui}</TooltipProvider>);
+};
+
 describe('CreatorProfilesTable', () => {
   const baseProfile: AdminCreatorProfileRow = {
     id: 'profile-1',
     username: 'alice',
+    usernameNormalized: 'alice',
     avatarUrl: null,
     isVerified: false,
     isClaimed: true,
@@ -35,7 +51,7 @@ describe('CreatorProfilesTable', () => {
   const defaultSort: AdminCreatorProfilesSort = 'created_desc';
 
   it('renders rows and pagination summary', () => {
-    render(
+    renderWithProviders(
       <CreatorProfilesTable
         profiles={[baseProfile]}
         page={1}
@@ -60,7 +76,7 @@ describe('CreatorProfilesTable', () => {
   });
 
   it('shows empty state when there are no profiles', () => {
-    render(
+    renderWithProviders(
       <CreatorProfilesTable
         profiles={[]}
         page={1}
@@ -74,16 +90,17 @@ describe('CreatorProfilesTable', () => {
     expect(screen.getByText('No creator profiles found.')).toBeInTheDocument();
   });
 
-  it('shows Copy claim link button for unclaimed profiles with a claim token', () => {
+  it('shows Copy claim link button for unclaimed profiles with a claim token', async () => {
     const unclaimedProfile: AdminCreatorProfileRow = {
       ...baseProfile,
       id: 'profile-2',
       username: 'bob',
+      usernameNormalized: 'bob',
       isClaimed: false,
       claimToken: 'test-claim-token',
     };
 
-    render(
+    renderWithProviders(
       <CreatorProfilesTable
         profiles={[unclaimedProfile]}
         page={1}
@@ -94,8 +111,14 @@ describe('CreatorProfilesTable', () => {
       />
     );
 
+    const menuTrigger = screen.getByRole('button', {
+      name: 'Creator actions',
+    });
+    const user = userEvent.setup();
+    await user.click(menuTrigger);
+
     expect(
-      screen.getByRole('button', { name: 'Copy claim link' })
+      await screen.findByRole('menuitem', { name: 'Copy claim link' })
     ).toBeInTheDocument();
   });
 });

@@ -48,7 +48,7 @@ export function AuthLayout({
   };
 
   return (
-    <div className='min-h-screen flex'>
+    <div className='min-h-screen flex bg-base text-primary-token'>
       <AuthBranding
         title={brandingTitle}
         description={brandingDescription}

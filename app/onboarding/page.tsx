@@ -43,30 +43,31 @@ export default async function OnboardingPage({
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   return (
-    <AuthLayout
-      brandingTitle='Finish setting up your Jovie profile'
-      brandingDescription='Choose your name and Jovie handle so your profile is ready to share.'
-      formTitle='Pick your @handle'
-      gradientFrom='purple-600'
-      gradientVia='cyan-600'
-      gradientTo='blue-600'
-      textColorClass='text-purple-100'
-      brandingShowText={false}
-    >
-      <div className='relative min-h-[500px]'>
-        {/* Theme Toggle */}
-        <div className='absolute top-4 right-4 z-20'>
-          <ThemeToggle />
-        </div>
-
-        {/* Unified onboarding form */}
-        <OnboardingFormWrapper
-          initialDisplayName={initialDisplayName}
-          initialHandle={initialHandle}
-          userEmail={userEmail}
-          userId={userId}
-        />
+    <>
+      <div className='fixed top-4 right-4 z-40'>
+        <ThemeToggle />
       </div>
-    </AuthLayout>
+
+      <AuthLayout
+        brandingTitle='Finish setting up your Jovie profile'
+        brandingDescription='Choose your name and Jovie handle so your profile is ready to share.'
+        formTitle='Pick your @handle'
+        gradientFrom='purple-600'
+        gradientVia='cyan-600'
+        gradientTo='blue-600'
+        textColorClass='text-purple-100'
+        brandingShowText={false}
+      >
+        <div className='relative min-h-[500px]'>
+          {/* Unified onboarding form */}
+          <OnboardingFormWrapper
+            initialDisplayName={initialDisplayName}
+            initialHandle={initialHandle}
+            userEmail={userEmail}
+            userId={userId}
+          />
+        </div>
+      </AuthLayout>
+    </>
   );
 }
