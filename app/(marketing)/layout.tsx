@@ -8,7 +8,7 @@ export default function MarketingLayout({
 }) {
   return (
     <div className='flex min-h-screen flex-col'>
-      <Header />
+      <Header sticky={false} logoSize='xs' />
       <main className='flex-1'>{children}</main>
       <Footer />
     </div>

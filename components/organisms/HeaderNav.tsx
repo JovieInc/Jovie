@@ -11,9 +11,14 @@ import { cn } from '@/lib/utils';
 export interface HeaderNavProps {
   sticky?: boolean;
   className?: string;
+  logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
-export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
+export function HeaderNav({
+  sticky = true,
+  className,
+  logoSize = 'sm',
+}: HeaderNavProps = {}) {
   return (
     <header
       data-testid='header-nav'
@@ -24,10 +29,10 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
       )}
     >
       <Container>
-        <div className='flex h-16 items-center'>
+        <div className='flex h-14 items-center md:h-16'>
           {/* Logo - Left side */}
           <div className='flex items-center'>
-            <LogoLink />
+            <LogoLink logoSize={logoSize} />
           </div>
 
           {/* Navigation - Center (hidden on mobile) */}
@@ -41,7 +46,7 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='h-auto px-0 py-0 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white'
                   >
                     Product
                   </Button>
@@ -76,7 +81,7 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
               </Popover>
               <NavLink
                 href='/pricing'
-                className='font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
               >
                 Pricing
               </NavLink>
@@ -94,7 +99,7 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
                   <Button
                     variant='ghost'
                     size='sm'
-                    className='min-h-[44px] px-2 font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white'
                   >
                     Product
                   </Button>
@@ -127,7 +132,7 @@ export function HeaderNav({ sticky = true, className }: HeaderNavProps = {}) {
               </Popover>
               <NavLink
                 href='/pricing'
-                className='min-h-[44px] px-2 font-medium flex items-center'
+                className='min-h-[44px] px-3 py-2 rounded-md font-medium flex items-center text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
               >
                 Pricing
               </NavLink>

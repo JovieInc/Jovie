@@ -1,11 +1,12 @@
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './ClaimHandleForm';
+import { HeroExampleProfiles } from './HeroExampleProfiles';
 import { HeroHandlePreviewChip } from './HeroHandlePreviewChip';
 import { QRCodeCard } from './QRCodeCard';
 
 export function NewHomeHero() {
   return (
-    <section className='relative overflow-hidden pt-10 pb-12 sm:pt-16 sm:pb-16 lg:pt-20 lg:pb-24'>
+    <section className='relative overflow-hidden pt-6 pb-10 sm:pt-10 sm:pb-14 lg:pt-14 lg:pb-20'>
       {/* Subtle background gradient */}
       <div className='absolute inset-0 bg-gradient-to-b from-white to-gray-50 dark:from-gray-900 dark:to-black'></div>
 
@@ -20,7 +21,7 @@ export function NewHomeHero() {
         <div className='flex flex-col lg:flex-row lg:items-center lg:gap-12'>
           {/* Left column: Text and form */}
           <div className='flex-1 text-center lg:text-left'>
-            <h1 className='text-4xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
+            <h1 className='text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl lg:text-6xl'>
               Claim your{' '}
               <span className='text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400'>
                 @handle
@@ -28,14 +29,15 @@ export function NewHomeHero() {
               .
             </h1>
 
-            <p className='mt-4 text-lg text-gray-600 dark:text-gray-300 sm:text-xl max-w-2xl mx-auto lg:mx-0'>
+            <p className='mt-3 text-base leading-7 text-gray-700 dark:text-gray-200 sm:text-lg sm:leading-8 max-w-2xl mx-auto lg:mx-0'>
               Secure your name. Share a profile that&apos;s fast, beautiful, and
               optimized to convert.
             </p>
 
             {/* Handle claim form */}
-            <div className='mt-8 max-w-md mx-auto lg:mx-0'>
+            <div className='mt-6 max-w-md mx-auto lg:mx-0'>
               <ClaimHandleForm />
+              <HeroExampleProfiles />
             </div>
           </div>
 
