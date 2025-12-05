@@ -49,6 +49,15 @@ export default clerkMiddleware(async (auth, req) => {
     const pathname = req.nextUrl.pathname;
     const isSensitiveAPI = pathname.startsWith('/api/link/');
 
+    // Block Sentry example pages in production (dev-only testing routes)
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (pathname === '/sentry-example-page' ||
+        pathname === '/api/sentry-example-api')
+    ) {
+      return NextResponse.rewrite(new URL('/404', req.url));
+    }
+
     // Allow sidebar demo to bypass authentication
     if (pathname === '/sidebar-demo') {
       return NextResponse.next();

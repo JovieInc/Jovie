@@ -130,12 +130,21 @@ async function fetchDashboardDataWithSession(
     // - 42703: undefined_column
     // - 42P01: undefined_table
     // - 42P02: undefined_parameter
-    const isMigrationError = (error: unknown): boolean => {
-      const pgError = error as { code?: string };
+    const isPgError = (error: unknown): error is { code: string } => {
       return (
-        pgError.code === '42703' ||
-        pgError.code === '42P01' ||
-        pgError.code === '42P02'
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        typeof (error as { code: unknown }).code === 'string'
+      );
+    };
+
+    const isMigrationError = (error: unknown): boolean => {
+      if (!isPgError(error)) return false;
+      return (
+        error.code === '42703' ||
+        error.code === '42P01' ||
+        error.code === '42P02'
       );
     };
 
