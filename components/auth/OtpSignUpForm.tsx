@@ -4,12 +4,9 @@ import * as Clerk from '@clerk/elements/common';
 import * as SignUp from '@clerk/elements/sign-up';
 import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 
 export function OtpSignUpForm() {
-  const searchParams = useSearchParams();
-  const redirectUrl = searchParams?.get?.('redirect_url') ?? '/onboarding';
-  const signInUrl = `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`;
+  const signInUrl = '/signin';
 
   return (
     <SignUp.Root routing='path' path='/signup'>
@@ -78,7 +75,7 @@ export function OtpSignUpForm() {
               <div className='text-center text-sm text-secondary-token'>
                 Already have an account?{' '}
                 <Link
-                  href='/signin'
+                  href={signInUrl}
                   className='text-accent hover:underline font-medium'
                 >
                   Sign in
