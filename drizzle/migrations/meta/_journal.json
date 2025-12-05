@@ -78,6 +78,13 @@
       "when": 1764712535311,
       "tag": "0010_notification_subscriptions",
       "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1764912363930,
+      "tag": "0011_safe_pyro",
+      "breakpoints": true
     }
   ]
 }
