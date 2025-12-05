@@ -20,7 +20,7 @@ export default async function OnboardingPage({
       ? `?handle=${encodeURIComponent(resolvedSearchParams.handle)}`
       : '';
     const redirectTarget = `/onboarding${handleParam}`;
-    redirect(`/sign-in?redirect_url=${encodeURIComponent(redirectTarget)}`);
+    redirect(`/signin?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
   const dashboardData = await getDashboardData();
