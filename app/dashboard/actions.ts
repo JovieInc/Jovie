@@ -124,9 +124,20 @@ async function fetchDashboardDataWithSession(
     const selected = creatorData[0];
 
     // Load user settings for UI preferences and social links presence in parallel;
-    // tolerate missing user_settings column/table during migrations.
-    // Note: These queries run inside the parent transaction from withDbSessionTx,
-    // so errors are handled gracefully without manual savepoint management.
+    // tolerate missing user_settings column/table during migrations only.
+    // PostgreSQL error codes:
+    // - 42703: undefined_column
+    // - 42P01: undefined_table
+    // - 42P02: undefined_parameter
+    const isMigrationError = (error: unknown): boolean => {
+      const pgError = error as { code?: string };
+      return (
+        pgError.code === '42703' ||
+        pgError.code === '42P01' ||
+        pgError.code === '42P02'
+      );
+    };
+
     const [settings, hasLinks] = await Promise.all([
       dbClient
         .select()
@@ -137,11 +148,15 @@ async function fetchDashboardDataWithSession(
           result => result?.[0] as { sidebarCollapsed: boolean } | undefined
         )
         .catch((error: unknown) => {
-          console.warn(
-            'user_settings not available yet, defaulting sidebarCollapsed=false',
-            error
-          );
-          return undefined;
+          if (isMigrationError(error)) {
+            console.warn(
+              'user_settings not available yet, defaulting sidebarCollapsed=false',
+              error
+            );
+            return undefined;
+          }
+          // Re-throw non-migration errors (network, permissions, RLS, etc.)
+          throw error;
         }),
       dbClient
         .select({ c: count() })
@@ -154,11 +169,15 @@ async function fetchDashboardDataWithSession(
         )
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
-          console.warn(
-            'Error counting social links, defaulting to false',
-            error
-          );
-          return false;
+          if (isMigrationError(error)) {
+            console.warn(
+              'social_links table/column not available yet, defaulting to false',
+              error
+            );
+            return false;
+          }
+          // Re-throw non-migration errors (network, permissions, RLS, etc.)
+          throw error;
         }),
     ]);
 
