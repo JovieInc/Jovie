@@ -4,7 +4,6 @@ import type { ComponentPropsWithoutRef } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
-import { UserButton } from '@/components/molecules/UserButton';
 import {
   Sidebar,
   SidebarContent,
@@ -17,6 +16,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
+import { UserButton } from '@/components/organisms/UserButton';
 import { cn } from '@/lib/utils';
 
 type SidebarRootProps = ComponentPropsWithoutRef<typeof Sidebar>;

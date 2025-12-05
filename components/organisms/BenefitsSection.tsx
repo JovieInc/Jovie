@@ -1,6 +1,6 @@
-import { FeatureCard } from '@/components/atoms/FeatureCard';
 import { SectionHeading } from '@/components/atoms/SectionHeading';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
+import { FeatureCard } from '@/components/molecules/FeatureCard';
 
 // Icons
 const LightningIcon = (

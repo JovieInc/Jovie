@@ -25,7 +25,7 @@ interface PrimaryCTAProps
   dataTestId?: string;
 }
 
-export default function PrimaryCTA({
+export function PrimaryCTA({
   children,
   ariaLabel,
   loadingLabel,

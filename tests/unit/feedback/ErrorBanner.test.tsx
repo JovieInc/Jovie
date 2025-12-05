@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ErrorBanner } from './ErrorBanner';
+import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 
 describe('ErrorBanner', () => {
   it('renders title and description with test id', () => {

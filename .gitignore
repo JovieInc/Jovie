@@ -40,3 +40,6 @@ flyout-demo-updated.html
 # Ignore generated sitemaps
 public/sitemap*.xml
 public/sitemap*.xml.gz
+
+# Sentry Config File
+.env.sentry-build-plugin

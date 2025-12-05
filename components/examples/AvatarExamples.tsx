@@ -10,7 +10,7 @@
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
-import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   formatAcceptedImageTypes,

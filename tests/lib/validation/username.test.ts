@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateUsername } from '../username';
+import { validateUsername } from '@/lib/validation/username';
 
 describe('validateUsername (server)', () => {
   it('accepts usernames with hyphens', () => {

@@ -1,6 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
@@ -123,43 +124,52 @@ async function fetchDashboardDataWithSession(
 
     const selected = creatorData[0];
 
-    // Load user settings for UI preferences and social links presence in parallel;
-    // tolerate missing user_settings column/table during migrations.
+    // Load user settings for UI preferences and social links presence in parallel.
+    // Tolerate missing tables/columns during migrations (PostgreSQL error codes:
+    // 42703=undefined_column, 42P01=undefined_table, 42P02=undefined_parameter)
+    const MIGRATION_ERROR_CODES = ['42703', '42P01', '42P02'];
+
     const [settings, hasLinks] = await Promise.all([
-      (async () => {
-        try {
-          const result = await dbClient
-            .select()
-            .from(userSettings)
-            .where(eq(userSettings.userId, userData.id))
-            .limit(1);
-          return result?.[0] as { sidebarCollapsed: boolean } | undefined;
-        } catch {
-          console.warn(
-            'user_settings not available yet, defaulting sidebarCollapsed=false'
-          );
-          return undefined;
-        }
-      })(),
-      (async () => {
-        try {
-          const result = await dbClient
-            .select({ c: count() })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
-              )
-            );
-          const total = Number(result?.[0]?.c ?? 0);
-          return total > 0;
-        } catch {
-          // On query error, default to false without failing dashboard load
-          console.warn('Error counting social links, defaulting to false');
-          return false;
-        }
-      })(),
+      dbClient
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, userData.id))
+        .limit(1)
+        .then(
+          result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+        )
+        .catch((error: unknown) => {
+          const code = (error as { code?: string })?.code;
+          if (code && MIGRATION_ERROR_CODES.includes(code)) {
+            console.warn('[Dashboard] user_settings migration in progress');
+            return undefined;
+          }
+          Sentry.captureException(error, {
+            tags: { query: 'user_settings', context: 'dashboard_data' },
+          });
+          throw error;
+        }),
+      dbClient
+        .select({ c: count() })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, selected.id),
+            eq(socialLinks.state, 'active')
+          )
+        )
+        .then(result => Number(result?.[0]?.c ?? 0) > 0)
+        .catch((error: unknown) => {
+          const code = (error as { code?: string })?.code;
+          if (code && MIGRATION_ERROR_CODES.includes(code)) {
+            console.warn('[Dashboard] social_links migration in progress');
+            return false;
+          }
+          Sentry.captureException(error, {
+            tags: { query: 'social_links_count', context: 'dashboard_data' },
+          });
+          throw error;
+        }),
     ]);
 
     const startOfMonth = new Date();

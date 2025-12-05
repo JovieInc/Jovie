@@ -18,7 +18,7 @@ import React, {
   useState,
 } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
-import { UniversalLinkInput } from '@/components/dashboard/atoms/UniversalLinkInput';
+import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
 import {

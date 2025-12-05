@@ -1,5 +1,6 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
 const EU_EEA_UK = [
@@ -39,6 +40,7 @@ const US_STATES = ['CA', 'CO', 'VA', 'CT', 'UT'];
 const CA_PROVINCES = ['QC'];
 
 export default clerkMiddleware(async (auth, req) => {
+  await ensureSentry();
   try {
     // Start performance timing
     const startTime = Date.now();
@@ -46,6 +48,15 @@ export default clerkMiddleware(async (auth, req) => {
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
     const isSensitiveAPI = pathname.startsWith('/api/link/');
+
+    // Block Sentry example pages in production (dev-only testing routes)
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (pathname === '/sentry-example-page' ||
+        pathname === '/api/sentry-example-api')
+    ) {
+      return NextResponse.rewrite(new URL('/404', req.url));
+    }
 
     // Allow sidebar demo to bypass authentication
     if (pathname === '/sidebar-demo') {

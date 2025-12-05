@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CookieActions } from '@/components/molecules/CookieActions';
-import CookieModal from '@/components/organisms/CookieModal';
+import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsentClient } from '@/lib/cookies/consent-client';
 
 declare global {

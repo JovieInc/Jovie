@@ -372,3 +372,32 @@ Configuration location: `.claude.json` (project-specific)
 - Gradually opt into `reactCompiler` once you’ve measured the build-time cost; it automatically memoizes components to cut redundant renders.
 - Lean on layout deduplication and incremental prefetching (built into Next.js 16) so shared layouts download once and cached chunks only refresh when invalidated.
 - Take advantage of React 19.2 additions (`View Transitions`, `useEffectEvent`, `<Activity />`) whenever you build new transitions or interaction patterns.
+
+## 15. Sentry Instrumentation & Logging
+
+- Always import Sentry via `import * as Sentry from '@sentry/nextjs'` and initialize once per context (client: `instrumentation-client.(js|ts)`, server: `sentry.server.config.ts`, edge: `sentry.edge.config.ts`).
+- Keep the default `Sentry.init` configuration (DSN + `enableLogs: true`) unless a teammate documents a safe override; reuse the provided logger (e.g., `const { logger } = Sentry`) rather than wiring new instances.
+- Use `Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] })` when enabling console forwarding so you don’t need to wrap every console call manually.
+- Capture unexpected exceptions with `Sentry.captureException(error)` inside `catch` blocks or fail-fast paths where errors should be surfaced.
+- Create spans for key UI/API actions (`button clicks`, `fetch calls`, `critical business logic`) using `Sentry.startSpan` with meaningful `op` and `name` values, and attach attributes/metrics describing inputs or request-specific data.
+  ```javascript
+  Sentry.startSpan(
+    { op: 'ui.click', name: 'Test Button Click' },
+    span => {
+      span.setAttribute('config', value);
+      span.setAttribute('metric', metric);
+      doSomething();
+    }
+  );
+  ```
+- Wrap API requests similarly so the span describes the route and HTTP operation when calling fetchers.
+  ```javascript
+  return Sentry.startSpan(
+    { op: 'http.client', name: `GET /api/users/${userId}` },
+    async () => {
+      const response = await fetch(`/api/users/${userId}`);
+      return response.json();
+    }
+  );
+  ```
+- Use the shared `logger` helpers for structured logging and prefer `logger.fmt` when injecting variables; e.g., `logger.debug(logger.fmt`Cache miss for user: ${userId}`)` or `logger.error('Failed to process payment', { orderId, amount })`.

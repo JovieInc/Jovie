@@ -460,21 +460,23 @@ export async function validateDbConnection(): Promise<{
 }> {
   const startTime = Date.now();
 
-  try {
-    if (!env.DATABASE_URL) {
-      return {
-        connected: false,
-        error: 'DATABASE_URL not configured',
-      };
-    }
+  const connectionString = process.env.DATABASE_URL;
 
-    await withRetry(async () => {
-      if (!_db) {
-        _db = initializeDb();
-      }
-      // Just test basic connection
-      await _db.execute(drizzleSql`SELECT 1`);
-    }, 'startupConnection');
+  if (!connectionString) {
+    return {
+      connected: false,
+      error: 'DATABASE_URL not configured',
+    };
+  }
+
+  const pool = new Pool({ connectionString });
+  const tempDb = drizzle(pool, { schema });
+
+  try {
+    await withRetry(
+      () => tempDb.execute(drizzleSql`SELECT 1`),
+      'startupConnection'
+    );
 
     const latency = Date.now() - startTime;
     logDbInfo('startupConnection', 'Database connection validated', {
@@ -491,6 +493,12 @@ export async function validateDbConnection(): Promise<{
       latency,
       error: error instanceof Error ? error.message : 'Unknown error',
     };
+  } finally {
+    try {
+      await pool.end();
+    } catch {
+      // Ignore shutdown errors; connection might already be closed.
+    }
   }
 }
 

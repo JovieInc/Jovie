@@ -1,7 +1,7 @@
 import { useUser } from '@clerk/nextjs';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import BrandingBadge from '@/components/organisms/BrandingBadge';
+import { BrandingBadge } from '@/components/organisms/BrandingBadge';
 
 // Mock Clerk's useUser hook
 vi.mock('@clerk/nextjs', () => ({

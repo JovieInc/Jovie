@@ -16,11 +16,7 @@ interface CookieModalProps {
   onSave?: (consent: Consent) => void;
 }
 
-export default function CookieModal({
-  open,
-  onClose,
-  onSave,
-}: CookieModalProps) {
+export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
   const [settings, setSettings] = useState<Consent>({
     essential: true,
     analytics: false,

@@ -9,7 +9,7 @@ This guide shows how to migrate from existing avatar components to the new unifi
 - **Features**: Multiple sizes, fallback initials, optimized loading, accessibility
 - **Usage**: Replace `ArtistAvatar`, `OptimizedAvatar` for read-only contexts
 
-### `AvatarUploadable` (Molecule) 
+### `AvatarUploadable` (Organism) 
 - **Purpose**: Interactive avatar with upload functionality for dashboard contexts
 - **Features**: Radial progress, drag & drop, file validation, analytics tracking
 - **Usage**: Replace `AvatarUpload`, `AvatarUploader` for editable contexts

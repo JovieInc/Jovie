@@ -35,7 +35,7 @@ vi.mock('@/lib/analytics', () => ({
 
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { UserButton } from '@/components/molecules/UserButton';
+import { UserButton } from '@/components/organisms/UserButton';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
 

@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useRef } from 'react';
-import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
 import { useToast } from '@/components/molecules/ToastContainer';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   formatAcceptedImageTypes,

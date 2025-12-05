@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
  * Branding badge that shows "Made with Jovie" for free plan users
  * Hidden for Pro plan users
  */
-export default function BrandingBadge() {
+export function BrandingBadge() {
   const { user, isLoaded } = useUser();
 
   // Show a placeholder while loading to avoid layout shift

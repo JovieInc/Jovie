@@ -7,7 +7,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { AvatarUploadable } from '@/components/molecules/AvatarUploadable';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { detectPlatform } from '@/lib/utils/platform-detection';
