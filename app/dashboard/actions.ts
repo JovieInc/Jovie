@@ -124,29 +124,10 @@ async function fetchDashboardDataWithSession(
 
     const selected = creatorData[0];
 
-    // Load user settings for UI preferences and social links presence in parallel;
-    // tolerate missing user_settings column/table during migrations only.
-    // PostgreSQL error codes for schema changes during migrations:
-    // - 42703: undefined_column
-    // - 42P01: undefined_table
-    // - 42P02: undefined_parameter
-    const isPgError = (error: unknown): error is { code: string } => {
-      return (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        typeof (error as { code: unknown }).code === 'string'
-      );
-    };
-
-    const isMigrationError = (error: unknown): boolean => {
-      if (!isPgError(error)) return false;
-      return (
-        error.code === '42703' ||
-        error.code === '42P01' ||
-        error.code === '42P02'
-      );
-    };
+    // Load user settings for UI preferences and social links presence in parallel.
+    // Tolerate missing tables/columns during migrations (PostgreSQL error codes:
+    // 42703=undefined_column, 42P01=undefined_table, 42P02=undefined_parameter)
+    const MIGRATION_ERROR_CODES = ['42703', '42P01', '42P02'];
 
     const [settings, hasLinks] = await Promise.all([
       dbClient
@@ -158,18 +139,13 @@ async function fetchDashboardDataWithSession(
           result => result?.[0] as { sidebarCollapsed: boolean } | undefined
         )
         .catch((error: unknown) => {
-          if (isMigrationError(error)) {
-            // Expected during migrations - log but don't alert
-            console.warn(
-              '[Dashboard] user_settings table/column not available (migration in progress)',
-              error
-            );
+          const code = (error as { code?: string })?.code;
+          if (code && MIGRATION_ERROR_CODES.includes(code)) {
+            console.warn('[Dashboard] user_settings migration in progress');
             return undefined;
           }
-          // Unexpected error - capture to Sentry and re-throw
           Sentry.captureException(error, {
             tags: { query: 'user_settings', context: 'dashboard_data' },
-            extra: { userId: userData.id },
           });
           throw error;
         }),
@@ -184,18 +160,13 @@ async function fetchDashboardDataWithSession(
         )
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
-          if (isMigrationError(error)) {
-            // Expected during migrations - log but don't alert
-            console.warn(
-              '[Dashboard] social_links table/column not available (migration in progress)',
-              error
-            );
+          const code = (error as { code?: string })?.code;
+          if (code && MIGRATION_ERROR_CODES.includes(code)) {
+            console.warn('[Dashboard] social_links migration in progress');
             return false;
           }
-          // Unexpected error - capture to Sentry and re-throw
           Sentry.captureException(error, {
             tags: { query: 'social_links_count', context: 'dashboard_data' },
-            extra: { profileId: selected.id },
           });
           throw error;
         }),
