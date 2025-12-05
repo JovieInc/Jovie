@@ -62,51 +62,42 @@ ALTER TABLE click_events
 CREATE INDEX IF NOT EXISTS idx_click_events_audience_member ON click_events(audience_member_id);
 
 -- Seed audience members from existing notification subscriptions (identified traffic)
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM pg_catalog.pg_tables
-    WHERE schemaname = 'public' AND tablename = 'notification_subscriptions'
-  ) THEN
-    INSERT INTO audience_members (
-      creator_profile_id,
-      type,
-      display_name,
-      first_seen_at,
-      last_seen_at,
-      visits,
-      engagement_score,
-      intent_level,
-      geo_country,
-      email,
-      phone,
-      fingerprint,
-      created_at,
-      updated_at
-    )
-    SELECT
-      creator_profile_id,
-      CASE
-        WHEN channel = 'email' THEN 'email'::audience_member_type
-        WHEN channel = 'phone' THEN 'sms'::audience_member_type
-        ELSE 'anonymous'
-      END,
-      COALESCE(email, phone),
-      created_at,
-      created_at,
-      1,
-      1,
-      'medium',
-      country_code,
-      email,
-      phone,
-      NULL,
-      created_at,
-      created_at
-    FROM notification_subscriptions;
-  END IF;
-END $$;
+INSERT INTO audience_members (
+  creator_profile_id,
+  type,
+  display_name,
+  first_seen_at,
+  last_seen_at,
+  visits,
+  engagement_score,
+  intent_level,
+  geo_country,
+  email,
+  phone,
+  fingerprint,
+  created_at,
+  updated_at
+)
+SELECT
+  creator_profile_id,
+  CASE
+    WHEN channel = 'email' THEN 'email'::audience_member_type
+    WHEN channel = 'phone' THEN 'sms'::audience_member_type
+    ELSE 'anonymous'
+  END,
+  COALESCE(email, phone),
+  created_at,
+  created_at,
+  1,
+  1,
+  'medium',
+  country_code,
+  email,
+  phone,
+  NULL,
+  created_at,
+  created_at
+FROM notification_subscriptions;
 
 -- Row Level Security for the new table
 ALTER TABLE audience_members ENABLE ROW LEVEL SECURITY;
