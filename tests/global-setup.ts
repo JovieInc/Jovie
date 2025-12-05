@@ -82,6 +82,12 @@ async function globalSetup() {
       process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3100',
   });
 
+  // OPTIMIZATION: Skip browser warmup for smoke tests
+  if (process.env.SMOKE_ONLY === '1') {
+    console.log('⚡ Skipping browser warmup for smoke tests');
+    return;
+  }
+
   // Start browser to warm up
   const browser = await chromium.launch();
   const page = await browser.newPage();
