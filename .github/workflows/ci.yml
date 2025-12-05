@@ -69,9 +69,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Only run for push/merge_group and PRs to production (or full-ci label)
-    # Skip for PRs to main to keep the fast lane truly fast (UI-only changes don't need DB)
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Only run for push and PRs to production (or full-ci label)
+    # Skip for merge queue and PRs to main to keep the fast lane truly fast
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -140,7 +140,8 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Drizzle check is NOT required for merge queue (main) - only run on push or PRs to production/full-ci
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -241,7 +242,8 @@ jobs:
   ci-build:
     name: Build
     needs: [ci-fast-checks]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Build is NOT required for merge queue (main) - only run on push or PRs to production/full-ci
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -295,7 +297,8 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-fast-checks]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Unit tests are NOT required for merge queue (main) - only run on push or PRs to production/full-ci
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -356,7 +359,8 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, ci-unit-tests]
-    if: ${{ github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with full-ci label
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
     env:
       # Use the Neon database URL from GitHub secrets
