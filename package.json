@@ -15,11 +15,11 @@
   "pnpm": {
     "overrides": {
       "parse5": "7.1.2",
-      "jws": "3.2.3",
-      "path-to-regexp": "8.3.0",
-      "esbuild": "0.27.1",
-      "cookie": "1.1.1",
-      "tmp": "0.2.4"
+      "jws": "4.0.1",
+      "path-to-regexp": ">=8.0.0",
+      "esbuild": ">=0.25.0",
+      "cookie": ">=1.0.0",
+      "tmp": ">=0.2.3"
     }
   },
   "scripts": {

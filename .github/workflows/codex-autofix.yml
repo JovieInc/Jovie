@@ -79,16 +79,27 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout failing ref
+      # SECURITY: First checkout trusted main branch for setup actions
+      # This prevents malicious PRs from modifying .github/actions/* to run arbitrary code
+      - name: Checkout trusted base (main) for setup actions
         if: steps.eligibility.outputs.eligible == 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.FAILED_HEAD_SHA }}
-          fetch-depth: 0
+          ref: main
+          path: trusted-setup
+          sparse-checkout: |
+            .github/actions
+          sparse-checkout-cone-mode: false
 
-      - name: Setup Node.js and pnpm
+      - name: Setup pnpm (from trusted source)
         if: steps.eligibility.outputs.eligible == 'true'
-        uses: ./.github/actions/setup-node-pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.eligibility.outputs.eligible == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
       - name: Prepare Codex prerequisites
         if: steps.eligibility.outputs.eligible == 'true'
@@ -104,9 +115,18 @@ jobs:
           mkdir -p "$HOME/.codex"
           echo "CODEX_HOME=$HOME/.codex" >> "$GITHUB_ENV"
 
-      - name: Install Codex CLI
+      - name: Install Codex CLI (global, no untrusted scripts)
         if: steps.eligibility.outputs.eligible == 'true'
-        run: pnpm add -g @openai/codex
+        run: npm install -g @openai/codex
+
+      # Now checkout the PR code in a separate workspace for Codex to analyze
+      - name: Checkout PR code for Codex analysis
+        if: steps.eligibility.outputs.eligible == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FAILED_HEAD_SHA }}
+          path: pr-workspace
+          fetch-depth: 0
 
       - name: Authenticate Codex (non-interactive)
         if: steps.eligibility.outputs.eligible == 'true'
@@ -115,8 +135,15 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: codex login --api-key "$OPENAI_API_KEY"
 
+      # Install dependencies in PR workspace using --ignore-scripts to prevent malicious postinstall
+      - name: Install PR dependencies (safe mode)
+        if: steps.eligibility.outputs.eligible == 'true'
+        working-directory: pr-workspace
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Run Codex to fix CI failure
         if: steps.eligibility.outputs.eligible == 'true'
+        working-directory: pr-workspace
         shell: bash
         run: |
           codex exec --full-auto --sandbox workspace-write "
@@ -141,6 +168,7 @@ jobs:
 
       - name: Verify typecheck, lint, and tests
         if: steps.eligibility.outputs.eligible == 'true'
+        working-directory: pr-workspace
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -153,6 +181,7 @@ jobs:
         if: success() && steps.eligibility.outputs.eligible == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
+          path: pr-workspace
           commit-message: "fix(ci): auto-fix failing CI via Codex"
           branch: codex/auto-fix-${{ github.event.workflow_run.run_id }}
           base: ${{ env.FAILED_HEAD_BRANCH }}
