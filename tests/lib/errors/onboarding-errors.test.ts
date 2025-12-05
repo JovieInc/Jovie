@@ -4,7 +4,7 @@ import {
   mapDatabaseError,
   OnboardingErrorCode,
   onboardingErrorToError,
-} from '../onboarding';
+} from '@/lib/errors/onboarding';
 
 describe('onboardingErrorToError', () => {
   it('embeds the error code in the message', () => {

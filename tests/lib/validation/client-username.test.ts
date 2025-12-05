@@ -3,7 +3,7 @@ import {
   debounce,
   generateUsernameSuggestions,
   validateUsernameFormat,
-} from '../client-username';
+} from '@/lib/validation/client-username';
 
 describe('validateUsernameFormat', () => {
   it('should return valid for proper usernames', () => {

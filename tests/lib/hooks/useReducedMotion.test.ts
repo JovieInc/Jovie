@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useReducedMotion } from '../useReducedMotion';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 describe('useReducedMotion', () => {
   // Mock matchMedia

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { StarterEmptyState } from './StarterEmptyState';
+import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 
 describe('StarterEmptyState', () => {
   it('renders title, description, and data-testid', () => {

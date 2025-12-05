@@ -1,13 +1,3 @@
-/**
- * Optimized DashboardNav Test
- *
- * Demonstrates fast testing techniques:
- * - Lazy mock loading
- * - Fast rendering utilities
- * - Minimal setup per test
- * - Focused assertions
- */
-
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/dashboard/actions';
@@ -16,7 +6,7 @@ import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
-// Lazy load mocks only when needed
+// Mock Next.js router with controllable return value
 const mockUsePathname = vi.fn(() => '/dashboard/overview');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
@@ -70,43 +60,43 @@ function renderDashboardNav(
   );
 }
 
-describe('DashboardNav (Optimized)', () => {
-  it('renders navigation items', () => {
+describe('DashboardNav', () => {
+  it('renders primary navigation items', () => {
     const { getByRole } = renderDashboardNav();
 
-    // Test essential functionality only, using role-based queries to avoid tooltip duplicates
     expect(getByRole('link', { name: 'Overview' })).toBeDefined();
     expect(getByRole('link', { name: 'Links' })).toBeDefined();
     expect(getByRole('link', { name: 'Analytics' })).toBeDefined();
-    expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
+    expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
 
-  it('applies active state correctly', () => {
+  it('renders secondary navigation items', () => {
+    const { getByRole } = renderDashboardNav();
+
+    expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
+    expect(getByRole('link', { name: 'Settings' })).toBeDefined();
+  });
+
+  it('applies active state to current page', () => {
     const { container } = renderDashboardNav();
 
-    // active link should have data-active="true"
     const activeLink = container.querySelector('[href="/dashboard/overview"]');
     expect(activeLink?.getAttribute('data-active')).toBe('true');
   });
 
   it('handles collapsed state', () => {
-    // Render inside a collapsed sidebar provider to ensure it does not throw
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
-    // Basic smoke test: overview link still renders
     const overviewLink = container.querySelector(
       '[href="/dashboard/overview"]'
     );
     expect(overviewLink).toBeDefined();
-
-    // Icons should be centered by applying collapsed width/justify classes
     expect(overviewLink?.className).toContain('justify-center');
   });
 
   it('differentiates primary and secondary nav styling', () => {
     const { container } = renderDashboardNav();
 
-    // Primary and secondary sections are wrapped with different spacing utilities
     const nav = container.querySelector('nav');
     const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
 
@@ -122,12 +112,10 @@ describe('DashboardNav (Optimized)', () => {
   });
 
   it('renders with different pathname', () => {
-    // Change mock return value for this test only
     mockUsePathname.mockReturnValueOnce('/dashboard/links');
 
     const { container } = renderDashboardNav();
 
-    // Verify links active state changes via data-active attribute
     const linksLink = container.querySelector('[href="/dashboard/links"]');
     expect(linksLink?.getAttribute('data-active')).toBe('true');
   });

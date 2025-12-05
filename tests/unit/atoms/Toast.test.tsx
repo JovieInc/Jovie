@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { Toast } from './Toast';
+import { Toast } from '@/components/atoms/Toast';
 
 describe('Toast Component', () => {
   it('renders with default props', () => {

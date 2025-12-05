@@ -14,7 +14,12 @@
   "packageManager": "pnpm@9.0.0",
   "pnpm": {
     "overrides": {
-      "parse5": "7.1.2"
+      "parse5": "7.1.2",
+      "jws": "3.2.3",
+      "path-to-regexp": "8.3.0",
+      "esbuild": "0.27.1",
+      "cookie": "1.1.1",
+      "tmp": "0.2.4"
     }
   },
   "scripts": {
@@ -126,6 +131,7 @@
     "drizzle-orm": "^0.44.5",
     "flags": "^4.0.1",
     "framer-motion": "^11.0.0",
+    "import-in-the-middle": "^2.0.0",
     "isomorphic-dompurify": "2.33.0",
     "lucide-react": "^0.555.0",
     "mdast-util-to-string": "^4.0.0",
@@ -138,6 +144,7 @@
     "recharts": "2.15.4",
     "remark": "^15.0.1",
     "remark-html": "^16.0.1",
+    "require-in-the-middle": "^8.0.1",
     "resend": "^6.5.2",
     "server-only": "^0.0.1",
     "sharp": "^0.34.5",

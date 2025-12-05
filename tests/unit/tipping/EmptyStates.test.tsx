@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { TippingEmptyState, TippingMetricsSkeleton } from './EmptyStates';
+import {
+  TippingEmptyState,
+  TippingMetricsSkeleton,
+} from '@/components/tipping/EmptyStates';
 
 // Mock next/image
 vi.mock('next/image', () => ({
