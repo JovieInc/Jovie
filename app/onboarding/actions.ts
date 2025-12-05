@@ -8,7 +8,9 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import {
   createOnboardingError,
+  mapDatabaseError,
   OnboardingErrorCode,
+  onboardingErrorToError,
 } from '@/lib/errors/onboarding';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
@@ -47,7 +49,7 @@ export async function completeOnboarding({
         OnboardingErrorCode.NOT_AUTHENTICATED,
         'User not authenticated'
       );
-      throw new Error(error.message);
+      throw onboardingErrorToError(error);
     }
 
     // Step 2: Input validation
@@ -57,15 +59,26 @@ export async function completeOnboarding({
         OnboardingErrorCode.INVALID_USERNAME,
         validation.error || 'Invalid username'
       );
-      throw new Error(error.message);
+      throw onboardingErrorToError(error);
     }
 
-    if (displayName && displayName.trim().length > 50) {
+    const trimmedDisplayName = displayName?.trim();
+
+    if (!trimmedDisplayName) {
+      throw onboardingErrorToError(
+        createOnboardingError(
+          OnboardingErrorCode.DISPLAY_NAME_REQUIRED,
+          'Display name is required'
+        )
+      );
+    }
+
+    if (trimmedDisplayName.length > 50) {
       const error = createOnboardingError(
         OnboardingErrorCode.DISPLAY_NAME_TOO_LONG,
         'Display name must be 50 characters or less'
       );
-      throw new Error(error.message);
+      throw onboardingErrorToError(error);
     }
 
     // Step 3: Rate limiting check
@@ -86,7 +99,6 @@ export async function completeOnboarding({
     // Step 4-6: Parallel operations for performance optimization
     const normalizedUsername = normalizeUsername(username);
 
-    const trimmedDisplayName = displayName?.trim() || normalizedUsername;
     const userEmail = email ?? null;
 
     const completion = await withDbSessionTx(
@@ -103,7 +115,7 @@ export async function completeOnboarding({
               OnboardingErrorCode.USERNAME_TAKEN,
               'Handle already taken'
             );
-            throw new Error(error.message);
+            throw onboardingErrorToError(error);
           }
         };
 
@@ -206,6 +218,13 @@ export async function completeOnboarding({
       '🔴 ERROR STACK:',
       error instanceof Error ? error.stack : 'No stack available'
     );
-    throw error;
+
+    // Normalize unknown errors into onboarding-shaped errors for consistent handling
+    const resolvedError =
+      error instanceof Error && /^\[([A-Z_]+)\]/.test(error.message)
+        ? error
+        : onboardingErrorToError(mapDatabaseError(error));
+
+    throw resolvedError;
   }
 }

@@ -161,8 +161,18 @@ async function fetchDashboardDataWithSession(
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
           const code = (error as { code?: string })?.code;
+          const message = (error as { message?: string })?.message ?? '';
+          const isMissingColumn =
+            message.includes('social_links.state') ||
+            (message.includes('column') && message.includes('social_links'));
           if (code && MIGRATION_ERROR_CODES.includes(code)) {
             console.warn('[Dashboard] social_links migration in progress');
+            return false;
+          }
+          if (isMissingColumn) {
+            console.warn(
+              '[Dashboard] social_links.state column missing; treating as no links'
+            );
             return false;
           }
           Sentry.captureException(error, {

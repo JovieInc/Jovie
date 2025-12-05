@@ -1,8 +1,11 @@
 import { eq } from 'drizzle-orm';
+import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 /**
  * Handle Availability Check API
@@ -126,6 +129,16 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Lightweight rate limit to reduce enumeration; uses same buckets as onboarding
+    const headersList = await headers();
+    const ip = extractClientIP(headersList);
+    // We don't have a userId here; namespace with IP only
+    await enforceOnboardingRateLimit({
+      userId: 'handle-check',
+      ip,
+      checkIP: true,
+    });
+
     const handleLower = handle.toLowerCase();
 
     // Add timeout to prevent hanging on database issues
