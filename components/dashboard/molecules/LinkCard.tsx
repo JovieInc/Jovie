@@ -309,5 +309,3 @@ export function LinkCard({
     </motion.div>
   );
 }
-
-export default LinkCard;

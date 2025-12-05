@@ -1,6 +1,6 @@
 import { SectionHeading } from '@/components/atoms/SectionHeading';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
-import { StepCard } from '@/components/atoms/StepCard';
+import { StepCard } from '@/components/molecules/StepCard';
 
 // Icons
 const LinkIcon = (

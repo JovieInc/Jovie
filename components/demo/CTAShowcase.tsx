@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import PrimaryCTA from '@/components/molecules/PrimaryCTA';
+import { PrimaryCTA } from '@/components/molecules/PrimaryCTA';
 
 export function CTAShowcase() {
   const [isLoading1, setIsLoading1] = useState(false);

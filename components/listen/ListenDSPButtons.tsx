@@ -8,7 +8,7 @@ type ListenDSPButtonsProps = {
   initialPreferredUrl?: string | null;
 };
 
-export default function ListenDSPButtons({
+export function ListenDSPButtons({
   handle,
   dsps,
   initialPreferredUrl,

@@ -402,5 +402,3 @@ export const UniversalLinkInput = forwardRef<
 );
 
 UniversalLinkInput.displayName = 'UniversalLinkInput';
-
-export default UniversalLinkInput;
