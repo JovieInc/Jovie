@@ -3,8 +3,10 @@ import { MetadataRoute } from 'next';
 import { APP_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { ensureSentry } from '@/lib/sentry/ensure';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  await ensureSentry();
   if (process.env.NEXT_PHASE === 'phase-production-build') {
     return buildStaticPagesOnly();
   }

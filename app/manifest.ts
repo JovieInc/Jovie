@@ -1,7 +1,9 @@
 import { MetadataRoute } from 'next';
 import { APP_NAME } from '@/constants/app';
+import { ensureSentry } from '@/lib/sentry/ensure';
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  await ensureSentry();
   return {
     name: `${APP_NAME} - Link in bio for music artists`,
     short_name: 'Jovie',

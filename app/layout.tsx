@@ -11,6 +11,7 @@ import './globals.css';
 import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
+import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
 // Configure Inter font
@@ -108,6 +109,7 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  await ensureSentry();
   // Check if cookie banner should be shown
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';

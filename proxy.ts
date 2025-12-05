@@ -1,5 +1,6 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
 const EU_EEA_UK = [
@@ -39,6 +40,7 @@ const US_STATES = ['CA', 'CO', 'VA', 'CT', 'UT'];
 const CA_PROVINCES = ['QC'];
 
 export default clerkMiddleware(async (auth, req) => {
+  await ensureSentry();
   try {
     // Start performance timing
     const startTime = Date.now();
