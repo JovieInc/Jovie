@@ -1,10 +1,23 @@
 name: Codex Auto-Fix on CI Failure
 
+# DISABLED: This workflow is disabled due to inherent security risks.
+# Running untrusted PR code with write permissions is flagged by CodeQL.
+# The workflow has fork protection but still executes PR code to fix CI failures.
+# Re-enable only if the security tradeoff is acceptable for your threat model.
+#
+# on:
+#   workflow_run:
+#     # Trigger after any run of the primary CI workflow completes
+#     workflows: ["CI"]
+#     types: [completed]
+
 on:
-  workflow_run:
-    # Trigger after any run of the primary CI workflow completes
-    workflows: ["CI"]
-    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to attempt auto-fix (manual trigger only)'
+        required: true
+        type: string
 
 permissions:
   contents: write
