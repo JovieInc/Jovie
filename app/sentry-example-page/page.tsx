@@ -2,7 +2,13 @@
 
 import * as Sentry from '@sentry/nextjs';
 import Head from 'next/head';
+import { notFound } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+// Guard: Only allow this page in development
+if (process.env.NODE_ENV === 'production') {
+  notFound();
+}
 
 class SentryExampleFrontendError extends Error {
   constructor(message: string | undefined) {
