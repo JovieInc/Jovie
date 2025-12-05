@@ -54,7 +54,9 @@ if (!db) {
 
     it("prevents a user from reading another user's private profile", async () => {
       const rows = await db.transaction(async (tx: any) => {
-        await tx.execute(drizzleSql`SET LOCAL app.user_id = ${userAClerkId}`);
+        await tx.execute(
+          drizzleSql.raw(`SET LOCAL app.user_id = '${userAClerkId}'`)
+        );
         return tx
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
@@ -66,7 +68,9 @@ if (!db) {
 
     it('allows the owner to read their own private profile', async () => {
       const rows = await db.transaction(async (tx: any) => {
-        await tx.execute(drizzleSql`SET LOCAL app.user_id = ${userBClerkId}`);
+        await tx.execute(
+          drizzleSql.raw(`SET LOCAL app.user_id = '${userBClerkId}'`)
+        );
         return tx
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
@@ -79,7 +83,9 @@ if (!db) {
 
     it("prevents a user from updating another user's profile", async () => {
       const updated = await db.transaction(async (tx: any) => {
-        await tx.execute(drizzleSql`SET LOCAL app.user_id = ${userAClerkId}`);
+        await tx.execute(
+          drizzleSql.raw(`SET LOCAL app.user_id = '${userAClerkId}'`)
+        );
         return tx
           .update(creatorProfiles)
           .set({ displayName: 'unauthorized-update' })
