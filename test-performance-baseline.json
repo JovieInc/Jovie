@@ -1,329 +1,737 @@
 {
-  "timestamp": "2025-09-04T00:03:54.572Z",
+  "timestamp": "2025-12-05T07:47:48.142Z",
   "metrics": {
-    "totalDuration": 0,
-    "setupTime": 0,
-    "testExecutionTime": 0,
-    "environmentTime": 0,
-    "transformTime": 0,
-    "collectTime": 0,
-    "prepareTime": 0,
+    "totalDuration": 72840,
+    "setupTime": 62120,
+    "testExecutionTime": 220190,
+    "environmentTime": 133780,
+    "transformTime": 4620,
+    "collectTime": 21770,
+    "prepareTime": 19900,
     "testResults": [
       {
-        "name": "tests/lib/anti-cloaking.test.ts",
-        "duration": 22,
-        "tests": 23,
+        "name": "tests/unit/components/atoms/Avatar/Avatar.test.tsx",
+        "duration": 1835,
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "name": "packages/ui/atoms/button.test.tsx",
+        "duration": 2011,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/cookie-banner.test.tsx",
+        "duration": 1936,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/AuthActions.test.tsx",
+        "duration": 2057,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/integration/rls-access-control.test.ts",
+        "duration": 3945,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/atoms/Toast.test.tsx",
+        "duration": 1874,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/user-button.test.tsx",
+        "duration": 2278,
+        "tests": 2,
         "status": "passed"
       },
       {
         "name": "tests/lib/database-performance.test.ts",
-        "duration": 878,
-        "tests": 15,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/deep-links.test.ts",
-        "duration": 9,
-        "tests": 25,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/rls-policies.test.ts",
-        "duration": 7,
-        "tests": 14,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/environment-validation.test.ts",
-        "duration": 146,
+        "duration": 2673,
         "tests": 15,
         "status": "passed"
       },
       {
         "name": "tests/lib/health-checks.test.ts",
-        "duration": 8,
+        "duration": 6831,
         "tests": 10,
         "status": "passed"
       },
       {
-        "name": "tests/unit/InfoBox.test.tsx",
-        "duration": 117,
-        "tests": 15,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/FeaturedCreators.test.tsx",
-        "duration": 301,
-        "tests": 11,
-        "status": "passed"
-      },
-      {
-        "name": "__tests__/components/dashboard/DashboardOverview.test.tsx",
-        "duration": 619,
-        "tests": 3,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/useFormState.test.tsx",
-        "duration": 103,
+        "name": "tests/unit/Form.test.tsx",
+        "duration": 2417,
         "tests": 12,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/DataCard.test.tsx",
-        "duration": 316,
-        "tests": 16,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/database-url-validation.test.ts",
-        "duration": 14,
-        "tests": 23,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/integrations.test.ts",
-        "duration": 8,
-        "tests": 6,
-        "status": "passed"
-      },
-      {
-        "name": "__tests__/components/dashboard/DashboardSplitView.test.tsx",
-        "duration": 267,
-        "tests": 5,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/OptimizedImage.test.tsx",
-        "duration": 351,
-        "tests": 9,
         "status": "passed"
       },
       {
         "name": "tests/unit/CTAButton.test.tsx",
-        "duration": 498,
+        "duration": 2500,
         "tests": 14,
         "status": "passed"
       },
       {
-        "name": "tests/unit/Select.test.tsx",
-        "duration": 835,
-        "tests": 16,
+        "name": "tests/unit/dashboard/DashboardNav.test.tsx",
+        "duration": 2046,
+        "tests": 6,
         "status": "passed"
       },
       {
-        "name": "tests/unit/ladygaga-seed.test.ts",
-        "duration": 64,
+        "name": "tests/unit/feedback/ErrorBanner.test.tsx",
+        "duration": 1879,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/NavLink.test.tsx",
+        "duration": 1981,
         "tests": 4,
         "status": "passed"
       },
       {
-        "name": "lib/validation/__tests__/client-username.test.ts",
-        "duration": 13,
-        "tests": 15,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/Form.test.tsx",
-        "duration": 286,
-        "tests": 12,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/ClaimHandleForm.test.tsx",
-        "duration": 1005,
+        "name": "tests/unit/PreFooterCTA.test.tsx",
+        "duration": 2014,
         "tests": 5,
         "status": "passed"
       },
       {
-        "name": "components/dashboard/molecules/LinkManager.test.tsx",
-        "duration": 198,
+        "name": "tests/unit/Header.test.tsx",
+        "duration": 1966,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/admin-creator-profiles-table.test.tsx",
+        "duration": 2446,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/dashboard/DashboardOverview.test.tsx",
+        "duration": 2030,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/SocialBar.test.tsx",
+        "duration": 2184,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/integrations.test.ts",
+        "duration": 1965,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "packages/ui/atoms/card.test.tsx",
+        "duration": 2177,
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/OptimizedImage.test.tsx",
+        "duration": 2115,
+        "tests": 9,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/SupportPage.test.tsx",
+        "duration": 2376,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/CopyToClipboardButton.test.tsx",
+        "duration": 2602,
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/DataCard.test.tsx",
+        "duration": 2401,
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/creator-profile-cap.test.tsx",
+        "duration": 2315,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/dsp.test.ts",
+        "duration": 1952,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/organisms/AvatarUpload.test.tsx",
+        "duration": 2216,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/auth/OtpSignInForm.test.tsx",
+        "duration": 2120,
+        "tests": 13,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FormField.test.tsx",
+        "duration": 1883,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/LogoLink.test.tsx",
+        "duration": 2408,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/QRCode.test.tsx",
+        "duration": 2153,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/DesktopQrOverlay.test.tsx",
+        "duration": 1932,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/InfoBox.test.tsx",
+        "duration": 1999,
+        "tests": 15,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/ProgressIndicator.test.tsx",
+        "duration": 2175,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/LoadingSpinner.test.tsx",
+        "duration": 3183,
         "tests": 4,
         "status": "passed"
       },
       {
         "name": "tests/unit/Button.test.tsx",
-        "duration": 553,
-        "tests": 14,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/dsp.test.ts",
-        "duration": 7,
-        "tests": 6,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/TipPromo.test.tsx",
-        "duration": 385,
-        "tests": 6,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/utils.test.ts",
-        "duration": 28,
-        "tests": 7,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/ProblemSolutionSection.test.tsx",
-        "duration": 1223,
-        "tests": 6,
-        "status": "passed"
-      },
-      {
-        "name": "tests/lib/drizzle-config.test.ts",
-        "duration": 186,
-        "tests": 8,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/Input.test.tsx",
-        "duration": 421,
+        "duration": 3534,
         "tests": 10,
         "status": "passed"
       },
       {
-        "name": "tests/unit/FormStatus.test.tsx",
-        "duration": 466,
-        "tests": 11,
-        "status": "passed"
-      },
-      {
-        "name": "tests/integration/handle-consistency.test.ts",
-        "duration": 5,
-        "tests": 3,
-        "status": "passed"
-      },
-      {
-        "name": "components/organisms/TipSection.test.tsx",
-        "duration": 104,
-        "tests": 3,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/FormField.test.tsx",
-        "duration": 565,
+        "name": "tests/unit/Logo.test.tsx",
+        "duration": 3056,
         "tests": 8,
         "status": "passed"
       },
       {
-        "name": "tests/unit/PreFooterCTA.test.tsx",
-        "duration": 827,
+        "name": "tests/unit/ClaimHandleForm.test.tsx",
+        "duration": 8268,
         "tests": 5,
         "status": "passed"
       },
       {
-        "name": "tests/unit/SupportPage.test.tsx",
-        "duration": 1095,
+        "name": "tests/unit/ProblemSolutionSection.test.tsx",
+        "duration": 8492,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/database.test.ts",
+        "duration": 2168,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/utils.test.ts",
+        "duration": 2236,
         "tests": 7,
         "status": "passed"
       },
       {
-        "name": "lib/hooks/__tests__/useReducedMotion.test.ts",
-        "duration": 133,
+        "name": "tests/lib/drizzle-config.test.ts",
+        "duration": 2180,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/hooks/useReducedMotion.test.ts",
+        "duration": 2045,
         "tests": 4,
         "status": "passed"
       },
       {
-        "name": "tests/unit/ProductFlyout.test.tsx",
-        "duration": 526,
+        "name": "tests/unit/organisms/TipSection.test.tsx",
+        "duration": 2130,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/TipPromo.test.tsx",
+        "duration": 2950,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FlyoutItem.test.tsx",
+        "duration": 2498,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FormStatus.test.tsx",
+        "duration": 1997,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/stripe/webhooks.test.ts",
+        "duration": 1911,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Input.test.tsx",
+        "duration": 1849,
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/errors/onboarding-errors.test.ts",
+        "duration": 1970,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/dashboard/profile.test.ts",
+        "duration": 1897,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FeaturedCreators.test.tsx",
+        "duration": 2096,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Icon.test.tsx",
+        "duration": 2064,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/tipping/EmptyStates.test.tsx",
+        "duration": 1824,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/HeaderNavFlyout.test.tsx",
+        "duration": 2414,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/onboarding-validation.test.ts",
+        "duration": 1862,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/account/email.test.ts",
+        "duration": 1958,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/BrandingBadge.test.tsx",
+        "duration": 2046,
         "tests": 5,
         "status": "passed"
       },
       {
-        "name": "components/ui/Toast.test.tsx",
-        "duration": 662,
-        "tests": 5,
+        "name": "tests/unit/atoms-barrel.test.ts",
+        "duration": 1896,
+        "tests": 1,
         "status": "passed"
       },
       {
-        "name": "__tests__/lib/platform-detection.test.ts",
-        "duration": 14,
+        "name": "tests/unit/api/images/upload.test.ts",
+        "duration": 1886,
+        "tests": 9,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/EnhancedDashboardLinks.test.tsx",
+        "duration": 2110,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/billing.test.tsx",
+        "duration": 2242,
+        "tests": 12,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/IconBadge.test.tsx",
+        "duration": 1913,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/forms.test.tsx",
+        "duration": 1980,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/profile/ArtistContactsButton.test.tsx",
+        "duration": 1917,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/dashboard/social-links.test.ts",
+        "duration": 1859,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/feedback/StarterEmptyState.test.tsx",
+        "duration": 2038,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/images/status.test.ts",
+        "duration": 1885,
         "tests": 5,
         "status": "passed"
       },
       {
         "name": "tests/lib/footer.test.ts",
-        "duration": 5,
+        "duration": 1880,
         "tests": 6,
         "status": "passed"
       },
       {
-        "name": "components/tipping/EmptyStates.test.tsx",
-        "duration": 89,
-        "tests": 6,
+        "name": "tests/unit/useFormState.test.tsx",
+        "duration": 1940,
+        "tests": 12,
         "status": "passed"
       },
       {
-        "name": "tests/unit/SocialBar.test.tsx",
-        "duration": 332,
+        "name": "tests/lib/platform-detection.test.ts",
+        "duration": 1837,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/validation/client-username.test.ts",
+        "duration": 1966,
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/TipJar.test.tsx",
+        "duration": 2056,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/ladygaga-seed.test.ts",
+        "duration": 1866,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/stripe/capture-tip.test.ts",
+        "duration": 2003,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/anti-cloaking.test.ts",
+        "duration": 2063,
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/atoms/AvatarAvatar.error-handling.test.tsx",
+        "duration": 2126,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/lib/entitlements.server.test.ts",
+        "duration": 2012,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/rls-policies.test.ts",
+        "duration": 1959,
+        "tests": 14,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/environment-validation.test.ts",
+        "duration": 2025,
+        "tests": 15,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/validation/onboarding.test.ts",
+        "duration": 1869,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/contacts/obfuscation.test.ts",
+        "duration": 1930,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/database-url-validation.test.ts",
+        "duration": 1840,
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/contacts/validation.test.ts",
+        "duration": 1821,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/ingestion/confidence.test.ts",
+        "duration": 1865,
         "tests": 3,
         "status": "passed"
       },
       {
+        "name": "tests/integration/handle-consistency.test.ts",
+        "duration": 1887,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/validation/username.test.ts",
+        "duration": 1787,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/deep-links.test.ts",
+        "duration": 1840,
+        "tests": 25,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/clerk/webhook.test.ts",
+        "duration": 1815,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "Popover > Basic Functionality > renders trigger and shows content on click",
+        "duration": 390,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Popover > Basic Functionality > closes on outside click",
+        "duration": 348,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
         "name": "Database Performance Monitoring > Query Tracking > should identify slow queries",
-        "duration": 601,
+        "duration": 603,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "DashboardOverview > renders setup tasks when incomplete",
-        "duration": 420,
+        "name": "Health Checks > Database Health Checks > should return health check structure",
+        "duration": 916,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "ProblemSolutionSection > tracks analytics when CTA button is clicked",
-        "duration": 463,
+        "name": "Health Checks > Database Health Checks > should validate database connection structure",
+        "duration": 445,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "Input > renders correctly with default props",
-        "duration": 356,
+        "name": "Health Checks > Database Health Checks > should return performance metrics structure",
+        "duration": 1034,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "FormStatus > renders loading state",
-        "duration": 354,
+        "name": "Health Checks > Health Check Performance > should complete health checks within reasonable time",
+        "duration": 438,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "FormField > renders correctly with label",
-        "duration": 342,
+        "name": "Health Checks > Health Check Performance > should handle concurrent health checks",
+        "duration": 1053,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "CTASection > renders the CTA button with correct text",
-        "duration": 479,
+        "name": "Health Checks > Error Handling > should handle database errors without crashing",
+        "duration": 669,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Error Handling > should provide useful error messages",
+        "duration": 404,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CreatorProfilesTable > renders rows and pagination summary",
+        "duration": 344,
         "tests": 1,
         "status": "passed"
       },
       {
         "name": "SupportPage > renders the support page correctly",
+        "duration": 362,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CopyToClipboardButton > renders with default labels",
+        "duration": 309,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CreatorProfile social links cap and visibility > renders at most MAX_SOCIAL_LINKS and filters inactive",
+        "duration": 368,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "LogoLink > renders with default props",
+        "duration": 418,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "LoadingSpinner > renders with default props and has proper accessibility",
+        "duration": 866,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders correctly with default props",
+        "duration": 439,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders with different variants",
+        "duration": 330,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders as link and span via asChild",
         "duration": 314,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "SupportPage > renders the contact support button as a link",
-        "duration": 465,
+        "name": "Logo > contains the Jovie logo path data",
+        "duration": 319,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "ProductFlyout > renders feature items",
-        "duration": 327,
+        "name": "ClaimHandleForm > prevents layout jumps with consistent spacing",
+        "duration": 519,
         "tests": 1,
         "status": "passed"
       },
       {
-        "name": "Toast Component > renders with different types",
-        "duration": 504,
+        "name": "ClaimHandleForm > has proper accessibility attributes",
+        "duration": 1646,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > has clipboard functionality",
+        "duration": 2105,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > has validation functionality",
+        "duration": 681,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > shake animation triggers on invalid submission",
+        "duration": 1298,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > renders unified section with problem and solution content",
+        "duration": 1631,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > renders Linear-inspired CTA button with proper styling",
+        "duration": 1313,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > tracks analytics when CTA button is clicked",
+        "duration": 335,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > includes arrow icon in CTA button with hover animation",
+        "duration": 331,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "TipPromo > renders the component when NEXT_PUBLIC_FEATURE_TIPS is \"true\"",
+        "duration": 490,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "HeaderNav flyout interactions > opens product menu when triggered",
+        "duration": 487,
         "tests": 1,
         "status": "passed"
       }
@@ -331,203 +739,737 @@
     "slowTests": [
       {
         "name": "tests/unit/ProblemSolutionSection.test.tsx",
-        "duration": 1223,
+        "duration": 8492,
         "tests": 6,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/SupportPage.test.tsx",
-        "duration": 1095,
-        "tests": 7,
         "status": "passed"
       },
       {
         "name": "tests/unit/ClaimHandleForm.test.tsx",
-        "duration": 1005,
+        "duration": 8268,
         "tests": 5,
         "status": "passed"
       },
       {
-        "name": "tests/lib/database-performance.test.ts",
-        "duration": 878,
-        "tests": 15,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/Select.test.tsx",
-        "duration": 835,
-        "tests": 16,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/PreFooterCTA.test.tsx",
-        "duration": 827,
-        "tests": 5,
-        "status": "passed"
-      },
-      {
-        "name": "components/ui/Toast.test.tsx",
-        "duration": 662,
-        "tests": 5,
-        "status": "passed"
-      },
-      {
-        "name": "__tests__/components/dashboard/DashboardOverview.test.tsx",
-        "duration": 619,
-        "tests": 3,
-        "status": "passed"
-      },
-      {
-        "name": "Database Performance Monitoring > Query Tracking > should identify slow queries",
-        "duration": 601,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/FormField.test.tsx",
-        "duration": 565,
-        "tests": 8,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/Button.test.tsx",
-        "duration": 553,
-        "tests": 14,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/ProductFlyout.test.tsx",
-        "duration": 526,
-        "tests": 5,
-        "status": "passed"
-      },
-      {
-        "name": "Toast Component > renders with different types",
-        "duration": 504,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/CTAButton.test.tsx",
-        "duration": 498,
-        "tests": 14,
-        "status": "passed"
-      },
-      {
-        "name": "CTASection > renders the CTA button with correct text",
-        "duration": 479,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/FormStatus.test.tsx",
-        "duration": 466,
-        "tests": 11,
-        "status": "passed"
-      },
-      {
-        "name": "SupportPage > renders the contact support button as a link",
-        "duration": 465,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "ProblemSolutionSection > tracks analytics when CTA button is clicked",
-        "duration": 463,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/Input.test.tsx",
-        "duration": 421,
+        "name": "tests/lib/health-checks.test.ts",
+        "duration": 6831,
         "tests": 10,
         "status": "passed"
       },
       {
-        "name": "DashboardOverview > renders setup tasks when incomplete",
-        "duration": 420,
-        "tests": 1,
+        "name": "tests/integration/rls-access-control.test.ts",
+        "duration": 3945,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Button.test.tsx",
+        "duration": 3534,
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/LoadingSpinner.test.tsx",
+        "duration": 3183,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Logo.test.tsx",
+        "duration": 3056,
+        "tests": 8,
         "status": "passed"
       },
       {
         "name": "tests/unit/TipPromo.test.tsx",
-        "duration": 385,
+        "duration": 2950,
         "tests": 6,
         "status": "passed"
       },
       {
-        "name": "Input > renders correctly with default props",
-        "duration": 356,
-        "tests": 1,
+        "name": "tests/lib/database-performance.test.ts",
+        "duration": 2673,
+        "tests": 15,
         "status": "passed"
       },
       {
-        "name": "FormStatus > renders loading state",
-        "duration": 354,
-        "tests": 1,
+        "name": "tests/unit/CopyToClipboardButton.test.tsx",
+        "duration": 2602,
+        "tests": 10,
         "status": "passed"
       },
       {
-        "name": "tests/unit/OptimizedImage.test.tsx",
-        "duration": 351,
-        "tests": 9,
+        "name": "tests/unit/CTAButton.test.tsx",
+        "duration": 2500,
+        "tests": 14,
         "status": "passed"
       },
       {
-        "name": "FormField > renders correctly with label",
-        "duration": 342,
-        "tests": 1,
-        "status": "passed"
-      },
-      {
-        "name": "tests/unit/SocialBar.test.tsx",
-        "duration": 332,
+        "name": "tests/unit/FlyoutItem.test.tsx",
+        "duration": 2498,
         "tests": 3,
         "status": "passed"
       },
       {
-        "name": "ProductFlyout > renders feature items",
-        "duration": 327,
+        "name": "tests/components/admin-creator-profiles-table.test.tsx",
+        "duration": 2446,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Form.test.tsx",
+        "duration": 2417,
+        "tests": 12,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/HeaderNavFlyout.test.tsx",
+        "duration": 2414,
         "tests": 1,
         "status": "passed"
       },
       {
+        "name": "tests/unit/LogoLink.test.tsx",
+        "duration": 2408,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
         "name": "tests/unit/DataCard.test.tsx",
-        "duration": 316,
+        "duration": 2401,
         "tests": 16,
         "status": "passed"
       },
       {
-        "name": "SupportPage > renders the support page correctly",
-        "duration": 314,
+        "name": "tests/unit/SupportPage.test.tsx",
+        "duration": 2376,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/creator-profile-cap.test.tsx",
+        "duration": 2315,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/user-button.test.tsx",
+        "duration": 2278,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/billing.test.tsx",
+        "duration": 2242,
+        "tests": 12,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/utils.test.ts",
+        "duration": 2236,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/organisms/AvatarUpload.test.tsx",
+        "duration": 2216,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/SocialBar.test.tsx",
+        "duration": 2184,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/drizzle-config.test.ts",
+        "duration": 2180,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "packages/ui/atoms/card.test.tsx",
+        "duration": 2177,
+        "tests": 31,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/ProgressIndicator.test.tsx",
+        "duration": 2175,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/database.test.ts",
+        "duration": 2168,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/QRCode.test.tsx",
+        "duration": 2153,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/organisms/TipSection.test.tsx",
+        "duration": 2130,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/atoms/AvatarAvatar.error-handling.test.tsx",
+        "duration": 2126,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/auth/OtpSignInForm.test.tsx",
+        "duration": 2120,
+        "tests": 13,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/OptimizedImage.test.tsx",
+        "duration": 2115,
+        "tests": 9,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/EnhancedDashboardLinks.test.tsx",
+        "duration": 2110,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > has clipboard functionality",
+        "duration": 2105,
         "tests": 1,
         "status": "passed"
       },
       {
         "name": "tests/unit/FeaturedCreators.test.tsx",
-        "duration": 301,
+        "duration": 2096,
         "tests": 11,
         "status": "passed"
       },
       {
-        "name": "tests/unit/Form.test.tsx",
-        "duration": 286,
+        "name": "tests/unit/Icon.test.tsx",
+        "duration": 2064,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/anti-cloaking.test.ts",
+        "duration": 2063,
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/AuthActions.test.tsx",
+        "duration": 2057,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/TipJar.test.tsx",
+        "duration": 2056,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/dashboard/DashboardNav.test.tsx",
+        "duration": 2046,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/BrandingBadge.test.tsx",
+        "duration": 2046,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/hooks/useReducedMotion.test.ts",
+        "duration": 2045,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/feedback/StarterEmptyState.test.tsx",
+        "duration": 2038,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/dashboard/DashboardOverview.test.tsx",
+        "duration": 2030,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/environment-validation.test.ts",
+        "duration": 2025,
+        "tests": 15,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/PreFooterCTA.test.tsx",
+        "duration": 2014,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/lib/entitlements.server.test.ts",
+        "duration": 2012,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "packages/ui/atoms/button.test.tsx",
+        "duration": 2011,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/stripe/capture-tip.test.ts",
+        "duration": 2003,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/InfoBox.test.tsx",
+        "duration": 1999,
+        "tests": 15,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FormStatus.test.tsx",
+        "duration": 1997,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/NavLink.test.tsx",
+        "duration": 1981,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/components/forms.test.tsx",
+        "duration": 1980,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/errors/onboarding-errors.test.ts",
+        "duration": 1970,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Header.test.tsx",
+        "duration": 1966,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/validation/client-username.test.ts",
+        "duration": 1966,
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/integrations.test.ts",
+        "duration": 1965,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/rls-policies.test.ts",
+        "duration": 1959,
+        "tests": 14,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/account/email.test.ts",
+        "duration": 1958,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/dsp.test.ts",
+        "duration": 1952,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/useFormState.test.tsx",
+        "duration": 1940,
         "tests": 12,
         "status": "passed"
       },
       {
-        "name": "__tests__/components/dashboard/DashboardSplitView.test.tsx",
-        "duration": 267,
+        "name": "tests/unit/cookie-banner.test.tsx",
+        "duration": 1936,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/DesktopQrOverlay.test.tsx",
+        "duration": 1932,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/contacts/obfuscation.test.ts",
+        "duration": 1930,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/profile/ArtistContactsButton.test.tsx",
+        "duration": 1917,
+        "tests": 2,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/IconBadge.test.tsx",
+        "duration": 1913,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/stripe/webhooks.test.ts",
+        "duration": 1911,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/dashboard/profile.test.ts",
+        "duration": 1897,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/atoms-barrel.test.ts",
+        "duration": 1896,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "tests/integration/handle-consistency.test.ts",
+        "duration": 1887,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/images/upload.test.ts",
+        "duration": 1886,
+        "tests": 9,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/images/status.test.ts",
+        "duration": 1885,
         "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/FormField.test.tsx",
+        "duration": 1883,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/footer.test.ts",
+        "duration": 1880,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/feedback/ErrorBanner.test.tsx",
+        "duration": 1879,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/atoms/Toast.test.tsx",
+        "duration": 1874,
+        "tests": 5,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/validation/onboarding.test.ts",
+        "duration": 1869,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/ladygaga-seed.test.ts",
+        "duration": 1866,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/ingestion/confidence.test.ts",
+        "duration": 1865,
+        "tests": 3,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/onboarding-validation.test.ts",
+        "duration": 1862,
+        "tests": 8,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/dashboard/social-links.test.ts",
+        "duration": 1859,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/Input.test.tsx",
+        "duration": 1849,
+        "tests": 10,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/database-url-validation.test.ts",
+        "duration": 1840,
+        "tests": 23,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/deep-links.test.ts",
+        "duration": 1840,
+        "tests": 25,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/platform-detection.test.ts",
+        "duration": 1837,
+        "tests": 7,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/components/atoms/Avatar/Avatar.test.tsx",
+        "duration": 1835,
+        "tests": 16,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/tipping/EmptyStates.test.tsx",
+        "duration": 1824,
+        "tests": 6,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/contacts/validation.test.ts",
+        "duration": 1821,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "tests/unit/api/clerk/webhook.test.ts",
+        "duration": 1815,
+        "tests": 11,
+        "status": "passed"
+      },
+      {
+        "name": "tests/lib/validation/username.test.ts",
+        "duration": 1787,
+        "tests": 4,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > has proper accessibility attributes",
+        "duration": 1646,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > renders unified section with problem and solution content",
+        "duration": 1631,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > renders Linear-inspired CTA button with proper styling",
+        "duration": 1313,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > shake animation triggers on invalid submission",
+        "duration": 1298,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Health Check Performance > should handle concurrent health checks",
+        "duration": 1053,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Database Health Checks > should return performance metrics structure",
+        "duration": 1034,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Database Health Checks > should return health check structure",
+        "duration": 916,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "LoadingSpinner > renders with default props and has proper accessibility",
+        "duration": 866,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > has validation functionality",
+        "duration": 681,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Error Handling > should handle database errors without crashing",
+        "duration": 669,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Database Performance Monitoring > Query Tracking > should identify slow queries",
+        "duration": 603,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ClaimHandleForm > prevents layout jumps with consistent spacing",
+        "duration": 519,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "TipPromo > renders the component when NEXT_PUBLIC_FEATURE_TIPS is \"true\"",
+        "duration": 490,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "HeaderNav flyout interactions > opens product menu when triggered",
+        "duration": 487,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Database Health Checks > should validate database connection structure",
+        "duration": 445,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders correctly with default props",
+        "duration": 439,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Health Check Performance > should complete health checks within reasonable time",
+        "duration": 438,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "LogoLink > renders with default props",
+        "duration": 418,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Health Checks > Error Handling > should provide useful error messages",
+        "duration": 404,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Popover > Basic Functionality > renders trigger and shows content on click",
+        "duration": 390,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CreatorProfile social links cap and visibility > renders at most MAX_SOCIAL_LINKS and filters inactive",
+        "duration": 368,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "SupportPage > renders the support page correctly",
+        "duration": 362,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Popover > Basic Functionality > closes on outside click",
+        "duration": 348,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CreatorProfilesTable > renders rows and pagination summary",
+        "duration": 344,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > tracks analytics when CTA button is clicked",
+        "duration": 335,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "ProblemSolutionSection > includes arrow icon in CTA button with hover animation",
+        "duration": 331,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders with different variants",
+        "duration": 330,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Logo > contains the Jovie logo path data",
+        "duration": 319,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "Button > renders as link and span via asChild",
+        "duration": 314,
+        "tests": 1,
+        "status": "passed"
+      },
+      {
+        "name": "CopyToClipboardButton > renders with default labels",
+        "duration": 309,
+        "tests": 1,
         "status": "passed"
       }
     ],
     "performanceStats": {
-      "p50": 327,
-      "p95": 1005,
-      "p99": 1223,
-      "average": 345.58490566037733,
-      "median": 327
+      "p50": 1952,
+      "p95": 3056,
+      "p99": 8268,
+      "average": 1897.8347107438017,
+      "median": 1952
     }
   },
   "targets": {
