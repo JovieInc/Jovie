@@ -5,6 +5,8 @@ on:
     branches: [main, production]
   pull_request:
     branches: [main, production]
+  merge_group:
+    branches: [main, production]
 
 jobs:
   performance-guard:
