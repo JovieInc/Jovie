@@ -116,12 +116,11 @@ export default async function RootLayout({
   const shouldInjectToolbar = process.env.NODE_ENV === 'development';
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  const content = (
-    <html lang='en' suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+  const headContent = (
+    <head>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
 (function() {
   try {
     var ls = localStorage.getItem('jovie-theme');
@@ -132,57 +131,74 @@ export default async function RootLayout({
   } catch (e) {}
 })();
 `,
-          }}
-        />
-        {/* Favicon and Icons */}
-        <link rel='icon' href='/favicon.ico' type='image/x-icon' />
-        <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
-        <link rel='manifest' href='/site.webmanifest' />
+        }}
+      />
+      {/* Favicon and Icons */}
+      <link rel='icon' href='/favicon.ico' type='image/x-icon' />
+      <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
+      <link rel='manifest' href='/site.webmanifest' />
 
-        {/* DNS Prefetch for critical external resources */}
-        <link rel='dns-prefetch' href='https://i.scdn.co' />
-        <link rel='dns-prefetch' href='https://api.spotify.com' />
-        <link rel='dns-prefetch' href='https://images.unsplash.com' />
-        <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
-        <link
-          rel='preconnect'
-          href='https://images.unsplash.com'
-          crossOrigin=''
-        />
+      {/* DNS Prefetch for critical external resources */}
+      <link rel='dns-prefetch' href='https://i.scdn.co' />
+      <link rel='dns-prefetch' href='https://api.spotify.com' />
+      <link rel='dns-prefetch' href='https://images.unsplash.com' />
+      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='' />
+      <link
+        rel='preconnect'
+        href='https://images.unsplash.com'
+        crossOrigin=''
+      />
 
-        {/* Structured Data for Organization */}
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: APP_NAME,
-              url: APP_URL,
-              logo: `${APP_URL}/brand/jovie-logo.svg`,
-              description:
-                'Link in bio for music artists. Connect your music, social media, and merch in one link.',
-              sameAs: [
-                'https://twitter.com/jovie',
-                'https://instagram.com/jovie',
-              ],
-            }),
-          }}
-        />
-      </head>
-      <body
-        className={`${inter.variable} font-sans bg-base text-primary-token`}
+      {/* Structured Data for Organization */}
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: APP_NAME,
+            url: APP_URL,
+            logo: `${APP_URL}/brand/jovie-logo.svg`,
+            description:
+              'Link in bio for music artists. Connect your music, social media, and merch in one link.',
+            sameAs: [
+              'https://twitter.com/jovie',
+              'https://instagram.com/jovie',
+            ],
+          }),
+        }}
+      />
+    </head>
+  );
+
+  const bodyClassName = `${inter.variable} font-sans bg-base text-primary-token`;
+
+  const authenticatedBody = (
+    <>
+      <ClerkProvider
+        publishableKey={publishableKey}
+        appearance={{
+          elements: {
+            rootBox: 'bg-base text-primary',
+            card: 'bg-surface-1 border border-subtle dark:border-default',
+            headerTitle: 'text-primary',
+            headerSubtitle: 'text-secondary',
+            formFieldInput:
+              'bg-surface-0 border border-default focus-ring-themed',
+            formButtonPrimary: 'btn btn-primary btn-md',
+            socialButtonsBlockButton: 'btn btn-secondary btn-md',
+            footerActionText: 'text-secondary',
+            footerActionLink: 'text-accent-token',
+          },
+        }}
       >
         <ClientProviders>{children}</ClientProviders>
-        {showCookieBanner && <CookieBannerSection />}
-        {/* <SpeedInsights /> */}
-        {shouldInjectToolbar && (
-          <>
-            <VercelToolbar />
-          </>
-        )}
-      </body>
-    </html>
+      </ClerkProvider>
+
+      {showCookieBanner && <CookieBannerSection />}
+      {/* <SpeedInsights /> */}
+      {shouldInjectToolbar && <VercelToolbar />}
+    </>
   );
 
   if (!publishableKey) {
@@ -191,14 +207,12 @@ export default async function RootLayout({
       process.env.NODE_ENV === 'development'
     ) {
       logger.debug('Bypassing Clerk authentication (no keys provided)');
-      return content;
     }
 
     return (
       <html lang='en' suppressHydrationWarning>
-        <body
-          className={`${inter.variable} font-sans bg-base text-primary-token`}
-        >
+        {headContent}
+        <body className={bodyClassName}>
           <div className='flex items-center justify-center min-h-screen'>
             <div className='text-center'>
               <h1 className='text-2xl font-bold text-red-600 mb-4'>
@@ -215,24 +229,9 @@ export default async function RootLayout({
   }
 
   return (
-    <ClerkProvider
-      publishableKey={publishableKey}
-      appearance={{
-        elements: {
-          rootBox: 'bg-base text-primary',
-          card: 'bg-surface-1 border border-subtle dark:border-default',
-          headerTitle: 'text-primary',
-          headerSubtitle: 'text-secondary',
-          formFieldInput:
-            'bg-surface-0 border border-default focus-ring-themed',
-          formButtonPrimary: 'btn btn-primary btn-md',
-          socialButtonsBlockButton: 'btn btn-secondary btn-md',
-          footerActionText: 'text-secondary',
-          footerActionLink: 'text-accent-token',
-        },
-      }}
-    >
-      {content}
-    </ClerkProvider>
+    <html lang='en' suppressHydrationWarning>
+      {headContent}
+      <body className={bodyClassName}>{authenticatedBody}</body>
+    </html>
   );
 }
