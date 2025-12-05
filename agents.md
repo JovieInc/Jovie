@@ -150,6 +150,49 @@ Configuration location: `.claude.json` (project-specific)
   - Avoid destructive changes without a clear data-migration plan.
   - **Linear append-only migrations** - never edit or squash existing migrations.
 
+### 5.1 Migration Creation Workflow (CRITICAL)
+
+When creating new database migrations, you **MUST** follow this exact process:
+
+1. **Generate migration using Drizzle:**
+   ```bash
+   pnpm run drizzle:generate
+   ```
+   This command:
+   - Creates a new `.sql` file in `drizzle/migrations/`
+   - **Automatically updates `drizzle/migrations/meta/_journal.json`**
+   - Generates a snapshot file in `drizzle/migrations/meta/`
+
+2. **NEVER manually create migration files** without updating the journal:
+   - ❌ **WRONG**: Create `0011_my_migration.sql` directly
+   - ✅ **RIGHT**: Use `pnpm run drizzle:generate` which updates both `.sql` and `_journal.json`
+
+3. **Verify journal is updated:**
+   - Check that `drizzle/migrations/meta/_journal.json` includes your new migration
+   - Journal entry must have: `idx`, `version`, `when`, `tag`, `breakpoints`
+   - Migration will be **silently skipped** if not in journal
+
+4. **Why this matters:**
+   - Drizzle's migration runner (`pnpm run drizzle:migrate`) only applies migrations listed in `_journal.json`
+   - If you create a `.sql` file but forget to update `_journal.json`, the migration will **never run** in CI or production
+   - This causes "column does not exist" errors and schema drift between environments
+
+**Example of a properly registered migration:**
+```json
+{
+  "idx": 13,
+  "version": "7",
+  "when": 1733400200000,
+  "tag": "0013_social_link_state",
+  "breakpoints": false
+}
+```
+
+**If you discover an unregistered migration:**
+1. DO NOT manually add it to `_journal.json` - this can cause migration order issues
+2. Instead, regenerate the migration using `pnpm run drizzle:generate`
+3. Or consult with team lead before manually editing the journal
+
 ## 5.5 CI/CD Workflow Details (YC-Aligned Rapid Deployment)
 
 ### Fast Path (Feature PRs → main)

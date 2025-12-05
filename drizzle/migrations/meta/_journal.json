@@ -78,6 +78,27 @@
       "when": 1764712535311,
       "tag": "0010_notification_subscriptions",
       "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1733400000000,
+      "tag": "0011_audience_members",
+      "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1733400100000,
+      "tag": "0012_audience_members_unique_fingerprint",
+      "breakpoints": false
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1733400200000,
+      "tag": "0013_social_link_state",
+      "breakpoints": false
     }
   ]
 }
