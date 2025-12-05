@@ -415,6 +415,12 @@ jobs:
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: npx playwright install chromium firefox --with-deps
 
+      - name: Run Database Migrations
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm run drizzle:migrate
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
+
       - name: E2E Smoke (PR to Preview)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: pnpm run e2e:smoke --trace=retain-on-failure
