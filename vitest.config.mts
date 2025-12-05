@@ -14,6 +14,8 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'tests/performance/**', 'node_modules/**'],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
+    // Isolate tests to prevent cross-contamination but allow within-file parallelism
+    isolate: true,
     // Coverage optimization
     coverage: {
       provider: 'v8',
@@ -28,10 +30,12 @@ export default defineConfig({
         'dist/**',
       ],
     },
-    // Test timeout - increased for database operations
-    testTimeout: 30000,
-    hookTimeout: 30000,
+    // Test timeout - reduced from 30s to 10s (most tests should be <200ms)
+    testTimeout: 10000,
+    hookTimeout: 10000,
     globals: true,
+    // Reduce overhead by limiting concurrent tests per worker
+    maxConcurrency: 5,
   },
   resolve: {
     alias: {

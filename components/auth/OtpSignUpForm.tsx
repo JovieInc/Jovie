@@ -6,6 +6,8 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 
 export function OtpSignUpForm() {
+  const signInUrl = '/signin';
+
   return (
     <SignUp.Root routing='path' path='/signup'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
@@ -35,7 +37,7 @@ export function OtpSignUpForm() {
               <div className='text-center text-sm text-secondary-token'>
                 Already have an account?{' '}
                 <Link
-                  href='/signin'
+                  href={signInUrl}
                   className='text-accent hover:underline font-medium'
                 >
                   Sign in
@@ -73,7 +75,7 @@ export function OtpSignUpForm() {
               <div className='text-center text-sm text-secondary-token'>
                 Already have an account?{' '}
                 <Link
-                  href='/signin'
+                  href={signInUrl}
                   className='text-accent hover:underline font-medium'
                 >
                   Sign in

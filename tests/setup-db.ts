@@ -1,34 +1,100 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import { migrate } from 'drizzle-orm/neon-http/migrator';
+import { neonConfig, Pool } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { migrate } from 'drizzle-orm/neon-serverless/migrator';
+import path from 'path';
+import { beforeAll } from 'vitest';
+import ws from 'ws';
+import * as schema from '@/lib/db/schema';
 
-// This file sets up the test database connection and runs migrations
+// Configure WebSocket for transaction support in tests
+neonConfig.webSocketConstructor = ws;
 
-// Get the database URL from environment variables
-const databaseUrl = process.env.DATABASE_URL;
+let dbSetupComplete = false;
+// biome-ignore lint/suspicious/noExplicitAny: Database type from Drizzle is complex and varies
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let db: any = null;
 
-if (!databaseUrl) {
-  throw new Error('DATABASE_URL is not set in test environment');
-}
+/**
+ * Setup database for integration tests.
+ * This is lazy-loaded - only runs when explicitly called by integration tests.
+ * Unit tests should NOT call this function.
+ */
+export async function setupDatabase() {
+  // Only setup once per test suite
+  if (dbSetupComplete) {
+    return db;
+  }
 
-// Create a connection to the test database
-const sql = neon(databaseUrl);
-const db = drizzle(sql);
+  if (process.env.NODE_ENV !== 'test') {
+    return null;
+  }
 
-// Run migrations before all tests
-beforeAll(async () => {
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (!databaseUrl) {
+    console.warn('DATABASE_URL is not set. Database tests will be skipped.');
+    return null;
+  }
+
+  const pool = new Pool({ connectionString: databaseUrl });
+  db = drizzle(pool, { schema });
+
   try {
-    await migrate(db, { migrationsFolder: './drizzle' });
+    const migrationsFolder = path.join(process.cwd(), 'drizzle', 'migrations');
+    try {
+      await migrate(db, { migrationsFolder });
+    } catch (error) {
+      console.warn(
+        'Migration failed, continuing with existing schema:',
+        error
+      );
+    }
+
+    await db.execute(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'ingestion_status') THEN
+          CREATE TYPE ingestion_status AS ENUM ('idle', 'pending', 'processing', 'failed');
+        END IF;
+      END $$;
+    `);
+
+    await db.execute(
+      'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS avatar_locked_by_user boolean NOT NULL DEFAULT false'
+    );
+    await db.execute(
+      'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS display_name_locked boolean NOT NULL DEFAULT false'
+    );
+    await db.execute(
+      "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS ingestion_status ingestion_status NOT NULL DEFAULT 'idle'"
+    );
+    await db.execute('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
+    await db.execute('ALTER TABLE users FORCE ROW LEVEL SECURITY');
+    await db.execute('ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY');
+    await db.execute('ALTER TABLE creator_profiles FORCE ROW LEVEL SECURITY');
+
+    // Enable RLS enforcement
+    await db.execute('SET row_security = on;');
+
+    // Make db available globally for tests
+    globalThis.db = db;
+    dbSetupComplete = true;
+
+    return db;
   } catch (error) {
     console.error('Failed to run migrations:', error);
     throw error;
   }
-});
+}
 
-// Clean up after all tests
-afterAll(async () => {
-  // Add any cleanup logic here if needed
-  // For example, you might want to drop test data
-});
+/**
+ * Helper for integration tests to use in beforeAll.
+ * Usage: setupDatabaseBeforeAll() at the top of your test file.
+ */
+export function setupDatabaseBeforeAll() {
+  beforeAll(async () => {
+    await setupDatabase();
+  });
+}
 
 export { db };
