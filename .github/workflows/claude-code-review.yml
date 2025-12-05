@@ -1,14 +1,9 @@
 name: Claude Code Review
 
+# Only run in merge queue - saves API costs and reduces noise on every commit
 on:
-  pull_request:
-    types: [opened, synchronize]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+  merge_group:
+    branches: [main, production]
 
 jobs:
   claude-review:

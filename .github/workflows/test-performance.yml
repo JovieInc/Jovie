@@ -54,34 +54,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Run Fast Test Suite
-        run: |
-          echo "Running optimized test suite..."
-          pnpm test:fast
-
-      - name: Test Results Summary
-        run: |
-          echo "🎯 Fast test suite completed successfully!"
-          echo "Target: All tests <200ms p95"
+        run: pnpm test:fast
 
   flaky-test-detection:
     name: Flaky Test Detection
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only run on main branch to avoid excessive CI time
-    if: github.ref == 'refs/heads/main'
+    # Only run on push to main (not PRs or merge queue)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
 
@@ -89,22 +73,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Detect Flaky Tests
-        run: |
-          echo "Running flaky test detection (5 runs)..."
-          pnpm test:flaky "" 5
+        run: pnpm test:flaky "" 5
         continue-on-error: true
 
       - name: Upload Quarantine Results
@@ -119,8 +92,8 @@ jobs:
     name: Performance Report
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    # Only run on main branch for performance tracking
-    if: github.ref == 'refs/heads/main'
+    # Only run on push to main (not PRs or merge queue)
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
       issues: write
@@ -130,22 +103,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Generate Performance Report
-        run: |
-          echo "Generating detailed performance report..."
-          pnpm test:profile
+        run: pnpm test:profile
 
       - name: Upload Performance Baseline
         uses: actions/upload-artifact@v4
