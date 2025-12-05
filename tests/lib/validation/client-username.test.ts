@@ -34,7 +34,7 @@ describe('validateUsernameFormat', () => {
     const longUsername = 'a'.repeat(31);
     expect(validateUsernameFormat(longUsername)).toEqual({
       valid: false,
-      error: 'Handle must be less than 30 characters',
+      error: 'Handle must be no more than 30 characters',
     });
   });
 
@@ -55,15 +55,17 @@ describe('validateUsernameFormat', () => {
     });
   });
 
-  it('should reject usernames starting or ending with hyphens', () => {
+  it('should reject usernames starting with hyphens', () => {
     expect(validateUsernameFormat('-username')).toEqual({
       valid: false,
-      error: 'Handle cannot start or end with a hyphen',
+      error: 'Handle must start with a letter',
     });
+  });
 
+  it('should reject usernames ending with hyphens', () => {
     expect(validateUsernameFormat('username-')).toEqual({
       valid: false,
-      error: 'Handle cannot start or end with a hyphen',
+      error: 'Handle cannot end with a hyphen',
     });
   });
 

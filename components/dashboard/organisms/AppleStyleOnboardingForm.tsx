@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { identify, track } from '@/lib/analytics';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { validateUsernameFormat } from '@/lib/validation/client-username';
 
 interface AppleStyleOnboardingFormProps {
   initialDisplayName?: string;
@@ -142,36 +143,15 @@ export function AppleStyleOnboardingForm({
         return;
       }
 
-      // Basic client validation
-      if (!normalizedInput || normalizedInput.length < 3) {
+      // Basic client validation aligned with server rules
+      const clientResult = validateUsernameFormat(normalizedInput);
+      if (!clientResult.valid) {
         setHandleValidation({
           available: false,
           checking: false,
-          error: 'Handle must be at least 3 characters.',
+          error: clientResult.error,
           clientValid: false,
-          suggestions: [],
-        });
-        return;
-      }
-
-      if (normalizedInput.length > 30) {
-        setHandleValidation({
-          available: false,
-          checking: false,
-          error: 'Keep it under 30 characters.',
-          clientValid: false,
-          suggestions: [],
-        });
-        return;
-      }
-
-      if (!/^[a-zA-Z0-9-]+$/.test(normalizedInput)) {
-        setHandleValidation({
-          available: false,
-          checking: false,
-          error: 'Letters, numbers, and hyphens only.',
-          clientValid: false,
-          suggestions: [],
+          suggestions: clientResult.suggestion ? [clientResult.suggestion] : [],
         });
         return;
       }
@@ -272,7 +252,6 @@ export function AppleStyleOnboardingForm({
       if (e) e.preventDefault();
 
       const resolvedHandle = (handle || handleInput).trim().toLowerCase();
-      const resolvedName = fullName.trim() || resolvedHandle;
 
       if (
         state.isSubmitting ||
@@ -303,9 +282,13 @@ export function AppleStyleOnboardingForm({
       }));
 
       try {
+        const trimmedName = fullName.trim();
+        if (!trimmedName) {
+          throw new Error('[DISPLAY_NAME_REQUIRED] Display name is required');
+        }
         await completeOnboarding({
           username: resolvedHandle,
-          displayName: resolvedName,
+          displayName: trimmedName,
           email: userEmail,
           redirectToDashboard: false,
         });
@@ -326,27 +309,37 @@ export function AppleStyleOnboardingForm({
           return;
         }
 
+        const errorMessage =
+          error instanceof Error ? error.message : 'Unknown error';
+        const errorCodeMatch =
+          error instanceof Error ? error.message.match(/^\[([A-Z_]+)\]/) : null;
+        const errorCode = errorCodeMatch?.[1];
+
         track('onboarding_error', {
           user_id: userId,
           handle: resolvedHandle,
-          error_message:
-            error instanceof Error ? error.message : 'Unknown error',
+          error_message: errorMessage,
+          error_code: errorCode,
           error_step: 'submission',
           timestamp: new Date().toISOString(),
         });
 
         let userMessage =
           'Something went wrong saving your handle. Please try again.';
-        if (error instanceof Error) {
-          if (error.message.includes('INVALID_SESSION')) {
-            userMessage = 'Your session expired. Please refresh and try again.';
-          } else if (error.message.includes('USERNAME_TAKEN')) {
-            userMessage =
-              'This handle is already taken. Please choose another one.';
-          } else if (error.message.includes('RATE_LIMITED')) {
-            userMessage =
-              'Too many attempts. Please try again in a few moments.';
-          }
+        const message = errorMessage.toUpperCase();
+        if (message.includes('INVALID_SESSION')) {
+          userMessage = 'Your session expired. Please refresh and try again.';
+        } else if (message.includes('USERNAME_TAKEN')) {
+          userMessage =
+            'This handle is already taken. Please choose another one.';
+        } else if (message.includes('RATE_LIMITED')) {
+          userMessage = 'Too many attempts. Please try again in a few moments.';
+        } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
+          userMessage = 'Please add your name to finish setup.';
+        } else if (message.includes('DISPLAY_NAME_TOO_LONG')) {
+          userMessage = 'Name must be 50 characters or less.';
+        } else if (message.includes('INVALID_USERNAME')) {
+          userMessage = 'Handle is invalid. Please update and try again.';
         }
 
         setState(prev => ({

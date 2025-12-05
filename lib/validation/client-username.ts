@@ -35,7 +35,7 @@ export function validateUsernameFormat(
   if (username.length > USERNAME_MAX_LENGTH) {
     return {
       valid: false,
-      error: `Handle must be less than ${USERNAME_MAX_LENGTH} characters`,
+      error: `Handle must be no more than ${USERNAME_MAX_LENGTH} characters`,
     };
   }
 
@@ -47,10 +47,17 @@ export function validateUsernameFormat(
   }
 
   // Additional validation rules
-  if (username.startsWith('-') || username.endsWith('-')) {
+  if (/^[0-9-]/.test(username)) {
     return {
       valid: false,
-      error: 'Handle cannot start or end with a hyphen',
+      error: 'Handle must start with a letter',
+    };
+  }
+
+  if (username.endsWith('-')) {
+    return {
+      valid: false,
+      error: 'Handle cannot end with a hyphen',
     };
   }
 
