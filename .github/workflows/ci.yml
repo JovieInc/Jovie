@@ -516,6 +516,7 @@ jobs:
       - name: DB seed (main)
         run: pnpm run db:seed
         env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
         continue-on-error: false
       - name: Pull env (main)
