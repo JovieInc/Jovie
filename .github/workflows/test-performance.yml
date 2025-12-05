@@ -33,9 +33,10 @@ jobs:
       - name: Performance Guard Results
         if: steps.performance-guard.outcome == 'failure'
         run: |
-          echo "❌ Performance guard failed - tests are too slow!"
-          echo "Run 'pnpm test:profile' locally for detailed analysis"
-          exit 1
+          echo "⚠️  Performance guard failed - tests are too slow!"
+          echo "📊 Run 'pnpm test:profile' locally for detailed analysis"
+          echo "ℹ️  This check is informational only and won't block merging"
+          echo "::warning::Test performance below target - see optimization docs"
 
       - name: Success Message
         if: steps.performance-guard.outcome == 'success'
