@@ -1,6 +1,7 @@
 'use server';
 
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
@@ -125,7 +126,7 @@ async function fetchDashboardDataWithSession(
 
     // Load user settings for UI preferences and social links presence in parallel;
     // tolerate missing user_settings column/table during migrations only.
-    // PostgreSQL error codes:
+    // PostgreSQL error codes for schema changes during migrations:
     // - 42703: undefined_column
     // - 42P01: undefined_table
     // - 42P02: undefined_parameter
@@ -149,13 +150,18 @@ async function fetchDashboardDataWithSession(
         )
         .catch((error: unknown) => {
           if (isMigrationError(error)) {
+            // Expected during migrations - log but don't alert
             console.warn(
-              'user_settings not available yet, defaulting sidebarCollapsed=false',
+              '[Dashboard] user_settings table/column not available (migration in progress)',
               error
             );
             return undefined;
           }
-          // Re-throw non-migration errors (network, permissions, RLS, etc.)
+          // Unexpected error - capture to Sentry and re-throw
+          Sentry.captureException(error, {
+            tags: { query: 'user_settings', context: 'dashboard_data' },
+            extra: { userId: userData.id },
+          });
           throw error;
         }),
       dbClient
@@ -170,13 +176,18 @@ async function fetchDashboardDataWithSession(
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
         .catch((error: unknown) => {
           if (isMigrationError(error)) {
+            // Expected during migrations - log but don't alert
             console.warn(
-              'social_links table/column not available yet, defaulting to false',
+              '[Dashboard] social_links table/column not available (migration in progress)',
               error
             );
             return false;
           }
-          // Re-throw non-migration errors (network, permissions, RLS, etc.)
+          // Unexpected error - capture to Sentry and re-throw
+          Sentry.captureException(error, {
+            tags: { query: 'social_links_count', context: 'dashboard_data' },
+            extra: { profileId: selected.id },
+          });
           throw error;
         }),
     ]);
