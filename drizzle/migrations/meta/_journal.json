@@ -99,6 +99,13 @@
       "when": 1733400200000,
       "tag": "0013_social_link_state",
       "breakpoints": false
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1733400300000,
+      "tag": "0014_recreate_audience_fingerprint_index_concurrent",
+      "breakpoints": false
     }
   ]
 }

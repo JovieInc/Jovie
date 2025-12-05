@@ -193,6 +193,33 @@ When creating new database migrations, you **MUST** follow this exact process:
 2. Instead, regenerate the migration using `pnpm run drizzle:generate`
 3. Or consult with team lead before manually editing the journal
 
+### 5.2 Zero-Downtime Index Creation (CRITICAL)
+
+When creating indexes in production migrations, you **MUST** use `CONCURRENTLY` to avoid blocking writes:
+
+**❌ WRONG - Blocks all writes:**
+```sql
+CREATE INDEX idx_name ON table_name (column_name);
+CREATE UNIQUE INDEX uniq_name ON table_name (column_name);
+```
+
+**✅ RIGHT - Allows concurrent writes:**
+```sql
+CREATE INDEX CONCURRENTLY idx_name ON table_name (column_name);
+CREATE UNIQUE INDEX CONCURRENTLY uniq_name ON table_name (column_name);
+```
+
+**Why this matters:**
+- Without `CONCURRENTLY`, PostgreSQL acquires an **exclusive lock** on the table
+- This **blocks all writes** (INSERT, UPDATE, DELETE) during index creation
+- Can cause **deployment timeouts** and **production downtime**
+- Large tables may take minutes to index, blocking all operations
+
+**Important notes:**
+- `CONCURRENTLY` cannot be used inside a transaction block
+- If your migration has multiple statements, you may need to split index creation into a separate migration
+- Always test index creation time on staging before deploying to production
+
 ## 5.5 CI/CD Workflow Details (YC-Aligned Rapid Deployment)
 
 ### Fast Path (Feature PRs → main)
