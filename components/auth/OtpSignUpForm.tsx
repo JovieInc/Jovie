@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation';
 
 export function OtpSignUpForm() {
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get('redirect_url') ?? '/onboarding';
+  const redirectUrl = searchParams?.get?.('redirect_url') ?? '/onboarding';
   const signInUrl = `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`;
 
   return (
