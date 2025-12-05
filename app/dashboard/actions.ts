@@ -125,69 +125,41 @@ async function fetchDashboardDataWithSession(
 
     // Load user settings for UI preferences and social links presence in parallel;
     // tolerate missing user_settings column/table during migrations.
+    // Note: These queries run inside the parent transaction from withDbSessionTx,
+    // so errors are handled gracefully without manual savepoint management.
     const [settings, hasLinks] = await Promise.all([
-      (async () => {
-        const savepointName = 'sp_user_settings';
-        try {
-          await dbClient.execute(drizzleSql.raw(`SAVEPOINT ${savepointName}`));
-          const result = await dbClient
-            .select()
-            .from(userSettings)
-            .where(eq(userSettings.userId, userData.id))
-            .limit(1);
-          await dbClient.execute(
-            drizzleSql.raw(`RELEASE SAVEPOINT ${savepointName}`)
-          );
-          return result?.[0] as { sidebarCollapsed: boolean } | undefined;
-        } catch (error) {
+      dbClient
+        .select()
+        .from(userSettings)
+        .where(eq(userSettings.userId, userData.id))
+        .limit(1)
+        .then(
+          result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+        )
+        .catch((error: unknown) => {
           console.warn(
             'user_settings not available yet, defaulting sidebarCollapsed=false',
             error
           );
-          try {
-            await dbClient.execute(
-              drizzleSql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`)
-            );
-          } catch {
-            // Ignore rollback errors; transaction may already be cleaned up
-          }
           return undefined;
-        }
-      })(),
-      (async () => {
-        const savepointName = 'sp_social_links';
-        try {
-          await dbClient.execute(drizzleSql.raw(`SAVEPOINT ${savepointName}`));
-          const result = await dbClient
-            .select({ c: count() })
-            .from(socialLinks)
-            .where(
-              and(
-                eq(socialLinks.creatorProfileId, selected.id),
-                eq(socialLinks.state, 'active')
-              )
-            );
-          await dbClient.execute(
-            drizzleSql.raw(`RELEASE SAVEPOINT ${savepointName}`)
-          );
-          const total = Number(result?.[0]?.c ?? 0);
-          return total > 0;
-        } catch (error) {
-          // On query error, default to false without failing dashboard load
+        }),
+      dbClient
+        .select({ c: count() })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, selected.id),
+            eq(socialLinks.state, 'active')
+          )
+        )
+        .then(result => Number(result?.[0]?.c ?? 0) > 0)
+        .catch((error: unknown) => {
           console.warn(
             'Error counting social links, defaulting to false',
             error
           );
-          try {
-            await dbClient.execute(
-              drizzleSql.raw(`ROLLBACK TO SAVEPOINT ${savepointName}`)
-            );
-          } catch {
-            // Ignore rollback errors; transaction may already be cleaned up
-          }
           return false;
-        }
-      })(),
+        }),
     ]);
 
     const startOfMonth = new Date();

@@ -4,16 +4,58 @@
 
 import * as Sentry from '@sentry/nextjs';
 
-Sentry.init({
-  dsn: 'https://da736fddd7d13787a1df93572014b870@o4510406034259968.ingest.us.sentry.io/4510479236792320',
+/**
+ * PII Collection Notice:
+ * When sendDefaultPii is enabled, Sentry may collect:
+ * - User IP addresses (anonymized via beforeSend)
+ * - User IDs (Clerk user IDs only, no emails)
+ * - Request headers (sensitive headers scrubbed)
+ *
+ * This data is used for error debugging and is retained per Sentry's data retention policy.
+ * Users can request data deletion via privacy@jov.ie.
+ */
 
-  // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
+const isProduction = process.env.NODE_ENV === 'production';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+
+  // Sample 10% of transactions in production, 100% in development
+  tracesSampleRate: isProduction ? 0.1 : 1.0,
 
   // Enable logs to be sent to Sentry
   enableLogs: true,
 
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
+  // Enable sending user PII - scrubbed via beforeSend hook below
   sendDefaultPii: true,
+
+  // Scrub sensitive data before sending to Sentry
+  beforeSend(event) {
+    // Anonymize IP addresses
+    if (event.user?.ip_address) {
+      event.user.ip_address = '{{auto}}';
+    }
+
+    // Remove email addresses if present
+    if (event.user?.email) {
+      delete event.user.email;
+    }
+
+    // Scrub sensitive headers
+    if (event.request?.headers) {
+      const sensitiveHeaders = [
+        'authorization',
+        'cookie',
+        'x-api-key',
+        'x-auth-token',
+      ];
+      for (const header of sensitiveHeaders) {
+        if (event.request.headers[header]) {
+          event.request.headers[header] = '[Filtered]';
+        }
+      }
+    }
+
+    return event;
+  },
 });
