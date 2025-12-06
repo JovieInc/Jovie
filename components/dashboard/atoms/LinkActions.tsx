@@ -1,19 +1,30 @@
 'use client';
 
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
-interface LinkActionsProps {
+export interface LinkActionsProps {
+  /** Callback when visibility is toggled */
   onToggle: () => void;
+  /** Callback when link is removed */
   onRemove: () => void;
+  /** Whether the link is currently visible */
   isVisible: boolean;
+  /** Whether to show the drag handle (default: true) */
   showDragHandle?: boolean;
+  /** Pointer down handler for drag handle */
   onDragHandlePointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
+  /** Additional CSS classes */
   className?: string;
 }
 
-export function LinkActions({
+/**
+ * LinkActions - Atomic component for link visibility toggle, remove, and drag actions.
+ * Uses design system tokens for consistent theming.
+ */
+export const LinkActions = memo(function LinkActions({
   onToggle,
   onRemove,
   isVisible,
@@ -28,9 +39,10 @@ export function LinkActions({
           <Button
             size='icon'
             variant='ghost'
-            className='h-7 w-7 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity'
+            className='h-7 w-7 text-tertiary-token hover:text-secondary-token opacity-0 group-hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             onClick={onToggle}
             aria-label={isVisible ? 'Hide link' : 'Show link'}
+            aria-pressed={isVisible}
           >
             {isVisible ? (
               <Icon name='Eye' className='h-3.5 w-3.5' />
@@ -49,7 +61,7 @@ export function LinkActions({
           <Button
             size='icon'
             variant='ghost'
-            className='h-7 w-7 text-destructive/70 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity'
+            className='h-7 w-7 text-tertiary-token hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             onClick={onRemove}
             aria-label='Remove link'
           >
@@ -62,13 +74,16 @@ export function LinkActions({
       {showDragHandle && (
         <button
           type='button'
-          className='h-7 w-5 flex items-center justify-center text-muted-foreground/40 hover:text-muted-foreground/70 transition-colors cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none'
+          className='h-7 w-5 flex items-center justify-center text-tertiary-token/40 hover:text-tertiary-token/70 transition-colors cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
           onPointerDown={onDragHandlePointerDown}
-          aria-label='Drag handle'
+          aria-label='Drag to reorder'
+          aria-roledescription='sortable'
         >
           <Icon name='GripVertical' className='h-4 w-4' />
         </button>
       )}
     </div>
   );
-}
+});
+
+LinkActions.displayName = 'LinkActions';

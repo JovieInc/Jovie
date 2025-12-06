@@ -13,6 +13,7 @@ import React, {
 import { Input } from '@/components/atoms/Input';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
+import { isBrandDark, relativeLuminance } from '@/lib/utils/color';
 import {
   type DetectedLink,
   detectPlatform,
@@ -129,25 +130,8 @@ export const UniversalLinkInput = forwardRef<
       ? `#${detectedLink.platform.color}`
       : '#6b7280'; // fallback gray-500
 
-    // Utilities for color contrast handling
-    const hexToRgb = (hex: string) => {
-      const h = hex.replace('#', '');
-      const bigint = parseInt(h, 16);
-      return {
-        r: (bigint >> 16) & 255,
-        g: (bigint >> 8) & 255,
-        b: bigint & 255,
-      };
-    };
-    const relativeLuminance = (hex: string) => {
-      const { r, g, b } = hexToRgb(hex);
-      const [R, G, B] = [r, g, b].map(v => {
-        const c = v / 255;
-        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-      });
-      return 0.2126 * R + 0.7152 * G + 0.0722 * B;
-    };
-    const isDarkBrand = relativeLuminance(brandColor) < 0.35; // Treat very dark brands (e.g., TikTok black) specially
+    // Use shared color utilities for brand icon styling
+    const isDarkBrand = isBrandDark(brandColor);
     const readableTextIsWhite = relativeLuminance(brandColor) < 0.6; // heuristic for button text
     const iconColor = isDarkBrand ? '#ffffff' : brandColor;
     const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandColor}15`;
