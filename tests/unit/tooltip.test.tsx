@@ -16,13 +16,13 @@ import {
   vi,
 } from 'vitest';
 
-// Configure fake timers with advanceTimers for async operations
+// Configure fake timers
 vi.useFakeTimers();
 
-// Helper to advance timers and flush promises
-const flushTimersAndPromises = async () => {
-  await act(async () => {
-    await vi.runAllTimersAsync();
+// Fast timer flush - advance by small amount to trigger immediate timers
+const flushTimers = () => {
+  act(() => {
+    vi.advanceTimersByTime(10);
   });
 };
 
@@ -88,7 +88,6 @@ describe('Tooltip', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    vi.runOnlyPendingTimers();
   });
 
   afterAll(() => {
@@ -122,11 +121,11 @@ describe('Tooltip', () => {
   });
 
   describe('Hover Interactions', () => {
-    it('shows tooltip on hover', async () => {
+    it('shows tooltip on hover', () => {
       // Use defaultOpen to test tooltip content rendering since jsdom doesn't fully support pointer events
       render(<BasicTooltip defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips.length).toBeGreaterThan(0);
@@ -154,19 +153,19 @@ describe('Tooltip', () => {
   });
 
   describe('Keyboard Interactions', () => {
-    it('shows tooltip on focus', async () => {
+    it('shows tooltip on focus', () => {
       // Use defaultOpen to test tooltip visibility since jsdom doesn't fully support pointer events
       render(<BasicTooltip defaultOpen={true} />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await flushTimersAndPromises();
+      flushTimers();
       trigger.focus();
 
       const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
     });
 
-    it.skip('hides tooltip on blur', async () => {
+    it.skip('hides tooltip on blur', () => {
       render(
         <TooltipWrapper>
           <Tooltip>
@@ -186,13 +185,13 @@ describe('Tooltip', () => {
 
       // Hover first button to show tooltip
       fireEvent.mouseEnter(firstButton);
-      await flushTimersAndPromises();
+      flushTimers();
       const tooltips = screen.getAllByText('First tooltip');
       expect(tooltips[0]).toBeVisible();
 
       // Move focus to second button to hide tooltip
       fireEvent.click(secondButton);
-      await flushTimersAndPromises();
+      flushTimers();
       const hidden = screen.queryAllByText('First tooltip');
       const openTooltip = hidden.find(el =>
         el.closest('[data-state="delayed-open"]')
@@ -201,17 +200,17 @@ describe('Tooltip', () => {
       expect(openTooltip).toBeUndefined();
     });
 
-    it('hides tooltip on Escape key', async () => {
+    it('hides tooltip on Escape key', () => {
       render(<BasicTooltip defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
       const tooltips = screen.getAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
 
       // Hide tooltip with Escape
-      await act(async () => {
+      act(() => {
         fireEvent.keyDown(document, { key: 'Escape' });
-        await vi.runAllTimersAsync();
+        vi.advanceTimersByTime(10);
       });
       const hidden = screen.queryAllByText('Test tooltip content');
       const visibleTooltip = hidden.find(el =>
@@ -223,10 +222,10 @@ describe('Tooltip', () => {
   });
 
   describe('Arrow Display', () => {
-    it('shows arrow by default', async () => {
+    it('shows arrow by default', () => {
       render(<BasicTooltip showArrow={true} defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltips = screen.getAllByText('Test tooltip content');
       const tooltipContent = tooltips[0].closest('[data-state]');
@@ -237,10 +236,10 @@ describe('Tooltip', () => {
       expect(arrow).toBeInTheDocument();
     });
 
-    it('hides arrow when showArrow is false', async () => {
+    it('hides arrow when showArrow is false', () => {
       render(<BasicTooltip showArrow={false} defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltips = screen.getAllByText('Test tooltip content');
       const tooltipContent = tooltips[0].closest('[data-state]');
@@ -253,11 +252,11 @@ describe('Tooltip', () => {
   });
 
   describe('Accessibility', () => {
-    it('has correct ARIA relationships', async () => {
+    it('has correct ARIA relationships', () => {
       render(<BasicTooltip defaultOpen={true} />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltip = screen.getByRole('tooltip');
       const triggerId = trigger.getAttribute('aria-describedby');
@@ -265,16 +264,16 @@ describe('Tooltip', () => {
       expect(triggerId).toBe(tooltipId);
     });
 
-    it('has proper role attributes', async () => {
+    it('has proper role attributes', () => {
       render(<BasicTooltip defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltip = screen.getByRole('tooltip');
       expect(tooltip).toHaveAttribute('role', 'tooltip');
     });
 
-    it('works with disabled elements via wrapper', async () => {
+    it('works with disabled elements via wrapper', () => {
       render(
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
@@ -288,7 +287,7 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const wrapper = screen.getByRole('button', {
         name: 'Disabled button',
@@ -301,7 +300,7 @@ describe('Tooltip', () => {
   });
 
   describe('Positioning', () => {
-    it('supports different side positions', async () => {
+    it('supports different side positions', () => {
       render(
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
@@ -313,14 +312,14 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const [tooltipText] = screen.getAllByText('Top tooltip');
       const tooltipContent = tooltipText.closest('[data-state]');
       expect(tooltipContent).toHaveAttribute('data-side', 'top');
     });
 
-    it('supports custom sideOffset', async () => {
+    it('supports custom sideOffset', () => {
       render(
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
@@ -334,14 +333,14 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
       const rendered = screen.getAllByText('Custom offset tooltip');
       expect(rendered.length).toBeGreaterThan(0);
     });
   });
 
   describe('Provider Configuration', () => {
-    it('respects custom delay durations', async () => {
+    it('respects custom delay durations', () => {
       // Test that provider configuration is applied by checking tooltip renders with defaultOpen
       render(
         <TooltipWrapper delayDuration={100}>
@@ -354,7 +353,7 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltips = screen.getAllByText('Delayed tooltip');
       expect(tooltips.length).toBeGreaterThan(0);
@@ -362,10 +361,10 @@ describe('Tooltip', () => {
   });
 
   describe('Reduced Motion', () => {
-    it('includes motion-reduce classes for accessibility', async () => {
+    it('includes motion-reduce classes for accessibility', () => {
       render(<BasicTooltip defaultOpen={true} />);
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltip = screen.getByRole('tooltip');
       const tooltipContent =
@@ -376,7 +375,7 @@ describe('Tooltip', () => {
   });
 
   describe('Complex Content', () => {
-    it('renders complex React node content', async () => {
+    it('renders complex React node content', () => {
       render(
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
@@ -393,7 +392,7 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const titleElements = screen.getAllByText('Complex content title');
       expect(titleElements.length).toBeGreaterThan(0);
@@ -401,7 +400,7 @@ describe('Tooltip', () => {
       expect(bodyElements.length).toBeGreaterThan(0);
     });
 
-    it('applies custom className to content', async () => {
+    it('applies custom className to content', () => {
       render(
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
@@ -415,7 +414,7 @@ describe('Tooltip', () => {
         </TooltipWrapper>
       );
 
-      await flushTimersAndPromises();
+      flushTimers();
 
       const tooltipElements = screen.getAllByText('Custom styled tooltip');
       const hasCustomClass = tooltipElements.some(element =>
