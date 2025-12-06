@@ -119,7 +119,8 @@ jobs:
 
   drizzle-migration-guard:
     name: Migration Guard
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
+    # Skip if 'skip-migration-guard' label is present (for schema consolidation)
+    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard') }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:

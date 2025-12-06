@@ -220,6 +220,61 @@ CREATE UNIQUE INDEX CONCURRENTLY uniq_name ON table_name (column_name);
 - If your migration has multiple statements, you may need to split index creation into a separate migration
 - Always test index creation time on staging before deploying to production
 
+### 5.3 PostgreSQL Syntax Requirements (CRITICAL)
+
+When writing raw SQL migrations, you **MUST** use correct PostgreSQL syntax. Common mistakes to avoid:
+
+#### ❌ WRONG: `CREATE TYPE IF NOT EXISTS`
+PostgreSQL does **NOT** support `IF NOT EXISTS` for `CREATE TYPE`:
+```sql
+-- ❌ INVALID SYNTAX - will fail
+CREATE TYPE IF NOT EXISTS my_enum AS ENUM ('a', 'b', 'c');
+```
+
+#### ✅ RIGHT: Use DO block with pg_type check
+```sql
+-- ✅ CORRECT - check pg_type catalog first
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'my_enum') THEN
+    CREATE TYPE my_enum AS ENUM ('a', 'b', 'c');
+  END IF;
+END $$;
+```
+
+#### ❌ WRONG: Multiple statements in Neon MCP
+The Neon MCP `run_sql` tool cannot execute multiple statements:
+```sql
+-- ❌ FAILS with "cannot insert multiple commands into a prepared statement"
+CREATE INDEX idx_a ON table_a (col);
+CREATE INDEX idx_b ON table_b (col);
+```
+
+#### ✅ RIGHT: One statement per call
+```sql
+-- ✅ CORRECT - execute each statement separately
+CREATE INDEX idx_a ON table_a (col);
+-- (separate call)
+CREATE INDEX idx_b ON table_b (col);
+```
+
+#### Other PostgreSQL gotchas:
+- **Enums are case-sensitive** - `'Active'` ≠ `'active'`
+- **Use `timestamp` not `datetime`** - PostgreSQL uses `timestamp` or `timestamptz`
+- **Use `text` not `varchar`** - In PostgreSQL, `text` is preferred over `varchar` for variable-length strings
+- **Use `jsonb` not `json`** - `jsonb` is binary and supports indexing; `json` is text-based
+- **Default values must match type** - `DEFAULT '{}'::jsonb` not `DEFAULT '{}'`
+
+### 5.4 Migration Testing Checklist
+
+Before merging any migration:
+
+1. **Syntax validation:** Run `pnpm run drizzle:check` locally
+2. **Fresh database test:** Apply migration to empty database
+3. **Idempotency:** Use `IF NOT EXISTS` / `IF EXISTS` where supported
+4. **Rollback plan:** Document how to reverse the migration if needed
+5. **Seed compatibility:** Ensure `pnpm run drizzle:seed` still works after migration
+
 ## 5.5 CI/CD Workflow Details (YC-Aligned Rapid Deployment)
 
 ### Fast Path (Feature PRs → main)
