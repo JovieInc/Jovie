@@ -362,17 +362,10 @@ jobs:
 
   ci-e2e-tests:
     name: E2E Tests
-    needs: [ci-build]
+    needs: [ci-build, neon-db]
     # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with full-ci label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
-    env:
-      # Use the Neon database URL from GitHub secrets
-      # The Neon GitHub integration should automatically set NEON_DATABASE_URL
-      DATABASE_URL: ${{ secrets.NEON_DATABASE_URL || secrets.DATABASE_URL }}
-      NODE_ENV: test
-      # Increase Node.js memory limit for tests
-      NODE_OPTIONS: '--max_old_space_size=4096'
     steps:
       - uses: actions/checkout@v6
         with:
@@ -401,6 +394,42 @@ jobs:
       - name: Setup Node.js and pnpm
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve DATABASE_URL for E2E
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          SRC=""
+          if [ -n "$CANDIDATE" ]; then
+            echo "Using Neon DB URL from neon-db job outputs"
+            echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+            SRC="neon-job-output"
+          elif [ -n "${{ secrets.NEON_DATABASE_URL }}" ]; then
+            echo "Using NEON_DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.NEON_DATABASE_URL }}" >> $GITHUB_ENV
+            SRC="secret:NEON_DATABASE_URL"
+          elif [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+            echo "Using DATABASE_URL_MAIN secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL_MAIN"
+          elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "Using DATABASE_URL secret"
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+            SRC="secret:DATABASE_URL"
+          else
+            echo "No DATABASE_URL could be resolved; E2E will fail without a database."
+            SRC="unresolved"
+          fi
+          echo "RESOLVED_DB_SOURCE=$SRC" >> $GITHUB_ENV
+
+      - name: Run migrations for E2E DB
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm run drizzle:migrate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: ${{ github.ref_name }}
+          ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
