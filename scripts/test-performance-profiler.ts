@@ -84,7 +84,7 @@ class TestPerformanceProfiler {
     console.log('⏱️  Running test suite with timing analysis...');
 
     try {
-      const output = execSync('pnpm test --reporter=verbose', {
+      const output = execSync('pnpm test:fast --reporter=verbose', {
         encoding: 'utf8',
         stdio: 'pipe',
         timeout: 120000, // 2 minutes timeout
