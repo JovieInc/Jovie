@@ -10,18 +10,22 @@
  * - Handles environment variable validation
  */
 
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
-import { drizzle } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
-import postgres from 'postgres';
 import * as readline from 'readline';
+import ws from 'ws';
 
 // Load environment variables: prefer .env.local, then fallback to .env
 config({ path: '.env.local', override: true });
 config();
+
+// Configure WebSocket for Node.js environment (required for Neon serverless driver)
+neonConfig.webSocketConstructor = ws;
 
 // Neon URL pattern for cleaning database URLs
 const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
@@ -218,7 +222,7 @@ async function runMigrations() {
   }
 
   // Connect to database
-  let sql: postgres.Sql;
+  let pool: Pool;
   let db: ReturnType<typeof drizzle>;
 
   try {
@@ -228,13 +232,10 @@ async function runMigrations() {
     const rawUrl = process.env.DATABASE_URL!;
     const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
 
-    sql = postgres(databaseUrl, {
-      ssl: true,
-      max: 1,
-      onnotice: () => {}, // Suppress notices
-    });
+    // Create connection pool with Neon serverless driver
+    pool = new Pool({ connectionString: databaseUrl });
 
-    db = drizzle(sql);
+    db = drizzle(pool);
 
     // Using default public schema
 
@@ -262,7 +263,7 @@ async function runMigrations() {
   } finally {
     // Close database connection
     try {
-      await sql.end();
+      await pool.end();
       log.info('Database connection closed');
     } catch {
       // Ignore close errors

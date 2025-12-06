@@ -25,6 +25,12 @@ if (webSocketConstructor) {
 // Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
 // but ensure firewall rules allow it if WS performance is required.
 
+// HTTPS Fallback Behavior:
+// - If WebSocket connection fails, Neon automatically falls back to HTTP fetch
+// - Transactions still work but may have slightly higher latency
+// - No code changes needed - fallback is automatic
+// - Monitor connection logs if experiencing transaction issues
+
 declare global {
   var db: NeonDatabase<typeof schema> | undefined;
   var pool: Pool | undefined;
