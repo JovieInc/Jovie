@@ -5,15 +5,19 @@ import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
+import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
-import { CreatorVerificationToggleButton } from '@/components/admin/CreatorVerificationToggleButton';
 import {
   getNextSort,
   getSortDirection,
   SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
+import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
+import { IngestProfileDialog } from '@/components/admin/IngestProfileDialog';
+import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { Icon } from '@/components/atoms/Icon';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import type {
   AdminCreatorProfileRow,
@@ -94,9 +98,32 @@ export function AdminCreatorProfilesWithSidebar({
     toggleVerification,
   } = useCreatorVerification(initialProfiles);
 
+  const {
+    profiles: profilesWithActions,
+    toggleFeatured,
+    toggleMarketing,
+    deleteCreatorOrUser,
+  } = useCreatorActions(profiles);
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
+
+  // New states for dialogs and responsive
+  const [isMobile, setIsMobile] = useState(false);
+  const [ingestDialogOpen, setIngestDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [profileToDelete, setProfileToDelete] = useState<AdminCreatorProfileRow | null>(null);
+
+  // Detect mobile breakpoint
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mediaQuery.matches);
+
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mediaQuery.addEventListener('change', handler);
+    return () => mediaQuery.removeEventListener('change', handler);
+  }, []);
 
   const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
   const canPrev = page > 1;
@@ -144,13 +171,13 @@ export function AdminCreatorProfilesWithSidebar({
   };
 
   const selectedProfile = useMemo(
-    () => profiles.find(p => p.id === selectedId) ?? null,
-    [profiles, selectedId]
+    () => profilesWithActions.find(p => p.id === selectedId) ?? null,
+    [profilesWithActions, selectedId]
   );
 
   const selectedIndex = useMemo(
-    () => profiles.findIndex(p => p.id === selectedId),
-    [profiles, selectedId]
+    () => profilesWithActions.findIndex(p => p.id === selectedId),
+    [profilesWithActions, selectedId]
   );
 
   const effectiveContact = useMemo(() => {
@@ -168,23 +195,23 @@ export function AdminCreatorProfilesWithSidebar({
     if (isFormElement(event.target)) return;
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (profiles.length === 0) return;
+      if (profilesWithActions.length === 0) return;
 
       event.preventDefault();
 
       if (event.key === 'ArrowDown') {
         if (selectedIndex === -1) {
-          setSelectedId(profiles[0]?.id ?? null);
+          setSelectedId(profilesWithActions[0]?.id ?? null);
         } else {
-          const nextIndex = Math.min(selectedIndex + 1, profiles.length - 1);
-          setSelectedId(profiles[nextIndex]?.id ?? null);
+          const nextIndex = Math.min(selectedIndex + 1, profilesWithActions.length - 1);
+          setSelectedId(profilesWithActions[nextIndex]?.id ?? null);
         }
       } else if (event.key === 'ArrowUp') {
         if (selectedIndex === -1) {
-          setSelectedId(profiles[profiles.length - 1]?.id ?? null);
+          setSelectedId(profilesWithActions[profilesWithActions.length - 1]?.id ?? null);
         } else {
           const prevIndex = Math.max(selectedIndex - 1, 0);
-          setSelectedId(profiles[prevIndex]?.id ?? null);
+          setSelectedId(profilesWithActions[prevIndex]?.id ?? null);
         }
       }
     } else if (event.key === ' ' || event.key === 'Spacebar') {
@@ -297,6 +324,17 @@ export function AdminCreatorProfilesWithSidebar({
                   <Link href={clearHref}>Clear</Link>
                 </Button>
               )}
+              <div className='ml-auto'>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='secondary'
+                  onClick={() => setIngestDialogOpen(true)}
+                >
+                  <Icon name='Plus' className='h-4 w-4 mr-2' />
+                  Ingest Profile
+                </Button>
+              </div>
             </form>
 
             <div className='text-xs text-secondary-token'>
@@ -330,7 +368,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </tr>
               </thead>
               <tbody className='divide-y divide-subtle/60'>
-                {profiles.length === 0 ? (
+                {profilesWithActions.length === 0 ? (
                   <tr>
                     <td
                       colSpan={6}
@@ -340,7 +378,7 @@ export function AdminCreatorProfilesWithSidebar({
                     </td>
                   </tr>
                 ) : (
-                  profiles.map(profile => {
+                  profilesWithActions.map(profile => {
                     const isSelected = profile.id === selectedId;
                     return (
                       <tr
@@ -365,6 +403,7 @@ export function AdminCreatorProfilesWithSidebar({
                             username={profile.username}
                             avatarUrl={profile.avatarUrl}
                             verified={profile.isVerified}
+                            isFeatured={profile.isFeatured}
                           />
                         </td>
                         <td className='px-2 py-3 font-medium text-primary-token'>
@@ -391,11 +430,12 @@ export function AdminCreatorProfilesWithSidebar({
                         <td className='px-2 py-3 text-xs text-secondary-token'>
                           {profile.isVerified ? 'Verified' : 'Not verified'}
                         </td>
-                        <td className='px-2 py-3 text-right'>
-                          <CreatorVerificationToggleButton
+                        <td className='px-2 py-3 text-right' onClick={e => e.stopPropagation()}>
+                          <CreatorActionsMenu
                             profile={profile}
+                            isMobile={isMobile}
                             status={verificationStatuses[profile.id] ?? 'idle'}
-                            onToggle={async () => {
+                            onToggleVerification={async () => {
                               const result = await toggleVerification(
                                 profile.id,
                                 !profile.isVerified
@@ -406,6 +446,34 @@ export function AdminCreatorProfilesWithSidebar({
                                   result.error
                                 );
                               }
+                            }}
+                            onToggleFeatured={async () => {
+                              const result = await toggleFeatured(
+                                profile.id,
+                                !profile.isFeatured
+                              );
+                              if (!result.success) {
+                                console.error(
+                                  'Failed to toggle featured',
+                                  result.error
+                                );
+                              }
+                            }}
+                            onToggleMarketing={async () => {
+                              const result = await toggleMarketing(
+                                profile.id,
+                                !profile.marketingOptOut
+                              );
+                              if (!result.success) {
+                                console.error(
+                                  'Failed to toggle marketing',
+                                  result.error
+                                );
+                              }
+                            }}
+                            onDelete={() => {
+                              setProfileToDelete(profile);
+                              setDeleteDialogOpen(true);
                             }}
                           />
                         </td>
@@ -455,6 +523,30 @@ export function AdminCreatorProfilesWithSidebar({
           onAvatarUpload={handleAvatarUpload}
         />
       </div>
+
+      {/* Dialogs */}
+      <IngestProfileDialog
+        open={ingestDialogOpen}
+        onOpenChange={setIngestDialogOpen}
+        onSuccess={() => {
+          // Refresh the page to show new profile
+          window.location.reload();
+        }}
+      />
+
+      <DeleteCreatorDialog
+        profile={profileToDelete}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={async () => {
+          if (!profileToDelete) return { success: false };
+          const result = await deleteCreatorOrUser(profileToDelete.id);
+          if (result.success) {
+            setProfileToDelete(null);
+          }
+          return result;
+        }}
+      />
     </div>
   );
 }

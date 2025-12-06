@@ -1,5 +1,6 @@
 'use client';
 
+import { Star } from 'lucide-react';
 import { useState } from 'react';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { useToast } from '@/components/molecules/ToastContainer';
@@ -14,6 +15,7 @@ export interface CreatorAvatarCellProps {
   username: string;
   avatarUrl: string | null;
   verified?: boolean;
+  isFeatured?: boolean;
 }
 
 export function CreatorAvatarCell({
@@ -21,6 +23,7 @@ export function CreatorAvatarCell({
   username,
   avatarUrl,
   verified = false,
+  isFeatured = false,
 }: CreatorAvatarCellProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
@@ -71,24 +74,31 @@ export function CreatorAvatarCell({
 
   return (
     <div className='flex items-center gap-2'>
-      <AvatarUploadable
-        src={previewUrl}
-        alt={`Avatar for @${username}`}
-        name={username}
-        size='sm'
-        uploadable
-        onUpload={handleUpload}
-        onError={message => {
-          showToast({
-            type: 'error',
-            message: message || 'Failed to upload avatar. Please try again.',
-          });
-        }}
-        maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-        acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-        showHoverOverlay
-        verified={verified}
-      />
+      <div className='relative'>
+        <AvatarUploadable
+          src={previewUrl}
+          alt={`Avatar for @${username}`}
+          name={username}
+          size='sm'
+          uploadable
+          onUpload={handleUpload}
+          onError={message => {
+            showToast({
+              type: 'error',
+              message: message || 'Failed to upload avatar. Please try again.',
+            });
+          }}
+          maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+          acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+          showHoverOverlay
+          verified={verified}
+        />
+        {isFeatured && (
+          <div className='absolute -top-1 -right-1 bg-yellow-400 dark:bg-yellow-500 rounded-full p-0.5 ring-2 ring-white dark:ring-gray-900'>
+            <Star className='h-3 w-3 text-white fill-current' />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -22,8 +22,11 @@ export interface AdminCreatorProfileRow {
   avatarUrl: string | null;
   displayName?: string | null;
   isVerified: boolean;
+  isFeatured: boolean;
+  marketingOptOut: boolean;
   isClaimed: boolean;
   claimToken: string | null;
+  userId: string | null;
   createdAt: Date | null;
   confidence?: number | null;
 }
@@ -126,8 +129,11 @@ export async function getAdminCreatorProfiles(
           avatarUrl: creatorProfiles.avatarUrl,
           displayName: creatorProfiles.displayName,
           isVerified: creatorProfiles.isVerified,
+          isFeatured: creatorProfiles.isFeatured,
+          marketingOptOut: creatorProfiles.marketingOptOut,
           isClaimed: creatorProfiles.isClaimed,
           claimToken: creatorProfiles.claimToken,
+          userId: creatorProfiles.userId,
           createdAt: creatorProfiles.createdAt,
         })
         .from(creatorProfiles)
@@ -215,8 +221,11 @@ export async function getAdminCreatorProfiles(
         displayName:
           (row as { displayName?: string | null }).displayName ?? null,
         isVerified: row.isVerified ?? false,
+        isFeatured: row.isFeatured ?? false,
+        marketingOptOut: row.marketingOptOut ?? false,
         isClaimed: row.isClaimed ?? false,
         claimToken: row.claimToken ?? null,
+        userId: row.userId ?? null,
         createdAt: row.createdAt ?? null,
         confidence: confidenceMap.get(row.id) ?? null,
       })),
