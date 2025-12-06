@@ -32,11 +32,11 @@ async function main() {
     const result = await db.execute(drizzleSql`
       SELECT routine_name, routine_type
       FROM information_schema.routines 
-      WHERE routine_name = 'onboarding_create_profile'
+      WHERE routine_name = 'create_profile_with_user'
     `);
 
     if (result.rows && result.rows.length > 0) {
-      console.log('✅ onboarding_create_profile function exists!');
+      console.log('✅ create_profile_with_user function exists!');
       console.log(
         `   Type: ${(result.rows?.[0] as { routine_type: string })?.routine_type}`
       );
