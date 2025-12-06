@@ -52,7 +52,7 @@ describe('ClaimHandleForm (Optimized)', () => {
 
     const previewContainer = document.querySelector('#handle-preview-text');
     expect(previewContainer).toBeInTheDocument();
-    expect(previewContainer).toHaveClass('min-h-[1.25rem]');
+    expect(previewContainer).toHaveClass('min-h-5');
   });
 
   test('has proper accessibility attributes', () => {

@@ -136,13 +136,13 @@ describe('OtpSignInForm', () => {
     expect(buttons[1]).toHaveTextContent('Continue');
   });
 
-  it('renders navigation link to signup', () => {
+  it('renders navigation link to waitlist', () => {
     render(<OtpSignInForm />);
 
-    const signupLinks = screen.getAllByText('Sign up');
-    expect(signupLinks).toHaveLength(2); // One in each step
-    signupLinks.forEach(link => {
-      expect(link.closest('a')).toHaveAttribute('href', '/signup');
+    const waitlistLinks = screen.getAllByText('Join waitlist');
+    expect(waitlistLinks).toHaveLength(2); // One in each step
+    waitlistLinks.forEach(link => {
+      expect(link.closest('a')).toHaveAttribute('href', '/waitlist');
     });
   });
 
@@ -189,11 +189,11 @@ describe('OtpSignInForm', () => {
     });
   });
 
-  it('signup link uses accent color', () => {
+  it('waitlist link uses accent color', () => {
     render(<OtpSignInForm />);
 
-    const signupLinks = screen.getAllByText('Sign up');
-    signupLinks.forEach(link => {
+    const waitlistLinks = screen.getAllByText('Join waitlist');
+    waitlistLinks.forEach(link => {
       expect(link.closest('a')).toHaveClass('text-accent');
     });
   });
