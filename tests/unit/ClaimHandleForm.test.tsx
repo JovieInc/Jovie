@@ -53,7 +53,7 @@ describe('ClaimHandleForm', () => {
     // Check that preview container exists with min-height to prevent layout jumps
     const previewContainer = document.querySelector('#handle-preview-text');
     expect(previewContainer).toBeInTheDocument();
-    expect(previewContainer).toHaveClass('min-h-[1.25rem]');
+    expect(previewContainer).toHaveClass('min-h-5');
   });
 
   test('has proper accessibility attributes', () => {
