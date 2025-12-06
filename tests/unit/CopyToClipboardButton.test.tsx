@@ -1,5 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Use fake timers for faster tests
+vi.useFakeTimers();
+
+// Helper to flush promises and timers
+const flushPromises = async () => {
+  await act(async () => {
+    await Promise.resolve();
+    vi.advanceTimersByTime(0);
+  });
+};
+
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 
 // Mock the analytics module
@@ -111,10 +123,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(button).toHaveTextContent('✓ Copied!');
-    });
+    await flushPromises();
 
+    expect(button).toHaveTextContent('✓ Copied!');
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       'https://jov.ie/test-profile'
     );
@@ -178,10 +189,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(button).toHaveTextContent('✓ Copied!');
-    });
+    await flushPromises();
 
+    expect(button).toHaveTextContent('✓ Copied!');
     expect(mockCreateElement).toHaveBeenCalledWith('textarea');
     expect(mockTextarea.value).toBe('https://jov.ie/test-profile');
     expect(mockTextarea.focus).toHaveBeenCalled();
@@ -249,10 +259,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(button).toHaveTextContent('✓ Copied!');
-    });
+    await flushPromises();
 
+    expect(button).toHaveTextContent('✓ Copied!');
     // Should try clipboard first, then fall back
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       'https://jov.ie/test-profile'
@@ -319,10 +328,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(button).toHaveTextContent('Failed to copy');
-    });
+    await flushPromises();
 
+    expect(button).toHaveTextContent('Failed to copy');
     expect(track).toHaveBeenCalledWith('profile_copy_url_click', {
       status: 'error',
     });
@@ -350,10 +358,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      expect(button).toHaveTextContent('Failed to copy');
-    });
+    await flushPromises();
 
+    expect(button).toHaveTextContent('Failed to copy');
     expect(track).toHaveBeenCalledWith('profile_copy_url_click', {
       status: 'error',
     });
@@ -377,12 +384,10 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      const statusElement = screen.getByRole('status');
-      expect(statusElement).toHaveTextContent(
-        'Profile URL copied to clipboard'
-      );
-    });
+    await flushPromises();
+
+    const statusElement = screen.getByRole('status');
+    expect(statusElement).toHaveTextContent('Profile URL copied to clipboard');
   });
 
   it('updates accessibility status on error', async () => {
@@ -393,9 +398,9 @@ describe('CopyToClipboardButton', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
 
-    await waitFor(() => {
-      const statusElement = screen.getByRole('status');
-      expect(statusElement).toHaveTextContent('Failed to copy profile URL');
-    });
+    await flushPromises();
+
+    const statusElement = screen.getByRole('status');
+    expect(statusElement).toHaveTextContent('Failed to copy profile URL');
   });
 });

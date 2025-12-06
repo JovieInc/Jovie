@@ -114,7 +114,8 @@ describe('CreatorProfilesTable', () => {
     const menuTrigger = screen.getByRole('button', {
       name: 'Creator actions',
     });
-    const user = userEvent.setup();
+    // Use userEvent with delay:null for speed
+    const user = userEvent.setup({ delay: null });
     await user.click(menuTrigger);
 
     expect(
