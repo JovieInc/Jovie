@@ -18,8 +18,8 @@ export function FooterBranding({
   size = 'md',
 }: FooterBrandingProps) {
   const signUpLink = artistHandle
-    ? `/sign-up?utm_source=profile&utm_artist=${artistHandle}`
-    : '/sign-up';
+    ? `/waitlist?utm_source=profile&utm_artist=${artistHandle}`
+    : '/waitlist';
 
   return (
     <div

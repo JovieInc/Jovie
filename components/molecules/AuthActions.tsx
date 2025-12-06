@@ -18,7 +18,7 @@ export function AuthActions() {
         size='lg'
         className='!h-[52px] !px-6 font-semibold tracking-wide shadow-[0_12px_30px_rgba(15,23,42,0.25)]'
       >
-        <Link href='/signup'>Sign up</Link>
+        <Link href='/waitlist'>Get started</Link>
       </Button>
     </div>
   );

@@ -31,7 +31,7 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
         Create your artist page in seconds.
       </p>
       <Button asChild size='lg' data-test='signup-btn'>
-        <Link href='/sign-up'>Sign up to get started</Link>
+        <Link href='/waitlist'>Get started</Link>
       </Button>
     </div>
   );

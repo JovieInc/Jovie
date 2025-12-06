@@ -35,10 +35,10 @@ export function OtpSignInForm() {
               <div className='text-center text-sm text-secondary-token'>
                 Don&apos;t have an account?{' '}
                 <Link
-                  href='/signup'
+                  href='/waitlist'
                   className='text-accent hover:underline font-medium'
                 >
-                  Sign up
+                  Join waitlist
                 </Link>
               </div>
             </div>
@@ -73,10 +73,10 @@ export function OtpSignInForm() {
               <div className='text-center text-sm text-secondary-token'>
                 Don&apos;t have an account?{' '}
                 <Link
-                  href='/signup'
+                  href='/waitlist'
                   className='text-accent hover:underline font-medium'
                 >
-                  Sign up
+                  Join waitlist
                 </Link>
               </div>
             </div>
