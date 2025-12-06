@@ -40,9 +40,9 @@ async function main() {
     console.log('✅ creator_type enum ready');
 
     // Create the onboarding function
-    console.log('📄 Creating onboarding_create_profile function...');
+    console.log('📄 Creating create_profile_with_user function...');
     await db.execute(drizzleSql`
-      CREATE OR REPLACE FUNCTION onboarding_create_profile(
+      CREATE OR REPLACE FUNCTION create_profile_with_user(
         p_clerk_user_id text,
         p_email text,
         p_username text,
@@ -106,12 +106,12 @@ async function main() {
       END;
       $$ LANGUAGE plpgsql SECURITY INVOKER;
     `);
-    console.log('✅ onboarding_create_profile function created');
+    console.log('✅ create_profile_with_user function created');
 
     // Add comment
     console.log('📝 Adding function comment...');
     await db.execute(drizzleSql`
-      COMMENT ON FUNCTION onboarding_create_profile(text, text, text, text, creator_type)
+      COMMENT ON FUNCTION create_profile_with_user(text, text, text, text, creator_type)
         IS 'Creates or updates user by clerk_id and creates a creator profile atomically with RLS session set.';
     `);
     console.log('✅ Function comment added');
@@ -121,12 +121,12 @@ async function main() {
     const result = await db.execute(drizzleSql`
       SELECT routine_name 
       FROM information_schema.routines 
-      WHERE routine_name = 'onboarding_create_profile'
+      WHERE routine_name = 'create_profile_with_user'
         AND routine_type = 'FUNCTION'
     `);
 
     if (result.rows && result.rows.length > 0) {
-      console.log('✅ onboarding_create_profile function verified!');
+      console.log('✅ create_profile_with_user function verified!');
     } else {
       console.log('❌ Function verification failed');
     }

@@ -21,6 +21,7 @@ import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
+import { getBrandIconStyles } from '@/lib/utils/color';
 import {
   canonicalIdentity,
   type DetectedLink,
@@ -735,7 +736,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   key={pill.id}
                   type='button'
                   onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-secondary-token bg-surface-1/80 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-0'
+                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-secondary-token bg-surface-1/80 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                   style={{ borderColor: brandHex }}
                 >
                   <span
@@ -918,15 +919,7 @@ function buildPrefillUrl(platformId: string): string {
   }
 }
 
-function SortableRow<T extends DetectedLink>({
-  id,
-  link,
-  index,
-  onToggle,
-  onRemove,
-  visible,
-  draggable = true,
-}: {
+interface SortableRowProps<T extends DetectedLink> {
   id: string;
   link: T;
   index: number;
@@ -934,7 +927,21 @@ function SortableRow<T extends DetectedLink>({
   onRemove: (idx: number) => void;
   visible: boolean;
   draggable?: boolean;
-}) {
+}
+
+/**
+ * SortableRow - Memoized row component for drag-and-drop link items.
+ * Uses shared color utilities for consistent brand theming.
+ */
+const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
+  id,
+  link,
+  index,
+  onToggle,
+  onRemove,
+  visible,
+  draggable = true,
+}: SortableRowProps<T>) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({
       id,
@@ -950,6 +957,8 @@ function SortableRow<T extends DetectedLink>({
     },
     [listeners]
   );
+
+  // Track dark theme for icon color inversion
   const [isDarkTheme, setIsDarkTheme] = React.useState(false);
   React.useEffect(() => {
     const root = document.documentElement;
@@ -960,36 +969,10 @@ function SortableRow<T extends DetectedLink>({
     return () => mo.disconnect();
   }, []);
 
-  // Brand color utilities (mirrors UniversalLinkInput heuristics)
-  const hexToRgb = (hex: string) => {
-    const h = hex.replace('#', '');
-    const bigint = parseInt(h, 16);
-    return {
-      r: (bigint >> 16) & 255,
-      g: (bigint >> 8) & 255,
-      b: bigint & 255,
-    };
-  };
-  const relativeLuminance = (hex: string) => {
-    const { r, g, b } = hexToRgb(hex);
-    const [R, G, B] = [r, g, b].map(v => {
-      const c = v / 255;
-      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-    });
-    return 0.2126 * R + 0.7152 * G + 0.0722 * B;
-  };
+  // Use shared color utilities for brand icon styling
   const iconMeta = getPlatformIcon(link.platform.icon);
   const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-  const brandIsDark = relativeLuminance(brandHex) < 0.35;
-  // In dark theme, invert very dark brands (e.g., X, TikTok) to white for legibility
-  const iconColor = isDarkTheme && brandIsDark ? '#ffffff' : brandHex;
-  const iconBg = isDarkTheme
-    ? brandIsDark
-      ? 'rgba(255,255,255,0.08)'
-      : `${brandHex}20`
-    : `${brandHex}15`;
-
-  // (deduped) keep single set of brand color utilities above
+  const { iconColor, iconBg } = getBrandIconStyles(brandHex, isDarkTheme);
 
   return (
     <li
@@ -1030,7 +1013,7 @@ function SortableRow<T extends DetectedLink>({
       </div>
     </li>
   );
-}
+});
 
 function groupLinks<T extends DetectedLink = DetectedLink>(
   links: T[]

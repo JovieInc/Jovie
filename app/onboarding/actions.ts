@@ -130,7 +130,7 @@ export async function completeOnboarding({
           await ensureHandleAvailable(null);
           await tx.execute(
             drizzleSql`
-              SELECT onboarding_create_profile(
+              SELECT create_profile_with_user(
                 ${clerkUserId},
                 ${userEmail ?? null},
                 ${normalizedUsername},
@@ -193,7 +193,7 @@ export async function completeOnboarding({
         await ensureHandleAvailable(null);
         await tx.execute(
           drizzleSql`
-            SELECT onboarding_create_profile(
+            SELECT create_profile_with_user(
               ${clerkUserId},
               ${userEmail ?? null},
               ${normalizedUsername},
