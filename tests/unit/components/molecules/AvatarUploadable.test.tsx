@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
+
+vi.useFakeTimers();
 
 // Mock analytics tracking
 vi.mock('@/lib/analytics', () => ({
@@ -45,6 +47,10 @@ describe('AvatarUploadable Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
   });
 
   describe('Display Mode (Non-uploadable)', () => {
@@ -177,9 +183,8 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        expect(mockOnUpload).toHaveBeenCalledWith(file);
-      });
+      await Promise.resolve();
+      expect(mockOnUpload).toHaveBeenCalledWith(file);
     });
   });
 
@@ -205,11 +210,10 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid file type')
-        );
-      });
+      await Promise.resolve();
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid file type')
+      );
     });
 
     it('validates file size and shows error for large files', async () => {
@@ -236,11 +240,10 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(
-          expect.stringContaining('File too large')
-        );
-      });
+      await Promise.resolve();
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.stringContaining('File too large')
+      );
     });
 
     it('accepts valid file types', async () => {
@@ -269,9 +272,8 @@ describe('AvatarUploadable Component', () => {
 
         fireEvent.change(fileInput, { target: { files: [validFile] } });
 
-        await waitFor(() => {
-          expect(mockOnUpload).toHaveBeenCalledWith(validFile);
-        });
+        await Promise.resolve();
+        expect(mockOnUpload).toHaveBeenCalledWith(validFile);
 
         unmount();
         vi.clearAllMocks();
@@ -297,9 +299,8 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [heicFile] } });
 
-      await waitFor(() => {
-        expect(mockOnUpload).toHaveBeenCalledWith(heicFile);
-      });
+      await Promise.resolve();
+      expect(mockOnUpload).toHaveBeenCalledWith(heicFile);
       expect(mockOnError).not.toHaveBeenCalled();
     });
 
@@ -321,11 +322,10 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [heicFile] } });
 
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(
-          expect.stringContaining('Invalid file type')
-        );
-      });
+      await Promise.resolve();
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid file type')
+      );
       expect(mockOnUpload).not.toHaveBeenCalled();
     });
 
@@ -350,11 +350,10 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith(
-          expect.stringContaining('File too large')
-        );
-      });
+      await Promise.resolve();
+      expect(mockOnError).toHaveBeenCalledWith(
+        expect.stringContaining('File too large')
+      );
       expect(mockOnUpload).not.toHaveBeenCalled();
     });
   });
@@ -379,11 +378,10 @@ describe('AvatarUploadable Component', () => {
         },
       });
 
-      await waitFor(() => {
-        expect(
-          screen.getByTestId('avatar-uploadable-drag-overlay')
-        ).toBeInTheDocument();
-      });
+      await Promise.resolve();
+      expect(
+        screen.getByTestId('avatar-uploadable-drag-overlay')
+      ).toBeInTheDocument();
     });
 
     it('handles file drop and triggers upload', async () => {
@@ -408,9 +406,8 @@ describe('AvatarUploadable Component', () => {
         },
       });
 
-      await waitFor(() => {
-        expect(mockOnUpload).toHaveBeenCalledWith(file);
-      });
+      await Promise.resolve();
+      expect(mockOnUpload).toHaveBeenCalledWith(file);
     });
 
     it('prevents default drag behavior', () => {
@@ -460,11 +457,10 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       fireEvent.change(fileInput, { target: { files: [createMockFile()] } });
 
-      await waitFor(() => {
-        expect(
-          screen.getByTestId('avatar-uploadable-progress')
-        ).toBeInTheDocument();
-      });
+      await Promise.resolve();
+      expect(
+        screen.getByTestId('avatar-uploadable-progress')
+      ).toBeInTheDocument();
     });
 
     it('announces progress to screen readers', () => {
@@ -503,9 +499,9 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        expect(mockOnSuccess).toHaveBeenCalled();
-      });
+      await Promise.resolve();
+      vi.runAllTimers();
+      expect(mockOnSuccess).toHaveBeenCalled();
     });
 
     it('shows error state when upload fails', async () => {
@@ -527,9 +523,9 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        expect(mockOnError).toHaveBeenCalledWith('Upload failed');
-      });
+      await Promise.resolve();
+      vi.runAllTimers();
+      expect(mockOnError).toHaveBeenCalledWith('Upload failed');
     });
   });
 
@@ -552,17 +548,16 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        expect(track).toHaveBeenCalledWith('avatar_upload_start', {
-          file_size: 2048,
-          file_type: 'image/jpeg',
-        });
+      await Promise.resolve();
+      expect(track).toHaveBeenCalledWith('avatar_upload_start', {
+        file_size: 2048,
+        file_type: 'image/jpeg',
       });
 
-      await waitFor(() => {
-        expect(track).toHaveBeenCalledWith('avatar_upload_success', {
-          file_size: 2048,
-        });
+      await Promise.resolve();
+      vi.runAllTimers();
+      expect(track).toHaveBeenCalledWith('avatar_upload_success', {
+        file_size: 2048,
       });
     });
 
@@ -587,15 +582,15 @@ describe('AvatarUploadable Component', () => {
 
       fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
-      await waitFor(() => {
-        expect(track).toHaveBeenCalledWith(
-          'avatar_upload_error',
-          expect.objectContaining({
-            error: 'validation_failed',
-            message: expect.stringContaining('Invalid file type'),
-          })
-        );
-      });
+      await Promise.resolve();
+      vi.runAllTimers();
+      expect(track).toHaveBeenCalledWith(
+        'avatar_upload_error',
+        expect.objectContaining({
+          error: 'validation_failed',
+          message: expect.stringContaining('Invalid file type'),
+        })
+      );
     });
   });
 
@@ -622,6 +617,7 @@ describe('AvatarUploadable Component', () => {
     });
 
     it('announces status changes to screen readers', async () => {
+      // Use immediately resolving mock for simpler async handling
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
 
       render(
@@ -637,15 +633,25 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile();
 
+      // Trigger file selection
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await waitFor(() => {
-        const successAnnouncement = screen.getByText(
-          'Profile photo uploaded successfully'
-        );
-        expect(successAnnouncement).toBeInTheDocument();
-        expect(successAnnouncement).toHaveAttribute('aria-live', 'polite');
+      // Flush microtasks to let the promise resolve
+      await act(async () => {
+        await Promise.resolve();
       });
+
+      // Advance timers to process any setTimeout calls
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+      });
+
+      // Now check for the success announcement
+      const successAnnouncement = screen.getByText(
+        'Profile photo uploaded successfully'
+      );
+      expect(successAnnouncement).toBeInTheDocument();
+      expect(successAnnouncement).toHaveAttribute('aria-live', 'polite');
     });
 
     it('has keyboard focus management', () => {
