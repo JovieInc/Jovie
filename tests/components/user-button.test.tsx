@@ -17,6 +17,11 @@ vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
 }));
 
+vi.mock('@clerk/nextjs', () => ({
+  useUser: vi.fn(),
+  useClerk: vi.fn(),
+}));
+
 const showToastMock = vi.fn();
 
 vi.mock('@/components/molecules/ToastContainer', () => ({
