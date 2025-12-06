@@ -19,8 +19,8 @@ export function ArtistSearch() {
       // Simulate search delay
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // For now, just redirect to sign-up
-      router.push('/sign-up');
+      // Redirect to waitlist (invite-only)
+      router.push('/waitlist');
     } catch (error) {
       console.error('Search error:', error);
     } finally {

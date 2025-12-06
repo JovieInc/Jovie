@@ -174,8 +174,8 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
       }
 
       if (!isSignedIn) {
-        // Send users to sign up; include redirect to onboarding with handle
-        router.push(`/sign-up?redirect_url=${encodeURIComponent(target)}`);
+        // Send users to waitlist; early access is invite-only
+        router.push('/waitlist');
         return;
       }
 
@@ -372,7 +372,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         </div>
 
         {helperState.text && (
-          <div id='handle-preview-text' className='min-h-[1.25rem]'>
+          <div id='handle-preview-text' className='min-h-5'>
             <p
               id={helperId}
               className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
@@ -389,7 +389,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         type='submit'
         variant='primary'
         size='lg'
-        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group !h-[54px] !px-6 text-base font-semibold tracking-wide !bg-gradient-to-br !from-blue-600/95 !via-indigo-600/85 !to-cyan-500/90 !text-white shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
+        className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group h-[54px]! px-6! text-base font-semibold tracking-wide bg-linear-to-br! from-blue-600/95! via-indigo-600/85! to-cyan-500/90! text-white! shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
         disabled={btnDisabled || !handle}
       >
         <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>

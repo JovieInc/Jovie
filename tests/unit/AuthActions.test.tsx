@@ -5,11 +5,13 @@ import { AuthActions } from '@/components/molecules/AuthActions';
 describe('AuthActions', () => {
   afterEach(cleanup);
 
-  it('always renders sign in and sign up links', () => {
+  it('always renders sign in and get started links', () => {
     render(<AuthActions />);
 
     expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /sign up/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /get started/i })
+    ).toBeInTheDocument();
   });
 
   it('wraps links in a flex container', () => {

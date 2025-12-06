@@ -90,6 +90,13 @@ export const scraperStrategyEnum = pgEnum('scraper_strategy', [
   'api',
 ]);
 
+export const waitlistStatusEnum = pgEnum('waitlist_status', [
+  'new',
+  'invited',
+  'claimed',
+  'rejected',
+]);
+
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',
   'phone',
@@ -468,6 +475,23 @@ export const scraperConfigs = pgTable('scraper_configs', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Waitlist entries for invite-only access
+export const waitlistEntries = pgTable('waitlist_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  fullName: text('full_name').notNull(),
+  email: text('email').notNull(),
+  primarySocialUrl: text('primary_social_url').notNull(),
+  primarySocialPlatform: text('primary_social_platform').notNull(),
+  primarySocialUrlNormalized: text('primary_social_url_normalized').notNull(),
+  spotifyUrl: text('spotify_url'),
+  spotifyUrlNormalized: text('spotify_url_normalized'),
+  heardAbout: text('heard_about'),
+  status: waitlistStatusEnum('status').default('new').notNull(),
+  primarySocialFollowerCount: integer('primary_social_follower_count'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -523,6 +547,9 @@ export const selectIngestionJobSchema = createSelectSchema(ingestionJobs);
 export const insertScraperConfigSchema = createInsertSchema(scraperConfigs);
 export const selectScraperConfigSchema = createSelectSchema(scraperConfigs);
 
+export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
+export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -570,3 +597,6 @@ export type NewIngestionJob = typeof ingestionJobs.$inferInsert;
 
 export type ScraperConfig = typeof scraperConfigs.$inferSelect;
 export type NewScraperConfig = typeof scraperConfigs.$inferInsert;
+
+export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
+export type NewWaitlistEntry = typeof waitlistEntries.$inferInsert;
