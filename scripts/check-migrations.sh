@@ -6,6 +6,12 @@
 
 set -e
 
+# Allow bypassing migration guard for schema consolidation
+if [ "$SKIP_MIGRATION_GUARD" = "true" ] || [ "$SKIP_MIGRATION_GUARD" = "1" ]; then
+    echo "ℹ️  Migration Guard: SKIP_MIGRATION_GUARD is set, bypassing checks"
+    exit 0
+fi
+
 # Configuration
 MIGRATIONS_DIR="drizzle/migrations"
 BASE_BRANCH=${1:-"origin/main"}
