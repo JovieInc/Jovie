@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
+import { hexToRgba } from '@/lib/utils/color';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -18,14 +19,6 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
     () => getPlatformIcon(link.platform)?.hex,
     [link.platform]
   );
-  const hexToRgba = (hex: string, alpha: number) => {
-    const h = hex.replace('#', '');
-    const bigint = parseInt(h, 16);
-    const r = (bigint >> 16) & 255;
-    const g = (bigint >> 8) & 255;
-    const b = bigint & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
   const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     // Track analytics first
@@ -83,7 +76,7 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
       onMouseLeave={() => setHover(false)}
       onFocus={() => setHover(true)}
       onBlur={() => setHover(false)}
-      className='group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ring-1 ring-black/5 dark:ring-white/10'
+      className='group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 cursor-pointer ring-1 ring-black/5 dark:ring-white/10'
       style={
         brandHex
           ? {

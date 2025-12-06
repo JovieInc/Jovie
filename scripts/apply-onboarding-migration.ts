@@ -2,7 +2,7 @@
 
 /**
  * Apply Onboarding Migration
- * Ensures the onboarding_create_profile function exists
+ * Ensures the create_profile_with_user function exists
  */
 
 import { neon } from '@neondatabase/serverless';
@@ -38,7 +38,7 @@ async function main() {
     );
     const migrationSQL = readFileSync(migrationPath, 'utf8');
 
-    console.log('📄 Applying onboarding_create_profile function...');
+    console.log('📄 Applying create_profile_with_user function...');
     await db.execute(drizzleSql.raw(migrationSQL));
 
     console.log('✅ Migration applied successfully!');
@@ -48,12 +48,12 @@ async function main() {
     const result = await db.execute(drizzleSql`
       SELECT routine_name 
       FROM information_schema.routines 
-      WHERE routine_name = 'onboarding_create_profile'
+      WHERE routine_name = 'create_profile_with_user'
         AND routine_type = 'FUNCTION'
     `);
 
     if (result.rows && result.rows.length > 0) {
-      console.log('✅ onboarding_create_profile function exists!');
+      console.log('✅ create_profile_with_user function exists!');
     } else {
       console.log('❌ Function not found after migration');
     }
