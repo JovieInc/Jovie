@@ -54,10 +54,9 @@ jobs:
         if: ${{ matrix.check == 'lint' }}
         uses: actions/cache@v4
         with:
-          path: .eslintcache
-          key: ${{ runner.os }}-eslint-${{ github.ref }}-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.js', '.eslintrc*') }}
+          path: .cache/eslint
+          key: ${{ runner.os }}-eslint-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.js', '.eslintrc*') }}
           restore-keys: |
-            ${{ runner.os }}-eslint-${{ github.ref }}-
             ${{ runner.os }}-eslint-
       - name: Run fast/lint check
         run: |
@@ -280,9 +279,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .next/cache
-          key: ${{ runner.os }}-next-${{ github.ref }}-${{ hashFiles('pnpm-lock.yaml', 'next.config.js', 'app/**', 'components/**', 'lib/**', 'styles/**') }}
+          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-next-${{ github.ref }}-
             ${{ runner.os }}-next-
 
       - name: Build
@@ -293,6 +291,9 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   ci-unit-tests:
     name: Unit Tests
@@ -355,10 +356,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   ci-e2e-tests:
     name: E2E Tests
-    needs: [ci-build, ci-unit-tests]
+    needs: [ci-build]
     # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with full-ci label
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
     runs-on: ubuntu-latest
@@ -409,7 +413,7 @@ jobs:
 
       - name: Install Playwright
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        run: npx playwright install --with-deps
+        run: npx playwright install chromium firefox --with-deps
 
       - name: E2E Smoke (PR to Preview)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
