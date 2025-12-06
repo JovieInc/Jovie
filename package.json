@@ -73,6 +73,7 @@
     "neon:migration:status": "tsx scripts/neon-migration-status.ts",
     "neon:init:migration-history": "tsx scripts/neon-init-migration-history.ts",
     "migration:guard": "bash scripts/check-migrations.sh origin/main",
+    "migration:validate": "bash scripts/validate-migrations.sh",
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:check": "drizzle-kit check",
     "drizzle:up": "drizzle-kit up",
@@ -218,6 +219,7 @@
   },
   "lint-staged": {
     "drizzle/migrations/**/*.{sql,ts}": [
+      "pnpm migration:validate",
       "pnpm migration:guard"
     ],
     "*.{js,jsx,ts,tsx}": [

@@ -149,6 +149,7 @@ export const users = pgTable('users', {
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   billingUpdatedAt: timestamp('billing_updated_at'),
+  deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -183,11 +184,15 @@ export const creatorProfiles = pgTable('creator_profiles', {
   isClaimed: boolean('is_claimed').default(false),
   claimToken: text('claim_token'),
   claimedAt: timestamp('claimed_at'),
+  claimTokenExpiresAt: timestamp('claim_token_expires_at'),
+  claimedFromIp: text('claimed_from_ip'),
+  claimedUserAgent: text('claimed_user_agent'),
   avatarLockedByUser: boolean('avatar_locked_by_user').default(false).notNull(),
   displayNameLocked: boolean('display_name_locked').default(false).notNull(),
   ingestionStatus: ingestionStatusEnum('ingestion_status')
     .default('idle')
     .notNull(),
+  lastIngestionError: text('last_ingestion_error'),
   lastLoginAt: timestamp('last_login_at'),
   profileViews: integer('profile_views').default(0),
   onboardingCompletedAt: timestamp('onboarding_completed_at'),
@@ -445,6 +450,9 @@ export const ingestionJobs = pgTable('ingestion_jobs', {
   attempts: integer('attempts').default(0).notNull(),
   runAt: timestamp('run_at').defaultNow().notNull(),
   priority: integer('priority').default(0).notNull(),
+  maxAttempts: integer('max_attempts').default(3).notNull(),
+  nextRunAt: timestamp('next_run_at'),
+  dedupKey: text('dedup_key'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

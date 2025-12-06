@@ -45,7 +45,13 @@ describe('CreatorProfilesTable', () => {
     isVerified: false,
     isClaimed: true,
     claimToken: null,
+    claimTokenExpiresAt: null,
     createdAt: new Date('2024-01-01T00:00:00Z'),
+    isFeatured: false,
+    marketingOptOut: false,
+    userId: 'user-1',
+    ingestionStatus: 'idle',
+    lastIngestionError: null,
   };
 
   const defaultSort: AdminCreatorProfilesSort = 'created_desc';

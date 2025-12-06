@@ -193,6 +193,33 @@ When creating new database migrations, you **MUST** follow this exact process:
 2. Instead, regenerate the migration using `pnpm run drizzle:generate`
 3. Or consult with team lead before manually editing the journal
 
+### 5.1.1 Migration Validation (Pre-commit Hook)
+
+A pre-commit hook automatically validates migration files to catch common issues:
+
+**What it checks:**
+1. Every `.sql` file in `drizzle/migrations/` has a corresponding entry in `_journal.json`
+2. Journal entries have all required fields: `idx`, `version`, `when`, `tag`, `breakpoints`
+3. Migration filenames match journal `tag` values
+4. No gaps in migration `idx` sequence
+
+**When it runs:**
+- Automatically on `git commit`
+- Before pushing to remote
+- Can be bypassed with `--no-verify` flag (use sparingly!)
+
+**If validation fails:**
+```bash
+❌ Migration validation failed:
+   - Migration file 0015_my_feature.sql found but not in _journal.json
+   - Use `pnpm drizzle-kit generate` to create migrations properly
+```
+
+**To fix:**
+1. Remove the manually created `.sql` file
+2. Run `pnpm drizzle-kit generate` to regenerate it properly
+3. Commit again
+
 ### 5.2 Zero-Downtime Index Creation (CRITICAL)
 
 When creating indexes in production migrations, you **MUST** use `CONCURRENTLY` to avoid blocking writes:
