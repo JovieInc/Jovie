@@ -74,6 +74,7 @@ pnpm test:profile
 - Identifies bottlenecks
 - Generates performance reports
 - Saves baseline for comparison
+- Runs the optimized `pnpm test:fast` suite with `--reporter=verbose` so profiling matches what guard enforces
 
 #### Performance Guard (CI)
 **File**: `scripts/test-performance-guard.ts`
@@ -83,6 +84,7 @@ pnpm test:guard
 - Enforces performance thresholds
 - Fails CI if tests are too slow
 - Prevents performance regressions
+- Executes `pnpm test:fast --reporter=verbose` to keep guard checks aligned with the fast suite
 
 #### Flaky Test Detector
 **File**: `scripts/flaky-test-detector.ts`
@@ -283,4 +285,3 @@ When adding new tests:
 ---
 
 **Goal**: Every test should complete in <200ms to enable YC-style fast feedback loops that keep developers in flow state.
-

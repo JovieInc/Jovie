@@ -73,7 +73,7 @@ class TestPerformanceGuard {
     console.log('⏱️  Running test suite with performance monitoring...');
 
     try {
-      const output = execSync('pnpm test', {
+      const output = execSync('pnpm test:fast --reporter=verbose', {
         encoding: 'utf8',
         stdio: 'pipe',
         timeout: 120000,
@@ -122,12 +122,13 @@ class TestPerformanceGuard {
 
     // Extract individual test results and calculate p95
     const testResults: number[] = [];
-    const testResultRegex = /✓\s+(.+?)\s+\((\d+)\s+tests?\)\s+(\d+)ms/g;
-    let match;
-
-    while ((match = testResultRegex.exec(output)) !== null) {
-      const [, name, , duration] = match;
-      const durationMs = parseInt(duration);
+    const seenTests = new Set<string>();
+    const addTestResult = (name: string, durationMs: number) => {
+      const key = `${name}::${durationMs}`;
+      if (seenTests.has(key)) {
+        return;
+      }
+      seenTests.add(key);
       testResults.push(durationMs);
 
       if (durationMs > this.thresholds.individualTest) {
@@ -136,6 +137,15 @@ class TestPerformanceGuard {
           duration: durationMs,
         });
       }
+    };
+
+    const simpleTestRegex = /^\s*(?:✓|✅)?\s*(.+?)\s+(\d+)ms\s*$/gm;
+    let match;
+
+    while ((match = simpleTestRegex.exec(output)) !== null) {
+      const [, name, duration] = match;
+      const durationMs = parseInt(duration);
+      addTestResult(name.trim(), durationMs);
     }
 
     // Calculate p95
