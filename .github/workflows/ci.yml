@@ -532,6 +532,10 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      # Main/staging must always use DATABASE_URL_MAIN; keep production secrets separate.
+      DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
       name: Main Staging
       url: https://main.jov.ie
@@ -543,13 +547,13 @@ jobs:
       - name: DB migrate (main - Drizzle)
         run: pnpm run drizzle:migrate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'  # Allow automated migrations on main (staging environment)
       - name: DB seed (main)
         run: pnpm run db:seed
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_MAIN }}
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
         continue-on-error: false
       - name: Pull env (main)
@@ -758,6 +762,10 @@ jobs:
     if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Production must always use DATABASE_URL; keep main/staging secrets separate.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
     environment:
       name: Production
       url: https://jov.ie
@@ -772,7 +780,7 @@ jobs:
       - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
         run: pnpm run drizzle:migrate:prod
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
           GIT_BRANCH: production
           ALLOW_PROD_MIGRATIONS: true
         continue-on-error: false
