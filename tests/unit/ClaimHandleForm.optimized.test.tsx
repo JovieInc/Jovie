@@ -11,7 +11,7 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, test, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Lazy-load mocks only when needed
 const mockPush = vi.fn();
@@ -52,7 +52,7 @@ describe('ClaimHandleForm (Optimized)', () => {
 
     const previewContainer = document.querySelector('#handle-preview-text');
     expect(previewContainer).toBeInTheDocument();
-    expect(previewContainer).toHaveClass('min-h-[1.25rem]');
+    expect(previewContainer).toHaveClass('min-h-5');
   });
 
   test('has proper accessibility attributes', () => {

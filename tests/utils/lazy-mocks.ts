@@ -150,45 +150,45 @@ export function loadBrowserApiMocks() {
   loadedMocks.add('browser-apis');
 }
 
+// Define mocked components outside the function to avoid hoisting issues
+const MockedHeadlessUiComponents = {
+  // Dialog components
+  Dialog: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
+    (props, ref) => {
+      return React.createElement('div', { ...props, ref, role: 'dialog' });
+    }
+  ),
+  DialogPanel: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
+    (props, ref) => {
+      return React.createElement('div', { ...props, ref });
+    }
+  ),
+  DialogTitle: React.forwardRef<HTMLHeadingElement, React.ComponentProps<'h2'>>(
+    (props, ref) => {
+      return React.createElement('h2', { ...props, ref });
+    }
+  ),
+  // Add other components as needed...
+  Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
+    (props, ref) => {
+      return React.createElement('input', { ...props, ref });
+    }
+  ),
+};
+
+// Add display names
+MockedHeadlessUiComponents.Dialog.displayName = 'MockedDialog';
+MockedHeadlessUiComponents.DialogPanel.displayName = 'MockedDialogPanel';
+MockedHeadlessUiComponents.DialogTitle.displayName = 'MockedDialogTitle';
+MockedHeadlessUiComponents.Input.displayName = 'MockedInput';
+
 /**
  * Lazy load Headless UI mocks only when needed
  */
 export function loadHeadlessUiMocks() {
   if (loadedMocks.has('headless-ui')) return;
 
-  const MockedComponents = {
-    // Dialog components
-    Dialog: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
-      (props, ref) => {
-        return React.createElement('div', { ...props, ref, role: 'dialog' });
-      }
-    ),
-    DialogPanel: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
-      (props, ref) => {
-        return React.createElement('div', { ...props, ref });
-      }
-    ),
-    DialogTitle: React.forwardRef<
-      HTMLHeadingElement,
-      React.ComponentProps<'h2'>
-    >((props, ref) => {
-      return React.createElement('h2', { ...props, ref });
-    }),
-    // Add other components as needed...
-    Input: React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
-      (props, ref) => {
-        return React.createElement('input', { ...props, ref });
-      }
-    ),
-  };
-
-  // Add display names
-  MockedComponents.Dialog.displayName = 'MockedDialog';
-  MockedComponents.DialogPanel.displayName = 'MockedDialogPanel';
-  MockedComponents.DialogTitle.displayName = 'MockedDialogTitle';
-  MockedComponents.Input.displayName = 'MockedInput';
-
-  vi.mock('@headlessui/react', () => MockedComponents);
+  vi.mock('@headlessui/react', () => MockedHeadlessUiComponents);
 
   loadedMocks.add('headless-ui');
 }
