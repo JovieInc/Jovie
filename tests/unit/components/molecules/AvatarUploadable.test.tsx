@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
@@ -617,6 +617,7 @@ describe('AvatarUploadable Component', () => {
     });
 
     it('announces status changes to screen readers', async () => {
+      // Use immediately resolving mock for simpler async handling
       mockOnUpload.mockResolvedValue('https://example.com/new-avatar.jpg');
 
       render(
@@ -632,10 +633,20 @@ describe('AvatarUploadable Component', () => {
       const fileInput = screen.getByLabelText('Choose profile photo file');
       const file = createMockFile();
 
+      // Trigger file selection
       fireEvent.change(fileInput, { target: { files: [file] } });
 
-      await Promise.resolve();
-      vi.runAllTimers();
+      // Flush microtasks to let the promise resolve
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Advance timers to process any setTimeout calls
+      await act(async () => {
+        vi.advanceTimersByTime(100);
+      });
+
+      // Now check for the success announcement
       const successAnnouncement = screen.getByText(
         'Profile photo uploaded successfully'
       );
