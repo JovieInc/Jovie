@@ -16,6 +16,20 @@ import { applyProfileEnrichment } from './profile';
 import { extractLinktree, fetchLinktreeDocument } from './strategies/linktree';
 import { type ExtractionResult } from './types';
 
+// Retry configuration
+const DEFAULT_MAX_ATTEMPTS = 3;
+const BASE_BACKOFF_MS = 5000; // 5 seconds
+const MAX_BACKOFF_MS = 300000; // 5 minutes
+
+/**
+ * Calculate exponential backoff delay with jitter.
+ */
+function calculateBackoff(attempt: number): number {
+  const exponentialDelay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
+  const jitter = Math.random() * 1000; // 0-1 second jitter
+  return Math.min(exponentialDelay + jitter, MAX_BACKOFF_MS);
+}
+
 const linktreePayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   sourceUrl: z.string().url(),
@@ -251,11 +265,16 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
   };
 }
 
+/**
+ * Claim pending jobs for processing.
+ * Respects maxAttempts and only claims jobs that are ready to run.
+ */
 export async function claimPendingJobs(
   tx: DbType,
   now: Date,
   limit = 5
 ): Promise<(typeof ingestionJobs.$inferSelect)[]> {
+  // Only select jobs that haven't exceeded max attempts
   const candidates = await tx
     .select()
     .from(ingestionJobs)
@@ -268,6 +287,21 @@ export async function claimPendingJobs(
   const claimed: (typeof ingestionJobs.$inferSelect)[] = [];
 
   for (const candidate of candidates) {
+    // Skip if already at max attempts
+    const maxAttempts = candidate.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+    if (candidate.attempts >= maxAttempts) {
+      // Mark as failed if at max attempts
+      await tx
+        .update(ingestionJobs)
+        .set({
+          status: 'failed',
+          error: `Exceeded max attempts (${maxAttempts})`,
+          updatedAt: new Date(),
+        })
+        .where(eq(ingestionJobs.id, candidate.id));
+      continue;
+    }
+
     const [updated] = await tx
       .update(ingestionJobs)
       .set({
@@ -289,6 +323,100 @@ export async function claimPendingJobs(
   }
 
   return claimed;
+}
+
+/**
+ * Mark a job as failed with optional retry scheduling.
+ * If attempts < maxAttempts, schedules retry with exponential backoff.
+ */
+export async function failJob(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect,
+  error: string
+): Promise<void> {
+  const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const shouldRetry = job.attempts < maxAttempts;
+
+  if (shouldRetry) {
+    const backoffMs = calculateBackoff(job.attempts);
+    const nextRunAt = new Date(Date.now() + backoffMs);
+
+    logger.info('Scheduling job retry', {
+      jobId: job.id,
+      attempt: job.attempts,
+      maxAttempts,
+      nextRunAt,
+      backoffMs,
+    });
+
+    await tx
+      .update(ingestionJobs)
+      .set({
+        status: 'pending',
+        error,
+        nextRunAt,
+        runAt: nextRunAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(ingestionJobs.id, job.id));
+  } else {
+    logger.warn('Job failed permanently', {
+      jobId: job.id,
+      attempts: job.attempts,
+      maxAttempts,
+      error,
+    });
+
+    await tx
+      .update(ingestionJobs)
+      .set({
+        status: 'failed',
+        error,
+        updatedAt: new Date(),
+      })
+      .where(eq(ingestionJobs.id, job.id));
+  }
+}
+
+/**
+ * Mark a job as succeeded.
+ */
+export async function succeedJob(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect
+): Promise<void> {
+  await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'succeeded',
+      error: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(ingestionJobs.id, job.id));
+}
+
+/**
+ * Reset a failed job for retry (admin action).
+ * Clears error, resets attempts, and sets status to pending.
+ */
+export async function resetJobForRetry(
+  tx: DbType,
+  jobId: string
+): Promise<boolean> {
+  const [updated] = await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'pending',
+      error: null,
+      attempts: 0,
+      runAt: new Date(),
+      nextRunAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(ingestionJobs.id, jobId))
+    .returning({ id: ingestionJobs.id });
+
+  return !!updated;
 }
 
 export async function processJob(

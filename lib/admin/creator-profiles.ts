@@ -15,6 +15,9 @@ import {
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
 
+// Default claim token expiration: 30 days
+const CLAIM_TOKEN_EXPIRY_DAYS = 30;
+
 export interface AdminCreatorProfileRow {
   id: string;
   username: string;
@@ -26,9 +29,12 @@ export interface AdminCreatorProfileRow {
   marketingOptOut: boolean;
   isClaimed: boolean;
   claimToken: string | null;
+  claimTokenExpiresAt: Date | null;
   userId: string | null;
   createdAt: Date | null;
   confidence?: number | null;
+  ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed';
+  lastIngestionError: string | null;
 }
 
 export type AdminCreatorProfilesSort =
@@ -133,8 +139,11 @@ export async function getAdminCreatorProfiles(
           marketingOptOut: creatorProfiles.marketingOptOut,
           isClaimed: creatorProfiles.isClaimed,
           claimToken: creatorProfiles.claimToken,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
           userId: creatorProfiles.userId,
           createdAt: creatorProfiles.createdAt,
+          ingestionStatus: creatorProfiles.ingestionStatus,
+          lastIngestionError: creatorProfiles.lastIngestionError,
         })
         .from(creatorProfiles)
         .where(whereClause)
@@ -150,23 +159,28 @@ export async function getAdminCreatorProfiles(
 
     const pageRows = rows;
 
-    // Ensure unclaimed profiles have a claim token so admins can generate claim links.
+    // Legacy backfill: Ensure unclaimed profiles have a claim token.
+    // NOTE: New profiles should have tokens generated at creation time.
+    // This backfill is temporary for legacy rows without tokens.
     const needsToken = pageRows.filter(
       row => !row.isClaimed && !row.claimToken
     );
 
     if (needsToken.length > 0) {
-      const tokensById = new Map<string, string>();
+      const tokensById = new Map<string, { token: string; expiresAt: Date }>();
 
       await Promise.all(
         needsToken.map(async row => {
           const token = randomUUID();
-          tokensById.set(row.id, token);
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + CLAIM_TOKEN_EXPIRY_DAYS);
+          tokensById.set(row.id, { token, expiresAt });
 
           await db
             .update(creatorProfiles)
             .set({
               claimToken: token,
+              claimTokenExpiresAt: expiresAt,
               updatedAt: new Date(),
             })
             .where(eq(creatorProfiles.id, row.id));
@@ -175,9 +189,11 @@ export async function getAdminCreatorProfiles(
 
       // Update in-memory rows so callers immediately see the new tokens.
       for (const row of pageRows) {
-        const token = tokensById.get(row.id);
-        if (token) {
-          (row as { claimToken?: string | null }).claimToken = token;
+        const tokenData = tokensById.get(row.id);
+        if (tokenData) {
+          (row as { claimToken?: string | null }).claimToken = tokenData.token;
+          (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt =
+            tokenData.expiresAt;
         }
       }
     }
@@ -217,7 +233,6 @@ export async function getAdminCreatorProfiles(
         username: row.username,
         usernameNormalized: row.usernameNormalized,
         avatarUrl: row.avatarUrl ?? null,
-        // displayName is optional in the admin listing but useful for detail views
         displayName:
           (row as { displayName?: string | null }).displayName ?? null,
         isVerified: row.isVerified ?? false,
@@ -225,9 +240,14 @@ export async function getAdminCreatorProfiles(
         marketingOptOut: row.marketingOptOut ?? false,
         isClaimed: row.isClaimed ?? false,
         claimToken: row.claimToken ?? null,
+        claimTokenExpiresAt:
+          (row as { claimTokenExpiresAt?: Date | null }).claimTokenExpiresAt ??
+          null,
         userId: row.userId ?? null,
         createdAt: row.createdAt ?? null,
         confidence: confidenceMap.get(row.id) ?? null,
+        ingestionStatus: row.ingestionStatus ?? 'idle',
+        lastIngestionError: row.lastIngestionError ?? null,
       })),
       page,
       pageSize,

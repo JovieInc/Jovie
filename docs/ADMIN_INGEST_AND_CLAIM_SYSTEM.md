@@ -240,6 +240,61 @@ Confidence signals:
 
 ---
 
+## Hardening (Implemented)
+
+### A. Creator Ingest Hardening
+
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| **Strict URL validation** | ✅ | HTTPS only, valid Linktree hosts, handle validation |
+| **Handle normalization** | ✅ | Lowercase, strip @, validate format (1-30 chars, alphanumeric + underscore) |
+| **Unique constraint** | ✅ | `usernameNormalized` unique at DB level (migration 0002) |
+| **Transaction + race safety** | ✅ | `withSystemIngestionSession` wraps all operations |
+| **Idempotency key** | ✅ | Optional UUID in request body |
+| **Error persistence** | ✅ | `lastIngestionError` column, `ingestionStatus = 'failed'` |
+| **Claim token at creation** | ✅ | Token + expiration generated in ingest route |
+| **Link dedup** | ✅ | Unique index on `(creatorProfileId, platform, url)` |
+
+### B. Claim Flow Hardening
+
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| **Token generated at create** | ✅ | Ingest route generates token; backfill for legacy |
+| **Token uniqueness** | ✅ | Unique partial index on `claimToken` |
+| **Token expiration** | ✅ | `claimTokenExpiresAt` (30 days default) |
+| **Atomic claim update** | ✅ | WHERE clause: `token = $token AND isClaimed = false AND userId IS NULL` |
+| **Audit columns** | ✅ | `claimedFromIp`, `claimedUserAgent` |
+| **Soft-delete check** | ✅ | Blocks claim if user has `deletedAt` set |
+| **Multi-profile guard** | ✅ | 1 user ↔ 1 profile (blocks second claim) |
+
+### C. Ingestion Jobs Hardening
+
+| Feature | Status | Implementation |
+|---------|--------|----------------|
+| **Max attempts** | ✅ | `maxAttempts` column (default 3) |
+| **Exponential backoff** | ✅ | `calculateBackoff()` with jitter |
+| **Dedup key** | ✅ | `dedupKey` column with unique partial index |
+| **Job status tracking** | ✅ | `failJob()`, `succeedJob()`, `resetJobForRetry()` |
+
+---
+
+## Migration: 0002_ingest_claim_hardening.sql
+
+Adds:
+- `creator_profiles.last_ingestion_error` (text)
+- `creator_profiles.claim_token_expires_at` (timestamp)
+- `creator_profiles.claimed_from_ip` (text)
+- `creator_profiles.claimed_user_agent` (text)
+- `ingestion_jobs.max_attempts` (int, default 3)
+- `ingestion_jobs.next_run_at` (timestamp)
+- `ingestion_jobs.dedup_key` (text)
+- Unique index on `username_normalized`
+- Unique partial index on `claim_token`
+- Unique index on `(creator_profile_id, platform, url)` for social_links
+- Index for efficient job polling
+
+---
+
 ## Related Documentation
 
 - `docs/link_ingestion_and_suggestions.md` – Full design doc for ingestion system

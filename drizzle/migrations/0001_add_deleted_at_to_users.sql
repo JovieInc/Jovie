@@ -1,6 +1,9 @@
 -- Migration: Add soft delete support to users table
+-- Generated manually on branch: chore/consolidate-migrations
 -- Date: 2025-12-06
 -- Description: Adds deletedAt timestamp column to users table for soft delete functionality
+-- NOTE: This migration was created during migration consolidation and follows the manual
+--       migration pattern. In normal circumstances, use `pnpm drizzle-kit generate`.
 
 -- Add deletedAt column to users table for soft deletes
 ALTER TABLE users
