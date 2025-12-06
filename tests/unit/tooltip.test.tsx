@@ -6,13 +6,26 @@ import {
 } from '@jovie/ui/atoms/tooltip';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
+
+vi.useFakeTimers();
 
 // Mock reduced motion
 const mockMatchMedia = vi.fn();
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: mockMatchMedia,
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: mockMatchMedia,
+  });
 });
 
 // Test wrapper component with provider
@@ -66,6 +79,11 @@ describe('Tooltip', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    vi.runOnlyPendingTimers();
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
   });
 
   describe('Rendering', () => {
@@ -99,8 +117,9 @@ describe('Tooltip', () => {
       render(<BasicTooltip />);
 
       const triggerElement = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(triggerElement);
+      vi.runAllTimers();
 
       const tooltips = await screen.findAllByText('Test tooltip content');
       expect(tooltips.length).toBeGreaterThan(0);
@@ -132,10 +151,11 @@ describe('Tooltip', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       // Use hover to reliably open the tooltip, then ensure it remains visible when focused
       await user.hover(trigger);
+      vi.runAllTimers();
       trigger.focus();
 
       const tooltips = await screen.findAllByText('Test tooltip content');
@@ -180,10 +200,11 @@ describe('Tooltip', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       // Show tooltip via hover
       await user.hover(trigger);
+      vi.runAllTimers();
       const tooltips = await screen.findAllByText('Test tooltip content');
       expect(tooltips[0]).toBeVisible();
 
@@ -203,8 +224,9 @@ describe('Tooltip', () => {
       render(<BasicTooltip showArrow={true} />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const tooltips = await screen.findAllByText('Test tooltip content');
       const tooltipContent = tooltips[0].closest('[data-state]');
@@ -237,8 +259,9 @@ describe('Tooltip', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const tooltip = await screen.findByRole('tooltip');
       const triggerId = trigger.getAttribute('aria-describedby');
@@ -250,8 +273,9 @@ describe('Tooltip', () => {
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const tooltip = await screen.findByRole('tooltip');
       expect(tooltip).toHaveAttribute('role', 'tooltip');
@@ -278,8 +302,10 @@ describe('Tooltip', () => {
 
       // Hovering the wrapper should show tooltip
       if (wrapper) {
-        const user = userEvent.setup();
+        const user = userEvent.setup({ delay: null });
         await user.hover(wrapper);
+        vi.runAllTimers();
+
         const tooltips = await screen.findAllByText(
           'This action is unavailable'
         );
@@ -302,8 +328,9 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const [tooltipText] = await screen.findAllByText('Top tooltip');
       const tooltipContent = tooltipText.closest('[data-state]');
@@ -325,8 +352,9 @@ describe('Tooltip', () => {
       );
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
       await user.hover(trigger);
+      vi.runAllTimers();
       const rendered = await screen.findAllByText('Custom offset tooltip');
       expect(rendered.length).toBeGreaterThan(0);
     });
@@ -361,12 +389,13 @@ describe('Tooltip', () => {
 
   describe('Reduced Motion', () => {
     it('includes motion-reduce classes for accessibility', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       render(<BasicTooltip />);
 
       const trigger = screen.getByRole('button', { name: 'Trigger' });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const tooltip = await screen.findByRole('tooltip');
       const tooltipContent =
@@ -377,7 +406,7 @@ describe('Tooltip', () => {
 
   describe('Complex Content', () => {
     it('renders complex React node content', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ delay: null });
 
       render(
         <TooltipWrapper>
@@ -397,6 +426,7 @@ describe('Tooltip', () => {
 
       const trigger = screen.getByRole('button', { name: 'Complex trigger' });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const titleElements = await screen.findAllByText('Complex content title');
       expect(titleElements.length).toBeGreaterThan(0);
@@ -424,6 +454,7 @@ describe('Tooltip', () => {
         name: 'Custom class trigger',
       });
       await user.hover(trigger);
+      vi.runAllTimers();
 
       const tooltipElements = await screen.findAllByText(
         'Custom styled tooltip'
