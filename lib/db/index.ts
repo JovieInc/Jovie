@@ -230,7 +230,11 @@ function initializeDb(): DbType {
   }
 
   // Use a single connection in development to avoid connection pool exhaustion
-  if (process.env.NODE_ENV === 'production') {
+  // In Edge runtime (where global is undefined), always create fresh instance
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasGlobal = typeof global !== 'undefined';
+
+  if (isProduction || !hasGlobal) {
     return drizzle(_pool, { schema, logger: false });
   } else {
     if (!global.db) {
