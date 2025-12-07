@@ -816,4 +816,3 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
         run: npx lhci autorun --config=.lighthouserc.json
-
