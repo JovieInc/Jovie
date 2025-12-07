@@ -41,6 +41,10 @@ export function OtpSignInForm() {
           >
             <SignIn.Strategy name='email_code'>
               <div className='space-y-4'>
+                <p className='text-sm text-secondary text-center'>
+                  We sent a code to your email
+                </p>
+
                 <Clerk.Field name='code'>
                   <AuthInput
                     type='text'
@@ -55,6 +59,13 @@ export function OtpSignInForm() {
 
                 <SignIn.Action submit className={SUBMIT_BUTTON_CLASSES}>
                   Continue
+                </SignIn.Action>
+
+                <SignIn.Action
+                  navigate='start'
+                  className='w-full text-center text-sm text-secondary hover:text-primary transition-colors'
+                >
+                  ← Use a different email
                 </SignIn.Action>
 
                 <AuthFooterLink

@@ -45,6 +45,13 @@ vi.mock('@clerk/elements/sign-up', () => ({
       {children}
     </div>
   ),
+  Strategy: ({
+    name,
+    children,
+  }: {
+    name: string;
+    children: React.ReactNode;
+  }) => <div data-testid={`signup-strategy-${name}`}>{children}</div>,
   Action: ({
     children,
     className,
