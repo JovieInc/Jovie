@@ -45,10 +45,11 @@ CREATE TABLE IF NOT EXISTS creator_contacts (
 );
 
 -- Create index for faster lookups by creator profile
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_creator_contacts_profile_id 
+-- Note: Cannot use CONCURRENTLY inside Drizzle transaction block
+CREATE INDEX IF NOT EXISTS idx_creator_contacts_profile_id
   ON creator_contacts(creator_profile_id);
 
 -- Create index for active contacts
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_creator_contacts_active 
-  ON creator_contacts(creator_profile_id, is_active) 
+CREATE INDEX IF NOT EXISTS idx_creator_contacts_active
+  ON creator_contacts(creator_profile_id, is_active)
   WHERE is_active = true;
