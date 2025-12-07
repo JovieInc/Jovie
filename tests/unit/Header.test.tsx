@@ -37,16 +37,14 @@ describe('Atomic Design Structure', () => {
     it('AuthActions component works correctly', () => {
       render(<AuthActions />);
 
-      expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
-      expect(
-        screen.getByRole('link', { name: 'Get started' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
 
       // Check that it's properly structured
       const container = screen.getByRole('link', {
-        name: 'Sign in',
+        name: 'Log in',
       }).parentElement;
-      expect(container).toHaveClass('flex', 'items-center', 'space-x-4');
+      expect(container).toHaveClass('flex', 'items-center', 'gap-2');
     });
   });
 
@@ -60,15 +58,13 @@ describe('Atomic Design Structure', () => {
         </div>
       );
 
-      // Should have logo and sign in/sign up links
+      // Should have logo and log in/sign up links
       expect(screen.getByRole('link', { name: 'Jovie' })).toHaveAttribute(
         'href',
         '/'
       ); // Logo link
-      expect(screen.getByRole('link', { name: 'Sign in' })).toBeInTheDocument();
-      expect(
-        screen.getByRole('link', { name: 'Get started' })
-      ).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
     });
   });
 });

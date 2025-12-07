@@ -18,6 +18,7 @@ export * from './JovieIcon';
 export * from './JovieLogo';
 export * from './Label';
 export * from './Logo';
+export * from './LogoIcon';
 export * from './LogoLink';
 export * from './LogoLoader';
 export * from './OptimizedImage';

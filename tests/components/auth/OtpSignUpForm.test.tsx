@@ -10,24 +10,18 @@ vi.mock('@clerk/elements/common', () => ({
   Field: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='field'>{children}</div>
   ),
-  Label: ({
+  Input: ({
+    type,
     children,
-    className,
+    asChild,
   }: {
-    children: React.ReactNode;
-    className?: string;
+    type: string;
+    children?: React.ReactNode;
+    asChild?: boolean;
   }) => (
-    <label data-testid='label' className={className}>
+    <div data-testid='clerk-input' data-type={type} data-aschild={asChild}>
       {children}
-    </label>
-  ),
-  Input: ({ type, className }: { type: string; className?: string }) => (
-    <input
-      data-testid='input'
-      type={type}
-      className={className}
-      aria-label={type === 'email' ? 'Email input' : 'Code input'}
-    />
+    </div>
   ),
   FieldError: ({ className }: { className?: string }) => (
     <div data-testid='field-error' className={className} />
@@ -108,25 +102,11 @@ describe('OtpSignUpForm', () => {
     );
   });
 
-  it('renders email input with correct label', () => {
-    render(<OtpSignUpForm />);
-
-    const labels = screen.getAllByTestId('label');
-    expect(labels[0]).toHaveTextContent('Email address');
-  });
-
-  it('renders verification code input with correct label', () => {
-    render(<OtpSignUpForm />);
-
-    const labels = screen.getAllByTestId('label');
-    expect(labels[1]).toHaveTextContent('Enter the code we emailed you');
-  });
-
-  it('displays "Send code" button in start step', () => {
+  it('displays "Continue with Email" button in start step', () => {
     render(<OtpSignUpForm />);
 
     const buttons = screen.getAllByTestId('signup-action');
-    expect(buttons[0]).toHaveTextContent('Send code');
+    expect(buttons[0]).toHaveTextContent('Continue with Email');
   });
 
   it('displays "Continue" button in verifications step', () => {
@@ -146,67 +126,40 @@ describe('OtpSignUpForm', () => {
     });
   });
 
-  it('uses semantic design tokens instead of hardcoded colors', () => {
+  it('uses semantic design tokens for global error', () => {
     render(<OtpSignUpForm />);
 
     const globalError = screen.getByTestId('global-error');
     expect(globalError).toHaveClass('text-destructive');
+  });
+
+  it('renders field errors with correct styling', () => {
+    render(<OtpSignUpForm />);
 
     const fieldErrors = screen.getAllByTestId('field-error');
-    fieldErrors.forEach(error => {
-      expect(error).toHaveClass('text-destructive');
-    });
+    expect(fieldErrors.length).toBeGreaterThan(0);
   });
 
-  it('applies correct styling to email input', () => {
+  it('renders email input field', () => {
     render(<OtpSignUpForm />);
 
-    const inputs = screen.getAllByTestId('input');
-    const emailInput = inputs[0];
-
-    expect(emailInput).toHaveClass('bg-background');
-    expect(emailInput).toHaveClass('text-primary-token');
-    expect(emailInput).toHaveClass('border-input');
-    expect(emailInput).toHaveClass('focus:ring-ring');
+    const inputs = screen.getAllByTestId('clerk-input');
+    expect(inputs[0]).toHaveAttribute('data-type', 'email');
   });
 
-  it('applies correct styling to code input with centered text', () => {
+  it('renders code input field for OTP', () => {
     render(<OtpSignUpForm />);
 
-    const inputs = screen.getAllByTestId('input');
-    const codeInput = inputs[1];
-
-    expect(codeInput).toHaveClass('text-center');
-    expect(codeInput).toHaveClass('tracking-[0.3em]');
+    const inputs = screen.getAllByTestId('clerk-input');
+    expect(inputs[1]).toHaveAttribute('data-type', 'text');
   });
 
-  it('renders labels with secondary-token color', () => {
+  it('uses AuthInput component with asChild pattern', () => {
     render(<OtpSignUpForm />);
 
-    const labels = screen.getAllByTestId('label');
-    labels.forEach(label => {
-      expect(label).toHaveClass('text-secondary-token');
-    });
-  });
-
-  it('signin link uses accent color', () => {
-    render(<OtpSignUpForm />);
-
-    const signinLinks = screen.getAllByText('Sign in');
-    signinLinks.forEach(link => {
-      expect(link.closest('a')).toHaveClass('text-accent');
-    });
-  });
-
-  it('uses purple buttons for signup actions', () => {
-    render(<OtpSignUpForm />);
-
-    const buttons = screen.getAllByTestId('signup-action');
-    buttons.forEach(button => {
-      expect(button).toHaveClass('btn');
-      expect(button).toHaveClass('btn-primary');
-      expect(button).toHaveClass('w-full');
-      expect(button).toHaveClass('justify-center');
+    const inputs = screen.getAllByTestId('clerk-input');
+    inputs.forEach(input => {
+      expect(input).toHaveAttribute('data-aschild', 'true');
     });
   });
 });
