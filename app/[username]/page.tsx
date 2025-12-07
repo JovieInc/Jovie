@@ -95,6 +95,7 @@ const getProfileAndLinks = unstable_cache(
       return { profile: null, links: [], contacts: [], status: 'error' };
     }
   },
+  // Key prefix stays stable; args are included in the cache key so each username gets its own entry.
   ['public-profile-v1'],
   { revalidate: 60 }
 );
