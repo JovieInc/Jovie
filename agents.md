@@ -220,6 +220,54 @@ A pre-commit hook automatically validates migration files to catch common issues
 2. Run `pnpm drizzle-kit generate` to regenerate it properly
 3. Commit again
 
+### 5.1.2 Multiple Migrations Per PR (Migration Guard)
+
+**Default policy: ONE migration per PR** to minimize merge conflicts and maintain clear change history.
+
+**If you need multiple migrations in a single PR**, use one of these approaches:
+
+#### Option 1: `schema:bulk` Label (Recommended)
+Use when intentionally adding multiple related migrations:
+
+```bash
+# Check migration status
+pnpm migration:multi-check
+
+# Add label to your PR
+pnpm migration:allow-multiple
+# Or manually: gh pr edit <PR> --add-label "schema:bulk"
+```
+
+This label:
+- ✅ Allows multiple migrations in the PR
+- ✅ Still validates each migration individually
+- ✅ Checks for CONCURRENTLY keyword
+- ✅ Verifies migrations are registered in _journal.json
+
+#### Option 2: `skip-migration-guard` Label (Exceptional Cases Only)
+Use ONLY when fixing broken migrations or schema consolidation:
+
+```bash
+# Bypass ALL migration checks (use with caution!)
+pnpm migration:skip-guard
+# Or manually: gh pr edit <PR> --add-label "skip-migration-guard"
+```
+
+**WARNING:** This completely bypasses migration validation. Only use for:
+- Fixing migration errors (e.g., removing CONCURRENTLY)
+- Cleaning up migration conflicts
+- Emergency schema fixes approved by team
+
+#### Option 3: Environment Variable (Local Testing)
+```bash
+SKIP_MIGRATION_GUARD=true pnpm migration:guard
+```
+
+**Quick reference:**
+- Check status: `bash scripts/handle-multiple-migrations.sh`
+- Allow multiple: `bash scripts/handle-multiple-migrations.sh --bulk`
+- Skip all checks: `bash scripts/handle-multiple-migrations.sh --skip`
+
 ### 5.2 Index Creation in Drizzle Migrations (CRITICAL)
 
 **NEVER use `CONCURRENTLY` in Drizzle migration files.** This is a common PostgreSQL mistake that will break your migrations.
