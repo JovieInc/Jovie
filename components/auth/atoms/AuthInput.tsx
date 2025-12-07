@@ -1,8 +1,6 @@
 'use client';
 
 import * as Clerk from '@clerk/elements/common';
-import { Input } from '@jovie/ui';
-import { cn } from '@/lib/utils';
 
 interface AuthInputProps {
   type: 'email' | 'text';
@@ -10,15 +8,14 @@ interface AuthInputProps {
   autoComplete?: string;
   maxLength?: number;
   variant?: 'default' | 'otp';
-  placeholder?: string;
 }
 
-const authInputClasses =
-  'border-0 bg-[#23252a] text-white placeholder:text-[#6b6f76] focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 rounded-lg';
+const baseClasses =
+  'w-full rounded-lg border border-input bg-background text-primary-token focus:outline-none focus:ring-2 focus:ring-ring focus:border-input';
 
 const variantClasses = {
-  default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-mono',
+  default: 'px-3 py-2',
+  otp: 'px-3 py-3 text-2xl tracking-[0.3em] text-center font-mono',
 } as const;
 
 export function AuthInput({
@@ -27,7 +24,6 @@ export function AuthInput({
   autoComplete,
   maxLength,
   variant = 'default',
-  placeholder,
 }: AuthInputProps) {
   return (
     <Clerk.Input
@@ -35,13 +31,7 @@ export function AuthInput({
       inputMode={inputMode}
       autoComplete={autoComplete}
       maxLength={maxLength}
-      asChild
-    >
-      <Input
-        inputSize='lg'
-        placeholder={placeholder}
-        className={cn(authInputClasses, variantClasses[variant])}
-      />
-    </Clerk.Input>
+      className={`${baseClasses} ${variantClasses[variant]}`}
+    />
   );
 }

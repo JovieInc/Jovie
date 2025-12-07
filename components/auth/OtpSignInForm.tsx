@@ -5,9 +5,10 @@ import * as SignIn from '@clerk/elements/sign-in';
 import { Card, CardContent } from '@jovie/ui';
 import { AuthFooterLink, AuthInput } from './atoms';
 
-const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-red-400';
-const SUBMIT_BUTTON_CLASSES =
-  'w-full rounded-lg bg-[#e8e8e8] hover:bg-white text-[#101012] font-medium py-3 px-4 transition-colors';
+const FIELD_LABEL_CLASSES =
+  'block text-sm font-medium text-secondary-token mb-1';
+const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-destructive';
+const SUBMIT_BUTTON_CLASSES = 'btn btn-primary w-full justify-center';
 
 export function OtpSignInForm() {
   return (
@@ -19,12 +20,15 @@ export function OtpSignInForm() {
           <SignIn.Step name='start' aria-label='Enter your email address'>
             <div className='space-y-4'>
               <Clerk.Field name='identifier'>
-                <AuthInput type='email' placeholder='Email Address' />
+                <Clerk.Label className={FIELD_LABEL_CLASSES}>
+                  Email address
+                </Clerk.Label>
+                <AuthInput type='email' />
                 <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
               </Clerk.Field>
 
               <SignIn.Action submit className={SUBMIT_BUTTON_CLASSES}>
-                Continue with Email
+                Send code
               </SignIn.Action>
 
               <AuthFooterLink
@@ -41,13 +45,15 @@ export function OtpSignInForm() {
           >
             <div className='space-y-4'>
               <Clerk.Field name='code'>
+                <Clerk.Label className={FIELD_LABEL_CLASSES}>
+                  Enter the code we emailed you
+                </Clerk.Label>
                 <AuthInput
                   type='text'
                   inputMode='numeric'
                   autoComplete='one-time-code'
                   maxLength={6}
                   variant='otp'
-                  placeholder='Enter code'
                 />
                 <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
               </Clerk.Field>
