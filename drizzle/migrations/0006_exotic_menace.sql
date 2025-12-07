@@ -1,23 +1,103 @@
-CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');--> statement-breakpoint
-CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');--> statement-breakpoint
-CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');--> statement-breakpoint
-CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');--> statement-breakpoint
-CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');--> statement-breakpoint
-CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');--> statement-breakpoint
-CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');--> statement-breakpoint
-CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');--> statement-breakpoint
-CREATE TYPE "public"."notification_channel" AS ENUM('email', 'phone');--> statement-breakpoint
-CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'completed', 'failed');--> statement-breakpoint
-CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');--> statement-breakpoint
-CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');--> statement-breakpoint
-CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');--> statement-breakpoint
-CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');--> statement-breakpoint
-CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');--> statement-breakpoint
-CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed', 'rejected');--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."audience_device_type" AS ENUM('mobile', 'desktop', 'tablet', 'unknown');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."audience_intent_level" AS ENUM('high', 'medium', 'low');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."audience_member_type" AS ENUM('anonymous', 'email', 'sms', 'spotify', 'customer');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."contact_channel" AS ENUM('email', 'phone');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."contact_role" AS ENUM('bookings', 'management', 'press_pr', 'brand_partnerships', 'fan_general', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."creator_type" AS ENUM('artist', 'podcaster', 'influencer', 'creator');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."currency_code" AS ENUM('USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SEK', 'NOK', 'DKK');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."ingestion_job_status" AS ENUM('pending', 'processing', 'succeeded', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."ingestion_source_type" AS ENUM('manual', 'admin', 'ingested');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."ingestion_status" AS ENUM('idle', 'pending', 'processing', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."link_type" AS ENUM('listen', 'social', 'tip', 'other');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."notification_channel" AS ENUM('email', 'phone');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."photo_status" AS ENUM('uploading', 'processing', 'completed', 'failed');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."scraper_strategy" AS ENUM('http', 'browser', 'api');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."social_account_status" AS ENUM('suspected', 'confirmed', 'rejected');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."social_link_state" AS ENUM('active', 'suggested', 'rejected');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."subscription_plan" AS ENUM('free', 'basic', 'premium', 'pro');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."subscription_status" AS ENUM('active', 'inactive', 'cancelled', 'past_due', 'trialing', 'incomplete', 'incomplete_expired', 'unpaid');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
+DO $$ BEGIN
+  CREATE TYPE "public"."waitlist_status" AS ENUM('new', 'invited', 'claimed', 'rejected');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;--> statement-breakpoint
 CREATE TABLE "audience_members" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
