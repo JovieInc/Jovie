@@ -239,6 +239,70 @@ jobs:
         run: |
           echo "ci-fast passed: Typecheck and Lint succeeded"
 
+  # Public Profile Smoke Test - runs on ALL PRs to main to block broken profiles
+  ci-public-profile-smoke:
+    name: Public Profile Smoke
+    needs: [ci-fast-checks]
+    # Run on all PRs to main (not just full-ci) and pushes to main
+    if: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Resolve DATABASE_URL
+        run: |
+          if [ -n "${{ secrets.DATABASE_URL_MAIN }}" ]; then
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_MAIN }}" >> $GITHUB_ENV
+          elif [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          else
+            echo "No DATABASE_URL available; skipping smoke test."
+            echo "SKIP_SMOKE=true" >> $GITHUB_ENV
+          fi
+
+      - name: Skip if no DB
+        if: env.SKIP_SMOKE == 'true'
+        run: |
+          echo "Skipping public profile smoke test (no DATABASE_URL for fork PR)."
+          exit 0
+
+      - name: Cache Playwright Browsers
+        if: env.SKIP_SMOKE != 'true'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
+
+      - name: Install Playwright (Chromium only)
+        if: env.SKIP_SMOKE != 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Public Profile Smoke Test
+        if: env.SKIP_SMOKE != 'true'
+        run: |
+          pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+
+      - name: Upload Playwright Artifacts on Failure
+        if: failure() && env.SKIP_SMOKE != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-profile-smoke-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 3
+
   ci-build:
     name: Build
     needs: [ci-fast-checks]
