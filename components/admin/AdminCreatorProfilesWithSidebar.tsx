@@ -14,10 +14,9 @@ import {
   SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
 import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
-import { IngestProfileDialog } from '@/components/admin/IngestProfileDialog';
+import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { Icon } from '@/components/atoms/Icon';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import type {
   AdminCreatorProfileRow,
@@ -34,6 +33,8 @@ interface AdminCreatorProfilesWithSidebarProps {
   search: string;
   sort: AdminCreatorProfilesSort;
   mode?: ContactSidebarMode;
+  /** Base path for pagination/sort links. Defaults to '/admin/users' */
+  basePath?: string;
 }
 
 function isFormElement(target: EventTarget | null): boolean {
@@ -91,6 +92,7 @@ export function AdminCreatorProfilesWithSidebar({
   search,
   sort,
   mode = 'admin',
+  basePath = '/admin/users',
 }: AdminCreatorProfilesWithSidebarProps) {
   const {
     profiles,
@@ -111,9 +113,9 @@ export function AdminCreatorProfilesWithSidebar({
 
   // New states for dialogs and responsive
   const [isMobile, setIsMobile] = useState(false);
-  const [ingestDialogOpen, setIngestDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [profileToDelete, setProfileToDelete] = useState<AdminCreatorProfileRow | null>(null);
+  const [profileToDelete, setProfileToDelete] =
+    useState<AdminCreatorProfileRow | null>(null);
 
   // Detect mobile breakpoint
   React.useEffect(() => {
@@ -145,7 +147,7 @@ export function AdminCreatorProfilesWithSidebar({
       params.set('q', search);
     }
     const query = params.toString();
-    return query.length > 0 ? `/admin/users?${query}` : '/admin/users';
+    return query.length > 0 ? `${basePath}?${query}` : basePath;
   };
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
@@ -203,12 +205,17 @@ export function AdminCreatorProfilesWithSidebar({
         if (selectedIndex === -1) {
           setSelectedId(profilesWithActions[0]?.id ?? null);
         } else {
-          const nextIndex = Math.min(selectedIndex + 1, profilesWithActions.length - 1);
+          const nextIndex = Math.min(
+            selectedIndex + 1,
+            profilesWithActions.length - 1
+          );
           setSelectedId(profilesWithActions[nextIndex]?.id ?? null);
         }
       } else if (event.key === 'ArrowUp') {
         if (selectedIndex === -1) {
-          setSelectedId(profilesWithActions[profilesWithActions.length - 1]?.id ?? null);
+          setSelectedId(
+            profilesWithActions[profilesWithActions.length - 1]?.id ?? null
+          );
         } else {
           const prevIndex = Math.max(selectedIndex - 1, 0);
           setSelectedId(profilesWithActions[prevIndex]?.id ?? null);
@@ -303,7 +310,7 @@ export function AdminCreatorProfilesWithSidebar({
 
           <div className='space-y-3'>
             <form
-              action='/admin/users'
+              action={basePath}
               method='get'
               className='flex flex-wrap items-center gap-3'
             >
@@ -325,15 +332,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </Button>
               )}
               <div className='ml-auto'>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='secondary'
-                  onClick={() => setIngestDialogOpen(true)}
-                >
-                  <Icon name='Plus' className='h-4 w-4 mr-2' />
-                  Ingest Profile
-                </Button>
+                <IngestProfileDropdown />
               </div>
             </form>
 
@@ -344,9 +343,9 @@ export function AdminCreatorProfilesWithSidebar({
           </div>
 
           <div className='overflow-x-auto'>
-            <table className='w-full border-collapse text-sm'>
+            <table className='w-full text-sm'>
               <thead className='text-left text-secondary-token'>
-                <tr className='border-b border-subtle/60 text-xs uppercase tracking-wide text-tertiary-token'>
+                <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
                   <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
                     Avatar
                   </th>
@@ -367,7 +366,7 @@ export function AdminCreatorProfilesWithSidebar({
                   </th>
                 </tr>
               </thead>
-              <tbody className='divide-y divide-subtle/60'>
+              <tbody>
                 {profilesWithActions.length === 0 ? (
                   <tr>
                     <td
@@ -430,7 +429,10 @@ export function AdminCreatorProfilesWithSidebar({
                         <td className='px-2 py-3 text-xs text-secondary-token'>
                           {profile.isVerified ? 'Verified' : 'Not verified'}
                         </td>
-                        <td className='px-2 py-3 text-right' onClick={e => e.stopPropagation()}>
+                        <td
+                          className='px-2 py-3 text-right'
+                          onClick={e => e.stopPropagation()}
+                        >
                           <CreatorActionsMenu
                             profile={profile}
                             isMobile={isMobile}
@@ -525,15 +527,6 @@ export function AdminCreatorProfilesWithSidebar({
       </div>
 
       {/* Dialogs */}
-      <IngestProfileDialog
-        open={ingestDialogOpen}
-        onOpenChange={setIngestDialogOpen}
-        onSuccess={() => {
-          // Refresh the page to show new profile
-          window.location.reload();
-        }}
-      />
-
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}

@@ -9,15 +9,15 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import React, { useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
+import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ArtistContactsButton } from '@/components/profile/ArtistContactsButton';
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { Container } from '@/components/site/Container';
-import { ThemeToggle } from '@/components/site/ThemeToggle';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -102,9 +102,7 @@ export function ProfileShell({
   backgroundPattern = 'grid',
   showGradientBlurs = true,
 }: ProfileShellProps) {
-  const router = useRouter();
   const [isTipNavigating, setIsTipNavigating] = useState(false);
-  const [isBackNavigating, setIsBackNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
@@ -431,44 +429,16 @@ export function ProfileShell({
         )}
 
         <Container>
-          {/* Back Button - Top left */}
-          {showBackButton && (
-            <div className='absolute top-4 left-4 z-10'>
-              <Button
-                className='rounded-full'
-                variant='frosted'
-                aria-label='Back to profile'
-                onClick={() => {
-                  if (isBackNavigating) return;
-                  setIsBackNavigating(true);
-                  router.push(`/${artist.handle}`);
-                }}
-                disabled={isBackNavigating}
-              >
-                {isBackNavigating ? (
-                  <div className='w-5 h-5 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin' />
-                ) : (
-                  <svg
-                    className='w-5 h-5 text-gray-700 dark:text-gray-300'
-                    fill='none'
-                    stroke='currentColor'
-                    viewBox='0 0 24 24'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M10 19l-7-7m0 0l7-7m-7 7h18'
-                    />
-                  </svg>
-                )}
-              </Button>
-            </div>
-          )}
+          {/* Top left nav button - Jovie icon on main profile, back button on sub-pages */}
+          <div className='absolute top-4 left-4 z-10'>
+            <ProfileNavButton
+              showBackButton={showBackButton}
+              artistHandle={artist.handle}
+            />
+          </div>
 
           {/* Top right controls */}
           <div className='absolute top-4 right-4 z-10 flex items-center gap-3'>
-            <ThemeToggle appearance='icon' />
             {showNotificationButton && notificationsEnabled ? (
               hasActiveSubscriptions ? (
                 <DropdownMenu

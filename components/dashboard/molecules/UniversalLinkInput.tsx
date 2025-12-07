@@ -210,12 +210,12 @@ export const UniversalLinkInput = forwardRef<
         {/* Link preview & title editing */}
         {detectedLink && (
           <div
-            className={`p-3 rounded-lg border transition-all duration-200 ${
+            className={`mt-2 p-3 rounded-lg border transition-all duration-200 ${
               isPlatformDuplicate
-                ? 'border-red-200 bg-red-50 dark:border-red-500/70 dark:bg-surface-1/80'
+                ? 'border-red-200 bg-red-50 dark:border-red-500/70 dark:bg-zinc-900/80'
                 : detectedLink.isValid
-                  ? 'border-surface-2 bg-surface-1'
-                  : 'border-red-200 bg-red-50/50 dark:border-red-500/70 dark:bg-surface-1/80'
+                  ? 'border-gray-200 bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900/80'
+                  : 'border-red-200 bg-red-50/50 dark:border-red-500/70 dark:bg-zinc-900/80'
             }`}
             style={
               detectedLink.isValid && !isPlatformDuplicate

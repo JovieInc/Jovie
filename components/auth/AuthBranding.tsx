@@ -1,5 +1,3 @@
-'use client';
-
 import { Logo } from '@/components/atoms/Logo';
 
 interface AuthBrandingProps {
