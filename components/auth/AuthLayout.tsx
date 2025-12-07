@@ -1,43 +1,60 @@
+import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { AuthBranding } from './AuthBranding';
-import { AuthFormContainer } from './AuthFormContainer';
-
-type GradientVariant =
-  | 'blue-purple-cyan'
-  | 'purple-cyan-blue'
-  | 'purple-pink-orange'
-  | 'green-blue-purple'
-  | 'red-orange-yellow';
+import { LogoIcon } from '@/components/atoms/LogoIcon';
 
 interface AuthLayoutProps {
   children: ReactNode;
   formTitle: string;
-  brandingTitle?: string;
-  brandingDescription?: string;
-  gradientVariant?: GradientVariant;
-  textColorClass?: string;
-  brandingShowText?: boolean;
+  footerPrompt?: string;
+  footerLinkText?: string;
+  footerLinkHref?: string;
 }
 
 export function AuthLayout({
   children,
   formTitle,
-  brandingTitle = 'Welcome to Jovie',
-  brandingDescription = 'Create your artist profile and share your music with the world.',
-  gradientVariant = 'blue-purple-cyan',
-  textColorClass = 'text-blue-100',
-  brandingShowText = true,
+  footerPrompt = "Don't have access?",
+  footerLinkText = 'Join the waitlist',
+  footerLinkHref = '/waitlist',
 }: AuthLayoutProps) {
   return (
-    <div className='min-h-screen flex bg-base text-primary-token'>
-      <AuthBranding
-        title={brandingTitle}
-        description={brandingDescription}
-        gradientVariant={gradientVariant}
-        textColorClass={textColorClass}
-        showText={brandingShowText}
-      />
-      <AuthFormContainer title={formTitle}>{children}</AuthFormContainer>
+    <div className='min-h-screen flex flex-col items-center justify-center bg-[#101012] px-4'>
+      {/* Logo */}
+      <div className='mb-6'>
+        <LogoIcon size={56} variant='white' />
+      </div>
+
+      {/* Title */}
+      <h1 className='text-lg font-medium text-[rgb(227,228,230)] mb-10'>
+        {formTitle}
+      </h1>
+
+      {/* Form content */}
+      <div className='w-full max-w-sm'>{children}</div>
+
+      {/* Footer */}
+      <p className='mt-10 text-sm text-[#6b6f76]'>
+        {footerPrompt}{' '}
+        <Link href={footerLinkHref} className='text-white hover:underline'>
+          {footerLinkText}
+        </Link>
+      </p>
+
+      {/* Legal links */}
+      <div className='absolute bottom-4 flex gap-4 text-xs text-[#666]'>
+        <Link
+          href='/legal/terms'
+          className='hover:text-white transition-colors no-underline'
+        >
+          Terms
+        </Link>
+        <Link
+          href='/legal/privacy'
+          className='hover:text-white transition-colors no-underline'
+        >
+          Privacy Policy
+        </Link>
+      </div>
     </div>
   );
 }

@@ -8,8 +8,9 @@ export default function SignUpPage() {
   return (
     <AuthLayout
       formTitle='Create your account'
-      gradientVariant='purple-cyan-blue'
-      textColorClass='text-purple-100'
+      footerPrompt='Already have an account?'
+      footerLinkText='Log in'
+      footerLinkHref='/signin'
     >
       <ClerkLoading>
         <AuthFormSkeleton />

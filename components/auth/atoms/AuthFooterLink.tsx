@@ -13,7 +13,7 @@ export function AuthFooterLink({
   linkText,
 }: AuthFooterLinkProps) {
   return (
-    <div className='text-center text-sm text-secondary-token'>
+    <div className='text-center text-sm text-zinc-400'>
       {prompt} <AuthLink href={href}>{linkText}</AuthLink>
     </div>
   );
