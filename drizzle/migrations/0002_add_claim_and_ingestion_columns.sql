@@ -40,6 +40,7 @@ ALTER TABLE ingestion_jobs
 ADD COLUMN dedup_key TEXT;
 
 -- Index for dedup_key lookups (partial index for non-null values only)
-CREATE INDEX CONCURRENTLY idx_ingestion_jobs_dedup_key 
+-- Note: Cannot use CONCURRENTLY inside Drizzle transaction block
+CREATE INDEX IF NOT EXISTS idx_ingestion_jobs_dedup_key 
 ON ingestion_jobs (dedup_key) 
 WHERE dedup_key IS NOT NULL;
