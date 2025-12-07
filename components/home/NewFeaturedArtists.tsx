@@ -20,21 +20,10 @@ export async function NewFeaturedArtists() {
   }
 
   return (
-    <section className='py-16 bg-white dark:bg-[#0a0a0b]'>
+    <section className='relative pt-0 pb-12'>
+      {/* Gradient blend from hero to this section */}
+      <div className='absolute inset-0 -z-10 bg-gradient-to-b from-white via-white to-neutral-50 dark:from-[#0a0a0b] dark:via-[#0a0a0b] dark:to-[#0f0f11]' />
       <Container>
-        {/* Section header */}
-        <div className='text-center mb-10'>
-          <h2
-            className='text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white'
-            style={{ fontSynthesisWeight: 'none' }}
-          >
-            See it in action
-          </h2>
-          <p className='mt-2 text-sm text-neutral-500 dark:text-neutral-400'>
-            Real profiles from real artists
-          </p>
-        </div>
-
         {error ? (
           <div className='flex items-center justify-center py-6'>
             <p className='text-sm text-neutral-500 dark:text-neutral-400'>
