@@ -102,8 +102,15 @@ export default clerkMiddleware(async (auth, req) => {
       pathname === '/sign-up';
 
     if (userId && isAuthPath) {
-      // If the user is already signed in and hits any auth page, send them to the dashboard
-      res = NextResponse.redirect(new URL('/dashboard', req.url));
+      // If the user is already signed in and hits any auth page, check for redirect_url
+      const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
+      if (redirectUrl && redirectUrl.startsWith('/')) {
+        // Honor the redirect_url if it's a valid internal path (e.g., /claim/token)
+        res = NextResponse.redirect(new URL(redirectUrl, req.url));
+      } else {
+        // Default to dashboard
+        res = NextResponse.redirect(new URL('/dashboard', req.url));
+      }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
       const url = req.nextUrl.clone();
