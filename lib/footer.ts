@@ -58,7 +58,7 @@ export async function generateFooterHTML({
           href="${signUpLink}"
           class="text-xs text-gray-500 hover:text-indigo-600 font-medium transition-colors"
         >
-          Claim your profile now
+          Join the waitlist
         </a>
 
         <div class="mt-4 pt-4 border-t border-gray-100">

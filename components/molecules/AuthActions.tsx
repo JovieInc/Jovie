@@ -1,25 +1,26 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import Link from 'next/link';
 
 export function AuthActions() {
   return (
-    <div className='flex items-center space-x-4'>
+    <div className='flex items-center gap-2'>
+      {/* Login - Geist secondary/ghost button */}
       <Link
         href='/signin'
-        className='text-sm px-4 py-2 min-h-[44px] text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 dark:focus-visible:ring-gray-500 rounded-md'
+        className='inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md text-neutral-200 bg-neutral-900 hover:bg-neutral-800 shadow-[0_0_0_1px_#2e2e2e] transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-white/50'
+        style={{ fontSynthesisWeight: 'none' }}
       >
-        Sign in
+        Log in
       </Link>
-      <Button
-        asChild
-        variant='primary'
-        size='lg'
-        className='!h-[52px] !px-6 font-semibold tracking-wide shadow-[0_12px_30px_rgba(15,23,42,0.25)]'
+      {/* Sign up - Geist primary button */}
+      <Link
+        href='/waitlist'
+        className='inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md bg-white text-black hover:bg-neutral-200 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-white/50'
+        style={{ fontSynthesisWeight: 'none' }}
       >
-        <Link href='/waitlist'>Get started</Link>
-      </Button>
+        Sign up
+      </Link>
     </div>
   );
 }

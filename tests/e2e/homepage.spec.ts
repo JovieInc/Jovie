@@ -77,7 +77,7 @@ test.describe('Homepage', () => {
       'Jovie ships a locked, elite artist page in seconds'
     );
     await expect(
-      section.getByRole('link', { name: /Claim your handle/ })
+      section.getByRole('link', { name: /Request Early Access/ })
     ).toBeVisible();
   });
 

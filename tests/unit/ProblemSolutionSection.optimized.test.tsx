@@ -48,7 +48,9 @@ describe('ProblemSolutionSection (Optimized)', () => {
   it('renders CTA button with proper attributes', () => {
     render(<ProblemSolutionSection />);
 
-    const ctaButton = screen.getByRole('link', { name: /Claim your handle/i });
+    const ctaButton = screen.getByRole('link', {
+      name: /Request Early Access/i,
+    });
     expect(ctaButton).toBeInTheDocument();
     expect(ctaButton).toHaveAttribute('href', '/onboarding');
   });
@@ -56,7 +58,9 @@ describe('ProblemSolutionSection (Optimized)', () => {
   it('tracks analytics when CTA button is clicked', () => {
     render(<ProblemSolutionSection />);
 
-    const ctaButton = screen.getByRole('link', { name: /Claim your handle/i });
+    const ctaButton = screen.getByRole('link', {
+      name: /Request Early Access/i,
+    });
     fireEvent.click(ctaButton);
 
     expect(track).toHaveBeenCalledWith('claim_handle_click', {

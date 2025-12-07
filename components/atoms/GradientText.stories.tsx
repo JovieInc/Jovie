@@ -57,7 +57,7 @@ export const PurpleCyan: Story = {
 export const InHeading: Story = {
   render: () => (
     <h1 className='text-4xl font-bold'>
-      Claim your <GradientText variant='primary'>handle</GradientText>
+      Join the <GradientText variant='primary'>waitlist</GradientText>
     </h1>
   ),
 };

@@ -47,14 +47,7 @@ export default async function OnboardingPage({
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   return (
-    <AuthLayout
-      brandingTitle='Finish setting up your Jovie profile'
-      brandingDescription='Choose your name and Jovie handle so your profile is ready to share.'
-      formTitle='Pick your @handle'
-      gradientVariant='purple-cyan-blue'
-      textColorClass='text-purple-100'
-      brandingShowText={false}
-    >
+    <AuthLayout formTitle='Pick your @handle'>
       <div className='relative min-h-[500px]'>
         {/* Theme Toggle pinned to viewport */}
         <div className='fixed top-4 right-4 z-40'>

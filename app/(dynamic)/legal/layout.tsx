@@ -11,10 +11,10 @@ export default function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className='flex min-h-screen flex-col bg-[#0D0E12]'>
+    <div className='flex min-h-screen flex-col bg-white dark:bg-[#0a0a0b]'>
       <Header />
-      <main className='flex-1 py-12'>
-        <Container size='xl'>{children}</Container>
+      <main className='flex-1 py-16 sm:py-20'>
+        <Container size='lg'>{children}</Container>
       </main>
       <Footer />
     </div>

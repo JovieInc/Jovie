@@ -1,12 +1,17 @@
-import { Button, Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import Link from 'next/link';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import { Container } from '@/components/site/Container';
-import { NavLink } from '@/components/ui/NavLink';
 import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
+
+// Geist nav link styles
+const navLinkClass =
+  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md text-neutral-400 hover:text-neutral-100 transition-colors duration-150 focus-visible:outline-none';
+const navLinkActiveClass =
+  'data-[state=open]:text-neutral-100 data-[state=open]:bg-neutral-800';
 
 export interface HeaderNavProps {
   sticky?: boolean;
@@ -15,132 +20,141 @@ export interface HeaderNavProps {
 }
 
 export function HeaderNav({
-  sticky = true,
+  sticky: _sticky = true,
   className,
   logoSize = 'sm',
 }: HeaderNavProps = {}) {
+  // Note: sticky prop reserved for future use
+  void _sticky;
   return (
     <header
       data-testid='header-nav'
       className={cn(
-        'z-50 w-full border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#0D0E12] backdrop-blur-sm supports-backdrop-filter:bg-white/80 dark:supports-backdrop-filter:bg-[#0D0E12]/80',
-        sticky && 'sticky top-0',
+        'sticky top-0 z-50 w-full bg-white dark:bg-black',
         className
       )}
+      style={{ fontSynthesisWeight: 'none' }}
     >
       <Container>
-        <div className='flex h-14 items-center md:h-16'>
+        <div className='flex h-16 items-center'>
           {/* Logo - Left side */}
           <div className='flex items-center'>
             <LogoLink logoSize={logoSize} />
           </div>
 
           {/* Navigation - Center (hidden on mobile) */}
-          <div className='hidden md:flex flex-1 justify-center'>
-            <nav
-              className='flex items-center space-x-6'
-              aria-label='Primary navigation'
-            >
+          <div className='hidden md:flex flex-1 justify-center ml-8'>
+            <nav className='flex items-center' aria-label='Primary navigation'>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white'
+                  <button
+                    className={cn(navLinkClass, navLinkActiveClass)}
+                    type='button'
                   >
                     Product
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent
                   align='center'
-                  className='w-[calc(100vw-2rem)] max-w-4xl p-6'
+                  sideOffset={8}
+                  className='w-[calc(100vw-2rem)] max-w-3xl p-0 border border-neutral-800 bg-black rounded-lg shadow-[0_0_0_1px_#333,0_4px_16px_rgba(0,0,0,0.4)]'
                   role='menu'
                 >
-                  <div className='grid grid-cols-2 gap-x-8 gap-y-1'>
-                    {FEATURES.map(feature => (
-                      <FlyoutItem
-                        key={feature.slug}
-                        feature={feature}
-                        className='hover:bg-(--bg) focus-visible:bg-(--bg)'
-                      />
-                    ))}
+                  <div className='p-4'>
+                    <div className='grid grid-cols-2 gap-x-8 gap-y-0'>
+                      <div>
+                        <p className='px-3 pb-2 text-xs font-medium text-neutral-500 uppercase tracking-wider'>
+                          Core Features
+                        </p>
+                        {FEATURES.slice(0, Math.ceil(FEATURES.length / 2)).map(
+                          feature => (
+                            <FlyoutItem
+                              key={feature.slug}
+                              feature={feature}
+                              className='hover:bg-neutral-900 rounded-md'
+                            />
+                          )
+                        )}
+                      </div>
+                      <div>
+                        <p className='px-3 pb-2 text-xs font-medium text-neutral-500 uppercase tracking-wider'>
+                          More
+                        </p>
+                        {FEATURES.slice(Math.ceil(FEATURES.length / 2)).map(
+                          feature => (
+                            <FlyoutItem
+                              key={feature.slug}
+                              feature={feature}
+                              className='hover:bg-neutral-900 rounded-md'
+                            />
+                          )
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className='mt-4 border-t border-(--border) pt-4'>
+                  <div className='border-t border-neutral-800 px-4 py-3 flex items-center justify-between'>
                     <Link
                       href='/changelog'
-                      className='group flex items-center justify-between rounded-lg p-2 text-sm text-(--muted) transition-colors hover:bg-(--bg) hover:text-(--fg)'
+                      className='text-sm text-neutral-400 hover:text-neutral-100 transition-colors'
                       role='menuitem'
                     >
-                      <span>View Changelog</span>
-                      <span className='text-xs opacity-75 group-hover:opacity-100'>
-                        →
-                      </span>
+                      Changelog
                     </Link>
                   </div>
                 </PopoverContent>
               </Popover>
-              <NavLink
-                href='/pricing'
-                className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-              >
+              <Link href='/pricing' className={navLinkClass}>
                 Pricing
-              </NavLink>
+              </Link>
             </nav>
           </div>
 
           {/* Mobile Navigation */}
-          <div className='md:hidden flex-1 justify-center flex'>
-            <nav
-              className='flex items-center space-x-4'
-              aria-label='Primary navigation'
-            >
+          <div className='md:hidden flex-1 justify-center flex ml-4'>
+            <nav className='flex items-center' aria-label='Primary navigation'>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='sm'
-                    className='min-h-[44px] px-3 py-2 rounded-md font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white'
+                  <button
+                    className={cn(navLinkClass, navLinkActiveClass)}
+                    type='button'
                   >
                     Product
-                  </Button>
+                  </button>
                 </PopoverTrigger>
                 <PopoverContent
                   align='start'
-                  className='w-80 p-4 md:hidden'
+                  sideOffset={8}
+                  className='w-80 p-0 border border-neutral-800 bg-black rounded-lg shadow-[0_0_0_1px_#333,0_4px_16px_rgba(0,0,0,0.4)] md:hidden'
                   role='menu'
                 >
-                  <div className='space-y-1'>
+                  <div className='p-3 space-y-1'>
                     {FEATURES.map(feature => (
                       <FlyoutItem
                         key={feature.slug}
                         feature={feature}
-                        className='min-h-[44px] hover:bg-(--bg) focus-visible:bg-(--bg)'
+                        className='min-h-[44px] hover:bg-neutral-900 rounded-md'
                       />
                     ))}
                   </div>
-                  <div className='mt-4 border-t border-(--border) pt-4'>
+                  <div className='border-t border-neutral-800 px-3 py-3'>
                     <Link
                       href='/changelog'
-                      className='flex min-h-[44px] items-center justify-between rounded-lg p-3 text-sm text-(--muted) transition-colors hover:bg-(--bg) hover:text-(--fg)'
+                      className='text-sm text-neutral-400 hover:text-neutral-100 transition-colors'
                       role='menuitem'
                     >
-                      <span>View Changelog</span>
-                      <span className='text-xs opacity-75'>→</span>
+                      Changelog
                     </Link>
                   </div>
                 </PopoverContent>
               </Popover>
-              <NavLink
-                href='/pricing'
-                className='min-h-[44px] px-3 py-2 rounded-md font-medium flex items-center text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-              >
+              <Link href='/pricing' className={navLinkClass}>
                 Pricing
-              </NavLink>
+              </Link>
             </nav>
           </div>
 
           {/* Actions - Right side */}
-          <div className='flex items-center space-x-4 md:ml-0 ml-auto'>
+          <div className='flex items-center gap-2'>
             <AuthActions />
           </div>
         </div>

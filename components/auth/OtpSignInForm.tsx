@@ -5,30 +5,26 @@ import * as SignIn from '@clerk/elements/sign-in';
 import { Card, CardContent } from '@jovie/ui';
 import { AuthFooterLink, AuthInput } from './atoms';
 
-const FIELD_LABEL_CLASSES =
-  'block text-sm font-medium text-secondary-token mb-1';
-const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-destructive';
-const SUBMIT_BUTTON_CLASSES = 'btn btn-primary w-full justify-center';
+const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-red-400';
+const SUBMIT_BUTTON_CLASSES =
+  'w-full rounded-lg bg-[#e8e8e8] hover:bg-white text-[#101012] font-medium py-3 px-4 transition-colors';
 
 export function OtpSignInForm() {
   return (
     <SignIn.Root routing='path' path='/signin'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-6 p-0 min-h-[260px]'>
+        <CardContent className='space-y-6 p-0'>
           <Clerk.GlobalError className='text-sm text-destructive' />
 
           <SignIn.Step name='start' aria-label='Enter your email address'>
             <div className='space-y-4'>
               <Clerk.Field name='identifier'>
-                <Clerk.Label className={FIELD_LABEL_CLASSES}>
-                  Email address
-                </Clerk.Label>
-                <AuthInput type='email' />
+                <AuthInput type='email' placeholder='Email Address' />
                 <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
               </Clerk.Field>
 
               <SignIn.Action submit className={SUBMIT_BUTTON_CLASSES}>
-                Send code
+                Continue with Email
               </SignIn.Action>
 
               <AuthFooterLink
@@ -45,15 +41,13 @@ export function OtpSignInForm() {
           >
             <div className='space-y-4'>
               <Clerk.Field name='code'>
-                <Clerk.Label className={FIELD_LABEL_CLASSES}>
-                  Enter the code we emailed you
-                </Clerk.Label>
                 <AuthInput
                   type='text'
                   inputMode='numeric'
                   autoComplete='one-time-code'
                   maxLength={6}
                   variant='otp'
+                  placeholder='Enter code'
                 />
                 <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
               </Clerk.Field>

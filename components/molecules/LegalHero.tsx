@@ -1,6 +1,3 @@
-import { SectionHeading } from '@/components/atoms/SectionHeading';
-import { cn } from '@/lib/utils';
-
 export interface LegalHeroProps {
   eyebrow: string;
   title: string;
@@ -15,32 +12,21 @@ export function LegalHero({
   highlight,
 }: LegalHeroProps) {
   return (
-    <section
-      className={cn(
-        'rounded-3xl border border-white/20 bg-gradient-to-br from-black/70 to-[#13151B] p-8 shadow-[0_30px_60px_rgba(0,0,0,0.45)]',
-        'backdrop-blur-sm'
-      )}
-    >
-      <p className='text-xs uppercase tracking-[0.5em] text-white/60'>
+    <header className='max-w-2xl'>
+      <p className='text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-3'>
         {eyebrow}
       </p>
-      <SectionHeading
-        level={1}
-        size='xl'
-        align='left'
-        className='!text-white mt-3'
-      >
+      <h1 className='text-3xl font-semibold tracking-tight text-neutral-900 dark:text-white sm:text-4xl'>
         {title}
-      </SectionHeading>
-      <p className='mt-4 text-base text-white/80 leading-relaxed'>
+      </h1>
+      <p className='mt-4 text-base text-neutral-600 dark:text-neutral-400 leading-relaxed'>
         {description}
       </p>
       {highlight && (
-        <div className='mt-6 inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-1 text-sm font-medium text-white/80'>
-          <span className='text-slate-200'>#</span>
-          <span>{highlight}</span>
+        <div className='mt-6 inline-flex items-center gap-2 px-3 py-1 text-xs font-medium rounded-full bg-neutral-100 dark:bg-white/10 text-neutral-600 dark:text-neutral-300 border border-neutral-200/50 dark:border-white/10'>
+          {highlight}
         </div>
       )}
-    </section>
+    </header>
   );
 }

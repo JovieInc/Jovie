@@ -1,6 +1,5 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { useState } from 'react';
 
 interface PricingToggleProps {
@@ -17,48 +16,38 @@ export function PricingToggle({ onChange }: PricingToggleProps) {
   };
 
   return (
-    <div className='flex items-center justify-center space-x-4'>
-      <span
-        className={`text-sm font-medium transition-colors duration-200 ${
-          !isYearly
-            ? 'text-gray-900 dark:text-white'
-            : 'text-gray-500 dark:text-gray-400'
-        }`}
-      >
-        Monthly $5
-      </span>
-
+    <div className='inline-flex items-center rounded-lg bg-neutral-100 dark:bg-neutral-800 p-1'>
       <button
         type='button'
-        role='switch'
-        aria-checked={isYearly}
-        onClick={handleToggle}
-        className={`
-          relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent 
-          transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-          ${isYearly ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}
-        `}
-      >
-        <span className='sr-only'>
-          Toggle between monthly and yearly billing
-        </span>
-        <motion.span
-          className='pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out'
-          animate={{ x: isYearly ? 24 : 0 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        />
-      </button>
-
-      <span
-        className={`text-sm font-medium transition-colors duration-200 ${
-          isYearly
-            ? 'text-gray-900 dark:text-white'
-            : 'text-gray-500 dark:text-gray-400'
+        onClick={() => {
+          if (isYearly) handleToggle();
+        }}
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 ${
+          !isYearly
+            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
+            : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
         }`}
+        style={{ fontSynthesisWeight: 'none' }}
+      >
+        Monthly $5
+      </button>
+      <button
+        type='button'
+        onClick={() => {
+          if (!isYearly) handleToggle();
+        }}
+        className={`px-4 py-2 text-sm font-medium rounded-md transition-all duration-150 flex items-center gap-2 ${
+          isYearly
+            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm'
+            : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300'
+        }`}
+        style={{ fontSynthesisWeight: 'none' }}
       >
         Yearly $50
-        <span className='ml-1 text-xs text-green-500'>(2 months free)</span>
-      </span>
+        <span className='text-xs text-emerald-600 dark:text-emerald-400 font-medium'>
+          Save $10
+        </span>
+      </button>
     </div>
   );
 }

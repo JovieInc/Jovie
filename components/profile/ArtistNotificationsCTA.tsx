@@ -1,6 +1,9 @@
 'use client';
 
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -8,6 +11,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@jovie/ui';
+import { Check, ChevronDown, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useId, useState } from 'react';
 import { useProfileNotifications } from '@/components/organisms/ProfileShell';
@@ -24,12 +28,63 @@ interface CountryOption {
   label: string;
 }
 
+// Countries supported by Twilio SMS (sorted by usage/popularity)
 const COUNTRY_OPTIONS: CountryOption[] = [
+  // North America
   { code: 'US', dialCode: '+1', flag: '🇺🇸', label: 'United States' },
-  { code: 'GB', dialCode: '+44', flag: '🇬🇧', label: 'United Kingdom' },
   { code: 'CA', dialCode: '+1', flag: '🇨🇦', label: 'Canada' },
-  { code: 'AU', dialCode: '+61', flag: '🇦🇺', label: 'Australia' },
+  { code: 'MX', dialCode: '+52', flag: '🇲🇽', label: 'Mexico' },
+  // Europe
+  { code: 'GB', dialCode: '+44', flag: '🇬🇧', label: 'United Kingdom' },
   { code: 'DE', dialCode: '+49', flag: '🇩🇪', label: 'Germany' },
+  { code: 'FR', dialCode: '+33', flag: '🇫🇷', label: 'France' },
+  { code: 'ES', dialCode: '+34', flag: '🇪🇸', label: 'Spain' },
+  { code: 'IT', dialCode: '+39', flag: '🇮🇹', label: 'Italy' },
+  { code: 'NL', dialCode: '+31', flag: '🇳🇱', label: 'Netherlands' },
+  { code: 'BE', dialCode: '+32', flag: '🇧🇪', label: 'Belgium' },
+  { code: 'CH', dialCode: '+41', flag: '🇨🇭', label: 'Switzerland' },
+  { code: 'AT', dialCode: '+43', flag: '🇦🇹', label: 'Austria' },
+  { code: 'SE', dialCode: '+46', flag: '🇸🇪', label: 'Sweden' },
+  { code: 'NO', dialCode: '+47', flag: '🇳🇴', label: 'Norway' },
+  { code: 'DK', dialCode: '+45', flag: '🇩🇰', label: 'Denmark' },
+  { code: 'FI', dialCode: '+358', flag: '🇫🇮', label: 'Finland' },
+  { code: 'IE', dialCode: '+353', flag: '🇮🇪', label: 'Ireland' },
+  { code: 'PT', dialCode: '+351', flag: '🇵🇹', label: 'Portugal' },
+  { code: 'PL', dialCode: '+48', flag: '🇵🇱', label: 'Poland' },
+  { code: 'CZ', dialCode: '+420', flag: '🇨🇿', label: 'Czech Republic' },
+  { code: 'GR', dialCode: '+30', flag: '🇬🇷', label: 'Greece' },
+  { code: 'RO', dialCode: '+40', flag: '🇷🇴', label: 'Romania' },
+  { code: 'HU', dialCode: '+36', flag: '🇭🇺', label: 'Hungary' },
+  // Asia Pacific
+  { code: 'AU', dialCode: '+61', flag: '🇦🇺', label: 'Australia' },
+  { code: 'NZ', dialCode: '+64', flag: '🇳🇿', label: 'New Zealand' },
+  { code: 'JP', dialCode: '+81', flag: '🇯🇵', label: 'Japan' },
+  { code: 'KR', dialCode: '+82', flag: '🇰🇷', label: 'South Korea' },
+  { code: 'SG', dialCode: '+65', flag: '🇸🇬', label: 'Singapore' },
+  { code: 'HK', dialCode: '+852', flag: '🇭🇰', label: 'Hong Kong' },
+  { code: 'TW', dialCode: '+886', flag: '🇹🇼', label: 'Taiwan' },
+  { code: 'MY', dialCode: '+60', flag: '🇲🇾', label: 'Malaysia' },
+  { code: 'PH', dialCode: '+63', flag: '🇵🇭', label: 'Philippines' },
+  { code: 'TH', dialCode: '+66', flag: '🇹🇭', label: 'Thailand' },
+  { code: 'ID', dialCode: '+62', flag: '🇮🇩', label: 'Indonesia' },
+  { code: 'VN', dialCode: '+84', flag: '🇻🇳', label: 'Vietnam' },
+  { code: 'IN', dialCode: '+91', flag: '🇮🇳', label: 'India' },
+  { code: 'PK', dialCode: '+92', flag: '🇵🇰', label: 'Pakistan' },
+  // Middle East
+  { code: 'IL', dialCode: '+972', flag: '🇮🇱', label: 'Israel' },
+  { code: 'AE', dialCode: '+971', flag: '🇦🇪', label: 'United Arab Emirates' },
+  { code: 'SA', dialCode: '+966', flag: '🇸🇦', label: 'Saudi Arabia' },
+  // South America
+  { code: 'BR', dialCode: '+55', flag: '🇧🇷', label: 'Brazil' },
+  { code: 'AR', dialCode: '+54', flag: '🇦🇷', label: 'Argentina' },
+  { code: 'CL', dialCode: '+56', flag: '🇨🇱', label: 'Chile' },
+  { code: 'CO', dialCode: '+57', flag: '🇨🇴', label: 'Colombia' },
+  { code: 'PE', dialCode: '+51', flag: '🇵🇪', label: 'Peru' },
+  // Africa
+  { code: 'ZA', dialCode: '+27', flag: '🇿🇦', label: 'South Africa' },
+  { code: 'NG', dialCode: '+234', flag: '🇳🇬', label: 'Nigeria' },
+  { code: 'KE', dialCode: '+254', flag: '🇰🇪', label: 'Kenya' },
+  { code: 'EG', dialCode: '+20', flag: '🇪🇬', label: 'Egypt' },
 ];
 
 function detectDefaultCountry(): CountryOption {
@@ -52,11 +107,17 @@ interface ArtistNotificationsCTAProps {
    * "link" matches the static profile button, "button" matches CTAButton.
    */
   variant?: 'link' | 'button';
+  /**
+   * When true, automatically opens the subscription form on mount.
+   * Used for /handle/subscribe route.
+   */
+  autoOpen?: boolean;
 }
 
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
+  autoOpen = false,
 }: ArtistNotificationsCTAProps) {
   const {
     state: notificationsState,
@@ -67,6 +128,7 @@ export function ArtistNotificationsCTA({
     subscribedChannels,
     setSubscribedChannels,
     setSubscriptionDetails,
+    openSubscription,
   } = useProfileNotifications();
 
   const [country, setCountry] = useState<CountryOption>(COUNTRY_OPTIONS[0]);
@@ -75,15 +137,37 @@ export function ArtistNotificationsCTA({
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
+  const [isCountryOpen, setIsCountryOpen] = useState<boolean>(false);
 
   const { success: showSuccess, error: showError } = useNotifications();
 
-  const countrySelectId = useId();
   const inputId = useId();
+  const inputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setCountry(detectDefaultCountry());
   }, []);
+
+  // Auto-focus input when entering editing state
+  React.useEffect(() => {
+    if (notificationsState === 'editing' && inputRef.current) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 100);
+    }
+  }, [notificationsState]);
+
+  // Auto-open subscription form when autoOpen prop is true
+  useEffect(() => {
+    if (autoOpen && notificationsEnabled && notificationsState === 'idle') {
+      openSubscription();
+    }
+  }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.phone
@@ -96,26 +180,42 @@ export function ArtistNotificationsCTA({
     setError(null);
   };
 
-  const handleCountryChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const next = COUNTRY_OPTIONS.find(
-      option => option.code === event.target.value
-    );
-    if (next) {
-      setCountry(next);
+  // Strip non-digits from phone input
+  const handlePhoneChange = (value: string) => {
+    // Only allow digits, spaces, dashes, and parentheses for formatting
+    const cleaned = value.replace(/[^\d\s\-()]/g, '');
+    // Store only digits internally
+    const digitsOnly = cleaned.replace(/[^\d]/g, '');
+    // Limit to 15 digits (E.164 max)
+    if (digitsOnly.length <= 15) {
+      setPhoneInput(digitsOnly);
     }
+    // Clear error when user starts typing
+    if (error) setError(null);
+  };
+
+  const handleEmailChange = (value: string) => {
+    setEmailInput(value);
+    // Clear error when user starts typing
+    if (error) setError(null);
   };
 
   const validateCurrent = (): boolean => {
     if (channel === 'phone') {
-      const trimmed = phoneInput.trim();
-      if (!trimmed) {
-        setError('Please enter your phone number');
+      const digitsOnly = phoneInput.replace(/[^\d]/g, '');
+
+      if (!digitsOnly) {
+        setError('Phone number is required');
         return false;
       }
 
-      const digitsOnly = trimmed.replace(/[^\d]/g, '');
-      if (digitsOnly.length < 7 || digitsOnly.length > 15) {
-        setError('Please enter a valid phone number');
+      if (digitsOnly.length < 10) {
+        setError('Phone number is too short');
+        return false;
+      }
+
+      if (digitsOnly.length > 15) {
+        setError('Phone number is too long');
         return false;
       }
 
@@ -123,13 +223,15 @@ export function ArtistNotificationsCTA({
       return true;
     }
 
-    const trimmedEmail = emailInput.trim();
+    const trimmedEmail = emailInput.trim().toLowerCase();
     if (!trimmedEmail) {
-      setError('Please enter your email address');
+      setError('Email address is required');
       return false;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // More robust email validation
+    const emailRegex =
+      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!emailRegex.test(trimmedEmail)) {
       setError('Please enter a valid email address');
       return false;
@@ -328,57 +430,94 @@ export function ArtistNotificationsCTA({
 
   return (
     <>
-      <div className='space-y-2'>
-        <div className='inline-flex w-full rounded-xl bg-black text-white dark:bg-white dark:text-black px-4 py-3 shadow-lg shadow-black/10 dark:shadow-white/10 transition-all duration-200 ease-out'>
-          <div className='flex w-full items-center gap-3 flex-wrap sm:flex-nowrap'>
-            {channel === 'phone' ? (
-              <div className='flex items-center'>
-                <label htmlFor={countrySelectId} className='sr-only'>
-                  Country code
-                </label>
-                <select
-                  id={countrySelectId}
-                  value={country.code}
-                  onChange={handleCountryChange}
-                  className='bg-black/30 dark:bg-black/10 border border-white/20 text-sm rounded-lg px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60'
+      <div className='space-y-3'>
+        {/* Input container - Geist style */}
+        <div className='rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden'>
+          <div className='flex items-center'>
+            {/* Country selector for phone */}
+            {channel === 'phone' && (
+              <Popover open={isCountryOpen} onOpenChange={setIsCountryOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type='button'
+                    className='h-11 px-3 flex items-center gap-1.5 border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors focus:outline-none'
+                    style={{ fontSynthesisWeight: 'none' }}
+                    aria-label='Select country code'
+                  >
+                    <span>{country.flag}</span>
+                    <span>{country.dialCode}</span>
+                    <ChevronDown className='w-3.5 h-3.5 text-neutral-400' />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align='start'
+                  sideOffset={4}
+                  className='w-64 p-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg'
                 >
-                  {COUNTRY_OPTIONS.map(option => (
-                    <option key={option.code} value={option.code}>
-                      {option.flag} {option.dialCode}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
+                  <div className='max-h-64 overflow-y-auto py-1'>
+                    {COUNTRY_OPTIONS.map(option => (
+                      <button
+                        key={option.code}
+                        type='button'
+                        onClick={() => {
+                          setCountry(option);
+                          setIsCountryOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                          country.code === option.code
+                            ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
+                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800'
+                        }`}
+                        style={{ fontSynthesisWeight: 'none' }}
+                      >
+                        <span className='text-base'>{option.flag}</span>
+                        <span className='flex-1 text-left'>{option.label}</span>
+                        <span className='text-neutral-500'>
+                          {option.dialCode}
+                        </span>
+                        {country.code === option.code && (
+                          <Check className='w-4 h-4 text-neutral-900 dark:text-neutral-100' />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
 
+            {/* Input field */}
             <div className='flex-1 min-w-0'>
               <label htmlFor={inputId} className='sr-only'>
                 {channel === 'phone' ? 'Phone number' : 'Email address'}
               </label>
               <input
+                ref={inputRef}
                 id={inputId}
                 type={channel === 'phone' ? 'tel' : 'email'}
-                className='w-full bg-transparent border-none text-sm sm:text-base placeholder:text-gray-300 dark:placeholder:text-gray-600 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-none'
+                inputMode={channel === 'phone' ? 'numeric' : 'email'}
+                pattern={channel === 'phone' ? '[0-9]*' : undefined}
+                className='w-full h-11 px-4 bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 border-none focus:outline-none focus:ring-0'
                 placeholder={
-                  channel === 'phone'
-                    ? 'Enter your phone number'
-                    : 'Enter your email'
+                  channel === 'phone' ? '(555) 123-4567' : 'your@email.com'
                 }
                 value={channel === 'phone' ? phoneInput : emailInput}
                 onChange={event => {
                   if (channel === 'phone') {
-                    setPhoneInput(event.target.value);
+                    handlePhoneChange(event.target.value);
                   } else {
-                    setEmailInput(event.target.value);
+                    handleEmailChange(event.target.value);
                   }
                 }}
                 onBlur={handleFieldBlur}
                 onKeyDown={handleKeyDown}
                 disabled={isSubmitting}
-                autoComplete={channel === 'phone' ? 'tel' : 'email'}
+                autoComplete={channel === 'phone' ? 'tel-national' : 'email'}
+                maxLength={channel === 'phone' ? 15 : 254}
+                style={{ fontSynthesisWeight: 'none' }}
               />
             </div>
 
+            {/* Channel toggle */}
             <ContactMethodToggle
               channel={channel}
               onChange={handleChannelChange}
@@ -387,21 +526,24 @@ export function ArtistNotificationsCTA({
           </div>
         </div>
 
-        {error ? (
-          <p className='text-sm text-red-500 dark:text-red-400' role='alert'>
-            {error}
-          </p>
-        ) : null}
+        {/* Subscribe button - Geist style */}
+        <button
+          type='button'
+          onClick={openConfirmIfValid}
+          disabled={isSubmitting}
+          className='w-full h-10 inline-flex items-center justify-center rounded-md bg-neutral-900 dark:bg-white text-white dark:text-black text-sm font-medium transition-colors duration-150 hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white'
+          style={{ fontSynthesisWeight: 'none' }}
+        >
+          {isSubmitting ? 'Subscribing…' : 'Subscribe'}
+        </button>
 
-        <div className='flex justify-end'>
-          <button
-            type='button'
-            onClick={openConfirmIfValid}
-            disabled={isSubmitting}
-            className='inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold bg-white text-black hover:bg-gray-100 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-black dark:text-white dark:hover:bg-gray-900 border border-transparent'
-          >
-            {isSubmitting ? 'Submitting…' : 'Subscribe'}
-          </button>
+        {/* Error message - below button to prevent layout shift */}
+        <div className='h-5'>
+          {error && (
+            <p className='text-sm text-red-500 dark:text-red-400' role='alert'>
+              {error}
+            </p>
+          )}
         </div>
       </div>
 
@@ -461,30 +603,32 @@ function ContactMethodToggle({
   disabled,
 }: ContactMethodToggleProps) {
   return (
-    <div className='inline-flex items-center rounded-full bg-white/10 dark:bg-black/10 p-0.5 text-xs font-medium'>
+    <div className='inline-flex items-center rounded-md bg-neutral-100 dark:bg-neutral-800 p-0.5 mr-2'>
       <button
         type='button'
         onClick={() => onChange('phone')}
         disabled={disabled}
-        className={`px-2 py-1 rounded-full transition-colors ${
+        aria-label='Phone'
+        className={`p-2 rounded transition-all duration-150 ${
           channel === 'phone'
-            ? 'bg-white text-black dark:bg-white dark:text-black'
-            : 'text-white/80 dark:text-white/70'
+            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm'
+            : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
         }`}
       >
-        Phone
+        <Phone className='w-4 h-4' />
       </button>
       <button
         type='button'
         onClick={() => onChange('email')}
         disabled={disabled}
-        className={`px-2 py-1 rounded-full transition-colors ${
+        aria-label='Email'
+        className={`p-2 rounded transition-all duration-150 ${
           channel === 'email'
-            ? 'bg-white text-black dark:bg-white dark:text-black'
-            : 'text-white/80 dark:text-white/70'
+            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm'
+            : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
         }`}
       >
-        Email
+        <Mail className='w-4 h-4' />
       </button>
     </div>
   );

@@ -2,12 +2,43 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { LogoIcon } from '@/components/atoms/LogoIcon';
 
 interface FormErrors {
   fullName?: string[];
   email?: string[];
   primarySocialUrl?: string[];
   spotifyUrl?: string[];
+}
+
+const INPUT_CLASSES =
+  'w-full px-4 py-3 border-0 rounded-lg bg-[#23252a] text-white placeholder:text-[#6b6f76] focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-colors';
+const BUTTON_CLASSES =
+  'w-full rounded-lg bg-[#e8e8e8] hover:bg-white text-[#101012] font-medium py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+
+function normalizeUrl(url: string): string {
+  if (!url.trim()) return '';
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim());
+}
+
+function isValidUrl(url: string): boolean {
+  if (!url.trim()) return false;
+  const normalized = normalizeUrl(url);
+  try {
+    const parsed = new URL(normalized);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
 }
 
 export default function WaitlistPage() {
@@ -23,9 +54,38 @@ export default function WaitlistPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError('');
     setFieldErrors({});
+
+    // Client-side validation
+    const errors: FormErrors = {};
+
+    if (!fullName.trim()) {
+      errors.fullName = ['Full name is required'];
+    }
+
+    if (!email.trim()) {
+      errors.email = ['Email is required'];
+    } else if (!isValidEmail(email)) {
+      errors.email = ['Please enter a valid email address'];
+    }
+
+    if (!primarySocialUrl.trim()) {
+      errors.primarySocialUrl = ['Social profile link is required'];
+    } else if (!isValidUrl(primarySocialUrl)) {
+      errors.primarySocialUrl = ['Please enter a valid URL'];
+    }
+
+    if (spotifyUrl.trim() && !isValidUrl(spotifyUrl)) {
+      errors.spotifyUrl = ['Please enter a valid Spotify URL'];
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const response = await fetch('/api/waitlist', {
@@ -34,8 +94,8 @@ export default function WaitlistPage() {
         body: JSON.stringify({
           fullName,
           email,
-          primarySocialUrl,
-          spotifyUrl: spotifyUrl || null,
+          primarySocialUrl: normalizeUrl(primarySocialUrl),
+          spotifyUrl: spotifyUrl ? normalizeUrl(spotifyUrl) : null,
           heardAbout: heardAbout || null,
         }),
       });
@@ -62,37 +122,76 @@ export default function WaitlistPage() {
 
   if (isSubmitted) {
     return (
-      <div className='min-h-screen bg-surface-0 transition-colors'>
-        <div className='container mx-auto px-4 py-16'>
-          <div className='max-w-md mx-auto text-center'>
-            <div className='bg-surface-1 rounded-2xl p-8 border border-subtle shadow-sm'>
-              <div className='mb-6'>
-                <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30'>
-                  <svg
-                    className='h-6 w-6 text-emerald-600 dark:text-emerald-400'
-                    fill='none'
-                    viewBox='0 0 24 24'
-                    stroke='currentColor'
-                    aria-hidden='true'
-                  >
-                    <path
-                      strokeLinecap='round'
-                      strokeLinejoin='round'
-                      strokeWidth={2}
-                      d='M5 13l4 4L19 7'
-                    />
-                  </svg>
-                </div>
-              </div>
-              <h2 className='text-2xl font-bold text-primary-token mb-4'>
-                You&apos;re on the waitlist!
-              </h2>
-              <p className='text-secondary-token'>
-                Thanks! We&apos;ll review your profile and reach out if we can
-                get you in early.
-              </p>
-            </div>
+      <div className='min-h-screen flex flex-col items-center justify-center bg-[#101012] px-4'>
+        {/* Animated logo to checkmark */}
+        <div className='mb-8 relative'>
+          {/* Logo fades out */}
+          <div className='animate-[fadeOut_0.3s_ease-out_forwards]'>
+            <LogoIcon size={56} variant='white' />
           </div>
+          {/* Checkmark fades in */}
+          <div className='absolute inset-0 flex items-center justify-center animate-[fadeIn_0.3s_ease-out_0.2s_forwards] opacity-0'>
+            <svg
+              className='h-14 w-14 text-white'
+              fill='none'
+              viewBox='0 0 24 24'
+              stroke='currentColor'
+              aria-hidden='true'
+            >
+              <path
+                className='animate-[drawCheck_0.4s_ease-out_0.4s_forwards]'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth={2}
+                strokeDasharray={24}
+                strokeDashoffset={24}
+                d='M5 13l4 4L19 7'
+                style={{
+                  animation: 'drawCheck 0.4s ease-out 0.4s forwards',
+                }}
+              />
+            </svg>
+          </div>
+        </div>
+
+        <div className='w-full max-w-sm text-center animate-[fadeIn_0.4s_ease-out_0.5s_forwards] opacity-0'>
+          <h2 className='text-lg font-medium text-[rgb(227,228,230)] mb-4'>
+            You&apos;re on the waitlist!
+          </h2>
+          <p className='text-sm text-[#6b6f76]'>
+            Thanks! We&apos;ll review your profile and reach out if we can get
+            you in early.
+          </p>
+        </div>
+
+        <style jsx>{`
+          @keyframes fadeOut {
+            from { opacity: 1; transform: scale(1); }
+            to { opacity: 0; transform: scale(0.8); }
+          }
+          @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+          }
+          @keyframes drawCheck {
+            to { stroke-dashoffset: 0; }
+          }
+        `}</style>
+
+        {/* Legal links */}
+        <div className='absolute bottom-4 flex gap-4 text-xs text-[#666]'>
+          <Link
+            href='/legal/terms'
+            className='hover:text-white transition-colors no-underline'
+          >
+            Terms
+          </Link>
+          <Link
+            href='/legal/privacy'
+            className='hover:text-white transition-colors no-underline'
+          >
+            Privacy Policy
+          </Link>
         </div>
       </div>
     );
@@ -102,173 +201,123 @@ export default function WaitlistPage() {
     fullName.trim() && email.trim() && primarySocialUrl.trim();
 
   return (
-    <div className='min-h-screen bg-surface-0 transition-colors'>
-      <div className='container mx-auto px-4 py-16'>
-        <div className='max-w-md mx-auto'>
-          <div className='text-center mb-8'>
-            <h1 className='text-3xl md:text-4xl font-bold text-primary-token mb-3'>
-              Jovie is invite-only.
-            </h1>
-            <p className='text-secondary-token'>
-              Join the waitlist and we&apos;ll review your profile for early
-              access.
+    <div className='min-h-screen flex flex-col items-center justify-center bg-[#101012] px-4'>
+      {/* Logo */}
+      <div className='mb-6'>
+        <LogoIcon size={56} variant='white' />
+      </div>
+
+      {/* Title */}
+      <h1 className='text-lg font-medium text-[rgb(227,228,230)] mb-2'>
+        Join the Jovie Waitlist
+      </h1>
+      <p className='text-sm text-[#6b6f76] mb-8 text-center max-w-xs'>
+        Jovie is invite-only. We&apos;ll review your profile for early access.
+      </p>
+
+      {/* Form */}
+      <div className='w-full max-w-sm'>
+        <form onSubmit={handleSubmit} className='space-y-4'>
+          <input
+            type='text'
+            id='fullName'
+            value={fullName}
+            onChange={e => setFullName(e.target.value)}
+            required
+            className={INPUT_CLASSES}
+            placeholder='Full Name'
+            disabled={isSubmitting}
+          />
+          {fieldErrors.fullName && (
+            <p className='text-sm text-red-400'>{fieldErrors.fullName[0]}</p>
+          )}
+
+          <input
+            type='email'
+            id='email'
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            className={INPUT_CLASSES}
+            placeholder='Email Address'
+            disabled={isSubmitting}
+          />
+          {fieldErrors.email && (
+            <p className='text-sm text-red-400'>{fieldErrors.email[0]}</p>
+          )}
+
+          <input
+            type='text'
+            id='primarySocialUrl'
+            value={primarySocialUrl}
+            onChange={e => setPrimarySocialUrl(e.target.value)}
+            required
+            className={INPUT_CLASSES}
+            placeholder='instagram.com/yourhandle'
+            disabled={isSubmitting}
+          />
+          {fieldErrors.primarySocialUrl && (
+            <p className='text-sm text-red-400'>
+              {fieldErrors.primarySocialUrl[0]}
             </p>
-          </div>
+          )}
 
-          <div className='bg-surface-1 rounded-2xl p-6 md:p-8 border border-subtle shadow-sm'>
-            <form onSubmit={handleSubmit} className='space-y-5'>
-              {/* Full Name */}
-              <div>
-                <label
-                  htmlFor='fullName'
-                  className='block text-sm font-medium text-primary-token mb-1.5'
-                >
-                  Full name <span className='text-rose-500'>*</span>
-                </label>
-                <input
-                  type='text'
-                  id='fullName'
-                  value={fullName}
-                  onChange={e => setFullName(e.target.value)}
-                  required
-                  className='w-full px-4 py-2.5 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors'
-                  placeholder='Your name'
-                  disabled={isSubmitting}
-                />
-                {fieldErrors.fullName && (
-                  <p className='mt-1 text-sm text-rose-500'>
-                    {fieldErrors.fullName[0]}
-                  </p>
-                )}
-              </div>
+          <input
+            type='text'
+            id='spotifyUrl'
+            value={spotifyUrl}
+            onChange={e => setSpotifyUrl(e.target.value)}
+            className={INPUT_CLASSES}
+            placeholder='open.spotify.com/artist/... (optional)'
+            disabled={isSubmitting}
+          />
 
-              {/* Email */}
-              <div>
-                <label
-                  htmlFor='email'
-                  className='block text-sm font-medium text-primary-token mb-1.5'
-                >
-                  Email <span className='text-rose-500'>*</span>
-                </label>
-                <input
-                  type='email'
-                  id='email'
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  className='w-full px-4 py-2.5 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors'
-                  placeholder='you@example.com'
-                  disabled={isSubmitting}
-                />
-                {fieldErrors.email && (
-                  <p className='mt-1 text-sm text-rose-500'>
-                    {fieldErrors.email[0]}
-                  </p>
-                )}
-              </div>
+          <input
+            type='text'
+            id='heardAbout'
+            value={heardAbout}
+            onChange={e => setHeardAbout(e.target.value)}
+            className={INPUT_CLASSES}
+            placeholder='How did you hear about us? (optional)'
+            disabled={isSubmitting}
+          />
 
-              {/* Primary Social URL */}
-              <div>
-                <label
-                  htmlFor='primarySocialUrl'
-                  className='block text-sm font-medium text-primary-token mb-1.5'
-                >
-                  Link to your largest social media profile{' '}
-                  <span className='text-rose-500'>*</span>
-                </label>
-                <input
-                  type='url'
-                  id='primarySocialUrl'
-                  value={primarySocialUrl}
-                  onChange={e => setPrimarySocialUrl(e.target.value)}
-                  required
-                  className='w-full px-4 py-2.5 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors'
-                  placeholder='https://instagram.com/yourhandle'
-                  disabled={isSubmitting}
-                />
-                {fieldErrors.primarySocialUrl && (
-                  <p className='mt-1 text-sm text-rose-500'>
-                    {fieldErrors.primarySocialUrl[0]}
-                  </p>
-                )}
-                <p className='mt-1 text-xs text-tertiary-token'>
-                  Instagram, TikTok, YouTube, X, Twitch, Linktree, etc.
-                </p>
-              </div>
+          {error && (
+            <div className='text-red-400 text-sm text-center'>{error}</div>
+          )}
 
-              {/* Spotify URL (optional) */}
-              <div>
-                <label
-                  htmlFor='spotifyUrl'
-                  className='block text-sm font-medium text-primary-token mb-1.5'
-                >
-                  Spotify artist/profile URL{' '}
-                  <span className='text-tertiary-token'>(optional)</span>
-                </label>
-                <input
-                  type='url'
-                  id='spotifyUrl'
-                  value={spotifyUrl}
-                  onChange={e => setSpotifyUrl(e.target.value)}
-                  className='w-full px-4 py-2.5 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors'
-                  placeholder='https://open.spotify.com/artist/...'
-                  disabled={isSubmitting}
-                />
-                {fieldErrors.spotifyUrl && (
-                  <p className='mt-1 text-sm text-rose-500'>
-                    {fieldErrors.spotifyUrl[0]}
-                  </p>
-                )}
-              </div>
+          <button
+            type='submit'
+            disabled={isSubmitting || !isFormValid}
+            className={BUTTON_CLASSES}
+          >
+            {isSubmitting ? 'Submitting…' : 'Join the Waitlist'}
+          </button>
+        </form>
+      </div>
 
-              {/* Heard About (optional) */}
-              <div>
-                <label
-                  htmlFor='heardAbout'
-                  className='block text-sm font-medium text-primary-token mb-1.5'
-                >
-                  How did you hear about Jovie?{' '}
-                  <span className='text-tertiary-token'>(optional)</span>
-                </label>
-                <input
-                  type='text'
-                  id='heardAbout'
-                  value={heardAbout}
-                  onChange={e => setHeardAbout(e.target.value)}
-                  className='w-full px-4 py-2.5 border border-subtle rounded-lg bg-surface-0 text-primary-token placeholder-tertiary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:border-transparent transition-colors'
-                  placeholder='Friend, social media, search, etc.'
-                  disabled={isSubmitting}
-                />
-              </div>
+      {/* Footer */}
+      <p className='mt-8 text-sm text-[#6b6f76]'>
+        Already have access?{' '}
+        <Link href='/signin' className='text-white hover:underline'>
+          Sign in
+        </Link>
+      </p>
 
-              {/* Generic error */}
-              {error && (
-                <div className='text-rose-500 text-sm text-center'>{error}</div>
-              )}
-
-              {/* Submit button */}
-              <button
-                type='submit'
-                disabled={isSubmitting || !isFormValid}
-                className='w-full bg-primary-token text-inverse-token font-semibold py-3 px-6 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed'
-              >
-                {isSubmitting ? 'Submitting…' : 'Join the waitlist'}
-              </button>
-            </form>
-          </div>
-
-          <div className='mt-8 text-center'>
-            <p className='text-sm text-tertiary-token'>
-              Already have access?{' '}
-              <Link
-                href='/signin'
-                className='text-accent hover:underline font-medium'
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
-        </div>
+      {/* Legal links */}
+      <div className='absolute bottom-4 flex gap-4 text-xs text-[#666]'>
+        <Link
+          href='/legal/terms'
+          className='hover:text-white transition-colors no-underline'
+        >
+          Terms
+        </Link>
+        <Link
+          href='/legal/privacy'
+          className='hover:text-white transition-colors no-underline'
+        >
+          Privacy Policy
+        </Link>
       </div>
     </div>
   );

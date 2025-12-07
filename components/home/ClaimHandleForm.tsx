@@ -421,7 +421,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
               </svg>
             </>
           ) : (
-            'Claim handle'
+            'Request Early Access'
           )}
         </span>
       </Button>
