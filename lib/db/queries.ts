@@ -63,8 +63,8 @@ export async function getCreatorProfileWithLinks(username: string) {
 
   if (!profile) return null;
 
-  // Then get all social links for this profile
-  const profileSocialLinks = await db
+  // Fetch socials and contacts in parallel to reduce tail latency
+  const socialsPromise = db
     .select({
       id: socialLinks.id,
       creatorProfileId: socialLinks.creatorProfileId,
@@ -82,53 +82,57 @@ export async function getCreatorProfileWithLinks(username: string) {
     .where(eq(socialLinks.creatorProfileId, profile.id))
     .orderBy(socialLinks.sortOrder);
 
-  // Contacts query - gracefully handle missing table (creator_contacts may not exist yet)
-  let profileContacts: CreatorContact[] = [];
-
-  try {
-    profileContacts = await db
-      .select({
-        id: creatorContacts.id,
-        creatorProfileId: creatorContacts.creatorProfileId,
-        role: creatorContacts.role,
-        customLabel: creatorContacts.customLabel,
-        personName: creatorContacts.personName,
-        companyName: creatorContacts.companyName,
-        territories: creatorContacts.territories,
-        email: creatorContacts.email,
-        phone: creatorContacts.phone,
-        preferredChannel: creatorContacts.preferredChannel,
-        isActive: creatorContacts.isActive,
-        sortOrder: creatorContacts.sortOrder,
-        createdAt: creatorContacts.createdAt,
-        updatedAt: creatorContacts.updatedAt,
-      })
-      .from(creatorContacts)
-      .where(
-        and(
-          eq(creatorContacts.creatorProfileId, profile.id),
-          eq(creatorContacts.isActive, true)
+  const contactsPromise: Promise<CreatorContact[]> = (async () => {
+    try {
+      return await db
+        .select({
+          id: creatorContacts.id,
+          creatorProfileId: creatorContacts.creatorProfileId,
+          role: creatorContacts.role,
+          customLabel: creatorContacts.customLabel,
+          personName: creatorContacts.personName,
+          companyName: creatorContacts.companyName,
+          territories: creatorContacts.territories,
+          email: creatorContacts.email,
+          phone: creatorContacts.phone,
+          preferredChannel: creatorContacts.preferredChannel,
+          isActive: creatorContacts.isActive,
+          sortOrder: creatorContacts.sortOrder,
+          createdAt: creatorContacts.createdAt,
+          updatedAt: creatorContacts.updatedAt,
+        })
+        .from(creatorContacts)
+        .where(
+          and(
+            eq(creatorContacts.creatorProfileId, profile.id),
+            eq(creatorContacts.isActive, true)
+          )
         )
-      )
-      .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt);
-  } catch (error: unknown) {
-    // Table may not exist yet - return empty contacts
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const causeMessage =
-      error instanceof Error && error.cause instanceof Error
-        ? error.cause.message
-        : '';
-    if (
-      errorMessage.includes('does not exist') ||
-      causeMessage.includes('does not exist')
-    ) {
-      console.warn(
-        'creator_contacts table does not exist, returning empty contacts'
-      );
-    } else {
+        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt);
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      const causeMessage =
+        error instanceof Error && error.cause instanceof Error
+          ? error.cause.message
+          : '';
+      if (
+        errorMessage.includes('does not exist') ||
+        causeMessage.includes('does not exist')
+      ) {
+        console.warn(
+          'creator_contacts table does not exist, returning empty contacts'
+        );
+        return [];
+      }
       throw error;
     }
-  }
+  })();
+
+  const [profileSocialLinks, profileContacts] = await Promise.all([
+    socialsPromise,
+    contactsPromise,
+  ]);
 
   return {
     ...profile,
