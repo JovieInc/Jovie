@@ -24,7 +24,7 @@ describe('generateFooterHTML', () => {
 
     expect(html).toContain('<footer');
     expect(html).toContain('Jovie');
-    expect(html).toContain('Claim your profile now');
+    expect(html).toContain('Join the waitlist');
     expect(html).toContain('Privacy');
     expect(html).toContain(`utm_artist=${mockArtist.handle}`);
   });
