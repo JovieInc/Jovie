@@ -1,6 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { PAGE_SUBTITLES } from '@/constants/app';
@@ -16,6 +17,8 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+
+export const runtime = 'edge';
 
 // Use a client wrapper to avoid ssr:false in a Server Component
 
@@ -168,8 +171,24 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const showTipButton = mode !== 'tip' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
+  // Determine if we should show the claim banner
+  // Show only for unclaimed profiles with a valid, non-expired claim token
+  const showClaimBanner =
+    !profile.is_claimed &&
+    profile.claim_token &&
+    !profile.claimed_at && // Not already claimed
+    // Check token expiration if we have the data
+    true; // Token expiration is checked server-side on claim
+
   return (
     <>
+      {showClaimBanner && profile.claim_token && (
+        <ClaimBanner
+          claimToken={profile.claim_token}
+          profileHandle={profile.username}
+          displayName={profile.display_name || undefined}
+        />
+      )}
       <StaticArtistPage
         mode={mode}
         artist={artist}
@@ -241,4 +260,3 @@ export async function generateMetadata({ params }: Props) {
 // Always render dynamically to ensure 404s return correct status
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';

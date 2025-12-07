@@ -35,7 +35,8 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
 
   if (!userId) {
     const redirectTarget = `/claim/${encodeURIComponent(token)}`;
-    redirect(`/sign-in?redirect_url=${encodeURIComponent(redirectTarget)}`);
+    // Redirect to signup (most claim users are new) with redirect back to claim
+    redirect(`/signup?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
   // Get request headers for audit
@@ -55,7 +56,9 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
 
   if (!profile) {
     // Invalid or expired token – send user to dashboard
-    logger.warn('Claim attempt with invalid token', { token: token.slice(0, 8) });
+    logger.warn('Claim attempt with invalid token', {
+      token: token.slice(0, 8),
+    });
     redirect('/dashboard');
   }
 
