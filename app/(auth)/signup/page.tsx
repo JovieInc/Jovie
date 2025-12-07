@@ -1,8 +1,7 @@
 'use client';
 
 import { ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
-import { AuthLayout } from '@/components/auth';
-import { OtpSignUpForm } from '@/components/auth/OtpSignUpForm';
+import { AuthLayout, OtpSignUpForm } from '@/components/auth';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export default function SignUpPage() {
@@ -11,9 +10,7 @@ export default function SignUpPage() {
       brandingTitle='Join Jovie today'
       brandingDescription='Create your profile in minutes and start sharing your story with a beautiful, conversion-optimized page.'
       formTitle='Create your account'
-      gradientFrom='purple-600'
-      gradientVia='cyan-600'
-      gradientTo='blue-600'
+      gradientVariant='purple-cyan-blue'
       textColorClass='text-purple-100'
     >
       <div className='min-h-[500px]'>

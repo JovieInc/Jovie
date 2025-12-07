@@ -1,6 +1,4 @@
-'use client';
-
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Logo } from '@/components/atoms/Logo';
 import { Container } from '@/components/site/Container';
 

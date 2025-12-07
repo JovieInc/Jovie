@@ -19,15 +19,22 @@ interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
   persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
   children: React.ReactNode;
+  /** If true, content area uses full width without max-w constraint */
+  fullWidth?: boolean;
 }
 
 export default function DashboardLayoutClient({
   dashboardData,
   persistSidebarCollapsed,
   children,
+  fullWidth = false,
 }: DashboardLayoutClientProps) {
   const [, startTransition] = useTransition();
   const pathname = usePathname();
+
+  // Routes that should use full width layout
+  const isFullWidthRoute = pathname?.startsWith('/admin/users') ?? false;
+  const useFullWidth = fullWidth || isFullWidthRoute;
 
   // Build a simple breadcrumb from the current path
   const crumbs = (() => {
@@ -104,7 +111,13 @@ export default function DashboardLayoutClient({
           <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
             <DashboardTopBar breadcrumbs={crumbs} />
             <main className='flex-1 min-h-0 overflow-auto'>
-              <div className='container mx-auto max-w-7xl p-6'>{children}</div>
+              <div
+                className={
+                  useFullWidth ? 'p-6' : 'container mx-auto max-w-7xl p-6'
+                }
+              >
+                {children}
+              </div>
             </main>
           </SidebarInset>
         </div>

@@ -23,6 +23,7 @@ export * from './LogoLoader';
 export * from './OptimizedImage';
 export * from './PlaceholderImage';
 export * from './Popover';
+export * from './ProfileNavButton';
 export * from './ProgressIndicator';
 export * from './QRCode';
 export * from './SectionHeading';

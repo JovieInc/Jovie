@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-
+import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
 import { ActivityTable } from '@/components/admin/activity-table';
-import { CreatorProfilesTable } from '@/components/admin/CreatorProfilesTable';
 import { KpiCards } from '@/components/admin/kpi-cards';
 import { MetricsChart } from '@/components/admin/metrics-chart';
 import { ReliabilityCard } from '@/components/admin/reliability-card';
@@ -120,13 +119,14 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           mrrUsd={metrics.mrrUsd}
           activeSubscribers={metrics.activeSubscribers}
         />
-        <CreatorProfilesTable
+        <AdminCreatorProfilesWithSidebar
           profiles={profiles}
           page={currentPage}
           pageSize={resolvedPageSize}
           total={total}
           search={search}
           sort={sort}
+          basePath='/admin'
         />
       </section>
 

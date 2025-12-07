@@ -785,6 +785,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   popularityIndex(b.platform.id)
               );
 
+            // Hide section when search/filter yields no results
+            if (items.length === 0) {
+              return null;
+            }
+
             return (
               <div key={section} className='space-y-3'>
                 <header className='flex items-center justify-between'>

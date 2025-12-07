@@ -76,6 +76,7 @@
     "migration:validate": "bash scripts/validate-migrations.sh",
     "drizzle:studio": "drizzle-kit studio",
     "drizzle:check": "drizzle-kit check",
+    "db:validate": "tsx scripts/validate-db-schema.ts",
     "drizzle:up": "drizzle-kit up",
     "tailwind:check": "node scripts/tailwind-guard.mjs",
     "tailwind:guard": "node scripts/tailwind-guard.mjs",

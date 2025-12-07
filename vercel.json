@@ -6,6 +6,10 @@
   },
   "rewrites": [
     {
+      "source": "/clerk/(.*)",
+      "destination": "https://clerk.jov.ie/$1"
+    },
+    {
       "source": "/ingest/static/(.*)",
       "destination": "https://us-assets.i.posthog.com/static/$1"
     },
