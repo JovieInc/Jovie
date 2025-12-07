@@ -127,14 +127,28 @@ export function SettingsPolished({
       body: formData,
     });
 
+    const data = (await response.json().catch(() => ({}))) as {
+      blobUrl?: string;
+      error?: string;
+      code?: string;
+      retryable?: boolean;
+    };
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        (errorData as { error?: string }).error || 'Upload failed'
-      );
+      // Throw structured error for AvatarUploadable to handle
+      const error = new Error(data.error || 'Upload failed') as Error & {
+        code?: string;
+        retryable?: boolean;
+      };
+      error.code = data.code;
+      error.retryable = data.retryable;
+      throw error;
     }
 
-    const data = (await response.json()) as { blobUrl: string };
+    if (!data.blobUrl) {
+      throw new Error('No image URL returned from upload');
+    }
+
     return data.blobUrl;
   }, []);
 

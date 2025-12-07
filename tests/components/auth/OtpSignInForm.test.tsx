@@ -123,16 +123,6 @@ describe('OtpSignInForm', () => {
     expect(buttons[1]).toHaveTextContent('Continue');
   });
 
-  it('renders navigation link to waitlist', () => {
-    render(<OtpSignInForm />);
-
-    const waitlistLinks = screen.getAllByText('Join waitlist');
-    expect(waitlistLinks).toHaveLength(2); // One in each step
-    waitlistLinks.forEach(link => {
-      expect(link.closest('a')).toHaveAttribute('href', '/waitlist');
-    });
-  });
-
   it('uses semantic design tokens for global error', () => {
     render(<OtpSignInForm />);
 

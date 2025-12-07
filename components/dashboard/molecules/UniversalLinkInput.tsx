@@ -1,7 +1,13 @@
 'use client';
 
-import { XMarkIcon } from '@heroicons/react/20/solid';
-import { Button } from '@jovie/ui';
+import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
 import React, {
   forwardRef,
   useCallback,
@@ -12,12 +18,103 @@ import React, {
   useState,
 } from 'react';
 import { Input } from '@/components/atoms/Input';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { isBrandDark } from '@/lib/utils/color';
 import {
   type DetectedLink,
   detectPlatform,
 } from '@/lib/utils/platform-detection';
+
+// Platform options for the dropdown selector
+const PLATFORM_OPTIONS = [
+  {
+    id: 'spotify',
+    name: 'Spotify',
+    icon: 'spotify',
+    prefill: 'https://open.spotify.com/artist/',
+  },
+  {
+    id: 'apple-music',
+    name: 'Apple Music',
+    icon: 'applemusic',
+    prefill: 'https://music.apple.com/artist/',
+  },
+  {
+    id: 'youtube-music',
+    name: 'YouTube Music',
+    icon: 'youtube',
+    prefill: 'https://music.youtube.com/channel/',
+  },
+  {
+    id: 'instagram',
+    name: 'Instagram',
+    icon: 'instagram',
+    prefill: 'https://instagram.com/',
+  },
+  {
+    id: 'tiktok',
+    name: 'TikTok',
+    icon: 'tiktok',
+    prefill: 'https://www.tiktok.com/@',
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    icon: 'youtube',
+    prefill: 'https://www.youtube.com/@',
+  },
+  { id: 'twitter', name: 'X (Twitter)', icon: 'x', prefill: 'https://x.com/' },
+  {
+    id: 'facebook',
+    name: 'Facebook',
+    icon: 'facebook',
+    prefill: 'https://facebook.com/',
+  },
+  {
+    id: 'soundcloud',
+    name: 'SoundCloud',
+    icon: 'soundcloud',
+    prefill: 'https://soundcloud.com/',
+  },
+  {
+    id: 'twitch',
+    name: 'Twitch',
+    icon: 'twitch',
+    prefill: 'https://twitch.tv/',
+  },
+  {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    icon: 'linkedin',
+    prefill: 'https://linkedin.com/in/',
+  },
+  { id: 'venmo', name: 'Venmo', icon: 'venmo', prefill: 'https://venmo.com/' },
+  {
+    id: 'discord',
+    name: 'Discord',
+    icon: 'discord',
+    prefill: 'https://discord.gg/',
+  },
+  {
+    id: 'threads',
+    name: 'Threads',
+    icon: 'threads',
+    prefill: 'https://threads.net/@',
+  },
+  {
+    id: 'telegram',
+    name: 'Telegram',
+    icon: 'telegram',
+    prefill: 'https://t.me/',
+  },
+  {
+    id: 'snapchat',
+    name: 'Snapchat',
+    icon: 'snapchat',
+    prefill: 'https://snapchat.com/add/',
+  },
+  { id: 'website', name: 'Website', icon: 'globe', prefill: 'https://' },
+] as const;
 
 interface UniversalLinkInputProps {
   onAdd: (link: DetectedLink) => void;
@@ -154,10 +251,128 @@ export const UniversalLinkInput = forwardRef<
       getInputElement: () => urlInputRef.current,
     }));
 
+    // Handle platform selection from dropdown - preserve handle/username
+    const handlePlatformSelect = useCallback(
+      (platform: (typeof PLATFORM_OPTIONS)[number]) => {
+        const input = urlInputRef.current;
+        const cursorPos = input?.selectionStart ?? url.length;
+
+        // Try to extract the handle/username from current URL
+        let handle = '';
+        try {
+          if (url.trim()) {
+            const parsed = new URL(
+              url.startsWith('http') ? url : `https://${url}`
+            );
+            const pathParts = parsed.pathname.split('/').filter(Boolean);
+            // Get the last meaningful path segment (usually the handle)
+            if (pathParts.length > 0) {
+              handle = pathParts[pathParts.length - 1];
+            }
+          }
+        } catch {
+          // If URL parsing fails, try to extract text after the last /
+          const lastSlash = url.lastIndexOf('/');
+          if (lastSlash !== -1 && lastSlash < url.length - 1) {
+            handle = url.slice(lastSlash + 1);
+          }
+        }
+
+        // Build new URL with the extracted handle
+        const newUrl = platform.prefill + handle;
+        setUrl(newUrl);
+        onQueryChange?.(newUrl);
+
+        // Restore focus without changing cursor position relative to handle
+        setTimeout(() => {
+          if (input) {
+            input.focus();
+            // Position cursor at the same relative position within the handle
+            const newCursorPos =
+              platform.prefill.length +
+              Math.max(0, cursorPos - (url.length - handle.length));
+            input.setSelectionRange(newCursorPos, newCursorPos);
+          }
+        }, 0);
+      },
+      [onQueryChange, url]
+    );
+
+    // Get current platform icon for the selector (detected or default)
+    const currentPlatformIcon = detectedLink?.platform.icon || 'globe';
+    const currentIconMeta = getPlatformIcon(currentPlatformIcon);
+    const currentIconHex = currentIconMeta?.hex
+      ? `#${currentIconMeta.hex}`
+      : '#6b7280';
+    const currentIconIsDark = isBrandDark(currentIconHex);
+    const selectorIconColor = currentIconIsDark ? '#ffffff' : currentIconHex;
+    const selectorIconBg = currentIconIsDark
+      ? 'rgba(255,255,255,0.08)'
+      : `${currentIconHex}15`;
+
     return (
       <div className='relative w-full' ref={inputRef}>
-        {/* URL Input */}
-        <div className='relative'>
+        {/* URL Input with platform selector */}
+        <div className='relative flex'>
+          {/* Platform selector dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type='button'
+                className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0'
+                aria-label='Select platform'
+              >
+                <div
+                  className='flex items-center justify-center w-6 h-6 rounded-full'
+                  style={{
+                    backgroundColor: selectorIconBg,
+                    color: selectorIconColor,
+                  }}
+                >
+                  <SocialIcon
+                    platform={currentPlatformIcon}
+                    className='w-3.5 h-3.5'
+                  />
+                </div>
+                <ChevronDownIcon className='w-4 h-4 text-tertiary-token' />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align='start'
+              className='max-h-80 overflow-y-auto'
+            >
+              {PLATFORM_OPTIONS.map(platform => {
+                const meta = getPlatformIcon(platform.icon);
+                const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+                const isDark = isBrandDark(hex);
+                const color = isDark ? '#9ca3af' : hex;
+                return (
+                  <DropdownMenuItem
+                    key={platform.id}
+                    onClick={() => handlePlatformSelect(platform)}
+                    className='flex items-center gap-2 cursor-pointer'
+                  >
+                    <div
+                      className='flex items-center justify-center w-5 h-5 rounded-full'
+                      style={{
+                        backgroundColor: isDark
+                          ? 'rgba(255,255,255,0.08)'
+                          : `${hex}15`,
+                        color,
+                      }}
+                    >
+                      <SocialIcon
+                        platform={platform.icon}
+                        className='w-3 h-3'
+                      />
+                    </div>
+                    <span>{platform.name}</span>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <label htmlFor='link-url-input' className='sr-only'>
             Enter link URL
           </label>
@@ -174,7 +389,7 @@ export const UniversalLinkInput = forwardRef<
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            className='pr-24'
+            className='pr-24 rounded-l-none'
             aria-describedby={
               detectedLink ? 'link-detection-status' : undefined
             }

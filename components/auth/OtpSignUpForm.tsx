@@ -3,7 +3,7 @@
 import * as Clerk from '@clerk/elements/common';
 import * as SignUp from '@clerk/elements/sign-up';
 import { Card, CardContent } from '@jovie/ui';
-import { AuthFooterLink, AuthInput } from './atoms';
+import { AuthInput } from './atoms';
 
 const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-red-400';
 const SUBMIT_BUTTON_CLASSES =
@@ -26,12 +26,6 @@ export function OtpSignUpForm() {
               <SignUp.Action submit className={SUBMIT_BUTTON_CLASSES}>
                 Continue with Email
               </SignUp.Action>
-
-              <AuthFooterLink
-                prompt='Already have an account?'
-                href='/signin'
-                linkText='Sign in'
-              />
             </div>
           </SignUp.Step>
 
@@ -67,12 +61,6 @@ export function OtpSignUpForm() {
                 >
                   ← Use a different email
                 </SignUp.Action>
-
-                <AuthFooterLink
-                  prompt='Already have an account?'
-                  href='/signin'
-                  linkText='Sign in'
-                />
               </div>
             </SignUp.Strategy>
           </SignUp.Step>
