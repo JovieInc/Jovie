@@ -125,11 +125,19 @@ if [ ${#CONCURRENT_FILES[@]} -gt 0 ]; then
   echo -e "${YELLOW}⚠️  CREATE INDEX CONCURRENTLY cannot run inside transaction blocks!${NC}"
   echo "Drizzle's migrate() function wraps migrations in transactions, causing failures."
   echo ""
-  echo "To fix:"
-  echo "1. Use 'CREATE INDEX' without CONCURRENTLY keyword"
-  echo "2. Or create a separate migration to fix the index creation"
+  echo "This will break:"
+  echo "  - E2E tests (migration setup fails)"
+  echo "  - CI/CD pipeline (deploy blocked)"
+  echo "  - Production deployments (migration fails)"
   echo ""
-  echo "See: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY"
+  echo "To fix:"
+  echo "  ❌ WRONG: CREATE INDEX CONCURRENTLY idx_name ON table_name (column);"
+  echo "  ✅ RIGHT: CREATE INDEX IF NOT EXISTS idx_name ON table_name (column);"
+  echo ""
+  echo "Why: Drizzle wraps migrations in transactions. PostgreSQL forbids CONCURRENTLY in transactions."
+  echo ""
+  echo "📖 Read: docs/MIGRATION_CONCURRENTLY_RULE.md for detailed explanation"
+  echo "🔗 PostgreSQL docs: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY"
 fi
 
 exit $EXIT_CODE

@@ -220,32 +220,44 @@ A pre-commit hook automatically validates migration files to catch common issues
 2. Run `pnpm drizzle-kit generate` to regenerate it properly
 3. Commit again
 
-### 5.2 Zero-Downtime Index Creation (CRITICAL)
+### 5.2 Index Creation in Drizzle Migrations (CRITICAL)
 
-When creating indexes in production migrations, you **MUST** use `CONCURRENTLY` to avoid blocking writes:
+**NEVER use `CONCURRENTLY` in Drizzle migration files.** This is a common PostgreSQL mistake that will break your migrations.
 
-**❌ WRONG - Blocks all writes:**
+**❌ WRONG - Will fail in Drizzle:**
 ```sql
-CREATE INDEX idx_name ON table_name (column_name);
-CREATE UNIQUE INDEX uniq_name ON table_name (column_name);
-```
-
-**✅ RIGHT - Allows concurrent writes:**
-```sql
+-- ❌ FORBIDDEN - Cannot run inside transaction blocks
 CREATE INDEX CONCURRENTLY idx_name ON table_name (column_name);
 CREATE UNIQUE INDEX CONCURRENTLY uniq_name ON table_name (column_name);
 ```
 
-**Why this matters:**
-- Without `CONCURRENTLY`, PostgreSQL acquires an **exclusive lock** on the table
-- This **blocks all writes** (INSERT, UPDATE, DELETE) during index creation
-- Can cause **deployment timeouts** and **production downtime**
-- Large tables may take minutes to index, blocking all operations
+**✅ RIGHT - Use standard CREATE INDEX:**
+```sql
+-- ✅ CORRECT - Works in Drizzle transaction blocks
+CREATE INDEX IF NOT EXISTS idx_name ON table_name (column_name);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_name ON table_name (column_name);
+```
 
-**Important notes:**
-- `CONCURRENTLY` cannot be used inside a transaction block
-- If your migration has multiple statements, you may need to split index creation into a separate migration
-- Always test index creation time on staging before deploying to production
+**Why CONCURRENTLY fails:**
+- Drizzle's `migrate()` function **wraps all migrations in transaction blocks** for atomicity
+- PostgreSQL **explicitly forbids** `CREATE INDEX CONCURRENTLY` inside transactions
+- Error: `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`
+- This breaks E2E tests, CI/CD pipeline, and production deployments
+
+**Production safety notes:**
+- Always use `IF NOT EXISTS` to make index creation idempotent
+- Test index creation time on staging first (for large tables)
+- For very large tables (>10M rows), consider:
+  1. Creating index during low-traffic window
+  2. Using partial indexes (`WHERE` clause) to reduce index size
+  3. Monitoring database load during migration
+- Drizzle migrations run quickly during deployment; indexes are created before traffic hits
+
+**Migration validation:**
+- Pre-commit hook automatically detects `CONCURRENTLY` in migrations
+- CI will fail if CONCURRENTLY is present
+- This prevents broken deployments before they reach production
+- **📖 Reference**: See `docs/MIGRATION_CONCURRENTLY_RULE.md` for detailed explanation and historical context
 
 ### 5.3 PostgreSQL Syntax Requirements (CRITICAL)
 
