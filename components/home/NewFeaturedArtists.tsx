@@ -22,7 +22,7 @@ export async function NewFeaturedArtists() {
   return (
     <section className='relative pt-0 pb-12'>
       {/* Gradient blend from hero to this section */}
-      <div className='absolute inset-0 -z-10 bg-gradient-to-b from-white via-white to-neutral-50 dark:from-[#0a0a0b] dark:via-[#0a0a0b] dark:to-[#0f0f11]' />
+      <div className='absolute inset-0 -z-10 bg-linear-to-b from-white via-white to-neutral-50 dark:from-[#0a0a0b] dark:via-[#0a0a0b] dark:to-[#0f0f11]' />
       <Container>
         {error ? (
           <div className='flex items-center justify-center py-6'>

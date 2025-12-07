@@ -187,7 +187,7 @@ export function NewFeaturesSection() {
             return (
               <div
                 key={index}
-                className='group relative p-6 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.02] hover:border-gray-300 dark:hover:border-white/[0.12] hover:bg-gray-100/50 dark:hover:bg-white/[0.04] transition-all duration-200'
+                className='group relative p-6 rounded-xl border border-gray-200 dark:border-white/8 bg-gray-50 dark:bg-white/2 hover:border-gray-300 dark:hover:border-white/12 hover:bg-gray-100/50 dark:hover:bg-white/4 transition-all duration-200'
               >
                 {/* Icon with Geist color */}
                 <div

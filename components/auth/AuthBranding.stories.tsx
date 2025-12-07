@@ -99,23 +99,23 @@ export const LogoOnly: Story = {
 export const AllGradients: Story = {
   render: () => (
     <div className='grid grid-cols-5 min-h-screen'>
-      <div className='bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-600 p-8 flex items-center justify-center'>
+      <div className='bg-linear-to-br from-blue-600 via-purple-600 to-cyan-600 p-8 flex items-center justify-center'>
         <span className='text-white font-medium text-sm'>blue-purple-cyan</span>
       </div>
-      <div className='bg-gradient-to-br from-purple-600 via-cyan-600 to-blue-600 p-8 flex items-center justify-center'>
+      <div className='bg-linear-to-br from-purple-600 via-cyan-600 to-blue-600 p-8 flex items-center justify-center'>
         <span className='text-white font-medium text-sm'>purple-cyan-blue</span>
       </div>
-      <div className='bg-gradient-to-br from-purple-600 via-pink-600 to-orange-600 p-8 flex items-center justify-center'>
+      <div className='bg-linear-to-br from-purple-600 via-pink-600 to-orange-600 p-8 flex items-center justify-center'>
         <span className='text-white font-medium text-sm'>
           purple-pink-orange
         </span>
       </div>
-      <div className='bg-gradient-to-br from-green-600 via-blue-600 to-purple-600 p-8 flex items-center justify-center'>
+      <div className='bg-linear-to-br from-green-600 via-blue-600 to-purple-600 p-8 flex items-center justify-center'>
         <span className='text-white font-medium text-sm'>
           green-blue-purple
         </span>
       </div>
-      <div className='bg-gradient-to-br from-red-600 via-orange-600 to-yellow-600 p-8 flex items-center justify-center'>
+      <div className='bg-linear-to-br from-red-600 via-orange-600 to-yellow-600 p-8 flex items-center justify-center'>
         <span className='text-white font-medium text-sm'>
           red-orange-yellow
         </span>
