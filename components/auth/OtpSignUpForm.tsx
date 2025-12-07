@@ -39,29 +39,31 @@ export function OtpSignUpForm() {
             name='verifications'
             aria-label='Verify your email with code'
           >
-            <div className='space-y-4'>
-              <Clerk.Field name='code'>
-                <AuthInput
-                  type='text'
-                  inputMode='numeric'
-                  autoComplete='one-time-code'
-                  maxLength={6}
-                  variant='otp'
-                  placeholder='Enter code'
+            <SignUp.Strategy name='email_code'>
+              <div className='space-y-4'>
+                <Clerk.Field name='code'>
+                  <AuthInput
+                    type='text'
+                    inputMode='numeric'
+                    autoComplete='one-time-code'
+                    maxLength={6}
+                    variant='otp'
+                    placeholder='Enter code'
+                  />
+                  <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
+                </Clerk.Field>
+
+                <SignUp.Action submit className={SUBMIT_BUTTON_CLASSES}>
+                  Continue
+                </SignUp.Action>
+
+                <AuthFooterLink
+                  prompt='Already have an account?'
+                  href='/signin'
+                  linkText='Sign in'
                 />
-                <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
-              </Clerk.Field>
-
-              <SignUp.Action submit className={SUBMIT_BUTTON_CLASSES}>
-                Continue
-              </SignUp.Action>
-
-              <AuthFooterLink
-                prompt='Already have an account?'
-                href='/signin'
-                linkText='Sign in'
-              />
-            </div>
+              </div>
+            </SignUp.Strategy>
           </SignUp.Step>
         </CardContent>
       </Card>

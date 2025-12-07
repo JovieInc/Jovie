@@ -60,6 +60,17 @@ for sql_file in "${SQL_FILES[@]}"; do
   fi
 done
 
+# Check for CREATE INDEX CONCURRENTLY in migrations (not DROP or comments)
+CONCURRENT_FILES=()
+for sql_file in "${SQL_FILES[@]}"; do
+  filename=$(basename "$sql_file")
+  # Check for CREATE INDEX CONCURRENTLY (case insensitive, ignoring comments and DROP)
+  if grep -i "CREATE[[:space:]]\+INDEX[[:space:]]\+CONCURRENTLY" "$sql_file" | grep -v "^[[:space:]]*--" >/dev/null 2>&1; then
+    CONCURRENT_FILES+=("$filename")
+    EXIT_CODE=1
+  fi
+done
+
 # Check for orphaned journal entries (entries without SQL files)
 ORPHANED_ENTRIES=()
 for tag in "${JOURNAL_TAGS[@]}"; do
@@ -102,6 +113,23 @@ if [ ${#ORPHANED_ENTRIES[@]} -gt 0 ]; then
   echo ""
   echo "These journal entries have no corresponding .sql file."
   echo "This usually happens after deleting/renaming migration files."
+fi
+
+if [ ${#CONCURRENT_FILES[@]} -gt 0 ]; then
+  echo -e "\n${RED}❌ CONCURRENTLY Keyword Detected${NC}"
+  echo -e "${RED}Found ${#CONCURRENT_FILES[@]} migration file(s) using CREATE INDEX CONCURRENTLY:${NC}"
+  for file in "${CONCURRENT_FILES[@]}"; do
+    echo -e "  ${RED}- ${file}${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}⚠️  CREATE INDEX CONCURRENTLY cannot run inside transaction blocks!${NC}"
+  echo "Drizzle's migrate() function wraps migrations in transactions, causing failures."
+  echo ""
+  echo "To fix:"
+  echo "1. Use 'CREATE INDEX' without CONCURRENTLY keyword"
+  echo "2. Or create a separate migration to fix the index creation"
+  echo ""
+  echo "See: https://www.postgresql.org/docs/current/sql-createindex.html#SQL-CREATEINDEX-CONCURRENTLY"
 fi
 
 exit $EXIT_CODE

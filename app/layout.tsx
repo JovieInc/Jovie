@@ -177,7 +177,6 @@ export default async function RootLayout({
     <>
       <ClerkProvider
         publishableKey={publishableKey}
-        proxyUrl='/clerk'
         appearance={{
           elements: {
             rootBox: 'bg-base text-primary',
