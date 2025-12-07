@@ -9,7 +9,7 @@ describe('CTASection', () => {
     render(
       <CTASection
         title='Launch your artist page in minutes. Convert visitors into fans.'
-        buttonText='Claim your handle →'
+        buttonText='Request Early Access →'
         buttonHref='/sign-up'
         variant='primary'
       />
@@ -26,14 +26,14 @@ describe('CTASection', () => {
     render(
       <CTASection
         title='Launch your artist page in minutes. Convert visitors into fans.'
-        buttonText='Claim your handle →'
+        buttonText='Request Early Access →'
         buttonHref='/sign-up'
         variant='primary'
       />
     );
 
     expect(
-      screen.getByRole('link', { name: /claim your handle/i })
+      screen.getByRole('link', { name: /request early access/i })
     ).toBeInTheDocument();
   });
 
@@ -41,7 +41,7 @@ describe('CTASection', () => {
     render(
       <CTASection
         title='Launch your artist page in minutes. Convert visitors into fans.'
-        buttonText='Claim your handle →'
+        buttonText='Request Early Access →'
         buttonHref='/sign-up'
         variant='primary'
       />
@@ -60,7 +60,7 @@ describe('CTASection', () => {
     render(
       <CTASection
         title='Launch your artist page in minutes. Convert visitors into fans.'
-        buttonText='Claim your handle →'
+        buttonText='Request Early Access →'
         buttonHref='/sign-up'
         variant='primary'
       />
@@ -81,7 +81,7 @@ describe('CTASection', () => {
     render(
       <CTASection
         title='Launch your artist page in minutes. Convert visitors into fans.'
-        buttonText='Claim your handle →'
+        buttonText='Request Early Access →'
         buttonHref='/sign-up'
         variant='primary'
       />
@@ -90,7 +90,7 @@ describe('CTASection', () => {
     const section = screen.getByRole('region');
     expect(section).toBeInTheDocument();
 
-    const link = screen.getByRole('link', { name: /claim your handle/i });
+    const link = screen.getByRole('link', { name: /request early access/i });
     expect(link).toHaveAttribute('href', '/sign-up');
   });
 });

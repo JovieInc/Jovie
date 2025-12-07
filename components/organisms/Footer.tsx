@@ -72,7 +72,7 @@ export function Footer({
     regular: {
       // Clerk-like footer: subtle border top, compact spacing, segmented theme selector
       containerClass:
-        'border-t border-gray-600/10 dark:border-gray-900 bg-white dark:bg-gray-900',
+        'border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#0a0a0b]',
       contentClass:
         'mx-auto max-w-7xl px-4 pt-6 pb-6 flex items-center justify-between',
       colorVariant: 'light' as const,
@@ -136,7 +136,7 @@ export function Footer({
 
     return (
       <footer
-        className={`border-t border-gray-600/10 dark:border-gray-900 bg-white dark:bg-gray-900 ${className}`}
+        className={`border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#0a0a0b] ${className}`}
       >
         <div className='mx-auto max-w-7xl px-4 pt-10 pb-6'>
           <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>

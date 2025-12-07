@@ -25,7 +25,7 @@ type Story = StoryObj<typeof meta>;
 
 export const HomePage: Story = {
   args: {
-    headline: 'Claim your handle',
+    headline: 'Join the waitlist',
     highlightText: 'handle',
     gradientVariant: 'primary',
     subtitle: 'Your personalized link in bio, ready in seconds.',

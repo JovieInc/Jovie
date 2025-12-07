@@ -1,7 +1,9 @@
-import { ArtistCard } from '@/components/molecules/ArtistCard';
+import { ArrowUpRight } from 'lucide-react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 
-const HERO_PREVIEW_COUNT = 3;
+const HERO_PREVIEW_COUNT = 4;
 
 export async function HeroExampleProfiles() {
   try {
@@ -13,35 +15,61 @@ export async function HeroExampleProfiles() {
     }
 
     return (
-      <div className='mt-6 space-y-3'>
-        <div className='flex items-center justify-between'>
-          <p className='text-xs font-semibold uppercase tracking-[0.3em] text-gray-500 dark:text-gray-400'>
-            Explore example profiles
+      <div className='mt-12'>
+        {/* Section header */}
+        <div className='flex items-center gap-3 mb-6'>
+          <div className='h-px flex-1 bg-neutral-200 dark:bg-neutral-800' />
+          <p className='text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400'>
+            Live profiles
           </p>
-          <p className='text-xs font-medium text-gray-600 dark:text-gray-300'>
-            Real creators, ready now
-          </p>
+          <div className='h-px flex-1 bg-neutral-200 dark:bg-neutral-800' />
         </div>
 
+        {/* Profile cards */}
         <div
-          aria-label='Example creator snapshots'
-          className='group relative flex items-stretch gap-3 overflow-x-auto pb-2 pl-1 text-left'
+          aria-label='Example creator profiles'
+          className='flex items-center justify-center gap-4'
         >
           {previews.map(creator => (
-            <div
+            <Link
               key={creator.id}
-              className='shrink-0 w-28 rounded-3xl bg-white/80 dark:bg-white/5 p-2 shadow-[0_10px_25px_rgba(15,23,42,0.1)] dark:shadow-[0_8px_20px_rgba(0,0,0,0.3)] backdrop-blur'
+              href={`/${creator.handle}`}
+              className='group relative flex flex-col items-center'
             >
-              <ArtistCard
-                handle={creator.handle}
-                name={creator.name}
-                src={creator.src}
-                size='sm'
-                showName
-                className='w-full'
-              />
-            </div>
+              {/* Avatar with ring */}
+              <div className='relative'>
+                <div className='w-14 h-14 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 group-hover:border-neutral-400 dark:group-hover:border-neutral-500 transition-colors duration-150'>
+                  <Image
+                    src={creator.src}
+                    alt={creator.name}
+                    width={56}
+                    height={56}
+                    className='w-full h-full object-cover'
+                  />
+                </div>
+                {/* Hover indicator */}
+                <div className='absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150'>
+                  <ArrowUpRight className='w-3 h-3 text-neutral-600 dark:text-neutral-400' />
+                </div>
+              </div>
+
+              {/* Handle */}
+              <p className='mt-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-neutral-100 transition-colors duration-150'>
+                @{creator.handle}
+              </p>
+            </Link>
           ))}
+        </div>
+
+        {/* View all link */}
+        <div className='mt-6 text-center'>
+          <Link
+            href='/explore'
+            className='inline-flex items-center gap-1 text-xs font-medium text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-150'
+          >
+            View all creators
+            <ArrowUpRight className='w-3 h-3' />
+          </Link>
         </div>
       </div>
     );

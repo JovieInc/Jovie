@@ -1,104 +1,75 @@
-'use client';
-
+import { AtSign, Share2, TrendingUp } from 'lucide-react';
 import { Container } from '@/components/site/Container';
 
-// Simple 3-step process
 const steps = [
   {
-    number: '1',
-    title: 'Claim your @handle',
-    icon: (
-      <svg
-        className='w-6 h-6'
-        fill='none'
-        viewBox='0 0 24 24'
-        stroke='currentColor'
-      >
-        <path
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          strokeWidth={2}
-          d='M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z'
-        />
-      </svg>
-    ),
+    number: '01',
+    title: 'Claim your handle',
+    description: 'Reserve your unique @username in seconds.',
+    icon: AtSign,
   },
   {
-    number: '2',
-    title: 'Share your profile',
-    icon: (
-      <svg
-        className='w-6 h-6'
-        fill='none'
-        viewBox='0 0 24 24'
-        stroke='currentColor'
-      >
-        <path
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          strokeWidth={2}
-          d='M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z'
-        />
-      </svg>
-    ),
+    number: '02',
+    title: 'Add your links',
+    description: 'Connect your music, socials, and merch.',
+    icon: Share2,
   },
   {
-    number: '3',
-    title: 'Watch conversions rise',
-    icon: (
-      <svg
-        className='w-6 h-6'
-        fill='none'
-        viewBox='0 0 24 24'
-        stroke='currentColor'
-      >
-        <path
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          strokeWidth={2}
-          d='M13 7h8m0 0v8m0-8l-8 8-4-4-6 6'
-        />
-      </svg>
-    ),
+    number: '03',
+    title: 'Grow your audience',
+    description: 'Track clicks and convert fans into followers.',
+    icon: TrendingUp,
   },
 ];
 
 export function NewHowItWorks() {
   return (
-    <section className='py-16 bg-white dark:bg-gray-900'>
+    <section className='py-20 sm:py-24'>
       <Container>
-        <div className='text-center mb-12'>
-          <h2 className='text-3xl font-bold text-gray-900 dark:text-white'>
+        {/* Header */}
+        <div className='text-center mb-16'>
+          <p className='text-sm font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 mb-3'>
+            Get started
+          </p>
+          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100'>
             How it works
           </h2>
         </div>
 
-        <div className='max-w-3xl mx-auto'>
-          <div className='relative'>
-            {/* Connection line */}
-            <div className='absolute top-0 left-[39px] w-0.5 h-full bg-gray-200 dark:bg-gray-700 hidden md:block'></div>
+        {/* Steps grid */}
+        <div className='max-w-4xl mx-auto'>
+          <div className='grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12'>
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              return (
+                <div key={index} className='relative text-center md:text-left'>
+                  {/* Connector line (desktop only) */}
+                  {index < steps.length - 1 && (
+                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-neutral-200 dark:bg-neutral-800' />
+                  )}
 
-            {/* Steps */}
-            <div className='space-y-12'>
-              {steps.map((step, index) => (
-                <div
-                  key={index}
-                  className='relative flex items-start md:items-center'
-                >
-                  {/* Step number with icon */}
-                  <div className='flex-shrink-0 flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white z-10'>
-                    {step.icon}
+                  {/* Step number */}
+                  <div className='inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 mb-4'>
+                    <span className='text-sm font-semibold text-neutral-900 dark:text-neutral-100'>
+                      {step.number}
+                    </span>
                   </div>
 
-                  {/* Step content */}
-                  <div className='ml-6'>
-                    <h3 className='text-xl font-semibold text-gray-900 dark:text-white'>
-                      {step.title}
-                    </h3>
+                  {/* Content */}
+                  <div className='space-y-2'>
+                    <div className='flex items-center justify-center md:justify-start gap-2'>
+                      <Icon className='h-4 w-4 text-neutral-400' />
+                      <h3 className='text-base font-medium text-neutral-900 dark:text-neutral-100'>
+                        {step.title}
+                      </h3>
+                    </div>
+                    <p className='text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed'>
+                      {step.description}
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
       </Container>

@@ -447,7 +447,7 @@ export function ProfileShell({
                 >
                   <DropdownMenuTrigger asChild>
                     <Button
-                      className='rounded-full relative'
+                      className='w-10 h-10 p-0 rounded-full relative'
                       variant='frosted'
                       aria-label='Manage notification channels'
                       aria-pressed={isNotificationMenuOpen || isSubscribed}
@@ -498,7 +498,7 @@ export function ProfileShell({
                 </DropdownMenu>
               ) : (
                 <Button
-                  className='rounded-full relative'
+                  className='w-10 h-10 p-0 rounded-full relative'
                   variant='frosted'
                   aria-label='Subscribe to notifications'
                   aria-pressed={notificationsState === 'editing'}

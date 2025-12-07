@@ -18,10 +18,10 @@ export function LegalPage({
   supportDescription,
 }: LegalPageProps) {
   return (
-    <section className='space-y-10'>
+    <div className='space-y-12'>
       <LegalHero {...hero} />
-      <div className='grid gap-10 lg:grid-cols-[300px_1fr]'>
-        <aside className='space-y-5 lg:sticky lg:top-24 lg:self-start'>
+      <div className='grid gap-12 lg:grid-cols-[220px_1fr] xl:grid-cols-[240px_1fr]'>
+        <aside className='hidden lg:block lg:sticky lg:top-24 lg:self-start'>
           <LegalSidebar toc={doc.toc} />
           <LegalSupportBlock
             description={supportDescription}
@@ -30,6 +30,6 @@ export function LegalPage({
         </aside>
         <LegalMarkdownReader html={doc.html} />
       </div>
-    </section>
+    </div>
   );
 }

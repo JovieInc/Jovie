@@ -35,7 +35,7 @@ export function FooterBranding({
           href={signUpLink}
           className='text-[10px] leading-snug uppercase tracking-[0.08em] text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 font-medium transition-colors text-center'
         >
-          Claim your profile now
+          Join the waitlist
         </Link>
       )}
     </div>

@@ -7,20 +7,17 @@ import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 export default function SignUpPage() {
   return (
     <AuthLayout
-      brandingTitle='Join Jovie today'
-      brandingDescription='Create your profile in minutes and start sharing your story with a beautiful, conversion-optimized page.'
       formTitle='Create your account'
-      gradientVariant='purple-cyan-blue'
-      textColorClass='text-purple-100'
+      footerPrompt='Already have an account?'
+      footerLinkText='Log in'
+      footerLinkHref='/signin'
     >
-      <div className='min-h-[500px]'>
-        <ClerkLoading>
-          <AuthFormSkeleton />
-        </ClerkLoading>
-        <ClerkLoaded>
-          <OtpSignUpForm />
-        </ClerkLoaded>
-      </div>
+      <ClerkLoading>
+        <AuthFormSkeleton />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <OtpSignUpForm />
+      </ClerkLoaded>
     </AuthLayout>
   );
 }

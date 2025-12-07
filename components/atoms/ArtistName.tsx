@@ -44,7 +44,7 @@ export function ArtistName({
   as: Tag = 'h1',
 }: ArtistNameProps) {
   const content = (
-    <span className='flex items-center justify-center gap-2'>
+    <span className='inline-flex items-baseline justify-center gap-1.5'>
       <span
         className={cn(
           'font-semibold text-gray-900 dark:text-white',
@@ -55,7 +55,11 @@ export function ArtistName({
       >
         {name}
       </span>
-      {isVerified && <VerifiedBadge size={badgeSizes[size]} />}
+      {isVerified && (
+        <span className='relative top-[0.1em]'>
+          <VerifiedBadge size={badgeSizes[size]} />
+        </span>
+      )}
     </span>
   );
 

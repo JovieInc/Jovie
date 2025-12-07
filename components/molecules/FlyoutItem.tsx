@@ -15,13 +15,8 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
       <Link
         ref={ref}
         href={feature.href}
-        className={`group relative flex items-start gap-3 rounded-lg p-3 transition-all duration-200 hover:scale-[1.02] hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${className}`}
-        style={
-          {
-            ...style,
-            '--ring-color': `color-mix(in srgb, var(${feature.colorVar}) 25%, transparent)`,
-          } as React.CSSProperties & { '--ring-color': string }
-        }
+        className={`group relative flex items-start gap-3 p-3 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 ${className}`}
+        style={style}
         role='menuitem'
       >
         <div className='flex-shrink-0'>
@@ -29,7 +24,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
         </div>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-2'>
-            <h3 className='text-sm font-semibold text-[var(--fg)] group-hover:text-[var(--fg)]'>
+            <h3 className='text-sm font-semibold text-gray-900 dark:text-white'>
               {feature.title}
             </h3>
             {feature.aiPowered && (
@@ -38,7 +33,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
               </span>
             )}
           </div>
-          <p className='mt-1 text-xs text-[var(--muted)] group-hover:text-[var(--muted)]'>
+          <p className='mt-0.5 text-xs text-gray-500 dark:text-gray-400'>
             {feature.blurb}
           </p>
         </div>

@@ -101,7 +101,7 @@ interface Props {
     username: string;
   };
   searchParams?: {
-    mode?: 'profile' | 'listen' | 'tip';
+    mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
   };
 }
 
@@ -156,6 +156,8 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         return PAGE_SUBTITLES.listen;
       case 'tip':
         return PAGE_SUBTITLES.tip;
+      case 'subscribe':
+        return PAGE_SUBTITLES.subscribe;
       default:
         return PAGE_SUBTITLES.profile;
     }

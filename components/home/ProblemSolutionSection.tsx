@@ -58,7 +58,7 @@ export function ProblemSolutionSection() {
             onClick={handleClick}
             className='inline-flex items-center justify-center px-8 py-4 text-base font-semibold text-white bg-gray-900 hover:bg-gray-800 dark:bg-gray-50 dark:text-gray-900 dark:hover:bg-gray-200 rounded-lg border border-gray-900 dark:border-gray-50 transition-all duration-200 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-gray-400 dark:focus-visible:ring-gray-600 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none group'
           >
-            <span>Claim your handle</span>
+            <span>Request Early Access</span>
             <svg
               className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1'
               fill='none'

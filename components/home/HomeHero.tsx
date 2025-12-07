@@ -38,7 +38,7 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
 
   return (
     <HeroSection
-      headline='Claim your handle'
+      headline='Request Early Access'
       highlightText='handle'
       gradientVariant='primary'
       subtitle={defaultSubtitle}

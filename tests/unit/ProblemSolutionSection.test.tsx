@@ -39,7 +39,9 @@ describe('ProblemSolutionSection', () => {
   it('renders Linear-inspired CTA button with proper styling', () => {
     render(<ProblemSolutionSection />);
 
-    const ctaButton = screen.getByRole('link', { name: /Claim your handle/i });
+    const ctaButton = screen.getByRole('link', {
+      name: /Request Early Access/i,
+    });
     expect(ctaButton).toBeInTheDocument();
     expect(ctaButton).toHaveAttribute('href', '/onboarding');
 
@@ -60,7 +62,9 @@ describe('ProblemSolutionSection', () => {
   it('tracks analytics when CTA button is clicked', () => {
     render(<ProblemSolutionSection />);
 
-    const ctaButton = screen.getByRole('link', { name: /Claim your handle/i });
+    const ctaButton = screen.getByRole('link', {
+      name: /Request Early Access/i,
+    });
     fireEvent.click(ctaButton);
 
     expect(track).toHaveBeenCalledWith('claim_handle_click', {
@@ -96,7 +100,9 @@ describe('ProblemSolutionSection', () => {
   it('includes arrow icon in CTA button with hover animation', () => {
     render(<ProblemSolutionSection />);
 
-    const ctaButton = screen.getByRole('link', { name: /Claim your handle/i });
+    const ctaButton = screen.getByRole('link', {
+      name: /Request Early Access/i,
+    });
     const arrowIcon = ctaButton.querySelector('svg');
 
     expect(arrowIcon).toBeInTheDocument();
