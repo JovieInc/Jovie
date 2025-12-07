@@ -35,6 +35,7 @@ export function ArtistInfo({
         name={artist.name}
         size={avatarSizeMap[avatarSize]}
         priority
+        verified={false}
       />
 
       <div className='space-y-1.5 sm:space-y-2 max-w-md'>

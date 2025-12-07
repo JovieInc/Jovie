@@ -7,7 +7,7 @@ import { Container } from '@/components/site/Container';
 
 export function NewUpgradeTeaser() {
   return (
-    <section className='py-16 sm:py-20'>
+    <section className='py-16 sm:py-20 bg-white dark:bg-[#0a0a0b]'>
       <Container>
         <div className='max-w-lg mx-auto'>
           <div className='relative rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 p-8 sm:p-10'>

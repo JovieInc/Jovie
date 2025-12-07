@@ -45,23 +45,14 @@ export function ProfileNavButton({
         )}
         aria-label='Go to Jovie homepage'
       >
-        <div
-          className={cn(
-            'w-5 h-5 flex items-center justify-center',
-            'transition-all duration-300 ease-out',
-            // Animate in from back button position
-            'animate-in fade-in zoom-in-90 duration-300'
-          )}
-        >
-          <Image
-            src='/brand/Jovie-Logo-Icon.svg'
-            alt='Jovie'
-            width={20}
-            height={20}
-            className='w-5 h-5 object-contain'
-            priority
-          />
-        </div>
+        <Image
+          src='/brand/Jovie-Logo-Icon.svg'
+          alt='Jovie'
+          width={40}
+          height={40}
+          className='w-10 h-10 object-cover rounded-full'
+          priority
+        />
       </Link>
     );
   }

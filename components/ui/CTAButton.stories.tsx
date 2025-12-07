@@ -16,7 +16,7 @@ type Story = StoryObj<typeof CTAButton>;
 
 export const Primary: Story = {
   args: {
-    children: 'Claim your Jovie handle',
+    children: 'Join the waitlist',
   },
 };
 

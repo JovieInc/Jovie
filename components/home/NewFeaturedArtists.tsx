@@ -1,7 +1,6 @@
-import {
-  type FeaturedCreator,
-  FeaturedCreatorsSection,
-} from '@/components/organisms/FeaturedArtistsSection';
+import Image from 'next/image';
+import Link from 'next/link';
+import { type FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { Container } from '@/components/site/Container';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 
@@ -21,24 +20,50 @@ export async function NewFeaturedArtists() {
   }
 
   return (
-    <section className='py-10 bg-white dark:bg-black'>
+    <section className='py-16 bg-white dark:bg-[#0a0a0b]'>
       <Container>
-        <div className='text-center mb-6'>
-          <p className='text-sm font-medium text-gray-600 dark:text-gray-400'>
-            Explore example Jovie profiles
+        {/* Section header */}
+        <div className='text-center mb-10'>
+          <h2
+            className='text-xl sm:text-2xl font-semibold text-neutral-900 dark:text-white'
+            style={{ fontSynthesisWeight: 'none' }}
+          >
+            See it in action
+          </h2>
+          <p className='mt-2 text-sm text-neutral-500 dark:text-neutral-400'>
+            Real profiles from real artists
           </p>
         </div>
 
         {error ? (
           <div className='flex items-center justify-center py-6'>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>{error}</p>
+            <p className='text-sm text-neutral-500 dark:text-neutral-400'>
+              {error}
+            </p>
           </div>
         ) : (
-          <FeaturedCreatorsSection
-            creators={artists}
-            showTitle={false}
-            showNames={true}
-          />
+          /* Artist grid - centered, clean layout */
+          <div className='flex flex-wrap items-center justify-center gap-6 sm:gap-8'>
+            {artists.slice(0, 6).map(creator => (
+              <Link
+                key={creator.id}
+                href={`/${creator.handle}`}
+                className='group flex flex-col items-center gap-3'
+              >
+                <div className='relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-800 group-hover:border-neutral-400 dark:group-hover:border-neutral-600 transition-colors'>
+                  <Image
+                    src={creator.src}
+                    alt={creator.alt || creator.name}
+                    fill
+                    className='object-cover'
+                  />
+                </div>
+                <span className='text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors'>
+                  {creator.name}
+                </span>
+              </Link>
+            ))}
+          </div>
         )}
       </Container>
     </section>

@@ -6,7 +6,7 @@ A token-driven call-to-action built on `@jovie/ui`'s `Button` primitive. It pres
 import { CTAButton } from '@/components/ui/CTAButton';
 
 <CTAButton href='/pricing' icon={<SparklesIcon />}>
-  Claim your Jovie handle
+  Join the waitlist
 </CTAButton>
 
 <CTAButton isLoading>Processing</CTAButton>
