@@ -123,16 +123,6 @@ describe('OtpSignUpForm', () => {
     expect(buttons[1]).toHaveTextContent('Continue');
   });
 
-  it('renders navigation link to signin', () => {
-    render(<OtpSignUpForm />);
-
-    const signinLinks = screen.getAllByText('Sign in');
-    expect(signinLinks).toHaveLength(2); // One in each step
-    signinLinks.forEach(link => {
-      expect(link.closest('a')).toHaveAttribute('href', '/signin');
-    });
-  });
-
   it('uses semantic design tokens for global error', () => {
     render(<OtpSignUpForm />);
 

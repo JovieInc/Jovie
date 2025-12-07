@@ -9,6 +9,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import type { UploadErrorCode } from '@/app/api/images/upload/route';
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
 import { track } from '@/lib/analytics';
 import {
@@ -31,6 +32,8 @@ export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   onError?: (error: string) => void;
   /** Success callback with new image URL */
   onSuccess?: (imageUrl: string) => void;
+  /** Retry callback when upload fails with retryable error */
+  onRetryableError?: (error: string, code: UploadErrorCode) => void;
   /** Maximum file size in bytes (default: 4MB, aligned with /api/images/upload) */
   maxFileSize?: number;
   /** Accepted file types */
@@ -203,6 +206,7 @@ export const AvatarUploadable = React.memo(
       progress = 0,
       onError,
       onSuccess,
+      onRetryableError,
       maxFileSize = DEFAULT_MAX_FILE_SIZE,
       acceptedTypes = DEFAULT_ACCEPTED_TYPES,
       showHoverOverlay = true,
@@ -280,13 +284,27 @@ export const AvatarUploadable = React.memo(
           track('avatar_upload_success', { file_size: file.size });
           resetStatus(2000);
         } catch (error) {
-          const errorMessage =
-            error instanceof Error ? error.message : 'Upload failed';
+          // Handle structured error responses
+          const errorData = error as {
+            message?: string;
+            code?: UploadErrorCode;
+            retryable?: boolean;
+          };
+          const errorMessage = errorData.message ?? 'Upload failed';
+          const errorCode = errorData.code;
+          const isRetryable = errorData.retryable ?? false;
+
           setUploadStatus('error');
           onError?.(errorMessage);
+
+          if (isRetryable && errorCode && onRetryableError) {
+            onRetryableError(errorMessage, errorCode);
+          }
+
           track('avatar_upload_error', {
-            error: 'upload_failed',
+            error: errorCode ?? 'upload_failed',
             message: errorMessage,
+            retryable: isRetryable,
           });
           resetStatus(3000);
         } finally {
@@ -298,6 +316,7 @@ export const AvatarUploadable = React.memo(
         clearStatusReset,
         maxFileSize,
         onError,
+        onRetryableError,
         onSuccess,
         onUpload,
         resetStatus,

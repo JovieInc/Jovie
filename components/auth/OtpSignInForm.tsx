@@ -3,7 +3,7 @@
 import * as Clerk from '@clerk/elements/common';
 import * as SignIn from '@clerk/elements/sign-in';
 import { Card, CardContent } from '@jovie/ui';
-import { AuthFooterLink, AuthInput } from './atoms';
+import { AuthInput } from './atoms';
 
 const FIELD_ERROR_CLASSES = 'mt-1 text-sm text-red-400';
 const SUBMIT_BUTTON_CLASSES =
@@ -26,12 +26,6 @@ export function OtpSignInForm() {
               <SignIn.Action submit className={SUBMIT_BUTTON_CLASSES}>
                 Continue with Email
               </SignIn.Action>
-
-              <AuthFooterLink
-                prompt="Don't have an account?"
-                href='/waitlist'
-                linkText='Join waitlist'
-              />
             </div>
           </SignIn.Step>
 
@@ -67,12 +61,6 @@ export function OtpSignInForm() {
                 >
                   ← Use a different email
                 </SignIn.Action>
-
-                <AuthFooterLink
-                  prompt="Don't have an account?"
-                  href='/waitlist'
-                  linkText='Join waitlist'
-                />
               </div>
             </SignIn.Strategy>
           </SignIn.Step>

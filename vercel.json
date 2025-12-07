@@ -1,7 +1,16 @@
 {
+  "crons": [
+    {
+      "path": "/api/cron/cleanup-photos",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 30
+    },
+    "app/api/cron/**/*.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

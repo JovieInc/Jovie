@@ -15,6 +15,44 @@ import { avatarUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs'; // Required for file upload processing
 
+// Structured error codes for client handling
+export const UPLOAD_ERROR_CODES = {
+  MISSING_BLOB_TOKEN: 'MISSING_BLOB_TOKEN',
+  RATE_LIMITED: 'RATE_LIMITED',
+  INVALID_CONTENT_TYPE: 'INVALID_CONTENT_TYPE',
+  NO_FILE: 'NO_FILE',
+  INVALID_FILE: 'INVALID_FILE',
+  FILE_TOO_LARGE: 'FILE_TOO_LARGE',
+  USER_NOT_FOUND: 'USER_NOT_FOUND',
+  INVALID_IMAGE: 'INVALID_IMAGE',
+  BLOB_UPLOAD_FAILED: 'BLOB_UPLOAD_FAILED',
+  PROCESSING_TIMEOUT: 'PROCESSING_TIMEOUT',
+  UPLOAD_FAILED: 'UPLOAD_FAILED',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+} as const;
+
+export type UploadErrorCode =
+  (typeof UPLOAD_ERROR_CODES)[keyof typeof UPLOAD_ERROR_CODES];
+
+interface UploadErrorResponse {
+  error: string;
+  code: UploadErrorCode;
+  retryable?: boolean;
+  retryAfter?: number;
+}
+
+function errorResponse(
+  error: string,
+  code: UploadErrorCode,
+  status: number,
+  options?: { retryable?: boolean; retryAfter?: number; headers?: HeadersInit }
+) {
+  const body: UploadErrorResponse = { error, code };
+  if (options?.retryable !== undefined) body.retryable = options.retryable;
+  if (options?.retryAfter !== undefined) body.retryAfter = options.retryAfter;
+  return NextResponse.json(body, { status, headers: options?.headers });
+}
+
 type BlobPut = typeof import('@vercel/blob').put;
 type SharpModule = typeof import('sharp');
 type SharpConstructor = SharpModule extends { default: infer D }
@@ -67,24 +105,61 @@ function buildBlobPaths(seoFileName: string, clerkUserId: string) {
   };
 }
 
+const MAX_BLOB_UPLOAD_RETRIES = 2;
+const BLOB_RETRY_DELAY_MS = 500;
+
 async function uploadBufferToBlob(
   put: BlobPut | null,
   path: string,
   buffer: Buffer
 ): Promise<string> {
-  if (put && process.env.BLOB_READ_WRITE_TOKEN) {
-    const blob = await put(path, buffer, {
-      access: 'public',
-      token: process.env.BLOB_READ_WRITE_TOKEN,
-      contentType: WEBP_MIME_TYPE,
-      cacheControlMaxAge: 60 * 60 * 24 * 365, // 1 year
-      addRandomSuffix: false,
-    });
-    return blob.url;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+
+  // Development/test fallback when token is missing
+  if (!put || !token) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Blob storage not configured');
+    }
+    console.warn(
+      '[DEV] BLOB_READ_WRITE_TOKEN missing, returning mock URL for:',
+      path
+    );
+    return `https://blob.vercel-storage.com/${path}`;
   }
 
-  // Development/test fallback keeps deterministic URLs while avoiding network writes
-  return `https://blob.vercel-storage.com/${path}`;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_BLOB_UPLOAD_RETRIES; attempt++) {
+    try {
+      const blob = await put(path, buffer, {
+        access: 'public',
+        token,
+        contentType: WEBP_MIME_TYPE,
+        cacheControlMaxAge: 60 * 60 * 24 * 365, // 1 year
+        addRandomSuffix: false,
+      });
+      return blob.url;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const isRetryable =
+        lastError.message.includes('network') ||
+        lastError.message.includes('timeout') ||
+        lastError.message.includes('ECONNRESET') ||
+        lastError.message.includes('503');
+
+      if (!isRetryable || attempt === MAX_BLOB_UPLOAD_RETRIES) {
+        throw lastError;
+      }
+
+      console.warn(
+        `Blob upload attempt ${attempt + 1} failed, retrying in ${BLOB_RETRY_DELAY_MS}ms:`,
+        lastError.message
+      );
+      await new Promise(resolve => setTimeout(resolve, BLOB_RETRY_DELAY_MS));
+    }
+  }
+
+  throw lastError ?? new Error('Blob upload failed after retries');
 }
 
 async function optimizeImageToWebp(file: File): Promise<{
@@ -143,27 +218,62 @@ async function optimizeImageToWebp(file: File): Promise<{
   };
 }
 
+// Timeout wrapper for image processing
+const PROCESSING_TIMEOUT_MS = 30_000; // 30 seconds
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  operation: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${operation} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
 export async function POST(request: NextRequest) {
+  // Early check for blob token in production
+  if (
+    process.env.NODE_ENV === 'production' &&
+    !process.env.BLOB_READ_WRITE_TOKEN
+  ) {
+    console.error('BLOB_READ_WRITE_TOKEN is not configured');
+    return errorResponse(
+      'Image upload is temporarily unavailable. Please try again later.',
+      UPLOAD_ERROR_CODES.MISSING_BLOB_TOKEN,
+      503,
+      { retryable: true }
+    );
+  }
+
   try {
     return await withDbSession(async clerkUserId => {
       // Rate limiting - 3 uploads per minute per user
       if (avatarUploadRateLimit) {
         const rateLimitResult = await avatarUploadRateLimit.limit(clerkUserId);
         if (!rateLimitResult.success) {
-          return NextResponse.json(
+          const retryAfter = Math.round(
+            (rateLimitResult.reset - Date.now()) / 1000
+          );
+          return errorResponse(
+            'Too many upload attempts. Please wait before trying again.',
+            UPLOAD_ERROR_CODES.RATE_LIMITED,
+            429,
             {
-              error:
-                'Too many upload attempts. Please wait before trying again.',
-              retryAfter: Math.round(
-                (rateLimitResult.reset - Date.now()) / 1000
-              ),
-            },
-            {
-              status: 429,
+              retryable: true,
+              retryAfter,
               headers: {
-                'Retry-After': Math.round(
-                  (rateLimitResult.reset - Date.now()) / 1000
-                ).toString(),
+                'Retry-After': retryAfter.toString(),
                 'X-RateLimit-Limit': rateLimitResult.limit.toString(),
                 'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
                 'X-RateLimit-Reset': new Date(
@@ -178,9 +288,10 @@ export async function POST(request: NextRequest) {
       // Validate content type and size
       const contentType = request.headers.get('content-type');
       if (!contentType?.startsWith('multipart/form-data')) {
-        return NextResponse.json(
-          { error: 'Invalid content type' },
-          { status: 400 }
+        return errorResponse(
+          'Invalid content type. Expected multipart/form-data.',
+          UPLOAD_ERROR_CODES.INVALID_CONTENT_TYPE,
+          400
         );
       }
 
@@ -191,9 +302,10 @@ export async function POST(request: NextRequest) {
         | '';
 
       if (!file) {
-        return NextResponse.json(
-          { error: 'No file provided' },
-          { status: 400 }
+        return errorResponse(
+          'No file provided. Please select an image to upload.',
+          UPLOAD_ERROR_CODES.NO_FILE,
+          400
         );
       }
 
@@ -204,20 +316,23 @@ export async function POST(request: NextRequest) {
       });
 
       if (!validation.success) {
-        return NextResponse.json(
-          {
-            error: 'Invalid file',
-            details: validation.error.issues,
-          },
-          { status: 400 }
+        const supportedTypes = SUPPORTED_IMAGE_MIME_TYPES.map(t =>
+          t.replace('image/', '').toUpperCase()
+        ).join(', ');
+        return errorResponse(
+          `Invalid file type. Supported formats: ${supportedTypes}`,
+          UPLOAD_ERROR_CODES.INVALID_FILE,
+          400
         );
       }
 
       // Check file size (4MB limit)
       if (file.size > AVATAR_MAX_FILE_SIZE_BYTES) {
-        return NextResponse.json(
-          { error: 'File too large. Maximum 4MB allowed.' },
-          { status: 400 }
+        const maxMB = Math.round(AVATAR_MAX_FILE_SIZE_BYTES / (1024 * 1024));
+        return errorResponse(
+          `File too large. Maximum ${maxMB}MB allowed.`,
+          UPLOAD_ERROR_CODES.FILE_TOO_LARGE,
+          400
         );
       }
 
@@ -229,7 +344,11 @@ export async function POST(request: NextRequest) {
         .limit(1);
 
       if (!dbUser) {
-        return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        return errorResponse(
+          'User account not found. Please sign in again.',
+          UPLOAD_ERROR_CODES.USER_NOT_FOUND,
+          404
+        );
       }
 
       // Create database record first
@@ -253,7 +372,12 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        const optimized = await optimizeImageToWebp(file);
+        // Process image with timeout protection
+        const optimized = await withTimeout(
+          optimizeImageToWebp(file),
+          PROCESSING_TIMEOUT_MS,
+          'Image processing'
+        );
         const seoFileName = buildSeoFilename({
           originalFilename: file.name,
           photoId: photoRecord.id,
@@ -261,12 +385,26 @@ export async function POST(request: NextRequest) {
         const blobPaths = buildBlobPaths(seoFileName, clerkUserId);
         const put = await getVercelBlobUploader();
 
-        const [blobUrl, largeUrl, mediumUrl, smallUrl] = await Promise.all([
-          uploadBufferToBlob(put, blobPaths.original, optimized.original.data),
-          uploadBufferToBlob(put, blobPaths.large, optimized.large),
-          uploadBufferToBlob(put, blobPaths.medium, optimized.medium),
-          uploadBufferToBlob(put, blobPaths.small, optimized.small),
-        ]);
+        // Upload all variants with timeout protection
+        const [blobUrl, largeUrl, mediumUrl, smallUrl] = await withTimeout(
+          Promise.all([
+            uploadBufferToBlob(
+              put,
+              blobPaths.original,
+              optimized.original.data
+            ),
+            uploadBufferToBlob(put, blobPaths.large, optimized.large),
+            uploadBufferToBlob(put, blobPaths.medium, optimized.medium),
+            uploadBufferToBlob(put, blobPaths.small, optimized.small),
+          ]),
+          PROCESSING_TIMEOUT_MS,
+          'Blob upload'
+        );
+
+        // Validate that we got real URLs back
+        if (!blobUrl || !blobUrl.startsWith('https://')) {
+          throw new Error('Invalid blob URL returned from storage');
+        }
 
         // Update record with optimized URLs
         await db
@@ -299,30 +437,49 @@ export async function POST(request: NextRequest) {
           { status: 201 }
         );
       } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Upload failed';
+
         // Update record with error status
         await db
           .update(profilePhotos)
           .set({
             status: 'failed',
-            errorMessage:
-              error instanceof Error ? error.message : 'Upload failed',
+            errorMessage: message,
             updatedAt: new Date(),
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        const message = error instanceof Error ? error.message : '';
         const lowerMessage = message.toLowerCase();
-        const isInvalidImage =
+
+        // Categorize errors for appropriate client response
+        if (lowerMessage.includes('timed out')) {
+          return errorResponse(
+            'Image processing took too long. Please try a smaller image.',
+            UPLOAD_ERROR_CODES.PROCESSING_TIMEOUT,
+            408,
+            { retryable: true }
+          );
+        }
+
+        if (
           lowerMessage.includes('unsupported image format') ||
           lowerMessage.includes('input buffer') ||
-          lowerMessage.includes('invalid');
+          lowerMessage.includes('invalid')
+        ) {
+          return errorResponse(
+            'Invalid image file. Please upload a supported image format.',
+            UPLOAD_ERROR_CODES.INVALID_IMAGE,
+            400
+          );
+        }
 
-        if (isInvalidImage) {
-          return NextResponse.json(
-            {
-              error: 'Invalid image file. Please upload a supported image.',
-            },
-            { status: 400 }
+        if (lowerMessage.includes('blob') || lowerMessage.includes('storage')) {
+          return errorResponse(
+            'Failed to save image. Please try again.',
+            UPLOAD_ERROR_CODES.BLOB_UPLOAD_FAILED,
+            502,
+            { retryable: true }
           );
         }
 
@@ -331,10 +488,20 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Avatar upload error:', error);
+
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return errorResponse(
+        'Please sign in to upload a profile photo.',
+        UPLOAD_ERROR_CODES.UNAUTHORIZED,
+        401
+      );
     }
 
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    return errorResponse(
+      'Upload failed. Please try again.',
+      UPLOAD_ERROR_CODES.UPLOAD_FAILED,
+      500,
+      { retryable: true }
+    );
   }
 }
