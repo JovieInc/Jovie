@@ -1,5 +1,7 @@
 -- Creator profile performance indexes
 -- Guardrails: Drizzle runs inside a transaction; avoid CONCURRENTLY here.
+-- Note: For large tables, run during low-traffic windows. Current table sizes are small.
+-- Index naming: idx_{table}_{columns} with abbreviated column names for readability.
 
 DO $$
 BEGIN
@@ -16,9 +18,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_indexes
-    WHERE schemaname = 'public' AND indexname = 'idx_social_links_creator_profile_sort_order'
+    WHERE schemaname = 'public' AND indexname = 'idx_social_links_profile_id_sort_order'
   ) THEN
-    CREATE INDEX idx_social_links_creator_profile_sort_order
+    CREATE INDEX idx_social_links_profile_id_sort_order
       ON social_links (creator_profile_id, sort_order);
   END IF;
 END $$;
@@ -27,9 +29,9 @@ DO $$
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_indexes
-    WHERE schemaname = 'public' AND indexname = 'idx_creator_contacts_creator_profile_active_sort'
+    WHERE schemaname = 'public' AND indexname = 'idx_creator_contacts_profile_id_active_sort'
   ) THEN
-    CREATE INDEX idx_creator_contacts_creator_profile_active_sort
+    CREATE INDEX idx_creator_contacts_profile_id_active_sort
       ON creator_contacts (creator_profile_id, is_active, sort_order);
   END IF;
 END $$;
