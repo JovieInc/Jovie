@@ -206,6 +206,7 @@ function initializeDb(): DbType {
       typeof process !== 'undefined' &&
       'once' in process &&
       typeof process.once === 'function' &&
+      typeof global !== 'undefined' &&
       !global.dbCleanupRegistered
     ) {
       global.dbCleanupRegistered = true;
