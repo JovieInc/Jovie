@@ -1,18 +1,19 @@
 'use client';
 
 import { ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
-import { AuthLayout, OtpSignInForm } from '@/components/auth';
-import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { AuthLayout, AuthPageSkeleton, OtpSignInForm } from '@/components/auth';
 
 export default function SignInPage() {
   return (
-    <AuthLayout formTitle='Log in to Jovie'>
+    <>
       <ClerkLoading>
-        <AuthFormSkeleton />
+        <AuthPageSkeleton formTitle='Log in to Jovie' />
       </ClerkLoading>
       <ClerkLoaded>
-        <OtpSignInForm />
+        <AuthLayout formTitle='Log in to Jovie'>
+          <OtpSignInForm />
+        </AuthLayout>
       </ClerkLoaded>
-    </AuthLayout>
+    </>
   );
 }

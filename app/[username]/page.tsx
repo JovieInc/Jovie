@@ -258,6 +258,7 @@ export async function generateMetadata({ params }: Props) {
 // Note: generateStaticParams removed to allow edge runtime
 // Edge runtime provides better performance for dynamic profile pages
 
-// Always render dynamically to ensure 404s return correct status
-export const revalidate = 0;
-export const dynamic = 'force-dynamic';
+// Cache the full HTML at the edge for 60s to make repeat visits instant.
+// The underlying DB query is also cached via unstable_cache with the same TTL.
+// 404s are still rendered correctly on cache miss.
+export const revalidate = 60;

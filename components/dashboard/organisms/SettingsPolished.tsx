@@ -35,6 +35,9 @@ interface SettingsPolishedProps {
   onArtistUpdate?: (updatedArtist: Artist) => void;
 }
 
+const SETTINGS_BUTTON_CLASS =
+  'px-5 py-2.5 text-sm font-medium rounded-md border border-(--accents-3) bg-neutral-200 text-black hover:bg-neutral-300 dark:bg-(--accents-2) dark:text-(--geist-foreground) dark:border-(--accents-4) dark:hover:bg-(--accents-3) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accents-4)/50 focus-visible:ring-offset-1';
+
 // Apple-style settings navigation - simplified and clean
 const settingsNavigation = [
   {
@@ -500,10 +503,9 @@ export function SettingsPolished({
           <Button
             type='submit'
             loading={isLoading}
-            className='px-6 py-2.5 text-sm font-medium rounded-lg shadow-sm text-white btn-press'
-            variant='primary'
+            className={SETTINGS_BUTTON_CLASS}
           >
-            Save Changes
+            Save changes
           </Button>
         </div>
       </form>
@@ -577,7 +579,7 @@ export function SettingsPolished({
               }
               className={cn(
                 'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
-                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:ring-2 ring-accent focus-visible:outline-none card-hover',
+                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:ring-2 ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent',
                 theme === option.value
                   ? 'border-accent/70 bg-surface-2'
                   : 'border-subtle hover:border-accent/50'
@@ -794,10 +796,9 @@ export function SettingsPolished({
         <Button
           type='submit'
           loading={isPixelSaving}
-          className='px-6 py-2.5 text-sm font-medium rounded-lg shadow-sm text-white btn-press'
-          variant='primary'
+          className={SETTINGS_BUTTON_CLASS}
         >
-          Save Pixels
+          Save pixels
         </Button>
       </div>
     </form>
@@ -855,7 +856,7 @@ export function SettingsPolished({
         <Button
           onClick={handleBilling}
           loading={isBillingLoading || billingStatus.loading}
-          className='px-4 py-2 text-sm font-medium rounded-lg text-white btn-press'
+          className={SETTINGS_BUTTON_CLASS}
           variant='primary'
         >
           {billingStatus.isPro ? 'Open Billing Portal' : 'Upgrade to Pro'}
@@ -879,7 +880,7 @@ export function SettingsPolished({
           <Button
             onClick={handleBilling}
             loading={isBillingLoading || billingStatus.loading}
-            className='px-4 py-2 text-sm font-medium rounded-lg text-white btn-press'
+            className={SETTINGS_BUTTON_CLASS}
             variant='primary'
           >
             Upgrade to Pro

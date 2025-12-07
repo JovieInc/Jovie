@@ -66,15 +66,27 @@ const HREF_REGEX = /href\s*=\s*["']([^"'#]+)["']/gi;
  */
 export function isLinktreeUrl(url: string): boolean {
   try {
+    const candidate = url.trim();
+
+    // Reject dangerous or unsupported schemes early
+    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+      return false;
+    }
+
+    // Reject protocol-relative URLs
+    if (candidate.startsWith('//')) {
+      return false;
+    }
+
     // Check original URL protocol before normalization (normalizeUrl converts http to https)
     const originalParsed = new URL(
-      url.startsWith('http') ? url : `https://${url}`
+      candidate.startsWith('http') ? candidate : `https://${candidate}`
     );
     if (originalParsed.protocol !== 'https:') {
       return false;
     }
 
-    const parsed = new URL(normalizeUrl(url));
+    const parsed = new URL(normalizeUrl(candidate));
 
     if (!LINKTREE_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
       return false;
@@ -93,15 +105,27 @@ export function isLinktreeUrl(url: string): boolean {
  */
 export function validateLinktreeUrl(url: string): string | null {
   try {
+    const candidate = url.trim();
+
+    // Reject dangerous or unsupported schemes early
+    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+      return null;
+    }
+
+    // Reject protocol-relative URLs
+    if (candidate.startsWith('//')) {
+      return null;
+    }
+
     // Check original URL protocol before normalization
     const originalParsed = new URL(
-      url.startsWith('http') ? url : `https://${url}`
+      candidate.startsWith('http') ? candidate : `https://${candidate}`
     );
     if (originalParsed.protocol !== 'https:') {
       return null;
     }
 
-    const normalized = normalizeUrl(url);
+    const normalized = normalizeUrl(candidate);
     const parsed = new URL(normalized);
 
     if (!LINKTREE_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
@@ -224,7 +248,8 @@ export function extractLinktree(html: string): ExtractionResult {
     )
       continue;
     if (rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) continue;
-    if (!/^https?:\/\//i.test(rawHref)) continue;
+    // Require explicit https scheme (reject http or protocol-relative)
+    if (!/^https:\/\/[^/]/i.test(rawHref)) continue;
 
     try {
       const normalizedHref = normalizeUrl(rawHref);

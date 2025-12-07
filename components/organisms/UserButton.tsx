@@ -98,12 +98,21 @@ export function UserButton({
   const contactEmail =
     user?.primaryEmailAddress?.emailAddress ||
     user?.emailAddresses?.[0]?.emailAddress;
+
+  const emailDerivedName = contactEmail?.split('@')[0]?.replace(/[._-]+/g, ' ');
+
   const displayName =
     artist?.name ||
     user?.fullName ||
-    user?.firstName ||
-    contactEmail ||
+    (user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.firstName) ||
+    user?.username ||
+    artist?.handle ||
+    emailDerivedName ||
     'Artist';
+
+  // Email is shown once in the dropdown identity block
   const userInitials = displayName
     ? displayName
         .split(' ')
@@ -398,10 +407,11 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-64 rounded-[28px] border border-white/20 bg-white/90 p-1 shadow-[0_20px_60px_rgba(15,23,42,0.28)] backdrop-blur-[30px] dark:border-white/10 dark:bg-[#020611]/95'
+        className='w-[244px] rounded-[12px] border border-(--accents-2) bg-(--geist-background) text-(--geist-foreground) p-3.5 shadow-[0_18px_45px_rgba(0,0,0,0.45)] font-sans text-[13px] leading-[18px] space-y-1'
       >
-        <DropdownMenuLabel className='px-3 pt-2 pb-2'>
-          <div className='flex items-center gap-2 px-1.5 py-2'>
+        {/* Identity block - name first, email once, smaller */}
+        <DropdownMenuLabel className='px-0 py-0 mb-1'>
+          <div className='flex items-center gap-3 px-2 py-2'>
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
@@ -410,124 +420,108 @@ export function UserButton({
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-2 truncate'>
-                <span className='truncate text-sm font-medium'>
+              <div className='flex items-center gap-1.5'>
+                <span className='truncate text-sm font-semibold text-primary-token'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
                   <Badge
                     variant='secondary'
                     size='sm'
-                    className='shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide'
+                    className='shrink-0 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wider bg-linear-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30'
                   >
                     Pro
                   </Badge>
                 )}
               </div>
               {contactEmail && (
-                <p className='truncate text-xs text-secondary-token'>
+                <p className='truncate text-xs text-secondary-token mt-0.5'>
                   {contactEmail}
                 </p>
               )}
             </div>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator className='mx-0 my-2 h-px bg-white/30 dark:bg-white/10' />
+
+        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+
+        {/* Primary actions group */}
         <DropdownMenuItem
           onClick={handleProfile}
-          className='group flex cursor-pointer items-center gap-1.5 rounded-2xl px-2.5 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-surface-2 dark:text-white'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
         >
           <Icon
             name='User'
-            className='h-4 w-4 text-slate-400 group-hover:text-primary-token dark:text-slate-200'
+            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
           />
           <span className='flex-1'>Profile</span>
         </DropdownMenuItem>
+
+        <DropdownMenuItem
+          onClick={handleSettings}
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
+        >
+          <Icon
+            name='Settings'
+            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
+          />
+          <span className='flex-1'>Account settings</span>
+        </DropdownMenuItem>
+
+        {/* Billing - only show for Pro users */}
         {billingStatus.loading ? (
           <DropdownMenuItem
             disabled
-            className='cursor-default focus:bg-transparent focus:text-secondary-token px-2.5 py-1.5 text-sm'
+            className='cursor-default focus:bg-transparent px-2 py-2 text-[13px] h-9'
           >
-            <div className='flex w-full items-center gap-3'>
-              <div className='h-6 w-6 animate-pulse rounded-full bg-surface-2' />
-              <div className='flex flex-1 flex-col gap-1'>
-                <div className='h-2.5 w-24 animate-pulse rounded-full bg-surface-2' />
-                <div className='h-2 w-16 animate-pulse rounded-full bg-surface-2/80' />
-              </div>
+            <div className='flex w-full items-center gap-2.5'>
+              <div className='h-4 w-4 animate-pulse rounded bg-white/10' />
+              <div className='h-3 w-20 animate-pulse rounded bg-white/10' />
             </div>
           </DropdownMenuItem>
         ) : billingStatus.isPro ? (
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='group flex cursor-pointer items-center gap-1.5 rounded-2xl px-2.5 py-1.5 text-sm text-slate-600 dark:text-white'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
           >
             <Icon
               name='CreditCard'
-              className='h-4 w-4 text-tertiary-token group-hover:text-primary-token'
+              className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
             />
             <span className='flex-1'>
-              {isManageBillingLoading ? 'Opening Stripe…' : 'Manage Billing'}
+              {isManageBillingLoading ? 'Opening…' : 'Manage billing'}
             </span>
           </DropdownMenuItem>
-        ) : (
-          <DropdownMenuItem
-            onClick={handleUpgrade}
-            disabled={isUpgradeLoading}
-            className='group flex cursor-pointer items-center gap-2 rounded-2xl border border-white/20 bg-gradient-to-br from-white/80 to-white/70 px-2.5 py-1.5 text-sm font-semibold text-primary-token shadow-[0_14px_40px_rgba(237,137,251,0.15)] transition hover:translate-y-0.5 hover:shadow-[0_20px_45px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/70 dark:border-white/10 dark:from-white/10 dark:to-white/10 dark:text-white dark:shadow-[0_15px_40px_rgba(255,255,255,0.08)]'
-          >
-            <Icon name='Sparkles' className='h-4 w-4 text-primary-token' />
-            <span className='flex-1 truncate'>
-              {isUpgradeLoading ? 'Securing your upgrade…' : 'Upgrade to Pro'}
-            </span>
-            <Icon name='ChevronRight' className='h-4 w-4 text-tertiary-token' />
-          </DropdownMenuItem>
-        )}
-        <DropdownMenuSeparator className='mx-1 my-2' />
-        <DropdownMenuLabel className='px-2 text-[10px] font-semibold uppercase tracking-[0.3em] text-tertiary-token/70'>
-          Settings
-        </DropdownMenuLabel>
-        <DropdownMenuItem
-          onClick={handleSettings}
-          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-2.5 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-surface-2 dark:text-white'
-        >
-          <Icon
-            name='Settings'
-            className='h-4 w-4 text-tertiary-token group-hover:text-primary-token dark:text-slate-200'
-          />
-          <span className='flex-1'>Account settings</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator className='mx-1 my-2' />
-        <div className='px-3'>
-          <div className='pb-1 text-[10px] font-semibold uppercase tracking-wide text-tertiary-token/70'>
-            Appearance
-          </div>
-          <div className='relative'>
-            <div className='pointer-events-none absolute inset-0 rounded-[28px] border border-white/15 dark:border-white/10 bg-transparent' />
+        ) : null}
+
+        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+
+        {/* Theme toggle - inline row: label left, pill right */}
+        <div className='flex items-center justify-between px-2 py-2'>
+          <span className='text-[13px] text-primary-token'>Theme</span>
+          <div className='relative h-7 w-[84px] rounded-full border border-(--accents-2) bg-(--accents-1) p-0.5'>
             <div
-              className='pointer-events-none absolute left-0 top-1/2 h-8 rounded-[20px] bg-white/90 transition-all duration-300 dark:bg-white/5'
+              className='pointer-events-none absolute top-0.5 h-6 w-6 rounded-full bg-black dark:bg-white shadow-sm transition-all duration-200 ease-out'
               style={{
-                transform: `translate(${activeIndex * 100}%, -50%)`,
-                width: 'calc(100% / 3)',
+                left: `calc(${activeIndex * 28}px + 2px)`,
               }}
             />
             <div
               role='radiogroup'
               aria-label='Theme mode'
-              className='grid grid-cols-3 gap-1 rounded-[26px] bg-transparent p-1 backdrop-blur-[20px]'
+              className='relative flex h-full'
             >
               {themeOptions.map(option => {
                 const isActive =
                   (option === 'system' && theme === 'system') ||
                   (option !== 'system' && resolvedTheme === option);
-
                 const label =
                   option === 'light'
                     ? 'Light'
                     : option === 'dark'
                       ? 'Dark'
-                      : 'System';
-
+                      : 'Auto';
                 const icon =
                   option === 'dark'
                     ? 'Moon'
@@ -541,54 +535,69 @@ export function UserButton({
                     type='button'
                     role='radio'
                     aria-checked={isActive}
+                    aria-label={label}
                     onClick={() => setTheme(option)}
                     className={cn(
-                      'flex items-center justify-center gap-1 rounded-[18px] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.15em] transition duration-300 ease-in-out focus-visible:outline-none',
+                      'relative z-10 flex h-6 w-7 items-center justify-center rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
                       isActive
-                        ? 'text-primary-token dark:text-white'
-                        : 'text-tertiary-token hover:text-primary-token'
+                        ? 'text-white dark:text-black'
+                        : 'text-secondary-token hover:text-primary-token'
                     )}
                   >
                     <Icon
                       name={icon}
-                      className='h-3.5 w-3.5 text-current'
+                      className='h-3.5 w-3.5'
                       aria-hidden='true'
                     />
-                    <span>{label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
         </div>
-        <DropdownMenuSeparator className='mx-1 my-2' />
+
+        {/* Feedback */}
         <DropdownMenuItem
           onClick={() => {
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-sm text-slate-600 transition hover:bg-surface-2 dark:text-slate-200'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
         >
           <Icon
             name='MessageSquare'
-            className='h-4 w-4 text-tertiary-token group-hover:text-primary-token'
+            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
           />
           <span className='flex-1'>Send feedback</span>
         </DropdownMenuItem>
-        <DropdownMenuSeparator className='mx-1 my-3' />
+
+        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+
+        {/* Sign out - pinned at bottom */}
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='group flex cursor-pointer items-center gap-2 rounded-2xl px-3 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-500/10 focus:bg-red-500/10 focus:text-red-600'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-red-400 transition-colors hover:bg-red-500/10 focus:bg-red-500/10'
         >
-          <Icon
-            name='LogOut'
-            className='h-4 w-4 text-red-600 group-hover:text-red-600'
-          />
+          <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>
             {isLoading ? 'Signing out…' : 'Sign out'}
           </span>
         </DropdownMenuItem>
+
+        {/* Upgrade CTA - text-only button, theme-aware colors */}
+        {!billingStatus.isPro && !billingStatus.loading && (
+          <div className='pt-2 pb-1 px-1'>
+            <button
+              type='button'
+              onClick={handleUpgrade}
+              disabled={isUpgradeLoading}
+              className='flex w-full items-center justify-center rounded-lg bg-black text-white dark:bg-white dark:text-black px-4 py-2.5 text-[13px] font-semibold transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed'
+            >
+              {isUpgradeLoading ? 'Upgrading…' : 'Upgrade to Pro'}
+            </button>
+          </div>
+        )}
       </DropdownMenuContent>
       <FeedbackModal
         isOpen={isFeedbackOpen}

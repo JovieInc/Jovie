@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db, ingestionJobs } from '@/lib/db';
 import {
@@ -38,14 +38,25 @@ export async function enqueueLinktreeIngestionJob(params: {
     depth: params.depth ?? 0,
   });
 
+  // Migration-safe dedup check: handles both indexed column AND legacy JSONB payload
+  // During migration window, existing records may have dedup_key = NULL
+  // After migration 0008 completes, all records will have dedup_key populated
   const existing = await db
     .select({ id: ingestionJobs.id })
     .from(ingestionJobs)
     .where(
       and(
         eq(ingestionJobs.jobType, 'import_linktree'),
-        eq(ingestionJobs.dedupKey, payload.dedupKey),
-        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+        or(
+          // Check indexed column (fast path after migration)
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          // Fallback: check JSONB payload for legacy records with NULL dedup_key
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+          )
+        )
       )
     )
     .limit(1);

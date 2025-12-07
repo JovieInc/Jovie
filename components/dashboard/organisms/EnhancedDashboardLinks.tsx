@@ -1,15 +1,11 @@
 'use client';
 
-import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
-import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/dashboard/actions';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
-import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
+import { usePreviewPanel } from '@/app/dashboard/PreviewPanelContext';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
@@ -574,29 +570,39 @@ export function EnhancedDashboardLinks({
   );
 
   // Prepare links for the phone preview component
-  // previewLinks reserved for future PhoneMockupPreview integration.
-
   const profilePath = `/${artist?.handle || 'username'}`;
 
+  // Preview panel integration - sync data to context
+  const { setPreviewData } = usePreviewPanel();
+
+  // Keep preview data in sync with current links
+  useEffect(() => {
+    setPreviewData({
+      username,
+      avatarUrl: avatarUrl || null,
+      links: dashboardLinks,
+      profilePath,
+    });
+  }, [username, avatarUrl, dashboardLinks, profilePath, setPreviewData]);
+
   return (
-    <div className='grid grid-cols-1 xl:grid-cols-[1fr_24rem] gap-6'>
-      <div className='w-full'>
-        <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
-          <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-            <div>
-              <h1 className='text-2xl font-bold text-primary-token'>
-                Manage Links
-              </h1>
-              <p className='mt-1 text-sm text-secondary-token'>
-                Add and manage your social and streaming links. Changes save
-                automatically.
-                {saveStatus.lastSaved && (
-                  <span className='ml-2 text-xs text-secondary-token'>
-                    Last saved: {saveStatus.lastSaved.toLocaleTimeString()}
-                  </span>
-                )}
-              </p>
-            </div>
+    <div className='min-w-0 min-h-screen'>
+      {/* Main content / links manager */}
+      <div className='w-full min-w-0'>
+        <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm h-full'>
+          <div className='mb-6'>
+            <h1 className='text-2xl font-bold text-primary-token'>
+              Manage Links
+            </h1>
+            <p className='mt-1 text-sm text-secondary-token'>
+              Add and manage your social and streaming links. Changes save
+              automatically.
+              {saveStatus.lastSaved && (
+                <span className='ml-2 text-xs text-secondary-token'>
+                  Last saved: {saveStatus.lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </p>
           </div>
 
           <GroupedLinksManager
@@ -617,73 +623,6 @@ export function EnhancedDashboardLinks({
           />
         </div>
       </div>
-
-      {/* Right column: Live Preview (only on Links page) */}
-      <aside className='hidden xl:block'>
-        <div className='sticky top-6 space-y-6'>
-          {/* Preview Container */}
-          <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <div className='mb-4 flex items-center justify-between'>
-              <h2 className='text-lg font-semibold text-primary-token'>
-                Live Preview
-              </h2>
-              <div className='text-sm text-secondary-token'>
-                Last saved:{' '}
-                {saveStatus.lastSaved
-                  ? saveStatus.lastSaved.toLocaleTimeString()
-                  : '—'}
-              </div>
-            </div>
-            <div className='h-[600px] w-full overflow-hidden rounded-xl border border-subtle'>
-              <ProfilePreview
-                username={username}
-                avatarUrl={avatarUrl || null}
-                links={dashboardLinks}
-                className='h-full w-full'
-              />
-            </div>
-          </div>
-
-          {/* URL Preview */}
-          <div className='bg-surface-1 rounded-2xl p-6 shadow-sm border border-subtle'>
-            <h3 className='text-sm font-medium text-primary-token mb-3'>
-              Your Profile URL
-            </h3>
-            <div className='flex flex-col sm:flex-row gap-2'>
-              <div className='flex-1 bg-surface-2 rounded-lg px-3 py-2 text-sm text-primary-token font-mono truncate'>
-                {typeof window !== 'undefined'
-                  ? `${window.location.origin}${profilePath}`
-                  : 'Loading...'}
-              </div>
-              <div className='flex gap-2'>
-                <CopyToClipboardButton
-                  relativePath={profilePath}
-                  idleLabel='Copy'
-                  successLabel='Copied!'
-                />
-                <Button
-                  asChild
-                  variant='outline'
-                  size='sm'
-                  className='shrink-0 flex-1 sm:flex-initial whitespace-nowrap'
-                >
-                  <Link
-                    href={profilePath}
-                    target='_blank'
-                    rel='noopener noreferrer'
-                  >
-                    <ArrowTopRightOnSquareIcon className='h-4 w-4 mr-1.5' />
-                    Open
-                  </Link>
-                </Button>
-              </div>
-            </div>
-            <p className='mt-2 text-xs text-secondary-token'>
-              Share this link with your audience
-            </p>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }

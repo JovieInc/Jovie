@@ -1,8 +1,5 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { publishProfileBasics } from '@/app/dashboard/actions';
-import { Input } from '@/components/atoms/Input';
-import { Textarea } from '@/components/atoms/Textarea';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
@@ -43,112 +40,89 @@ export function DashboardOverview({
   ).length;
 
   return (
-    <div>
-      <div className='mb-8'>
-        <h1 className='text-2xl font-bold text-primary-token'>Dashboard</h1>
-        <p className='text-secondary-token mt-1'>
-          Welcome back, {artist.name || 'Artist'}
-        </p>
-      </div>
-
-      <DashboardCard variant='settings' className='mb-6'>
-        <form
-          action={publishProfileBasics}
-          className='space-y-4'
-          data-testid='profile-publish-form'
-        >
-          <input type='hidden' name='profileId' value={artist.id} />
-          <div className='space-y-2'>
-            <label
-              className='text-sm font-medium text-secondary-token'
-              htmlFor='displayName'
-            >
-              Display name
-            </label>
-            <Input
-              id='displayName'
-              name='displayName'
-              defaultValue={artist.name ?? ''}
-              required
-            />
-          </div>
-          <div className='space-y-2'>
-            <label
-              className='text-sm font-medium text-secondary-token'
-              htmlFor='bio'
-            >
-              Bio (optional)
-            </label>
-            <Textarea
-              id='bio'
-              name='bio'
-              defaultValue={artist.tagline ?? ''}
-              rows={3}
-            />
+    <div className='space-y-6'>
+      <div className='rounded-3xl border border-white/5 bg-linear-to-r from-[#0f111a] via-[#0a0c15] to-[#0f111a] p-6 shadow-[0_25px_70px_rgba(5,10,25,0.35)]'>
+        <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
+          <div>
+            <p className='text-xs uppercase tracking-[0.3em] text-tertiary-token/70'>
+              Dashboard
+            </p>
+            <h1 className='text-2xl font-semibold text-white'>
+              Welcome back, {artist.name || 'Artist'}
+            </h1>
+            <p className='text-sm text-secondary-token'>
+              Keep your profile polished and ready to share.
+            </p>
           </div>
           <div className='flex flex-wrap gap-3'>
-            <Button type='submit' size='sm' variant='primary'>
-              Save changes
-            </Button>
-            <Button asChild size='sm' variant='secondary'>
+            <Button asChild variant='secondary' size='sm'>
               <Link
                 href={`/${artist.handle}`}
                 target='_blank'
                 rel='noopener noreferrer'
               >
-                Preview live profile
+                View live profile
               </Link>
             </Button>
+            <CopyToClipboardButton relativePath={`/${artist.handle}`} />
           </div>
-        </form>
+        </div>
+      </div>
+
+      <DashboardCard variant='settings' className='h-full'>
+        <DashboardActivityFeed profileId={artist.id} />
       </DashboardCard>
 
-      <DashboardActivityFeed profileId={artist.id} />
-
       <DashboardCard variant='settings'>
-        <h3 className='text-lg font-medium text-primary-token mb-4'>
-          {allTasksComplete ? 'Profile Ready!' : 'Complete Your Setup'}
-        </h3>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <p className='text-xs uppercase tracking-[0.25em] text-tertiary-token/70'>
+              Setup
+            </p>
+            <h3 className='text-lg font-semibold text-primary-token'>
+              {allTasksComplete ? 'Profile ready!' : 'Complete your setup'}
+            </h3>
+            <p className='text-sm text-secondary-token'>
+              {allTasksComplete
+                ? 'Everything essential is live—share your profile.'
+                : 'Finish the essentials to unlock the full experience.'}
+            </p>
+          </div>
+          <div className='text-sm font-semibold text-secondary-token'>
+            {completedCount}/{totalSteps} done
+          </div>
+        </div>
 
         {allTasksComplete ? (
-          <div className='space-y-4'>
+          <div className='mt-4 space-y-4'>
             <CompletionBanner />
-            <div className='flex gap-3'>
+            <div className='flex flex-wrap gap-3'>
               <Button asChild size='sm'>
                 <Link
                   href={`/${artist.handle}`}
                   target='_blank'
                   rel='noopener noreferrer'
                 >
-                  View Profile
+                  View profile
                 </Link>
               </Button>
               <CopyToClipboardButton relativePath={`/${artist.handle}`} />
             </div>
           </div>
         ) : (
-          <div>
-            {/* Progress indicator */}
-            <div className='mb-4'>
-              <div className='flex justify-between items-center mb-2'>
-                <span className='text-sm text-secondary-token'>
-                  Setup Progress
-                </span>
-                <span className='text-sm text-secondary-token'>{`${completedCount}/${totalSteps}`}</span>
-              </div>
+          <div className='mt-4 space-y-4'>
+            <div
+              role='progressbar'
+              aria-valuenow={completedCount}
+              aria-valuemin={0}
+              aria-valuemax={totalSteps}
+              aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
+              className='relative h-3 overflow-hidden rounded-full bg-surface-2'
+            >
               <div
-                role='progressbar'
-                aria-valuenow={completedCount}
-                aria-valuemin={0}
-                aria-valuemax={totalSteps}
-                aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
-                className='w-full bg-surface-2 rounded-full h-2'
-              >
-                <div
-                  className='bg-accent h-2 rounded-full transition-all duration-300 ease-in-out'
-                  style={{ width: `${(completedCount / totalSteps) * 100}%` }}
-                />
-              </div>
+                className='absolute inset-y-0 left-0 rounded-full bg-accent transition-all duration-300 ease-in-out'
+                style={{ width: `${(completedCount / totalSteps) * 100}%` }}
+              />
             </div>
 
             <ol className='space-y-3 list-none pl-0'>

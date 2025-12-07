@@ -1,7 +1,7 @@
 import type { Preview } from '@storybook/nextjs-vite';
 import { ThemeProvider } from 'next-themes';
 import React from 'react';
-import { ToastProvider } from '../components/ui/ToastContainer';
+import { ToastProvider } from '../components/molecules/ToastContainer';
 import '../app/globals.css';
 
 const preview: Preview = {

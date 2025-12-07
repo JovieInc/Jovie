@@ -2,10 +2,7 @@ import type { StorybookConfig } from '@storybook/nextjs-vite';
 import path from 'path';
 
 const config: StorybookConfig = {
-  stories: [
-    '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    '../stories/**/*.@(mdx|stories.@(js|jsx|ts|tsx))',
-  ],
+  stories: ['../components/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
   addons: [
     '@storybook/addon-docs',
     '@storybook/addon-a11y',
@@ -58,7 +55,9 @@ const config: StorybookConfig = {
         '@/app/dashboard/actions': require.resolve(
           './dashboard-actions-mock.ts'
         ),
-        '@/app/onboarding/actions': require.resolve('./empty-module.js'),
+        '@/app/onboarding/actions': require.resolve(
+          './onboarding-actions-mock.ts'
+        ),
         // Also handle absolute imports without alias
         '../../../app/dashboard/actions': require.resolve(
           './dashboard-actions-mock.ts'
@@ -69,9 +68,15 @@ const config: StorybookConfig = {
         '../app/dashboard/actions': require.resolve(
           './dashboard-actions-mock.ts'
         ),
-        '../../../app/onboarding/actions': require.resolve('./empty-module.js'),
-        '../../app/onboarding/actions': require.resolve('./empty-module.js'),
-        '../app/onboarding/actions': require.resolve('./empty-module.js'),
+        '../../../app/onboarding/actions': require.resolve(
+          './onboarding-actions-mock.ts'
+        ),
+        '../../app/onboarding/actions': require.resolve(
+          './onboarding-actions-mock.ts'
+        ),
+        '../app/onboarding/actions': require.resolve(
+          './onboarding-actions-mock.ts'
+        ),
         // Mock Next.js navigation for Storybook
         'next/navigation': require.resolve('./next-navigation-mock.js'),
         // Mock Clerk authentication for Storybook
@@ -86,6 +91,20 @@ const config: StorybookConfig = {
           __dirname,
           'clerk-server-mock.js'
         ),
+        // Mock @clerk/elements to prevent package.json lookup warning
+        '@clerk/elements': path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        '@clerk/elements/common': path.resolve(
+          __dirname,
+          'clerk-elements-mock.jsx'
+        ),
+        '@clerk/elements/sign-in': path.resolve(
+          __dirname,
+          'clerk-elements-mock.jsx'
+        ),
+        '@clerk/elements/sign-up': path.resolve(
+          __dirname,
+          'clerk-elements-mock.jsx'
+        ),
       },
     };
 
@@ -95,6 +114,30 @@ const config: StorybookConfig = {
       target: 'es2020',
       loader: 'tsx',
       include: /\.(ts|tsx|js|jsx)$/,
+    };
+
+    // Exclude @clerk/elements from dependency optimization to prevent package.json lookup warning
+    config.optimizeDeps = {
+      ...config.optimizeDeps,
+      exclude: [...(config.optimizeDeps?.exclude || []), '@clerk/elements'],
+    };
+
+    // Suppress "use client" directive warnings in build output
+    config.build = {
+      ...config.build,
+      rollupOptions: {
+        ...config.build?.rollupOptions,
+        onwarn(warning, warn) {
+          // Suppress "use client" directive warnings
+          if (
+            warning.code === 'MODULE_LEVEL_DIRECTIVE' &&
+            warning.message.includes('use client')
+          ) {
+            return;
+          }
+          warn(warning);
+        },
+      },
     };
 
     return config;

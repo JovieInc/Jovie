@@ -7,6 +7,7 @@
 // Base utilities
 export {
   createExtractionResult,
+  decodeHtmlEntities,
   ExtractionError,
   type ExtractionErrorCode,
   extractLinks,

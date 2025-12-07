@@ -9,11 +9,17 @@ import {
   type DashboardBreadcrumbItem,
   DashboardTopBar,
 } from '@/components/dashboard/layout/DashboardTopBar';
+import {
+  PREVIEW_PANEL_WIDTH,
+  PreviewPanel,
+} from '@/components/dashboard/layout/PreviewPanel';
+import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import type { DashboardData } from './actions';
 import { DashboardDataProvider } from './DashboardDataContext';
+import { PreviewPanelProvider, usePreviewPanel } from './PreviewPanelContext';
 
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
@@ -102,26 +108,54 @@ export default function DashboardLayoutClient({
 
   return (
     <DashboardDataProvider value={dashboardData}>
-      <PendingClaimRunner />
-      <PendingClaimHandler />
+      <PreviewPanelProvider>
+        <PendingClaimRunner />
+        <PendingClaimHandler />
 
-      <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-        <div className='flex h-svh w-full overflow-hidden bg-base'>
-          <DashboardSidebar />
-          <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
-            <DashboardTopBar breadcrumbs={crumbs} />
-            <main className='flex-1 min-h-0 overflow-auto'>
-              <div
-                className={
-                  useFullWidth ? 'p-6' : 'container mx-auto max-w-7xl p-6'
-                }
-              >
-                {children}
-              </div>
-            </main>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
+        <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
+          <DashboardLayoutInner crumbs={crumbs} useFullWidth={useFullWidth}>
+            {children}
+          </DashboardLayoutInner>
+        </SidebarProvider>
+      </PreviewPanelProvider>
     </DashboardDataProvider>
+  );
+}
+
+/** Inner component that can access preview panel context */
+function DashboardLayoutInner({
+  crumbs,
+  useFullWidth,
+  children,
+}: {
+  crumbs: DashboardBreadcrumbItem[];
+  useFullWidth: boolean;
+  children: React.ReactNode;
+}) {
+  const { isOpen: previewOpen } = usePreviewPanel();
+
+  return (
+    <div className='flex h-svh w-full overflow-hidden bg-base'>
+      <DashboardSidebar />
+      <SidebarInset
+        className='flex flex-1 flex-col overflow-hidden transition-[margin] duration-300 ease-out'
+        style={{
+          marginRight: previewOpen ? PREVIEW_PANEL_WIDTH : 0,
+        }}
+      >
+        <DashboardTopBar
+          breadcrumbs={crumbs}
+          actions={<PreviewToggleButton />}
+        />
+        <main className='flex-1 min-h-0 overflow-auto'>
+          <div
+            className={useFullWidth ? 'p-6' : 'container mx-auto max-w-7xl p-6'}
+          >
+            {children}
+          </div>
+        </main>
+      </SidebarInset>
+      <PreviewPanel />
+    </div>
   );
 }

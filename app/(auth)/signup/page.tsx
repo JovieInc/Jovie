@@ -1,8 +1,7 @@
 'use client';
 
 import { ClerkLoaded, ClerkLoading } from '@clerk/nextjs';
-import { AuthLayout, OtpSignUpForm } from '@/components/auth';
-import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { AuthLayout, AuthPageSkeleton, OtpSignUpForm } from '@/components/auth';
 
 export default function SignUpPage() {
   return (
@@ -13,7 +12,12 @@ export default function SignUpPage() {
       footerLinkHref='/signin'
     >
       <ClerkLoading>
-        <AuthFormSkeleton />
+        <AuthPageSkeleton
+          formTitle='Create your account'
+          footerPrompt='Already have an account?'
+          footerLinkText='Log in'
+          footerLinkHref='/signin'
+        />
       </ClerkLoading>
       <ClerkLoaded>
         <OtpSignUpForm />

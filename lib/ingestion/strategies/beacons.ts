@@ -10,6 +10,7 @@ import type { ExtractionResult } from '../types';
 import {
   normalizeHandle as baseNormalizeHandle,
   createExtractionResult,
+  decodeHtmlEntities,
   ExtractionError,
   extractLinks,
   extractMetaContent,
@@ -65,15 +66,27 @@ const BEACONS_HANDLE_REGEX =
  */
 export function isBeaconsUrl(url: string): boolean {
   try {
+    const candidate = url.trim();
+
+    // Reject dangerous or unsupported schemes early
+    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+      return false;
+    }
+
+    // Reject protocol-relative URLs
+    if (candidate.startsWith('//')) {
+      return false;
+    }
+
     // Check original URL protocol before normalization (normalizeUrl converts http to https)
     const originalParsed = new URL(
-      url.startsWith('http') ? url : `https://${url}`
+      candidate.startsWith('http') ? candidate : `https://${candidate}`
     );
     if (originalParsed.protocol !== 'https:') {
       return false;
     }
 
-    const parsed = new URL(normalizeUrl(url));
+    const parsed = new URL(normalizeUrl(candidate));
 
     if (!BEACONS_CONFIG.validHosts.has(parsed.hostname.toLowerCase())) {
       return false;
@@ -425,21 +438,6 @@ function extractBeaconsSpecificData(html: string): {
   }
 
   return result;
-}
-
-/**
- * Decodes common HTML entities.
- */
-function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ');
 }
 
 // ============================================================================
