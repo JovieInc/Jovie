@@ -553,3 +553,60 @@ Before merging any migration:
   );
   ```
 - Use the shared `logger` helpers for structured logging and prefer `logger.fmt` when injecting variables; e.g., `logger.debug(logger.fmt`Cache miss for user: ${userId}`)` or `logger.error('Failed to process payment', { orderId, amount })`.
+
+## 16. Auto-Commit at End of Job (REQUIRED)
+
+All AI agents **MUST** commit their work at the end of every job/task. This ensures no work is lost and maintains a clean audit trail.
+
+### Rules
+
+1. **Always commit before ending a session:**
+   - After completing a task, stage and commit all changes.
+   - Use conventional commit format: `[feat|fix|chore]: <description>`.
+   - Keep commit messages concise but descriptive.
+
+2. **Commit command sequence:**
+   ```bash
+   git add -A
+   git commit -m "[type]: <description>"
+   ```
+
+3. **When to commit:**
+   - At the end of every completed task.
+   - Before switching to a different task.
+   - Before ending a conversation/session.
+   - After any significant milestone within a larger task.
+
+4. **Commit message format:**
+   - `feat:` for new features or enhancements.
+   - `fix:` for bug fixes.
+   - `chore:` for maintenance, refactors, docs, or config changes.
+   - Include ticket/issue number if available: `[feat]: add user avatar (#123)`.
+
+5. **Do NOT commit if:**
+   - The code is in a broken state (fails typecheck/lint).
+   - You are explicitly told not to commit.
+   - The changes are exploratory/experimental and the user hasn't approved them.
+
+6. **Push policy:**
+   - Commit locally at minimum.
+   - Push to remote only if on a feature branch (never push directly to `main` or `production`).
+   - Ask before pushing if uncertain about branch state.
+
+### Example End-of-Job Flow
+
+```bash
+# 1. Verify changes are valid
+pnpm typecheck && pnpm lint
+
+# 2. Stage all changes
+git add -A
+
+# 3. Commit with conventional message
+git commit -m "feat: add skeleton loaders for auth screens"
+
+# 4. (Optional) Push if on feature branch
+git push origin feat/auth-skeleton-loaders
+```
+
+**Failure to commit at end of job is a violation of agent protocol.**
