@@ -624,12 +624,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Create PR body with QA checklist
-          pr_body="## Release Promotion: main → production
+          # Create PR body with QA checklist (using heredoc to avoid backtick issues)
+          pr_body=$(cat <<'EOF'
+          ## Release Promotion: main → production
 
-          **⚠️ Manual Review Required**
+          **Manual Review Required**
 
-          This PR promotes changes from `main` to `production` for production release.
+          This PR promotes changes from **main** to **production** for production release.
 
           ### Pre-merge Checklist
           - [ ] **Full CI passed** (ci-full job completed successfully)
@@ -653,16 +654,18 @@ jobs:
           - [ ] **Feature documentation** updated (if applicable)
           - [ ] **API docs updated** (if API changes)
 
-          **🚨 Do not merge until all checks pass and manual QA is complete.**"
+          **Do not merge until all checks pass and manual QA is complete.**
+          EOF
+          )
 
           # Check if PR already exists
           existing_pr=$(gh pr list --head main --base production --json number --jq '.[0].number // empty')
           if [ -z "$existing_pr" ]; then
             echo "Creating new PR: main → production"
-            gh pr create --base production --head main --title "🚀 Release: Promote main → production" --body "$pr_body"
+            gh pr create --base production --head main --title "Release: Promote main to production" --body "$pr_body"
           else
             echo "PR already exists: #$existing_pr (updating with latest checklist)"
-            gh pr edit "$existing_pr" --title "🚀 Release: Promote main → production" --body "$pr_body"
+            gh pr edit "$existing_pr" --title "Release: Promote main to production" --body "$pr_body"
           fi
 
   ai-review-gate:
