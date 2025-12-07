@@ -1,12 +1,10 @@
 'use client';
 
 import { useAuth } from '@clerk/nextjs';
-import { motion } from 'framer-motion';
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { FeatureList } from '@/components/pricing/FeatureList';
-import { PricingCTA } from '@/components/pricing/PricingCTA';
 import { PricingToggle } from '@/components/pricing/PricingToggle';
 import { Container } from '@/components/site/Container';
 
@@ -17,37 +15,24 @@ export default function PricingPage() {
   const [, setIsYearly] = useState(false);
 
   const freeFeatures = [
-    { title: 'Blazing-fast profiles, SEO-optimized' },
-    {
-      title:
-        'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)',
-    },
-    {
-      title: 'Constant A/B testing and machine learning to maximize conversion',
-    },
-    {
-      title:
-        'Smart deep links (/listen, /tip, etc.) for Instagram&apos;s multiple link slots',
-    },
-    { title: 'Clean dark/light mode, desktop QR code handoff' },
-    { title: 'App deep links (no browser/login friction)' },
-    {
-      title:
-        'Analytics focused on conversion (clicks → conversions, referrers, countries)',
-    },
-    { title: 'Unique Jovie handle (jov.ie/yourname)' },
+    'Blazing-fast profiles, SEO-optimized',
+    'AI-driven personalization (dynamic profiles tailored to visitor location/device/persona)',
+    'Constant A/B testing and machine learning to maximize conversion',
+    "Smart deep links (/listen, /tip, etc.) for Instagram's multiple link slots",
+    'Clean dark/light mode, desktop QR code handoff',
+    'App deep links (no browser/login friction)',
+    'Analytics focused on conversion (clicks → conversions, referrers, countries)',
+    'Unique Jovie handle (jov.ie/yourname)',
   ];
 
   const handleSubscribe = async () => {
     if (!isSignedIn) {
-      // Redirect to sign up if not authenticated
       router.push('/signup');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Route through server-side checkout flow for remove branding
       router.push('/billing/remove-branding');
     } finally {
       setIsLoading(false);
@@ -55,156 +40,174 @@ export default function PricingPage() {
   };
 
   return (
-    <div className='min-h-screen bg-linear-to-b from-white to-gray-50 dark:from-gray-900 dark:to-gray-800'>
+    <div className='min-h-screen bg-white dark:bg-[#0a0a0b]'>
       <Container size='md'>
-        <motion.div
-          className='py-24 sm:py-32'
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.div
-            className='text-center mb-16'
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-6xl max-w-4xl mx-auto leading-tight'>
-              <span className='block'>Free forever.</span>
-              <span className='block'>Remove branding for $5.</span>
+        <div className='py-20 sm:py-28'>
+          {/* Header */}
+          <div className='text-center mb-16'>
+            <h1
+              className='text-4xl sm:text-5xl font-semibold tracking-tight text-neutral-900 dark:text-white leading-[1.1]'
+              style={{ fontSynthesisWeight: 'none' }}
+            >
+              Free forever.
+              <br />
+              Remove branding for $5.
             </h1>
-            <p className='mt-6 text-xl leading-8 text-gray-600 dark:text-gray-300 max-w-2xl mx-auto'>
+            <p className='mt-5 text-lg text-neutral-500 dark:text-neutral-400 max-w-xl mx-auto'>
               Your Jovie profile that actually converts. Beautiful, intelligent,
               impossibly fast.
             </p>
-          </motion.div>
+          </div>
 
-          <div className='grid md:grid-cols-2 gap-12 items-start'>
+          {/* Pricing Cards */}
+          <div className='grid md:grid-cols-2 gap-6 max-w-4xl mx-auto'>
             {/* Free Plan */}
-            <motion.div
-              className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg overflow-hidden'
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-            >
-              <div className='p-8'>
-                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
+            <div className='rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-8'>
+              <div className='mb-6'>
+                <h2
+                  className='text-lg font-medium text-neutral-900 dark:text-white'
+                  style={{ fontSynthesisWeight: 'none' }}
+                >
                   Free Forever
                 </h2>
-                <p className='mt-2 text-gray-600 dark:text-gray-400'>
+                <p className='mt-1 text-sm text-neutral-500 dark:text-neutral-400'>
                   Everything you need to create a beautiful profile.
                 </p>
-
-                <div className='mt-6 flex items-baseline'>
-                  <span className='text-5xl font-bold text-gray-900 dark:text-white'>
-                    $0
-                  </span>
-                  <span className='ml-1 text-xl text-gray-500 dark:text-gray-400'>
-                    /forever
-                  </span>
-                </div>
-
-                <FeatureList
-                  title='What&apos;s included:'
-                  features={freeFeatures}
-                />
-
-                <div className='mt-8'>
-                  <Link
-                    href='/'
-                    className='inline-flex w-full items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 px-6 py-3 text-base font-medium text-gray-900 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-all duration-200'
-                  >
-                    Continue with free
-                  </Link>
-                </div>
               </div>
-            </motion.div>
 
-            {/* Paid Plan */}
-            <motion.div
-              className='rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl overflow-hidden relative'
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              {/* Highlight banner */}
-              <div className='bg-black text-white dark:bg-white dark:text-black text-sm font-medium px-4 py-2 text-center'>
+              <div className='flex items-baseline mb-8'>
+                <span
+                  className='text-4xl font-semibold text-neutral-900 dark:text-white'
+                  style={{ fontSynthesisWeight: 'none' }}
+                >
+                  $0
+                </span>
+                <span className='ml-2 text-neutral-500 dark:text-neutral-400'>
+                  /forever
+                </span>
+              </div>
+
+              <Link
+                href='/'
+                className='block w-full h-10 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white text-sm font-medium text-center leading-10 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors'
+                style={{ fontSynthesisWeight: 'none' }}
+              >
+                Continue with free
+              </Link>
+
+              <div className='mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-800'>
+                <p
+                  className='text-sm font-medium text-neutral-900 dark:text-white mb-4'
+                  style={{ fontSynthesisWeight: 'none' }}
+                >
+                  What&apos;s included:
+                </p>
+                <ul className='space-y-3'>
+                  {freeFeatures.map((feature, index) => (
+                    <li key={index} className='flex items-start gap-3'>
+                      <Check className='w-4 h-4 text-neutral-400 dark:text-neutral-500 mt-0.5 shrink-0' />
+                      <span className='text-sm text-neutral-600 dark:text-neutral-400'>
+                        {feature}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            {/* Pro Plan */}
+            <div className='rounded-xl border border-neutral-900 dark:border-neutral-100 bg-white dark:bg-neutral-900 overflow-hidden relative'>
+              {/* Badge */}
+              <div
+                className='bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-medium px-3 py-1.5 text-center'
+                style={{ fontSynthesisWeight: 'none' }}
+              >
                 Designed for professionals
               </div>
 
               <div className='p-8'>
-                <h2 className='text-2xl font-bold text-gray-900 dark:text-white'>
-                  Pro
-                </h2>
-                <p className='mt-2 text-gray-600 dark:text-gray-400'>
-                  Your brand. Your story. Nothing else.
-                </p>
+                <div className='mb-6'>
+                  <h2
+                    className='text-lg font-medium text-neutral-900 dark:text-white'
+                    style={{ fontSynthesisWeight: 'none' }}
+                  >
+                    Pro
+                  </h2>
+                  <p className='mt-1 text-sm text-neutral-500 dark:text-neutral-400'>
+                    Your brand. Your story. Nothing else.
+                  </p>
+                </div>
 
-                <div className='mt-6'>
+                <div className='mb-8'>
                   <PricingToggle onChange={setIsYearly} />
                 </div>
 
-                <div className='mt-8'>
-                  <p className='text-sm text-gray-500 dark:text-gray-400 mb-4'>
+                <button
+                  onClick={handleSubscribe}
+                  disabled={isLoading}
+                  className='w-full h-10 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                  style={{ fontSynthesisWeight: 'none' }}
+                >
+                  {isLoading
+                    ? 'Processing...'
+                    : isSignedIn
+                      ? 'Remove branding →'
+                      : 'Upgrade →'}
+                </button>
+
+                <div className='mt-8 pt-8 border-t border-neutral-100 dark:border-neutral-800'>
+                  <p className='text-sm text-neutral-500 dark:text-neutral-400 mb-4'>
                     All free features, plus:
                   </p>
                   <ul className='space-y-3'>
-                    <li className='flex items-start'>
-                      <svg
-                        className='h-5 w-5 shrink-0 text-gray-900 dark:text-white mt-0.5'
-                        fill='none'
-                        viewBox='0 0 24 24'
-                        stroke='currentColor'
-                      >
-                        <path
-                          strokeLinecap='round'
-                          strokeLinejoin='round'
-                          strokeWidth={2}
-                          d='M5 13l4 4L19 7'
-                        />
-                      </svg>
-                      <span className='ml-3 text-base text-gray-700 dark:text-gray-300'>
-                        <strong>Remove the Jovie branding</strong> for a clean,
-                        professional look
+                    <li className='flex items-start gap-3'>
+                      <Check className='w-4 h-4 text-neutral-900 dark:text-white mt-0.5 shrink-0' />
+                      <span className='text-sm text-neutral-600 dark:text-neutral-300'>
+                        <strong className='text-neutral-900 dark:text-white'>
+                          Remove the Jovie branding
+                        </strong>{' '}
+                        for a clean, professional look
                       </span>
                     </li>
                   </ul>
                 </div>
-
-                <div className='mt-8'>
-                  <motion.button
-                    onClick={handleSubscribe}
-                    disabled={isLoading}
-                    className='inline-flex w-full items-center justify-center rounded-lg px-6 py-3 text-base font-medium transition-all duration-200 cursor-pointer bg-black text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:bg-white dark:text-black dark:hover:bg-gray-100 disabled:opacity-70 disabled:cursor-not-allowed'
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                  >
-                    {isLoading
-                      ? 'Processing...'
-                      : isSignedIn
-                        ? 'Remove branding →'
-                        : 'Upgrade →'}
-                  </motion.button>
-                </div>
               </div>
-            </motion.div>
+            </div>
           </div>
 
-          {/* CTA Section */}
-          <PricingCTA onUpgrade={handleSubscribe} isLoading={isLoading} />
+          {/* Bottom CTA */}
+          <div className='mt-12 max-w-4xl mx-auto'>
+            <div className='rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 p-8'>
+              <div className='flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6'>
+                <div>
+                  <h3
+                    className='text-lg font-medium text-neutral-900 dark:text-white'
+                    style={{ fontSynthesisWeight: 'none' }}
+                  >
+                    Make it yours.
+                  </h3>
+                  <p className='mt-1 text-sm text-neutral-500 dark:text-neutral-400'>
+                    Remove the Jovie branding for just $5. That&apos;s it.
+                  </p>
+                </div>
+                <button
+                  onClick={handleSubscribe}
+                  disabled={isLoading}
+                  className='shrink-0 h-10 px-6 rounded-md bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-sm font-medium hover:bg-neutral-800 dark:hover:bg-neutral-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+                  style={{ fontSynthesisWeight: 'none' }}
+                >
+                  {isLoading ? 'Processing...' : 'Remove branding →'}
+                </button>
+              </div>
+            </div>
+          </div>
 
-          <motion.div
-            className='mt-16 text-center'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.5 }}
-          >
-            <p className='text-sm text-gray-500 dark:text-gray-400'>
-              All plans include unlimited updates and our 30-day money-back
-              guarantee.
-            </p>
-          </motion.div>
-        </motion.div>
+          {/* Footer note */}
+          <p className='mt-10 text-center text-sm text-neutral-400 dark:text-neutral-500'>
+            All plans include unlimited updates and our 30-day money-back
+            guarantee.
+          </p>
+        </div>
       </Container>
     </div>
   );

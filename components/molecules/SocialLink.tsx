@@ -76,20 +76,18 @@ export function SocialLink({ link, handle, artistName }: SocialLinkProps) {
       onMouseLeave={() => setHover(false)}
       onFocus={() => setHover(true)}
       onBlur={() => setHover(false)}
-      className='group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 cursor-pointer ring-1 ring-black/5 dark:ring-white/10'
+      className={`group flex h-10 w-10 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 cursor-pointer border backdrop-blur-sm ${
+        hover
+          ? 'border-neutral-400 dark:border-neutral-500 bg-white dark:bg-neutral-700'
+          : 'border-neutral-200 dark:border-neutral-700 bg-white/80 dark:bg-neutral-800/80'
+      } text-neutral-700 dark:text-neutral-200`}
       style={
-        brandHex
+        brandHex && hover
           ? {
               color: `#${brandHex}`,
-              backgroundColor: hexToRgba(brandHex, 0.12),
-              boxShadow: hover
-                ? `0 0 0 0.5px ${hexToRgba(brandHex, 0.6)}, 0 10px 24px -12px ${hexToRgba(brandHex, 0.6)}`
-                : undefined,
-              filter: hover ? 'none' : 'grayscale(1)',
+              boxShadow: `0 0 0 1px ${hexToRgba(brandHex, 0.3)}, 0 4px 12px -4px ${hexToRgba(brandHex, 0.4)}`,
             }
-          : {
-              filter: hover ? 'none' : 'grayscale(1)',
-            }
+          : undefined
       }
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}

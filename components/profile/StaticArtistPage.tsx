@@ -77,6 +77,14 @@ function renderContent(
         </div>
       );
 
+    case 'subscribe':
+      // Subscribe mode - show notification subscription form directly
+      return (
+        <div className='space-y-4'>
+          <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+        </div>
+      );
+
     default: // 'profile' mode
       // Only show the Listen Now / notifications CTA if the artist has streaming platforms configured
       const hasStreamingPlatforms =

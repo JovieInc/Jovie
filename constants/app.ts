@@ -22,6 +22,7 @@ export const PAGE_SUBTITLES = {
   profile: 'Artist',
   tip: 'Tip with Venmo',
   listen: 'Choose a Service',
+  subscribe: 'Get notified',
 } as const;
 
 // Legacy FEATURE_FLAGS removed (waitlist deprecated). Use `lib/feature-flags.ts`.

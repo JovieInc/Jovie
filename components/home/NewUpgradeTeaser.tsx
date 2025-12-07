@@ -1,43 +1,63 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 
 export function NewUpgradeTeaser() {
   return (
-    <section className='py-12 bg-white dark:bg-black'>
+    <section className='py-16 sm:py-20'>
       <Container>
-        <div className='max-w-md mx-auto'>
-          <div className='relative group'>
-            {/* Subtle glow effect on hover */}
-            <div className='absolute -inset-1 bg-linear-to-r from-blue-600/20 to-purple-600/20 rounded-2xl blur-lg opacity-0 group-hover:opacity-100 transition-opacity duration-500'></div>
-
-            {/* Card content */}
-            <div className='relative p-6 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all duration-300'>
-              <div className='text-center'>
-                <h3 className='text-xl font-bold text-gray-900 dark:text-white mb-3'>
-                  Remove the branding
-                </h3>
-
-                <p className='text-gray-600 dark:text-gray-400 mb-6'>
-                  $5/mo or $50/yr{' '}
-                  <span className='text-green-600 dark:text-green-400 font-medium'>
-                    (2 months free)
-                  </span>
-                </p>
-
-                <Button
-                  asChild
-                  variant='primary'
-                  className='w-full justify-center'
-                >
-                  <Link href='/billing/remove-branding'>
-                    Upgrade → Remove Branding
-                  </Link>
-                </Button>
-              </div>
+        <div className='max-w-lg mx-auto'>
+          <div className='relative rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 p-8 sm:p-10'>
+            {/* Badge */}
+            <div className='flex justify-center mb-6'>
+              <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 rounded-full'>
+                Pro
+              </span>
             </div>
+
+            {/* Heading */}
+            <h3 className='text-center text-lg sm:text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100'>
+              Remove Jovie branding
+            </h3>
+
+            {/* Pricing */}
+            <div className='mt-4 flex items-baseline justify-center gap-2'>
+              <span className='text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white'>
+                $5
+              </span>
+              <span className='text-sm text-neutral-500 dark:text-neutral-400'>
+                /month
+              </span>
+            </div>
+
+            <p className='mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400'>
+              or $50/year{' '}
+              <span className='text-emerald-600 dark:text-emerald-400 font-medium'>
+                — save 2 months
+              </span>
+            </p>
+
+            {/* CTA */}
+            <div className='mt-8'>
+              <Button
+                asChild
+                variant='primary'
+                className='w-full justify-center gap-2 h-11 text-sm font-medium'
+              >
+                <Link href='/billing/remove-branding'>
+                  Upgrade to Pro
+                  <ArrowRight className='h-4 w-4' />
+                </Link>
+              </Button>
+            </div>
+
+            {/* Footer note */}
+            <p className='mt-4 text-center text-xs text-neutral-400 dark:text-neutral-500'>
+              Cancel anytime. No questions asked.
+            </p>
           </div>
         </div>
       </Container>
