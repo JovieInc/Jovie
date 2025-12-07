@@ -426,19 +426,21 @@ export function SettingsPolished({
             <h3 className='text-lg font-medium text-primary'>Profile Photo</h3>
           </div>
 
-          <AvatarUploadable
-            src={artist.image_url}
-            alt={artist.name || 'Profile photo'}
-            name={artist.name || artist.handle}
-            size='xl'
-            uploadable
-            showHoverOverlay
-            onUpload={handleAvatarUpload}
-            onSuccess={handleAvatarUpdate}
-            onError={message => showToast({ type: 'error', message })}
-            maxFileSize={maxAvatarSize}
-            acceptedTypes={acceptedAvatarTypes}
-          />
+          <div className='w-20 h-20'>
+            <AvatarUploadable
+              src={artist.image_url}
+              alt={artist.name || 'Profile photo'}
+              name={artist.name || artist.handle}
+              size='xl'
+              uploadable
+              showHoverOverlay
+              onUpload={handleAvatarUpload}
+              onSuccess={handleAvatarUpdate}
+              onError={message => showToast({ type: 'error', message })}
+              maxFileSize={maxAvatarSize}
+              acceptedTypes={acceptedAvatarTypes}
+            />
+          </div>
         </DashboardCard>
 
         {/* Basic Info Card */}

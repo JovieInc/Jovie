@@ -308,6 +308,7 @@ export interface LegacySocialLink {
   url: string;
   clicks: number;
   created_at: string;
+  is_visible?: boolean; // Optional visibility flag for preview filtering
 }
 
 // =====================================

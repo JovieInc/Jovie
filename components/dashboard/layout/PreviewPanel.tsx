@@ -16,7 +16,8 @@ const PREVIEW_PANEL_WIDTH = 400;
 export function PreviewPanel() {
   const { isOpen, close, previewData } = usePreviewPanel();
 
-  if (!isOpen || !previewData) {
+  // Don't render anything until we have preview data
+  if (!previewData) {
     return null;
   }
 
@@ -24,11 +25,14 @@ export function PreviewPanel() {
 
   return (
     <aside
+      aria-hidden={!isOpen}
       className={cn(
         'fixed top-0 right-0 z-40 h-svh flex flex-col',
         'bg-surface-1 border-l border-subtle shadow-xl',
-        'transition-transform duration-300 ease-out',
-        isOpen ? 'translate-x-0' : 'translate-x-full'
+        'transition-[transform,opacity] duration-300 ease-out',
+        isOpen
+          ? 'translate-x-0 opacity-100'
+          : 'translate-x-full opacity-0 pointer-events-none'
       )}
       style={{ width: PREVIEW_PANEL_WIDTH }}
     >
@@ -79,9 +83,8 @@ export function PreviewPanel() {
             />
             <Button
               asChild
-              variant='outline'
               size='sm'
-              className='flex-1 whitespace-nowrap'
+              className='flex-1 whitespace-nowrap bg-white text-black hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100'
             >
               <Link
                 href={profilePath}

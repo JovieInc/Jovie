@@ -66,6 +66,17 @@ vi.mock('@/app/dashboard/DashboardDataContext', () => ({
   }),
 }));
 
+vi.mock('@/app/dashboard/PreviewPanelContext', () => ({
+  usePreviewPanel: () => ({
+    isOpen: false,
+    open: vi.fn(),
+    close: vi.fn(),
+    toggle: vi.fn(),
+    previewData: null,
+    setPreviewData: vi.fn(),
+  }),
+}));
+
 vi.mock('@/types/db', async () => {
   const actual =
     await vi.importActual<typeof import('@/types/db')>('@/types/db');
