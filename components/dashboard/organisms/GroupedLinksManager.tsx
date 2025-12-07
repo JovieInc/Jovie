@@ -599,12 +599,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         existingPlatforms={links
           .filter(l => l.platform.id !== 'youtube')
           .map(l => l.platform.id)}
-        socialVisibleCount={
-          links.filter(
-            l => l.platform.category === 'social' && linkIsVisible(l)
-          ).length
-        }
-        socialVisibleLimit={MAX_SOCIAL_LINKS}
         creatorName={creatorName}
         prefillUrl={prefillUrl}
         onPrefillConsumed={() => setPrefillUrl(undefined)}
@@ -731,24 +725,36 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             {suggestionPills.map(pill => {
               const iconMeta = getPlatformIcon(pill.simpleIconId);
               const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+              // Detect dark colors (like TikTok #000, X #000) and use a lighter fallback
+              const isDarkColor = (() => {
+                const hex = brandHex.replace('#', '');
+                const r = parseInt(hex.slice(0, 2), 16);
+                const g = parseInt(hex.slice(2, 4), 16);
+                const b = parseInt(hex.slice(4, 6), 16);
+                // Luminance threshold - colors below this are too dark
+                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                return luminance < 0.25;
+              })();
+              const iconColor = isDarkColor ? '#9ca3af' : brandHex; // gray-400 fallback
+              const borderColor = isDarkColor ? '#6b728066' : `${brandHex}66`;
               return (
                 <button
                   key={pill.id}
                   type='button'
                   onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-secondary-token bg-surface-1/80 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                  style={{ borderColor: brandHex }}
+                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-tertiary-token bg-surface-1/60 opacity-50 transition-all hover:opacity-100 hover:text-secondary-token hover:bg-surface-2/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 whitespace-nowrap shrink-0'
+                  style={{ borderColor }}
                 >
                   <span
-                    className='flex items-center justify-center rounded-full bg-surface-2/80 p-0.5'
-                    style={{ color: brandHex }}
+                    className='flex items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors shrink-0'
+                    style={{ color: iconColor }}
                   >
                     <SocialIcon
                       platform={pill.simpleIconId}
                       className='h-3.5 w-3.5'
                     />
                   </span>
-                  <span>{pill.label}</span>
+                  <span className='whitespace-nowrap'>{pill.label}</span>
                   <span className='ml-0.5 text-[10px]'>+</span>
                 </button>
               );
@@ -853,7 +859,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                           </svg>
                         </span>
                       </TooltipTrigger>
-                      <TooltipContent side='top'>
+                      <TooltipContent side='top' className='max-w-xs text-wrap'>
                         Links are ordered automatically based on popularity.
                         Some links (like YouTube) can appear in both Music &
                         Social.
@@ -877,7 +883,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                         index={links.findIndex(
                           l => l.normalizedUrl === link.normalizedUrl
                         )}
-                        draggable={section !== 'earnings'}
+                        draggable={section !== 'earnings' && items.length > 1}
                         onToggle={handleToggle}
                         onRemove={handleRemove}
                         visible={linkIsVisible(link as T)}

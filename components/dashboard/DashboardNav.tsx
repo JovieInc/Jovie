@@ -10,6 +10,7 @@ import {
   ShieldCheckIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
+import { Kbd } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -143,9 +144,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
               children: (
                 <div className='flex items-center gap-2'>
                   <span>{item.name}</span>
-                  <kbd className='text-xs text-tertiary-token border rounded px-1'>
-                    {shortcut}
-                  </kbd>
+                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
                 </div>
               ),
             }

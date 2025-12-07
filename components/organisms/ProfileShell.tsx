@@ -225,10 +225,12 @@ export function ProfileShell({
       // Ignore parse failures
     }
   }, [artist.id, notificationsEnabled]);
-  const socialNetworkLinks = socialLinks.filter(link =>
-    SOCIAL_NETWORK_PLATFORMS.includes(
-      link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
-    )
+  const socialNetworkLinks = socialLinks.filter(
+    link =>
+      link.is_visible !== false &&
+      SOCIAL_NETWORK_PLATFORMS.includes(
+        link.platform.toLowerCase() as (typeof SOCIAL_NETWORK_PLATFORMS)[number]
+      )
   );
   const hasSocialLinks = socialNetworkLinks.length > 0;
   const hasContacts = contacts.length > 0;

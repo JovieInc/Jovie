@@ -267,12 +267,87 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
 ];
 
 /**
+ * Common domain misspellings mapped to correct domains
+ */
+const DOMAIN_MISSPELLINGS: Record<string, string> = {
+  // Instagram misspellings
+  'insatagram.com': 'instagram.com',
+  'instagran.com': 'instagram.com',
+  'instagarm.com': 'instagram.com',
+  'instragram.com': 'instagram.com',
+  'insragram.com': 'instagram.com',
+  'intagram.com': 'instagram.com',
+  'instagam.com': 'instagram.com',
+  'instgram.com': 'instagram.com',
+  'insagram.com': 'instagram.com',
+  'instagrm.com': 'instagram.com',
+  'instagramm.com': 'instagram.com',
+  // TikTok misspellings
+  'tiktoc.com': 'tiktok.com',
+  'ticktok.com': 'tiktok.com',
+  'tictok.com': 'tiktok.com',
+  'tiktik.com': 'tiktok.com',
+  'tikток.com': 'tiktok.com',
+  'titkok.com': 'tiktok.com',
+  // YouTube misspellings
+  'yotube.com': 'youtube.com',
+  'youtub.com': 'youtube.com',
+  'youutube.com': 'youtube.com',
+  'yuotube.com': 'youtube.com',
+  'youtue.com': 'youtube.com',
+  'youube.com': 'youtube.com',
+  'yutube.com': 'youtube.com',
+  'youtubee.com': 'youtube.com',
+  // Twitter/X misspellings
+  'twiter.com': 'twitter.com',
+  'twtter.com': 'twitter.com',
+  'twiiter.com': 'twitter.com',
+  'twittter.com': 'twitter.com',
+  'twitterr.com': 'twitter.com',
+  // Spotify misspellings
+  'spotfy.com': 'spotify.com',
+  'spotiify.com': 'spotify.com',
+  'spotifiy.com': 'spotify.com',
+  'spotifi.com': 'spotify.com',
+  'soptify.com': 'spotify.com',
+  'spoitfy.com': 'spotify.com',
+  // Facebook misspellings
+  'facebok.com': 'facebook.com',
+  'facbook.com': 'facebook.com',
+  'faceboo.com': 'facebook.com',
+  'faceebook.com': 'facebook.com',
+  'faceboook.com': 'facebook.com',
+  // LinkedIn misspellings
+  'linkdin.com': 'linkedin.com',
+  'linkedn.com': 'linkedin.com',
+  'linkein.com': 'linkedin.com',
+  'linkeind.com': 'linkedin.com',
+  // SoundCloud misspellings
+  'soundclod.com': 'soundcloud.com',
+  'soundcoud.com': 'soundcloud.com',
+  'souncloud.com': 'soundcloud.com',
+  // Twitch misspellings
+  'twich.tv': 'twitch.tv',
+  'twicth.tv': 'twitch.tv',
+  // Venmo misspellings
+  'vemno.com': 'venmo.com',
+  'vnemo.com': 'venmo.com',
+};
+
+/**
  * Normalize a URL by cleaning UTM parameters and enforcing HTTPS
  */
 export function normalizeUrl(url: string): string {
   try {
     // Normalize stray spaces around dots
     url = url.replace(/\s*\.\s*/g, '.');
+
+    // Fix common domain misspellings
+    for (const [misspelled, correct] of Object.entries(DOMAIN_MISSPELLINGS)) {
+      // Case-insensitive replacement of misspelled domains
+      const regex = new RegExp(misspelled.replace('.', '\\.'), 'gi');
+      url = url.replace(regex, correct);
+    }
 
     // Comma instead of dot before common TLDs (e.g., youtube,com)
     url = url.replace(/,(?=\s*(com|net|tv|be|gg|me)\b)/gi, '.');
@@ -455,13 +530,25 @@ export function detectPlatform(
   // Friendly error copy per platform
   const errorExamples: Record<string, string> = {
     spotify:
-      'That doesn’t look like a Spotify link. Example: https://open.spotify.com/artist/1234',
-    instagram:
-      'That doesn’t look like an Instagram link. Example: https://instagram.com/username',
-    tiktok:
-      'That doesn’t look like a TikTok link. Example: https://tiktok.com/@username',
-    youtube:
-      'That doesn’t look like a YouTube link. Example: https://youtube.com/@handle',
+      'Add your artist ID. Example: https://open.spotify.com/artist/1234',
+    instagram: 'Add your username. Example: https://instagram.com/username',
+    tiktok: 'Add your username. Example: https://tiktok.com/@username',
+    youtube: 'Add your handle. Example: https://youtube.com/@handle',
+    twitter: 'Add your username. Example: https://x.com/username',
+    venmo: 'Add your username. Example: https://venmo.com/username',
+    facebook: 'Add your page name. Example: https://facebook.com/pagename',
+    linkedin: 'Add your profile. Example: https://linkedin.com/in/username',
+    soundcloud: 'Add your username. Example: https://soundcloud.com/username',
+    twitch: 'Add your username. Example: https://twitch.tv/username',
+    threads: 'Add your username. Example: https://threads.net/@username',
+    snapchat: 'Add your username. Example: https://snapchat.com/add/username',
+    discord: 'Add your invite code. Example: https://discord.gg/invitecode',
+    telegram: 'Add your username. Example: https://t.me/username',
+    reddit: 'Add your username. Example: https://reddit.com/u/username',
+    pinterest: 'Add your username. Example: https://pinterest.com/username',
+    onlyfans: 'Add your username. Example: https://onlyfans.com/username',
+    linktree: 'Add your username. Example: https://linktr.ee/username',
+    bandcamp: 'Add your subdomain. Example: https://username.bandcamp.com',
   };
 
   return {
@@ -598,8 +685,37 @@ function validateUrl(url: string, platform: PlatformInfo): boolean {
         }
         return false;
       }
+      // Platforms that require a username/handle in the path
+      case 'venmo':
+        return /venmo\.com\/[a-zA-Z0-9_-]+\/?$/.test(url);
+      case 'facebook':
+        return /facebook\.com\/[a-zA-Z0-9._-]+\/?$/.test(url);
+      case 'linkedin':
+        return /linkedin\.com\/(in|company)\/[a-zA-Z0-9_-]+\/?$/.test(url);
+      case 'soundcloud':
+        return /soundcloud\.com\/[a-zA-Z0-9_-]+\/?/.test(url);
+      case 'twitch':
+        return /twitch\.tv\/[a-zA-Z0-9_]+\/?$/.test(url);
+      case 'threads':
+        return /threads\.net\/@[a-zA-Z0-9._]+\/?$/.test(url);
+      case 'snapchat':
+        return /snapchat\.com\/add\/[a-zA-Z0-9._-]+\/?$/.test(url);
+      case 'discord':
+        return /discord\.(gg|com\/invite)\/[a-zA-Z0-9]+\/?$/.test(url);
+      case 'telegram':
+        return /(t\.me|telegram\.me)\/[a-zA-Z0-9_]+\/?$/.test(url);
+      case 'reddit':
+        return /reddit\.com\/(r|u|user)\/[a-zA-Z0-9_]+\/?$/.test(url);
+      case 'pinterest':
+        return /pinterest\.com\/[a-zA-Z0-9_]+\/?$/.test(url);
+      case 'onlyfans':
+        return /onlyfans\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
+      case 'linktree':
+        return /linktr\.ee\/[a-zA-Z0-9._]+\/?$/.test(url);
+      case 'bandcamp':
+        return /[a-zA-Z0-9_-]+\.bandcamp\.com\/?/.test(url);
       default:
-        return true; // Basic URL validation passed
+        return true; // Basic URL validation passed for unknown platforms
     }
   } catch {
     return false;

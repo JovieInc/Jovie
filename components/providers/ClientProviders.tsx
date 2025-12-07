@@ -14,18 +14,7 @@ type LazyProvidersLoadingProps = LazyProvidersProps &
 
 function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   const { children } = props as LazyProvidersLoadingProps;
-  return (
-    <>
-      {children}
-      <div
-        aria-hidden='true'
-        className='fixed bottom-4 right-4 z-[40] flex items-center gap-2 rounded-full bg-surface-1/80 px-3 py-1.5 text-[11px] text-secondary shadow-lg backdrop-blur-sm'
-      >
-        <span className='h-1.5 w-1.5 animate-pulse rounded-full bg-current' />
-        <span className='opacity-70'>Enhancing experience…</span>
-      </div>
-    </>
-  );
+  return <>{children}</>;
 }
 
 // Lazy load non-critical providers to reduce initial bundle size

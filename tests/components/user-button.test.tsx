@@ -183,7 +183,7 @@ describe('UserButton billing actions', () => {
 
     fireEvent.click(screen.getByText('Adele Adkins'));
 
-    fireEvent.click(screen.getByText('Manage Billing'));
+    fireEvent.click(screen.getByText('Manage billing'));
 
     await flushMicrotasks();
 

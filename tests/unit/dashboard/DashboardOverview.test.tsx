@@ -65,7 +65,7 @@ describe('DashboardOverview', () => {
 
     renderDashboard(profile, false);
 
-    expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
+    expect(screen.getByText('Complete your setup')).toBeInTheDocument();
 
     // Task titles (use regex to ignore numeric prefixes like "1. ").
     // Some labels may appear both as list text and as button text; allow multiple.
@@ -97,7 +97,7 @@ describe('DashboardOverview', () => {
     });
     renderDashboard(profile, false);
 
-    expect(screen.getByText('Complete Your Setup')).toBeInTheDocument();
+    expect(screen.getByText('Complete your setup')).toBeInTheDocument();
 
     // Completed labels for first two tasks
     expect(screen.getByText('Handle claimed')).toBeInTheDocument();
@@ -132,11 +132,13 @@ describe('DashboardOverview', () => {
     renderDashboard(profile, true);
 
     // Completion UI
-    expect(screen.getByText('Profile Ready!')).toBeInTheDocument();
+    expect(screen.getByText('Profile ready!')).toBeInTheDocument();
     expect(screen.getByText('Your profile is ready!')).toBeInTheDocument();
 
-    // Copy flow
-    const copyBtn = screen.getByRole('button', { name: 'Copy URL' });
+    // Copy flow - there are two Copy URL buttons (header and completion section), use the first one
+    const copyBtns = screen.getAllByRole('button', { name: 'Copy URL' });
+    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
+    const copyBtn = copyBtns[0];
     fireEvent.click(copyBtn);
 
     // Clipboard called with computed profile URL
@@ -152,20 +154,22 @@ describe('DashboardOverview', () => {
     // Allow React state update microtask to flush
     await Promise.resolve();
 
-    // Status updates to success and aria-live announces it
-    expect(
-      screen.getByRole('button', { name: /Copied!/i })
-    ).toBeInTheDocument();
+    // Status updates to success and aria-live announces it (at least one button shows Copied!)
+    const copiedBtns = screen.getAllByRole('button', { name: /Copied!/i });
+    expect(copiedBtns.length).toBeGreaterThanOrEqual(1);
 
-    const status = screen.getByRole('status');
-    expect(status).toHaveTextContent('Profile URL copied to clipboard');
+    // At least one status element should announce the copy
+    const statuses = screen.getAllByRole('status');
+    const hasAnnouncement = statuses.some(s =>
+      s.textContent?.includes('Profile URL copied to clipboard')
+    );
+    expect(hasAnnouncement).toBe(true);
 
     // After timer elapses, reset back to idle
     vi.advanceTimersByTime(2000);
     // Flush microtask to reflect state reset
     await Promise.resolve();
-    expect(
-      screen.getByRole('button', { name: 'Copy URL' })
-    ).toBeInTheDocument();
+    const resetBtns = screen.getAllByRole('button', { name: 'Copy URL' });
+    expect(resetBtns.length).toBeGreaterThanOrEqual(1);
   });
 });

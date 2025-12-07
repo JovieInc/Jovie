@@ -20,7 +20,6 @@ export { Badge, badgeVariants } from './atoms/badge';
 // Button
 export type { ButtonProps } from './atoms/button';
 export { Button, buttonVariants } from './atoms/button';
-
 // Card
 export type {
   CardContentProps,
@@ -39,10 +38,8 @@ export {
   CardTitle,
   cardVariants,
 } from './atoms/card';
-
 // Checkbox
 export { Checkbox } from './atoms/checkbox';
-
 // Dialog
 export {
   Dialog,
@@ -56,7 +53,6 @@ export {
   DialogTitle,
   DialogTrigger,
 } from './atoms/dialog';
-
 // Dropdown Menu
 export {
   DropdownMenu,
@@ -75,11 +71,9 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from './atoms/dropdown-menu';
-
 // Field
 export type { FieldProps } from './atoms/field';
 export { Field } from './atoms/field';
-
 // Form
 export {
   Form,
@@ -91,10 +85,12 @@ export {
   FormMessage,
   useFormField,
 } from './atoms/form';
-
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
+// Keyboard (Kbd)
+export type { KbdProps } from './atoms/kbd';
+export { Kbd } from './atoms/kbd';
 
 // Label
 export type { LabelProps } from './atoms/label';

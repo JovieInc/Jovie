@@ -40,7 +40,22 @@ export function DashboardSidebar({
     <Sidebar
       variant='sidebar'
       collapsible='icon'
-      className={className}
+      className={cn(
+        '[--sidebar-width:244px]',
+        '[--sidebar-width-icon:56px]',
+        '[--sidebar:#f5f5f5]',
+        '[--sidebar-foreground:#23252a]',
+        '[--sidebar-accent:#e0e0e0]',
+        '[--sidebar-accent-foreground:#111111]',
+        '[--sidebar-border:#e0e0e0]',
+        '[--sidebar-ring:#50e3c2]',
+        'dark:[--sidebar:#090909]',
+        'dark:[--sidebar-foreground:#b0b5c0]',
+        'dark:[--sidebar-accent:#141418]',
+        'dark:[--sidebar-accent-foreground:#ffffff]',
+        'dark:[--sidebar-border:#23252a]',
+        className
+      )}
       {...props}
     >
       <SidebarHeader className='relative'>
@@ -66,7 +81,6 @@ export function DashboardSidebar({
               Dashboard
             </span>
           </Link>
-
           <SidebarTrigger
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(

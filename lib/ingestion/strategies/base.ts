@@ -301,15 +301,15 @@ export function extractHrefs(html: string): string[] {
  * Checks if an href is valid for extraction.
  */
 function isValidHref(href: string): boolean {
-  // Skip empty, anchors, javascript, mailto, tel
+  // Skip empty, anchors, javascript, mailto, tel, data
   if (!href || href.startsWith('#')) return false;
   if (href.startsWith('javascript:')) return false;
   if (href.startsWith('mailto:')) return false;
   if (href.startsWith('tel:')) return false;
   if (href.startsWith('data:')) return false;
 
-  // Must be http(s) or protocol-relative
-  if (!/^(https?:\/\/|\/\/)/i.test(href)) return false;
+  // Require explicit https scheme (reject protocol-relative and http)
+  if (!/^https:\/\/[^/]/i.test(href)) return false;
 
   return true;
 }
@@ -452,15 +452,27 @@ export function validatePlatformUrl(
   config: StrategyConfig
 ): { valid: boolean; normalized: string | null; handle: string | null } {
   try {
+    const candidate = url.trim();
+
+    // Reject dangerous or unsupported schemes early
+    if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
+      return { valid: false, normalized: null, handle: null };
+    }
+
+    // Reject protocol-relative URLs to avoid inheriting caller context
+    if (candidate.startsWith('//')) {
+      return { valid: false, normalized: null, handle: null };
+    }
+
     // Check original URL protocol before normalization (normalizeUrl converts http to https)
     const originalParsed = new URL(
-      url.startsWith('http') ? url : `https://${url}`
+      candidate.startsWith('http') ? candidate : `https://${candidate}`
     );
     if (originalParsed.protocol !== 'https:') {
       return { valid: false, normalized: null, handle: null };
     }
 
-    const normalized = normalizeUrl(url);
+    const normalized = normalizeUrl(candidate);
     const parsed = new URL(normalized);
 
     // Must be HTTPS (after normalization, should always be true if original was https)
@@ -509,16 +521,20 @@ function escapeRegex(str: string): string {
 /**
  * Decodes common HTML entities.
  */
-function decodeHtmlEntities(str: string): string {
+export function decodeHtmlEntities(str: string): string {
+  // Decode once; if already decoded, return as-is
+  if (!str.includes('&')) {
+    return str;
+  }
+
   return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&#x2F;/g, '/')
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&nbsp;/gi, ' ');
 }
 
 /**

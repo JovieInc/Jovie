@@ -18,6 +18,19 @@ export function ProfileSkeleton() {
       <div className='absolute top-1/4 left-1/4 w-96 h-96 bg-linear-to-r from-blue-400/10 to-purple-400/10 dark:from-blue-400/20 dark:to-purple-400/20 rounded-full blur-3xl opacity-50' />
       <div className='absolute bottom-1/4 right-1/4 w-96 h-96 bg-linear-to-r from-purple-400/10 to-cyan-400/10 dark:from-purple-400/20 dark:to-cyan-400/20 rounded-full blur-3xl opacity-50' />
       <Container>
+        {/* Top chrome placeholders to prevent layout shift */}
+        <div className='absolute top-4 left-4 z-10'>
+          <div
+            className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none'
+            aria-hidden='true'
+          />
+        </div>
+        <div className='absolute top-4 right-4 z-10'>
+          <div
+            className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none'
+            aria-hidden='true'
+          />
+        </div>
         <div className='flex min-h-screen flex-col py-12 relative z-10'>
           <div className='flex-1 flex flex-col items-center justify-start px-4'>
             <div className='w-full max-w-md space-y-8'>

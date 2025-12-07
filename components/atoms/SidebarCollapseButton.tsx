@@ -2,6 +2,7 @@
 
 import {
   Button,
+  Kbd,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -49,9 +50,7 @@ export function SidebarCollapseButton({
         <TooltipContent side='right' className='font-medium'>
           <div className='flex items-center gap-2'>
             <span>{isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
-            <kbd className='inline-flex items-center rounded border border-border bg-surface-1 px-1 font-mono text-xs'>
-              ⌘ ⇧ S
-            </kbd>
+            <Kbd>⌘ ⇧ S</Kbd>
           </div>
         </TooltipContent>
       </Tooltip>

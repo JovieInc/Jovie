@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { LogoIcon } from '@/components/atoms/LogoIcon';
+import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 
 interface FormErrors {
   fullName?: string[];
@@ -42,6 +43,7 @@ function isValidUrl(url: string): boolean {
 }
 
 export default function WaitlistPage() {
+  const [isHydrating, setIsHydrating] = useState(true);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
@@ -51,6 +53,10 @@ export default function WaitlistPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+
+  useEffect(() => {
+    setIsHydrating(false);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -199,6 +205,10 @@ export default function WaitlistPage() {
 
   const isFormValid =
     fullName.trim() && email.trim() && primarySocialUrl.trim();
+
+  if (isHydrating) {
+    return <WaitlistSkeleton />;
+  }
 
   return (
     <div className='min-h-screen flex flex-col items-center justify-center bg-[#101012] px-4'>

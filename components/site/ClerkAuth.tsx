@@ -1,12 +1,7 @@
 'use client';
 
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { UserButton } from '@/components/organisms/UserButton';
 
 /**
  * Client-side component to render Clerk authentication buttons.
