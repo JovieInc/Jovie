@@ -290,8 +290,9 @@ jobs:
           pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          # Use mock keys for testing if real keys not available
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY || 'pk_test_mock-key-for-ci-testing' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_mock-key-for-ci-testing' }}
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && env.SKIP_SMOKE != 'true'
