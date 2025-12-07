@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS waitlist_entries (
 );
 
 -- Create indexes for admin listing and filtering
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_waitlist_entries_created_at ON waitlist_entries (created_at DESC);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_waitlist_entries_status ON waitlist_entries (status);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_waitlist_entries_email ON waitlist_entries (email);
+-- Note: Cannot use CONCURRENTLY inside Drizzle transaction block
+CREATE INDEX IF NOT EXISTS idx_waitlist_entries_created_at ON waitlist_entries (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_waitlist_entries_status ON waitlist_entries (status);
+CREATE INDEX IF NOT EXISTS idx_waitlist_entries_email ON waitlist_entries (email);
