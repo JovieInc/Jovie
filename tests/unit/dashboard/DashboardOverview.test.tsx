@@ -132,7 +132,7 @@ describe('DashboardOverview', () => {
     renderDashboard(profile, true);
 
     // Completion UI
-    expect(screen.getByText('Profile Ready!')).toBeInTheDocument();
+    expect(screen.getByText('Profile ready!')).toBeInTheDocument();
     expect(screen.getByText('Your profile is ready!')).toBeInTheDocument();
 
     // Copy flow
