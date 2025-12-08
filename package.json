@@ -136,7 +136,7 @@
     "dotenv": "^17.2.1",
     "drizzle-orm": "^0.44.5",
     "flags": "^4.0.1",
-    "framer-motion": "^11.0.0",
+    "framer-motion": "^12.23.25",
     "import-in-the-middle": "^2.0.0",
     "isomorphic-dompurify": "2.33.0",
     "lucide-react": "^0.555.0",
