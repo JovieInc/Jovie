@@ -14,7 +14,10 @@ export function OtpSignUpForm() {
     <SignUp.Root routing='path' path='/signup'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
         <CardContent className='space-y-6 p-0'>
-          <Clerk.GlobalError className='text-sm text-destructive' />
+          {/* Fixed height container to prevent layout shift when error appears */}
+          <div className='min-h-[24px]'>
+            <Clerk.GlobalError className='text-sm text-destructive' />
+          </div>
 
           <SignUp.Step name='start' aria-label='Enter your email address'>
             <div className='space-y-4'>
