@@ -150,6 +150,9 @@ function isRetryableError(error: unknown): boolean {
 
   const retryablePatterns = [
     /connection.*reset/i,
+    /connection.*terminated/i,
+    /connection.*closed/i,
+    /connection.*unexpectedly/i,
     /timeout/i,
     /network/i,
     /temporary/i,
@@ -161,6 +164,8 @@ function isRetryableError(error: unknown): boolean {
     /database is starting up/i,
     /too many connections/i,
     /connection pool exhausted/i,
+    /client has encountered a connection error/i,
+    /terminating connection due to administrator command/i,
   ];
 
   return retryablePatterns.some(
@@ -182,6 +187,9 @@ function initializeDb(): DbType {
     );
   }
 
+  const isProduction = process.env.NODE_ENV === 'production';
+  const hasGlobal = typeof global !== 'undefined';
+
   logDbInfo(
     'db_init',
     'Initializing database connection with transaction support',
@@ -196,7 +204,14 @@ function initializeDb(): DbType {
   // Create the database connection pool
   // Note: Pool works in both Edge and Node, but WebSocket (for transactions) is Node-only
   if (!_pool) {
-    _pool = new Pool({ connectionString: databaseUrl });
+    _pool = new Pool({
+      connectionString: databaseUrl,
+      // Neon serverless connections can be terminated unexpectedly;
+      // keep pool small and allow quick reconnection
+      max: isProduction ? 10 : 3,
+      idleTimeoutMillis: 30000, // 30s idle timeout
+      connectionTimeoutMillis: 10000, // 10s connection timeout
+    });
 
     // In development, clean up pools created during hot reloads to avoid leaks.
     // Use a process-global flag so we only register listeners once, even if this
@@ -231,9 +246,6 @@ function initializeDb(): DbType {
 
   // Use a single connection in development to avoid connection pool exhaustion
   // In Edge runtime (where global is undefined), always create fresh instance
-  const isProduction = process.env.NODE_ENV === 'production';
-  const hasGlobal = typeof global !== 'undefined';
-
   if (isProduction || !hasGlobal) {
     return drizzle(_pool, { schema, logger: false });
   } else {
