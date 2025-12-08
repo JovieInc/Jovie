@@ -11,6 +11,7 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
   type SupportedImageMimeType,
 } from '@/lib/images/config';
+import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs'; // Required for file upload processing
@@ -283,6 +284,12 @@ export async function POST(request: NextRequest) {
             }
           );
         }
+      } else if (process.env.NODE_ENV === 'production') {
+        // Log warning in production when rate limiting is disabled
+        console.warn(
+          '[upload] Rate limiting disabled - Redis not configured. User:',
+          clerkUserId.slice(0, 10) + '...'
+        );
       }
 
       // Validate content type and size
@@ -321,6 +328,19 @@ export async function POST(request: NextRequest) {
         ).join(', ');
         return errorResponse(
           `Invalid file type. Supported formats: ${supportedTypes}`,
+          UPLOAD_ERROR_CODES.INVALID_FILE,
+          400
+        );
+      }
+
+      // Validate magic bytes to prevent MIME type spoofing
+      const fileBuffer = await fileToBuffer(file);
+      if (!validateMagicBytes(fileBuffer, normalizedType)) {
+        console.warn(
+          `[upload] Magic bytes mismatch for claimed type ${normalizedType}`
+        );
+        return errorResponse(
+          'File content does not match declared type. Please upload a valid image.',
           UPLOAD_ERROR_CODES.INVALID_FILE,
           400
         );
