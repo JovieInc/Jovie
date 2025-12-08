@@ -241,15 +241,20 @@ export function extractLinktree(html: string): ExtractionResult {
 
   while ((match = HREF_REGEX.exec(html)) !== null) {
     const rawHref = match[1];
-    if (
-      !rawHref ||
-      rawHref.startsWith('#') ||
-      rawHref.startsWith('javascript:')
-    )
-      continue;
-    if (rawHref.startsWith('mailto:') || rawHref.startsWith('tel:')) continue;
+    if (!rawHref || rawHref.startsWith('#')) continue;
+
+    // Normalize and trim to prevent bypass via whitespace/case
+    const normalized = rawHref.trim().toLowerCase();
+
+    // Block dangerous schemes (case-insensitive)
+    if (normalized.startsWith('javascript:')) continue;
+    if (normalized.startsWith('mailto:')) continue;
+    if (normalized.startsWith('tel:')) continue;
+    if (normalized.startsWith('data:')) continue;
+    if (normalized.startsWith('vbscript:')) continue;
+
     // Require explicit https scheme (reject http or protocol-relative)
-    if (!/^https:\/\/[^/]/i.test(rawHref)) continue;
+    if (!normalized.startsWith('https://')) continue;
 
     try {
       const normalizedHref = normalizeUrl(rawHref);
