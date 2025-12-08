@@ -290,10 +290,9 @@ jobs:
           pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
-          # Use properly formatted mock Clerk keys for testing if real keys not available
-          # Clerk keys must be properly formatted base64 strings to pass validation
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xldmVyLWNsYW0tMTIzNDU2Nzg5MA==' }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_Y2xldmVyLWNsYW0tMTIzNDU2Nzg5MA==' }}
+          # Use same mock Clerk keys as tests/global-setup.ts for consistency
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY || 'pk_test_mock-key-for-testing' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_mock-key-for-testing' }}
 
       - name: Upload Playwright Artifacts on Failure
         if: failure() && env.SKIP_SMOKE != 'true'
