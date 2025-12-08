@@ -22,6 +22,11 @@ const webSocketConstructor = !isEdgeRuntime
 if (webSocketConstructor) {
   neonConfig.webSocketConstructor = webSocketConstructor;
 }
+
+// Enable connection caching for better cold-start performance
+// This helps when Neon compute is auto-suspended
+neonConfig.fetchConnectionCache = true;
+
 // Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
 // but ensure firewall rules allow it if WS performance is required.
 
@@ -210,7 +215,16 @@ function initializeDb(): DbType {
       // keep pool small and allow quick reconnection
       max: isProduction ? 10 : 3,
       idleTimeoutMillis: 30000, // 30s idle timeout
-      connectionTimeoutMillis: 10000, // 10s connection timeout
+      connectionTimeoutMillis: 15000, // 15s connection timeout (allows Neon wake-up)
+    });
+
+    // Handle pool errors to prevent unhandled rejections
+    // and allow the pool to recover from transient failures
+    _pool.on('error', (err: Error) => {
+      logDbError('pool_error', err, {
+        message: 'Pool encountered an error, will attempt to recover',
+      });
+      // Don't throw - let the pool attempt to recover
     });
 
     // In development, clean up pools created during hot reloads to avoid leaks.
