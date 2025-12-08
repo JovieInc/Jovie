@@ -69,15 +69,11 @@ export function DashboardOverview({
         </div>
       </div>
 
-      <DashboardCard variant='settings' className='h-full'>
-        <DashboardActivityFeed profileId={artist.id} />
-      </DashboardCard>
-
-      <DashboardCard variant='settings'>
+      <DashboardCard variant='onboarding'>
         <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
           <div>
             <p className='text-xs uppercase tracking-[0.25em] text-tertiary-token/70'>
-              Setup
+              {allTasksComplete ? 'Complete' : 'Getting Started'}
             </p>
             <h3 className='text-lg font-semibold text-primary-token'>
               {allTasksComplete ? 'Profile ready!' : 'Complete your setup'}
@@ -88,8 +84,16 @@ export function DashboardOverview({
                 : 'Finish the essentials to unlock the full experience.'}
             </p>
           </div>
-          <div className='text-sm font-semibold text-secondary-token'>
-            {completedCount}/{totalSteps} done
+          <div className='flex items-center gap-2'>
+            <div className='text-sm font-semibold text-secondary-token'>
+              {completedCount}/{totalSteps}
+            </div>
+            <div className='h-2 w-16 overflow-hidden rounded-full bg-surface-2'>
+              <div
+                className='h-full rounded-full bg-linear-to-r from-accent to-accent/80 transition-all duration-300 ease-out'
+                style={{ width: `${(completedCount / totalSteps) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -117,15 +121,15 @@ export function DashboardOverview({
               aria-valuemin={0}
               aria-valuemax={totalSteps}
               aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
-              className='relative h-3 overflow-hidden rounded-full bg-surface-2'
+              className='relative h-2 overflow-hidden rounded-full bg-surface-2'
             >
               <div
-                className='absolute inset-y-0 left-0 rounded-full bg-accent transition-all duration-300 ease-in-out'
+                className='absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-accent to-accent/80 transition-all duration-300 ease-out'
                 style={{ width: `${(completedCount / totalSteps) * 100}%` }}
               />
             </div>
 
-            <ol className='space-y-3 list-none pl-0'>
+            <ol className='space-y-2 list-none pl-0'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'
@@ -167,6 +171,10 @@ export function DashboardOverview({
             </ol>
           </div>
         )}
+      </DashboardCard>
+
+      <DashboardCard variant='settings' className='h-full'>
+        <DashboardActivityFeed profileId={artist.id} />
       </DashboardCard>
     </div>
   );

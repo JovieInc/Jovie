@@ -8,7 +8,8 @@ interface DashboardCardProps {
     | 'interactive'
     | 'settings'
     | 'analytics'
-    | 'empty-state';
+    | 'empty-state'
+    | 'onboarding';
   children: React.ReactNode;
   className?: string;
   onClick?: () => void;

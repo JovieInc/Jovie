@@ -23,10 +23,11 @@ interface SelectionState {
 interface SearchResult {
   id: string;
   name: string;
+  url: string;
   imageUrl?: string;
   popularity: number;
   followers?: number;
-  spotifyUrl: string;
+  verified?: boolean;
 }
 
 export function ArtistSelectionForm() {
@@ -42,12 +43,14 @@ export function ArtistSelectionForm() {
   });
 
   const {
-    searchResults,
-    isLoading,
+    results: searchResults,
+    state: searchState,
     error: searchError,
-    searchArtists,
-    clearResults,
+    search: searchArtists,
+    clear: clearResults,
   } = useArtistSearch();
+
+  const isLoading = searchState === 'loading';
 
   // Check for pending claim in sessionStorage
   useEffect(() => {
@@ -69,7 +72,9 @@ export function ArtistSelectionForm() {
     (option: { id: string; name: string; imageUrl?: string } | null) => {
       if (option) {
         // Find the full artist data from results
-        const artist = searchResults.find(a => a.id === option.id);
+        const artist = searchResults.find(
+          (a: SearchResult) => a.id === option.id
+        );
         if (artist) {
           setSelectedArtist(artist);
         }
@@ -144,7 +149,7 @@ export function ArtistSelectionForm() {
   // Convert Spotify artists to Combobox options
   const options = useMemo(
     () =>
-      searchResults.map(artist => ({
+      searchResults.map((artist: SearchResult) => ({
         id: artist.id,
         name: artist.name,
         imageUrl: artist.imageUrl,
@@ -156,7 +161,7 @@ export function ArtistSelectionForm() {
   useEffect(() => {
     if (pendingClaim && searchResults.length > 0 && !selectedArtist) {
       const matchingArtist = searchResults.find(
-        artist =>
+        (artist: SearchResult) =>
           artist.name.toLowerCase() === pendingClaim.artistName.toLowerCase() ||
           artist.id === pendingClaim.spotifyId
       );

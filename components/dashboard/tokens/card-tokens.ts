@@ -84,5 +84,8 @@ export const cardTokens = {
 
     floating:
       'bg-surface-1 backdrop-blur-lg border border-default rounded-xl p-6 shadow-xl shadow-black/12 dark:shadow-black/35 hover:shadow-2xl hover:shadow-black/15 dark:hover:shadow-black/40 transition-all duration-300 ease-out',
+
+    onboarding:
+      'relative bg-surface-1 rounded-2xl p-6 shadow-lg shadow-black/8 dark:shadow-black/30 transition-all duration-300 ease-out before:absolute before:inset-0 before:rounded-2xl before:p-[1px] before:bg-gradient-to-br before:from-white/20 before:via-white/5 before:to-transparent before:-z-10 after:absolute after:inset-[1px] after:rounded-[15px] after:bg-surface-1 after:-z-10 ring-1 ring-white/10 dark:ring-white/5',
   },
 };

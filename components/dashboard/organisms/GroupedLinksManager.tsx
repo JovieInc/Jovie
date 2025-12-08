@@ -78,6 +78,7 @@ interface SuggestionPillConfig {
 }
 
 const SUGGESTION_PILLS: SuggestionPillConfig[] = [
+  { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
   { id: 'spotify', label: 'Spotify', simpleIconId: 'spotify' },
   { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
   {
@@ -94,6 +95,7 @@ const SUGGESTION_PILLS: SuggestionPillConfig[] = [
 ];
 
 const MUSIC_FIRST_ORDER = [
+  'spotify-artist',
   'spotify',
   'apple-music',
   'youtube-music',
@@ -446,6 +448,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       const next = prev.filter((_, i) => i !== idx);
       return next;
     });
+  }
+
+  function handleEdit(idx: number) {
+    const link = links[idx];
+    if (!link) return;
+    // Set the URL in the input field for editing
+    setPrefillUrl(link.normalizedUrl || link.originalUrl);
+    // Remove the link from the list so user can re-add it with changes
+    setLinks(prev => prev.filter((_, i) => i !== idx));
   }
 
   function onDragEnd(ev: DragEndEvent) {
@@ -801,7 +812,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 <header className='flex items-center justify-between'>
                   <button
                     type='button'
-                    className='flex items-center gap-2 text-sm font-semibold capitalize text-primary-token'
+                    className='flex items-center gap-2 text-sm font-semibold capitalize text-primary-token rounded-md px-1 -mx-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                     onClick={() =>
                       setCollapsed(prev => ({
                         ...prev,
@@ -868,12 +879,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   </div>
                 </header>
                 <SortableContext items={items.map(idFor)}>
-                  <ul
+                  <div
                     id={`links-section-${section}`}
                     className={cn(
-                      'divide-y divide-subtle dark:divide-white/10 rounded-lg border border-subtle dark:border-white/10 bg-surface-1',
+                      'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3',
                       collapsed[section] && 'hidden'
                     )}
+                    role='list'
                   >
                     {items.map(link => (
                       <SortableRow
@@ -886,15 +898,16 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                         draggable={section !== 'earnings' && items.length > 1}
                         onToggle={handleToggle}
                         onRemove={handleRemove}
+                        onEdit={handleEdit}
                         visible={linkIsVisible(link as T)}
                       />
                     ))}
                     {items.length === 0 && (
-                      <li className='p-3 text-sm text-tertiary italic'>
+                      <div className='col-span-full p-3 text-sm text-tertiary italic'>
                         No {labelFor(section)} links match your search
-                      </li>
+                      </div>
                     )}
-                  </ul>
+                  </div>
                 </SortableContext>
               </div>
             );
@@ -907,6 +920,9 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
 function buildPrefillUrl(platformId: string): string {
   switch (platformId) {
+    case 'spotify-artist':
+      // Special case: triggers search mode in UniversalLinkInput
+      return '__SEARCH_MODE__:spotify';
     case 'spotify':
       return 'https://open.spotify.com/artist/';
     case 'apple-music':
@@ -936,6 +952,7 @@ interface SortableRowProps<T extends DetectedLink> {
   index: number;
   onToggle: (idx: number) => void;
   onRemove: (idx: number) => void;
+  onEdit: (idx: number) => void;
   visible: boolean;
   draggable?: boolean;
 }
@@ -950,6 +967,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
   index,
   onToggle,
   onRemove,
+  onEdit,
   visible,
   draggable = true,
 }: SortableRowProps<T>) {
@@ -985,36 +1003,47 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
   const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
   const { iconColor, iconBg } = getBrandIconStyles(brandHex, isDarkTheme);
 
+  // For dark colors (TikTok, X), use a lighter border color
+  const isDarkColor = (() => {
+    const hex = brandHex.replace('#', '');
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    return luminance < 0.25;
+  })();
+  const borderColor = isDarkColor
+    ? isDarkTheme
+      ? '#6b7280' // gray-500 for dark theme
+      : '#9ca3af' // gray-400 for light theme
+    : brandHex;
+
   return (
-    <li
+    <div
       ref={setNodeRef}
-      className='group relative p-3 text-sm text-secondary-token flex items-center justify-between gap-3 hover:bg-surface-2/50 rounded-lg transition-colors'
+      {...attributes}
+      className={cn(
+        'group relative rounded-xl border-2 bg-surface-1 p-4 text-sm shadow-sm transition-all',
+        'hover:shadow-md hover:scale-[1.01] focus-within:shadow-md',
+        !visible && 'opacity-60'
+      )}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
+        borderColor,
       }}
-      {...attributes}
     >
-      <div className='min-w-0 flex items-start gap-3 flex-1'>
+      {/* Card header with icon and actions */}
+      <div className='flex items-start justify-between gap-2 mb-3'>
         <div
-          className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all group-hover:scale-[1.04] group-hover:ring-1 group-hover:ring-subtle'
+          className='flex items-center justify-center w-10 h-10 rounded-lg shrink-0 transition-transform group-hover:scale-105'
           style={{ backgroundColor: iconBg, color: iconColor }}
           aria-hidden='true'
         >
-          <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
+          <SocialIcon platform={link.platform.icon} className='w-5 h-5' />
         </div>
-        <div className='min-w-0 flex-1'>
-          <div className='text-primary-token font-medium truncate'>
-            {link.suggestedTitle}
-          </div>
-          <div className='text-xs text-tertiary-token/80 truncate'>
-            {link.normalizedUrl}
-          </div>
-        </div>
-      </div>
-
-      <div className='flex items-center gap-1'>
         <LinkActions
+          onEdit={() => onEdit(index)}
           onToggle={() => onToggle(index)}
           onRemove={() => onRemove(index)}
           isVisible={visible}
@@ -1022,7 +1051,17 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
           onDragHandlePointerDown={handleDragHandlePointerDown}
         />
       </div>
-    </li>
+
+      {/* Card content */}
+      <div className='min-w-0'>
+        <div className='text-primary-token font-semibold truncate mb-1'>
+          {link.suggestedTitle}
+        </div>
+        <div className='text-xs text-tertiary-token truncate'>
+          {link.normalizedUrl}
+        </div>
+      </div>
+    </div>
   );
 });
 
