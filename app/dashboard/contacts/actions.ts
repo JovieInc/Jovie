@@ -2,12 +2,9 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { and, asc, eq } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore } from 'next/cache';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbType } from '@/lib/db';
 import { creatorContacts, creatorProfiles, users } from '@/lib/db/schema';
@@ -144,11 +141,8 @@ export async function saveContact(
       throw new Error('Unable to save contact');
     }
 
-    revalidateTag('dashboard-data', 'default');
-    if (profile.usernameNormalized) {
-      revalidatePath(`/${profile.usernameNormalized}`);
-    }
-    revalidatePath('/dashboard/contacts');
+    // Use centralized cache invalidation
+    await invalidateProfileCache(profile.usernameNormalized);
 
     return mapContact(saved);
   });
@@ -184,10 +178,7 @@ export async function deleteContact(
 
     await tx.delete(creatorContacts).where(eq(creatorContacts.id, contactId));
 
-    revalidateTag('dashboard-data', 'default');
-    if (profile.usernameNormalized) {
-      revalidatePath(`/${profile.usernameNormalized}`);
-    }
-    revalidatePath('/dashboard/contacts');
+    // Use centralized cache invalidation
+    await invalidateProfileCache(profile.usernameNormalized);
   });
 }

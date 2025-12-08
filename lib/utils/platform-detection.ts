@@ -638,6 +638,38 @@ function validateUrl(url: string, platform: PlatformInfo): boolean {
   try {
     new URL(url); // Basic URL validation
 
+    const pathParts = new URL(url).pathname.split('/').filter(Boolean);
+    const requiresHandle = new Set([
+      'instagram',
+      'twitter',
+      'tiktok',
+      'facebook',
+      'linkedin',
+      'venmo',
+      'soundcloud',
+      'twitch',
+      'threads',
+      'snapchat',
+      'discord',
+      'telegram',
+      'reddit',
+      'pinterest',
+      'onlyfans',
+      'linktree',
+      'bandcamp',
+      'line',
+      'viber',
+      'rumble',
+      'youtube',
+    ]);
+    if (requiresHandle.has(platform.id)) {
+      const last = pathParts[pathParts.length - 1] ?? '';
+      // must have at least one non-separator character (not just @)
+      if (!last.replace(/^@/, '').trim()) {
+        return false;
+      }
+    }
+
     // Platform-specific validation rules
     switch (platform.id) {
       case 'spotify':

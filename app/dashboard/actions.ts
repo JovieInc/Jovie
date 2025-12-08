@@ -3,13 +3,10 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
-import {
-  unstable_noStore as noStore,
-  revalidatePath,
-  revalidateTag,
-} from 'next/cache';
+import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
 import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
 import {
   type CreatorProfile,
@@ -459,10 +456,8 @@ export async function updateCreatorProfile(
         throw new Error('Profile not found or unauthorized');
       }
 
-      revalidateTag('dashboard-data', 'default');
-      if (updatedProfile.usernameNormalized) {
-        revalidatePath(`/${updatedProfile.usernameNormalized}`);
-      }
+      // Use centralized cache invalidation
+      await invalidateProfileCache(updatedProfile.usernameNormalized);
 
       return updatedProfile;
     } catch (error) {
@@ -495,13 +490,11 @@ export async function publishProfileBasics(formData: FormData): Promise<void> {
       ? bioRaw.trim()
       : undefined;
 
+  // updateCreatorProfile already handles cache invalidation via invalidateProfileCache
   await updateCreatorProfile(profileId, {
     displayName,
     bio,
     onboardingCompletedAt: new Date(),
     isPublic: true,
   });
-
-  revalidateTag('dashboard-data', 'default');
-  revalidatePath('/dashboard/overview');
 }

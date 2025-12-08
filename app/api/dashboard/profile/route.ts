@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { withDbSession } from '@/lib/auth/session';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import {
@@ -307,17 +308,15 @@ export async function PUT(req: Request) {
         );
       }
 
-      // Cache invalidation and analytics tracking in parallel (non-blocking)
-      const backgroundTasks = [
-        trackServerEvent(
-          'dashboard_profile_updated',
-          undefined,
-          clerkUserId
-        ).catch(error => console.warn('Analytics tracking failed:', error)),
-      ];
+      // Cache invalidation - must complete before response
+      await invalidateProfileCache(updatedProfile.usernameNormalized);
 
-      // Run background tasks in parallel without blocking the response
-      Promise.all(backgroundTasks);
+      // Analytics tracking (non-blocking)
+      trackServerEvent(
+        'dashboard_profile_updated',
+        undefined,
+        clerkUserId
+      ).catch(error => console.warn('Analytics tracking failed:', error));
 
       return NextResponse.json(
         { profile: updatedProfile },

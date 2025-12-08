@@ -8,7 +8,10 @@ interface AuthLinkProps {
 
 export function AuthLink({ href, children }: AuthLinkProps) {
   return (
-    <Link href={href} className='text-white hover:underline font-medium'>
+    <Link
+      href={href}
+      className='text-white hover:underline font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#101012] rounded'
+    >
       {children}
     </Link>
   );

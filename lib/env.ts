@@ -275,6 +275,7 @@ export function validateEnvironment(
 
 /**
  * Get environment information for debugging
+ * Note: Some properties (platform, nodeVersion) are only available in Node.js runtime
  */
 export function getEnvironmentInfo() {
   const nodeEnv = process.env.NODE_ENV || 'development';
@@ -282,13 +283,23 @@ export function getEnvironmentInfo() {
   const isDevelopment = nodeEnv === 'development';
   const isTest = nodeEnv === 'test';
 
+  // These are Node.js-only APIs, not available in Edge runtime
+  const platform =
+    typeof process !== 'undefined' && 'platform' in process
+      ? process.platform
+      : 'edge';
+  const nodeVersion =
+    typeof process !== 'undefined' && 'version' in process
+      ? process.version
+      : 'edge-runtime';
+
   return {
     nodeEnv,
     isProduction,
     isDevelopment,
     isTest,
-    platform: process.platform,
-    nodeVersion: process.version,
+    platform,
+    nodeVersion,
     hasDatabase: !!env.DATABASE_URL,
     hasClerk: !!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     hasStripe: !!(

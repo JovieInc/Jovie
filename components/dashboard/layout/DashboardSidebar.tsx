@@ -58,7 +58,7 @@ export function DashboardSidebar({
       )}
       {...props}
     >
-      <SidebarHeader className='relative'>
+      <SidebarHeader className='relative pb-1'>
         <div className='group/toggle flex items-center gap-2 px-2 py-3'>
           <Link
             href='/dashboard/overview'
@@ -89,7 +89,7 @@ export function DashboardSidebar({
             )}
           />
         </div>
-        <SidebarSeparator className='my-1' />
+        <SidebarSeparator className='my-0.5' />
       </SidebarHeader>
 
       <SidebarContent className='flex-1'>

@@ -260,9 +260,18 @@ export async function GET(request: Request) {
         },
         system: {
           status: 'ok',
-          nodeVersion: process.version,
-          platform: process.platform,
-          uptime: process.uptime(),
+          nodeVersion:
+            typeof process !== 'undefined' && 'version' in process
+              ? process.version
+              : 'unknown',
+          platform:
+            typeof process !== 'undefined' && 'platform' in process
+              ? process.platform
+              : 'unknown',
+          uptime:
+            typeof process !== 'undefined' && 'uptime' in process
+              ? process.uptime()
+              : 0,
           memory: {
             used: 0,
             total: 0,

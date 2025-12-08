@@ -62,3 +62,46 @@
   --sidebar-input-background: 28 31 35; /* Input backgrounds */
   --sidebar-input-border: 51 56 61; /* Input borders */
 }
+
+/* Auth step transition animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-in {
+  animation-duration: 300ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: both;
+}
+
+.fade-in-0 {
+  animation-name: fadeIn;
+}
+
+.slide-in-from-bottom-2 {
+  animation-name: slideInFromBottom;
+}
+
+.duration-300 {
+  animation-duration: 300ms;
+}
+
+.ease-out {
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
