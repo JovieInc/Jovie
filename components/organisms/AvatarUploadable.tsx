@@ -165,17 +165,17 @@ function ProgressRing({
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='rounded-full bg-surface-0 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] shadow-sm'>
+          <div className='rounded-full bg-surface-0 text-primary-token ring-1 ring-(--color-border-subtle) shadow-sm'>
             <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-[color:var(--color-border-subtle)] shadow-sm'>
+          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-(--color-border-subtle) shadow-sm'>
             <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'uploading' && (
-          <div className='rounded-full bg-[color:var(--color-accent)] text-[color:var(--color-accent-foreground)] ring-1 ring-[color:var(--color-accent)] shadow-sm animate-pulse'>
+          <div className='rounded-full bg-(--color-accent) text-(--color-accent-foreground) ring-1 ring-accent shadow-sm animate-pulse'>
             <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
@@ -434,7 +434,7 @@ export const AvatarUploadable = React.memo(
           className={cn(
             'transition-all duration-200 ease-out',
             isInteractive &&
-              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-[color:var(--color-accent)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[color:var(--color-bg-base)]',
+              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-(--color-bg-base)',
             isDragOver && 'scale-105',
             isUploading && 'opacity-80'
           )}
