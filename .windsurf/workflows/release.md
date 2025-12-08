@@ -32,11 +32,14 @@ When CI passes on `main`:
 3. PR requires manual approval before merge
 
 ### 4. Merge production PR
+**IMPORTANT: Always use squash merge to prevent branch divergence!**
 // turbo
 ```bash
-# After manual review, merge the promotion PR
-gh pr merge --merge --auto
+# After manual review, merge the promotion PR with SQUASH
+gh pr merge --squash --auto
 ```
+
+> ⚠️ The production branch ruleset only allows squash merges. Using `--merge` or `--rebase` will be rejected.
 
 ### 5. Production deploy runs automatically
 When PR merges to `production`:
@@ -58,3 +61,21 @@ When PR merges to `production`:
 ### Production migration blocked
 1. Ensure `ALLOW_PROD_MIGRATIONS=true` is set in CI
 2. Check `GIT_BRANCH=production` is passed to migration script
+
+### Production branch diverged from main
+This happens if someone merged a PR to production with `--merge` instead of `--squash`.
+
+**To fix:**
+```bash
+# 1. Temporarily disable production ruleset
+gh api repos/JovieInc/Jovie/rulesets/7143910 -X PUT -f enforcement="disabled"
+
+# 2. Force-sync production to main
+git fetch origin
+git push origin origin/main:production --force
+
+# 3. Re-enable production ruleset
+gh api repos/JovieInc/Jovie/rulesets/7143910 -X PUT -f enforcement="active"
+```
+
+**Prevention:** The production ruleset now only allows squash merges (`allowed_merge_methods: ["squash"]`).
