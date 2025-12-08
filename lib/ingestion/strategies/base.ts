@@ -301,15 +301,22 @@ export function extractHrefs(html: string): string[] {
  * Checks if an href is valid for extraction.
  */
 function isValidHref(href: string): boolean {
-  // Skip empty, anchors, javascript, mailto, tel, data
+  // Skip empty or anchors
   if (!href || href.startsWith('#')) return false;
-  if (href.startsWith('javascript:')) return false;
-  if (href.startsWith('mailto:')) return false;
-  if (href.startsWith('tel:')) return false;
-  if (href.startsWith('data:')) return false;
+
+  // Normalize and trim to prevent bypass via whitespace/newlines
+  const normalized = href.trim().toLowerCase();
+
+  // Block dangerous schemes (case-insensitive, handles whitespace bypass)
+  if (normalized.startsWith('javascript:')) return false;
+  if (normalized.startsWith('mailto:')) return false;
+  if (normalized.startsWith('tel:')) return false;
+  if (normalized.startsWith('data:')) return false;
+  if (normalized.startsWith('vbscript:')) return false;
 
   // Require explicit https scheme (reject protocol-relative and http)
-  if (!/^https:\/\/[^/]/i.test(href)) return false;
+  // Use the normalized version for the check
+  if (!normalized.startsWith('https://')) return false;
 
   return true;
 }
@@ -520,6 +527,8 @@ function escapeRegex(str: string): string {
 
 /**
  * Decodes common HTML entities.
+ * Note: &amp; must be decoded LAST to avoid double-unescaping
+ * (e.g., "&amp;lt;" should become "&lt;", not "<")
  */
 export function decodeHtmlEntities(str: string): string {
   // Decode once; if already decoded, return as-is
@@ -527,14 +536,15 @@ export function decodeHtmlEntities(str: string): string {
     return str;
   }
 
+  // Decode specific entities first, then ampersand last
   return str
-    .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
     .replace(/&#x27;/gi, "'")
-    .replace(/&nbsp;/gi, ' ');
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&'); // Must be last to avoid double-unescaping
 }
 
 /**
