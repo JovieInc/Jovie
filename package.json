@@ -172,7 +172,7 @@
     "@clerk/dev-cli": "^0.0.12",
     "@clerk/testing": "^1.12.5",
     "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
+    "@commitlint/config-conventional": "^20.2.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.35.0",
     "@next/bundle-analyzer": "^16.0.7",
