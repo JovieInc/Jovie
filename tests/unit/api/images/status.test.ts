@@ -44,6 +44,10 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
 }));
 
+// Valid UUID v4 for tests
+const TEST_PHOTO_UUID = '550e8400-e29b-41d4-a716-446655440000';
+const NON_EXISTENT_UUID = '550e8400-e29b-41d4-a716-446655440001';
+
 describe('/api/images/status/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,10 +57,10 @@ describe('/api/images/status/[id]', () => {
     auth.mockResolvedValue({ userId: null });
 
     const request = new NextRequest(
-      'http://localhost:3000/api/images/status/test-id'
+      `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ id: 'test-id' }),
+      params: Promise.resolve({ id: TEST_PHOTO_UUID }),
     });
 
     expect(response.status).toBe(401);
@@ -71,10 +75,10 @@ describe('/api/images/status/[id]', () => {
     db.select().from().where().limit.mockResolvedValue([]);
 
     const request = new NextRequest(
-      'http://localhost:3000/api/images/status/non-existent'
+      `http://localhost:3000/api/images/status/${NON_EXISTENT_UUID}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ id: 'non-existent' }),
+      params: Promise.resolve({ id: NON_EXISTENT_UUID }),
     });
 
     expect(response.status).toBe(404);
@@ -86,7 +90,7 @@ describe('/api/images/status/[id]', () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
 
     const mockPhoto = {
-      id: 'test-photo-id',
+      id: TEST_PHOTO_UUID,
       status: 'completed',
       blobUrl: 'https://blob.vercel-storage.com/test.jpg',
       smallUrl: 'https://blob.vercel-storage.com/test-small.jpg',
@@ -104,15 +108,15 @@ describe('/api/images/status/[id]', () => {
       .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
-      'http://localhost:3000/api/images/status/test-photo-id'
+      `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ id: 'test-photo-id' }),
+      params: Promise.resolve({ id: TEST_PHOTO_UUID }),
     });
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.id).toBe('test-photo-id');
+    expect(data.id).toBe(TEST_PHOTO_UUID);
     expect(data.status).toBe('completed');
     expect(data.blobUrl).toBe(mockPhoto.blobUrl);
     expect(data.mediumUrl).toBe(mockPhoto.mediumUrl);
@@ -122,7 +126,7 @@ describe('/api/images/status/[id]', () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
 
     const mockPhoto = {
-      id: 'test-photo-id',
+      id: TEST_PHOTO_UUID,
       status: 'processing',
       blobUrl: 'https://blob.vercel-storage.com/test.jpg',
       smallUrl: null,
@@ -140,10 +144,10 @@ describe('/api/images/status/[id]', () => {
       .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
-      'http://localhost:3000/api/images/status/test-photo-id'
+      `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ id: 'test-photo-id' }),
+      params: Promise.resolve({ id: TEST_PHOTO_UUID }),
     });
 
     expect(response.status).toBe(200);
@@ -156,7 +160,7 @@ describe('/api/images/status/[id]', () => {
     auth.mockResolvedValue({ userId: 'test-user-id' });
 
     const mockPhoto = {
-      id: 'test-photo-id',
+      id: TEST_PHOTO_UUID,
       status: 'failed',
       blobUrl: 'https://blob.vercel-storage.com/test.jpg',
       smallUrl: null,
@@ -174,10 +178,10 @@ describe('/api/images/status/[id]', () => {
       .limit.mockResolvedValue([{ photo: mockPhoto }]);
 
     const request = new NextRequest(
-      'http://localhost:3000/api/images/status/test-photo-id'
+      `http://localhost:3000/api/images/status/${TEST_PHOTO_UUID}`
     );
     const response = await GET(request, {
-      params: Promise.resolve({ id: 'test-photo-id' }),
+      params: Promise.resolve({ id: TEST_PHOTO_UUID }),
     });
 
     expect(response.status).toBe(200);

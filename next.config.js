@@ -55,6 +55,18 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],

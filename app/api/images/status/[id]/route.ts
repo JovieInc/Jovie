@@ -5,6 +5,14 @@ import { db, profilePhotos, users } from '@/lib/db';
 
 export const runtime = 'edge';
 
+// UUID v4 regex pattern for validation
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
 interface RouteContext {
   params: Promise<{
     id: string;
@@ -21,6 +29,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: photoId } = await context.params;
     if (!photoId) {
       return NextResponse.json({ error: 'Photo ID required' }, { status: 400 });
+    }
+
+    // Validate UUID format to prevent injection attacks
+    if (!isValidUUID(photoId)) {
+      return NextResponse.json(
+        { error: 'Invalid photo ID format' },
+        { status: 400 }
+      );
     }
 
     // Get photo record - ensure user owns it by matching Clerk user to internal UUID

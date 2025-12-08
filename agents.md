@@ -140,7 +140,32 @@ Configuration location: `.claude.json` (project-specific)
 ## 5. Neon & Migrations
 
 - **Do not** run Drizzle migrations manually in ad-hoc ways.
+- **Do not** make direct DDL changes to the database - use Drizzle migrations only.
 - **Long-lived branches:** Only `main` and `production` (no preview branch).
+
+### Database-Level Migration Protection
+
+The database has an event trigger that **blocks direct DDL changes** to the public schema. This ensures all schema changes go through Drizzle migrations.
+
+**What's blocked:**
+- `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE` outside of migrations
+- Direct index, sequence, or type modifications
+
+**What's allowed:**
+- Drizzle migrations (automatically detected via lock on `__drizzle_migrations`)
+- Changes to the `drizzle` schema (migration tracking)
+
+**Emergency bypass (use sparingly):**
+```sql
+SET app.allow_schema_changes = 'true';
+-- Your emergency DDL here
+```
+
+**To install on a new database:**
+```bash
+psql $DATABASE_URL -f scripts/setup-migration-protection.sql
+```
+
 - CI is responsible for:
   - Creating per-PR Neon ephemeral DBs for full CI (auto-created, auto-deleted on PR close).
   - Running `drizzle:check` to validate schema changes before merge.

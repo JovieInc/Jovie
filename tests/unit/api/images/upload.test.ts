@@ -71,6 +71,13 @@ vi.mock('@/lib/rate-limit', () => ({
   avatarUploadRateLimit: null, // Disabled in tests
 }));
 
+// Mock magic bytes validation - we test this separately
+// In API tests, we want to test the overall flow, not the byte-level validation
+const mockValidateMagicBytes = vi.fn();
+vi.mock('@/lib/images/validate-magic-bytes', () => ({
+  validateMagicBytes: (...args: unknown[]) => mockValidateMagicBytes(...args),
+}));
+
 vi.mock('@vercel/blob', () => ({
   put: vi.fn(async (path: string) => ({
     url: `https://blob.vercel-storage.com/${path}`,
@@ -119,6 +126,33 @@ vi.mock('sharp', () => {
   };
 });
 
+// Helper to create files with valid magic bytes
+const MAGIC_BYTES = {
+  jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+  png: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+  webp: new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00]),
+};
+
+function createValidImageFile(
+  name: string,
+  type: 'image/jpeg' | 'image/png' | 'image/webp',
+  size?: number
+): File {
+  let bytes: Uint8Array;
+  if (type === 'image/jpeg') bytes = MAGIC_BYTES.jpeg;
+  else if (type === 'image/png') bytes = MAGIC_BYTES.png;
+  else bytes = MAGIC_BYTES.webp;
+
+  // Create a Blob first, then File - ensures arrayBuffer() works correctly
+  // Cast to BlobPart to satisfy TypeScript's strict ArrayBuffer typing
+  const blob = new Blob([bytes as unknown as BlobPart], { type });
+  const file = new File([blob], name, { type });
+  if (size !== undefined) {
+    Object.defineProperty(file, 'size', { value: size });
+  }
+  return file;
+}
+
 function createMultipartRequest(formData: FormData): NextRequest {
   const request = new NextRequest('http://localhost:3000/api/images/upload', {
     method: 'POST',
@@ -143,6 +177,9 @@ describe('/api/images/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sharpMetadataMock.mockResolvedValue({ width: 800, height: 800 });
+
+    // Default: magic bytes validation passes for valid image types
+    mockValidateMagicBytes.mockReturnValue(true);
 
     // Setup default mock implementations
     mockInsert.mockReturnValue({
@@ -226,10 +263,11 @@ describe('/api/images/upload', () => {
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
-    const file = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
-    Object.defineProperty(file, 'size', {
-      value: 5 * 1024 * 1024 + 1,
-    });
+    const file = createValidImageFile(
+      'large.jpg',
+      'image/jpeg',
+      5 * 1024 * 1024 + 1
+    );
     formData.append('file', file);
 
     const request = createMultipartRequest(formData);
@@ -245,11 +283,9 @@ describe('/api/images/upload', () => {
     // Mock authenticated user
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
-    // Create valid image file
+    // Create valid image file with proper magic bytes
     const formData = new FormData();
-    const file = new File(['fake-image-data'], 'test.jpg', {
-      type: 'image/jpeg',
-    });
+    const file = createValidImageFile('test.jpg', 'image/jpeg');
     formData.append('file', file);
 
     const request = createMultipartRequest(formData);
@@ -269,7 +305,7 @@ describe('/api/images/upload', () => {
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
-    const file = new File(['fake-jpeg'], 'test.jpeg', { type: 'image/jpeg' });
+    const file = createValidImageFile('test.jpeg', 'image/jpeg');
     formData.append('file', file);
 
     const request = createMultipartRequest(formData);
@@ -282,7 +318,7 @@ describe('/api/images/upload', () => {
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
-    const file = new File(['fake-png'], 'test.png', { type: 'image/png' });
+    const file = createValidImageFile('test.png', 'image/png');
     formData.append('file', file);
 
     const request = createMultipartRequest(formData);
@@ -295,7 +331,7 @@ describe('/api/images/upload', () => {
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     const formData = new FormData();
-    const file = new File(['fake-webp'], 'test.webp', { type: 'image/webp' });
+    const file = createValidImageFile('test.webp', 'image/webp');
     formData.append('file', file);
 
     const request = createMultipartRequest(formData);
@@ -317,5 +353,55 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(201);
     const data = await response.json();
     expect(data.blobUrl).toContain('.webp');
+  });
+
+  it('should reject files with spoofed MIME type (magic bytes mismatch)', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
+    // Mock magic bytes validation to fail (simulating spoofed file)
+    mockValidateMagicBytes.mockReturnValue(false);
+
+    // Create a file that claims to be JPEG but has text content (no JPEG magic bytes)
+    const formData = new FormData();
+    const spoofedFile = new File(['not-a-real-jpeg-file'], 'fake.jpg', {
+      type: 'image/jpeg',
+    });
+    formData.append('file', spoofedFile);
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+    expect(response.status).toBe(400);
+
+    const data = await response.json();
+    expect(data.error).toContain('does not match declared type');
+    expect(data.code).toBe('INVALID_FILE');
+  });
+
+  it('should accept files with valid JPEG magic bytes', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
+    const formData = new FormData();
+    const file = createValidImageFile('valid.jpg', 'image/jpeg');
+    formData.append('file', file);
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+    // Should pass magic bytes validation and proceed to processing
+    expect(response.status).toBe(201);
+  });
+
+  it('should accept files with valid PNG magic bytes', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
+    const formData = new FormData();
+    const file = createValidImageFile('valid.png', 'image/png');
+    formData.append('file', file);
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+    expect(response.status).toBe(201);
   });
 });
