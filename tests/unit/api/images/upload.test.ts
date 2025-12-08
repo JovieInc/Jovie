@@ -179,7 +179,8 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(401);
 
     const data = await response.json();
-    expect(data.error).toBe('Unauthorized');
+    expect(data.error).toBe('Please sign in to upload a profile photo.');
+    expect(data.code).toBe('UNAUTHORIZED');
   });
 
   it('should reject requests without files', async () => {
@@ -195,7 +196,10 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(400);
 
     const data = await response.json();
-    expect(data.error).toBe('No file provided');
+    expect(data.error).toBe(
+      'No file provided. Please select an image to upload.'
+    );
+    expect(data.code).toBe('NO_FILE');
   });
 
   it('should reject non-image files', async () => {
@@ -213,7 +217,8 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(400);
 
     const data = await response.json();
-    expect(data.error).toBe('Invalid file');
+    expect(data.error).toContain('Invalid file type');
+    expect(data.code).toBe('INVALID_FILE');
   });
 
   it('should reject files larger than 4MB', async () => {
