@@ -171,7 +171,7 @@
     "@clerk/clerk-js": "^5.113.0",
     "@clerk/dev-cli": "^0.0.12",
     "@clerk/testing": "^1.13.21",
-    "@commitlint/cli": "^19.8.1",
+    "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.35.0",
