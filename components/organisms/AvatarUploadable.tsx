@@ -434,7 +434,7 @@ export const AvatarUploadable = React.memo(
           className={cn(
             'transition-all duration-200 ease-out',
             isInteractive &&
-              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-[color:var(--color-accent)] group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-[color:var(--color-bg-base)]',
+              'group-hover:brightness-95 group-focus-visible:ring-2 group-focus-visible:ring-accent group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-(--color-bg-base)',
             isDragOver && 'scale-105',
             isUploading && 'opacity-80'
           )}
