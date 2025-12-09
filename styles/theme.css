@@ -44,8 +44,8 @@
   /* Enhanced sidebar tokens for atomic components */
   --sidebar-muted: 107 114 128;
   /* --text-secondary equivalent */
-  --sidebar-muted-foreground: 156 163 175;
-  /* --text-muted equivalent */
+  --sidebar-muted-foreground: 113 113 122;
+  /* --text-muted equivalent - improved contrast */
   --sidebar-surface: 249 250 251;
   /* --surface-1 equivalent */
   --sidebar-surface-hover: 241 245 249;
