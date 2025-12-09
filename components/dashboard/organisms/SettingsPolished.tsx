@@ -910,7 +910,7 @@ export function SettingsPolished({
     <div className='flex gap-8'>
       {/* Apple-style Navigation Sidebar */}
       <div className='w-64 shrink-0'>
-        <div className='sticky top-8'>
+        <div className='sticky top-0 pt-2'>
           <nav className='space-y-1'>
             {settingsNavigation.map(item => {
               const Icon = item.icon;
