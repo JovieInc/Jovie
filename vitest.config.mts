@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
-    exclude: ['tests/e2e/**', 'tests/performance/**', 'node_modules/**'],
+    exclude: ['tests/e2e/**', 'tests/performance/**', 'node_modules/**', '.next/**'],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
