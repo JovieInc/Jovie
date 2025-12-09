@@ -64,6 +64,13 @@
       "when": 1733555000000,
       "tag": "0008_populate_dedup_key_column",
       "breakpoints": false
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1733600000000,
+      "tag": "0009_allow_system_ingestion",
+      "breakpoints": false
     }
   ]
 }
