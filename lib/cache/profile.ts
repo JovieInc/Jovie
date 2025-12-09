@@ -29,7 +29,7 @@ export async function invalidateProfileCache(
   // Invalidate dashboard pages that display profile data
   revalidatePath('/dashboard');
   revalidatePath('/dashboard/overview');
-  revalidatePath('/dashboard/settings');
+  revalidatePath('/settings');
 }
 
 /**

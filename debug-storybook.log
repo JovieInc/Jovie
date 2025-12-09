@@ -1,0 +1,21 @@
+[22:22:40.985] [INFO] storybook v10.1.4
+[22:22:41.440] [DEBUG] Getting package.json info for /Users/timwhite/Documents/GitHub/TBF/Jovie/package.json...
+[22:22:42.320] [DEBUG] Serving static files from [36mnode_modules/.pnpm/@chromatic-com+storybook@4.1.3_storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1_/node_modules/@chromatic-com/storybook/assets[39m at [36m/addon-visual-tests-assets[39m
+[22:22:42.327] [INFO] Starting...
+[22:22:42.368] [WARN] unable to find package.json for @clerk/elements
+[22:22:42.882] [DEBUG] Starting preview..
+[22:22:43.081] [DEBUG] Using tsconfig paths for react-docgen
+[22:22:43.107] [ERROR] Failed to build the preview
+[22:22:43.109] [ERROR] [38;2;241;97;97mReferenceError: __dirname is not defined[39m
+    at Object.viteFinal (file://./.storybook/main.ts:45:27)
+    at file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/_node-chunks/chunk-QZJSO2TW.js:10134:36
+    at async createViteServer (file://./node_modules/.pnpm/@storybook+builder-vite@10.1.4_esbuild@0.27.1_msw@2.12.4_@types+node@24.10.1_typescript@5.9.3_x746ve3qrurag5gpeejnerd5fi/node_modules/@storybook/builder-vite/dist/index.js:6410:21)
+    at async Module.start (file://./node_modules/.pnpm/@storybook+builder-vite@10.1.4_esbuild@0.27.1_msw@2.12.4_@types+node@24.10.1_typescript@5.9.3_x746ve3qrurag5gpeejnerd5fi/node_modules/@storybook/builder-vite/dist/index.js:6435:17)
+    at async storybookDevServer (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/core-server/index.js:7180:82)
+    at async buildOrThrow (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/core-server/index.js:5556:12)
+    at async buildDevStandalone (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/core-server/index.js:7582:66)
+    at async withTelemetry (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/_node-chunks/chunk-6KX7N5UF.js:205:12)
+    at async dev (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/bin/core.js:2734:3)
+    at async _Command.<anonymous> (file://./node_modules/.pnpm/storybook@10.1.4_@testing-library+dom@10.4.1_react-dom@18.3.1_react@18.3.1__react@18.3.1/node_modules/storybook/dist/bin/core.js:2801:92)
+[22:22:43.110] [WARN] Broken build, fix the error above.
+You may need to refresh the browser.

@@ -3,6 +3,7 @@
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 type Activity = {
@@ -115,7 +116,22 @@ export function DashboardActivityFeed({
       {error ? (
         <p className='mt-4 text-sm text-red-500'>{error}</p>
       ) : isLoading ? (
-        <p className='mt-4 text-sm text-secondary-token'>Loading activity...</p>
+        <div className='mt-4 space-y-3' aria-busy='true'>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className='flex items-center gap-3' aria-hidden='true'>
+              <LoadingSkeleton
+                height='h-8'
+                width='h-8'
+                rounded='full'
+                className='w-8'
+              />
+              <div className='flex-1 space-y-2'>
+                <LoadingSkeleton height='h-4' width='w-3/4' />
+                <LoadingSkeleton height='h-3' width='w-1/3' />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : activities.length === 0 ? (
         <div className='mt-4 space-y-2 text-sm text-secondary-token'>
           <div>

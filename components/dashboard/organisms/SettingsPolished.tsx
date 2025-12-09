@@ -1,13 +1,9 @@
 'use client';
 
 import {
-  BellIcon,
   CreditCardIcon,
-  PaintBrushIcon,
   RocketLaunchIcon,
-  ShieldCheckIcon,
   SparklesIcon,
-  UserIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
@@ -33,58 +29,17 @@ import { DashboardCard } from '../atoms/DashboardCard';
 interface SettingsPolishedProps {
   artist: Artist;
   onArtistUpdate?: (updatedArtist: Artist) => void;
+  focusSection?: string;
 }
 
-const SETTINGS_BUTTON_CLASS =
-  'px-5 py-2.5 text-sm font-medium rounded-md border border-(--accents-3) bg-neutral-200 text-black hover:bg-neutral-300 dark:bg-(--accents-2) dark:text-(--geist-foreground) dark:border-(--accents-4) dark:hover:bg-(--accents-3) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accents-4)/50 focus-visible:ring-offset-1';
-
-// Apple-style settings navigation - simplified and clean
-const settingsNavigation = [
-  {
-    name: 'Profile',
-    id: 'profile',
-    icon: UserIcon,
-  },
-  {
-    name: 'Account',
-    id: 'account',
-    icon: ShieldCheckIcon,
-  },
-  {
-    name: 'Appearance',
-    id: 'appearance',
-    icon: PaintBrushIcon,
-  },
-  {
-    name: 'Notifications',
-    id: 'notifications',
-    icon: BellIcon,
-  },
-  {
-    name: 'Remove Branding',
-    id: 'remove-branding',
-    icon: SparklesIcon,
-    isPro: true,
-  },
-  {
-    name: 'Ad Pixels',
-    id: 'ad-pixels',
-    icon: RocketLaunchIcon,
-    isPro: true,
-  },
-  {
-    name: 'Billing',
-    id: 'billing',
-    icon: CreditCardIcon,
-  },
-];
+// Use Geist button styling directly; keep layout helper only.
+const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 export function SettingsPolished({
   artist,
   onArtistUpdate,
+  focusSection,
 }: SettingsPolishedProps) {
-  const [currentSection, setCurrentSection] = useState('profile');
-  const [isLoading, setIsLoading] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const billingStatus = useBillingStatus();
@@ -247,16 +202,9 @@ export function SettingsPolished({
     [artist, onArtistUpdate]
   );
 
-  const scrollToSection = (sectionId: string) => {
-    setCurrentSection(sectionId);
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-        inline: 'nearest',
-      });
-    }
+  const handleBilling = async () => {
+    setIsBillingLoading(true);
+    await router.push('/dashboard/billing');
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -291,78 +239,6 @@ export function SettingsPolished({
       console.error('Error saving theme preference:', error);
     }
   };
-
-  const handleBilling = async () => {
-    if (isBillingLoading) return;
-
-    setIsBillingLoading(true);
-    try {
-      if (billingStatus.isPro && billingStatus.hasStripeCustomer) {
-        const response = await fetch('/api/stripe/portal', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to create billing portal session');
-        }
-
-        const { url } = await response.json();
-        window.location.href = url;
-      } else {
-        // User doesn't have a subscription - get default Pro plan price ID and redirect to checkout
-        router.push('/billing/remove-branding');
-      }
-    } catch (error) {
-      console.error('Error handling billing:', error);
-      router.push('/pricing');
-    } finally {
-      setIsBillingLoading(false);
-    }
-  };
-
-  const handleSubmit = useCallback(
-    async (e: React.FormEvent) => {
-      e.preventDefault();
-      setIsLoading(true);
-
-      try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            updates: {
-              username: formData.username,
-              displayName: formData.displayName,
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update profile');
-        }
-
-        const { profile } = await response.json();
-
-        if (onArtistUpdate) {
-          onArtistUpdate({
-            ...artist,
-            handle: profile.username,
-            name: profile.displayName,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to update profile:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [formData, artist, onArtistUpdate]
-  );
 
   const handleMarketingToggle = useCallback(async (enabled: boolean) => {
     setIsMarketingSaving(true);
@@ -432,100 +308,81 @@ export function SettingsPolished({
   const appDomain = APP_URL.replace(/^https?:\/\//, '');
 
   const renderProfileSection = () => (
-    <div className='space-y-6'>
-      <form onSubmit={handleSubmit} className='space-y-6'>
-        {/* Profile Photo Card */}
-        <DashboardCard variant='settings'>
-          <div className='flex items-center justify-between mb-4'>
-            <h3 className='text-lg font-medium text-primary'>Profile Photo</h3>
+    <DashboardCard variant='settings'>
+      <div className='flex flex-col gap-6'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+          <div>
+            <h3 className='text-lg font-medium text-primary mb-2'>
+              Profile Photo
+            </h3>
           </div>
+        </div>
 
-          <div className='w-20 h-20'>
-            <AvatarUploadable
-              src={artist.image_url}
-              alt={artist.name || 'Profile photo'}
-              name={artist.name || artist.handle}
-              size='xl'
-              uploadable
-              showHoverOverlay
-              onUpload={handleAvatarUpload}
-              onSuccess={handleAvatarUpdate}
-              onError={message => showToast({ type: 'error', message })}
-              maxFileSize={maxAvatarSize}
-              acceptedTypes={acceptedAvatarTypes}
-            />
-          </div>
-        </DashboardCard>
+        <div className='w-20 h-20'>
+          <AvatarUploadable
+            src={artist.image_url}
+            alt={artist.name || 'Profile photo'}
+            name={artist.name || artist.handle}
+            size='xl'
+            uploadable
+            showHoverOverlay
+            onUpload={handleAvatarUpload}
+            onSuccess={handleAvatarUpdate}
+            onError={message => showToast({ type: 'error', message })}
+            maxFileSize={maxAvatarSize}
+            acceptedTypes={acceptedAvatarTypes}
+          />
+        </div>
 
-        {/* Basic Info Card */}
-        <DashboardCard variant='settings'>
-          <h3 className='text-lg font-medium text-primary mb-6'>
-            Basic Information
-          </h3>
-
-          <div className='space-y-6'>
-            {/* Username */}
-            <div>
-              <label
-                htmlFor='username'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Username
-              </label>
-              <div className='relative'>
-                <div className='flex rounded-lg shadow-sm'>
-                  <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary text-sm select-none'>
-                    {appDomain}/
-                  </span>
-                  <Input
-                    type='text'
-                    name='username'
-                    id='username'
-                    value={formData.username}
-                    onChange={e =>
-                      handleInputChange('username', e.target.value)
-                    }
-                    placeholder='yourname'
-                    className='flex-1 min-w-0'
-                    inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm transition-colors'
-                  />
-                </div>
+        <div className='space-y-6'>
+          {/* Username */}
+          <div>
+            <label
+              htmlFor='username'
+              className='block text-sm font-medium text-primary mb-2'
+            >
+              Username
+            </label>
+            <div className='relative'>
+              <div className='flex rounded-lg shadow-sm'>
+                <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary text-sm select-none'>
+                  {appDomain}/
+                </span>
+                <Input
+                  type='text'
+                  name='username'
+                  id='username'
+                  value={formData.username}
+                  onChange={e => handleInputChange('username', e.target.value)}
+                  placeholder='yourname'
+                  className='flex-1 min-w-0'
+                  inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm transition-colors'
+                />
               </div>
             </div>
-
-            {/* Display Name */}
-            <div>
-              <label
-                htmlFor='displayName'
-                className='block text-sm font-medium text-primary mb-2'
-              >
-                Display Name
-              </label>
-              <Input
-                type='text'
-                name='displayName'
-                id='displayName'
-                value={formData.displayName}
-                onChange={e => handleInputChange('displayName', e.target.value)}
-                placeholder='The name your fans will see'
-                inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-              />
-            </div>
           </div>
-        </DashboardCard>
 
-        {/* Save Button */}
-        <div className='flex justify-end pt-2'>
-          <Button
-            type='submit'
-            loading={isLoading}
-            className={SETTINGS_BUTTON_CLASS}
-          >
-            Save changes
-          </Button>
+          {/* Display Name */}
+          <div>
+            <label
+              htmlFor='displayName'
+              className='block text-sm font-medium text-primary mb-2'
+            >
+              Display Name
+            </label>
+            <Input
+              type='text'
+              name='displayName'
+              id='displayName'
+              value={formData.displayName}
+              onChange={e => handleInputChange('displayName', e.target.value)}
+              placeholder='The name your fans will see'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+            />
+          </div>
         </div>
-      </form>
-    </div>
+      </div>
+    </DashboardCard>
   );
 
   const renderAccountSection = () => (
@@ -595,7 +452,7 @@ export function SettingsPolished({
               }
               className={cn(
                 'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
-                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:ring-2 ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent',
+                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
                 theme === option.value
                   ? 'border-accent/70 bg-surface-2'
                   : 'border-subtle hover:border-accent/50'
@@ -906,172 +763,101 @@ export function SettingsPolished({
     );
   };
 
+  const sections = [
+    {
+      id: 'profile',
+      title: 'Profile',
+      description: 'Manage your public profile and account details.',
+      render: renderProfileSection,
+    },
+    {
+      id: 'account',
+      title: 'Account',
+      description:
+        'Manage email addresses, password, connected accounts, and more.',
+      render: renderAccountSection,
+    },
+    {
+      id: 'appearance',
+      title: 'Appearance',
+      description: 'Customize how the interface looks and feels.',
+      render: renderAppearanceSection,
+    },
+    {
+      id: 'notifications',
+      title: 'Notifications',
+      description: 'Manage your email preferences and communication settings.',
+      render: () =>
+        notificationsEnabled ? (
+          renderNotificationsSection()
+        ) : (
+          <DashboardCard variant='settings'>
+            <div className='text-center py-4'>
+              <h3 className='text-lg font-medium text-primary mb-2'>
+                Notifications are not available yet
+              </h3>
+              <p className='text-sm text-secondary'>
+                We&apos;re focused on getting the core Jovie profile experience
+                right before launching notifications.
+              </p>
+            </div>
+          </DashboardCard>
+        ),
+    },
+    {
+      id: 'remove-branding',
+      title: 'Remove Branding',
+      description:
+        'Hide Jovie branding from your profile for a professional look.',
+      render: () =>
+        isPro
+          ? renderRemoveBrandingSection()
+          : renderProUpgradeCard(
+              'Professional Appearance',
+              'Remove Jovie branding to create a fully custom experience for your fans.',
+              SparklesIcon
+            ),
+    },
+    {
+      id: 'ad-pixels',
+      title: 'Ad Pixels',
+      description:
+        'Connect Facebook, Google, and TikTok pixels to track conversions.',
+      render: () =>
+        isPro
+          ? renderAdPixelsSection()
+          : renderProUpgradeCard(
+              'Unlock Growth Tracking',
+              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+              RocketLaunchIcon
+            ),
+    },
+    {
+      id: 'billing',
+      title: 'Billing & Subscription',
+      description:
+        'Manage your subscription, payment methods, and billing history.',
+      render: renderBillingSection,
+    },
+  ];
+
+  const visibleSections = focusSection
+    ? sections.filter(section => section.id === focusSection)
+    : sections;
+
   return (
-    <div className='flex gap-8'>
-      {/* Apple-style Navigation Sidebar */}
-      <div className='w-64 shrink-0'>
-        <div className='sticky top-0 pt-2'>
-          <nav className='space-y-1'>
-            {settingsNavigation.map(item => {
-              const Icon = item.icon;
-              const isActive = currentSection === item.id;
-              const isLocked = item.isPro && !isPro;
-
-              if (item.id === 'notifications' && !notificationsEnabled) {
-                return null;
-              }
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (isLocked) {
-                      scrollToSection('billing');
-                    } else {
-                      scrollToSection(item.id);
-                    }
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg text-sm font-medium transition-all duration-200',
-                    isActive
-                      ? 'bg-accent text-white shadow-sm'
-                      : 'text-primary hover:bg-surface-2',
-                    isLocked && 'opacity-60'
-                  )}
-                >
-                  <Icon className='h-5 w-5 shrink-0' />
-                  <span className='flex-1'>{item.name}</span>
-                  {isLocked && (
-                    <ShieldCheckIcon className='h-4 w-4 text-orange-400' />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </div>
-
-      {/* Settings Content (scroll handled by outer dashboard layout) */}
-      <div className='flex-1 min-w-0'>
-        <div className='space-y-8 pb-8'>
-          {/* Profile Section */}
-          <section id='profile' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Profile
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Manage your public profile and account details.
-              </p>
-            </div>
-            {renderProfileSection()}
-          </section>
-
-          {/* Account Section */}
-          <section id='account' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Account
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Manage email addresses, password, connected accounts, and more.
-              </p>
-            </div>
-            {renderAccountSection()}
-          </section>
-
-          {/* Appearance Section */}
-          <section id='appearance' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Appearance
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Customize how the interface looks and feels.
-              </p>
-            </div>
-            {renderAppearanceSection()}
-          </section>
-
-          {/* Notifications Section */}
-          <section id='notifications' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Notifications
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Manage your email preferences and communication settings.
-              </p>
-            </div>
-            {notificationsEnabled ? (
-              renderNotificationsSection()
-            ) : (
-              <DashboardCard variant='settings'>
-                <div className='text-center py-4'>
-                  <h3 className='text-lg font-medium text-primary mb-2'>
-                    Notifications are not available yet
-                  </h3>
-                  <p className='text-sm text-secondary'>
-                    We&apos;re focused on getting the core Jovie profile
-                    experience right before launching notifications.
-                  </p>
-                </div>
-              </DashboardCard>
-            )}
-          </section>
-
-          {/* Pro Features */}
-          <section id='remove-branding' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Remove Branding
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Hide Jovie branding from your profile for a professional look.
-              </p>
-            </div>
-            {isPro
-              ? renderRemoveBrandingSection()
-              : renderProUpgradeCard(
-                  'Professional Appearance',
-                  'Remove Jovie branding to create a fully custom experience for your fans.',
-                  SparklesIcon
-                )}
-          </section>
-
-          <section id='ad-pixels' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Ad Pixels
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Connect Facebook, Google, and TikTok pixels to track
-                conversions.
-              </p>
-            </div>
-            {isPro
-              ? renderAdPixelsSection()
-              : renderProUpgradeCard(
-                  'Unlock Growth Tracking',
-                  'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-                  RocketLaunchIcon
-                )}
-          </section>
-
-          {/* Billing Section */}
-          <section id='billing' className='scroll-mt-4'>
-            <div className='mb-6'>
-              <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-                Billing & Subscription
-              </h1>
-              <p className='mt-1 text-sm text-secondary'>
-                Manage your subscription, payment methods, and billing history.
-              </p>
-            </div>
-            {renderBillingSection()}
-          </section>
-        </div>
-      </div>
+    <div className='space-y-8 pb-8'>
+      {visibleSections.map(section => (
+        <section id={section.id} key={section.id} className='scroll-mt-4'>
+          <div className='mb-6'>
+            <h1 className='text-2xl font-semibold tracking-tight text-primary'>
+              {section.title}
+            </h1>
+            <p className='mt-1 text-sm text-secondary'>{section.description}</p>
+          </div>
+          {section.render()}
+        </section>
+      ))}
     </div>
   );
 }

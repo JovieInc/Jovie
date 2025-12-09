@@ -3,7 +3,7 @@
 import { ClerkProvider, useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { MyStatsig } from '@/app/my-statsig';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
@@ -109,28 +109,6 @@ export function ClientProviders({
   initialThemeMode = 'system',
   publishableKey,
 }: ClientProvidersProps) {
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // During SSR and initial hydration, render children without Clerk
-  // This prevents the window is not defined error from ClerkJSScript
-  if (!mounted) {
-    return (
-      <ThemeProvider
-        attribute='class'
-        defaultTheme={initialThemeMode}
-        enableSystem={true}
-        disableTransitionOnChange
-        storageKey='jovie-theme'
-      >
-        {children}
-      </ThemeProvider>
-    );
-  }
-
   return (
     <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
       <ClientProvidersInner initialThemeMode={initialThemeMode}>

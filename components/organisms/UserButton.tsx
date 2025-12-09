@@ -182,16 +182,12 @@ export function UserButton({
     }
   };
 
-  const profileUrl = profileHref ?? '/dashboard/settings';
-  const settingsUrl = settingsHref ?? '/dashboard/settings';
+  const profileUrl = profileHref ?? '/settings';
+  const settingsUrl = settingsHref ?? '/settings';
   const navigateTo = (href: string | undefined) => {
     if (!href) return;
     setIsMenuOpen(false);
-    try {
-      window.open(href, '_blank', 'noopener,noreferrer');
-    } catch {
-      router.push(href);
-    }
+    router.push(href);
   };
   const handleProfile = () => navigateTo(profileUrl);
   const handleSettings = () => navigateTo(settingsUrl);
@@ -411,7 +407,7 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[220px] rounded-xl border border-white/10 bg-black/95 text-primary-token p-3 shadow-2xl backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1'
+        className='w-[248px] rounded-xl border border-subtle bg-surface-1 text-primary-token p-3 shadow-lg backdrop-blur-md font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-1'
       >
         {/* Identity block - name first, email once, smaller */}
         <DropdownMenuLabel className='px-0 py-0 mb-1'>
@@ -452,7 +448,7 @@ export function UserButton({
         {/* Primary actions group */}
         <DropdownMenuItem
           onClick={handleProfile}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
         >
           <Icon
             name='User'
@@ -463,7 +459,7 @@ export function UserButton({
 
         <DropdownMenuItem
           onClick={handleSettings}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
         >
           <Icon
             name='Settings'
@@ -476,7 +472,7 @@ export function UserButton({
         {billingStatus.loading ? (
           <DropdownMenuItem
             disabled
-            className='cursor-default focus:bg-transparent px-2 py-2 text-[13px] h-9'
+            className='cursor-default focus:bg-transparent px-2.5 py-2 text-[13px] h-9'
           >
             <div className='flex w-full items-center gap-2.5'>
               <div className='h-4 w-4 animate-pulse rounded bg-white/10' />
@@ -487,7 +483,7 @@ export function UserButton({
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95 disabled:active:scale-100'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2 disabled:opacity-70 disabled:cursor-not-allowed'
           >
             <Icon
               name='CreditCard'
@@ -502,9 +498,11 @@ export function UserButton({
         <div className='h-1' />
 
         {/* Theme toggle - inline row: label left, pill right */}
-        <div className='flex items-center justify-between px-2 py-2'>
-          <span className='text-[13px] text-primary-token'>Theme</span>
-          <div className='relative h-7 w-[84px] rounded-full border border-(--accents-2) bg-(--accents-1) p-0.5'>
+        <div className='flex items-center justify-between px-2.5 py-2'>
+          <span className='text-[13px] font-medium text-primary-token'>
+            Theme
+          </span>
+          <div className='relative h-7 w-[84px] rounded-full border border-subtle bg-surface-2 p-0.5'>
             <div
               className='pointer-events-none absolute top-0.5 h-6 w-6 rounded-full bg-black dark:bg-white shadow-sm transition-all duration-200 ease-out'
               style={{
@@ -566,7 +564,7 @@ export function UserButton({
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
         >
           <Icon
             name='MessageSquare'
@@ -581,7 +579,7 @@ export function UserButton({
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-red-400 transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-red-500/10 hover:opacity-90 focus:bg-red-500/10 active:scale-[0.97] active:opacity-95 disabled:active:scale-100'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-all duration-150 hover:bg-red-500/10 focus:bg-red-500/10 disabled:opacity-60 disabled:cursor-not-allowed'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>
@@ -592,14 +590,15 @@ export function UserButton({
         {/* Upgrade CTA - text-only button, theme-aware colors */}
         {!billingStatus.isPro && !billingStatus.loading && (
           <div className='pt-2 pb-1 px-1'>
-            <button
+            <Button
               type='button'
               onClick={handleUpgrade}
               disabled={isUpgradeLoading}
-              className='flex w-full items-center justify-center rounded-lg bg-black text-white dark:bg-white dark:text-black px-4 py-2.5 text-[13px] font-semibold transition-colors hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed'
+              variant='primary'
+              className='w-full justify-center rounded-lg text-[13px] font-semibold'
             >
               {isUpgradeLoading ? 'Upgrading…' : 'Upgrade to Pro'}
-            </button>
+            </Button>
           </div>
         )}
       </DropdownMenuContent>

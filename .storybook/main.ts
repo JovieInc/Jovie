@@ -1,11 +1,17 @@
 import type { StorybookConfig } from '@storybook/nextjs-vite';
+import { createRequire } from 'module';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const config: StorybookConfig = {
   stories: ['../components/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
   addons: [
     '@storybook/addon-docs',
     '@storybook/addon-a11y',
+    '@storybook/addon-vitest',
     '@chromatic-com/storybook',
   ],
   framework: {
@@ -46,6 +52,8 @@ const config: StorybookConfig = {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       alias: {
         ...config.resolve?.alias,
+        '@': path.resolve(__dirname, '..'),
+        '@jovie/ui': path.resolve(__dirname, '../packages/ui'),
         // Mock Node.js modules that can't run in browser
         'node:async_hooks': require.resolve('./empty-module.js'),
         'server-only': require.resolve('./empty-module.js'),

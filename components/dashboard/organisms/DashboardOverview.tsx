@@ -150,7 +150,7 @@ export function DashboardOverview({
                 incompleteLabel='Secure your unique profile URL'
                 action={
                   <Button asChild size='sm' variant='primary'>
-                    <Link href='/dashboard/settings'>Claim handle</Link>
+                    <Link href='/settings'>Claim handle</Link>
                   </Button>
                 }
               />

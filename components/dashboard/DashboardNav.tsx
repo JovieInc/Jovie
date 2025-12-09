@@ -1,13 +1,18 @@
 'use client';
 
 import {
+  ArrowLeftIcon,
   BanknotesIcon,
+  BellIcon,
   ChartPieIcon,
   Cog6ToothIcon,
   HomeIcon,
   IdentificationIcon,
   LinkIcon,
+  PaintBrushIcon,
+  RocketLaunchIcon,
   ShieldCheckIcon,
+  SparklesIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
@@ -81,8 +86,7 @@ const navShortcuts: Record<string, string> = {
   settings: '7',
 };
 
-// Secondary Navigation - Additional features
-const secondaryNavigation: typeof primaryNavigation = [
+const secondaryNavigation = [
   {
     name: 'Earnings',
     href: '/dashboard/tipping',
@@ -92,10 +96,61 @@ const secondaryNavigation: typeof primaryNavigation = [
   },
   {
     name: 'Settings',
-    href: '/dashboard/settings',
+    href: '/settings',
     id: 'settings',
     icon: Cog6ToothIcon,
     description: 'Configure your account and preferences',
+  },
+];
+
+const settingsNavigation = [
+  {
+    name: 'Back to app',
+    href: '/dashboard/overview',
+    id: 'back',
+    icon: ArrowLeftIcon,
+  },
+  {
+    name: 'Profile',
+    href: '/settings/profile',
+    id: 'profile',
+    icon: IdentificationIcon,
+  },
+  {
+    name: 'Account',
+    href: '/settings/account',
+    id: 'account',
+    icon: ShieldCheckIcon,
+  },
+  {
+    name: 'Appearance',
+    href: '/settings/appearance',
+    id: 'appearance',
+    icon: PaintBrushIcon,
+  },
+  {
+    name: 'Notifications',
+    href: '/settings/notifications',
+    id: 'notifications',
+    icon: BellIcon,
+  },
+  {
+    name: 'Remove Branding',
+    href: '/settings/remove-branding',
+    id: 'remove-branding',
+    icon: SparklesIcon,
+  },
+  {
+    name: 'Ad Pixels',
+    href: '/settings/ad-pixels',
+    id: 'ad-pixels',
+    icon: RocketLaunchIcon,
+  },
+  {
+    name: 'Billing',
+    href: '/settings/billing',
+    id: 'billing',
+    icon: BanknotesIcon,
   },
 ];
 
@@ -131,13 +186,16 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
     ? primaryNavigation
     : primaryNavigation.filter(item => item.id !== 'contacts');
 
-  const renderSection = (items: typeof primaryNavigation) => (
+  const isInSettings = pathname.startsWith('/settings');
+  const activeItems = isInSettings ? settingsNavigation : primaryItems;
+
+  const renderSection = (
+    items: typeof primaryNavigation | typeof settingsNavigation
+  ) => (
     <SidebarMenu>
       {items.map(item => {
         const isActive =
-          pathname === item.href ||
-          (pathname === '/dashboard' && item.id === 'overview');
-
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
         const shortcut = navShortcuts[item.id];
         const tooltip = shortcut
           ? {
@@ -176,14 +234,17 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       aria-label='Dashboard navigation'
       role='navigation'
     >
-      {/* Primary Navigation Block */}
-      <div className='mb-2'>{renderSection(primaryItems)}</div>
-
-      {/* Soft spacing instead of a hard divider */}
-      <div className='mb-2 h-1' />
-
-      {/* Secondary Navigation Block */}
-      <div className='mb-1'>{renderSection(secondaryNavigation)}</div>
+      <SidebarGroup className='mb-1'>
+        <SidebarGroupContent>{renderSection(activeItems)}</SidebarGroupContent>
+      </SidebarGroup>
+      {!isInSettings && (
+        <SidebarGroup className='mt-0'>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            {renderSection(secondaryNavigation)}
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
 
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (

@@ -11,8 +11,6 @@ export interface FeatureFlags {
   progressiveOnboardingEnabled: boolean;
   // Profile settings feature flag
   profileSettingsEnabled: boolean;
-  // Avatar upload with Vercel Blob integration
-  avatarUploadEnabled?: boolean;
   // Advanced avatar uploader component with radial progress and drag/drop
   avatarUploaderEnabled?: boolean;
   // Minimalist design for onboarding screens (Apple-inspired)
@@ -35,8 +33,6 @@ const defaultFeatureFlags: FeatureFlags = {
   progressiveOnboardingEnabled: true,
   // Profile settings enabled by default
   profileSettingsEnabled: true,
-  // Avatar upload disabled by default (requires Vercel Blob setup)
-  avatarUploadEnabled: false,
   // Advanced avatar uploader disabled by default (requires feature flag)
   avatarUploaderEnabled: false,
   // Minimalist design for onboarding screens (Apple-inspired)
@@ -74,7 +70,6 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
         typeof data?.universalNotificationsEnabled !== 'undefined' ||
         typeof data?.progressiveOnboardingEnabled !== 'undefined' ||
         typeof data?.profileSettingsEnabled !== 'undefined' ||
-        typeof data?.avatarUploadEnabled !== 'undefined' ||
         hasRpcFlag
       ) {
         return {
@@ -111,10 +106,6 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
           profileSettingsEnabled: Boolean(
             (data as Record<string, unknown>).profileSettingsEnabled ??
               defaultFeatureFlags.profileSettingsEnabled
-          ),
-          avatarUploadEnabled: Boolean(
-            (data as Record<string, unknown>).avatarUploadEnabled ??
-              defaultFeatureFlags.avatarUploadEnabled
           ),
           avatarUploaderEnabled: Boolean(
             (data as Record<string, unknown>).avatarUploaderEnabled ??
@@ -171,10 +162,6 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
               defaultFeatureFlags.progressiveOnboardingEnabled
           ),
           profileSettingsEnabled: defaultFeatureFlags.profileSettingsEnabled,
-          avatarUploadEnabled: Boolean(
-            data2.flags?.avatarUploadEnabled?.default ??
-              defaultFeatureFlags.avatarUploadEnabled
-          ),
         };
       }
     }
@@ -227,7 +214,6 @@ export async function getServerFeatureFlags(
               data.featureClickAnalyticsRpc || data.feature_click_analytics_rpc
             ),
             profileSettingsEnabled: Boolean(data.profileSettingsEnabled),
-            avatarUploadEnabled: Boolean(data.avatarUploadEnabled),
             avatarUploaderEnabled: Boolean(data.avatarUploaderEnabled),
           };
         }
@@ -265,9 +251,6 @@ export async function getServerFeatureFlags(
       profileSettingsEnabled:
         localFlags.profileSettingsEnabled ??
         defaultFeatureFlags.profileSettingsEnabled,
-      avatarUploadEnabled:
-        localFlags.avatarUploadEnabled ??
-        defaultFeatureFlags.avatarUploadEnabled,
       avatarUploaderEnabled:
         localFlags.avatarUploaderEnabled ??
         defaultFeatureFlags.avatarUploaderEnabled,

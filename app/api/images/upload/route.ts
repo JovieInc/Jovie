@@ -460,6 +460,12 @@ export async function POST(request: NextRequest) {
         const message =
           error instanceof Error ? error.message : 'Upload failed';
 
+        console.error('[upload] Finalize failed', {
+          photoId: photoRecord.id,
+          message,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+
         // Update record with error status
         await db
           .update(profilePhotos)
