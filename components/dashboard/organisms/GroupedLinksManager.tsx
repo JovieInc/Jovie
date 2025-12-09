@@ -166,35 +166,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
   const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
 
   useEffect(() => {
     setPendingSuggestions(suggestedLinks);
   }, [suggestedLinks]);
-
-  const matchesSearch = useCallback(
-    (l: T): boolean => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      const suggestedTitle = (
-        (l as unknown as { suggestedTitle?: string }).suggestedTitle ||
-        (l.platform.name ?? '')
-      ).toLowerCase();
-      const url = (
-        (l as unknown as { normalizedUrl?: string }).normalizedUrl ||
-        (l as unknown as { originalUrl?: string }).originalUrl ||
-        ''
-      ).toLowerCase();
-      const platformId = (l.platform.id ?? '').toLowerCase();
-
-      return (
-        suggestedTitle.includes(q) || url.includes(q) || platformId.includes(q)
-      );
-    },
-    [searchQuery]
-  );
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -503,7 +480,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [existingPlatforms, isMusicProfile]);
 
   const hasAnyLinks = links.length > 0;
-  const filteredCount = links.filter(matchesSearch).length;
+  const filteredCount = links.length;
 
   const COMPLETION_TARGET = 6;
   const completionPercent = hasAnyLinks
@@ -588,7 +565,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         creatorName={creatorName}
         prefillUrl={prefillUrl}
         onPrefillConsumed={() => setPrefillUrl(undefined)}
-        onQueryChange={setSearchQuery}
+        onQueryChange={() => {}}
       />
 
       {/* Links summary + completion indicator */}
@@ -688,7 +665,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         </div>
       )}
 
-      {suggestionPills.length > 0 && !searchQuery.trim() && (
+      {suggestionPills.length > 0 && (
         <div className='mt-3 relative' aria-label='Quick link suggestions'>
           <div
             className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
@@ -743,7 +720,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         </div>
       )}
 
-      {!hasAnyLinks && !searchQuery.trim() && (
+      {!hasAnyLinks && (
         <div className='mt-4 rounded-lg border border-dashed border-subtle bg-surface-1/40 px-4 py-6 text-center animate-pulse'>
           <p className='text-sm font-medium text-primary-token'>
             Add links to build your profile.
@@ -763,13 +740,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               return null;
             }
 
-            const items = groupItems
-              .filter(matchesSearch)
-              .sort(
-                (a, b) =>
-                  popularityIndex(a.platform.id) -
-                  popularityIndex(b.platform.id)
-              );
+            const items = groupItems.sort(
+              (a, b) =>
+                popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
+            );
 
             // Hide section when search/filter yields no results
             if (items.length === 0) {

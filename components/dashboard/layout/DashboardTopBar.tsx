@@ -20,7 +20,7 @@ export function DashboardTopBar({
       <div className='mx-auto flex h-12 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8'>
         <nav
           aria-label='Breadcrumb'
-          className='flex items-center gap-1 text-sm text-secondary-token/70 dark:text-secondary-token/85'
+          className='flex items-center gap-1 text-sm text-secondary-token'
         >
           {breadcrumbs.map((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
@@ -34,17 +34,17 @@ export function DashboardTopBar({
                     href={crumb.href}
                     className='transition-colors hover:text-primary-token'
                   >
-                    <span className='text-xs text-tertiary-token/70 dark:text-tertiary-token/80'>
+                    <span className='text-xs text-secondary-token/80 dark:text-tertiary-token/80'>
                       {crumb.label}
                     </span>
                   </Link>
                 ) : (
-                  <span className='text-secondary-token/85 dark:text-secondary-token'>
+                  <span className='text-primary-token dark:text-secondary-token'>
                     {crumb.label}
                   </span>
                 )}
                 {!isLast && (
-                  <span className='text-tertiary-token/50 dark:text-tertiary-token/70'>
+                  <span className='text-secondary-token/50 dark:text-tertiary-token/70'>
                     ›
                   </span>
                 )}

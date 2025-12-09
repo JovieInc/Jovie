@@ -75,7 +75,7 @@ export function DashboardOverview({
             </Button>
             <CopyToClipboardButton
               relativePath={`/${artist.handle}`}
-              className='bg-transparent border border-white/10 text-secondary-token hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
+              className='bg-transparent border border-black/10 dark:border-white/10 text-secondary-token hover:bg-black/5 dark:hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
             />
           </div>
         </div>
