@@ -93,13 +93,11 @@ export function SocialIcon({
     ariaLabel ? { 'aria-label': ariaLabel } : { 'aria-hidden': true };
 
   if (icon) {
-    const isTikTok = platform.toLowerCase() === 'tiktok';
-
     return (
       <svg
         className={iconClass}
         style={sizeStyle}
-        fill={isTikTok ? '#ffffff' : 'currentColor'}
+        fill='currentColor'
         viewBox='0 0 24 24'
         aria-hidden={ariaHidden}
         aria-label={ariaLabel}

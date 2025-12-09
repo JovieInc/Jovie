@@ -12,7 +12,7 @@ export function AccountDashboard() {
         <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
           Account Settings
         </h1>
-        <p className='mt-2 text-gray-600 dark:text-gray-400'>
+        <p className='mt-2 text-gray-700 dark:text-gray-300'>
           Manage your account preferences and settings
         </p>
       </div>
@@ -29,7 +29,7 @@ export function AccountDashboard() {
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                 Billing & Subscription
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Manage your subscription and payment methods
               </p>
             </div>
@@ -51,7 +51,7 @@ export function AccountDashboard() {
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                 Profile Settings
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Update your profile information and preferences
               </p>
             </div>
@@ -73,7 +73,7 @@ export function AccountDashboard() {
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                 General Settings
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Configure app preferences and notifications
               </p>
             </div>
@@ -96,7 +96,7 @@ export function AccountDashboard() {
             <h4 className='text-sm font-medium text-gray-900 dark:text-white'>
               Account Status
             </h4>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <p className='text-sm text-gray-700 dark:text-gray-300'>
               Your account is active and in good standing
             </p>
           </div>
@@ -104,7 +104,7 @@ export function AccountDashboard() {
             <h4 className='text-sm font-medium text-gray-900 dark:text-white'>
               Data & Privacy
             </h4>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <p className='text-sm text-gray-700 dark:text-gray-300'>
               We protect your data according to our privacy policy
             </p>
           </div>
@@ -116,7 +116,7 @@ export function AccountDashboard() {
         <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-4'>
           Need Help?
         </h3>
-        <p className='text-sm text-gray-600 dark:text-gray-400 mb-4'>
+        <p className='text-sm text-gray-700 dark:text-gray-300 mb-4'>
           Get support, view documentation, or contact our team
         </p>
         <div className='flex flex-col sm:flex-row gap-3'>

@@ -184,9 +184,14 @@ export function UserButton({
 
   const profileUrl = profileHref ?? '/dashboard/settings';
   const settingsUrl = settingsHref ?? '/dashboard/settings';
-  const navigateTo = (href: string) => {
+  const navigateTo = (href: string | undefined) => {
+    if (!href) return;
     setIsMenuOpen(false);
-    router.push(href);
+    try {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    } catch {
+      router.push(href);
+    }
   };
   const handleProfile = () => navigateTo(profileUrl);
   const handleSettings = () => navigateTo(settingsUrl);
@@ -406,7 +411,7 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[244px] rounded-xl border-none bg-surface-1/95 text-primary-token p-3.5 shadow-[0_22px_72px_-14px_rgba(0,0,0,0.38)] backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-2/90'
+        className='w-[220px] rounded-xl border border-white/10 bg-black/95 text-primary-token p-3 shadow-2xl backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1'
       >
         {/* Identity block - name first, email once, smaller */}
         <DropdownMenuLabel className='px-0 py-0 mb-1'>
@@ -420,7 +425,7 @@ export function UserButton({
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-1.5'>
-                <span className='truncate text-sm font-medium text-primary-token/90'>
+                <span className='truncate text-sm font-medium text-primary-token'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (

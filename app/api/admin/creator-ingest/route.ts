@@ -140,7 +140,7 @@ export async function POST(request: Request) {
       const [created] = await tx
         .insert(creatorProfiles)
         .values({
-          userId: null,
+          // userId intentionally omitted to avoid inserting empty-string UUID
           creatorType: 'creator',
           username: handle,
           usernameNormalized,

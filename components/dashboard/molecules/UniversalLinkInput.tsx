@@ -809,10 +809,10 @@ export const UniversalLinkInput = forwardRef<
                   <DropdownMenuItem
                     key={platform.id}
                     onSelect={() => handleArtistSearchSelect(platform.provider)}
-                    className='flex items-center gap-2 cursor-pointer'
+                    className='flex items-center gap-2 cursor-pointer py-1.5 text-[13px]'
                   >
                     <div
-                      className='flex items-center justify-center w-6 h-6 rounded-md'
+                      className='flex items-center justify-center w-5 h-5 rounded'
                       style={{
                         backgroundColor: hex,
                         color: '#ffffff',
@@ -820,7 +820,7 @@ export const UniversalLinkInput = forwardRef<
                     >
                       <SocialIcon
                         platform={platform.icon}
-                        className='w-3.5 h-3.5'
+                        className='w-3 h-3'
                       />
                     </div>
                     <span>{platform.name}</span>
@@ -839,10 +839,10 @@ export const UniversalLinkInput = forwardRef<
                   <DropdownMenuItem
                     key={platform.id}
                     onSelect={() => handlePlatformSelect(platform)}
-                    className='flex items-center gap-2 cursor-pointer'
+                    className='flex items-center gap-2 cursor-pointer py-1.5 text-[13px]'
                   >
                     <div
-                      className='flex items-center justify-center w-6 h-6 rounded-md'
+                      className='flex items-center justify-center w-5 h-5 rounded'
                       style={{
                         backgroundColor: hex,
                         color: '#ffffff',
@@ -850,7 +850,7 @@ export const UniversalLinkInput = forwardRef<
                     >
                       <SocialIcon
                         platform={platform.icon}
-                        className='w-3.5 h-3.5'
+                        className='w-3 h-3'
                       />
                     </div>
                     <span>{platform.name}</span>

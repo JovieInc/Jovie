@@ -155,7 +155,7 @@ function renderContent(
             {/* Subtle placeholder matching the Listen Now button dimensions to avoid layout shift */}
             <div
               aria-hidden='true'
-              className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl border border-default bg-white text-primary-token/85 shadow-md select-none'
+              className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl border border-default bg-white text-gray-400 dark:text-gray-500 shadow-md select-none'
             >
               Listen
             </div>
