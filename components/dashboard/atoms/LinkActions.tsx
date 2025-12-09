@@ -1,25 +1,19 @@
 'use client';
 
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 export interface LinkActionsProps {
-  /** Callback when visibility is toggled */
   onToggle: () => void;
-  /** Callback when link is removed */
   onRemove: () => void;
-  /** Callback when edit is clicked */
   onEdit?: () => void;
-  /** Whether the link is currently visible */
   isVisible: boolean;
-  /** Whether to show the drag handle (default: true) */
   showDragHandle?: boolean;
-  /** Pointer down handler for drag handle */
   onDragHandlePointerDown?: (e: React.PointerEvent<HTMLButtonElement>) => void;
-  /** Additional CSS classes */
   className?: string;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -31,77 +25,85 @@ export const LinkActions = memo(function LinkActions({
   onRemove,
   onEdit,
   isVisible,
-  showDragHandle = true,
+  showDragHandle = false,
   onDragHandlePointerDown,
   className,
+  isOpen,
+  onOpenChange,
 }: LinkActionsProps) {
+  const [openInternal, setOpenInternal] = useState(false);
+  const open = isOpen ?? openInternal;
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next);
+    else setOpenInternal(next);
+  };
+
   return (
     <div className={cn('flex items-center gap-1', className)}>
-      {onEdit && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size='icon'
-              variant='ghost'
-              className='h-7 w-7 text-tertiary-token hover:text-secondary-token opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-              onClick={onEdit}
-              aria-label='Edit link'
-            >
-              <Icon name='Pencil' className='h-3.5 w-3.5' />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side='top'>Edit link</TooltipContent>
-        </Tooltip>
-      )}
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size='icon'
-            variant='ghost'
-            className='h-7 w-7 text-tertiary-token hover:text-secondary-token opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-            onClick={onToggle}
-            aria-label={isVisible ? 'Hide link' : 'Show link'}
-            aria-pressed={isVisible}
-          >
-            {isVisible ? (
-              <Icon name='Eye' className='h-3.5 w-3.5' />
-            ) : (
-              <Icon name='EyeOff' className='h-3.5 w-3.5' />
-            )}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side='top'>
-          {isVisible ? 'Hide link' : 'Show link'}
-        </TooltipContent>
-      </Tooltip>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            size='icon'
-            variant='ghost'
-            className='h-7 w-7 text-tertiary-token hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-            onClick={onRemove}
-            aria-label='Remove link'
-          >
-            <Icon name='Trash2' className='h-3.5 w-3.5' />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side='top'>Remove link</TooltipContent>
-      </Tooltip>
-
-      {showDragHandle && (
+      {showDragHandle ? (
         <button
           type='button'
-          className='h-7 w-5 flex items-center justify-center text-tertiary-token/40 hover:text-tertiary-token/70 transition-colors cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
           onPointerDown={onDragHandlePointerDown}
+          className='opacity-0 group-hover:opacity-70 group-focus-within:opacity-100 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-100 active:scale-[0.97]'
           aria-label='Drag to reorder'
-          aria-roledescription='sortable'
         >
-          <Icon name='GripVertical' className='h-4 w-4' />
+          <span className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-surface-2/80 text-secondary-token ring-1 ring-subtle shadow-sm'>
+            <Icon name='GripVertical' className='h-3.5 w-3.5' />
+          </span>
         </button>
-      )}
+      ) : null}
+
+      <div className='relative'>
+        <button
+          type='button'
+          aria-label='Link actions'
+          onClick={() => setOpen(!open)}
+          className='inline-flex h-8 w-8 items-center justify-center rounded-md bg-surface-2/70 text-secondary-token ring-1 ring-subtle transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:text-primary-token hover:bg-surface-2 active:scale-[0.97]'
+        >
+          <Icon name='MoreVertical' className='h-4 w-4' />
+        </button>
+        <div className='sr-only'>Actions: edit, hide/show, delete</div>
+
+        {open ? (
+          <div className='absolute right-0 top-9 z-10 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg'>
+            {onEdit ? (
+              <button
+                type='button'
+                onClick={() => {
+                  setOpen(false);
+                  onEdit();
+                }}
+                className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
+              >
+                <Icon name='Pencil' className='h-4 w-4' />
+                Edit
+              </button>
+            ) : null}
+            <button
+              type='button'
+              onClick={() => {
+                setOpen(false);
+                onToggle();
+              }}
+              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
+            >
+              <Icon name={isVisible ? 'Eye' : 'EyeOff'} className='h-4 w-4' />
+              {isVisible ? 'Hide' : 'Show'}
+            </button>
+            <button
+              type='button'
+              onClick={() => {
+                setOpen(false);
+                onRemove();
+              }}
+              className='flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-destructive hover:text-destructive/80 hover:bg-surface-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
+            >
+              <Icon name='Trash' className='h-4 w-4' />
+              Delete
+            </button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 });

@@ -1,8 +1,9 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
@@ -42,15 +43,15 @@ interface HandleValidationState {
 const ONBOARDING_STEPS = [
   {
     id: 'name',
-    title: "What's your name?",
-    prompt: 'This will show on your Jovie profile.',
+    title: 'What should we call you?',
+    prompt: '',
   },
   {
     id: 'handle',
     title: 'Pick your @handle',
-    prompt: 'This becomes your Jovie link.',
+    prompt: '',
   },
-  { id: 'done', title: "You're live.", prompt: "Here's your link." },
+  { id: 'done', title: "You're live.", prompt: 'Your Jovie link' },
 ] as const;
 
 export function AppleStyleOnboardingForm({
@@ -89,11 +90,27 @@ export function AppleStyleOnboardingForm({
 
   const validationSequence = useRef(0);
   const abortController = useRef<AbortController | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+  const handleInputRef = useRef<HTMLInputElement | null>(null);
 
   const profileBaseUrl = getBaseUrl();
   const displayDomain = profileBaseUrl
     .replace(/^https?:\/\//, '')
     .replace(/\/$/, '');
+
+  const namePlaceholder = useMemo(() => {
+    const options = [
+      'Madonna',
+      'BLACKPINK',
+      'Tiësto',
+      'FISHER',
+      'Neon Hitch',
+      'U2',
+      'Imagine Dragons',
+      'ODESZA',
+    ];
+    return options[Math.floor(Math.random() * options.length)];
+  }, []);
 
   useEffect(() => {
     if (userId) {
@@ -103,6 +120,15 @@ export function AppleStyleOnboardingForm({
       });
     }
   }, [userId]);
+
+  // Step-based autofocus for keyboard-only users
+  useEffect(() => {
+    const target =
+      currentStepIndex === 0 ? nameInputRef.current : handleInputRef.current;
+    if (target) {
+      target.focus();
+    }
+  }, [currentStepIndex]);
 
   const goToNextStep = useCallback(() => {
     if (currentStepIndex >= ONBOARDING_STEPS.length - 1) return;
@@ -385,6 +411,14 @@ export function AppleStyleOnboardingForm({
     router.refresh();
   }, [router]);
 
+  const goBack = useCallback(() => {
+    if (currentStepIndex > 0) {
+      goToPreviousStep();
+    } else {
+      router.back();
+    }
+  }, [currentStepIndex, goToPreviousStep, router]);
+
   const retryOperation = useCallback(() => {
     setState(prev => ({
       ...prev,
@@ -402,28 +436,31 @@ export function AppleStyleOnboardingForm({
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[0].title}
               </h1>
-              <p className='text-(--muted) text-sm sm:text-base'>
-                {ONBOARDING_STEPS[0].prompt}
-              </p>
+              {ONBOARDING_STEPS[0].prompt && (
+                <p className='text-(--muted) text-sm sm:text-base'>
+                  {ONBOARDING_STEPS[0].prompt}
+                </p>
+              )}
             </div>
 
             <div className='w-full max-w-md space-y-6'>
               <div className='space-y-4'>
-                <label
-                  className='text-sm font-medium text-(--muted)'
-                  htmlFor='display-name'
-                >
-                  Your name
-                </label>
                 <Input
                   id='display-name'
+                  ref={nameInputRef}
                   type='text'
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
-                  placeholder='Your full name'
+                  placeholder={namePlaceholder}
+                  aria-label='Your full name'
                   inputClassName='w-full px-4 py-4 text-lg bg-(--panel) border-2 border-(--border) rounded-xl focus-ring text-(--fg) transition-all'
                   maxLength={50}
                   autoComplete='name'
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && fullName.trim()) {
+                      goToNextStep();
+                    }
+                  }}
                 />
 
                 <Button
@@ -435,13 +472,6 @@ export function AppleStyleOnboardingForm({
                   Continue
                 </Button>
               </div>
-
-              <button
-                onClick={goToPreviousStep}
-                className='w-full text-center text-(--muted) hover:text-(--fg) py-2 text-sm transition-colors'
-              >
-                Back
-              </button>
             </div>
           </div>
         );
@@ -464,11 +494,12 @@ export function AppleStyleOnboardingForm({
                   className='text-sm font-medium text-(--muted)'
                   htmlFor='handle-input'
                 >
-                  Enter your desired handle
+                  @handle
                 </label>
                 <div className='relative'>
                   <Input
                     id='handle-input'
+                    ref={handleInputRef}
                     aria-label='Enter your desired handle'
                     type='text'
                     value={handleInput}
@@ -482,6 +513,16 @@ export function AppleStyleOnboardingForm({
                           ? 'border-green-500'
                           : 'border-(--border)'
                     } focus-ring text-(--fg)`}
+                    onKeyDown={e => {
+                      if (
+                        e.key === 'Enter' &&
+                        handleValidation.available &&
+                        handleValidation.clientValid &&
+                        !state.isSubmitting
+                      ) {
+                        handleSubmit();
+                      }
+                    }}
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
@@ -493,9 +534,11 @@ export function AppleStyleOnboardingForm({
                   )}
                 </div>
 
-                <div className='text-center p-3 bg-(--panel) rounded-xl border border-(--border)'>
-                  <p className='text-(--muted) text-sm'>Your profile link</p>
-                  <p className='font-mono text-(--fg) text-sm sm:text-base break-all max-w-full'>
+                <div className='text-center space-y-1'>
+                  <p className='text-(--muted) text-xs sm:text-sm font-medium'>
+                    Your Jovie link
+                  </p>
+                  <p className='font-mono text-(--muted) text-base sm:text-lg break-all max-w-full font-semibold'>
                     {displayDomain}/{handleInput || 'yourhandle'}
                   </p>
                 </div>
@@ -536,30 +579,27 @@ export function AppleStyleOnboardingForm({
                 </Button>
               </div>
 
-              {state.error && (
-                <ErrorBanner
-                  title='We could not save your handle'
-                  description={state.error}
-                  actions={[
-                    {
-                      label: 'Try again',
-                      onClick: retryOperation,
-                    },
-                    {
-                      label: 'Contact support',
-                      href: '/support',
-                    },
-                  ]}
-                  testId='onboarding-error'
-                />
-              )}
-
-              <button
-                onClick={goToPreviousStep}
-                className='w-full text-center text-(--muted) hover:text-(--fg) py-2 text-sm transition-colors'
-              >
-                Back
-              </button>
+              <div className='min-h-[140px] flex items-start'>
+                {state.error ? (
+                  <ErrorBanner
+                    title='We could not save your handle'
+                    description={state.error}
+                    actions={[
+                      {
+                        label: 'Try again',
+                        onClick: retryOperation,
+                      },
+                      {
+                        label: 'Contact support',
+                        href: '/support',
+                      },
+                    ]}
+                    testId='onboarding-error'
+                  />
+                ) : (
+                  <div aria-hidden='true' className='w-full' />
+                )}
+              </div>
             </div>
           </div>
         );
@@ -577,13 +617,16 @@ export function AppleStyleOnboardingForm({
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='text-center p-4 bg-(--panel) border border-(--border) rounded-xl'>
-                <p className='font-mono text-lg text-(--fg)'>
+              <div className='text-center space-y-1'>
+                <p className='text-(--muted) text-xs sm:text-sm font-medium'>
+                  Your Jovie link
+                </p>
+                <p className='font-mono text-(--muted) text-base sm:text-lg break-all max-w-full font-semibold'>
                   {displayDomain}/{profileReadyHandle || handle}
                 </p>
               </div>
 
-              <div className='space-y-3'>
+              <div className='space-y-4'>
                 <Button
                   onClick={goToDashboard}
                   variant='primary'
@@ -595,7 +638,7 @@ export function AppleStyleOnboardingForm({
                 <Button
                   onClick={copyProfileLink}
                   variant='secondary'
-                  className='w-full py-4 text-lg rounded-xl'
+                  className='w-full py-4 text-lg rounded-xl bg-transparent border border-(--border) text-(--muted) hover:bg-(--border)'
                 >
                   Copy Link
                 </Button>
@@ -614,23 +657,28 @@ export function AppleStyleOnboardingForm({
     }
   };
 
-  const ProgressIndicator = () => {
-    return (
-      <div className='fixed top-0 left-0 right-0 z-50'>
-        <div className='h-1 bg-(--border)'>
-          <div
-            className='h-full bg-(--accent-pro) transition-all duration-500 ease-in-out'
-            style={{
-              width: `${((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100}%`,
-            }}
-          />
-        </div>
-      </div>
-    );
-  };
+  const ProgressIndicator = () => (
+    <div className='w-full h-1 bg-[#1f1f22] rounded-full overflow-hidden'>
+      <div
+        className='h-full bg-white transition-all duration-500 ease-in-out'
+        style={{
+          width: `${((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100}%`,
+        }}
+      />
+    </div>
+  );
 
   return (
-    <div className='min-h-screen flex flex-col bg-(--bg) text-(--fg)'>
+    <div className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'>
+      <button
+        type='button'
+        onClick={goBack}
+        aria-label='Go back'
+        className='fixed top-4 left-4 md:top-6 md:left-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-(--fg) hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)'
+      >
+        <ArrowLeft className='h-5 w-5' />
+      </button>
+
       <ProgressIndicator />
 
       <a
@@ -646,7 +694,7 @@ export function AppleStyleOnboardingForm({
       </div>
 
       <main
-        className='flex-1 flex items-center justify-center px-4 pt-6 pb-16 md:pt-10 md:pb-24'
+        className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
         id='main-content'
         role='main'
         aria-labelledby='step-heading'

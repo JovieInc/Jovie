@@ -14,7 +14,7 @@ import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { GroupedLinksManager } from './GroupedLinksManager';
 
 // Define platform types
-type PlatformType = 'social' | 'dsp' | 'custom';
+type PlatformType = 'social' | 'dsp' | 'earnings' | 'custom';
 
 function getPlatformCategory(platform: string): PlatformType {
   const dspPlatforms = new Set([
@@ -29,6 +29,18 @@ function getPlatformCategory(platform: string): PlatformType {
     'pandora',
   ]);
 
+  const earningsPlatforms = new Set([
+    'patreon',
+    'buy_me_a_coffee',
+    'kofi',
+    'paypal',
+    'venmo',
+    'cashapp',
+    'shopify',
+    'etsy',
+    'amazon',
+  ]);
+
   const socialPlatforms = new Set([
     'instagram',
     'twitter',
@@ -36,18 +48,10 @@ function getPlatformCategory(platform: string): PlatformType {
     'youtube',
     'facebook',
     'twitch',
-    'shopify',
-    'etsy',
-    'amazon',
-    'patreon',
-    'buy_me_a_coffee',
-    'kofi',
-    'paypal',
-    'venmo',
-    'cashapp',
   ]);
 
   if (dspPlatforms.has(platform)) return 'dsp';
+  if (earningsPlatforms.has(platform)) return 'earnings';
   if (socialPlatforms.has(platform)) return 'social';
   return 'custom';
 }
@@ -139,7 +143,9 @@ export function EnhancedDashboardLinks({
 
   const buildPlatformMeta = useCallback((link: ProfileSocialLink): Platform => {
     const displayName = getSocialPlatformLabel(link.platform as SocialPlatform);
-    const category = getPlatformCategory(link.platform);
+    const category: PlatformType =
+      (link.platformType as PlatformType | null | undefined) ??
+      getPlatformCategory(link.platform);
     return {
       id: link.platform,
       name: displayName,
@@ -265,9 +271,13 @@ export function EnhancedDashboardLinks({
         const [input] = args as [LinkItem[]];
 
         const normalized: LinkItem[] = input.map((item, index) => {
-          const rawCategory = item.platform.category;
+          const rawCategory = item.platform.category as
+            | PlatformType
+            | undefined;
           const category: PlatformType =
-            rawCategory === 'dsp' || rawCategory === 'social'
+            rawCategory === 'dsp' ||
+            rawCategory === 'social' ||
+            rawCategory === 'earnings'
               ? rawCategory
               : 'custom';
 
@@ -373,11 +383,8 @@ export function EnhancedDashboardLinks({
         const rawVisibility = (link as unknown as { isVisible?: boolean })
           .isVisible;
         const isVisible = rawVisibility ?? true;
-        const rawCategory = link.platform.category;
-        const category: PlatformType =
-          rawCategory === 'dsp' || rawCategory === 'social'
-            ? rawCategory
-            : 'custom';
+        const rawCategory = link.platform.category as PlatformType | undefined;
+        const category: PlatformType = rawCategory ?? 'custom';
 
         const idBase = link.normalizedUrl || link.originalUrl;
         const state = meta.state ?? (isVisible ? 'active' : 'suggested');
@@ -536,13 +543,15 @@ export function EnhancedDashboardLinks({
       links.map(link => {
         // Map our internal category type to the expected category type in EnhancedDashboardLayout
         const mapCategory = (
-          category: 'social' | 'dsp' | 'custom'
+          category: PlatformType
         ): 'social' | 'music' | 'commerce' | 'other' | undefined => {
           switch (category) {
             case 'dsp':
               return 'music';
             case 'social':
               return 'social';
+            case 'earnings':
+              return 'commerce';
             case 'custom':
               return 'other';
             default:

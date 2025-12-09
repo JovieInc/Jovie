@@ -12,6 +12,11 @@ interface OtpInputProps {
    */
   autoSubmit?: boolean;
   /**
+   * Whether to focus the first digit on mount
+   * @default true
+   */
+  autoFocus?: boolean;
+  /**
    * Accessible label for the OTP input
    */
   'aria-label'?: string;
@@ -27,12 +32,14 @@ interface OtpInputProps {
  */
 export function OtpInput({
   autoSubmit = true,
+  autoFocus = true,
   'aria-label': ariaLabel = 'One-time password',
 }: OtpInputProps) {
   return (
     <Clerk.Input
       type='otp'
       autoSubmit={autoSubmit}
+      autoFocus={autoFocus}
       length={OTP_LENGTH}
       className='flex justify-center gap-2'
       aria-label={ariaLabel}

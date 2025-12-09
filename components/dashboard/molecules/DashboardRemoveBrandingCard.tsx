@@ -14,8 +14,8 @@ export function DashboardRemoveBrandingCard({
     <Link
       href='/billing/remove-branding'
       className={cn(
-        'group relative block overflow-hidden rounded-2xl border border-subtle bg-surface-1 px-3.5 py-3.5 text-primary-token shadow-sm backdrop-blur-sm',
-        'transition-all duration-200 ease-out hover:-translate-y-0.5 hover:bg-surface-2 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base',
+        'group relative block overflow-hidden rounded-xl border border-subtle/70 bg-surface-1/85 px-4 py-4 text-primary-token shadow-sm backdrop-blur-sm',
+        'transition-all duration-180 ease-out hover:-translate-y-0.25 hover:bg-surface-2/85 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base',
         'group-data-[collapsible=icon]:hidden',
         className
       )}

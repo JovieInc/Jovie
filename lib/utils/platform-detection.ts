@@ -6,7 +6,7 @@
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: 'dsp' | 'social' | 'custom'; // DSP = Digital Service Provider (music platforms)
+  category: 'dsp' | 'social' | 'earnings' | 'custom'; // DSP = Digital Service Provider (music platforms)
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -122,7 +122,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   venmo: {
     id: 'venmo',
     name: 'Venmo',
-    category: 'social',
+    category: 'earnings',
     icon: 'venmo',
     color: '3D95CE',
     placeholder: 'https://venmo.com/username',

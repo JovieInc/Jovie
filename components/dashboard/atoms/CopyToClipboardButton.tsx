@@ -12,6 +12,7 @@ export interface CopyToClipboardButtonProps {
   idleLabel?: string;
   successLabel?: string;
   errorLabel?: string;
+  className?: string;
 }
 
 export function CopyToClipboardButton({
@@ -19,6 +20,7 @@ export function CopyToClipboardButton({
   idleLabel = 'Copy URL',
   successLabel = '✓ Copied!',
   errorLabel = 'Failed to copy',
+  className,
 }: CopyToClipboardButtonProps) {
   const [status, setStatus] = useState<CopyStatus>('idle');
 
@@ -94,7 +96,12 @@ export function CopyToClipboardButton({
 
   return (
     <div className='relative'>
-      <Button variant='secondary' size='sm' onClick={onCopy}>
+      <Button
+        variant='secondary'
+        size='sm'
+        onClick={onCopy}
+        className={className}
+      >
         {status === 'success'
           ? successLabel
           : status === 'error'
