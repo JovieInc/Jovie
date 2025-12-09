@@ -128,7 +128,7 @@ export function SettingsPolished({
         if (!response.ok) {
           throw new Error(
             (data as { error?: string }).error ||
-              'Failed to update profile photo'
+            'Failed to update profile photo'
           );
         }
 
@@ -819,10 +819,10 @@ export function SettingsPolished({
         isPro
           ? renderRemoveBrandingSection()
           : renderProUpgradeCard(
-              'Professional Appearance',
-              'Remove Jovie branding to create a fully custom experience for your fans.',
-              SparklesIcon
-            ),
+            'Professional Appearance',
+            'Remove Jovie branding to create a fully custom experience for your fans.',
+            SparklesIcon
+          ),
     },
     {
       id: 'ad-pixels',
@@ -833,10 +833,10 @@ export function SettingsPolished({
         isPro
           ? renderAdPixelsSection()
           : renderProUpgradeCard(
-              'Unlock Growth Tracking',
-              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-              RocketLaunchIcon
-            ),
+            'Unlock Growth Tracking',
+            'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+            RocketLaunchIcon
+          ),
     },
     {
       id: 'billing',

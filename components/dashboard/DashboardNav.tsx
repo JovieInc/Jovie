@@ -199,13 +199,13 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
         const shortcut = navShortcuts[item.id];
         const tooltip = shortcut
           ? {
-              children: (
-                <div className='flex items-center gap-2'>
-                  <span>{item.name}</span>
-                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-                </div>
-              ),
-            }
+            children: (
+              <div className='flex items-center gap-2'>
+                <span>{item.name}</span>
+                <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
+              </div>
+            ),
+          }
           : item.name;
 
         return (
@@ -234,20 +234,17 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       aria-label='Dashboard navigation'
       role='navigation'
     >
-      <SidebarGroup className='mb-2'>
-        <SidebarGroupContent className='w-full text-sm mb-2'>
-          {renderSection(activeItems)}
-        </SidebarGroupContent>
+      <SidebarGroup className='mb-1'>
+        <SidebarGroupContent>{renderSection(activeItems)}</SidebarGroupContent>
       </SidebarGroup>
       {!isInSettings && (
-        <SidebarGroup className='mb-1'>
+        <SidebarGroup className='mt-0'>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent className='w-full text-sm mb-1'>
+          <SidebarGroupContent>
             {renderSection(secondaryNavigation)}
           </SidebarGroupContent>
         </SidebarGroup>
       )}
-
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
         <div className='mt-1.5'>
