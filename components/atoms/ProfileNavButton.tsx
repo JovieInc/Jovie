@@ -9,6 +9,8 @@ interface ProfileNavButtonProps {
   artistHandle: string;
   /** Additional class names */
   className?: string;
+  /** Optional loading state to show animated spinner on the logo */
+  loading?: boolean;
 }
 
 /**
@@ -20,6 +22,7 @@ export function ProfileNavButton({
   showBackButton,
   artistHandle,
   className,
+  loading = false,
 }: ProfileNavButtonProps) {
   // Shared button styles
   const buttonClasses = cn(
@@ -41,18 +44,37 @@ export function ProfileNavButton({
           'shadow-sm hover:shadow-md',
           'hover:bg-white/90 dark:hover:bg-black/70',
           'transition-all duration-200',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+          'transition-[opacity,transform,filter] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90 active:scale-[0.97]'
         )}
         aria-label='Go to Jovie homepage'
       >
-        <Image
-          src='/brand/Jovie-Logo-Icon.svg'
-          alt='Jovie'
-          width={40}
-          height={40}
-          className='w-10 h-10 object-cover rounded-full'
-          priority
-        />
+        <div className='relative'>
+          {/* Static logo */}
+          <Image
+            src='/brand/Jovie-Logo-Icon.svg'
+            alt='Jovie'
+            width={40}
+            height={40}
+            className='w-10 h-10 object-cover rounded-full'
+            priority
+          />
+          {/* Loading spinner overlay */}
+          <Image
+            src='/brand/Jovie-Logo-Icon.svg'
+            alt='Jovie loading'
+            width={40}
+            height={40}
+            className={cn(
+              'absolute inset-0 w-10 h-10 object-cover rounded-full',
+              'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
+              loading
+                ? 'opacity-100 scale-100 animate-spin-slow'
+                : 'opacity-0 scale-0 pointer-events-none'
+            )}
+            priority
+          />
+        </div>
       </Link>
     );
   }

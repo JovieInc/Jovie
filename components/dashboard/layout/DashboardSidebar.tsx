@@ -41,19 +41,20 @@ export function DashboardSidebar({
       variant='sidebar'
       collapsible='icon'
       className={cn(
-        '[--sidebar-width:244px]',
+        '[--sidebar-width:236px]',
         '[--sidebar-width-icon:56px]',
-        '[--sidebar:#f5f5f5]',
+        '[--sidebar:#f1f1f4]',
         '[--sidebar-foreground:#23252a]',
-        '[--sidebar-accent:#e0e0e0]',
-        '[--sidebar-accent-foreground:#111111]',
-        '[--sidebar-border:#e0e0e0]',
+        '[--sidebar-accent:#e6e8ee]',
+        '[--sidebar-accent-foreground:#0f1115]',
+        '[--sidebar-border:#e2e4ea]',
         '[--sidebar-ring:#50e3c2]',
-        'dark:[--sidebar:#090909]',
-        'dark:[--sidebar-foreground:#b0b5c0]',
-        'dark:[--sidebar-accent:#141418]',
-        'dark:[--sidebar-accent-foreground:#ffffff]',
-        'dark:[--sidebar-border:#23252a]',
+        'dark:[--sidebar:#0f1115]',
+        'dark:[--sidebar-foreground:#c6ccd8]',
+        'dark:[--sidebar-accent:#171b22]',
+        'dark:[--sidebar-accent-foreground:#f2f4f8]',
+        '[--sidebar-border:#1c1f26]',
+        'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
         className
       )}
       {...props}
@@ -64,8 +65,8 @@ export function DashboardSidebar({
             href='/dashboard/overview'
             aria-label='Go to dashboard'
             className={cn(
-              'flex flex-1 items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-sidebar-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-              'group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0'
+              'flex h-12 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'group-data-[collapsible=icon]:justify-center'
             )}
           >
             <div className='flex items-center justify-center'>
@@ -92,7 +93,7 @@ export function DashboardSidebar({
         <SidebarSeparator className='my-0.5' />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1'>
+      <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             <DashboardNav />

@@ -18,7 +18,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 // Use a client wrapper to avoid ssr:false in a Server Component
 

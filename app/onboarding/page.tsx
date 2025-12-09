@@ -47,7 +47,12 @@ export default async function OnboardingPage({
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   return (
-    <AuthLayout formTitle='Pick your @handle'>
+    <AuthLayout
+      formTitle="What's your name?"
+      showFooterPrompt={false}
+      showFormTitle={false}
+      logoSpinDelayMs={10000}
+    >
       <div className='relative min-h-[500px]'>
         {/* Theme Toggle pinned to viewport */}
         <div className='fixed top-4 right-4 z-40'>

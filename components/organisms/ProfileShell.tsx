@@ -578,9 +578,9 @@ export function ProfileShell({
                       <div className='flex-shrink-0'>
                         <CTAButton
                           href={`/${artist.handle}?mode=tip`}
-                          variant='ghost'
+                          variant='primary'
                           size='sm'
-                          className='px-3 py-1.5 text-xs rounded-full bg-white/10 hover:bg-white/20 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10 backdrop-blur-sm'
+                          className='px-3 py-1.5 text-xs rounded-full bg-black text-white hover:bg-neutral-900 dark:bg-white dark:text-black dark:hover:bg-gray-100 border border-transparent shadow-sm'
                           isLoading={isTipNavigating}
                           onClick={() => setIsTipNavigating(true)}
                         >

@@ -11,13 +11,17 @@ import { Artist } from '@/types/db';
 interface StaticListenInterfaceProps {
   artist: Artist;
   handle: string;
+  dspsOverride?: AvailableDSP[];
 }
 
 export const StaticListenInterface = React.memo(function StaticListenInterface({
   artist,
   handle,
+  dspsOverride,
 }: StaticListenInterfaceProps) {
-  const [dsps] = useState<AvailableDSP[]>(() => getAvailableDSPs(artist));
+  const [dsps] = useState<AvailableDSP[]>(
+    () => dspsOverride ?? getAvailableDSPs(artist)
+  );
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
@@ -135,7 +139,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
               aria-label={`Open in ${dsp.name} app if installed, otherwise opens in web browser`}
             >
               <div
-                className='flex-shrink-0'
+                className='shrink-0'
                 dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
               />
               <span>
