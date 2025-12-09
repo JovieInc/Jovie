@@ -6,31 +6,43 @@ import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLi
 // Mock platform detection
 vi.mock('@/lib/utils/platform-detection', () => ({
   detectPlatform: (url: string) => {
-    if (url.includes('spotify.com')) {
-      return {
-        platform: {
-          id: 'spotify',
-          name: 'Spotify',
-          icon: 'spotify',
-          color: '1DB954',
-        },
-        normalizedUrl: url,
-        suggestedTitle: 'Spotify',
-        isValid: true,
-      };
-    }
-    if (url.includes('instagram.com')) {
-      return {
-        platform: {
-          id: 'instagram',
-          name: 'Instagram',
-          icon: 'instagram',
-          color: 'E4405F',
-        },
-        normalizedUrl: url,
-        suggestedTitle: 'Instagram',
-        isValid: true,
-      };
+    // Use URL parsing for proper hostname matching (avoids CodeQL incomplete-url-substring-sanitization)
+    try {
+      const parsed = new URL(url);
+      if (
+        parsed.hostname === 'open.spotify.com' ||
+        parsed.hostname === 'spotify.com'
+      ) {
+        return {
+          platform: {
+            id: 'spotify',
+            name: 'Spotify',
+            icon: 'spotify',
+            color: '1DB954',
+          },
+          normalizedUrl: url,
+          suggestedTitle: 'Spotify',
+          isValid: true,
+        };
+      }
+      if (
+        parsed.hostname === 'instagram.com' ||
+        parsed.hostname === 'www.instagram.com'
+      ) {
+        return {
+          platform: {
+            id: 'instagram',
+            name: 'Instagram',
+            icon: 'instagram',
+            color: 'E4405F',
+          },
+          normalizedUrl: url,
+          suggestedTitle: 'Instagram',
+          isValid: true,
+        };
+      }
+    } catch {
+      // Invalid URL
     }
     return null;
   },
