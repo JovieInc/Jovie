@@ -275,6 +275,7 @@ export function validateEnvironment(
 
 /**
  * Get environment information for debugging
+ * Note: Some properties (platform, nodeVersion) are only available in Node.js runtime
  */
 export function getEnvironmentInfo() {
   const nodeEnv = process.env.NODE_ENV || 'development';
@@ -282,13 +283,26 @@ export function getEnvironmentInfo() {
   const isDevelopment = nodeEnv === 'development';
   const isTest = nodeEnv === 'test';
 
+  // These are Node.js-only APIs, not available in Edge runtime
+  // We cast to any to avoid static analysis errors during build
+  let platform = 'edge';
+  let nodeVersion = 'edge-runtime';
+
+  if (typeof process !== 'undefined' && !process.env.NEXT_RUNTIME) {
+    // Only access these if we are likely in a Node environment (NEXT_RUNTIME is undefined or 'nodejs')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const p = process as any;
+    if (p.platform) platform = p.platform;
+    if (p.version) nodeVersion = p.version;
+  }
+
   return {
     nodeEnv,
     isProduction,
     isDevelopment,
     isTest,
-    platform: process.platform,
-    nodeVersion: process.version,
+    platform,
+    nodeVersion,
     hasDatabase: !!env.DATABASE_URL,
     hasClerk: !!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     hasStripe: !!(

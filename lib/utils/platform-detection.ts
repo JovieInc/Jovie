@@ -6,7 +6,7 @@
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: 'dsp' | 'social' | 'custom'; // DSP = Digital Service Provider (music platforms)
+  category: 'dsp' | 'social' | 'earnings' | 'custom'; // DSP = Digital Service Provider (music platforms)
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -122,7 +122,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   venmo: {
     id: 'venmo',
     name: 'Venmo',
-    category: 'social',
+    category: 'earnings',
     icon: 'venmo',
     color: '3D95CE',
     placeholder: 'https://venmo.com/username',
@@ -637,6 +637,38 @@ function generateSuggestedTitle(
 function validateUrl(url: string, platform: PlatformInfo): boolean {
   try {
     new URL(url); // Basic URL validation
+
+    const pathParts = new URL(url).pathname.split('/').filter(Boolean);
+    const requiresHandle = new Set([
+      'instagram',
+      'twitter',
+      'tiktok',
+      'facebook',
+      'linkedin',
+      'venmo',
+      'soundcloud',
+      'twitch',
+      'threads',
+      'snapchat',
+      'discord',
+      'telegram',
+      'reddit',
+      'pinterest',
+      'onlyfans',
+      'linktree',
+      'bandcamp',
+      'line',
+      'viber',
+      'rumble',
+      'youtube',
+    ]);
+    if (requiresHandle.has(platform.id)) {
+      const last = pathParts[pathParts.length - 1] ?? '';
+      // must have at least one non-separator character (not just @)
+      if (!last.replace(/^@/, '').trim()) {
+        return false;
+      }
+    }
 
     // Platform-specific validation rules
     switch (platform.id) {

@@ -192,12 +192,15 @@ export function DashboardTipping() {
         ) : null}
       </div>
 
-      {/* Tipping content - Blurred when no Venmo handle */}
+      {/* Tipping content - Blurred and inert when no Venmo handle */}
       <div
         className={cn(
           'space-y-6 transition-all duration-300',
           !hasVenmoHandle && 'filter blur-sm pointer-events-none select-none'
         )}
+        aria-hidden={!hasVenmoHandle ? true : undefined}
+        // @ts-expect-error inert is a valid HTML attribute but not yet in React types
+        inert={!hasVenmoHandle ? '' : undefined}
       >
         <div className='grid gap-6 lg:grid-cols-[1.45fr_1fr]'>
           <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>

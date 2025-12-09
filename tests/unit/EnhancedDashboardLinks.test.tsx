@@ -35,17 +35,31 @@ vi.mock('@/lib/utils', async () => {
     debounce: <T extends (...args: unknown[]) => unknown>(
       func: T,
       _wait: number
-    ): ((...args: Parameters<T>) => void) & { cancel: () => void } => {
+    ): ((...args: Parameters<T>) => void) & {
+      cancel: () => void;
+      flush: () => void;
+    } => {
       void _wait;
       const debounced = (...args: Parameters<T>): void => {
         void func(...args);
       };
 
-      (debounced as typeof debounced & { cancel: () => void }).cancel =
-        () => {};
+      (
+        debounced as typeof debounced & {
+          cancel: () => void;
+          flush: () => void;
+        }
+      ).cancel = () => {};
+      (
+        debounced as typeof debounced & {
+          cancel: () => void;
+          flush: () => void;
+        }
+      ).flush = () => {};
 
       return debounced as ((...args: Parameters<T>) => void) & {
         cancel: () => void;
+        flush: () => void;
       };
     },
   };

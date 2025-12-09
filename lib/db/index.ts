@@ -249,11 +249,19 @@ function initializeDb(): DbType {
       process.once('beforeExit', cleanup);
       process.once('SIGINT', () => {
         cleanup();
-        process.exit(0);
+        // Safe exit for Node environment, cast to avoid Edge build static analysis error
+        if (typeof process !== 'undefined' && 'exit' in process) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (process as any).exit(0);
+        }
       });
       process.once('SIGTERM', () => {
         cleanup();
-        process.exit(0);
+        // Safe exit for Node environment, cast to avoid Edge build static analysis error
+        if (typeof process !== 'undefined' && 'exit' in process) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (process as any).exit(0);
+        }
       });
     }
   }

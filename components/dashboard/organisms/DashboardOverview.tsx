@@ -41,13 +41,17 @@ export function DashboardOverview({
 
   return (
     <div className='space-y-6'>
-      <div className='rounded-3xl border border-white/5 bg-linear-to-r from-[#0f111a] via-[#0a0c15] to-[#0f111a] p-6 shadow-[0_25px_70px_rgba(5,10,25,0.35)]'>
+      <DashboardCard
+        variant='analytics'
+        className='rounded-2xl bg-surface-0/80 shadow-sm dark:bg-linear-to-r dark:from-[#0f111a] dark:via-[#0a0c15] dark:to-[#0f111a] dark:shadow-[0_25px_70px_rgba(5,10,25,0.35)]'
+        padding='large'
+      >
         <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
           <div>
-            <p className='text-xs uppercase tracking-[0.3em] text-tertiary-token/70'>
+            <p className='text-xs uppercase tracking-[0.3em] text-secondary-token'>
               Dashboard
             </p>
-            <h1 className='text-2xl font-semibold text-white'>
+            <h1 className='text-2xl font-semibold text-primary-token'>
               Welcome back, {artist.name || 'Artist'}
             </h1>
             <p className='text-sm text-secondary-token'>
@@ -55,7 +59,12 @@ export function DashboardOverview({
             </p>
           </div>
           <div className='flex flex-wrap gap-3'>
-            <Button asChild variant='secondary' size='sm'>
+            <Button
+              asChild
+              variant='secondary'
+              size='sm'
+              className='bg-transparent border border-white/10 text-secondary-token hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
+            >
               <Link
                 href={`/${artist.handle}`}
                 target='_blank'
@@ -64,22 +73,21 @@ export function DashboardOverview({
                 View live profile
               </Link>
             </Button>
-            <CopyToClipboardButton relativePath={`/${artist.handle}`} />
+            <CopyToClipboardButton
+              relativePath={`/${artist.handle}`}
+              className='bg-transparent border border-black/10 dark:border-white/10 text-secondary-token hover:bg-black/5 dark:hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
+            />
           </div>
         </div>
-      </div>
-
-      <DashboardCard variant='settings' className='h-full'>
-        <DashboardActivityFeed profileId={artist.id} />
       </DashboardCard>
 
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+      <DashboardCard variant='onboarding'>
+        <div className='flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between'>
           <div>
-            <p className='text-xs uppercase tracking-[0.25em] text-tertiary-token/70'>
-              Setup
+            <p className='text-xs uppercase tracking-[0.25em] text-secondary-token'>
+              {allTasksComplete ? 'Complete' : 'Getting Started'}
             </p>
-            <h3 className='text-lg font-semibold text-primary-token'>
+            <h3 className='text-xl font-semibold text-primary-token/95'>
               {allTasksComplete ? 'Profile ready!' : 'Complete your setup'}
             </h3>
             <p className='text-sm text-secondary-token'>
@@ -88,8 +96,16 @@ export function DashboardOverview({
                 : 'Finish the essentials to unlock the full experience.'}
             </p>
           </div>
-          <div className='text-sm font-semibold text-secondary-token'>
-            {completedCount}/{totalSteps} done
+          <div className='flex items-center gap-2'>
+            <div className='text-xs font-semibold text-primary-token'>
+              {completedCount}/{totalSteps}
+            </div>
+            <div className='h-2 w-16 overflow-hidden rounded-full border border-subtle bg-surface-2'>
+              <div
+                className='h-full rounded-full bg-linear-to-r from-accent to-accent/80 shadow-[0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out'
+                style={{ width: `${(completedCount / totalSteps) * 100}%` }}
+              />
+            </div>
           </div>
         </div>
 
@@ -117,15 +133,15 @@ export function DashboardOverview({
               aria-valuemin={0}
               aria-valuemax={totalSteps}
               aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
-              className='relative h-3 overflow-hidden rounded-full bg-surface-2'
+              className='relative h-2 overflow-hidden rounded-full border border-subtle bg-surface-2'
             >
               <div
-                className='absolute inset-y-0 left-0 rounded-full bg-accent transition-all duration-300 ease-in-out'
+                className='absolute inset-y-0 left-0 rounded-full bg-linear-to-r from-accent to-accent/80 shadow-[0_0_0_1px_rgba(0,0,0,0.04)] transition-all duration-300 ease-out'
                 style={{ width: `${(completedCount / totalSteps) * 100}%` }}
               />
             </div>
 
-            <ol className='space-y-3 list-none pl-0'>
+            <ol className='space-y-2 list-none pl-0'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'
@@ -146,7 +162,12 @@ export function DashboardOverview({
                 completeLabel='Music link added'
                 incompleteLabel='Connect Spotify, Apple Music, or YouTube'
                 action={
-                  <Button asChild size='sm' variant='primary'>
+                  <Button
+                    asChild
+                    size='sm'
+                    variant='primary'
+                    className='px-4 sm:px-5 text-[13px] rounded-lg hover:opacity-90'
+                  >
                     <Link href='/dashboard/links'>Add music link</Link>
                   </Button>
                 }
@@ -159,7 +180,12 @@ export function DashboardOverview({
                 completeLabel='Social links added'
                 incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
                 action={
-                  <Button asChild size='sm' variant='primary'>
+                  <Button
+                    asChild
+                    size='sm'
+                    variant='primary'
+                    className='px-4 sm:px-5 text-[13px] rounded-lg hover:opacity-90'
+                  >
                     <Link href='/dashboard/links'>Add social links</Link>
                   </Button>
                 }
@@ -167,6 +193,10 @@ export function DashboardOverview({
             </ol>
           </div>
         )}
+      </DashboardCard>
+
+      <DashboardCard variant='settings' className='h-full'>
+        <DashboardActivityFeed profileId={artist.id} />
       </DashboardCard>
     </div>
   );

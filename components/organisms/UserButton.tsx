@@ -8,7 +8,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
@@ -407,7 +406,7 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[244px] rounded-[12px] border border-(--accents-2) bg-(--geist-background) text-(--geist-foreground) p-3.5 shadow-[0_18px_45px_rgba(0,0,0,0.45)] font-sans text-[13px] leading-[18px] space-y-1'
+        className='w-[244px] rounded-xl border-none bg-surface-1/95 text-primary-token p-3.5 shadow-[0_22px_72px_-14px_rgba(0,0,0,0.38)] backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-2/90'
       >
         {/* Identity block - name first, email once, smaller */}
         <DropdownMenuLabel className='px-0 py-0 mb-1'>
@@ -421,7 +420,7 @@ export function UserButton({
             />
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-1.5'>
-                <span className='truncate text-sm font-semibold text-primary-token'>
+                <span className='truncate text-sm font-medium text-primary-token/90'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
@@ -435,7 +434,7 @@ export function UserButton({
                 )}
               </div>
               {contactEmail && (
-                <p className='truncate text-xs text-secondary-token mt-0.5'>
+                <p className='truncate text-xs text-secondary-token/75 mt-0.5'>
                   {contactEmail}
                 </p>
               )}
@@ -443,12 +442,12 @@ export function UserButton({
           </div>
         </DropdownMenuLabel>
 
-        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+        <div className='h-1' />
 
         {/* Primary actions group */}
         <DropdownMenuItem
           onClick={handleProfile}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
         >
           <Icon
             name='User'
@@ -459,7 +458,7 @@ export function UserButton({
 
         <DropdownMenuItem
           onClick={handleSettings}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
         >
           <Icon
             name='Settings'
@@ -483,7 +482,7 @@ export function UserButton({
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95 disabled:active:scale-100'
           >
             <Icon
               name='CreditCard'
@@ -495,7 +494,7 @@ export function UserButton({
           </DropdownMenuItem>
         ) : null}
 
-        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+        <div className='h-1' />
 
         {/* Theme toggle - inline row: label left, pill right */}
         <div className='flex items-center justify-between px-2 py-2'>
@@ -562,7 +561,7 @@ export function UserButton({
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-colors hover:bg-(--accents-1) focus:bg-(--accents-1)'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-primary-token transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-(--accents-1) hover:opacity-90 focus:bg-(--accents-1) active:scale-[0.97] active:opacity-95'
         >
           <Icon
             name='MessageSquare'
@@ -571,13 +570,13 @@ export function UserButton({
           <span className='flex-1'>Send feedback</span>
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator className='my-1.5 h-px bg-(--accents-2)' />
+        <div className='h-1' />
 
         {/* Sign out - pinned at bottom */}
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-red-400 transition-colors hover:bg-red-500/10 focus:bg-red-500/10'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2 text-[13px] text-red-400 transition-all duration-100 ease-[cubic-bezier(.33,.01,.27,1)] hover:bg-red-500/10 hover:opacity-90 focus:bg-red-500/10 active:scale-[0.97] active:opacity-95 disabled:active:scale-100'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>

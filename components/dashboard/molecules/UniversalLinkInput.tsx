@@ -1,13 +1,19 @@
 'use client';
 
-import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import {
+  ChevronDownIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+} from '@heroicons/react/20/solid';
 import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
+import Image from 'next/image';
 import React, {
   forwardRef,
   useCallback,
@@ -19,11 +25,31 @@ import React, {
 } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import { track } from '@/lib/analytics';
+import {
+  type SpotifyArtistResult,
+  useArtistSearch,
+} from '@/lib/hooks/useArtistSearch';
 import { isBrandDark } from '@/lib/utils/color';
 import {
   type DetectedLink,
   detectPlatform,
 } from '@/lib/utils/platform-detection';
+
+// Special search mode platforms
+const ARTIST_SEARCH_PLATFORMS = [
+  {
+    id: 'spotify-artist',
+    name: 'Spotify Artist',
+    icon: 'spotify',
+    searchMode: true,
+    provider: 'spotify' as const,
+  },
+  // Apple Music can be added here later
+] as const;
+
+type ArtistSearchProvider =
+  (typeof ARTIST_SEARCH_PLATFORMS)[number]['provider'];
 
 // Platform options for the dropdown selector
 const PLATFORM_OPTIONS = [
@@ -116,6 +142,14 @@ const PLATFORM_OPTIONS = [
   { id: 'website', name: 'Website', icon: 'globe', prefill: 'https://' },
 ] as const;
 
+// Format follower count for display
+function formatFollowers(count: number | undefined): string {
+  if (!count) return '';
+  if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M followers`;
+  if (count >= 1_000) return `${(count / 1_000).toFixed(1)}K followers`;
+  return `${count} followers`;
+}
+
 interface UniversalLinkInputProps {
   onAdd: (link: DetectedLink) => void;
   placeholder?: string;
@@ -152,9 +186,44 @@ export const UniversalLinkInput = forwardRef<
     const inputRef = useRef<HTMLDivElement>(null);
     const urlInputRef = useRef<HTMLInputElement>(null);
 
+    // Artist search mode state
+    const [searchMode, setSearchMode] = useState<ArtistSearchProvider | null>(
+      null
+    );
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showResults, setShowResults] = useState(false);
+    const [activeResultIndex, setActiveResultIndex] = useState(-1);
+    const resultsListRef = useRef<HTMLUListElement>(null);
+
+    // Artist search hook
+    const {
+      results: artistResults,
+      state: searchState,
+      error: searchError,
+      search: searchArtists,
+      clear: clearSearch,
+    } = useArtistSearch({ debounceMs: 300, limit: 5 });
+
     // If parent provides a prefill URL and we are empty, consume it once
     useEffect(() => {
-      if (prefillUrl && !url) {
+      if (prefillUrl && !url && !searchMode) {
+        // Check for special search mode marker
+        if (prefillUrl.startsWith('__SEARCH_MODE__:')) {
+          const provider = prefillUrl.split(':')[1] as ArtistSearchProvider;
+          if (provider === 'spotify') {
+            setSearchMode(provider);
+            setUrl('');
+            setSearchQuery('');
+            clearSearch();
+            onPrefillConsumed?.();
+            onQueryChange?.('');
+            setTimeout(() => {
+              urlInputRef.current?.focus();
+            }, 0);
+            return;
+          }
+        }
+
         setUrl(prefillUrl);
         onPrefillConsumed?.();
         onQueryChange?.(prefillUrl);
@@ -251,11 +320,146 @@ export const UniversalLinkInput = forwardRef<
       getInputElement: () => urlInputRef.current,
     }));
 
-    // Handle platform selection from dropdown - preserve handle/username
+    // Handle artist selection from search results
+    const handleArtistSelect = useCallback(
+      (artist: SpotifyArtistResult) => {
+        // Track artist selection
+        track('spotify_artist_select', {
+          artist_id: artist.id,
+          artist_name: artist.name,
+          followers: artist.followers,
+          result_count: artistResults.length,
+        });
+
+        // Create a detected link from the artist
+        const link = detectPlatform(artist.url, creatorName);
+        if (link && link.isValid) {
+          // Override the title with the artist name
+          const enrichedLink = {
+            ...link,
+            suggestedTitle: artist.name,
+          };
+          onAdd(enrichedLink);
+        }
+
+        // Exit search mode and reset
+        setSearchMode(null);
+        setSearchQuery('');
+        setShowResults(false);
+        setActiveResultIndex(-1);
+        clearSearch();
+        setUrl('');
+        onQueryChange?.('');
+
+        // Focus input after adding
+        setTimeout(() => {
+          urlInputRef.current?.focus();
+        }, 50);
+      },
+      [artistResults.length, clearSearch, creatorName, onAdd, onQueryChange]
+    );
+
+    // Handle search input changes
+    const handleSearchInputChange = useCallback(
+      (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+        setActiveResultIndex(-1);
+        searchArtists(value);
+        setShowResults(true);
+      },
+      [searchArtists]
+    );
+
+    // Exit search mode
+    const exitSearchMode = useCallback(() => {
+      setSearchMode(null);
+      setSearchQuery('');
+      setShowResults(false);
+      setActiveResultIndex(-1);
+      clearSearch();
+      // Optionally prefill with Spotify URL base
+      setUrl('https://open.spotify.com/artist/');
+      onQueryChange?.('https://open.spotify.com/artist/');
+      setTimeout(() => {
+        const input = urlInputRef.current;
+        if (input) {
+          input.focus();
+          const endPos = input.value.length;
+          input.setSelectionRange(endPos, endPos);
+        }
+      }, 0);
+    }, [clearSearch, onQueryChange]);
+
+    // Handle keyboard navigation in search results
+    const handleSearchKeyDown = useCallback(
+      (e: React.KeyboardEvent) => {
+        if (!showResults || artistResults.length === 0) {
+          if (e.key === 'Escape') {
+            e.preventDefault();
+            exitSearchMode();
+          }
+          return;
+        }
+
+        switch (e.key) {
+          case 'ArrowDown':
+            e.preventDefault();
+            setActiveResultIndex(prev =>
+              prev < artistResults.length - 1 ? prev + 1 : 0
+            );
+            break;
+          case 'ArrowUp':
+            e.preventDefault();
+            setActiveResultIndex(prev =>
+              prev > 0 ? prev - 1 : artistResults.length - 1
+            );
+            break;
+          case 'Enter':
+            e.preventDefault();
+            if (activeResultIndex >= 0 && artistResults[activeResultIndex]) {
+              handleArtistSelect(artistResults[activeResultIndex]);
+            }
+            break;
+          case 'Escape':
+            e.preventDefault();
+            if (showResults) {
+              setShowResults(false);
+              setActiveResultIndex(-1);
+            } else {
+              exitSearchMode();
+            }
+            break;
+          case 'Tab':
+            // Close results on tab
+            setShowResults(false);
+            setActiveResultIndex(-1);
+            break;
+        }
+      },
+      [
+        showResults,
+        artistResults,
+        activeResultIndex,
+        handleArtistSelect,
+        exitSearchMode,
+      ]
+    );
+
+    // Scroll active result into view
+    useEffect(() => {
+      if (activeResultIndex >= 0 && resultsListRef.current) {
+        const activeItem = resultsListRef.current.children[
+          activeResultIndex
+        ] as HTMLElement;
+        activeItem?.scrollIntoView({ block: 'nearest' });
+      }
+    }, [activeResultIndex]);
+
+    // Handle platform selection from dropdown - prefill URL and focus at end
     const handlePlatformSelect = useCallback(
       (platform: (typeof PLATFORM_OPTIONS)[number]) => {
         const input = urlInputRef.current;
-        const cursorPos = input?.selectionStart ?? url.length;
 
         // Try to extract the handle/username from current URL
         let handle = '';
@@ -283,19 +487,36 @@ export const UniversalLinkInput = forwardRef<
         setUrl(newUrl);
         onQueryChange?.(newUrl);
 
-        // Restore focus without changing cursor position relative to handle
+        // Focus input and position cursor at end so user can immediately type handle
         setTimeout(() => {
           if (input) {
             input.focus();
-            // Position cursor at the same relative position within the handle
-            const newCursorPos =
-              platform.prefill.length +
-              Math.max(0, cursorPos - (url.length - handle.length));
-            input.setSelectionRange(newCursorPos, newCursorPos);
+            const endPos = newUrl.length;
+            input.setSelectionRange(endPos, endPos);
           }
         }, 0);
       },
       [onQueryChange, url]
+    );
+
+    // Handle artist search platform selection
+    const handleArtistSearchSelect = useCallback(
+      (provider: ArtistSearchProvider) => {
+        // Track entering search mode
+        track('spotify_artist_search_start', { provider });
+
+        setSearchMode(provider);
+        setUrl('');
+        setSearchQuery('');
+        clearSearch();
+        setShowResults(false);
+        setActiveResultIndex(-1);
+        onQueryChange?.('');
+        setTimeout(() => {
+          urlInputRef.current?.focus();
+        }, 0);
+      },
+      [clearSearch, onQueryChange]
     );
 
     // Get current platform icon for the selector (detected or default)
@@ -304,11 +525,237 @@ export const UniversalLinkInput = forwardRef<
     const currentIconHex = currentIconMeta?.hex
       ? `#${currentIconMeta.hex}`
       : '#6b7280';
-    const currentIconIsDark = isBrandDark(currentIconHex);
-    const selectorIconColor = currentIconIsDark ? '#ffffff' : currentIconHex;
-    const selectorIconBg = currentIconIsDark
-      ? 'rgba(255,255,255,0.08)'
-      : `${currentIconHex}15`;
+    // Always use brand color as background with white icon for visibility in both modes
+    const selectorIconColor = '#ffffff';
+    const selectorIconBg = currentIconHex;
+
+    // Render search mode UI
+    if (searchMode) {
+      const searchPlatform = ARTIST_SEARCH_PLATFORMS.find(
+        p => p.provider === searchMode
+      );
+      const iconMeta = getPlatformIcon(searchPlatform?.icon || 'spotify');
+      const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#1DB954';
+      const isDarkBrand = isBrandDark(brandHex);
+      const iconColor = isDarkBrand ? '#ffffff' : brandHex;
+      const iconBg = isDarkBrand ? 'rgba(255,255,255,0.08)' : `${brandHex}15`;
+
+      return (
+        <div className='relative w-full' ref={inputRef}>
+          <div className='relative flex'>
+            {/* Search mode indicator */}
+            <div
+              className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 shrink-0'
+              style={{ borderColor: `${brandHex}40` }}
+            >
+              <div
+                className='flex items-center justify-center w-6 h-6 rounded-full'
+                style={{ backgroundColor: iconBg, color: iconColor }}
+              >
+                <SocialIcon
+                  platform={searchPlatform?.icon || 'spotify'}
+                  className='w-3.5 h-3.5'
+                />
+              </div>
+              <MagnifyingGlassIcon className='w-4 h-4 text-tertiary-token' />
+            </div>
+
+            <label htmlFor='artist-search-input' className='sr-only'>
+              Search Spotify artists
+            </label>
+            <Input
+              ref={urlInputRef}
+              id='artist-search-input'
+              type='text'
+              placeholder='Search Spotify artists...'
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              onKeyDown={handleSearchKeyDown}
+              onFocus={() => searchQuery.length >= 2 && setShowResults(true)}
+              onBlur={() => {
+                // Delay to allow click on results
+                setTimeout(() => setShowResults(false), 200);
+              }}
+              disabled={disabled}
+              autoCapitalize='none'
+              autoCorrect='off'
+              autoComplete='off'
+              className='pr-12 rounded-l-none'
+              role='combobox'
+              aria-expanded={showResults && artistResults.length > 0}
+              aria-controls='artist-search-results'
+              aria-activedescendant={
+                activeResultIndex >= 0
+                  ? `artist-result-${activeResultIndex}`
+                  : undefined
+              }
+              aria-describedby='artist-search-status'
+            />
+
+            {/* Clear/exit button */}
+            <div className='absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2'>
+              {searchState === 'loading' && (
+                <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin' />
+              )}
+              <button
+                type='button'
+                onClick={exitSearchMode}
+                className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                aria-label='Exit search mode'
+              >
+                <XMarkIcon className='w-4 h-4' />
+              </button>
+            </div>
+          </div>
+
+          {/* Search results dropdown */}
+          {showResults && (
+            <div
+              className='absolute z-50 w-full mt-1 rounded-lg border border-subtle bg-surface-1 shadow-lg overflow-hidden'
+              style={{ borderColor: `${brandHex}30` }}
+            >
+              {searchState === 'loading' && artistResults.length === 0 && (
+                <div className='p-3 space-y-2'>
+                  {[...Array(3)].map((_, i) => (
+                    <div
+                      key={i}
+                      className='flex items-center gap-3 animate-pulse'
+                    >
+                      <div className='w-10 h-10 rounded-full bg-surface-3' />
+                      <div className='flex-1 space-y-1'>
+                        <div className='h-4 w-32 bg-surface-3 rounded' />
+                        <div className='h-3 w-20 bg-surface-3 rounded' />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {searchState === 'empty' && (
+                <div className='p-4 text-center'>
+                  <p className='text-sm text-secondary-token'>
+                    No artists found
+                  </p>
+                  <button
+                    type='button'
+                    onClick={exitSearchMode}
+                    className='mt-2 text-xs text-accent hover:underline'
+                  >
+                    Add link manually
+                  </button>
+                </div>
+              )}
+
+              {searchState === 'error' && (
+                <div className='p-4 text-center'>
+                  <p className='text-sm text-red-500'>
+                    {searchError || 'Search failed'}
+                  </p>
+                  <button
+                    type='button'
+                    onClick={exitSearchMode}
+                    className='mt-2 text-xs text-accent hover:underline'
+                  >
+                    Add link manually
+                  </button>
+                </div>
+              )}
+
+              {artistResults.length > 0 && (
+                <ul
+                  ref={resultsListRef}
+                  id='artist-search-results'
+                  role='listbox'
+                  className='max-h-64 overflow-y-auto'
+                >
+                  {artistResults.map((artist, index) => (
+                    <li
+                      key={artist.id}
+                      id={`artist-result-${index}`}
+                      role='option'
+                      aria-selected={index === activeResultIndex}
+                      aria-label={`${artist.name}${artist.followers ? `, ${formatFollowers(artist.followers)}` : ''}`}
+                      className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${
+                        index === activeResultIndex
+                          ? 'bg-surface-2'
+                          : 'hover:bg-surface-2/50'
+                      }`}
+                      onClick={() => handleArtistSelect(artist)}
+                      onMouseEnter={() => setActiveResultIndex(index)}
+                    >
+                      {/* Artist image */}
+                      <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
+                        {artist.imageUrl ? (
+                          <Image
+                            src={artist.imageUrl}
+                            alt={artist.name}
+                            fill
+                            sizes='40px'
+                            className='object-cover'
+                            unoptimized
+                          />
+                        ) : (
+                          <div className='w-full h-full flex items-center justify-center'>
+                            <SocialIcon
+                              platform='spotify'
+                              className='w-5 h-5 text-tertiary-token'
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Artist info */}
+                      <div className='flex-1 min-w-0'>
+                        <div className='font-medium text-primary-token truncate'>
+                          {artist.name}
+                        </div>
+                        {artist.followers && (
+                          <div className='text-xs text-tertiary-token'>
+                            {formatFollowers(artist.followers)}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Verified badge placeholder */}
+                      {artist.verified && (
+                        <div className='shrink-0 text-accent'>
+                          <svg
+                            className='w-4 h-4'
+                            viewBox='0 0 20 20'
+                            fill='currentColor'
+                          >
+                            <path
+                              fillRule='evenodd'
+                              d='M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z'
+                              clipRule='evenodd'
+                            />
+                          </svg>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Screen reader status */}
+          <div id='artist-search-status' className='sr-only' aria-live='polite'>
+            {searchState === 'loading' && 'Searching...'}
+            {searchState === 'empty' && 'No artists found'}
+            {searchState === 'error' && (searchError || 'Search failed')}
+            {searchState === 'success' &&
+              `${artistResults.length} artists found. Use arrow keys to navigate.`}
+          </div>
+
+          {/* Helper text */}
+          <div className='mt-2 text-xs text-secondary-token'>
+            💡 Select the official artist profile to ensure your link works
+            correctly
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className='relative w-full' ref={inputRef}>
@@ -319,7 +766,7 @@ export const UniversalLinkInput = forwardRef<
             <DropdownMenuTrigger asChild>
               <button
                 type='button'
-                className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0'
+                className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:z-10'
                 aria-label='Select platform'
               >
                 <div
@@ -340,30 +787,70 @@ export const UniversalLinkInput = forwardRef<
             <DropdownMenuContent
               align='start'
               className='max-h-80 overflow-y-auto'
+              // Prevent Radix from refocusing the trigger; keep focus on URL input
+              onCloseAutoFocus={event => {
+                event.preventDefault();
+                const input = urlInputRef.current;
+                if (input) {
+                  // Defer to ensure dropdown has fully closed before focusing
+                  requestAnimationFrame(() => {
+                    input.focus();
+                    const endPos = input.value.length;
+                    input.setSelectionRange(endPos, endPos);
+                  });
+                }
+              }}
             >
-              {PLATFORM_OPTIONS.map(platform => {
+              {/* Artist search options */}
+              {ARTIST_SEARCH_PLATFORMS.map(platform => {
                 const meta = getPlatformIcon(platform.icon);
                 const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
-                const isDark = isBrandDark(hex);
-                const color = isDark ? '#9ca3af' : hex;
                 return (
                   <DropdownMenuItem
                     key={platform.id}
-                    onClick={() => handlePlatformSelect(platform)}
+                    onSelect={() => handleArtistSearchSelect(platform.provider)}
                     className='flex items-center gap-2 cursor-pointer'
                   >
                     <div
-                      className='flex items-center justify-center w-5 h-5 rounded-full'
+                      className='flex items-center justify-center w-6 h-6 rounded-md'
                       style={{
-                        backgroundColor: isDark
-                          ? 'rgba(255,255,255,0.08)'
-                          : `${hex}15`,
-                        color,
+                        backgroundColor: hex,
+                        color: '#ffffff',
                       }}
                     >
                       <SocialIcon
                         platform={platform.icon}
-                        className='w-3 h-3'
+                        className='w-3.5 h-3.5'
+                      />
+                    </div>
+                    <span>{platform.name}</span>
+                    <MagnifyingGlassIcon className='w-3 h-3 text-tertiary-token ml-auto' />
+                  </DropdownMenuItem>
+                );
+              })}
+
+              <DropdownMenuSeparator />
+
+              {/* Regular platform options */}
+              {PLATFORM_OPTIONS.map(platform => {
+                const meta = getPlatformIcon(platform.icon);
+                const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
+                return (
+                  <DropdownMenuItem
+                    key={platform.id}
+                    onSelect={() => handlePlatformSelect(platform)}
+                    className='flex items-center gap-2 cursor-pointer'
+                  >
+                    <div
+                      className='flex items-center justify-center w-6 h-6 rounded-md'
+                      style={{
+                        backgroundColor: hex,
+                        color: '#ffffff',
+                      }}
+                    >
+                      <SocialIcon
+                        platform={platform.icon}
+                        className='w-3.5 h-3.5'
                       />
                     </div>
                     <span>{platform.name}</span>
@@ -418,7 +905,7 @@ export const UniversalLinkInput = forwardRef<
               <button
                 type='button'
                 onClick={handleClear}
-                className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors'
+                className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                 aria-label='Clear input'
               >
                 <XMarkIcon className='w-4 h-4' />
@@ -517,7 +1004,7 @@ export const UniversalLinkInput = forwardRef<
                 <button
                   type='button'
                   onClick={handleClear}
-                  className='flex items-center justify-center w-8 h-8 rounded-lg text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors'
+                  className='flex items-center justify-center w-8 h-8 rounded-lg text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
                   aria-label='Cancel'
                 >
                   <XMarkIcon className='w-5 h-5' />

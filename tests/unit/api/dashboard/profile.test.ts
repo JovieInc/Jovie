@@ -59,6 +59,14 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/username/sync', () => syncHoisted);
 
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateProfileCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/validation/username', () => ({
+  validateUsername: vi.fn(() => ({ isValid: true })),
+}));
+
 describe('PUT /api/dashboard/profile', () => {
   const mockUpdateUser = clerkClientMock.users.updateUser;
   const mockUpdateUserProfileImage =

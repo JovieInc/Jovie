@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 import { isAdminEmail } from '@/lib/admin/roles';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -83,10 +84,7 @@ export async function toggleCreatorVerifiedAction(
     .where(eq(creatorProfiles.id, profileId))
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
-  if (updatedProfile?.usernameNormalized) {
-    revalidatePath(`/${updatedProfile.usernameNormalized}`);
-  }
-
+  await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath('/admin');
 }
 
@@ -111,10 +109,7 @@ export async function updateCreatorAvatarAsAdmin(
     .where(eq(creatorProfiles.id, profileId))
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
-  if (updatedProfile?.usernameNormalized) {
-    revalidatePath(`/${updatedProfile.usernameNormalized}`);
-  }
-
+  await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath('/admin');
 }
 
@@ -142,10 +137,7 @@ export async function toggleCreatorFeaturedAction(
     .where(eq(creatorProfiles.id, profileId))
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
-  if (updatedProfile?.usernameNormalized) {
-    revalidatePath(`/${updatedProfile.usernameNormalized}`);
-  }
-
+  await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath('/admin');
   revalidatePath('/'); // Featured creators show on homepage
 }

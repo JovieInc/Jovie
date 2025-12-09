@@ -9,6 +9,24 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **Branches & PRs:** Always work on feature branches from `main` and follow sections 1–2 for branching and PR expectations.
 - **Guardrails:** Before making product changes, skim sections 8–13 for architecture, runtime/auth/DB rules, testing expectations, and CI/CD/landmine guidance.
 
+## ⛔ CRITICAL: Production Merge Prohibition
+
+**AI agents must NEVER merge PRs to the `production` branch.**
+
+This includes:
+- Running `gh pr merge` on any PR targeting `production`
+- Running `gh pr review --approve` on production PRs
+- Enabling auto-merge on production PRs
+- Any action that results in code being deployed to production
+
+**Production merges require explicit human approval and action.** AI agents may:
+- Create PRs targeting `main`
+- Merge PRs to `main` (with auto-merge label, after CI passes)
+- Create promotion PRs from `main` → `production` (via workflow trigger)
+- Monitor CI status on production PRs
+
+But **only the human operator** may approve and merge to `production`.
+
 ## 0. Analytics & Feature Flags (Statsig-only)
 
 - Statsig is the **only** product analytics and feature flag platform used in this repo.

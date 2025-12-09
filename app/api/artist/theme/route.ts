@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { ArtistTheme } from '@/components/profile/ArtistThemeProvider';
+import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 
@@ -41,6 +42,9 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+
+      // Invalidate cache for the updated profile
+      await invalidateProfileCache(result[0].usernameNormalized);
 
       return NextResponse.json({ success: true });
     } catch (dbError) {

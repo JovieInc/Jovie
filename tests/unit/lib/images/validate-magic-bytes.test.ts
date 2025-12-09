@@ -36,15 +36,81 @@ describe('validateMagicBytes', () => {
   });
 
   describe('WebP validation', () => {
-    it('should accept valid WebP magic bytes (RIFF container)', () => {
-      // WebP starts with RIFF
-      const webpBuffer = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00]);
+    it('should accept valid WebP magic bytes (RIFF + WEBP)', () => {
+      // WebP format: RIFF (4 bytes) + size (4 bytes) + WEBP (4 bytes)
+      const webpBuffer = Buffer.from([
+        0x52,
+        0x49,
+        0x46,
+        0x46, // RIFF
+        0x00,
+        0x00,
+        0x00,
+        0x00, // file size (placeholder)
+        0x57,
+        0x45,
+        0x42,
+        0x50, // WEBP
+      ]);
       expect(validateMagicBytes(webpBuffer, 'image/webp')).toBe(true);
     });
 
     it('should reject invalid WebP magic bytes', () => {
       const invalidBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
       expect(validateMagicBytes(invalidBuffer, 'image/webp')).toBe(false);
+    });
+
+    it('should reject WAV files spoofed as WebP (RIFF + WAVE)', () => {
+      // WAV format: RIFF (4 bytes) + size (4 bytes) + WAVE (4 bytes)
+      const wavBuffer = Buffer.from([
+        0x52,
+        0x49,
+        0x46,
+        0x46, // RIFF
+        0x00,
+        0x00,
+        0x00,
+        0x00, // file size (placeholder)
+        0x57,
+        0x41,
+        0x56,
+        0x45, // WAVE (not WEBP)
+      ]);
+      expect(validateMagicBytes(wavBuffer, 'image/webp')).toBe(false);
+    });
+
+    it('should reject AVI files spoofed as WebP (RIFF + AVI)', () => {
+      // AVI format: RIFF (4 bytes) + size (4 bytes) + AVI  (4 bytes)
+      const aviBuffer = Buffer.from([
+        0x52,
+        0x49,
+        0x46,
+        0x46, // RIFF
+        0x00,
+        0x00,
+        0x00,
+        0x00, // file size (placeholder)
+        0x41,
+        0x56,
+        0x49,
+        0x20, // AVI  (not WEBP)
+      ]);
+      expect(validateMagicBytes(aviBuffer, 'image/webp')).toBe(false);
+    });
+
+    it('should reject WebP with only RIFF header (missing WEBP signature)', () => {
+      // Only RIFF header, no WEBP signature
+      const riffOnlyBuffer = Buffer.from([
+        0x52,
+        0x49,
+        0x46,
+        0x46, // RIFF
+        0x00,
+        0x00,
+        0x00,
+        0x00, // file size
+      ]);
+      expect(validateMagicBytes(riffOnlyBuffer, 'image/webp')).toBe(false);
     });
   });
 

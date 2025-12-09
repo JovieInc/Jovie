@@ -2,6 +2,7 @@
 
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useState } from 'react';
+import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 type Activity = {
@@ -25,7 +26,13 @@ function formatTimeAgo(value: string) {
   return `${days}d ago`;
 }
 
-export function DashboardActivityFeed({ profileId }: { profileId: string }) {
+export function DashboardActivityFeed({
+  profileId,
+  profileHandle,
+}: {
+  profileId: string;
+  profileHandle?: string;
+}) {
   const gate = useFeatureGate(STATSIG_FLAGS.AUDIENCE_V2);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,9 +117,23 @@ export function DashboardActivityFeed({ profileId }: { profileId: string }) {
       ) : isLoading ? (
         <p className='mt-4 text-sm text-secondary-token'>Loading activity...</p>
       ) : activities.length === 0 ? (
-        <p className='mt-4 text-sm text-secondary-token'>
-          No recent interactions yet.
-        </p>
+        <div className='mt-4 space-y-2 text-sm text-secondary-token'>
+          <div>
+            <p className='font-medium text-primary-token/90'>
+              Waiting for activity… 🚀
+            </p>
+            <p>Share your link to get started.</p>
+          </div>
+          {profileHandle ? (
+            <div>
+              <CopyToClipboardButton
+                relativePath={`/${profileHandle}`}
+                idleLabel='Copy your link'
+                className='bg-transparent border border-black/10 dark:border-white/10 text-secondary-token hover:bg-black/5 dark:hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
+              />
+            </div>
+          ) : null}
+        </div>
       ) : (
         <ul className='mt-4 space-y-3 text-sm text-primary-token'>
           {activities.map(activity => (

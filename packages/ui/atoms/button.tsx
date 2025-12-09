@@ -119,7 +119,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
               </span>
             )}
-            <span className={loading ? 'opacity-0' : 'opacity-100'}>
+            <span
+              className={cn(
+                'inline-flex items-center',
+                loading ? 'opacity-0' : 'opacity-100'
+              )}
+            >
               {children}
             </span>
           </>
@@ -127,7 +132,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         React.isValidElement(children) ? (
           children
         ) : (
-          <span className={loading ? 'opacity-0' : 'opacity-100'}>
+          <span
+            className={cn(
+              'inline-flex items-center',
+              loading ? 'opacity-0' : 'opacity-100'
+            )}
+          >
             {children}
           </span>
         )}
