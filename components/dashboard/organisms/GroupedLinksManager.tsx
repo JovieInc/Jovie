@@ -793,7 +793,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   >
                     <svg
                       className={cn(
-                        'h-4 w-4 transition-transform',
+                        'h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]',
                         collapsed[section] ? '-rotate-90' : 'rotate-0'
                       )}
                       viewBox='0 0 20 20'
@@ -962,8 +962,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
   draggable = true,
   openMenuId,
   onAnyMenuOpen,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for new-card pulse animation
-  isLastAdded: _isLastAdded,
+  isLastAdded,
 }: SortableRowProps<T>) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({
@@ -1049,6 +1048,26 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       )}
       style={cardStyle}
     >
+      {/* Border shimmer effect for newly added cards */}
+      {isLastAdded && (
+        <>
+          <div
+            className='pointer-events-none absolute inset-0 rounded-xl z-0'
+            style={{
+              background: `linear-gradient(90deg, transparent 0%, ${brandHex} 50%, transparent 100%)`,
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.2s ease-out forwards',
+            }}
+          />
+          <div
+            className='pointer-events-none absolute rounded-xl bg-surface-1 z-0'
+            style={{
+              inset: '2px',
+            }}
+          />
+        </>
+      )}
+
       {/* Hidden indicator badge */}
       {!visible && (
         <div className='absolute -top-2 -right-2 flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground border border-border shadow-sm'>
@@ -1058,7 +1077,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       )}
 
       {/* Card header with icon and actions */}
-      <div className='flex items-start justify-between gap-2 mb-3'>
+      <div className='relative z-10 flex items-start justify-between gap-2 mb-3'>
         <div
           className={cn(
             'flex items-center justify-center w-10 h-10 rounded-lg shrink-0 transition-transform group-hover:scale-105',
@@ -1095,7 +1114,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       </div>
 
       {/* Card content */}
-      <div className='min-w-0'>
+      <div className='relative z-10 min-w-0'>
         <div
           className={cn(
             'font-semibold truncate mb-1',

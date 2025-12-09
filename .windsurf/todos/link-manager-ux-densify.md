@@ -4,4 +4,4 @@
 - [x] Adjust category headers (spacing above grid; low-contrast label/divider/icon treatment).
 - [x] Refine link count indicator to single-line, subtle; hide/replace when complete.
 - [x] Update affordances: ellipsis menu instead of floating delete dot; hover tint + active scale; drag handle shown on hover.
-- [ ] Animate category collapse (chevron + fade/height), new-link pulse; keep cards visible while adding.
+- [x] Animate category collapse (chevron + fade/height), new-link pulse; keep cards visible while adding.

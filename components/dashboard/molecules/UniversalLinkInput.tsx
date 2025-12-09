@@ -807,8 +807,6 @@ export const UniversalLinkInput = forwardRef<
               {ARTIST_SEARCH_PLATFORMS.map(platform => {
                 const meta = getPlatformIcon(platform.icon);
                 const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
-                const isDark = isBrandDark(hex);
-                const color = isDark ? '#9ca3af' : hex;
                 return (
                   <DropdownMenuItem
                     key={platform.id}
@@ -816,17 +814,15 @@ export const UniversalLinkInput = forwardRef<
                     className='flex items-center gap-2 cursor-pointer'
                   >
                     <div
-                      className='flex items-center justify-center w-5 h-5 rounded-full'
+                      className='flex items-center justify-center w-6 h-6 rounded-md'
                       style={{
-                        backgroundColor: isDark
-                          ? 'rgba(255,255,255,0.08)'
-                          : `${hex}15`,
-                        color,
+                        backgroundColor: hex,
+                        color: '#ffffff',
                       }}
                     >
                       <SocialIcon
                         platform={platform.icon}
-                        className='w-3 h-3'
+                        className='w-3.5 h-3.5'
                       />
                     </div>
                     <span>{platform.name}</span>
@@ -841,8 +837,6 @@ export const UniversalLinkInput = forwardRef<
               {PLATFORM_OPTIONS.map(platform => {
                 const meta = getPlatformIcon(platform.icon);
                 const hex = meta?.hex ? `#${meta.hex}` : '#6b7280';
-                const isDark = isBrandDark(hex);
-                const color = isDark ? '#9ca3af' : hex;
                 return (
                   <DropdownMenuItem
                     key={platform.id}
@@ -850,17 +844,15 @@ export const UniversalLinkInput = forwardRef<
                     className='flex items-center gap-2 cursor-pointer'
                   >
                     <div
-                      className='flex items-center justify-center w-5 h-5 rounded-full'
+                      className='flex items-center justify-center w-6 h-6 rounded-md'
                       style={{
-                        backgroundColor: isDark
-                          ? 'rgba(255,255,255,0.08)'
-                          : `${hex}15`,
-                        color,
+                        backgroundColor: hex,
+                        color: '#ffffff',
                       }}
                     >
                       <SocialIcon
                         platform={platform.icon}
-                        className='w-3 h-3'
+                        className='w-3.5 h-3.5'
                       />
                     </div>
                     <span>{platform.name}</span>

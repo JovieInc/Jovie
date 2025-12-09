@@ -258,6 +258,11 @@ export function EnhancedDashboardLinks({
     convertDbLinksToSuggestions(suggestionInitialLinks || [])
   );
 
+  // Sync links when server props change (e.g., navigation back to page)
+  useEffect(() => {
+    setLinks(convertDbLinksToLinkItems(activeInitialLinks || []));
+  }, [convertDbLinksToLinkItems, activeInitialLinks]);
+
   useEffect(() => {
     setSuggestedLinks(
       convertDbLinksToSuggestions(suggestionInitialLinks || [])
@@ -368,6 +373,13 @@ export function EnhancedDashboardLinks({
       }, 500),
     [profileId]
   );
+
+  // Flush pending saves on unmount to prevent data loss
+  useEffect(() => {
+    return () => {
+      debouncedSave.flush();
+    };
+  }, [debouncedSave]);
 
   const handleManagerLinksChange = useCallback(
     (updated: DetectedLink[]) => {
