@@ -346,6 +346,7 @@ describe('Base Extraction Utilities', () => {
     });
 
     it('throws EMPTY_RESPONSE for empty body', async () => {
+      vi.useFakeTimers();
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
         status: 200,
@@ -354,16 +355,20 @@ describe('Base Extraction Utilities', () => {
         headers: new Headers({ 'content-type': 'text/html' }),
       } as Response);
 
-      try {
-        await fetchDocument('https://example.com/page');
-        expect.fail('Should have thrown');
-      } catch (e) {
-        expect(e).toBeInstanceOf(ExtractionError);
-        expect((e as ExtractionError).code).toBe('EMPTY_RESPONSE');
-      }
+      const promise = fetchDocument('https://example.com/page');
+      // Attach error handler immediately to prevent unhandled rejection
+      const errorPromise = promise.catch(e => e);
+      // Advance timers to skip retry delays
+      await vi.runAllTimersAsync();
+
+      const error = await errorPromise;
+      expect(error).toBeInstanceOf(ExtractionError);
+      expect((error as ExtractionError).code).toBe('EMPTY_RESPONSE');
+      vi.useRealTimers();
     });
 
     it('retries on transient failures', async () => {
+      vi.useFakeTimers();
       vi.mocked(fetch)
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
@@ -374,11 +379,16 @@ describe('Base Extraction Utilities', () => {
           headers: new Headers({ 'content-type': 'text/html' }),
         } as Response);
 
-      const result = await fetchDocument('https://example.com/page', {
+      const promise = fetchDocument('https://example.com/page', {
         maxRetries: 2,
       });
+      // Advance timers to skip retry delays
+      await vi.runAllTimersAsync();
+
+      const result = await promise;
       expect(result.html).toBe('<html></html>');
       expect(fetch).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
     });
 
     it('does not retry on 404', async () => {
