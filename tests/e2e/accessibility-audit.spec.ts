@@ -208,46 +208,133 @@ test.describe('Accessibility Audit', () => {
   //   await signInUser(page);
   // });
 
-  test('Check dashboard contrast in light and dark modes', async ({ page }) => {
-    test.setTimeout(120000);
-    const routes = ['/', '/signin', '/signup'];
+  test('Check contrast in light and dark modes across key pages', async ({
+    page,
+  }) => {
+    test.setTimeout(180000);
+
+    // Public pages (no auth required)
+    const publicRoutes = ['/', '/signin', '/signup', '/pricing'];
+
+    // Dashboard/admin pages (require auth - will be skipped if not signed in)
+    const authRoutes = [
+      '/dashboard',
+      '/dashboard/settings',
+      '/dashboard/links',
+      '/account',
+      '/admin/users',
+    ];
+
+    const routes = publicRoutes;
+
+    // Helper to force theme via class (more reliable than finding switch)
+    async function setTheme(theme: 'light' | 'dark') {
+      await page.evaluate(t => {
+        if (t === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }, theme);
+      await page.waitForTimeout(300);
+    }
 
     for (const route of routes) {
       const url = route.startsWith('http')
         ? route
         : `http://localhost:3000${route}`;
       await page.goto(url);
+      await page.waitForLoadState('networkidle');
 
-      const isDark = await page.evaluate(() =>
-        document.documentElement.classList.contains('dark')
-      );
-      if (isDark) {
-        const themeSwitch = page.locator('button[role="switch"]');
-        if (await themeSwitch.isVisible()) {
-          await themeSwitch.click();
-          await page.waitForTimeout(500);
-        }
-      }
-
+      // Always test BOTH themes for every page
       console.log(`Auditing ${route} in Light Mode...`);
+      await setTheme('light');
       await auditPage(page, 'light', route);
 
-      const themeSwitch = page.locator('button[role="switch"]');
-      if (await themeSwitch.isVisible()) {
-        await themeSwitch.click();
-        await page.waitForTimeout(500);
-
-        console.log(`Auditing ${route} in Dark Mode...`);
-        await auditPage(page, 'dark', route);
-      } else {
-        console.warn(
-          `Theme switch not found on ${route}, skipping Dark Mode check`
-        );
-      }
+      console.log(`Auditing ${route} in Dark Mode...`);
+      await setTheme('dark');
+      await auditPage(page, 'dark', route);
     }
 
     console.log('AUDIT_RESULTS_START');
     console.log(JSON.stringify(issues, null, 2));
     console.log('AUDIT_RESULTS_END');
+
+    // Fail test if any major issues found
+    const majorIssues = issues.filter(i => i.severity === 'major');
+    if (majorIssues.length > 0) {
+      console.error(`Found ${majorIssues.length} major contrast violations:`);
+      majorIssues.forEach(i => {
+        console.error(
+          `  [${i.theme}] ${i.page} - "${i.textOrIcon}" (${i.contrastRatio})`
+        );
+      });
+    }
+    expect(
+      majorIssues.length,
+      `Found ${majorIssues.length} major contrast violations`
+    ).toBe(0);
+  });
+
+  test('Check authenticated pages contrast (requires auth)', async ({
+    page,
+  }) => {
+    test.setTimeout(180000);
+
+    // Try to sign in - skip test if auth fails
+    try {
+      await signInUser(page);
+    } catch {
+      test.skip(true, 'Auth not available, skipping authenticated page audit');
+      return;
+    }
+
+    const authRoutes = [
+      '/dashboard',
+      '/dashboard/settings',
+      '/dashboard/links',
+      '/account',
+    ];
+
+    async function setTheme(theme: 'light' | 'dark') {
+      await page.evaluate(t => {
+        if (t === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }, theme);
+      await page.waitForTimeout(300);
+    }
+
+    for (const route of authRoutes) {
+      const url = `http://localhost:3000${route}`;
+      await page.goto(url);
+      await page.waitForLoadState('networkidle');
+
+      // Check if we got redirected to signin (auth failed)
+      if (page.url().includes('/signin')) {
+        console.warn(`Skipping ${route} - redirected to signin`);
+        continue;
+      }
+
+      console.log(`Auditing ${route} in Light Mode...`);
+      await setTheme('light');
+      await auditPage(page, 'light', route);
+
+      console.log(`Auditing ${route} in Dark Mode...`);
+      await setTheme('dark');
+      await auditPage(page, 'dark', route);
+    }
+
+    console.log('AUTH_AUDIT_RESULTS_START');
+    console.log(JSON.stringify(issues, null, 2));
+    console.log('AUTH_AUDIT_RESULTS_END');
+
+    const majorIssues = issues.filter(i => i.severity === 'major');
+    expect(
+      majorIssues.length,
+      `Found ${majorIssues.length} major contrast violations in auth pages`
+    ).toBe(0);
   });
 });

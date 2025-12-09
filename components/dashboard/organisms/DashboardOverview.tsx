@@ -87,7 +87,7 @@ export function DashboardOverview({
             <p className='text-xs uppercase tracking-[0.25em] text-secondary-token'>
               {allTasksComplete ? 'Complete' : 'Getting Started'}
             </p>
-            <h3 className='text-xl font-semibold text-primary-token/95'>
+            <h3 className='text-xl font-semibold text-primary-token'>
               {allTasksComplete ? 'Profile ready!' : 'Complete your setup'}
             </h3>
             <p className='text-sm text-secondary-token'>

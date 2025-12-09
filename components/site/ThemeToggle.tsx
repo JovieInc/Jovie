@@ -125,26 +125,6 @@ export function ThemeToggle({
       >
         <button
           type='button'
-          aria-label='Dark'
-          className={`${baseBtn} ${theme === 'dark' ? activeBtn : ''}`}
-          onClick={() => setTheme('dark')}
-        >
-          <span className='absolute inset-[calc(-3/16*1rem)]' />
-          <svg
-            viewBox='0 0 20 20'
-            fill='currentColor'
-            aria-hidden='true'
-            className='size-5'
-          >
-            <path
-              fillRule='evenodd'
-              d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
-              clipRule='evenodd'
-            />
-          </svg>
-        </button>
-        <button
-          type='button'
           aria-label='Light'
           className={`${baseBtn} ${theme === 'light' ? activeBtn : ''}`}
           onClick={() => setTheme('light')}
@@ -156,21 +136,47 @@ export function ThemeToggle({
             aria-hidden='true'
             className='size-5'
           >
+            <circle
+              cx='10'
+              cy='10'
+              r='3.25'
+              stroke='currentColor'
+              strokeWidth='1.5'
+              fill={theme === 'light' ? 'currentColor' : 'none'}
+              fillOpacity={theme === 'light' ? '0.15' : '0'}
+            />
             <g
               stroke='currentColor'
               strokeLinecap='round'
               strokeLinejoin='round'
               strokeWidth='1.5'
             >
-              <circle
-                cx='10'
-                cy='10'
-                r='3.25'
-                fill='currentColor'
-                fillOpacity='.15'
-              ></circle>
-              <path d='M10 3.75v.5M14.42 5.58l-.354.354M16.25 10h-.5M14.42 14.42l-.354-.354M10 15.75v.5M5.934 14.065l-.354.354M4.25 10h-.5M5.934 5.935 5.58 5.58'></path>
+              <path d='M10 3.75v.5M14.42 5.58l-.354.354M16.25 10h-.5M14.42 14.42l-.354-.354M10 15.75v.5M5.934 14.065l-.354.354M4.25 10h-.5M5.934 5.935 5.58 5.58' />
             </g>
+          </svg>
+        </button>
+        <button
+          type='button'
+          aria-label='Dark'
+          className={`${baseBtn} ${theme === 'dark' ? activeBtn : ''}`}
+          onClick={() => setTheme('dark')}
+        >
+          <span className='absolute inset-[calc(-3/16*1rem)]' />
+          <svg
+            viewBox='0 0 20 20'
+            fill='none'
+            aria-hidden='true'
+            className='size-5'
+          >
+            <path
+              stroke='currentColor'
+              strokeWidth='1.5'
+              strokeLinecap='round'
+              strokeLinejoin='round'
+              fill={theme === 'dark' ? 'currentColor' : 'none'}
+              fillOpacity={theme === 'dark' ? '0.15' : '0'}
+              d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
+            />
           </svg>
         </button>
         <button
@@ -187,12 +193,12 @@ export function ThemeToggle({
             className='size-5'
           >
             <path
-              fill='currentColor'
-              fillOpacity='0.15'
               stroke='currentColor'
               strokeLinecap='round'
               strokeLinejoin='round'
               strokeWidth='1.5'
+              fill={theme === 'system' ? 'currentColor' : 'none'}
+              fillOpacity={theme === 'system' ? '0.15' : '0'}
               d='M10 12.5v2.75m0 0H7.75m2.25 0h2.25m-6.5-3h8.5a1 1 0 0 0 1-1v-5.5a1 1 0 0 0-1-1h-8.5a1 1 0 0 0-1 1v5.5a1 1 0 0 0 1 1Z'
             />
           </svg>

@@ -298,7 +298,7 @@ export function AdminCreatorProfilesWithSidebar({
         onKeyDown={handleKeyDown}
         aria-label='Creator profiles table'
       >
-        <div className='flex-1 w-full space-y-6 rounded-[28px] border border-subtle bg-surface-1/80 p-6 shadow-sm transition'>
+        <div className='w-full space-y-6'>
           <div className='space-y-1'>
             <h2 className='text-lg font-semibold text-primary-token'>
               Creator profiles
@@ -342,26 +342,26 @@ export function AdminCreatorProfilesWithSidebar({
             </div>
           </div>
 
-          <div className='overflow-x-auto'>
-            <table className='w-full text-sm'>
+          <div className='overflow-auto max-h-[60vh]'>
+            <table className='w-full text-sm table-fixed'>
               <thead className='text-left text-secondary-token'>
                 <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     Avatar
                   </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     Handle
                   </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     {renderSortHeader('created')}
                   </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     {renderSortHeader('claimed')}
                   </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     {renderSortHeader('verified')}
                   </th>
-                  <th className='px-2 py-2 text-right sticky top-0 z-10 bg-surface-1/80'>
+                  <th className='px-2 py-2 text-right sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
                     Action
                   </th>
                 </tr>
@@ -423,11 +423,27 @@ export function AdminCreatorProfilesWithSidebar({
                               }).format(profile.createdAt)
                             : '—'}
                         </td>
-                        <td className='px-2 py-3 text-xs text-secondary-token'>
-                          {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+                        <td className='px-2 py-3 text-xs'>
+                          <span
+                            className={cn(
+                              profile.isClaimed
+                                ? 'text-green-700 dark:text-green-400'
+                                : 'text-primary-token'
+                            )}
+                          >
+                            {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+                          </span>
                         </td>
-                        <td className='px-2 py-3 text-xs text-secondary-token'>
-                          {profile.isVerified ? 'Verified' : 'Not verified'}
+                        <td className='px-2 py-3 text-xs'>
+                          <span
+                            className={cn(
+                              profile.isVerified
+                                ? 'text-green-700 dark:text-green-400'
+                                : 'text-primary-token'
+                            )}
+                          >
+                            {profile.isVerified ? 'Verified' : 'Not verified'}
+                          </span>
                         </td>
                         <td
                           className='px-2 py-3 text-right'

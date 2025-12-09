@@ -119,7 +119,7 @@ export function DashboardActivityFeed({
       ) : activities.length === 0 ? (
         <div className='mt-4 space-y-2 text-sm text-secondary-token'>
           <div>
-            <p className='font-medium text-primary-token/90'>
+            <p className='font-medium text-primary-token'>
               Waiting for activity… 🚀
             </p>
             <p>Share your link to get started.</p>
