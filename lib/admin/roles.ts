@@ -1,6 +1,6 @@
 import 'server-only';
 
-const DEFAULT_ADMIN_EMAILS = ['tim@jov.ie'];
+const DEFAULT_ADMIN_EMAILS = ['tim@jov.ie', 't@timwhite.co'];
 
 function parseAdminEmails(): Set<string> {
   const raw =
