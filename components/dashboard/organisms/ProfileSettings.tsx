@@ -2,7 +2,7 @@
 
 import { ChevronDownIcon } from '@heroicons/react/16/solid';
 import { PhotoIcon, UserCircleIcon } from '@heroicons/react/24/solid';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
 import { APP_URL } from '@/constants/app';
@@ -18,6 +18,7 @@ export function ProfileSettings({
   onArtistUpdate,
 }: ProfileSettingsProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState({
     username: artist.handle || '',
     displayName: artist.name || '',
@@ -153,10 +154,21 @@ export function ProfileSettings({
                 />
                 <button
                   type='button'
+                  onClick={() => fileInputRef.current?.click()}
                   className='rounded-md bg-surface-1 px-3 py-2 text-sm font-medium text-primary border border-subtle hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 ring-accent'
                 >
                   Change
                 </button>
+                <input
+                  ref={fileInputRef}
+                  type='file'
+                  className='hidden'
+                  accept='image/png, image/jpeg, image/gif'
+                  onChange={e => {
+                    // TODO: Implement profile photo upload logic
+                    console.log('Selected file:', e.target.files?.[0]);
+                  }}
+                />
               </div>
             </div>
 

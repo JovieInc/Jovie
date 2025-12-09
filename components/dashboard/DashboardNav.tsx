@@ -156,7 +156,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
               <Link
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className='flex h-9 w-full min-w-0 items-center gap-2 px-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
+                className='flex h-8 w-full min-w-0 items-center gap-2 px-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
               >
                 <item.icon className='size-5' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
@@ -177,13 +177,13 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       role='navigation'
     >
       {/* Primary Navigation Block */}
-      <div className='mb-3'>{renderSection(primaryItems)}</div>
+      <div className='mb-2'>{renderSection(primaryItems)}</div>
 
       {/* Soft spacing instead of a hard divider */}
-      <div className='mb-3 h-2' />
+      <div className='mb-2 h-1' />
 
       {/* Secondary Navigation Block */}
-      <div className='mb-2'>{renderSection(secondaryNavigation)}</div>
+      <div className='mb-1'>{renderSection(secondaryNavigation)}</div>
 
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
