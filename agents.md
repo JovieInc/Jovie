@@ -27,6 +27,26 @@ This includes:
 
 But **only the human operator** may approve and merge to `production`.
 
+## ⛔ CRITICAL: Repository Settings & Branch Protection Prohibition
+
+**AI agents must NEVER modify repository settings, branch protection rules, or rulesets.**
+
+This includes:
+- Modifying branch protection rules via GitHub API or CLI
+- Changing ruleset configurations (`.github/rulesets/*.yml`)
+- Disabling or bypassing linear history requirements
+- Adding admin bypass permissions
+- Modifying required status checks
+- Changing merge method restrictions (squash, rebase, merge)
+- Any `gh api` calls that modify repository or branch settings
+
+**Repository configuration changes require explicit human approval.** If a workflow or process requires a settings change, AI agents must:
+1. Document the proposed change and rationale
+2. Request human approval before proceeding
+3. Never execute the change autonomously
+
+Violations of this rule can cause merge conflicts, break CI/CD pipelines, and compromise repository integrity.
+
 ## 0. Analytics & Feature Flags (Statsig-only)
 
 - Statsig is the **only** product analytics and feature flag platform used in this repo.
