@@ -60,12 +60,12 @@ export function DashboardSidebar({
       {...props}
     >
       <SidebarHeader className='relative pb-1'>
-        <div className='group/toggle flex items-center gap-2 px-2 py-3'>
+        <div className='group/toggle flex items-center gap-2 px-2 py-2'>
           <Link
             href='/dashboard/overview'
             aria-label='Go to dashboard'
             className={cn(
-              'flex h-12 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'flex h-10 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
               'group-data-[collapsible=icon]:justify-center'
             )}
           >
@@ -75,7 +75,7 @@ export function DashboardSidebar({
                 alt='Jovie'
                 width={20}
                 height={20}
-                className='h-8 w-8 rounded-full'
+                className='h-7 w-7 rounded-full'
               />
             </div>
             <span className='sr-only group-data-[collapsible=icon]:hidden'>
@@ -85,7 +85,7 @@ export function DashboardSidebar({
           <SidebarTrigger
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'h-9 w-9 shrink-0 border border-subtle bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'h-8 w-8 shrink-0 border border-subtle bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
               'group-data-[state=closed]:hidden'
             )}
           />

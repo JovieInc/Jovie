@@ -165,6 +165,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   } | null>(null);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [addingLink, setAddingLink] = useState<T | null>(null);
 
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
   const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
@@ -319,10 +320,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       return;
     }
 
+    setAddingLink(enriched);
+    // Show pulsing placeholder for a moment to indicate creation
+    await new Promise(resolve => setTimeout(resolve, 600));
+
     const next = [...links, enriched];
     setLinks(next);
     setLastAddedId(idFor(enriched as T));
     onLinkAdded?.([enriched as T]);
+    setAddingLink(null);
 
     setCollapsed(prev => ({ ...prev, [section]: false }));
 
@@ -745,8 +751,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
             );
 
-            // Hide section when search/filter yields no results
-            if (items.length === 0) {
+            const isAddingToThis =
+              addingLink && sectionOf(addingLink) === section;
+            // Hide section when search/filter yields no results, unless we're adding to it
+            if (items.length === 0 && !isAddingToThis) {
               return null;
             }
 
@@ -860,6 +868,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                               />
                             );
                           })}
+                          {isAddingToThis && (
+                            <div className='relative rounded-xl border border-dashed border-black/10 dark:border-white/10 bg-surface-1/40 p-4 animate-pulse h-[74px] flex items-center gap-4'>
+                              <div className='h-10 w-10 rounded-full bg-black/5 dark:bg-white/5' />
+                              <div className='flex-1 space-y-2'>
+                                <div className='h-4 w-1/3 bg-black/5 dark:bg-white/5 rounded' />
+                                <div className='h-3 w-1/4 bg-black/5 dark:bg-white/5 rounded' />
+                              </div>
+                            </div>
+                          )}
                           {items.length === 0 && (
                             <div className='col-span-full p-3 text-sm text-tertiary italic'>
                               No {labelFor(section)} links match your search

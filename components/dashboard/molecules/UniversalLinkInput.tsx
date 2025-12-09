@@ -641,7 +641,7 @@ export const UniversalLinkInput = forwardRef<
                     onClick={exitSearchMode}
                     className='mt-2 text-xs text-accent hover:underline'
                   >
-                    Paste link instead
+                    Add link manually
                   </button>
                 </div>
               )}
@@ -656,7 +656,7 @@ export const UniversalLinkInput = forwardRef<
                     onClick={exitSearchMode}
                     className='mt-2 text-xs text-accent hover:underline'
                   >
-                    Paste link instead
+                    Add link manually
                   </button>
                 </div>
               )}

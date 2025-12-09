@@ -80,29 +80,31 @@ export function DeleteCreatorDialog({
           </div>
 
           <div className='space-y-2 text-center'>
-            <AlertDialogTitle className='text-base font-semibold'>
+            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
               {isClaimed ? 'Delete User Account' : 'Delete Creator Profile'}
             </AlertDialogTitle>
-            <AlertDialogDescription className='text-sm text-muted-foreground'>
+            <AlertDialogDescription className='text-sm text-secondary-token'>
               {isClaimed
                 ? `This will permanently delete the user account for `
                 : `This will permanently delete `}
-              <span className='font-medium text-foreground'>@{username}</span>
+              <span className='font-medium text-primary-token'>
+                @{username}
+              </span>
               {isClaimed ? '.' : "'s profile."}
             </AlertDialogDescription>
           </div>
         </AlertDialogHeader>
 
         {/* Items list */}
-        <div className='rounded-lg border border-border/50 bg-muted/30 p-4'>
-          <p className='mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground'>
+        <div className='rounded-lg border border-subtle bg-surface-2/50 p-4'>
+          <p className='mb-3 text-xs font-medium uppercase tracking-wider text-tertiary-token'>
             Data to be deleted
           </p>
           <ul className='space-y-2'>
             {items.map((item, i) => (
               <li key={i} className='flex items-center gap-2 text-sm'>
                 <Icon name='X' className='h-3.5 w-3.5 text-red-500/70' />
-                <span className='text-muted-foreground'>{item}</span>
+                <span className='text-secondary-token'>{item}</span>
               </li>
             ))}
           </ul>
