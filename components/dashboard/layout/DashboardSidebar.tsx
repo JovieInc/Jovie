@@ -53,7 +53,7 @@ export function DashboardSidebar({
         'dark:[--sidebar-foreground:#c6ccd8]',
         'dark:[--sidebar-accent:#171b22]',
         'dark:[--sidebar-accent-foreground:#f2f4f8]',
-        '[--sidebar-border:#1c1f26]',
+        'dark:[--sidebar-border:#1c1f26]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
         className
       )}

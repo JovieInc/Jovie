@@ -406,7 +406,7 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[244px] rounded-xl border-none bg-surface-1/95 text-(--geist-foreground) p-3.5 shadow-[0_22px_72px_-14px_rgba(0,0,0,0.38)] backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-2/90'
+        className='w-[244px] rounded-xl border-none bg-surface-1/95 text-primary-token p-3.5 shadow-[0_22px_72px_-14px_rgba(0,0,0,0.38)] backdrop-blur-xl font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-2/90'
       >
         {/* Identity block - name first, email once, smaller */}
         <DropdownMenuLabel className='px-0 py-0 mb-1'>
