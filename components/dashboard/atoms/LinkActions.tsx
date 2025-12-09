@@ -58,14 +58,14 @@ export const LinkActions = memo(function LinkActions({
           type='button'
           aria-label='Link actions'
           onClick={() => setOpen(!open)}
-          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/10 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
+          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
         >
-          <Icon name='MoreVertical' className='h-5 w-5 text-white' />
+          <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
         </button>
         <div className='sr-only'>Actions: edit, hide/show, delete</div>
 
         {open ? (
-          <div className='absolute right-0 top-9 z-10 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg'>
+          <div className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg'>
             {onEdit ? (
               <button
                 type='button'

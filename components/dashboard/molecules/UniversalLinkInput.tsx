@@ -525,11 +525,9 @@ export const UniversalLinkInput = forwardRef<
     const currentIconHex = currentIconMeta?.hex
       ? `#${currentIconMeta.hex}`
       : '#6b7280';
-    const currentIconIsDark = isBrandDark(currentIconHex);
-    const selectorIconColor = currentIconIsDark ? '#ffffff' : currentIconHex;
-    const selectorIconBg = currentIconIsDark
-      ? 'rgba(255,255,255,0.08)'
-      : `${currentIconHex}15`;
+    // Always use brand color as background with white icon for visibility in both modes
+    const selectorIconColor = '#ffffff';
+    const selectorIconBg = currentIconHex;
 
     // Render search mode UI
     if (searchMode) {

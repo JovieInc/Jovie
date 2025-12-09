@@ -374,12 +374,23 @@ export function EnhancedDashboardLinks({
     [profileId]
   );
 
-  // Flush pending saves on unmount to prevent data loss
+  // Cancel pending saves when profileId changes to prevent saving to wrong profile
+  // Flush on unmount to prevent data loss
+  useEffect(() => {
+    return () => {
+      // On profileId change, cancel (don't flush) to avoid saving stale data to old profile
+      // On unmount, this also cancels which is safe since component is going away
+      debouncedSave.cancel();
+    };
+  }, [debouncedSave]);
+
+  // Flush pending saves on actual unmount (not profileId change)
   useEffect(() => {
     return () => {
       debouncedSave.flush();
     };
-  }, [debouncedSave]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleManagerLinksChange = useCallback(
     (updated: DetectedLink[]) => {

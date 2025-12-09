@@ -1042,7 +1042,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       ref={setNodeRef}
       {...attributes}
       className={cn(
-        'group relative rounded-xl border border-white/10 bg-surface-1/95 p-4 text-sm shadow-[0_14px_42px_-18px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-all',
+        'group relative rounded-xl border border-black/10 dark:border-white/10 bg-surface-1/95 p-4 text-sm shadow-[0_14px_42px_-18px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-all',
         'hover:shadow-[0_18px_56px_-16px_rgba(0,0,0,0.5)] hover:scale-[1.01] focus-within:shadow-[0_18px_56px_-16px_rgba(0,0,0,0.5)]',
         !visible && 'opacity-50 grayscale'
       )}
