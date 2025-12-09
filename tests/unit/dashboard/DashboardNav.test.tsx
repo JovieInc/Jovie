@@ -107,8 +107,8 @@ describe('DashboardNav', () => {
     const secondaryMenuParent = (menus[1] as HTMLElement | undefined)
       ?.parentElement;
 
-    expect(primaryMenuParent?.className).toContain('mb-6');
-    expect(secondaryMenuParent?.className).toContain('mb-4');
+    expect(primaryMenuParent?.className).toContain('mb-3');
+    expect(secondaryMenuParent?.className).toContain('mb-2');
   });
 
   it('renders with different pathname', () => {
