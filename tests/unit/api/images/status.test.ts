@@ -46,7 +46,9 @@ describe('/api/images/status/[id]', () => {
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-id'
     );
-    const response = await GET(request, { params: { id: 'test-id' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ id: 'test-id' }),
+    });
 
     expect(response.status).toBe(401);
     const data = await response.json();
@@ -62,7 +64,9 @@ describe('/api/images/status/[id]', () => {
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/non-existent'
     );
-    const response = await GET(request, { params: { id: 'non-existent' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ id: 'non-existent' }),
+    });
 
     expect(response.status).toBe(404);
     const data = await response.json();
@@ -90,7 +94,9 @@ describe('/api/images/status/[id]', () => {
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'
     );
-    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ id: 'test-photo-id' }),
+    });
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -121,7 +127,9 @@ describe('/api/images/status/[id]', () => {
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'
     );
-    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ id: 'test-photo-id' }),
+    });
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -150,7 +158,9 @@ describe('/api/images/status/[id]', () => {
     const request = new NextRequest(
       'http://localhost:3000/api/images/status/test-photo-id'
     );
-    const response = await GET(request, { params: { id: 'test-photo-id' } });
+    const response = await GET(request, {
+      params: Promise.resolve({ id: 'test-photo-id' }),
+    });
 
     expect(response.status).toBe(200);
     const data = await response.json();

@@ -6,9 +6,9 @@ import { db, profilePhotos } from '@/lib/db';
 export const runtime = 'edge';
 
 interface RouteParams {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const photoId = params.id;
+    const { id: photoId } = await params;
     if (!photoId) {
       return NextResponse.json({ error: 'Photo ID required' }, { status: 400 });
     }
