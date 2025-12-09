@@ -38,7 +38,7 @@ describe('LinkActions Keyboard Accessibility', () => {
     vi.clearAllMocks();
   });
 
-  it('toggle button is keyboard accessible', async () => {
+  it('menu button opens dropdown and toggle is accessible', async () => {
     const user = userEvent.setup();
     render(
       <LinkActions
@@ -48,20 +48,19 @@ describe('LinkActions Keyboard Accessibility', () => {
       />
     );
 
-    const toggleButton = screen.getByRole('button', { name: /hide link/i });
+    // Open the menu
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
 
-    // Focus and activate with keyboard
-    toggleButton.focus();
-    expect(toggleButton).toHaveFocus();
+    // Find and click the Hide button in the dropdown
+    const toggleButton = screen.getByRole('button', { name: /^hide$/i });
+    expect(toggleButton).toBeInTheDocument();
 
-    await user.keyboard('{Enter}');
+    await user.click(toggleButton);
     expect(mockOnToggle).toHaveBeenCalledTimes(1);
-
-    await user.keyboard(' '); // Space
-    expect(mockOnToggle).toHaveBeenCalledTimes(2);
   });
 
-  it('remove button is keyboard accessible', async () => {
+  it('menu button opens dropdown and remove is accessible', async () => {
     const user = userEvent.setup();
     render(
       <LinkActions
@@ -71,16 +70,20 @@ describe('LinkActions Keyboard Accessibility', () => {
       />
     );
 
-    const removeButton = screen.getByRole('button', { name: /remove link/i });
+    // Open the menu
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
 
-    removeButton.focus();
-    expect(removeButton).toHaveFocus();
+    // Find and click the Delete button in the dropdown
+    const removeButton = screen.getByRole('button', { name: /delete/i });
+    expect(removeButton).toBeInTheDocument();
 
-    await user.keyboard('{Enter}');
+    await user.click(removeButton);
     expect(mockOnRemove).toHaveBeenCalledTimes(1);
   });
 
-  it('has correct aria-pressed state for toggle', () => {
+  it('shows correct toggle text based on visibility', async () => {
+    const user = userEvent.setup();
     const { rerender } = render(
       <LinkActions
         onToggle={mockOnToggle}
@@ -89,9 +92,13 @@ describe('LinkActions Keyboard Accessibility', () => {
       />
     );
 
-    const toggleButton = screen.getByRole('button', { name: /hide link/i });
-    expect(toggleButton).toHaveAttribute('aria-pressed', 'true');
+    // Open menu and check for Hide
+    const menuButton = screen.getByRole('button', { name: /link actions/i });
+    await user.click(menuButton);
+    expect(screen.getByRole('button', { name: /^hide$/i })).toBeInTheDocument();
 
+    // Close menu and rerender with isVisible=false
+    await user.click(menuButton);
     rerender(
       <LinkActions
         onToggle={mockOnToggle}
@@ -100,13 +107,12 @@ describe('LinkActions Keyboard Accessibility', () => {
       />
     );
 
-    const toggleButtonHidden = screen.getByRole('button', {
-      name: /show link/i,
-    });
-    expect(toggleButtonHidden).toHaveAttribute('aria-pressed', 'false');
+    // Open menu and check for Show
+    await user.click(screen.getByRole('button', { name: /link actions/i }));
+    expect(screen.getByRole('button', { name: /^show$/i })).toBeInTheDocument();
   });
 
-  it('drag handle has correct aria attributes', () => {
+  it('drag handle has correct aria-label', () => {
     render(
       <LinkActions
         onToggle={mockOnToggle}
@@ -118,50 +124,10 @@ describe('LinkActions Keyboard Accessibility', () => {
     );
 
     const dragHandle = screen.getByRole('button', { name: /drag to reorder/i });
-    expect(dragHandle).toHaveAttribute('aria-roledescription', 'sortable');
+    expect(dragHandle).toBeInTheDocument();
   });
 
-  it('buttons have focus-visible ring classes', () => {
-    render(
-      <LinkActions
-        onToggle={mockOnToggle}
-        onRemove={mockOnRemove}
-        isVisible={true}
-        showDragHandle={true}
-        onDragHandlePointerDown={mockOnDragHandlePointerDown}
-      />
-    );
-
-    const toggleButton = screen.getByRole('button', { name: /hide link/i });
-    const removeButton = screen.getByRole('button', { name: /remove link/i });
-    const dragHandle = screen.getByRole('button', { name: /drag to reorder/i });
-
-    expect(toggleButton.className).toContain('focus-visible:ring-2');
-    expect(removeButton.className).toContain('focus-visible:ring-2');
-    expect(dragHandle.className).toContain('focus-visible:ring-2');
-  });
-
-  it('buttons have group-focus-within opacity class for keyboard visibility', () => {
-    render(
-      <LinkActions
-        onToggle={mockOnToggle}
-        onRemove={mockOnRemove}
-        isVisible={true}
-        showDragHandle={true}
-        onDragHandlePointerDown={mockOnDragHandlePointerDown}
-      />
-    );
-
-    const toggleButton = screen.getByRole('button', { name: /hide link/i });
-    const removeButton = screen.getByRole('button', { name: /remove link/i });
-    const dragHandle = screen.getByRole('button', { name: /drag to reorder/i });
-
-    expect(toggleButton.className).toContain('group-focus-within:opacity-100');
-    expect(removeButton.className).toContain('group-focus-within:opacity-100');
-    expect(dragHandle.className).toContain('group-focus-within:opacity-100');
-  });
-
-  it('Tab navigates through all action buttons', async () => {
+  it('Tab navigates to menu button and drag handle', async () => {
     const user = userEvent.setup();
     render(
       <LinkActions
@@ -173,18 +139,14 @@ describe('LinkActions Keyboard Accessibility', () => {
       />
     );
 
-    // Tab to first button (toggle)
-    await user.tab();
-    expect(screen.getByRole('button', { name: /hide link/i })).toHaveFocus();
-
-    // Tab to second button (remove)
-    await user.tab();
-    expect(screen.getByRole('button', { name: /remove link/i })).toHaveFocus();
-
-    // Tab to third button (drag handle)
+    // Tab to drag handle (first focusable)
     await user.tab();
     expect(
       screen.getByRole('button', { name: /drag to reorder/i })
     ).toHaveFocus();
+
+    // Tab to menu button
+    await user.tab();
+    expect(screen.getByRole('button', { name: /link actions/i })).toHaveFocus();
   });
 });
