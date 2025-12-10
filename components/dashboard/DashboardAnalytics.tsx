@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 type Range = '1d' | '7d' | '30d';
@@ -89,7 +90,9 @@ export function DashboardAnalytics() {
           )}
         </div>
         {loading && (
-          <div className='mt-6 h-8 w-40 bg-surface-2 rounded animate-pulse' />
+          <div className='mt-6'>
+            <LoadingSkeleton height='h-8' width='w-40' rounded='md' />
+          </div>
         )}
         {error && <p className='mt-4 text-sm text-destructive'>{error}</p>}
       </DashboardCard>
@@ -101,11 +104,11 @@ export function DashboardAnalytics() {
             Top Countries
           </h3>
           {loading ? (
-            <ul className='space-y-3'>
+            <ul className='space-y-3' aria-hidden='true'>
               {Array.from({ length: 5 }).map((_, i) => (
                 <li key={i} className='flex items-center justify-between'>
-                  <span className='h-4 w-32 bg-surface-2 rounded animate-pulse' />
-                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                  <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
+                  <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                 </li>
               ))}
             </ul>
@@ -138,11 +141,11 @@ export function DashboardAnalytics() {
             Top Referrers
           </h3>
           {loading ? (
-            <ul className='space-y-3'>
+            <ul className='space-y-3' aria-hidden='true'>
               {Array.from({ length: 5 }).map((_, i) => (
                 <li key={i} className='flex items-center justify-between'>
-                  <span className='h-4 w-36 bg-surface-2 rounded animate-pulse' />
-                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                  <LoadingSkeleton height='h-4' width='w-36' rounded='md' />
+                  <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                 </li>
               ))}
             </ul>

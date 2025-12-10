@@ -446,8 +446,7 @@ export const AvatarUploadable = React.memo(
             className={cn(
               'absolute inset-0 flex items-center justify-center rounded-full',
               'bg-surface-3/80 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] backdrop-blur',
-              'opacity-0 transition-opacity duration-200 group-hover:opacity-100',
-              avatarProps.rounded !== 'full' && 'rounded-lg'
+              'opacity-0 transition-opacity duration-200 group-hover:opacity-100'
             )}
             aria-hidden='true'
             data-testid='avatar-uploadable-hover-overlay'
@@ -461,8 +460,7 @@ export const AvatarUploadable = React.memo(
             className={cn(
               'absolute inset-0 flex items-center justify-center rounded-full',
               'bg-[color:var(--color-accent)]/90 text-[color:var(--color-accent-foreground)]',
-              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200',
-              avatarProps.rounded !== 'full' && 'rounded-lg'
+              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200'
             )}
             aria-hidden='true'
             data-testid='avatar-uploadable-drag-overlay'

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
@@ -31,27 +31,38 @@ export function AvatarUpload({
 }: AvatarUploadProps) {
   const { showToast } = useToast();
   const uploadableRef = useRef<HTMLDivElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   const handleUpload = useCallback(async (file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
+    setLastError(null);
+    setIsUploading(true);
 
-    const response = await fetch('/api/images/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || 'Upload failed');
+      const response = await fetch('/api/images/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const { blobUrl } = (await response.json()) as { blobUrl: string };
+      return blobUrl;
+    } finally {
+      setIsUploading(false);
     }
-
-    const { blobUrl } = (await response.json()) as { blobUrl: string };
-    return blobUrl;
   }, []);
 
   const handleSuccess = useCallback(
     (url: string) => {
+      setIsUploading(false);
+      setLastError(null);
       showToast({
         type: 'success',
         message: 'Profile photo updated successfully!',
@@ -63,6 +74,8 @@ export function AvatarUpload({
 
   const handleError = useCallback(
     (message: string) => {
+      setIsUploading(false);
+      setLastError(message);
       showToast({
         type: 'error',
         message,
@@ -94,9 +107,10 @@ export function AvatarUpload({
         <button
           type='button'
           onClick={() => uploadableRef.current?.click()}
-          className='inline-flex items-center justify-center rounded-md border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-2 focus-ring'
+          disabled={isUploading}
+          className='inline-flex items-center justify-center rounded-md border border-subtle bg-surface-1 px-4 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-2 focus-ring disabled:cursor-not-allowed disabled:opacity-60'
         >
-          Upload photo
+          {isUploading ? 'Uploading…' : 'Upload photo'}
         </button>
 
         <p className='text-sm text-secondary-token'>
@@ -104,9 +118,19 @@ export function AvatarUpload({
           Square images work best.
         </p>
 
-        <p className='text-xs text-tertiary-token'>
-          If upload fails, a default avatar will be used automatically.
-        </p>
+        <div className='space-y-1 text-xs text-tertiary-token'>
+          <p>If upload fails, a default avatar will be used automatically.</p>
+          {isUploading && (
+            <p className='text-secondary-token'>
+              Uploading… please keep this tab open.
+            </p>
+          )}
+          {lastError && (
+            <p className='text-destructive' role='alert'>
+              {lastError}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

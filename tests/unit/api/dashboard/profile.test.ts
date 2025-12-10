@@ -141,7 +141,9 @@ describe('PUT /api/dashboard/profile', () => {
     expect(mockUpdateUserProfileImage).toHaveBeenCalledTimes(1);
     const payload = mockUpdateUserProfileImage.mock.calls[0]?.[1];
     expect(payload?.file).toBeInstanceOf(Blob);
-    expect(fetchMock).toHaveBeenCalledWith('https://example.com/upload.png');
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/upload.png', {
+      signal: expect.any(AbortSignal),
+    });
 
     fetchMock.mockRestore();
   });

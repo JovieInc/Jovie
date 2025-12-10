@@ -59,13 +59,13 @@ export function DashboardSidebar({
       )}
       {...props}
     >
-      <SidebarHeader className='relative pb-1'>
-        <div className='group/toggle flex items-center gap-2 px-2 py-2'>
+      <SidebarHeader className='relative pb-0'>
+        <div className='group/toggle flex items-center gap-2 px-2 py-1'>
           <Link
             href='/dashboard/overview'
             aria-label='Go to dashboard'
             className={cn(
-              'flex h-10 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
               'group-data-[collapsible=icon]:justify-center'
             )}
           >
@@ -90,7 +90,6 @@ export function DashboardSidebar({
             )}
           />
         </div>
-        <SidebarSeparator className='my-0.5' />
       </SidebarHeader>
 
       <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
@@ -117,7 +116,7 @@ export function DashboardSidebar({
             <UserButton
               showUserInfo={!isCollapsed}
               profileHref={profileHref}
-              settingsHref='/dashboard/settings'
+              settingsHref='/settings'
             />
           </div>
         </div>

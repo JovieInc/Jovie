@@ -24,10 +24,10 @@ test.describe('Dashboard Routing', () => {
   });
 
   test('should deep link directly to settings page', async ({ page }) => {
-    await page.goto('/dashboard/settings');
+    await page.goto('/settings');
 
     // URL should remain as settings
-    await expect(page).toHaveURL('/dashboard/settings');
+    await expect(page).toHaveURL('/settings');
 
     // Check that settings content is visible
     await expect(page.getByText('Settings')).toBeVisible();
@@ -45,6 +45,13 @@ test.describe('Dashboard Routing', () => {
     // Check that analytics content is visible
     await expect(page.getByText('Analytics')).toBeVisible();
     await expect(page.getByText('Track your performance')).toBeVisible();
+  });
+
+  test('redirects to settings when clicking settings', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByRole('button', { name: 'Open user menu' }).click();
+    await page.getByRole('menuitem', { name: /account settings/i }).click();
+    await expect(page).toHaveURL(/\/settings/);
   });
 
   test('should navigate between dashboard pages', async ({ page }) => {
@@ -86,7 +93,7 @@ test.describe('Dashboard Routing', () => {
 
     // Navigate to settings page
     await page.getByText('Settings').click();
-    await expect(page).toHaveURL('/dashboard/settings');
+    await expect(page).toHaveURL('/settings');
 
     // Go back to links
     await page.goBack();

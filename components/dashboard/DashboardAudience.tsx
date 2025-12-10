@@ -5,6 +5,7 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
@@ -368,6 +369,50 @@ export function DashboardAudience() {
 
   if (!artist) {
     return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className='space-y-6' aria-busy='true'>
+        <div>
+          <LoadingSkeleton height='h-6' width='w-40' rounded='md' />
+          <div className='mt-2 flex gap-2'>
+            <LoadingSkeleton height='h-4' width='w-24' rounded='full' />
+            <LoadingSkeleton height='h-4' width='w-16' rounded='full' />
+          </div>
+        </div>
+        <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
+          <div className='grid grid-cols-6 gap-4 border-b border-subtle px-4 py-3'>
+            {activeColumns.map(col => (
+              <LoadingSkeleton
+                key={col.key}
+                height='h-4'
+                width='w-24'
+                rounded='md'
+              />
+            ))}
+          </div>
+          <ul className='divide-y divide-subtle'>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li
+                key={i}
+                className='grid grid-cols-6 gap-4 px-4 py-3'
+                aria-hidden='true'
+              >
+                {activeColumns.map(col => (
+                  <LoadingSkeleton
+                    key={`${col.key}-${i}`}
+                    height='h-4'
+                    width='w-32'
+                    rounded='md'
+                  />
+                ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
   }
 
   const paginationLabel = () => {

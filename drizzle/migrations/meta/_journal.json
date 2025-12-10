@@ -71,6 +71,20 @@
       "when": 1733600000000,
       "tag": "0009_allow_system_ingestion",
       "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1733650000000,
+      "tag": "0010_avatar_public_access",
+      "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1733750000000,
+      "tag": "0011_creator_user_nullable",
+      "breakpoints": false
     }
   ]
 }

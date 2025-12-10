@@ -6,7 +6,6 @@ import { useSession, useUser } from '@clerk/nextjs';
 import {
   CheckCircleIcon,
   EnvelopeIcon,
-  KeyIcon,
   ShieldExclamationIcon,
   SignalSlashIcon,
 } from '@heroicons/react/24/outline';
@@ -72,15 +71,6 @@ export function AccountSettingsSection() {
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
-
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [signOutOthers, setSignOutOthers] = useState(true);
-  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saving'>(
-    'idle'
-  );
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,40 +237,6 @@ export function AccountSettingsSection() {
       showToast({ type: 'error', message });
     } finally {
       setSyncingEmailId(null);
-    }
-  };
-
-  const handlePasswordUpdate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!user) return;
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match.');
-      return;
-    }
-
-    setPasswordStatus('saving');
-    setPasswordError(null);
-
-    try {
-      await user.updatePassword({
-        currentPassword,
-        newPassword,
-        signOutOfOtherSessions: signOutOthers,
-      });
-
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast({
-        type: 'success',
-        message: 'Password updated successfully.',
-      });
-    } catch (error) {
-      const message = extractErrorMessage(error);
-      setPasswordError(message);
-    } finally {
-      setPasswordStatus('idle');
     }
   };
 
@@ -467,80 +423,6 @@ export function AccountSettingsSection() {
             </form>
           </div>
         </div>
-      </DashboardCard>
-
-      <DashboardCard variant='settings'>
-        <div className='flex items-start justify-between gap-6'>
-          <div className='flex-1'>
-            <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-              <KeyIcon className='h-5 w-5 text-accent' />
-              Password & security
-            </h3>
-            <p className='mt-1 text-sm text-secondary max-w-lg'>
-              Choose a strong password to safeguard your account. You can also
-              automatically sign out sessions on other devices after updating
-              it.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handlePasswordUpdate} className='mt-6 space-y-4'>
-          <FormField label='Current password' required>
-            <Input
-              type='password'
-              value={currentPassword}
-              onChange={event => setCurrentPassword(event.target.value)}
-              placeholder='Enter your current password'
-              required
-            />
-          </FormField>
-
-          <FormField label='New password' required>
-            <Input
-              type='password'
-              value={newPassword}
-              onChange={event => setNewPassword(event.target.value)}
-              placeholder='Create a new password'
-              required
-            />
-          </FormField>
-
-          <FormField label='Confirm new password' required>
-            <Input
-              type='password'
-              value={confirmPassword}
-              onChange={event => setConfirmPassword(event.target.value)}
-              placeholder='Re-enter new password'
-              required
-            />
-          </FormField>
-
-          <label className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3 text-sm text-secondary'>
-            <input
-              type='checkbox'
-              className='mt-1'
-              checked={signOutOthers}
-              onChange={event => setSignOutOthers(event.target.checked)}
-            />
-            <span>
-              Sign out other sessions after updating my password
-              <span className='block text-xs text-tertiary mt-1'>
-                Recommended if you suspect someone else has access to your
-                account.
-              </span>
-            </span>
-          </label>
-
-          {passwordError && (
-            <p className='text-sm text-red-500'>{passwordError}</p>
-          )}
-
-          <div className='flex justify-end gap-2'>
-            <Button type='submit' disabled={passwordStatus === 'saving'}>
-              {passwordStatus === 'saving' ? 'Updating…' : 'Update password'}
-            </Button>
-          </div>
-        </form>
       </DashboardCard>
 
       <DashboardCard variant='settings'>

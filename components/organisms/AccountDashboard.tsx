@@ -58,7 +58,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/dashboard/settings'>Edit Profile</Link>
+              <Link href='/settings'>Edit Profile</Link>
             </Button>
           </div>
         </div>
@@ -80,7 +80,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/dashboard/settings'>View Settings</Link>
+              <Link href='/settings'>View Settings</Link>
             </Button>
           </div>
         </div>
