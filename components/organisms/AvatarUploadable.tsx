@@ -68,9 +68,9 @@ const DEFAULT_MAX_FILE_SIZE = AVATAR_MAX_FILE_SIZE_BYTES; // API enforced
 const DEFAULT_ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;
 
 const STATUS_COLORS = {
-  uploading: 'text-accent-token',
-  success: 'text-primary-token',
-  error: 'text-destructive',
+  uploading: 'text-indigo-500',
+  success: 'text-green-500',
+  error: 'text-red-500',
   idle: 'text-secondary-token',
 } as const;
 
@@ -165,17 +165,17 @@ function ProgressRing({
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='rounded-full bg-surface-0 text-primary-token ring-1 ring-(--color-border-subtle) shadow-sm'>
+          <div className='rounded-full bg-white text-green-600 ring-1 ring-green-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
             <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-(--color-border-subtle) shadow-sm'>
+          <div className='rounded-full bg-white text-red-600 ring-1 ring-red-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
             <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'uploading' && (
-          <div className='rounded-full bg-(--color-accent) text-(--color-accent-foreground) ring-1 ring-accent shadow-sm animate-pulse'>
+          <div className='rounded-full bg-indigo-500 text-white ring-1 ring-indigo-100 shadow-sm animate-pulse transition-all duration-200 ease-out'>
             <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
