@@ -8,6 +8,7 @@ const {
   mockAuth,
   mockInsert,
   mockUpdate,
+  mockSelect,
   mockEq,
   sharpMock,
   sharpMetadataMock,
@@ -15,6 +16,7 @@ const {
   mockAuth: vi.fn(),
   mockInsert: vi.fn(),
   mockUpdate: vi.fn(),
+  mockSelect: vi.fn(),
   mockEq: vi.fn(),
   sharpMock: vi.fn(),
   sharpMetadataMock: vi.fn(),
@@ -26,19 +28,36 @@ vi.mock('@clerk/nextjs/server', () => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: async (
-    operation: (userId: string) => Promise<unknown>
-  ): Promise<unknown> => {
+  withDbSession: async (operation: (userId: string) => Promise<unknown>) => {
     const { userId } = await mockAuth();
-    if (!userId) {
-      throw new Error('Unauthorized');
-    }
+    if (!userId) throw new Error('Unauthorized');
     return operation(userId);
+  },
+  withDbSessionTx: async (
+    operation: (
+      tx: {
+        select: typeof mockSelect;
+        insert: typeof mockInsert;
+        update: typeof mockUpdate;
+        execute: typeof mockInsert;
+      },
+      userId: string
+    ) => Promise<unknown>
+  ) => {
+    const { userId } = await mockAuth();
+    if (!userId) throw new Error('Unauthorized');
+    const tx = {
+      select: mockSelect,
+      insert: mockInsert,
+      update: mockUpdate,
+      execute: vi.fn(),
+    };
+    return operation(tx as never, userId);
   },
 }));
 
 vi.mock('@/lib/db', () => {
-  const select = vi.fn().mockReturnValue({
+  const select = mockSelect.mockReturnValue({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue([{ id: 'internal-user-id' }]),
@@ -178,6 +197,9 @@ describe('/api/images/upload', () => {
     vi.clearAllMocks();
     sharpMetadataMock.mockResolvedValue({ width: 800, height: 800 });
 
+    // Default authenticated user; individual tests override as needed
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
     // Default: magic bytes validation passes for valid image types
     mockValidateMagicBytes.mockReturnValue(true);
 
@@ -258,7 +280,7 @@ describe('/api/images/upload', () => {
     expect(data.code).toBe('INVALID_FILE');
   });
 
-  it('should reject files larger than 4MB', async () => {
+  it('should reject files larger than 25MB', async () => {
     // Mock authenticated user
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
@@ -266,7 +288,7 @@ describe('/api/images/upload', () => {
     const file = createValidImageFile(
       'large.jpg',
       'image/jpeg',
-      5 * 1024 * 1024 + 1
+      30 * 1024 * 1024 // 30MB > 25MB limit
     );
     formData.append('file', file);
 

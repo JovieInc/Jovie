@@ -220,6 +220,7 @@ export const AvatarUploadable = React.memo(
     const [uploadStatus, setUploadStatus] = useState<
       'idle' | 'uploading' | 'success' | 'error'
     >('idle');
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const statusResetTimeoutRef = useRef<number | null>(null);
@@ -253,6 +254,25 @@ export const AvatarUploadable = React.memo(
       [clearStatusReset]
     );
 
+    const setPreviewFromFile = useCallback((file: File) => {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(prev => {
+        if (prev && prev.startsWith('blob:')) {
+          URL.revokeObjectURL(prev);
+        }
+        return url;
+      });
+    }, []);
+
+    useEffect(
+      () => () => {
+        if (previewUrl && previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      },
+      [previewUrl]
+    );
+
     const handleFileUpload = useCallback(
       async (file: File) => {
         if (!onUpload) return;
@@ -272,6 +292,7 @@ export const AvatarUploadable = React.memo(
 
         setIsUploading(true);
         setUploadStatus('uploading');
+        setPreviewFromFile(file);
         track('avatar_upload_start', {
           file_size: file.size,
           file_type: file.type,
@@ -280,6 +301,7 @@ export const AvatarUploadable = React.memo(
         try {
           const imageUrl = await onUpload(file);
           setUploadStatus('success');
+          setPreviewUrl(imageUrl);
           onSuccess?.(imageUrl);
           track('avatar_upload_success', { file_size: file.size });
           resetStatus(2000);
@@ -306,6 +328,8 @@ export const AvatarUploadable = React.memo(
             message: errorMessage,
             retryable: isRetryable,
           });
+          // Revert preview to previous image on failure
+          setPreviewUrl(null);
           resetStatus(3000);
         } finally {
           setIsUploading(false);
@@ -320,6 +344,7 @@ export const AvatarUploadable = React.memo(
         onSuccess,
         onUpload,
         resetStatus,
+        setPreviewFromFile,
       ]
     );
 
@@ -430,7 +455,7 @@ export const AvatarUploadable = React.memo(
         aria-busy={isUploading}
       >
         <Avatar
-          src={src}
+          src={previewUrl ?? src}
           className={cn(
             'transition-all duration-200 ease-out',
             isInteractive &&
