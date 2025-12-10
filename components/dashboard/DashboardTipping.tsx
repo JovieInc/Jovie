@@ -27,7 +27,9 @@ export function DashboardTipping() {
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null
   );
-  const [venmoHandle, setVenmoHandle] = useState(artist?.venmo_handle || '');
+  const [venmoHandle, setVenmoHandle] = useState(
+    artist?.venmo_handle?.replace(/^@/, '') || ''
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function DashboardTipping() {
         },
         body: JSON.stringify({
           updates: {
-            venmo_handle: venmoHandle,
+            venmo_handle: venmoHandle ? `@${venmoHandle}` : '',
           },
         }),
       });
@@ -54,10 +56,11 @@ export function DashboardTipping() {
         throw new Error('Failed to update Venmo handle');
       }
 
-      const updatedArtist = { ...artist, venmo_handle: venmoHandle };
+      const normalizedHandle = venmoHandle ? `@${venmoHandle}` : '';
+      const updatedArtist = { ...artist, venmo_handle: normalizedHandle };
       setArtist(updatedArtist);
       setIsEditing(false);
-      setSaveSuccess(`Connected to @${venmoHandle}`);
+      setSaveSuccess(`Connected to ${normalizedHandle}`);
       // Clear success after a short delay
       setTimeout(() => setSaveSuccess(null), 2500);
     } catch (error) {
@@ -69,7 +72,7 @@ export function DashboardTipping() {
 
   const handleCancel = () => {
     if (!artist) return;
-    setVenmoHandle(artist.venmo_handle || '');
+    setVenmoHandle(artist.venmo_handle?.replace(/^@/, '') || '');
     setIsEditing(false);
   };
 
@@ -97,25 +100,34 @@ export function DashboardTipping() {
         </p>
       </div>
 
-      {/* Venmo Handle Setup - Always Visible — border tokens normalized to border-subtle for consistency with dashboard */}
-      <div className='relative z-20 mb-6 rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
-        <SectionHeader
-          className='mb-4 px-0 py-0 border-0'
-          title='Venmo Handle'
-          description={
-            hasVenmoHandle
-              ? 'Your Venmo handle for receiving tips'
-              : 'Your handle will appear on your profile so fans can tip you directly.'
-          }
-          right={
-            !hasVenmoHandle ? (
-              <WalletIcon className='h-6 w-6 text-accent' />
-            ) : null
-          }
-        />
+      {/* Venmo Handle Setup — hidden when already connected unless editing */}
+      {hasVenmoHandle && !isEditing ? (
+        <div className='mb-4 flex items-center justify-between rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
+          <div className='flex items-center gap-2 text-sm text-primary-token'>
+            <WalletIcon className='h-5 w-5 text-accent' />
+            <span className='font-mono rounded-md bg-surface-2 px-2 py-1'>
+              {artist.venmo_handle}
+            </span>
+            <span className='text-secondary-token'>Connected</span>
+          </div>
+          <Button
+            onClick={() => setIsEditing(true)}
+            variant='ghost'
+            size='sm'
+            className='text-accent hover:text-accent/80'
+          >
+            Edit
+          </Button>
+        </div>
+      ) : (
+        <div className='relative z-20 mb-6 rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>
+          <SectionHeader
+            className='mb-4 px-0 py-0 border-0'
+            title='Venmo Handle'
+            description='Your handle will appear on your profile so fans can tip you directly.'
+            right={<WalletIcon className='h-6 w-6 text-accent' />}
+          />
 
-        {/* Wizard block: when editing OR not set, show inline setup */}
-        {isEditing || !hasVenmoHandle ? (
           <div className='space-y-4'>
             <div>
               <label
@@ -134,7 +146,7 @@ export function DashboardTipping() {
                   placeholder='your-username'
                   autoFocus
                   className='flex-1'
-                  inputClassName='w-full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-0'
+                  inputClassName='w/full rounded-lg border border-subtle bg-surface-0 px-3 py-2 text-primary-token placeholder:text-tertiary-token transition-colors focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-0'
                 />
               </div>
               <p className='text-xs text-secondary-token mt-2'>
@@ -172,25 +184,8 @@ export function DashboardTipping() {
               </div>
             )}
           </div>
-        ) : hasVenmoHandle ? (
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center gap-2'>
-              <span className='text-sm font-mono bg-surface-2 px-3 py-1 rounded-md text-primary-token'>
-                @{artist.venmo_handle}
-              </span>
-              <span className='text-xs text-secondary-token'>Connected</span>
-            </div>
-            <Button
-              onClick={() => setIsEditing(true)}
-              variant='ghost'
-              size='sm'
-              className='text-accent hover:text-accent/80'
-            >
-              Edit
-            </Button>
-          </div>
-        ) : null}
-      </div>
+        </div>
+      )}
 
       {/* Tipping content - Blurred and inert when no Venmo handle */}
       <div
@@ -199,8 +194,7 @@ export function DashboardTipping() {
           !hasVenmoHandle && 'filter blur-sm pointer-events-none select-none'
         )}
         aria-hidden={!hasVenmoHandle ? true : undefined}
-        // @ts-expect-error inert is a valid HTML attribute but not yet in React types
-        inert={!hasVenmoHandle ? '' : undefined}
+        inert={hasVenmoHandle ? undefined : true}
       >
         <div className='grid gap-6 lg:grid-cols-[1.45fr_1fr]'>
           <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm transition-all duration-300 hover:border-default hover:shadow-md'>

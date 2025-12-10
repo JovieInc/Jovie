@@ -32,14 +32,12 @@ export function DashboardTopBar({
                 {crumb.href && !isLast ? (
                   <Link
                     href={crumb.href}
-                    className='transition-colors hover:text-primary-token'
+                    className='text-sm text-secondary-token/80 transition-colors hover:text-primary-token dark:text-tertiary-token/80'
                   >
-                    <span className='text-xs text-secondary-token/80 dark:text-tertiary-token/80'>
-                      {crumb.label}
-                    </span>
+                    {crumb.label}
                   </Link>
                 ) : (
-                  <span className='text-primary-token dark:text-secondary-token'>
+                  <span className='text-sm font-medium text-primary-token dark:text-secondary-token'>
                     {crumb.label}
                   </span>
                 )}

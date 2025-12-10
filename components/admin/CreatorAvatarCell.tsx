@@ -94,8 +94,8 @@ export function CreatorAvatarCell({
           verified={verified}
         />
         {isFeatured && (
-          <div className='absolute -top-1 -right-1 bg-yellow-400 dark:bg-yellow-500 rounded-full p-0.5 ring-2 ring-white dark:ring-gray-900'>
-            <Star className='h-3 w-3 text-white fill-current' />
+          <div className='absolute -top-1 -left-1'>
+            <Star className='h-3 w-3 text-yellow-400 dark:text-yellow-300 fill-current' />
           </div>
         )}
       </div>

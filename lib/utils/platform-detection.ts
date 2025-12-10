@@ -339,6 +339,23 @@ const DOMAIN_MISSPELLINGS: Record<string, string> = {
  */
 export function normalizeUrl(url: string): string {
   try {
+    const lowered = url.trim().toLowerCase();
+    const dangerousSchemes = [
+      'javascript:',
+      'data:',
+      'vbscript:',
+      'file:',
+      'mailto:',
+    ];
+    if (dangerousSchemes.some(scheme => lowered.startsWith(scheme))) {
+      throw new Error('Unsafe scheme');
+    }
+    // Block encoded control characters that can lead to injection
+    const encodedControlPattern = /%(0a|0d|09|00)/i;
+    if (encodedControlPattern.test(lowered)) {
+      throw new Error('Unsafe encoded control characters');
+    }
+
     // Normalize stray spaces around dots
     url = url.replace(/\s*\.\s*/g, '.');
 
@@ -636,6 +653,21 @@ function generateSuggestedTitle(
  */
 function validateUrl(url: string, platform: PlatformInfo): boolean {
   try {
+    const lowered = url.trim().toLowerCase();
+    const dangerousSchemes = [
+      'javascript:',
+      'data:',
+      'vbscript:',
+      'file:',
+      'mailto:',
+    ];
+    if (dangerousSchemes.some(scheme => lowered.startsWith(scheme))) {
+      return false;
+    }
+    if (/%(0a|0d|09|00)/i.test(lowered)) {
+      return false;
+    }
+
     new URL(url); // Basic URL validation
 
     const pathParts = new URL(url).pathname.split('/').filter(Boolean);

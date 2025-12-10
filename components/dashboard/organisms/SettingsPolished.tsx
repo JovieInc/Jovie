@@ -44,6 +44,9 @@ export function SettingsPolished({
   const router = useRouter();
   const billingStatus = useBillingStatus();
   const { isPro } = billingStatus;
+  const [isMarketingSaving, setIsMarketingSaving] = useState(false);
+  const [isPixelSaving, setIsPixelSaving] = useState(false);
+  const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: artist.handle || '',
@@ -51,7 +54,6 @@ export function SettingsPolished({
   });
 
   const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
-  const [isMarketingSaving, setIsMarketingSaving] = useState(false);
 
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const notificationsEnabled = notificationsGate.value;
@@ -62,7 +64,6 @@ export function SettingsPolished({
     tiktokPixel: '',
     customPixel: '',
   });
-  const [isPixelSaving, setIsPixelSaving] = useState(false);
 
   // State for branding removal toggle
   const [hideBranding, setHideBranding] = useState(
@@ -211,6 +212,72 @@ export function SettingsPolished({
   const handleBilling = async () => {
     setIsBillingLoading(true);
     await router.push('/settings/billing');
+  };
+
+  const handleProfileSave = async () => {
+    const displayName = formData.displayName.trim();
+    const username = formData.username.trim();
+
+    if (!displayName) {
+      showToast({ type: 'error', message: 'Display name cannot be empty.' });
+      return;
+    }
+
+    setIsProfileSaving(true);
+    try {
+      const response = await fetch('/api/dashboard/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          updates: {
+            username,
+            displayName,
+          },
+        }),
+      });
+
+      const data = (await response.json().catch(() => ({}))) as {
+        profile?: {
+          username?: string;
+          usernameNormalized?: string;
+          displayName?: string;
+          bio?: string | null;
+        };
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      if (data.profile && onArtistUpdate) {
+        onArtistUpdate({
+          ...artist,
+          handle: data.profile.username ?? artist.handle,
+          name: data.profile.displayName ?? artist.name,
+          tagline: data.profile.bio ?? artist.tagline,
+        });
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        username: data.profile?.username ?? username,
+        displayName: data.profile?.displayName ?? displayName,
+      }));
+
+      showToast({ type: 'success', message: 'Profile updated successfully.' });
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : 'Failed to update profile';
+      showToast({ type: 'error', message });
+    } finally {
+      setIsProfileSaving(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {
@@ -391,6 +458,17 @@ export function SettingsPolished({
               placeholder='The name your fans will see'
               inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
+          </div>
+
+          <div className='flex justify-end pt-2'>
+            <Button
+              type='button'
+              onClick={handleProfileSave}
+              loading={isProfileSaving}
+              className={SETTINGS_BUTTON_CLASS}
+            >
+              Save profile
+            </Button>
           </div>
         </div>
       </div>

@@ -116,6 +116,18 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     );
   });
 
+  it('blocks Enter when URL has unsafe scheme', async () => {
+    const user = userEvent.setup();
+    render(<UniversalLinkInput onAdd={mockOnAdd} />);
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'javascript:alert(1)');
+
+    await user.keyboard('{Enter}');
+
+    expect(mockOnAdd).not.toHaveBeenCalled();
+  });
+
   it('supports Escape key to clear input', async () => {
     const user = userEvent.setup();
     render(<UniversalLinkInput onAdd={mockOnAdd} />);

@@ -187,7 +187,9 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
     : primaryNavigation.filter(item => item.id !== 'contacts');
 
   const isInSettings = pathname.startsWith('/settings');
-  const activeItems = isInSettings ? settingsNavigation : primaryItems;
+  const navSections = isInSettings
+    ? [settingsNavigation]
+    : [primaryItems, secondaryNavigation];
 
   const renderSection = (
     items: typeof primaryNavigation | typeof settingsNavigation
@@ -199,13 +201,13 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
         const shortcut = navShortcuts[item.id];
         const tooltip = shortcut
           ? {
-            children: (
-              <div className='flex items-center gap-2'>
-                <span>{item.name}</span>
-                <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-              </div>
-            ),
-          }
+              children: (
+                <div className='flex items-center gap-2'>
+                  <span>{item.name}</span>
+                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
+                </div>
+              ),
+            }
           : item.name;
 
         return (
@@ -234,17 +236,15 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       aria-label='Dashboard navigation'
       role='navigation'
     >
-      <SidebarGroup className='mb-1'>
-        <SidebarGroupContent>{renderSection(activeItems)}</SidebarGroupContent>
+      <SidebarGroup className='mb-1 space-y-1.5'>
+        <SidebarGroupContent className='space-y-1'>
+          {navSections.map((section, idx) => (
+            <div key={idx} data-nav-section>
+              {renderSection(section)}
+            </div>
+          ))}
+        </SidebarGroupContent>
       </SidebarGroup>
-      {!isInSettings && (
-        <SidebarGroup className='mt-0'>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {renderSection(secondaryNavigation)}
-          </SidebarGroupContent>
-        </SidebarGroup>
-      )}
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
         <div className='mt-1.5'>

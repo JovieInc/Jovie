@@ -1,8 +1,16 @@
 'use client';
 
+import { UserGroupIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
-
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from 'react';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
 import {
@@ -21,6 +29,26 @@ import type { DashboardData } from './actions';
 import { DashboardDataProvider } from './DashboardDataContext';
 import { PreviewPanelProvider, usePreviewPanel } from './PreviewPanelContext';
 
+type TableMeta = {
+  rowCount: number | null;
+  toggle?: (() => void) | null;
+};
+
+type TableMetaContextValue = {
+  tableMeta: TableMeta;
+  setTableMeta: (meta: TableMeta) => void;
+};
+
+const TableMetaContext = createContext<TableMetaContextValue | null>(null);
+
+export function useTableMeta(): TableMetaContextValue {
+  const ctx = useContext(TableMetaContext);
+  if (!ctx) {
+    throw new Error('useTableMeta must be used within DashboardLayoutClient');
+  }
+  return ctx;
+}
+
 interface DashboardLayoutClientProps {
   dashboardData: DashboardData;
   persistSidebarCollapsed?: (collapsed: boolean) => Promise<void>;
@@ -37,9 +65,18 @@ export default function DashboardLayoutClient({
 }: DashboardLayoutClientProps) {
   const [, startTransition] = useTransition();
   const pathname = usePathname();
+  const [tableMeta, setTableMeta] = useState<TableMeta>({
+    rowCount: null,
+    toggle: null,
+  });
 
   // Routes that should use full width layout
   const isFullWidthRoute = pathname?.startsWith('/admin/users') ?? false;
+  const isContactTableRoute =
+    pathname?.startsWith('/admin/users') ||
+    pathname?.startsWith('/dashboard/audience');
+  const isAnalyticsRoute =
+    pathname?.startsWith('/dashboard/analytics') ?? false;
   const useFullWidth = fullWidth || isFullWidthRoute;
 
   // Build a simple breadcrumb from the current path
@@ -113,9 +150,16 @@ export default function DashboardLayoutClient({
         <PendingClaimHandler />
 
         <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-          <DashboardLayoutInner crumbs={crumbs} useFullWidth={useFullWidth}>
-            {children}
-          </DashboardLayoutInner>
+          <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+            <DashboardLayoutInner
+              crumbs={crumbs}
+              useFullWidth={useFullWidth}
+              isContactTableRoute={isContactTableRoute}
+              isAnalyticsRoute={isAnalyticsRoute}
+            >
+              {children}
+            </DashboardLayoutInner>
+          </TableMetaContext.Provider>
         </SidebarProvider>
       </PreviewPanelProvider>
     </DashboardDataProvider>
@@ -126,26 +170,62 @@ export default function DashboardLayoutClient({
 function DashboardLayoutInner({
   crumbs,
   useFullWidth,
+  isContactTableRoute,
+  isAnalyticsRoute,
   children,
 }: {
   crumbs: DashboardBreadcrumbItem[];
   useFullWidth: boolean;
+  isContactTableRoute: boolean;
+  isAnalyticsRoute: boolean;
   children: React.ReactNode;
 }) {
-  const { isOpen: previewOpen } = usePreviewPanel();
+  const { isOpen: previewOpen, close: closePreview } = usePreviewPanel();
+  const { tableMeta } = useTableMeta();
+
+  // Ensure preview is closed/hidden on contact-table routes
+  useEffect(() => {
+    if (isContactTableRoute && previewOpen) {
+      closePreview();
+    }
+  }, [isContactTableRoute, previewOpen, closePreview]);
+
+  const ContactToggleButton = useMemo(() => {
+    if (!isContactTableRoute) return null;
+    if (!tableMeta.rowCount || tableMeta.rowCount <= 0 || !tableMeta.toggle)
+      return null;
+    return (
+      <Button
+        variant='ghost'
+        size='icon'
+        onClick={tableMeta.toggle}
+        aria-label='Toggle contact details'
+        className='h-9 w-9'
+      >
+        <UserGroupIcon className='h-5 w-5' />
+      </Button>
+    );
+  }, [isContactTableRoute, tableMeta.rowCount, tableMeta.toggle]);
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <DashboardSidebar />
       <SidebarInset
-        className='flex flex-1 flex-col overflow-hidden transition-[margin] duration-300 ease-out'
+        className='flex flex-1 flex-col overflow-hidden transition-[margin-right] duration-300 ease-out'
         style={{
-          marginRight: previewOpen ? PREVIEW_PANEL_WIDTH : 0,
+          marginRight:
+            isContactTableRoute || !previewOpen ? 0 : PREVIEW_PANEL_WIDTH,
         }}
       >
         <DashboardTopBar
           breadcrumbs={crumbs}
-          actions={<PreviewToggleButton />}
+          actions={
+            isContactTableRoute ? (
+              ContactToggleButton
+            ) : isAnalyticsRoute ? null : (
+              <PreviewToggleButton />
+            )
+          }
         />
         <main className='flex-1 min-h-0 overflow-auto'>
           <div
@@ -155,7 +235,7 @@ function DashboardLayoutInner({
           </div>
         </main>
       </SidebarInset>
-      <PreviewPanel />
+      {!isContactTableRoute && <PreviewPanel />}
     </div>
   );
 }

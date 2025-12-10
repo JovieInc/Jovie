@@ -51,35 +51,43 @@ export function ClaimBanner({
 
   return (
     <div
-      className='w-full bg-linear-to-r from-indigo-600 via-purple-600 to-pink-500 text-white'
+      className='relative w-full overflow-hidden bg-linear-to-r from-indigo-700 via-purple-700 to-fuchsia-600 text-white shadow-[0_8px_30px_rgba(0,0,0,0.28)]'
       role='banner'
       aria-label='Claim profile banner'
       data-testid='claim-banner'
     >
-      <div className='max-w-4xl mx-auto px-4 py-3 sm:py-4'>
-        <div className='flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4'>
+      <div
+        className='absolute inset-0 bg-gradient-radial from-white/12 via-white/6 to-transparent opacity-70'
+        aria-hidden
+      />
+      <div className='relative max-w-4xl mx-auto px-4 py-2 sm:py-3'>
+        <div className='flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3'>
           {/* Banner text */}
-          <div className='flex items-center gap-2 text-center sm:text-left'>
+          <div className='flex items-center gap-2 text-center sm:text-left max-w-xs sm:max-w-sm'>
             <Sparkles
-              className='h-5 w-5 shrink-0 hidden sm:block'
+              className='h-4 w-4 shrink-0 hidden sm:block'
               aria-hidden='true'
             />
-            <p className='text-sm sm:text-base font-medium'>
-              <span className='hidden sm:inline'>Is this your profile? </span>
-              <span className='sm:hidden'>Your profile? </span>
-              <span className='font-semibold'>Claim {name}</span>
+            <p className='text-xs sm:text-sm font-semibold leading-tight tracking-tight'>
+              <span className='sm:hidden'>Your profile? Claim {name}</span>
+              <span className='hidden sm:inline'>
+                Is this your profile? Claim {name}
+              </span>
             </p>
           </div>
 
           {/* CTA Button */}
           <Link
             href={getClaimUrl()}
-            className='inline-flex items-center gap-2 px-4 py-2 bg-white text-indigo-700 font-semibold text-sm rounded-full hover:bg-indigo-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-600'
+            className='inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-slate-900 font-semibold text-xs sm:text-sm shadow-sm ring-1 ring-white/70 hover:bg-white/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-indigo-700'
             data-testid='claim-banner-cta'
             aria-label={`Claim profile for ${name}`}
           >
             Claim Profile
-            <ArrowRight className='h-4 w-4' aria-hidden='true' />
+            <ArrowRight
+              className='h-3.5 w-3.5 sm:h-4 sm:w-4'
+              aria-hidden='true'
+            />
           </Link>
         </div>
       </div>

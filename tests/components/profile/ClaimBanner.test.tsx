@@ -60,7 +60,9 @@ describe('ClaimBanner', () => {
 
       render(<ClaimBanner {...defaultProps} />);
 
-      expect(screen.getByText(/Claim testartist/)).toBeInTheDocument();
+      expect(
+        screen.getByText('Your profile? Claim testartist')
+      ).toBeInTheDocument();
     });
 
     it('displays display name when provided', () => {
@@ -70,7 +72,9 @@ describe('ClaimBanner', () => {
         <ClaimBanner {...defaultProps} displayName='Test Artist Display' />
       );
 
-      expect(screen.getByText(/Claim Test Artist Display/)).toBeInTheDocument();
+      expect(
+        screen.getByText('Your profile? Claim Test Artist Display')
+      ).toBeInTheDocument();
     });
 
     it('has proper accessibility attributes', () => {
@@ -148,9 +152,13 @@ describe('ClaimBanner', () => {
       render(<ClaimBanner {...defaultProps} />);
 
       // Mobile text
-      expect(screen.getByText('Your profile?')).toBeInTheDocument();
+      expect(
+        screen.getByText('Your profile? Claim testartist')
+      ).toBeInTheDocument();
       // Desktop text
-      expect(screen.getByText('Is this your profile?')).toBeInTheDocument();
+      expect(
+        screen.getByText('Is this your profile? Claim testartist')
+      ).toBeInTheDocument();
     });
   });
 });

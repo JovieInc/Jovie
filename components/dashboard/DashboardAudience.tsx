@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { useTableMeta } from '@/app/dashboard/DashboardLayoutClient';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
@@ -195,6 +196,7 @@ export function DashboardAudience() {
   const [selectedMember, setSelectedMember] = useState<AudienceRow | null>(
     null
   );
+  const { setTableMeta } = useTableMeta();
 
   useEffect(() => {
     setPage(1);
@@ -324,6 +326,23 @@ export function DashboardAudience() {
     activeSortDirection,
     isAudienceV2Enabled,
   ]);
+
+  // Expose row count and a toggle handler for the contact action button
+  useEffect(() => {
+    const toggle = () => {
+      if (rows.length === 0) return;
+      setSelectedMember(current => (current ? null : (rows[0] ?? null)));
+    };
+
+    setTableMeta({
+      rowCount: rows.length,
+      toggle: rows.length > 0 ? toggle : null,
+    });
+
+    return () => {
+      setTableMeta({ rowCount: null, toggle: null });
+    };
+  }, [rows, setTableMeta]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 

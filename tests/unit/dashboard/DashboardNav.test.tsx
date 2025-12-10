@@ -36,6 +36,7 @@ const baseDashboardData: DashboardData = {
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: false,
+  hasMusicLinks: false,
   isAdmin: false,
   tippingStats: {
     tipClicks: 0,
@@ -100,17 +101,13 @@ describe('DashboardNav', () => {
     const nav = container.querySelector('nav');
     const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
 
-    expect(menus.length).toBeGreaterThanOrEqual(2);
+    expect(menus.length).toBeGreaterThanOrEqual(1);
 
     const primaryMenuParent = (menus[0] as HTMLElement | undefined)
       ?.parentElement;
-    const secondaryMenuParent = (menus[1] as HTMLElement | undefined)
-      ?.parentElement;
     const primaryGroup = primaryMenuParent?.parentElement;
-    const secondaryGroup = secondaryMenuParent?.parentElement;
 
-    expect(primaryGroup?.className).toContain('mb-1');
-    expect(secondaryGroup?.className).toContain('mt-0');
+    expect(primaryGroup?.className).toMatch(/space-y-1/);
   });
 
   it('renders with different pathname', () => {
