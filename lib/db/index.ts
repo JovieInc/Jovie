@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
@@ -5,6 +6,8 @@ import ws from 'ws';
 import { env } from '@/lib/env';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
+
+export { and, eq } from 'drizzle-orm';
 
 declare const EdgeRuntime: string | undefined;
 

@@ -151,6 +151,7 @@ export const photoStatusEnum = pgEnum('photo_status', [
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').unique().notNull(),
+  name: text('name'),
   email: text('email').unique(),
   isPro: boolean('is_pro').default(false),
   stripeCustomerId: text('stripe_customer_id').unique(),

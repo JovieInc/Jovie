@@ -12,6 +12,7 @@ overrides:
   cookie: '>=1.0.0'
   tmp: '>=0.2.3'
   vite: ^6.3.5
+  drizzle-orm: 0.45.0
 
 importers:
 
@@ -153,7 +154,7 @@ importers:
         specifier: ^17.2.1
         version: 17.2.3
       drizzle-orm:
-        specifier: ^0.45.0
+        specifier: 0.45.0
         version: 0.45.0(@neondatabase/serverless@1.0.2)(@opentelemetry/api@1.9.0)(@types/pg@8.15.6)(@upstash/redis@1.35.7)(postgres@3.4.7)
       flags:
         specifier: ^4.0.1
@@ -5131,7 +5132,7 @@ packages:
   drizzle-zod@0.8.3:
     resolution: {integrity: sha512-66yVOuvGhKJnTdiqj1/Xaaz9/qzOdRJADpDa68enqS6g3t0kpNkwNYjUuaeXgZfO/UWuIM9HIhSlJ6C5ZraMww==}
     peerDependencies:
-      drizzle-orm: '>=0.36.0'
+      drizzle-orm: 0.45.0
       zod: ^3.25.0 || ^4.0.0
 
   dunder-proto@1.0.1:

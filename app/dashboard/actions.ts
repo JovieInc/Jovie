@@ -26,6 +26,7 @@ export interface DashboardData {
   needsOnboarding: boolean;
   sidebarCollapsed: boolean;
   hasSocialLinks: boolean;
+  hasMusicLinks: boolean;
   isAdmin: boolean;
   tippingStats: {
     tipClicks: number;
@@ -69,8 +70,25 @@ export interface ProfileSocialLink {
   confidence?: number | null;
   sourcePlatform?: string | null;
   sourceType?: 'manual' | 'admin' | 'ingested' | null;
-  evidence?: { sources?: string[]; signals?: string[] } | null;
+  evidence?: {
+    sources?: string[];
+    signals?: string[];
+    linkType?: string | null;
+  } | null;
 }
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const DSP_PLATFORMS = [
+  'spotify',
+  'apple_music',
+  'youtube_music',
+  'soundcloud',
+  'bandcamp',
+  'tidal',
+  'deezer',
+  'amazon_music',
+  'pandora',
+] as const;
+
 async function fetchDashboardDataWithSession(
   dbClient: DbType,
   clerkUserId: string
@@ -95,6 +113,7 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        hasMusicLinks: false,
         tippingStats: emptyTippingStats,
       };
     }
@@ -115,18 +134,19 @@ async function fetchDashboardDataWithSession(
         needsOnboarding: true,
         sidebarCollapsed: false,
         hasSocialLinks: false,
+        hasMusicLinks: false,
         tippingStats: emptyTippingStats,
       };
     }
 
     const selected = creatorData[0];
 
-    // Load user settings for UI preferences and social links presence in parallel.
+    // Load user settings for UI preferences and social/music links presence in parallel.
     // Tolerate missing tables/columns during migrations (PostgreSQL error codes:
     // 42703=undefined_column, 42P01=undefined_table, 42P02=undefined_parameter)
     const MIGRATION_ERROR_CODES = ['42703', '42P01', '42P02'];
 
-    const [settings, hasLinks] = await Promise.all([
+    const [settings, hasLinks, hasMusicLinks] = await Promise.all([
       dbClient
         .select()
         .from(userSettings)
@@ -174,6 +194,38 @@ async function fetchDashboardDataWithSession(
           }
           Sentry.captureException(error, {
             tags: { query: 'social_links_count', context: 'dashboard_data' },
+          });
+          throw error;
+        }),
+      dbClient
+        .select({ c: count() })
+        .from(socialLinks)
+        .where(
+          and(
+            eq(socialLinks.creatorProfileId, selected.id),
+            eq(socialLinks.state, 'active'),
+            eq(socialLinks.platformType, 'dsp')
+          )
+        )
+        .then(result => Number(result?.[0]?.c ?? 0) > 0)
+        .catch((error: unknown) => {
+          const code = (error as { code?: string })?.code;
+          const message = (error as { message?: string })?.message ?? '';
+          const isMissingColumn =
+            message.includes('social_links.state') ||
+            (message.includes('column') && message.includes('social_links'));
+          if (code && MIGRATION_ERROR_CODES.includes(code)) {
+            console.warn('[Dashboard] social_links migration in progress');
+            return false;
+          }
+          if (isMissingColumn) {
+            console.warn(
+              '[Dashboard] social_links.state column missing; treating as no music links'
+            );
+            return false;
+          }
+          Sentry.captureException(error, {
+            tags: { query: 'music_links_count', context: 'dashboard_data' },
           });
           throw error;
         }),
@@ -232,6 +284,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: !profileIsPublishable(selected),
       sidebarCollapsed: settings?.sidebarCollapsed ?? false,
       hasSocialLinks: hasLinks,
+      hasMusicLinks,
       tippingStats,
     };
   } catch (error) {
@@ -244,6 +297,7 @@ async function fetchDashboardDataWithSession(
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      hasMusicLinks: false,
       tippingStats: createEmptyTippingStats(),
     };
   }
@@ -266,6 +320,7 @@ export async function getDashboardData(): Promise<DashboardData> {
       needsOnboarding: true,
       sidebarCollapsed: false,
       hasSocialLinks: false,
+      hasMusicLinks: false,
       isAdmin,
       tippingStats: createEmptyTippingStats(),
     };

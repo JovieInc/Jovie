@@ -182,7 +182,13 @@ export function UserButton({
     }
   };
 
-  const profileUrl = profileHref ?? '/settings';
+  const profileUrl =
+    profileHref ??
+    (user?.username
+      ? `/${user.username}`
+      : artist?.handle
+        ? `/${artist.handle}`
+        : '/settings');
   const settingsUrl = settingsHref ?? '/settings';
   const navigateTo = (href: string | undefined) => {
     if (!href) return;

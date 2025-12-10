@@ -106,13 +106,15 @@ interface Props {
   };
   searchParams?: {
     mode?: 'profile' | 'listen' | 'tip' | 'subscribe';
+    claim_token?: string;
   };
 }
 
 export default async function ArtistPage({ params, searchParams }: Props) {
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
-  const { mode = 'profile' } = resolvedSearchParams || {};
+  const { mode = 'profile', claim_token: claimTokenParam } =
+    resolvedSearchParams || {};
 
   const normalizedUsername = username.toLowerCase();
   const { profile, links, contacts, status } =
@@ -167,19 +169,18 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     }
   };
 
-  // Show tip button when not in tip mode and artist has venmo
+  // Show tip button only in profile/default mode and when artist has venmo
   const hasVenmoLink = socialLinks.some(link => link.platform === 'venmo');
-  const showTipButton = mode !== 'tip' && hasVenmoLink;
+  const showTipButton = mode === 'profile' && hasVenmoLink;
   const showBackButton = mode !== 'profile';
 
   // Determine if we should show the claim banner
-  // Show only for unclaimed profiles with a valid, non-expired claim token
+  // Show only when a claim token is present in the URL and matches the profile's token
   const showClaimBanner =
+    !!claimTokenParam &&
+    claimTokenParam === profile.claim_token &&
     !profile.is_claimed &&
-    profile.claim_token &&
-    !profile.claimed_at && // Not already claimed
-    // Check token expiration if we have the data
-    true; // Token expiration is checked server-side on claim
+    !profile.claimed_at;
 
   return (
     <>

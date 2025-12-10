@@ -45,7 +45,7 @@ export function PhoneMockupPreview({
       <div
         className={cn(
           'absolute inset-0 -z-10 rounded-[2.5rem]',
-          'bg-gradient-to-br from-gray-50/80 to-gray-100/80 dark:from-gray-900/80 dark:to-gray-800/80',
+          'bg-linear-to-br from-gray-50/80 to-gray-100/80 dark:from-gray-900/80 dark:to-gray-800/80',
           'backdrop-blur-xl border border-white/20',
           'shadow-[0_25px_50px_-12px_rgba(0,0,0,0.15)]',
           'transition-all duration-300',
@@ -58,11 +58,11 @@ export function PhoneMockupPreview({
       <div
         className={cn(
           'relative w-full max-w-[300px] mx-auto',
-          'aspect-[9/19] rounded-[2.5rem] p-2',
+          'aspect-9/19 rounded-[2.5rem] p-2',
           'bg-gray-900 text-white',
           'shadow-2xl',
           'overflow-hidden',
-          'border-[10px] border-gray-900',
+          'border-10 border-gray-900',
           'transition-all duration-300'
         )}
       >
@@ -78,8 +78,8 @@ export function PhoneMockupPreview({
           )}
         >
           {/* Profile header */}
-          <div className='relative h-40 bg-gradient-to-br from-indigo-500 to-purple-600'>
-            <div className='absolute inset-0 bg-gradient-to-t from-black/30 to-transparent' />
+          <div className='relative h-40 bg-linear-to-br from-indigo-500 to-purple-600'>
+            <div className='absolute inset-0 bg-linear-to-t from-black/30 to-transparent' />
 
             <div className='relative z-10 flex flex-col items-center justify-center h-full pt-6 px-6'>
               {/* Avatar */}
@@ -172,6 +172,10 @@ export function PhoneMockupPreview({
                     }}
                     onHoverStart={() => setActiveLink(link.id)}
                     onHoverEnd={() => setActiveLink(null)}
+                    onClick={event => event.preventDefault()}
+                    role='presentation'
+                    aria-hidden='true'
+                    tabIndex={-1}
                     className={cn(
                       'relative block p-4 rounded-xl',
                       'bg-surface-1 hover:bg-surface-2',
@@ -185,7 +189,7 @@ export function PhoneMockupPreview({
                     <div className='flex items-center gap-3'>
                       <div
                         className={cn(
-                          'flex-shrink-0 w-10 h-10 rounded-lg',
+                          'shrink-0 w-10 h-10 rounded-lg',
                           'flex items-center justify-center',
                           'bg-surface-0',
                           'shadow-sm',
@@ -214,7 +218,7 @@ export function PhoneMockupPreview({
                         </p>
                       </div>
 
-                      <div className='flex-shrink-0 text-tertiary-token'>
+                      <div className='shrink-0 text-tertiary-token'>
                         <svg
                           className='w-4 h-4'
                           fill='none'
@@ -235,7 +239,7 @@ export function PhoneMockupPreview({
                     <div
                       className={cn(
                         'absolute inset-0 -z-10 opacity-0',
-                        'bg-gradient-to-r from-primary-500/5 to-primary-600/5 dark:from-primary-400/5 dark:to-primary-500/5',
+                        'bg-linear-to-r from-primary-500/5 to-primary-600/5 dark:from-primary-400/5 dark:to-primary-500/5',
                         'transition-opacity duration-300',
                         activeLink === link.id && 'opacity-100'
                       )}

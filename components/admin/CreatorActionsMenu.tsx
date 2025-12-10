@@ -100,7 +100,10 @@ export function CreatorActionsMenu({
               type='button'
               size='icon'
               variant='ghost'
-              className={cn('h-8 w-8', stateClass)}
+              className={cn(
+                'h-8 w-8 text-secondary-token hover:text-primary-token',
+                stateClass
+              )}
               onClick={onToggleVerification}
               disabled={isLoading}
             >
@@ -123,7 +126,10 @@ export function CreatorActionsMenu({
               type='button'
               size='icon'
               variant='ghost'
-              className={cn('h-8 w-8', stateClass)}
+              className={cn(
+                'h-8 w-8 text-secondary-token hover:text-primary-token',
+                stateClass
+              )}
               onClick={onToggleFeatured}
               disabled={isLoading}
             >
@@ -145,7 +151,10 @@ export function CreatorActionsMenu({
               type='button'
               size='icon'
               variant='ghost'
-              className={cn('h-8 w-8', stateClass)}
+              className={cn(
+                'h-8 w-8 text-secondary-token hover:text-primary-token',
+                stateClass
+              )}
               onClick={onToggleMarketing}
               disabled={isLoading}
             >
@@ -170,7 +179,7 @@ export function CreatorActionsMenu({
               type='button'
               size='icon'
               variant='ghost'
-              className='h-8 w-8'
+              className='h-8 w-8 text-secondary-token hover:text-primary-token'
               asChild
             >
               <Link
@@ -193,7 +202,7 @@ export function CreatorActionsMenu({
               type='button'
               size='icon'
               variant='ghost'
-              className='h-8 w-8'
+              className='h-8 w-8 text-secondary-token hover:text-primary-token'
               disabled={isLoading}
             >
               <MoreHorizontal className='h-4 w-4' />

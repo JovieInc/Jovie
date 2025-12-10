@@ -244,8 +244,24 @@ export const UniversalLinkInput = forwardRef<
 
     // Real-time platform detection (uses creatorName for better SEO titles)
     const detectedLink = useMemo(() => {
-      if (!url.trim()) return null;
-      return detectPlatform(url.trim(), creatorName);
+      const trimmed = url.trim();
+      if (!trimmed) return null;
+      const lowered = trimmed.toLowerCase();
+      const unsafePrefixes = [
+        'javascript:',
+        'data:',
+        'vbscript:',
+        'file:',
+        'mailto:',
+      ];
+      const hasEncodedControl = /%(0a|0d|09|00)/i.test(lowered);
+      if (
+        unsafePrefixes.some(prefix => lowered.startsWith(prefix)) ||
+        hasEncodedControl
+      ) {
+        return null;
+      }
+      return detectPlatform(trimmed, creatorName);
     }, [url, creatorName]);
 
     // Handle URL input changes (also used as combined search query)

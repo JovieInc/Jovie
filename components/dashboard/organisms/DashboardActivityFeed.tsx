@@ -98,17 +98,17 @@ export function DashboardActivityFeed({
   }
 
   return (
-    <div className='rounded-lg border border-subtle bg-surface-1 p-6 shadow-sm'>
-      <div className='flex items-center justify-between'>
+    <div className='rounded-2xl bg-transparent p-1'>
+      <div className='flex items-center justify-between px-1'>
         <div>
-          <p className='text-xs uppercase tracking-wider text-secondary-token'>
+          <p className='text-[11px] uppercase tracking-[0.22em] text-secondary-token'>
             Activity feed
           </p>
-          <h3 className='text-lg font-semibold text-primary-token'>
+          <h3 className='text-base font-semibold text-primary-token'>
             Recent actions
           </h3>
         </div>
-        <span className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-secondary-token'>
+        <span className='rounded-full bg-surface-2 px-3 py-1 text-[11px] font-semibold text-secondary-token'>
           Live
         </span>
       </div>
@@ -133,21 +133,19 @@ export function DashboardActivityFeed({
           ))}
         </div>
       ) : activities.length === 0 ? (
-        <div className='mt-4 space-y-2 text-sm text-secondary-token'>
-          <div>
-            <p className='font-medium text-primary-token'>
-              Waiting for activity… 🚀
+        <div className='mt-4 space-y-3 rounded-2xl bg-surface-1/40 p-4 shadow-none ring-1 ring-black/5 dark:ring-white/5 text-sm text-secondary-token'>
+          <div className='space-y-1'>
+            <p className='text-sm font-semibold text-primary-token'>
+              No activity yet
             </p>
-            <p>Share your link to get started.</p>
+            <p>Share your profile link to start tracking fan activity.</p>
           </div>
           {profileHandle ? (
-            <div>
-              <CopyToClipboardButton
-                relativePath={`/${profileHandle}`}
-                idleLabel='Copy your link'
-                className='bg-transparent border border-black/10 dark:border-white/10 text-secondary-token hover:bg-black/5 dark:hover:bg-white/5 hover:text-primary-token active:scale-[0.97] transition-transform duration-150 ease-out'
-              />
-            </div>
+            <CopyToClipboardButton
+              relativePath={`/${profileHandle}`}
+              idleLabel='Copy profile link'
+              className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
+            />
           ) : null}
         </div>
       ) : (

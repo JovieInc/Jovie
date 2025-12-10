@@ -9,8 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useSearchParams } from 'next/navigation';
-import React, { useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
@@ -105,9 +105,22 @@ export function ProfileShell({
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const forceNotifications = searchParams?.get('preview') === '1';
   const notificationsEnabled = notificationsGate.value || forceNotifications;
+  const mode = searchParams?.get('mode') ?? 'profile';
+
+  // Reset tip loading on navigation/back
+  useEffect(() => {
+    setIsTipNavigating(false);
+  }, [pathname, mode]);
+
+  useEffect(() => {
+    const handlePopState = () => setIsTipNavigating(false);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [notificationsState, setNotificationsState] =
     useState<ProfileNotificationsState>('idle');
   const [channel, setChannel] = useState<NotificationChannel>('phone');

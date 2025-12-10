@@ -11,6 +11,7 @@ import {
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import {
   Sidebar,
@@ -38,6 +39,21 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ className }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [hash, setHash] = useState<string>('');
+
+  useEffect(() => {
+    // Track hash so items like /admin#usage don't double-highlight
+    const updateHash = () => setHash(window.location.hash || '');
+    updateHash();
+    window.addEventListener('hashchange', updateHash);
+    return () => window.removeEventListener('hashchange', updateHash);
+  }, []);
+
+  const pathWithHash = hash ? `${pathname}${hash}` : pathname;
+  const activeHref =
+    navItems.find(item => item.href === pathWithHash)?.href ??
+    navItems.find(item => item.href === pathname)?.href ??
+    null;
 
   return (
     <Sidebar variant='sidebar' className={className}>
@@ -75,8 +91,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         >
           <SidebarMenu>
             {navItems.map(item => {
-              const targetPath = item.href.split('#')[0] ?? item.href;
-              const isActive = pathname === targetPath;
+              const isActive = item.href === activeHref;
 
               return (
                 <SidebarMenuItem key={item.label}>

@@ -18,6 +18,12 @@ export const DSP_CONFIGS: Record<string, DSPConfig> = {
     textColor: 'white',
     logoSvg: `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>Spotify</title><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.48.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.32 11.28-1.08 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>`,
   },
+  soundcloud: {
+    name: 'SoundCloud',
+    color: '#FF5500',
+    textColor: 'white',
+    logoSvg: `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>SoundCloud</title><path d="M17.7 9.024a3.31 3.31 0 0 0-.515.043 5.59 5.59 0 0 0-5.47-4.498 5.52 5.52 0 0 0-3.27 1.056 4.74 4.74 0 0 0-1.868 3.373c-.037.321-.034.642.009.962a3.69 3.69 0 0 0-1.323-.24 3.65 3.65 0 1 0 0 7.3h12.437a2.69 2.69 0 0 0 0-5.381Z"/></svg>`,
+  },
   apple_music: {
     name: 'Apple Music',
     color: '#FA243C',
@@ -29,6 +35,12 @@ export const DSP_CONFIGS: Record<string, DSPConfig> = {
     color: '#FF0000',
     textColor: 'white',
     logoSvg: `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>YouTube</title><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>`,
+  },
+  soundcloud_release: {
+    name: 'SoundCloud',
+    color: '#FF5500',
+    textColor: 'white',
+    logoSvg: `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>SoundCloud</title><path d="M17.7 9.024a3.31 3.31 0 0 0-.515.043 5.59 5.59 0 0 0-5.47-4.498 5.52 5.52 0 0 0-3.27 1.056 4.74 4.74 0 0 0-1.868 3.373c-.037.321-.034.642.009.962a3.69 3.69 0 0 0-1.323-.24 3.65 3.65 0 1 0 0 7.3h12.437a2.69 2.69 0 0 0 0-5.381Z"/></svg>`,
   },
 };
 
@@ -75,6 +87,16 @@ export function getAvailableDSPs(
       name: 'YouTube',
       url: artist.youtube_url,
       config: DSP_CONFIGS.youtube,
+    });
+  }
+
+  // Check SoundCloud
+  if ((artist as Artist & { soundcloud_url?: string }).soundcloud_url) {
+    dsps.push({
+      key: 'soundcloud',
+      name: 'SoundCloud',
+      url: (artist as Artist & { soundcloud_url?: string }).soundcloud_url!,
+      config: DSP_CONFIGS.soundcloud,
     });
   }
 

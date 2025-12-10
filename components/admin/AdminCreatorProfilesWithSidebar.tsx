@@ -2,8 +2,9 @@
 
 import { Button, Input } from '@jovie/ui';
 import Link from 'next/link';
-import React, { useCallback, useMemo, useState } from 'react';
-
+import { useRouter } from 'next/navigation';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useTableMeta } from '@/app/dashboard/DashboardLayoutClient';
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
@@ -24,6 +25,14 @@ import type {
 } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
+
+function useOptionalTableMeta() {
+  try {
+    return useTableMeta();
+  } catch {
+    return null;
+  }
+}
 
 interface AdminCreatorProfilesWithSidebarProps {
   profiles: AdminCreatorProfileRow[];
@@ -94,6 +103,7 @@ export function AdminCreatorProfilesWithSidebar({
   mode = 'admin',
   basePath = '/admin/users',
 }: AdminCreatorProfilesWithSidebarProps) {
+  const router = useRouter();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -110,6 +120,14 @@ export function AdminCreatorProfilesWithSidebar({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
+  const tableMetaCtx = useOptionalTableMeta();
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const [searchTerm, setSearchTerm] = useState(search);
+  const setTableMeta = React.useMemo(
+    () => tableMetaCtx?.setTableMeta ?? (() => {}),
+    [tableMetaCtx]
+  );
+  const [headerElevated, setHeaderElevated] = useState(false);
 
   // New states for dialogs and responsive
   const [isMobile, setIsMobile] = useState(false);
@@ -161,25 +179,41 @@ export function AdminCreatorProfilesWithSidebar({
     const direction = getSortDirection(sort, column);
 
     return (
-      <Link
-        href={createSortHref(column)}
-        className='inline-flex items-center gap-1 text-xs uppercase tracking-wide font-semibold'
-        onClick={event => event.stopPropagation()}
+      <button
+        type='button'
+        onClick={event => {
+          event.stopPropagation();
+          router.push(createSortHref(column));
+        }}
+        className='inline-flex w-full items-center gap-1 text-xs uppercase tracking-wide font-semibold text-left hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
       >
         {columnConfig.label}
         <SortIndicator direction={direction} />
-      </Link>
+      </button>
     );
   };
 
+  const filteredProfiles = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (!term) return profilesWithActions;
+    return profilesWithActions.filter(profile => {
+      const username = profile.username.toLowerCase();
+      const displayName =
+        'displayName' in profile
+          ? (profile.displayName ?? '').toLowerCase()
+          : '';
+      return username.includes(term) || displayName.includes(term);
+    });
+  }, [profilesWithActions, searchTerm]);
+
   const selectedProfile = useMemo(
-    () => profilesWithActions.find(p => p.id === selectedId) ?? null,
-    [profilesWithActions, selectedId]
+    () => filteredProfiles.find(p => p.id === selectedId) ?? null,
+    [filteredProfiles, selectedId]
   );
 
   const selectedIndex = useMemo(
-    () => profilesWithActions.findIndex(p => p.id === selectedId),
-    [profilesWithActions, selectedId]
+    () => filteredProfiles.findIndex(p => p.id === selectedId),
+    [filteredProfiles, selectedId]
   );
 
   const effectiveContact = useMemo(() => {
@@ -197,28 +231,28 @@ export function AdminCreatorProfilesWithSidebar({
     if (isFormElement(event.target)) return;
 
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (profilesWithActions.length === 0) return;
+      if (filteredProfiles.length === 0) return;
 
       event.preventDefault();
 
       if (event.key === 'ArrowDown') {
         if (selectedIndex === -1) {
-          setSelectedId(profilesWithActions[0]?.id ?? null);
+          setSelectedId(filteredProfiles[0]?.id ?? null);
         } else {
           const nextIndex = Math.min(
             selectedIndex + 1,
-            profilesWithActions.length - 1
+            filteredProfiles.length - 1
           );
-          setSelectedId(profilesWithActions[nextIndex]?.id ?? null);
+          setSelectedId(filteredProfiles[nextIndex]?.id ?? null);
         }
       } else if (event.key === 'ArrowUp') {
         if (selectedIndex === -1) {
           setSelectedId(
-            profilesWithActions[profilesWithActions.length - 1]?.id ?? null
+            filteredProfiles[filteredProfiles.length - 1]?.id ?? null
           );
         } else {
           const prevIndex = Math.max(selectedIndex - 1, 0);
-          setSelectedId(profilesWithActions[prevIndex]?.id ?? null);
+          setSelectedId(filteredProfiles[prevIndex]?.id ?? null);
         }
       }
     } else if (event.key === ' ' || event.key === 'Spacebar') {
@@ -287,116 +321,168 @@ export function AdminCreatorProfilesWithSidebar({
     []
   );
 
+  // Ensure the phone preview never opens empty: select the first creator if none is selected.
+  React.useEffect(() => {
+    if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
+      setSelectedId(profilesWithActions[0]!.id);
+      setDraftContact(null);
+    }
+  }, [sidebarOpen, selectedId, profilesWithActions]);
+
+  React.useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setHeaderElevated(container.scrollTop > 0);
+    };
+
+    handleScroll();
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Expose row count and toggle handler for dashboard action button
+  React.useEffect(() => {
+    const toggle = () => {
+      setSidebarOpen(prev => {
+        const next = !prev;
+        if (next && !selectedId && filteredProfiles[0]) {
+          setSelectedId(filteredProfiles[0]!.id);
+          setDraftContact(null);
+        }
+        return next;
+      });
+    };
+
+    setTableMeta({
+      rowCount: filteredProfiles.length,
+      toggle,
+    });
+
+    return () => {
+      setTableMeta({ rowCount: null, toggle: null });
+    };
+  }, [filteredProfiles, selectedId, setTableMeta]);
+
   return (
-    <div className='flex flex-col md:flex-row md:items-stretch gap-4 md:min-h-[calc(100vh-220px)]'>
+    <div className='flex flex-col gap-4 md:flex-row md:items-stretch min-h-screen md:min-h-[calc(100vh-80px)]'>
       <div
         className={cn(
-          'flex-1 outline-none',
+          'flex-1 outline-none flex flex-col',
           'transition-[flex-basis] duration-200 ease-out'
         )}
         tabIndex={0}
         onKeyDown={handleKeyDown}
         aria-label='Creator profiles table'
       >
-        <div className='w-full space-y-6'>
-          <div className='space-y-1'>
-            <h2 className='text-lg font-semibold text-primary-token'>
-              Creator profiles
-            </h2>
-            <p className='text-xs text-secondary-token'>
-              View and manage creator verification and avatars.
-            </p>
-          </div>
-
-          <div className='space-y-3'>
-            <form
-              action={basePath}
-              method='get'
-              className='flex flex-wrap items-center gap-3'
-            >
-              <input type='hidden' name='sort' value={sort} />
-              <Input
-                name='q'
-                placeholder='Search by handle'
-                defaultValue={search}
-                className='max-w-xs'
-              />
-              <input type='hidden' name='page' value='1' />
-              <AdminCreatorFilters initialPageSize={pageSize} />
-              <Button type='submit' size='sm' variant='secondary'>
-                Search
-              </Button>
-              {search && search.length > 0 && (
-                <Button asChild size='sm' variant='ghost'>
-                  <Link href={clearHref}>Clear</Link>
-                </Button>
-              )}
-              <div className='ml-auto'>
-                <IngestProfileDropdown />
-              </div>
-            </form>
-
-            <div className='text-xs text-secondary-token'>
+        <div className='w-full space-y-4'>
+          <div className='flex flex-wrap items-center gap-3 justify-between text-xs text-secondary-token'>
+            <div>
               Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
               {total.toLocaleString()} profiles
             </div>
+            <div className='flex flex-wrap items-center gap-3'>
+              <form
+                action={basePath}
+                method='get'
+                className='flex items-center gap-2 flex-nowrap'
+              >
+                <input type='hidden' name='sort' value={sort} />
+                <input type='hidden' name='pageSize' value={pageSize} />
+                <Input
+                  name='q'
+                  placeholder='Search by handle'
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  className='w-[220px]'
+                />
+                <input type='hidden' name='page' value='1' />
+                <Button type='submit' size='sm' variant='secondary'>
+                  Search
+                </Button>
+                {search && search.length > 0 && (
+                  <Button asChild size='sm' variant='ghost'>
+                    <Link href={clearHref}>Clear</Link>
+                  </Button>
+                )}
+              </form>
+              <div className='ml-1'>
+                <IngestProfileDropdown />
+              </div>
+            </div>
           </div>
+        </div>
 
-          <div className='overflow-auto max-h-[60vh]'>
-            <table className='w-full text-sm table-fixed'>
-              <thead className='text-left text-secondary-token'>
-                <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    Avatar
-                  </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    Handle
-                  </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    {renderSortHeader('created')}
-                  </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    {renderSortHeader('claimed')}
-                  </th>
-                  <th className='px-2 py-2 text-left sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    {renderSortHeader('verified')}
-                  </th>
-                  <th className='px-2 py-2 text-right sticky top-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm'>
-                    Action
-                  </th>
+        <div className='flex-1 overflow-auto' ref={tableContainerRef}>
+          <table className='w-full table-fixed text-sm'>
+            <thead
+              className={cn(
+                'text-left text-secondary-token border-b border-surface-3/60',
+                headerElevated &&
+                  'shadow-sm shadow-black/10 dark:shadow-black/40'
+              )}
+            >
+              <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80'>
+                  Creator
+                </th>
+                <th
+                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  onClick={() => router.push(createSortHref('created'))}
+                >
+                  {renderSortHeader('created')}
+                </th>
+                <th
+                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  onClick={() => router.push(createSortHref('claimed'))}
+                >
+                  {renderSortHeader('claimed')}
+                </th>
+                <th
+                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  onClick={() => router.push(createSortHref('verified'))}
+                >
+                  {renderSortHeader('verified')}
+                </th>
+                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-right backdrop-blur-sm dark:bg-black/80'>
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {profilesWithActions.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    className='px-2 py-6 text-center text-sm text-secondary-token'
+                  >
+                    No creator profiles found.
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {profilesWithActions.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className='px-2 py-6 text-center text-sm text-secondary-token'
+              ) : (
+                profilesWithActions.map(profile => {
+                  const isSelected = profile.id === selectedId;
+                  return (
+                    <tr
+                      key={profile.id}
+                      className={cn(
+                        'cursor-pointer transition-colors duration-200',
+                        isSelected
+                          ? 'bg-gray-200 dark:bg-gray-800'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-900/50'
+                      )}
+                      onClick={() => handleRowClick(profile.id)}
+                      aria-selected={isSelected}
                     >
-                      No creator profiles found.
-                    </td>
-                  </tr>
-                ) : (
-                  profilesWithActions.map(profile => {
-                    const isSelected = profile.id === selectedId;
-                    return (
-                      <tr
-                        key={profile.id}
+                      <td
                         className={cn(
-                          'transition-colors duration-200 cursor-pointer',
-                          isSelected
-                            ? 'bg-gray-50 dark:bg-gray-900/60'
-                            : 'hover:bg-surface-2/60'
+                          'px-2 py-3 border-l border-transparent',
+                          isSelected &&
+                            'border-l-[3px] border-accent/80 bg-surface-2/60 dark:bg-white/5'
                         )}
-                        onClick={() => handleRowClick(profile.id)}
-                        aria-selected={isSelected}
                       >
-                        <td
-                          className={cn(
-                            'px-2 py-3 border-l border-transparent',
-                            isSelected && 'border-l-2 border-accent'
-                          )}
-                        >
+                        <div className='flex items-center gap-3'>
                           <CreatorAvatarCell
                             profileId={profile.id}
                             username={profile.username}
@@ -404,108 +490,133 @@ export function AdminCreatorProfilesWithSidebar({
                             verified={profile.isVerified}
                             isFeatured={profile.isFeatured}
                           />
-                        </td>
-                        <td className='px-2 py-3 font-medium text-primary-token'>
                           <Link
                             href={`/${profile.username}`}
-                            className='hover:underline'
+                            className='font-medium text-primary-token hover:underline'
                             onClick={event => event.stopPropagation()}
                           >
                             @{profile.username}
                           </Link>
-                        </td>
-                        <td className='px-2 py-3 text-secondary-token'>
-                          {profile.createdAt
-                            ? new Intl.DateTimeFormat('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              }).format(profile.createdAt)
-                            : '—'}
-                        </td>
-                        <td className='px-2 py-3 text-xs'>
-                          <span
-                            className={cn(
-                              profile.isClaimed
-                                ? 'text-green-700 dark:text-green-400'
-                                : 'text-primary-token'
-                            )}
-                          >
-                            {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
-                          </span>
-                        </td>
-                        <td className='px-2 py-3 text-xs'>
-                          <span
-                            className={cn(
-                              profile.isVerified
-                                ? 'text-green-700 dark:text-green-400'
-                                : 'text-primary-token'
-                            )}
-                          >
-                            {profile.isVerified ? 'Verified' : 'Not verified'}
-                          </span>
-                        </td>
-                        <td
-                          className='px-2 py-3 text-right'
-                          onClick={e => e.stopPropagation()}
+                        </div>
+                      </td>
+                      <td className='px-2 py-3 text-xs text-tertiary-token'>
+                        {profile.createdAt
+                          ? new Intl.DateTimeFormat('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }).format(profile.createdAt)
+                          : '—'}
+                      </td>
+                      <td className='px-2 py-3 text-xs'>
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
+                            profile.isClaimed
+                              ? 'bg-green-50 text-green-800 ring-1 ring-inset ring-green-200 dark:bg-green-900/40 dark:text-green-200 dark:ring-green-800'
+                              : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
+                          )}
                         >
-                          <CreatorActionsMenu
-                            profile={profile}
-                            isMobile={isMobile}
-                            status={verificationStatuses[profile.id] ?? 'idle'}
-                            onToggleVerification={async () => {
-                              const result = await toggleVerification(
-                                profile.id,
-                                !profile.isVerified
+                          {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+                        </span>
+                      </td>
+                      <td className='px-2 py-3 text-xs'>
+                        <span
+                          className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
+                            profile.isVerified
+                              ? 'bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:ring-blue-800'
+                              : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
+                          )}
+                        >
+                          {profile.isVerified ? (
+                            <>
+                              <span aria-hidden='true'>★</span>
+                              <span>Verified</span>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                className='h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                                aria-hidden='true'
+                              />
+                              <span>Not verified</span>
+                            </>
+                          )}
+                        </span>
+                      </td>
+                      <td
+                        className='px-2 py-3 text-right'
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <CreatorActionsMenu
+                          profile={profile}
+                          isMobile={isMobile}
+                          status={verificationStatuses[profile.id] ?? 'idle'}
+                          onToggleVerification={async () => {
+                            const result = await toggleVerification(
+                              profile.id,
+                              !profile.isVerified
+                            );
+                            if (!result.success) {
+                              console.error(
+                                'Failed to toggle verification',
+                                result.error
                               );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle verification',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onToggleFeatured={async () => {
-                              const result = await toggleFeatured(
-                                profile.id,
-                                !profile.isFeatured
+                            }
+                          }}
+                          onToggleFeatured={async () => {
+                            const result = await toggleFeatured(
+                              profile.id,
+                              !profile.isFeatured
+                            );
+                            if (!result.success) {
+                              console.error(
+                                'Failed to toggle featured',
+                                result.error
                               );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle featured',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onToggleMarketing={async () => {
-                              const result = await toggleMarketing(
-                                profile.id,
-                                !profile.marketingOptOut
+                            }
+                          }}
+                          onToggleMarketing={async () => {
+                            const result = await toggleMarketing(
+                              profile.id,
+                              !profile.marketingOptOut
+                            );
+                            if (!result.success) {
+                              console.error(
+                                'Failed to toggle marketing',
+                                result.error
                               );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle marketing',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onDelete={() => {
-                              setProfileToDelete(profile);
-                              setDeleteDialogOpen(true);
-                            }}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                            }
+                          }}
+                          onDelete={() => {
+                            setProfileToDelete(profile);
+                            setDeleteDialogOpen(true);
+                          }}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
 
-          <div className='mt-4 flex items-center justify-between gap-2 text-xs text-secondary-token'>
-            <div>
+        <div className='sticky bottom-0 left-0 right-0 mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 bg-white/90 px-3 py-2 text-xs text-secondary-token backdrop-blur-sm dark:bg-black/90'>
+          <div className='flex items-center gap-2'>
+            <span>
               Page {page} of {totalPages}
+            </span>
+            <span className='text-tertiary-token'>
+              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()}
+            </span>
+          </div>
+          <div className='flex items-center gap-3'>
+            <div className='flex items-center gap-2'>
+              <span>Rows per page</span>
+              <AdminCreatorFilters initialPageSize={pageSize} />
             </div>
             <div className='flex items-center gap-2'>
               <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
@@ -525,21 +636,23 @@ export function AdminCreatorProfilesWithSidebar({
 
       <div
         className={cn(
-          'hidden md:flex md:shrink-0 md:h-full transition-[width] duration-200 ease-out overflow-hidden',
+          'hidden md:flex md:flex-col md:shrink-0 h-full min-h-screen md:self-stretch bg-white dark:bg-black border-l border-surface-3 transition-[width] duration-200 ease-out overflow-hidden',
           sidebarOpen && effectiveContact
             ? 'md:w-[340px] lg:w-[360px]'
             : 'md:w-0 lg:w-0'
         )}
         aria-hidden={!sidebarOpen || !effectiveContact}
       >
-        <ContactSidebar
-          contact={effectiveContact}
-          mode={mode}
-          isOpen={sidebarOpen && Boolean(effectiveContact)}
-          onClose={handleSidebarClose}
-          onContactChange={handleContactChange}
-          onAvatarUpload={handleAvatarUpload}
-        />
+        <div className='flex-1 overflow-auto'>
+          <ContactSidebar
+            contact={effectiveContact}
+            mode={mode}
+            isOpen={sidebarOpen && Boolean(effectiveContact)}
+            onClose={handleSidebarClose}
+            onContactChange={handleContactChange}
+            onAvatarUpload={handleAvatarUpload}
+          />
+        </div>
       </div>
 
       {/* Dialogs */}

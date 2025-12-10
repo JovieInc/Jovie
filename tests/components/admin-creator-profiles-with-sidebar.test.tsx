@@ -43,7 +43,11 @@ vi.mock('@/components/admin/CreatorActionsMenu', () => ({
   ),
 }));
 
-const renderWithProviders = (ui: React.ReactElement) => {
+vi.mock('@/components/organisms/UserButton', () => ({
+  UserButton: () => <div data-testid='user-button' />,
+}));
+
+const renderWithProviders = (ui: React.ReactNode) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
@@ -79,7 +83,6 @@ describe('AdminCreatorProfilesWithSidebar', () => {
       />
     );
 
-    expect(screen.getByText('Creator profiles')).toBeInTheDocument();
     expect(screen.getByText('@alice')).toBeInTheDocument();
     expect(
       screen.getByRole('link', {

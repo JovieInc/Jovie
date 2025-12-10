@@ -1,13 +1,8 @@
 import type { Metadata } from 'next';
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
 import { ActivityTable } from '@/components/admin/activity-table';
 import { KpiCards } from '@/components/admin/kpi-cards';
 import { MetricsChart } from '@/components/admin/metrics-chart';
 import { ReliabilityCard } from '@/components/admin/reliability-card';
-import {
-  type AdminCreatorProfilesSort,
-  getAdminCreatorProfiles,
-} from '@/lib/admin/creator-profiles';
 import {
   getAdminActivityFeed,
   getAdminReliabilitySummary,
@@ -17,15 +12,6 @@ import {
 interface AdminOverviewMetrics {
   mrrUsd: number;
   activeSubscribers: number;
-}
-
-interface AdminPageProps {
-  searchParams?: {
-    page?: string;
-    q?: string;
-    sort?: string;
-    pageSize?: string;
-  };
 }
 
 export const metadata: Metadata = {
@@ -54,7 +40,7 @@ async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
   }
 }
 
-export default async function AdminPage({ searchParams }: AdminPageProps) {
+export default async function AdminPage() {
   const metrics = await getAdminOverviewMetrics();
 
   const [usageSeries, reliabilitySummary, activityItems] = await Promise.all([
@@ -62,42 +48,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
     getAdminReliabilitySummary(),
     getAdminActivityFeed(20),
   ]);
-
-  const pageParam = searchParams?.page
-    ? Number.parseInt(searchParams.page, 10)
-    : 1;
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
-  const search = searchParams?.q ?? '';
-
-  const pageSizeParam = searchParams?.pageSize
-    ? Number.parseInt(searchParams.pageSize, 10)
-    : 20;
-  const pageSize =
-    Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100
-      ? pageSizeParam
-      : 20;
-
-  const sortParam = searchParams?.sort;
-  const sort: AdminCreatorProfilesSort =
-    sortParam === 'created_asc' ||
-    sortParam === 'verified_desc' ||
-    sortParam === 'verified_asc' ||
-    sortParam === 'claimed_desc' ||
-    sortParam === 'claimed_asc'
-      ? sortParam
-      : 'created_desc';
-
-  const {
-    profiles,
-    page: currentPage,
-    pageSize: resolvedPageSize,
-    total,
-  } = await getAdminCreatorProfiles({
-    page,
-    pageSize,
-    search,
-    sort,
-  });
 
   return (
     <div className='space-y-8'>
@@ -118,15 +68,6 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
         <KpiCards
           mrrUsd={metrics.mrrUsd}
           activeSubscribers={metrics.activeSubscribers}
-        />
-        <AdminCreatorProfilesWithSidebar
-          profiles={profiles}
-          page={currentPage}
-          pageSize={resolvedPageSize}
-          total={total}
-          search={search}
-          sort={sort}
-          basePath='/admin'
         />
       </section>
 
