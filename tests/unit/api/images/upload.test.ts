@@ -111,7 +111,9 @@ vi.mock('sharp', () => {
     const pipeline = {
       clone: vi.fn(),
       resize: vi.fn(),
-      webp: vi.fn(),
+      avif: vi.fn(),
+      toColourspace: vi.fn(),
+      withMetadata: vi.fn(),
       toBuffer: vi.fn(),
       metadata: sharpMetadataMock,
       rotate: vi.fn(),
@@ -119,7 +121,9 @@ vi.mock('sharp', () => {
 
     pipeline.clone.mockImplementation(createPipeline);
     pipeline.resize.mockReturnValue(pipeline);
-    pipeline.webp.mockReturnValue(pipeline);
+    pipeline.avif.mockReturnValue(pipeline);
+    pipeline.toColourspace.mockReturnValue(pipeline);
+    pipeline.withMetadata.mockReturnValue(pipeline);
     pipeline.rotate.mockReturnValue(pipeline);
     pipeline.toBuffer.mockImplementation(
       async (options?: { resolveWithObject?: boolean }) => {
@@ -374,7 +378,7 @@ describe('/api/images/upload', () => {
     const response = await POST(request);
     expect(response.status).toBe(202);
     const data = await response.json();
-    expect(data.blobUrl).toContain('.webp');
+    expect(data.blobUrl).toContain('.avif');
   });
 
   it('should reject files with spoofed MIME type (magic bytes mismatch)', async () => {

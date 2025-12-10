@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { profilePhotos, users } from '@/lib/db';
+import { db, profilePhotos, users } from '@/lib/db';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -15,10 +15,7 @@ import {
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
 
-export const runtime = 'nodejs'; // Required for file upload processing
-
-// Structured error codes for client handling
-export const UPLOAD_ERROR_CODES = {
+const UPLOAD_ERROR_CODES = {
   MISSING_BLOB_TOKEN: 'MISSING_BLOB_TOKEN',
   RATE_LIMITED: 'RATE_LIMITED',
   INVALID_CONTENT_TYPE: 'INVALID_CONTENT_TYPE',
@@ -60,15 +57,8 @@ type SharpModule = typeof import('sharp');
 type SharpConstructor = SharpModule extends { default: infer D }
   ? D
   : SharpModule;
-const WEBP_MIME_TYPE = 'image/webp';
-const [, AVATAR_1024, AVATAR_512, AVATAR_256, AVATAR_128] =
-  AVATAR_OPTIMIZED_SIZES;
-const AVATAR_SIZE_MAP = {
-  original: AVATAR_1024,
-  large: AVATAR_512,
-  medium: AVATAR_256,
-  small: AVATAR_128,
-} as const;
+const AVIF_MIME_TYPE = 'image/avif';
+const AVATAR_CANONICAL_SIZE = AVATAR_OPTIMIZED_SIZES[2]; // 512px canonical
 
 type PgErrorInfo = {
   code?: string;
@@ -131,28 +121,21 @@ async function fileToBuffer(file: File): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-function buildBlobPaths(seoFileName: string, clerkUserId: string) {
-  const basePath = `avatars/users/${clerkUserId}/${seoFileName}`;
-
-  return {
-    original: `${basePath}.webp`,
-    large: `${basePath}-lg.webp`,
-    medium: `${basePath}-md.webp`,
-    small: `${basePath}-sm.webp`,
-  };
-}
-
 const MAX_BLOB_UPLOAD_RETRIES = 2;
 const BLOB_RETRY_DELAY_MS = 500;
+
+function buildBlobPath(seoFileName: string, clerkUserId: string) {
+  return `avatars/users/${clerkUserId}/${seoFileName}.avif`;
+}
 
 async function uploadBufferToBlob(
   put: BlobPut | null,
   path: string,
-  buffer: Buffer
+  buffer: Buffer,
+  contentType: string
 ): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
 
-  // Development/test fallback when token is missing
   if (!put || !token) {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Blob storage not configured');
@@ -171,8 +154,8 @@ async function uploadBufferToBlob(
       const blob = await put(path, buffer, {
         access: 'public',
         token,
-        contentType: WEBP_MIME_TYPE,
-        cacheControlMaxAge: 60 * 60 * 24 * 365, // 1 year
+        contentType,
+        cacheControlMaxAge: 60 * 60 * 24 * 365,
         addRandomSuffix: false,
       });
       return blob.url;
@@ -199,11 +182,8 @@ async function uploadBufferToBlob(
   throw lastError ?? new Error('Blob upload failed after retries');
 }
 
-async function optimizeImageToWebp(file: File): Promise<{
-  original: { data: Buffer; info: OutputInfo };
-  large: Buffer;
-  medium: Buffer;
-  small: Buffer;
+async function optimizeImageToAvif(file: File): Promise<{
+  avatar: { data: Buffer; info: OutputInfo };
   width: number | null;
   height: number | null;
 }> {
@@ -212,46 +192,29 @@ async function optimizeImageToWebp(file: File): Promise<{
 
   const baseImage = sharp(inputBuffer, {
     failOnError: false,
-  }).rotate();
+  })
+    .rotate()
+    .withMetadata({ orientation: undefined });
 
   const metadata = await baseImage.metadata();
 
-  const original = await baseImage
+  const avatar = await baseImage
     .clone()
     .resize({
-      width: AVATAR_SIZE_MAP.original,
-      height: AVATAR_SIZE_MAP.original,
-      fit: 'inside',
+      width: AVATAR_CANONICAL_SIZE,
+      height: AVATAR_CANONICAL_SIZE,
+      fit: 'cover',
+      position: 'centre',
       withoutEnlargement: true,
     })
-    .webp({ quality: 82, effort: 5, smartSubsample: true })
+    .toColourspace('srgb')
+    .avif({ quality: 65, effort: 4 })
     .toBuffer({ resolveWithObject: true });
 
-  const createVariant = (size: number) =>
-    baseImage
-      .clone()
-      .resize({
-        width: size,
-        height: size,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .webp({ quality: 82, effort: 5, smartSubsample: true })
-      .toBuffer();
-
-  const [large, medium, small] = await Promise.all([
-    createVariant(AVATAR_SIZE_MAP.large),
-    createVariant(AVATAR_SIZE_MAP.medium),
-    createVariant(AVATAR_SIZE_MAP.small),
-  ]);
-
   return {
-    original,
-    large,
-    medium,
-    small,
-    width: original.info.width ?? metadata.width ?? null,
-    height: original.info.height ?? metadata.height ?? null,
+    avatar,
+    width: avatar.info.width ?? metadata.width ?? null,
+    height: avatar.info.height ?? metadata.height ?? null,
   };
 }
 
@@ -426,6 +389,7 @@ export async function POST(request: NextRequest) {
           clerkId: users.clerkId,
         })
         .from(users)
+        // @ts-ignore drizzle version mismatch in tests/runtime
         .where(eq(users.clerkId, userIdFromSession))
         .limit(1);
 
@@ -456,11 +420,12 @@ export async function POST(request: NextRequest) {
             status: 'processing',
             updatedAt: new Date(),
           })
+          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        // Process image with timeout protection
+        // Process image with timeout protection (single canonical AVIF)
         const optimized = await withTimeout(
-          optimizeImageToWebp(file),
+          optimizeImageToAvif(file),
           PROCESSING_TIMEOUT_MS,
           'Image processing'
         );
@@ -469,27 +434,22 @@ export async function POST(request: NextRequest) {
           originalFilename: file.name,
           photoId: photoRecord.id,
         });
-        const blobPaths = buildBlobPaths(seoFileName, clerkUserId);
+        const blobPath = buildBlobPath(seoFileName, clerkUserId);
         const put = await getVercelBlobUploader();
 
-        // Upload all variants with timeout protection
-        const [blobUrl, largeUrl, mediumUrl, smallUrl] = await withTimeout(
-          Promise.all([
-            uploadBufferToBlob(
-              put,
-              blobPaths.original,
-              optimized.original.data
-            ),
-            uploadBufferToBlob(put, blobPaths.large, optimized.large),
-            uploadBufferToBlob(put, blobPaths.medium, optimized.medium),
-            uploadBufferToBlob(put, blobPaths.small, optimized.small),
-          ]),
+        const avatarUrl = await withTimeout(
+          uploadBufferToBlob(
+            put,
+            blobPath,
+            optimized.avatar.data,
+            AVIF_MIME_TYPE
+          ),
           PROCESSING_TIMEOUT_MS,
           'Blob upload'
         );
 
         // Validate that we got real URLs back
-        if (!blobUrl || !blobUrl.startsWith('https://')) {
+        if (!avatarUrl || !avatarUrl.startsWith('https://')) {
           throw new Error('Invalid blob URL returned from storage');
         }
 
@@ -497,30 +457,33 @@ export async function POST(request: NextRequest) {
         await tx
           .update(profilePhotos)
           .set({
-            blobUrl,
-            smallUrl,
-            mediumUrl,
-            largeUrl,
+            blobUrl: avatarUrl,
+            smallUrl: avatarUrl,
+            mediumUrl: avatarUrl,
+            largeUrl: avatarUrl,
             // Use legacy-friendly status that exists in both old/new enums
             status: 'ready',
-            mimeType: WEBP_MIME_TYPE,
+            mimeType: AVIF_MIME_TYPE,
             fileSize:
-              optimized.original.info.size ?? optimized.original.data.length,
+              optimized.avatar.info.size ?? optimized.avatar.data.length,
             width: optimized.width ?? null,
             height: optimized.height ?? null,
             processedAt: new Date(),
             updatedAt: new Date(),
           })
+          // @ts-ignore drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         return NextResponse.json(
           {
             jobId: photoRecord.id,
+            photoId: photoRecord.id,
             status: 'ready',
-            blobUrl,
-            largeUrl,
-            mediumUrl,
-            smallUrl,
+            avatarUrl,
+            blobUrl: avatarUrl,
+            largeUrl: avatarUrl,
+            mediumUrl: avatarUrl,
+            smallUrl: avatarUrl,
           },
           { status: 202 }
         );
