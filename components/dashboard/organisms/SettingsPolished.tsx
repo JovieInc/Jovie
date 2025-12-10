@@ -128,7 +128,7 @@ export function SettingsPolished({
         if (!response.ok) {
           throw new Error(
             (data as { error?: string }).error ||
-            'Failed to update profile photo'
+              'Failed to update profile photo'
           );
         }
 
@@ -324,20 +324,26 @@ export function SettingsPolished({
           </div>
         </div>
 
-        <div className='w-20 h-20'>
-          <AvatarUploadable
-            src={artist.image_url}
-            alt={artist.name || 'Profile photo'}
-            name={artist.name || artist.handle}
-            size='xl'
-            uploadable
-            showHoverOverlay
-            onUpload={handleAvatarUpload}
-            onSuccess={handleAvatarUpdate}
-            onError={message => showToast({ type: 'error', message })}
-            maxFileSize={maxAvatarSize}
-            acceptedTypes={acceptedAvatarTypes}
-          />
+        <div className='flex flex-col items-center justify-center gap-4'>
+          <div className='w-48 h-48'>
+            <AvatarUploadable
+              src={artist.image_url}
+              alt={artist.name || 'Profile photo'}
+              name={artist.name || artist.handle}
+              size='display-xl'
+              uploadable
+              showHoverOverlay
+              onUpload={handleAvatarUpload}
+              onSuccess={handleAvatarUpdate}
+              onError={message => showToast({ type: 'error', message })}
+              maxFileSize={maxAvatarSize}
+              acceptedTypes={acceptedAvatarTypes}
+              className='mx-auto animate-in fade-in duration-300'
+            />
+          </div>
+          <p className='text-sm text-secondary text-center'>
+            Drag & drop or click to upload. Watch the ring animation for status.
+          </p>
         </div>
 
         <div className='space-y-6'>
@@ -819,10 +825,10 @@ export function SettingsPolished({
         isPro
           ? renderRemoveBrandingSection()
           : renderProUpgradeCard(
-            'Professional Appearance',
-            'Remove Jovie branding to create a fully custom experience for your fans.',
-            SparklesIcon
-          ),
+              'Professional Appearance',
+              'Remove Jovie branding to create a fully custom experience for your fans.',
+              SparklesIcon
+            ),
     },
     {
       id: 'ad-pixels',
@@ -833,10 +839,10 @@ export function SettingsPolished({
         isPro
           ? renderAdPixelsSection()
           : renderProUpgradeCard(
-            'Unlock Growth Tracking',
-            'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-            RocketLaunchIcon
-          ),
+              'Unlock Growth Tracking',
+              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+              RocketLaunchIcon
+            ),
     },
     {
       id: 'billing',
