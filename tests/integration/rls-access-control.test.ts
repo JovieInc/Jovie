@@ -63,7 +63,7 @@ if (!db) {
           {
             userId: userA.id,
             creatorProfileId: publicProfile.id,
-            status: 'completed',
+            status: 'ready',
             blobUrl: 'https://public-avatar.test/original.webp',
             smallUrl: 'https://public-avatar.test/s.webp',
             mediumUrl: 'https://public-avatar.test/m.webp',
@@ -72,7 +72,7 @@ if (!db) {
           {
             userId: userB.id,
             creatorProfileId: privateProfile.id,
-            status: 'completed',
+            status: 'ready',
             blobUrl: 'https://private-avatar.test/original.webp',
             smallUrl: 'https://private-avatar.test/s.webp',
             mediumUrl: 'https://private-avatar.test/m.webp',

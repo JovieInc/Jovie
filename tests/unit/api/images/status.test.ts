@@ -91,7 +91,7 @@ describe('/api/images/status/[id]', () => {
 
     const mockPhoto = {
       id: TEST_PHOTO_UUID,
-      status: 'completed',
+      status: 'ready',
       blobUrl: 'https://blob.vercel-storage.com/test.jpg',
       smallUrl: 'https://blob.vercel-storage.com/test-small.jpg',
       mediumUrl: 'https://blob.vercel-storage.com/test-medium.jpg',
@@ -116,10 +116,10 @@ describe('/api/images/status/[id]', () => {
 
     expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.id).toBe(TEST_PHOTO_UUID);
-    expect(data.status).toBe('completed');
-    expect(data.blobUrl).toBe(mockPhoto.blobUrl);
-    expect(data.mediumUrl).toBe(mockPhoto.mediumUrl);
+    expect(data.jobId).toBe(TEST_PHOTO_UUID);
+    expect(data.status).toBe('ready');
+    expect(data.formats.webp.original).toBe(mockPhoto.blobUrl);
+    expect(data.formats.webp.medium).toBe(mockPhoto.mediumUrl);
   });
 
   it('should handle processing status', async () => {
