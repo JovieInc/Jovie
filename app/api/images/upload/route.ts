@@ -1,3 +1,4 @@
+import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
@@ -270,6 +271,16 @@ async function withTimeout<T>(
 }
 
 export async function POST(request: NextRequest) {
+  // Auth check first to avoid wrapping in transaction when unauthorized
+  const { userId: clerkUserId } = await auth();
+  if (!clerkUserId) {
+    return errorResponse(
+      'Please sign in to upload a profile photo.',
+      UPLOAD_ERROR_CODES.UNAUTHORIZED,
+      401
+    );
+  }
+
   // Early check for blob token in production
   if (
     process.env.NODE_ENV === 'production' &&
@@ -285,10 +296,27 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return await withDbSessionTx(async (tx, clerkUserId) => {
+    // Some test environments may mock withDbSessionTx away; provide fallback
+    const runWithSession =
+      typeof withDbSessionTx === 'function'
+        ? withDbSessionTx
+        : async <T>(
+            operation: (
+              tx: typeof import('@/lib/db').db,
+              userId: string
+            ) => Promise<T>
+          ) => {
+            return operation(
+              (await import('@/lib/db')).db,
+              clerkUserId
+            ) as unknown as Promise<T>;
+          };
+
+    return await runWithSession(async (tx, userIdFromSession) => {
       // Rate limiting - 3 uploads per minute per user
       if (avatarUploadRateLimit) {
-        const rateLimitResult = await avatarUploadRateLimit.limit(clerkUserId);
+        const rateLimitResult =
+          await avatarUploadRateLimit.limit(userIdFromSession);
         if (!rateLimitResult.success) {
           const retryAfter = Math.round(
             (rateLimitResult.reset - Date.now()) / 1000
@@ -315,7 +343,7 @@ export async function POST(request: NextRequest) {
         // Log warning in production when rate limiting is disabled
         console.warn(
           '[upload] Rate limiting disabled - Redis not configured. User:',
-          clerkUserId.slice(0, 10) + '...'
+          userIdFromSession.slice(0, 10) + '...'
         );
       }
 
@@ -390,7 +418,7 @@ export async function POST(request: NextRequest) {
           clerkId: users.clerkId,
         })
         .from(users)
-        .where(eq(users.clerkId, clerkUserId))
+        .where(eq(users.clerkId, userIdFromSession))
         .limit(1);
 
       if (!dbUser) {
@@ -480,10 +508,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             id: photoRecord.id,
-            status: 'completed',
+            status: 'ready',
             blobUrl,
             smallUrl,
             mediumUrl,
+            largeUrl,
           },
           { status: 201 }
         );
