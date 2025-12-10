@@ -106,9 +106,11 @@ describe('DashboardNav', () => {
       ?.parentElement;
     const secondaryMenuParent = (menus[1] as HTMLElement | undefined)
       ?.parentElement;
+    const primaryGroup = primaryMenuParent?.parentElement;
+    const secondaryGroup = secondaryMenuParent?.parentElement;
 
-    expect(primaryMenuParent?.className).toContain('mb-2');
-    expect(secondaryMenuParent?.className).toContain('mb-1');
+    expect(primaryGroup?.className).toContain('mb-1');
+    expect(secondaryGroup?.className).toContain('mt-0');
   });
 
   it('renders with different pathname', () => {
