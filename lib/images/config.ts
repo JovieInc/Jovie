@@ -16,14 +16,10 @@ export const SUPPORTED_IMAGE_MIME_TYPES = [
 export type SupportedImageMimeType =
   (typeof SUPPORTED_IMAGE_MIME_TYPES)[number];
 
-export const AVATAR_MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024; // 4MB API limit
+export const AVATAR_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB API limit
 
-export const AVATAR_OPTIMIZED_SIZES = {
-  small: 128,
-  medium: 256,
-  large: 512,
-  original: 1024,
-} as const;
+// Square targets, ordered from largest to smallest
+export const AVATAR_OPTIMIZED_SIZES = [1536, 1024, 512, 256, 128] as const;
 
 export function formatAcceptedImageTypes(
   accepted: readonly string[] = SUPPORTED_IMAGE_MIME_TYPES

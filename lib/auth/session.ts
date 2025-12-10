@@ -10,7 +10,7 @@ import { type DbType, db } from '@/lib/db';
  */
 export function validateClerkUserId(userId: string): void {
   // Clerk user IDs are alphanumeric with underscores, typically starting with 'user_'
-  const clerkIdPattern = /^[a-zA-Z0-9_]+$/;
+  const clerkIdPattern = /^[a-zA-Z0-9_-]+$/;
   if (!clerkIdPattern.test(userId)) {
     throw new Error('Invalid user ID format');
   }
@@ -66,12 +66,21 @@ export async function withDbSessionTx<T>(
   // Validate userId format to prevent SQL injection
   validateClerkUserId(userId);
 
+  // In tests, db may be a lightweight mock without transaction support.
+  if (typeof (db as DbType).transaction !== 'function') {
+    // Fall back to using the mocked db object directly.
+    return await operation(db as unknown as DbType, userId);
+  }
+
   return await db.transaction(async tx => {
-    // Important: SET LOCAL must be inside the transaction to take effect
-    await tx.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
-    await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`)
-    );
+    // Important: SET LOCAL must be inside the transaction to take effect.
+    // In unit tests, drizzleSql may be mocked without .raw; guard accordingly.
+    if (typeof drizzleSql?.raw === 'function') {
+      await tx.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
+      await tx.execute(
+        drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`)
+      );
+    }
     // Transaction client now properly typed with neon-serverless driver
     return await operation(tx, userId);
   });

@@ -47,6 +47,12 @@ describe('AvatarUploadable Component', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // jsdom lacks createObjectURL; mock for preview logic
+    // @ts-expect-error partial URL mock
+    global.URL = {
+      createObjectURL: vi.fn(() => 'blob:preview'),
+      revokeObjectURL: vi.fn(),
+    };
   });
 
   afterAll(() => {
@@ -329,7 +335,7 @@ describe('AvatarUploadable Component', () => {
       expect(mockOnUpload).not.toHaveBeenCalled();
     });
 
-    it('enforces 4MB default max file size', async () => {
+    it('enforces 25MB default max file size', async () => {
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -345,7 +351,7 @@ describe('AvatarUploadable Component', () => {
       const largeFile = createMockFile(
         'large.jpg',
         'image/jpeg',
-        5 * 1024 * 1024
+        30 * 1024 * 1024
       );
 
       fireEvent.change(fileInput, { target: { files: [largeFile] } });

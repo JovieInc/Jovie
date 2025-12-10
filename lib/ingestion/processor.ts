@@ -249,20 +249,34 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
     .set({ ingestionStatus: 'processing', updatedAt: new Date() })
     .where(eq(creatorProfiles.id, profile.id));
 
-  const html = await fetchLinktreeDocument(parsed.sourceUrl);
-  const extraction = extractLinktree(html);
-  const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+  try {
+    const html = await fetchLinktreeDocument(parsed.sourceUrl);
+    const extraction = extractLinktree(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
 
-  return {
-    ...result,
-    sourceUrl: parsed.sourceUrl,
-    extractedLinks: extraction.links.length,
-  };
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Linktree ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
 }
 
 /**
