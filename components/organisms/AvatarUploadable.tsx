@@ -255,9 +255,20 @@ export const AvatarUploadable = React.memo(
     );
 
     const setPreviewFromFile = useCallback((file: File) => {
+      const canUseObjectUrl =
+        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+
+      if (!canUseObjectUrl) {
+        return;
+      }
+
       const url = URL.createObjectURL(file);
       setPreviewUrl(prev => {
-        if (prev && prev.startsWith('blob:')) {
+        if (
+          prev &&
+          prev.startsWith('blob:') &&
+          typeof URL.revokeObjectURL === 'function'
+        ) {
           URL.revokeObjectURL(prev);
         }
         return url;
@@ -266,7 +277,12 @@ export const AvatarUploadable = React.memo(
 
     useEffect(
       () => () => {
-        if (previewUrl && previewUrl.startsWith('blob:')) {
+        if (
+          previewUrl &&
+          previewUrl.startsWith('blob:') &&
+          typeof URL !== 'undefined' &&
+          typeof URL.revokeObjectURL === 'function'
+        ) {
           URL.revokeObjectURL(previewUrl);
         }
       },
