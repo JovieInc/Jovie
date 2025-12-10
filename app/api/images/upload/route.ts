@@ -2,8 +2,8 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { z } from 'zod';
-import { withDbSession } from '@/lib/auth/session';
-import { db, profilePhotos, users } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
+import { profilePhotos, users } from '@/lib/db';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -60,6 +60,33 @@ type SharpConstructor = SharpModule extends { default: infer D }
   ? D
   : SharpModule;
 const WEBP_MIME_TYPE = 'image/webp';
+
+type PgErrorInfo = {
+  code?: string;
+  detail?: string;
+  hint?: string;
+  schema?: string;
+  table?: string;
+  constraint?: string;
+};
+
+const extractPgError = (error: unknown): PgErrorInfo | null => {
+  if (typeof error !== 'object' || error === null) return null;
+  const maybeError = error as Record<string, unknown>;
+  return {
+    code: typeof maybeError.code === 'string' ? maybeError.code : undefined,
+    detail:
+      typeof maybeError.detail === 'string' ? maybeError.detail : undefined,
+    hint: typeof maybeError.hint === 'string' ? maybeError.hint : undefined,
+    schema:
+      typeof maybeError.schema === 'string' ? maybeError.schema : undefined,
+    table: typeof maybeError.table === 'string' ? maybeError.table : undefined,
+    constraint:
+      typeof maybeError.constraint === 'string'
+        ? maybeError.constraint
+        : undefined,
+  };
+};
 
 // Dynamically import Vercel Blob when needed
 async function getVercelBlobUploader(): Promise<BlobPut | null> {
@@ -258,7 +285,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
       // Rate limiting - 3 uploads per minute per user
       if (avatarUploadRateLimit) {
         const rateLimitResult = await avatarUploadRateLimit.limit(clerkUserId);
@@ -357,8 +384,11 @@ export async function POST(request: NextRequest) {
       }
 
       // Look up the internal user ID (UUID) for the authenticated Clerk user
-      const [dbUser] = await db
-        .select({ id: users.id })
+      const [dbUser] = await tx
+        .select({
+          id: users.id,
+          clerkId: users.clerkId,
+        })
         .from(users)
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
@@ -372,7 +402,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Create database record first
-      const [photoRecord] = await db
+      const [photoRecord] = await tx
         .insert(profilePhotos)
         .values({
           userId: dbUser.id,
@@ -384,7 +414,7 @@ export async function POST(request: NextRequest) {
         .returning();
 
       try {
-        await db
+        await tx
           .update(profilePhotos)
           .set({
             status: 'processing',
@@ -398,6 +428,7 @@ export async function POST(request: NextRequest) {
           PROCESSING_TIMEOUT_MS,
           'Image processing'
         );
+
         const seoFileName = buildSeoFilename({
           originalFilename: file.name,
           photoId: photoRecord.id,
@@ -427,14 +458,15 @@ export async function POST(request: NextRequest) {
         }
 
         // Update record with optimized URLs
-        await db
+        await tx
           .update(profilePhotos)
           .set({
             blobUrl,
             smallUrl,
             mediumUrl,
             largeUrl,
-            status: 'completed',
+            // Use legacy-friendly status that exists in both old/new enums
+            status: 'ready',
             mimeType: WEBP_MIME_TYPE,
             fileSize:
               optimized.original.info.size ?? optimized.original.data.length,
@@ -452,63 +484,22 @@ export async function POST(request: NextRequest) {
             blobUrl,
             smallUrl,
             mediumUrl,
-            largeUrl,
           },
           { status: 201 }
         );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Upload failed';
+        const pgError = extractPgError(error);
 
         console.error('[upload] Finalize failed', {
           photoId: photoRecord.id,
           message,
           stack: error instanceof Error ? error.stack : undefined,
+          pgError,
         });
 
-        // Update record with error status
-        await db
-          .update(profilePhotos)
-          .set({
-            status: 'failed',
-            errorMessage: message,
-            updatedAt: new Date(),
-          })
-          .where(eq(profilePhotos.id, photoRecord.id));
-
-        const lowerMessage = message.toLowerCase();
-
-        // Categorize errors for appropriate client response
-        if (lowerMessage.includes('timed out')) {
-          return errorResponse(
-            'Image processing took too long. Please try a smaller image.',
-            UPLOAD_ERROR_CODES.PROCESSING_TIMEOUT,
-            408,
-            { retryable: true }
-          );
-        }
-
-        if (
-          lowerMessage.includes('unsupported image format') ||
-          lowerMessage.includes('input buffer') ||
-          lowerMessage.includes('invalid')
-        ) {
-          return errorResponse(
-            'Invalid image file. Please upload a supported image format.',
-            UPLOAD_ERROR_CODES.INVALID_IMAGE,
-            400
-          );
-        }
-
-        if (lowerMessage.includes('blob') || lowerMessage.includes('storage')) {
-          return errorResponse(
-            'Failed to save image. Please try again.',
-            UPLOAD_ERROR_CODES.BLOB_UPLOAD_FAILED,
-            502,
-            { retryable: true }
-          );
-        }
-
+        // Propagate so outer catch handles generic error response
         throw error;
       }
     });

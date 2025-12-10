@@ -143,7 +143,7 @@ export const currencyCodeEnum = pgEnum('currency_code', [
 export const photoStatusEnum = pgEnum('photo_status', [
   'uploading',
   'processing',
-  'completed',
+  'ready',
   'failed',
 ]);
 
