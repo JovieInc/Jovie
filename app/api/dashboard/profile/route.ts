@@ -259,6 +259,8 @@ export async function PUT(req: Request) {
           ? profileUpdates.avatarUrl
           : undefined;
 
+      // Clerk sync - handle failures gracefully
+      let clerkSyncFailed = false;
       try {
         if (Object.keys(clerkUpdates).length > 0) {
           const clerk = await clerkClient();
@@ -266,9 +268,12 @@ export async function PUT(req: Request) {
         }
 
         if (avatarUrl) {
-          const avatarResponse = await fetch(avatarUrl);
+          // Add timeout for avatar fetch to prevent hanging
+          const avatarResponse = await fetch(avatarUrl, {
+            signal: AbortSignal.timeout(10000), // 10 second timeout
+          });
           if (!avatarResponse.ok) {
-            throw new Error('Unable to download uploaded avatar');
+            throw new Error(`Avatar fetch failed: ${avatarResponse.status}`);
           }
 
           const contentType =
@@ -282,11 +287,13 @@ export async function PUT(req: Request) {
           });
         }
       } catch (error) {
-        console.error('Failed to sync profile updates with Clerk:', error);
-        return NextResponse.json(
-          { error: 'Failed to sync profile updates' },
-          { status: 502 }
-        );
+        clerkSyncFailed = true;
+        console.error('Failed to sync profile updates with Clerk:', {
+          error: error instanceof Error ? error.message : error,
+          userId: clerkUserId,
+          hasAvatarUrl: !!avatarUrl,
+        });
+        // Don't fail the entire request - avatar is still stored in our DB
       }
 
       const [updatedProfile] = await db
@@ -318,8 +325,21 @@ export async function PUT(req: Request) {
         clerkUserId
       ).catch(error => console.warn('Analytics tracking failed:', error));
 
+      // Add cache-busting query parameter to avatar URL if present
+      const responseProfile = { ...updatedProfile };
+      if (responseProfile.avatarUrl) {
+        const url = new URL(responseProfile.avatarUrl);
+        url.searchParams.set('v', Date.now().toString());
+        responseProfile.avatarUrl = url.toString();
+      }
+
       return NextResponse.json(
-        { profile: updatedProfile },
+        {
+          profile: responseProfile,
+          warning: clerkSyncFailed
+            ? 'Profile updated but avatar sync to Clerk failed. Your profile photo will still be visible on Jovie.'
+            : undefined,
+        },
         { status: 200, headers: { 'Cache-Control': 'no-store' } }
       );
     });

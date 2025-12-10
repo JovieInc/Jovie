@@ -133,12 +133,18 @@ export function SettingsPolished({
         }
 
         const profile = (data as { profile?: { avatarUrl?: string } }).profile;
+        const warning = (data as { warning?: string }).warning;
 
         if (onArtistUpdate) {
           onArtistUpdate({
             ...artist,
             image_url: profile?.avatarUrl ?? imageUrl,
           });
+        }
+
+        // Show warning if Clerk sync failed but don't treat as error
+        if (warning) {
+          showToast({ type: 'warning', message: warning });
         }
       } catch (error) {
         if (onArtistUpdate) {
@@ -204,7 +210,7 @@ export function SettingsPolished({
 
   const handleBilling = async () => {
     setIsBillingLoading(true);
-    await router.push('/dashboard/billing');
+    await router.push('/settings/billing');
   };
 
   const handleInputChange = (field: string, value: string) => {

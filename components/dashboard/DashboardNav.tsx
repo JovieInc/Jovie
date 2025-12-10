@@ -234,13 +234,15 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       aria-label='Dashboard navigation'
       role='navigation'
     >
-      <SidebarGroup className='mb-1'>
-        <SidebarGroupContent>{renderSection(activeItems)}</SidebarGroupContent>
+      <SidebarGroup className='mb-2'>
+        <SidebarGroupContent className='w-full text-sm mb-2'>
+          {renderSection(activeItems)}
+        </SidebarGroupContent>
       </SidebarGroup>
       {!isInSettings && (
-        <SidebarGroup className='mt-0'>
+        <SidebarGroup className='mb-1'>
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
+          <SidebarGroupContent className='w-full text-sm mb-1'>
             {renderSection(secondaryNavigation)}
           </SidebarGroupContent>
         </SidebarGroup>
