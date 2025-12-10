@@ -61,6 +61,14 @@ type SharpConstructor = SharpModule extends { default: infer D }
   ? D
   : SharpModule;
 const WEBP_MIME_TYPE = 'image/webp';
+const [, AVATAR_1024, AVATAR_512, AVATAR_256, AVATAR_128] =
+  AVATAR_OPTIMIZED_SIZES;
+const AVATAR_SIZE_MAP = {
+  original: AVATAR_1024,
+  large: AVATAR_512,
+  medium: AVATAR_256,
+  small: AVATAR_128,
+} as const;
 
 type PgErrorInfo = {
   code?: string;
@@ -211,8 +219,8 @@ async function optimizeImageToWebp(file: File): Promise<{
   const original = await baseImage
     .clone()
     .resize({
-      width: AVATAR_OPTIMIZED_SIZES.original,
-      height: AVATAR_OPTIMIZED_SIZES.original,
+      width: AVATAR_SIZE_MAP.original,
+      height: AVATAR_SIZE_MAP.original,
       fit: 'inside',
       withoutEnlargement: true,
     })
@@ -232,9 +240,9 @@ async function optimizeImageToWebp(file: File): Promise<{
       .toBuffer();
 
   const [large, medium, small] = await Promise.all([
-    createVariant(AVATAR_OPTIMIZED_SIZES.large),
-    createVariant(AVATAR_OPTIMIZED_SIZES.medium),
-    createVariant(AVATAR_OPTIMIZED_SIZES.small),
+    createVariant(AVATAR_SIZE_MAP.large),
+    createVariant(AVATAR_SIZE_MAP.medium),
+    createVariant(AVATAR_SIZE_MAP.small),
   ]);
 
   return {

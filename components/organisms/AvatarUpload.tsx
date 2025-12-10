@@ -114,8 +114,8 @@ export function AvatarUpload({
         </button>
 
         <p className='text-sm text-secondary-token'>
-          {ACCEPTED_TYPE_LABEL} accepted. Auto-optimized to WebP. Max size 4MB.
-          Square images work best.
+          {ACCEPTED_TYPE_LABEL} accepted. Auto-optimized to AVIF/WebP (JPEG
+          fallback). Max size 25MB. Square images work best.
         </p>
 
         <div className='space-y-1 text-xs text-tertiary-token'>
