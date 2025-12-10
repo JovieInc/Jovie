@@ -814,7 +814,7 @@ export function SettingsPolished({
       id: 'remove-branding',
       title: 'Remove Branding',
       description:
-        'Hide Jovie branding from your profile for a professional look.',
+        'Remove Jovie branding to create a fully custom experience for your fans.',
       render: () =>
         isPro
           ? renderRemoveBrandingSection()
