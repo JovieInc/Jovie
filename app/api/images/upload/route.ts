@@ -515,14 +515,14 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json(
           {
-            id: photoRecord.id,
+            jobId: photoRecord.id,
             status: 'ready',
             blobUrl,
-            smallUrl,
-            mediumUrl,
             largeUrl,
+            mediumUrl,
+            smallUrl,
           },
-          { status: 201 }
+          { status: 202 }
         );
       } catch (error) {
         const message =

@@ -293,10 +293,10 @@ describe('/api/images/upload', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
 
-    expect(data).toHaveProperty('id', 'test-photo-id');
-    expect(data).toHaveProperty('status', 'completed');
+    expect(data).toHaveProperty('jobId', 'test-photo-id');
+    expect(data).toHaveProperty('status', 'ready');
     expect(data).toHaveProperty('blobUrl');
     expect(data).toHaveProperty('smallUrl');
   });
@@ -311,7 +311,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept PNG images', async () => {
@@ -324,7 +324,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept WebP images', async () => {
@@ -337,7 +337,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept HEIC images and normalize output', async () => {
@@ -350,7 +350,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     const data = await response.json();
     expect(data.blobUrl).toContain('.webp');
   });
@@ -389,7 +389,7 @@ describe('/api/images/upload', () => {
 
     const response = await POST(request);
     // Should pass magic bytes validation and proceed to processing
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept files with valid PNG magic bytes', async () => {
@@ -402,6 +402,6 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 });
