@@ -197,17 +197,18 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
     <SidebarMenu>
       {items.map(item => {
         const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          pathname === item.href ||
+          (pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
         const shortcut = navShortcuts[item.id];
         const tooltip = shortcut
           ? {
-              children: (
-                <div className='flex items-center gap-2'>
-                  <span>{item.name}</span>
-                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-                </div>
-              ),
-            }
+            children: (
+              <div className='flex items-center gap-2'>
+                <span>{item.name}</span>
+                <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
+              </div>
+            ),
+          }
           : item.name;
 
         return (

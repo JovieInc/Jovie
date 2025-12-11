@@ -1,6 +1,15 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  Button,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from '@jovie/ui';
+import { Check, Loader2, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -128,6 +137,27 @@ export function AdminCreatorProfilesWithSidebar({
     [tableMetaCtx]
   );
   const [headerElevated, setHeaderElevated] = useState(false);
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set());
+  const [pendingProfiles, setPendingProfiles] = useState<
+    Pick<
+      AdminCreatorProfileRow,
+      | 'id'
+      | 'username'
+      | 'usernameNormalized'
+      | 'avatarUrl'
+      | 'isVerified'
+      | 'isFeatured'
+      | 'marketingOptOut'
+      | 'isClaimed'
+      | 'claimToken'
+      | 'claimTokenExpiresAt'
+      | 'userId'
+      | 'createdAt'
+      | 'ingestionStatus'
+      | 'lastIngestionError'
+      | 'displayName'
+    >[]
+  >([]);
 
   // New states for dialogs and responsive
   const [isMobile, setIsMobile] = useState(false);
@@ -144,6 +174,15 @@ export function AdminCreatorProfilesWithSidebar({
     mediaQuery.addEventListener('change', handler);
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
+
+  // Drop pending placeholders once real profiles arrive.
+  React.useEffect(() => {
+    setPendingProfiles(prev =>
+      prev.filter(pending =>
+        profilesWithActions.every(profile => profile.id !== pending.id)
+      )
+    );
+  }, [profilesWithActions]);
 
   const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
   const canPrev = page > 1;
@@ -193,10 +232,17 @@ export function AdminCreatorProfilesWithSidebar({
     );
   };
 
+  const mergedProfiles = useMemo(() => {
+    const pendingFiltered = pendingProfiles.filter(
+      pending => !profilesWithActions.some(profile => profile.id === pending.id)
+    );
+    return [...pendingFiltered, ...profilesWithActions];
+  }, [pendingProfiles, profilesWithActions]);
+
   const filteredProfiles = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return profilesWithActions;
-    return profilesWithActions.filter(profile => {
+    if (!term) return mergedProfiles;
+    return mergedProfiles.filter(profile => {
       const username = profile.username.toLowerCase();
       const displayName =
         'displayName' in profile
@@ -204,7 +250,7 @@ export function AdminCreatorProfilesWithSidebar({
           : '';
       return username.includes(term) || displayName.includes(term);
     });
-  }, [profilesWithActions, searchTerm]);
+  }, [mergedProfiles, searchTerm]);
 
   const selectedProfile = useMemo(
     () => filteredProfiles.find(p => p.id === selectedId) ?? null,
@@ -216,6 +262,18 @@ export function AdminCreatorProfilesWithSidebar({
     [filteredProfiles, selectedId]
   );
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedCount = selectedIds.size;
+  const allSelected =
+    filteredProfiles.length > 0 && selectedCount === filteredProfiles.length;
+  const someSelected =
+    selectedCount > 0 && selectedCount < filteredProfiles.length;
+  const headerCheckboxState: boolean | 'indeterminate' = allSelected
+    ? true
+    : someSelected
+      ? 'indeterminate'
+      : false;
+
   const effectiveContact = useMemo(() => {
     if (draftContact && draftContact.id === selectedId) return draftContact;
     return mapProfileToContact(selectedProfile);
@@ -226,6 +284,36 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(true);
     setDraftContact(null);
   }, []);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (filteredProfiles.length === 0) return new Set<string>();
+      if (prev.size === filteredProfiles.length) return new Set<string>();
+      return new Set(filteredProfiles.map(p => p.id));
+    });
+  };
+
+  React.useEffect(() => {
+    setSelectedIds(prev => {
+      const next = new Set<string>();
+      filteredProfiles.forEach(profile => {
+        if (prev.has(profile.id)) next.add(profile.id);
+      });
+      return next;
+    });
+  }, [filteredProfiles]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isFormElement(event.target)) return;
@@ -366,7 +454,14 @@ export function AdminCreatorProfilesWithSidebar({
   }, [filteredProfiles, selectedId, setTableMeta]);
 
   return (
-    <div className='flex flex-col gap-4 md:flex-row md:items-stretch min-h-screen md:min-h-[calc(100vh-80px)]'>
+    <div
+      className={cn(
+        'relative flex flex-col gap-0 md:flex-row md:items-stretch min-h-screen md:min-h-[calc(100vh-80px)] md:h-svh',
+        sidebarOpen && effectiveContact
+          ? 'md:pr-[340px] lg:pr-[360px]'
+          : undefined
+      )}
+    >
       <div
         className={cn(
           'flex-1 outline-none flex flex-col',
@@ -376,9 +471,9 @@ export function AdminCreatorProfilesWithSidebar({
         onKeyDown={handleKeyDown}
         aria-label='Creator profiles table'
       >
-        <div className='w-full space-y-4'>
-          <div className='flex flex-wrap items-center gap-3 justify-between text-xs text-secondary-token'>
-            <div>
+        <div className='w-full space-y-4 px-2 sm:px-3 md:px-4'>
+          <div className='relative z-30 flex flex-wrap items-center justify-between gap-3 text-xs text-[#555] dark:text-[#999] mb-3 md:mb-4 bg-white border-b border-[#e5e5e5] px-2 sm:px-3 md:px-4 py-3 rounded-none dark:bg-[#0a0a0a] dark:border-[#1f1f1f]'>
+            <div className='hidden sm:block'>
               Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
               {total.toLocaleString()} profiles
             </div>
@@ -386,7 +481,7 @@ export function AdminCreatorProfilesWithSidebar({
               <form
                 action={basePath}
                 method='get'
-                className='flex items-center gap-2 flex-nowrap'
+                className='relative z-40 isolate flex items-center gap-2 flex-nowrap'
               >
                 <input type='hidden' name='sort' value={sort} />
                 <input type='hidden' name='pageSize' value={pageSize} />
@@ -408,50 +503,111 @@ export function AdminCreatorProfilesWithSidebar({
                 )}
               </form>
               <div className='ml-1'>
-                <IngestProfileDropdown />
+                <IngestProfileDropdown
+                  onIngestPending={({ id, username }) => {
+                    setPendingProfiles(prev => {
+                      if (prev.some(profile => profile.id === id)) return prev;
+                      return [
+                        ...prev,
+                        {
+                          id,
+                          username,
+                          usernameNormalized: username.toLowerCase(),
+                          displayName: username,
+                          avatarUrl: null,
+                          isVerified: false,
+                          isFeatured: false,
+                          marketingOptOut: false,
+                          isClaimed: false,
+                          claimToken: null,
+                          claimTokenExpiresAt: null,
+                          userId: null,
+                          createdAt: new Date(),
+                          ingestionStatus: 'processing',
+                          lastIngestionError: null,
+                        },
+                      ];
+                    });
+                  }}
+                />
               </div>
             </div>
           </div>
         </div>
 
-        <div className='flex-1 overflow-auto' ref={tableContainerRef}>
-          <table className='w-full table-fixed text-sm'>
+        <div
+          className='flex-1 overflow-auto w-full px-0 bg-white text-[#111] dark:bg-[#0a0a0a] dark:text-[#eaeaea]'
+          ref={tableContainerRef}
+        >
+          <table className='w-full min-w-full table-auto text-sm border-separate border-spacing-0'>
             <thead
               className={cn(
-                'text-left text-secondary-token border-b border-surface-3/60',
+                'sticky top-0 z-40 text-left text-[#111] border-b border-[#e5e5e5] bg-white dark:text-[#eaeaea] dark:border-[#1f1f1f] dark:bg-[#0a0a0a]',
                 headerElevated &&
-                  'shadow-sm shadow-black/10 dark:shadow-black/40'
+                  'shadow-sm shadow-black/10 dark:shadow-black/30'
               )}
             >
               <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80'>
-                  Creator
+                <th className='w-14 px-3 py-2 text-left'>
+                  <div className='flex items-center gap-2'>
+                    <Checkbox
+                      aria-label='Select all creators'
+                      checked={headerCheckboxState}
+                      onCheckedChange={toggleSelectAll}
+                      className='h-4 w-4 bg-[#111] border-[#1f1f1f] data-[state=checked]:bg-[#222] data-[state=checked]:border-[#1f1f1f] focus-visible:ring-2 focus-visible:ring-[#444]'
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant='ghost'
+                          size='sm'
+                          className='h-8 px-2 text-[11px] font-semibold'
+                          disabled={selectedIds.size === 0}
+                        >
+                          Bulk actions
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align='start'
+                        className='rounded-lg bg-white text-[#111] border border-[#e5e5e5] dark:bg-[#111] dark:text-[#eaeaea] dark:border-[#1f1f1f]'
+                      >
+                        <DropdownMenuItem disabled>
+                          Feature selected (coming soon)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>
+                          Unverify selected (coming soon)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled className='text-destructive'>
+                          Delete selected (coming soon)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </th>
+                <th className='px-2 py-2 text-left' />
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('created'))}
                 >
                   {renderSortHeader('created')}
                 </th>
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('claimed'))}
                 >
                   {renderSortHeader('claimed')}
                 </th>
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('verified'))}
                 >
                   {renderSortHeader('verified')}
                 </th>
-                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-right backdrop-blur-sm dark:bg-black/80'>
-                  Action
-                </th>
+                <th className='px-2 py-2 text-right'>Action</th>
               </tr>
             </thead>
             <tbody>
-              {profilesWithActions.length === 0 ? (
+              {filteredProfiles.length === 0 ? (
                 <tr>
                   <td
                     colSpan={6}
@@ -461,139 +617,264 @@ export function AdminCreatorProfilesWithSidebar({
                   </td>
                 </tr>
               ) : (
-                profilesWithActions.map(profile => {
+                filteredProfiles.map(profile => {
+                  const isPending = profile.ingestionStatus !== 'idle';
                   const isSelected = profile.id === selectedId;
+                  const isChecked = selectedIds.has(profile.id);
                   return (
                     <tr
                       key={profile.id}
                       className={cn(
-                        'cursor-pointer transition-colors duration-200',
-                        isSelected
-                          ? 'bg-gray-200 dark:bg-gray-800'
-                          : 'hover:bg-gray-100 dark:hover:bg-gray-900/50'
+                        'cursor-pointer transition-colors duration-200 h-16 text-[#111] bg-white hover:bg-[#f5f5f5] dark:text-[#eaeaea] dark:bg-[#111] dark:hover:bg-[#1a1a1a]',
+                        isSelected &&
+                          'bg-[#eaeaea] dark:bg-[#111] dark:ring-1 dark:ring-[#1f1f1f]'
                       )}
-                      onClick={() => handleRowClick(profile.id)}
+                      onClick={() => {
+                        if (isPending) return;
+                        handleRowClick(profile.id);
+                      }}
                       aria-selected={isSelected}
                     >
                       <td
                         className={cn(
-                          'px-2 py-3 border-l border-transparent',
-                          isSelected &&
-                            'border-l-[3px] border-accent/80 bg-surface-2/60 dark:bg-white/5'
+                          'w-14 px-3 py-3 border-l border-transparent',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
                         )}
                       >
                         <div className='flex items-center gap-3'>
-                          <CreatorAvatarCell
-                            profileId={profile.id}
-                            username={profile.username}
-                            avatarUrl={profile.avatarUrl}
-                            verified={profile.isVerified}
-                            isFeatured={profile.isFeatured}
-                          />
-                          <Link
-                            href={`/${profile.username}`}
-                            className='font-medium text-primary-token hover:underline'
+                          <Checkbox
+                            aria-label={`Select ${profile.username}`}
+                            checked={isChecked}
+                            disabled={isPending}
                             onClick={event => event.stopPropagation()}
-                          >
-                            @{profile.username}
-                          </Link>
-                        </div>
-                      </td>
-                      <td className='px-2 py-3 text-xs text-tertiary-token'>
-                        {profile.createdAt
-                          ? new Intl.DateTimeFormat('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            }).format(profile.createdAt)
-                          : '—'}
-                      </td>
-                      <td className='px-2 py-3 text-xs'>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
-                            profile.isClaimed
-                              ? 'bg-green-50 text-green-800 ring-1 ring-inset ring-green-200 dark:bg-green-900/40 dark:text-green-200 dark:ring-green-800'
-                              : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
-                          )}
-                        >
-                          {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
-                        </span>
-                      </td>
-                      <td className='px-2 py-3 text-xs'>
-                        <span
-                          className={cn(
-                            'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
-                            profile.isVerified
-                              ? 'bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:ring-blue-800'
-                              : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
-                          )}
-                        >
-                          {profile.isVerified ? (
-                            <>
-                              <span aria-hidden='true'>★</span>
-                              <span>Verified</span>
-                            </>
+                            onCheckedChange={() => toggleSelect(profile.id)}
+                            className='h-4 w-4 bg-white border-[#e5e5e5] data-[state=checked]:bg-[#111] data-[state=checked]:border-[#111] focus-visible:ring-2 focus-visible:ring-[#dcdcdc] dark:bg-[#111] dark:border-[#1f1f1f] dark:data-[state=checked]:bg-[#222] dark:data-[state=checked]:border-[#1f1f1f] dark:focus-visible:ring-[#444]'
+                          />
+                          {isPending ? (
+                            <div className='flex items-center gap-3'>
+                              <div className='h-10 w-10 rounded-full bg-surface-3 animate-pulse' />
+                              <div className='flex flex-col gap-1'>
+                                <div className='h-3 w-24 rounded bg-surface-3 animate-pulse' />
+                                <div className='h-3 w-16 rounded bg-surface-3/80 animate-pulse' />
+                              </div>
+                            </div>
                           ) : (
                             <>
-                              <span
-                                className='h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500'
-                                aria-hidden='true'
+                              <CreatorAvatarCell
+                                profileId={profile.id}
+                                username={profile.username}
+                                avatarUrl={profile.avatarUrl}
+                                verified={profile.isVerified}
+                                isFeatured={profile.isFeatured}
                               />
-                              <span>Not verified</span>
+                              <Link
+                                href={`/${profile.username}`}
+                                className='flex flex-col leading-tight hover:underline'
+                                onClick={event => event.stopPropagation()}
+                                aria-label={`@${profile.username}`}
+                              >
+                                <span
+                                  className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'
+                                  aria-hidden='true'
+                                >
+                                  {profile.displayName ?? profile.username}
+                                </span>
+                                <span
+                                  className='text-[12px] text-secondary-token max-w-[180px] truncate whitespace-nowrap'
+                                  aria-hidden='true'
+                                >
+                                  @{profile.username}
+                                </span>
+                              </Link>
                             </>
                           )}
-                        </span>
+                        </div>
                       </td>
                       <td
-                        className='px-2 py-3 text-right'
+                        className={cn(
+                          'px-2 py-3 text-xs text-tertiary-token',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
+                        )}
+                      />
+                      <td
+                        className={cn(
+                          'px-2 py-3 text-xs text-tertiary-token',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
+                        )}
+                      >
+                        {isPending ? (
+                          <div className='h-3 w-20 rounded bg-surface-3 animate-pulse' />
+                        ) : profile.createdAt ? (
+                          new Intl.DateTimeFormat('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          }).format(profile.createdAt)
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-2 py-3 text-xs',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
+                        )}
+                      >
+                        {isPending ? (
+                          <div className='h-6 w-24 rounded-full bg-surface-3 animate-pulse' />
+                        ) : (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
+                              profile.isClaimed
+                                ? 'bg-green-50 text-green-800 ring-1 ring-inset ring-green-200 dark:bg-green-900/40 dark:text-green-200 dark:ring-green-800'
+                                : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
+                            )}
+                          >
+                            {profile.isClaimed ? (
+                              <>
+                                <Star
+                                  className='h-3 w-3 fill-current'
+                                  aria-hidden='true'
+                                />
+                                <span>Claimed</span>
+                              </>
+                            ) : (
+                              <>
+                                <span
+                                  className='h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                                  aria-hidden='true'
+                                />
+                                <span>Unclaimed</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-2 py-3 text-xs',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
+                        )}
+                      >
+                        {isPending ? (
+                          <div className='h-6 w-24 rounded-full bg-surface-3 animate-pulse' />
+                        ) : (
+                          <span
+                            className={cn(
+                              'inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium',
+                              profile.isVerified
+                                ? 'bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200 dark:bg-blue-900/30 dark:text-blue-100 dark:ring-blue-800'
+                                : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
+                            )}
+                          >
+                            {profile.isVerified ? (
+                              <>
+                                <Check className='h-3 w-3' aria-hidden='true' />
+                                <span>Verified</span>
+                              </>
+                            ) : (
+                              <>
+                                <span
+                                  className='h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                                  aria-hidden='true'
+                                />
+                                <span>Not verified</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={cn(
+                          'px-2 py-3 text-right',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
+                        )}
                         onClick={e => e.stopPropagation()}
                       >
-                        <CreatorActionsMenu
-                          profile={profile}
-                          isMobile={isMobile}
-                          status={verificationStatuses[profile.id] ?? 'idle'}
-                          onToggleVerification={async () => {
-                            const result = await toggleVerification(
-                              profile.id,
-                              !profile.isVerified
-                            );
-                            if (!result.success) {
-                              console.error(
-                                'Failed to toggle verification',
-                                result.error
-                              );
-                            }
-                          }}
-                          onToggleFeatured={async () => {
-                            const result = await toggleFeatured(
-                              profile.id,
-                              !profile.isFeatured
-                            );
-                            if (!result.success) {
-                              console.error(
-                                'Failed to toggle featured',
-                                result.error
-                              );
-                            }
-                          }}
-                          onToggleMarketing={async () => {
-                            const result = await toggleMarketing(
-                              profile.id,
-                              !profile.marketingOptOut
-                            );
-                            if (!result.success) {
-                              console.error(
-                                'Failed to toggle marketing',
-                                result.error
-                              );
-                            }
-                          }}
-                          onDelete={() => {
-                            setProfileToDelete(profile);
-                            setDeleteDialogOpen(true);
-                          }}
-                        />
+                        <div className='flex flex-col items-end gap-1'>
+                          {isPending ? (
+                            <div className='inline-flex items-center justify-end gap-2 text-secondary-token'>
+                              <Loader2 className='h-4 w-4 animate-spin' />
+                              <span className='text-xs'>Ingesting…</span>
+                            </div>
+                          ) : (
+                            <CreatorActionsMenu
+                              profile={profile}
+                              isMobile={isMobile}
+                              status={
+                                verificationStatuses[profile.id] ?? 'idle'
+                              }
+                              onToggleVerification={async () => {
+                                const result = await toggleVerification(
+                                  profile.id,
+                                  !profile.isVerified
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle verification',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onToggleFeatured={async () => {
+                                const result = await toggleFeatured(
+                                  profile.id,
+                                  !profile.isFeatured
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle featured',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onToggleMarketing={async () => {
+                                const result = await toggleMarketing(
+                                  profile.id,
+                                  !profile.marketingOptOut
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle marketing',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onDelete={() => {
+                                setProfileToDelete(profile);
+                                setDeleteDialogOpen(true);
+                              }}
+                              onRefresh={async () => {
+                                setRefreshingIds(prev => {
+                                  const next = new Set(prev);
+                                  next.add(profile.id);
+                                  return next;
+                                });
+                                try {
+                                  await fetch('/api/admin/creator-ingest', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      url: `https://linktr.ee/${profile.usernameNormalized ?? profile.username}`,
+                                    }),
+                                  });
+                                } catch (error) {
+                                  console.error('Refresh ingest failed', error);
+                                } finally {
+                                  setRefreshingIds(prev => {
+                                    const next = new Set(prev);
+                                    next.delete(profile.id);
+                                    return next;
+                                  });
+                                }
+                              }}
+                              refreshing={refreshingIds.has(profile.id)}
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -603,7 +884,7 @@ export function AdminCreatorProfilesWithSidebar({
           </table>
         </div>
 
-        <div className='sticky bottom-0 left-0 right-0 mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 bg-white/90 px-3 py-2 text-xs text-secondary-token backdrop-blur-sm dark:bg-black/90'>
+        <div className='sticky bottom-0 left-0 right-0 mt-4 flex flex-wrap items-center justify-between gap-3 bg-white/95 text-[#111] border-t border-[#e5e5e5] px-3 py-2 text-xs backdrop-blur-sm shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.15)] dark:bg-[#0a0a0a]/95 dark:text-[#eaeaea] dark:border-t-[#1f1f1f] dark:shadow-[0_-8px_16px_-12px_rgba(0,0,0,0.5)]'>
           <div className='flex items-center gap-2'>
             <span>
               Page {page} of {totalPages}
@@ -636,7 +917,7 @@ export function AdminCreatorProfilesWithSidebar({
 
       <div
         className={cn(
-          'hidden md:flex md:flex-col md:shrink-0 h-full min-h-screen md:self-stretch bg-white dark:bg-black border-l border-surface-3 transition-[width] duration-200 ease-out overflow-hidden',
+          'hidden md:flex md:flex-col md:shrink-0 md:fixed md:top-0 md:right-0 md:h-svh md:z-40 bg-sidebar text-sidebar-foreground border-l border-sidebar-border transition-[width] duration-200 ease-out overflow-hidden shadow-xl',
           sidebarOpen && effectiveContact
             ? 'md:w-[340px] lg:w-[360px]'
             : 'md:w-0 lg:w-0'

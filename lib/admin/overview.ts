@@ -1,13 +1,9 @@
 import 'server-only';
 
-import { and, count, desc, sql as drizzleSql, eq, gte, or } from 'drizzle-orm';
+import { desc, gte } from 'drizzle-orm';
 
 import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
-import {
-  clickEvents,
-  creatorProfiles,
-  stripeWebhookEvents,
-} from '@/lib/db/schema';
+import { creatorProfiles } from '@/lib/db/schema';
 
 export interface AdminUsagePoint {
   label: string;
@@ -38,18 +34,24 @@ export async function getAdminUsageSeries(
 ): Promise<AdminUsagePoint[]> {
   const now = new Date();
   const startDate = new Date(now.getTime() - (days - 1) * MS_PER_DAY);
+  const startIso = startDate.toISOString();
 
   let rows: { date: string; activeUsers: number | null }[] = [];
   try {
-    rows = await db
-      .select({
-        date: drizzleSql<string>`DATE(${clickEvents.createdAt})`,
-        activeUsers: drizzleSql<number>`COUNT(DISTINCT ${clickEvents.ipAddress})`,
-      })
-      .from(clickEvents)
-      .where(gte(clickEvents.createdAt, startDate))
-      .groupBy(drizzleSql`DATE(${clickEvents.createdAt})`)
-      .orderBy(drizzleSql`DATE(${clickEvents.createdAt})`);
+    const result = await db.execute(
+      `
+        SELECT DATE(created_at) AS date, COUNT(DISTINCT ip_address) AS active_users
+        FROM click_events
+        WHERE created_at >= '${startIso}'
+        GROUP BY DATE(created_at)
+        ORDER BY DATE(created_at)
+      `
+    );
+    const rawRows = (result as { rows?: Record<string, unknown>[] }).rows ?? [];
+    rows = rawRows.map(row => ({
+      date: String(row.date),
+      activeUsers: row.active_users != null ? Number(row.active_users) : null,
+    }));
   } catch (error) {
     console.error('Error loading admin usage series', error);
     // Fall through with empty rows, which will produce a zeroed series
@@ -80,6 +82,7 @@ export async function getAdminUsageSeries(
 export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - MS_PER_DAY);
+  const dayAgoIso = dayAgo.toISOString();
   const hasStripeEvents = await doesTableExist(TABLE_NAMES.stripeWebhookEvents);
 
   if (!hasStripeEvents) {
@@ -93,35 +96,42 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
   }
 
   try {
-    const [dbHealth, totalEventsRows, incidentRows] = await Promise.all([
-      checkDbHealth(),
-      db
-        .select({ count: count() })
-        .from(stripeWebhookEvents)
-        .where(gte(stripeWebhookEvents.createdAt, dayAgo)),
-      db
-        .select({
-          count: count(),
-          lastAt: drizzleSql<Date>`MAX(${stripeWebhookEvents.createdAt})`,
-        })
-        .from(stripeWebhookEvents)
-        .where(
-          and(
-            gte(stripeWebhookEvents.createdAt, dayAgo),
-            or(
-              // Payment failures are treated as incidents
-              eq(stripeWebhookEvents.type, 'invoice.payment_failed'),
-              // Subscription cancellations are also operationally important
-              eq(stripeWebhookEvents.type, 'customer.subscription.deleted')
-            )
-          )
-        ),
-    ]);
+    const dbHealth = await checkDbHealth();
 
-    const totalEvents = totalEventsRows[0]?.count ?? 0;
-    const incidentCount = incidentRows[0]?.count ?? 0;
-    const lastIncidentAt =
-      (incidentRows[0] as { lastAt?: Date | null } | undefined)?.lastAt ?? null;
+    let totalEvents = 0;
+    let incidentCount = 0;
+    let lastIncidentAt: Date | null = null;
+
+    try {
+      const result = await db.execute(
+        `
+          SELECT COUNT(*) AS count
+          FROM stripe_webhook_events
+          WHERE created_at >= '${dayAgoIso}'
+        `
+      );
+      const rows = (result as { rows?: Record<string, unknown>[] }).rows ?? [];
+      totalEvents = Number(rows[0]?.count ?? 0);
+    } catch (error) {
+      console.error('Error counting stripe webhook events', error);
+    }
+
+    try {
+      const result = await db.execute(
+        `
+          SELECT COUNT(*) AS count, MAX(created_at) AS last_at
+          FROM stripe_webhook_events
+          WHERE created_at >= '${dayAgoIso}'
+            AND (type = 'invoice.payment_failed' OR type = 'customer.subscription.deleted')
+        `
+      );
+      const rows = (result as { rows?: Record<string, unknown>[] }).rows ?? [];
+      incidentCount = Number(rows[0]?.count ?? 0);
+      lastIncidentAt =
+        rows[0]?.last_at != null ? new Date(String(rows[0]?.last_at)) : null;
+    } catch (error) {
+      console.error('Error loading stripe incident summary', error);
+    }
 
     const errorRatePercent =
       totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
@@ -219,10 +229,10 @@ export async function getAdminActivityFeed(
 ): Promise<AdminActivityItem[]> {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * MS_PER_DAY);
-  const [hasCreatorProfiles, hasStripeEvents] = await Promise.all([
-    doesTableExist(TABLE_NAMES.creatorProfiles),
-    doesTableExist(TABLE_NAMES.stripeWebhookEvents),
-  ]);
+  const sevenDaysAgoIso = sevenDaysAgo.toISOString();
+
+  const hasStripeEvents = await doesTableExist(TABLE_NAMES.stripeWebhookEvents);
+  const hasCreatorProfiles = await doesTableExist(TABLE_NAMES.creatorProfiles);
 
   try {
     const creatorPromise: Promise<CreatorActivityRow[]> = hasCreatorProfiles
@@ -233,27 +243,37 @@ export async function getAdminActivityFeed(
             createdAt: creatorProfiles.createdAt,
           })
           .from(creatorProfiles)
-          .where(gte(creatorProfiles.createdAt, sevenDaysAgo))
+          .where(gte(creatorProfiles.createdAt, new Date(sevenDaysAgoIso)))
           .orderBy(desc(creatorProfiles.createdAt))
           .limit(limit)
       : Promise.resolve([] as CreatorActivityRow[]);
 
-    const stripePromise: Promise<StripeActivityRow[]> = hasStripeEvents
-      ? db
-          .select({
-            id: stripeWebhookEvents.id,
-            type: stripeWebhookEvents.type,
-            createdAt: stripeWebhookEvents.createdAt,
-          })
-          .from(stripeWebhookEvents)
-          .where(gte(stripeWebhookEvents.createdAt, sevenDaysAgo))
-          .orderBy(desc(stripeWebhookEvents.createdAt))
-          .limit(limit)
-      : Promise.resolve([] as StripeActivityRow[]);
-
     const [recentCreators, recentStripeEvents] = await Promise.all([
       creatorPromise,
-      stripePromise,
+      (async () => {
+        if (!hasStripeEvents) return [] as StripeActivityRow[];
+        try {
+          const result = await db.execute(
+            `
+              SELECT id, type, created_at
+              FROM stripe_webhook_events
+              WHERE created_at >= '${sevenDaysAgoIso}'
+              ORDER BY created_at DESC
+              LIMIT ${limit}
+            `
+          );
+          const rows =
+            (result as { rows?: Record<string, unknown>[] }).rows ?? [];
+          return rows.map(row => ({
+            id: String(row.id),
+            type: String(row.type),
+            createdAt: new Date(String(row.created_at)),
+          }));
+        } catch (error) {
+          console.error('Error loading stripe activity feed', error);
+          return [] as StripeActivityRow[];
+        }
+      })(),
     ]);
 
     const creatorItems: AdminActivityItem[] = recentCreators.map(row => ({

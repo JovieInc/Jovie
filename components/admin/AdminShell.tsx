@@ -44,7 +44,7 @@ export function AdminShell({ children }: AdminShellProps) {
         <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
           <DashboardTopBar breadcrumbs={breadcrumbs} />
           <main className='min-h-0 flex-1 overflow-auto'>
-            <div className='container mx-auto max-w-7xl p-6'>{children}</div>
+            <div className='w-full px-0 py-6'>{children}</div>
           </main>
         </SidebarInset>
       </div>

@@ -16,6 +16,7 @@ import {
   createExtractionResult,
   ExtractionError,
   extractMetaContent,
+  extractScriptJson,
   type FetchOptions,
   fetchDocument,
   type StrategyConfig,
@@ -230,7 +231,54 @@ export async function fetchLinktreeDocument(
  * 2. href attributes for external links
  * 3. JSON-LD structured data (if present)
  */
+type LinktreePageProps = {
+  props?: {
+    pageProps?: {
+      seo?: { title?: string | null; image?: string | null };
+      user?: {
+        fullName?: string | null;
+        profilePicture?: { url?: string | null } | null;
+      };
+      account?: { displayName?: string | null; profilePicture?: string | null };
+    };
+  };
+  query?: { handle?: string };
+};
+
 export function extractLinktree(html: string): ExtractionResult {
+  const nextData = extractScriptJson<LinktreePageProps>(html, '__NEXT_DATA__');
+
+  const nextDisplayName =
+    nextData?.props?.pageProps?.seo?.title ??
+    nextData?.props?.pageProps?.user?.fullName ??
+    nextData?.props?.pageProps?.account?.displayName ??
+    null;
+
+  const sanitizeAvatar = (candidate?: string | null): string | null => {
+    if (!candidate) return null;
+    try {
+      const parsed = new URL(
+        candidate.startsWith('http') ? candidate : `https://${candidate}`
+      );
+      if (parsed.protocol !== 'https:') return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  };
+
+  const domAvatarMatch = html.match(
+    /id=["']profile-picture["'][^>]*\s(?:src|data-src)=["']([^"']+)["']/i
+  );
+  const domAvatar = sanitizeAvatar(domAvatarMatch?.[1] ?? null);
+
+  const nextAvatar = sanitizeAvatar(
+    nextData?.props?.pageProps?.seo?.image ??
+      nextData?.props?.pageProps?.user?.profilePicture?.url ??
+      nextData?.props?.pageProps?.account?.profilePicture ??
+      null
+  );
+
   // Extract links using custom logic for Linktree
   const links: ExtractionResult['links'] = [];
   const seen = new Set<string>();
@@ -294,6 +342,7 @@ export function extractLinktree(html: string): ExtractionResult {
 
   // Extract display name from meta tags
   let displayName =
+    nextDisplayName ??
     extractMetaContent(html, 'og:title') ??
     extractMetaContent(html, 'twitter:title') ??
     null;
@@ -306,10 +355,16 @@ export function extractLinktree(html: string): ExtractionResult {
       .trim();
   }
 
-  // Extract avatar from meta tags
+  if (displayName && /links?\b/i.test(displayName) && nextData?.query?.handle) {
+    displayName = nextData.query.handle;
+  }
+
+  // Extract avatar from Next.js data or meta tags
   const avatarUrl =
-    extractMetaContent(html, 'og:image') ??
-    extractMetaContent(html, 'twitter:image') ??
+    domAvatar ??
+    nextAvatar ??
+    sanitizeAvatar(extractMetaContent(html, 'og:image')) ??
+    sanitizeAvatar(extractMetaContent(html, 'twitter:image')) ??
     null;
 
   return createExtractionResult(links, displayName, avatarUrl);

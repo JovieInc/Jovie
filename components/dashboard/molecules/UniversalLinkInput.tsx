@@ -6,12 +6,12 @@ import {
   XMarkIcon,
 } from '@heroicons/react/20/solid';
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  Input,
 } from '@jovie/ui';
 import Image from 'next/image';
 import React, {
@@ -23,7 +23,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Input } from '@/components/atoms/Input';
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import {
@@ -159,6 +158,8 @@ interface UniversalLinkInputProps {
   onPrefillConsumed?: () => void; // notify parent once we consume it
   creatorName?: string; // Creator's name for personalized link titles
   onQueryChange?: (value: string) => void; // mirror URL value for filtering/search
+  onPreviewChange?: (link: DetectedLink | null, isDuplicate: boolean) => void;
+  clearSignal?: number;
 }
 
 export interface UniversalLinkInputRef {
@@ -179,6 +180,8 @@ export const UniversalLinkInput = forwardRef<
       onPrefillConsumed,
       creatorName,
       onQueryChange,
+      onPreviewChange,
+      clearSignal = 0,
     },
     forwardedRef
   ) => {
@@ -331,6 +334,21 @@ export const UniversalLinkInput = forwardRef<
     const isPlatformDuplicate = detectedLink
       ? existingPlatforms.includes(detectedLink.platform.id)
       : false;
+
+    useEffect(() => {
+      if (!onPreviewChange) return;
+      if (!detectedLink || !detectedLink.isValid) {
+        onPreviewChange(null, false);
+        return;
+      }
+      onPreviewChange(detectedLink, isPlatformDuplicate);
+    }, [detectedLink, isPlatformDuplicate, onPreviewChange]);
+
+    useEffect(() => {
+      if (!clearSignal) return;
+      handleClear();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clearSignal]);
 
     useImperativeHandle(forwardedRef, () => ({
       getInputElement: () => urlInputRef.current,
@@ -940,110 +958,6 @@ export const UniversalLinkInput = forwardRef<
               ? 'No valid link detected. Please enter a valid URL.'
               : ''}
         </div>
-
-        {/* Link preview */}
-        {detectedLink && (
-          <div
-            className={`-mt-px p-3 rounded-b-lg border border-t-0 transition-all duration-200 ${
-              isPlatformDuplicate
-                ? 'border-red-200 bg-red-50 dark:border-red-500/70 dark:bg-zinc-900/80'
-                : detectedLink.isValid
-                  ? 'border-gray-200 bg-gray-50 dark:border-zinc-700 dark:bg-zinc-900/80'
-                  : 'border-red-200 bg-red-50/50 dark:border-red-500/70 dark:bg-zinc-900/80'
-            }`}
-            style={
-              detectedLink.isValid && !isPlatformDuplicate
-                ? { borderColor: `${brandColor}40` }
-                : undefined
-            }
-            role='region'
-            aria-label='Link preview'
-          >
-            <div className='flex items-start gap-3'>
-              {/* Platform icon */}
-              <div
-                className='flex items-center justify-center w-8 h-8 rounded-lg shrink-0 mt-0.5'
-                style={{
-                  backgroundColor: iconBg,
-                  color: iconColor,
-                }}
-                aria-hidden='true'
-              >
-                <SocialIcon
-                  platform={detectedLink.platform.icon}
-                  className='w-4 h-4'
-                />
-              </div>
-
-              <div className='flex-1 min-w-0'>
-                {/* Platform name - primary focus */}
-                <div className='flex items-center gap-2'>
-                  <span className='font-semibold text-base text-primary-token'>
-                    {detectedLink.platform.name}
-                  </span>
-                  {detectedLink.isValid && !isPlatformDuplicate && (
-                    <span className='text-green-500 text-xs'>
-                      ✓ Ready to add
-                    </span>
-                  )}
-                </div>
-
-                {/* URL preview - secondary */}
-                <div className='text-xs text-tertiary-token truncate mt-0.5'>
-                  {detectedLink.normalizedUrl}
-                </div>
-
-                {/* Duplicate platform warning */}
-                {isPlatformDuplicate && (
-                  <div
-                    className='text-xs text-amber-600 dark:text-amber-400 mt-2'
-                    role='alert'
-                  >
-                    You already have a {detectedLink.platform.name} link. Adding
-                    another may confuse visitors.
-                  </div>
-                )}
-
-                {/* Validation error - friendly language */}
-                {!detectedLink.isValid && detectedLink.error && (
-                  <div
-                    className='text-xs text-red-500 dark:text-red-400 mt-2'
-                    role='alert'
-                  >
-                    {detectedLink.error}
-                  </div>
-                )}
-              </div>
-
-              {/* Action buttons */}
-              <div className='flex items-center gap-2 shrink-0'>
-                <button
-                  type='button'
-                  onClick={handleClear}
-                  className='flex items-center justify-center w-8 h-8 rounded-lg text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                  aria-label='Cancel'
-                >
-                  <XMarkIcon className='w-5 h-5' />
-                </button>
-                <Button
-                  onClick={handleAdd}
-                  disabled={
-                    disabled || !detectedLink.isValid || isPlatformDuplicate
-                  }
-                  variant='primary'
-                  size='sm'
-                  aria-label={
-                    isPlatformDuplicate
-                      ? `Cannot add duplicate ${detectedLink.platform.name} link`
-                      : `Add ${detectedLink.platform.name}`
-                  }
-                >
-                  Add
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Validation hint */}
         {url && !detectedLink?.isValid && (

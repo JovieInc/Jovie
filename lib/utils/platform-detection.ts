@@ -87,6 +87,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: 'FF5500',
     placeholder: 'https://soundcloud.com/username',
   },
+  'amazon-music': {
+    id: 'amazon-music',
+    name: 'Amazon Music',
+    category: 'dsp',
+    icon: 'amazon',
+    color: 'FF9900',
+    placeholder: 'https://music.amazon.com/artists/...',
+  },
   bandcamp: {
     id: 'bandcamp',
     name: 'Bandcamp',
@@ -94,6 +102,22 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     icon: 'bandcamp',
     color: '629AA0',
     placeholder: 'https://username.bandcamp.com',
+  },
+  'tencent-music': {
+    id: 'tencent-music',
+    name: 'Tencent Music',
+    category: 'dsp',
+    icon: 'qq',
+    color: '12B7F5',
+    placeholder: 'https://y.qq.com/n/ryqq/singer/...',
+  },
+  netease: {
+    id: 'netease',
+    name: 'Netease Music',
+    category: 'dsp',
+    icon: 'neteasecloudmusic',
+    color: 'C20C0C',
+    placeholder: 'https://music.163.com/#/artist?id=...',
   },
   youtube: {
     id: 'youtube',

@@ -98,32 +98,7 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
-CREATE TABLE "audience_members" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"creator_profile_id" uuid NOT NULL,
-	"type" "audience_member_type" DEFAULT 'anonymous' NOT NULL,
-	"display_name" text,
-	"first_seen_at" timestamp DEFAULT now() NOT NULL,
-	"last_seen_at" timestamp DEFAULT now() NOT NULL,
-	"visits" integer DEFAULT 0 NOT NULL,
-	"engagement_score" integer DEFAULT 0 NOT NULL,
-	"intent_level" "audience_intent_level" DEFAULT 'low' NOT NULL,
-	"geo_city" text,
-	"geo_country" text,
-	"device_type" "audience_device_type" DEFAULT 'unknown' NOT NULL,
-	"referrer_history" jsonb DEFAULT '[]'::jsonb,
-	"latest_actions" jsonb DEFAULT '[]'::jsonb,
-	"email" text,
-	"phone" text,
-	"spotify_connected" boolean DEFAULT false NOT NULL,
-	"purchase_count" integer DEFAULT 0 NOT NULL,
-	"tags" jsonb DEFAULT '[]'::jsonb,
-	"fingerprint" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "click_events" (
+CREATE TABLE IF NOT EXISTS "click_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"link_id" uuid,
@@ -142,7 +117,7 @@ CREATE TABLE "click_events" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "creator_contacts" (
+CREATE TABLE IF NOT EXISTS "creator_contacts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"role" "contact_role" NOT NULL,
@@ -159,7 +134,7 @@ CREATE TABLE "creator_contacts" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "creator_profiles" (
+CREATE TABLE IF NOT EXISTS "creator_profiles" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid,
 	"creator_type" "creator_type" NOT NULL,
@@ -195,7 +170,7 @@ CREATE TABLE "creator_profiles" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "ingestion_jobs" (
+CREATE TABLE IF NOT EXISTS "ingestion_jobs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"job_type" text NOT NULL,
 	"payload" jsonb NOT NULL,
@@ -211,7 +186,7 @@ CREATE TABLE "ingestion_jobs" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "notification_subscriptions" (
+CREATE TABLE IF NOT EXISTS "notification_subscriptions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"channel" "notification_channel" NOT NULL,
@@ -223,7 +198,7 @@ CREATE TABLE "notification_subscriptions" (
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "profile_photos" (
+CREATE TABLE IF NOT EXISTS "profile_photos" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" uuid NOT NULL,
 	"creator_profile_id" uuid,
@@ -248,7 +223,7 @@ CREATE TABLE "profile_photos" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "scraper_configs" (
+CREATE TABLE IF NOT EXISTS "scraper_configs" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"network" text NOT NULL,
 	"strategy" "scraper_strategy" DEFAULT 'http' NOT NULL,
@@ -259,7 +234,7 @@ CREATE TABLE "scraper_configs" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "signed_link_access" (
+CREATE TABLE IF NOT EXISTS "signed_link_access" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"link_id" text NOT NULL,
 	"signed_token" text NOT NULL,
@@ -272,7 +247,7 @@ CREATE TABLE "signed_link_access" (
 	CONSTRAINT "signed_link_access_signed_token_unique" UNIQUE("signed_token")
 );
 --> statement-breakpoint
-CREATE TABLE "social_accounts" (
+CREATE TABLE IF NOT EXISTS "social_accounts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"platform" text NOT NULL,
@@ -289,7 +264,7 @@ CREATE TABLE "social_accounts" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "social_links" (
+CREATE TABLE IF NOT EXISTS "social_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"platform" text NOT NULL,
@@ -308,7 +283,7 @@ CREATE TABLE "social_links" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "stripe_webhook_events" (
+CREATE TABLE IF NOT EXISTS "stripe_webhook_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"stripe_event_id" text NOT NULL,
 	"type" text NOT NULL,
@@ -319,7 +294,7 @@ CREATE TABLE "stripe_webhook_events" (
 	CONSTRAINT "stripe_webhook_events_stripe_event_id_unique" UNIQUE("stripe_event_id")
 );
 --> statement-breakpoint
-CREATE TABLE "tips" (
+CREATE TABLE IF NOT EXISTS "tips" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"creator_profile_id" uuid NOT NULL,
 	"amount_cents" integer NOT NULL,
@@ -334,14 +309,14 @@ CREATE TABLE "tips" (
 	CONSTRAINT "tips_payment_intent_id_unique" UNIQUE("payment_intent_id")
 );
 --> statement-breakpoint
-CREATE TABLE "user_settings" (
+CREATE TABLE IF NOT EXISTS "user_settings" (
 	"user_id" uuid PRIMARY KEY NOT NULL,
 	"theme_mode" "theme_mode" DEFAULT 'system' NOT NULL,
 	"sidebar_collapsed" boolean DEFAULT false NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
+CREATE TABLE IF NOT EXISTS "users" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"clerk_id" text NOT NULL,
 	"email" text,
@@ -358,7 +333,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_stripe_subscription_id_unique" UNIQUE("stripe_subscription_id")
 );
 --> statement-breakpoint
-CREATE TABLE "waitlist_entries" (
+CREATE TABLE IF NOT EXISTS "waitlist_entries" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"full_name" text NOT NULL,
 	"email" text NOT NULL,
@@ -374,7 +349,7 @@ CREATE TABLE "waitlist_entries" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "wrapped_links" (
+CREATE TABLE IF NOT EXISTS "wrapped_links" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"short_id" text NOT NULL,
 	"encrypted_url" text NOT NULL,
@@ -389,17 +364,43 @@ CREATE TABLE "wrapped_links" (
 	CONSTRAINT "wrapped_links_short_id_unique" UNIQUE("short_id")
 );
 --> statement-breakpoint
-ALTER TABLE "audience_members" ADD CONSTRAINT "audience_members_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "click_events" ADD CONSTRAINT "click_events_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "click_events" ADD CONSTRAINT "click_events_link_id_social_links_id_fk" FOREIGN KEY ("link_id") REFERENCES "public"."social_links"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "click_events" ADD CONSTRAINT "click_events_audience_member_id_audience_members_id_fk" FOREIGN KEY ("audience_member_id") REFERENCES "public"."audience_members"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "creator_contacts" ADD CONSTRAINT "creator_contacts_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "creator_profiles" ADD CONSTRAINT "creator_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "notification_subscriptions" ADD CONSTRAINT "notification_subscriptions_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_ingestion_owner_user_id_users_id_fk" FOREIGN KEY ("ingestion_owner_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "social_accounts" ADD CONSTRAINT "social_accounts_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "social_links" ADD CONSTRAINT "social_links_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tips" ADD CONSTRAINT "tips_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'audience_members_creator_profile_id_creator_profiles_id_fk'
+  ) THEN
+    ALTER TABLE "audience_members"
+    ADD CONSTRAINT "audience_members_creator_profile_id_creator_profiles_id_fk"
+    FOREIGN KEY ("creator_profile_id")
+    REFERENCES "public"."creator_profiles"("id")
+    ON DELETE cascade ON UPDATE no action;
+  END IF;
+END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'click_events_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "click_events" ADD CONSTRAINT "click_events_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'click_events_link_id_social_links_id_fk') THEN ALTER TABLE "click_events" ADD CONSTRAINT "click_events_link_id_social_links_id_fk" FOREIGN KEY ("link_id") REFERENCES "public"."social_links"("id") ON DELETE set null ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'click_events_audience_member_id_audience_members_id_fk') THEN ALTER TABLE "click_events" ADD CONSTRAINT "click_events_audience_member_id_audience_members_id_fk" FOREIGN KEY ("audience_member_id") REFERENCES "public"."audience_members"("id") ON DELETE set null ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_contacts_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "creator_contacts" ADD CONSTRAINT "creator_contacts_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'creator_profiles_user_id_users_id_fk') THEN ALTER TABLE "creator_profiles" ADD CONSTRAINT "creator_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'notification_subscriptions_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "notification_subscriptions" ADD CONSTRAINT "notification_subscriptions_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'profile_photos_user_id_users_id_fk') THEN ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'profile_photos_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'profile_photos_ingestion_owner_user_id_users_id_fk') THEN ALTER TABLE "profile_photos" ADD CONSTRAINT "profile_photos_ingestion_owner_user_id_users_id_fk" FOREIGN KEY ("ingestion_owner_user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'social_accounts_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "social_accounts" ADD CONSTRAINT "social_accounts_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'social_links_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "social_links" ADD CONSTRAINT "social_links_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tips_creator_profile_id_creator_profiles_id_fk') THEN ALTER TABLE "tips" ADD CONSTRAINT "tips_creator_profile_id_creator_profiles_id_fk" FOREIGN KEY ("creator_profile_id") REFERENCES "public"."creator_profiles"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;
+--> statement-breakpoint
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_settings_user_id_users_id_fk') THEN ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action; END IF; END $$;

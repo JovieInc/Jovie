@@ -1,8 +1,15 @@
+import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { creatorProfiles } from '@/lib/db/schema';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  buildSeoFilename,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
+import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
@@ -25,6 +32,123 @@ const ingestSchema = z.object({
 });
 
 export const runtime = 'nodejs';
+
+function normalizeDisplayName(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  // Replace underscores/hyphens with spaces and collapse whitespace
+  const cleaned = trimmed
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s'.]/gu, '')
+    .trim();
+
+  if (!cleaned) return '';
+
+  // Title-case words
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      const lower = word.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
+async function copyAvatarToBlob(
+  sourceUrl: string,
+  handle: string
+): Promise<string | null> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+    return null;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const response = await fetch(sourceUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Fetch failed with status ${response.status}`);
+    }
+
+    const contentTypeHeader = response.headers.get('content-type');
+    const contentType =
+      (contentTypeHeader
+        ? contentTypeHeader.split(';')[0].toLowerCase()
+        : '') || '';
+    if (
+      !contentType ||
+      !SUPPORTED_IMAGE_MIME_TYPES.includes(
+        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+      )
+    ) {
+      throw new Error(`Unsupported content type: ${contentType}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > AVATAR_MAX_FILE_SIZE_BYTES) {
+      throw new Error('Avatar exceeds max size');
+    }
+    const buffer = Buffer.from(arrayBuffer);
+
+    if (
+      !validateMagicBytes(
+        buffer,
+        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+      )
+    ) {
+      throw new Error('Magic bytes validation failed');
+    }
+
+    const sharp = (await import('sharp')).default;
+    const baseImage = sharp(buffer, { failOnError: false })
+      .rotate()
+      .withMetadata({ orientation: undefined });
+
+    const optimized = await baseImage
+      .resize({
+        width: 512,
+        height: 512,
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: 65, effort: 4 })
+      .toBuffer();
+
+    const path = `avatars/ingestion/${handle}/${buildSeoFilename({
+      originalFilename: 'avatar',
+      photoId: randomUUID(),
+    })}.avif`;
+
+    const blob = await uploadBlob(path, optimized, {
+      access: 'public',
+      token,
+      contentType: 'image/avif',
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+      addRandomSuffix: false,
+    });
+
+    if (!blob?.url) {
+      throw new Error('Blob upload returned no URL');
+    }
+
+    return blob.url;
+  } catch (error) {
+    logger.warn('Failed to copy avatar to blob', {
+      sourceUrl,
+      handle,
+      error,
+    });
+    return null;
+  }
+}
 
 /**
  * Admin endpoint to ingest a Linktree profile.
@@ -127,7 +251,15 @@ export async function POST(request: Request) {
       }
 
       const displayName = extraction.displayName?.trim() || handle;
-      const avatarUrl = extraction.avatarUrl?.trim() || null;
+      const normalizedDisplayName =
+        normalizeDisplayName(displayName) ||
+        normalizeDisplayName(handle) ||
+        handle;
+      const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
+
+      const hostedAvatarUrl = externalAvatarUrl
+        ? await copyAvatarToBlob(externalAvatarUrl, handle)
+        : null;
 
       // Generate claim token at creation time (not on read)
       const claimToken = randomUUID();
@@ -144,8 +276,8 @@ export async function POST(request: Request) {
           creatorType: 'creator',
           username: handle,
           usernameNormalized,
-          displayName,
-          avatarUrl,
+          displayName: normalizedDisplayName,
+          avatarUrl: hostedAvatarUrl,
           isPublic: true,
           isVerified: false,
           isFeatured: false,
@@ -156,7 +288,6 @@ export async function POST(request: Request) {
           settings: {},
           theme: {},
           ingestionStatus: 'processing',
-          lastIngestionError: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -185,7 +316,7 @@ export async function POST(request: Request) {
             id: created.id,
             usernameNormalized,
             avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName ?? displayName,
+            displayName: created.displayName ?? normalizedDisplayName,
             avatarLockedByUser: false,
             displayNameLocked: false,
           },
@@ -205,7 +336,6 @@ export async function POST(request: Request) {
         .update(creatorProfiles)
         .set({
           ingestionStatus: mergeError ? 'failed' : 'idle',
-          lastIngestionError: mergeError,
           updatedAt: new Date(),
         })
         .where(eq(creatorProfiles.id, created.id));
@@ -235,10 +365,17 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
+    // Log full error for debugging ingestion failures
+
+    console.error('Admin ingestion failed full error', error);
+
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error('Admin ingestion failed', { error: errorMessage });
+    logger.error('Admin ingestion failed', {
+      error: errorMessage,
+      raw: error,
+    });
 
     // Check for unique constraint violation (race condition fallback)
     if (

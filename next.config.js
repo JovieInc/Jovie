@@ -51,6 +51,12 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'linktr.ee',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'api.qrserver.com',
         port: '',
         pathname: '/**',

@@ -7,7 +7,6 @@ import React, {
   createContext,
   useContext,
   useEffect,
-  useMemo,
   useState,
   useTransition,
 } from 'react';
@@ -190,22 +189,18 @@ function DashboardLayoutInner({
     }
   }, [isContactTableRoute, previewOpen, closePreview]);
 
-  const ContactToggleButton = useMemo(() => {
-    if (!isContactTableRoute) return null;
-    if (!tableMeta.rowCount || tableMeta.rowCount <= 0 || !tableMeta.toggle)
-      return null;
-    return (
-      <Button
-        variant='ghost'
-        size='icon'
-        onClick={tableMeta.toggle}
-        aria-label='Toggle contact details'
-        className='h-9 w-9'
-      >
-        <UserGroupIcon className='h-5 w-5' />
-      </Button>
-    );
-  }, [isContactTableRoute, tableMeta.rowCount, tableMeta.toggle]);
+  const ContactToggleButton = isContactTableRoute ? (
+    <Button
+      variant='ghost'
+      size='icon'
+      onClick={() => tableMeta.toggle?.()}
+      aria-label='Toggle contact details'
+      className='h-9 w-9'
+      disabled={!tableMeta.toggle}
+    >
+      <UserGroupIcon className='h-5 w-5' />
+    </Button>
+  ) : null;
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
@@ -229,7 +224,11 @@ function DashboardLayoutInner({
         />
         <main className='flex-1 min-h-0 overflow-auto'>
           <div
-            className={useFullWidth ? 'p-6' : 'container mx-auto max-w-7xl p-6'}
+            className={
+              useFullWidth
+                ? 'w-full px-0 py-6'
+                : 'container mx-auto max-w-7xl p-6'
+            }
           >
             {children}
           </div>

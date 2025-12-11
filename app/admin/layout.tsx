@@ -31,6 +31,7 @@ export default async function AdminLayout({
       <DashboardLayoutClient
         dashboardData={dashboardData}
         persistSidebarCollapsed={setSidebarCollapsed}
+        fullWidth
       >
         {children}
       </DashboardLayoutClient>
