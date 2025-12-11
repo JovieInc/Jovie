@@ -321,7 +321,7 @@ function isValidHref(href: string): boolean {
   try {
     // Throws on invalid URLs
     // normalizeUrl is heavier; basic URL parse is enough for validation here.
-     
+
     new URL(trimmed);
     return true;
   } catch {
@@ -377,6 +377,9 @@ export interface LinkExtractionOptions {
   sourceSignal: string;
 }
 
+// Hosts that are primarily tracking/shorteners and should be skipped.
+const TRACKING_HOSTS = new Set<string>(['bit.ly', 't.co', 'lnkd.in', 'rb.gy']);
+
 /**
  * Extracts normalized, deduped links from HTML content with platform metadata.
  */
@@ -393,6 +396,7 @@ export function extractLinks(
       const normalizedUrl = normalizeUrl(href);
       const host = new URL(normalizedUrl).hostname.toLowerCase();
       if (options.skipHosts.has(host)) continue;
+      if (TRACKING_HOSTS.has(host)) continue;
 
       const detected = detectPlatform(normalizedUrl);
       if (!detected.isValid) continue;

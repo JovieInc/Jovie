@@ -671,6 +671,7 @@ export function AdminCreatorProfilesWithSidebar({
                                 href={`/${profile.username}`}
                                 className='flex flex-col leading-tight hover:underline'
                                 onClick={event => event.stopPropagation()}
+                                aria-label={`@${profile.username}`}
                               >
                                 <span className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'>
                                   {profile.displayName ?? profile.username}
