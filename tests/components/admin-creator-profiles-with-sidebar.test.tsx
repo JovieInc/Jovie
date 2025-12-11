@@ -1,6 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
@@ -11,8 +11,14 @@ import type {
 
 vi.mock('next/link', () => ({
   __esModule: true,
-  default: ({ children, href }: { children: ReactNode; href: string }) => (
-    <a href={href}>{children}</a>
+  default: ({
+    children,
+    href,
+    ...props
+  }: { children: ReactNode; href: string } & ComponentProps<'a'>) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
   ),
 }));
 
@@ -47,7 +53,7 @@ vi.mock('@/components/organisms/UserButton', () => ({
   UserButton: () => <div data-testid='user-button' />,
 }));
 
-const renderWithProviders = (ui: React.ReactNode) => {
+const renderWithProviders = (ui: ReactNode) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
@@ -71,7 +77,7 @@ describe('AdminCreatorProfilesWithSidebar', () => {
 
   const defaultSort: AdminCreatorProfilesSort = 'created_desc';
 
-  it('renders rows and pagination summary', () => {
+  it('renders rows and pagination summary with accessible link', () => {
     renderWithProviders(
       <AdminCreatorProfilesWithSidebar
         profiles={[baseProfile]}
@@ -83,15 +89,13 @@ describe('AdminCreatorProfilesWithSidebar', () => {
       />
     );
 
-    expect(screen.getByText('@alice')).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', {
-        name: '@alice',
-      })
-    ).toHaveAttribute('href', '/alice');
+    const handleText = screen.getByText('@alice');
+    expect(handleText.closest('a')).toHaveAttribute('href', '/alice');
     expect(screen.getAllByText('Claimed').length).toBeGreaterThan(0);
     expect(screen.getByText('Not verified')).toBeInTheDocument();
-    expect(screen.getByText(/Showing 1.*1 of 1 profiles/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Showing 1[\u2013-]1 of 1 profiles/)
+    ).toBeInTheDocument();
     expect(screen.getByTestId('creator-avatar-cell')).toBeInTheDocument();
   });
 

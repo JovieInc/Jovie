@@ -166,6 +166,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [addingLink, setAddingLink] = useState<T | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<{
+    link: DetectedLink;
+    isDuplicate: boolean;
+  } | null>(null);
+  const [clearSignal, setClearSignal] = useState(0);
 
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
   const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
@@ -572,6 +577,14 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         prefillUrl={prefillUrl}
         onPrefillConsumed={() => setPrefillUrl(undefined)}
         onQueryChange={() => {}}
+        onPreviewChange={(link, isDuplicate) => {
+          if (!link || isDuplicate) {
+            setPendingPreview(null);
+            return;
+          }
+          setPendingPreview({ link, isDuplicate });
+        }}
+        clearSignal={clearSignal}
       />
 
       {/* Links summary + completion indicator */}
@@ -868,6 +881,61 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                               />
                             );
                           })}
+                          {pendingPreview &&
+                            sectionOf(pendingPreview.link as T) === section && (
+                              <div className='relative rounded-xl border border-subtle bg-surface-1 p-4 flex items-start gap-3'>
+                                <div
+                                  className='flex h-9 w-9 items-center justify-center rounded-lg'
+                                  style={{
+                                    backgroundColor: `#${pendingPreview.link.platform.color}26`,
+                                    color: `#${pendingPreview.link.platform.color}`,
+                                  }}
+                                  aria-hidden='true'
+                                >
+                                  <SocialIcon
+                                    platform={pendingPreview.link.platform.icon}
+                                    className='h-4 w-4'
+                                  />
+                                </div>
+                                <div className='flex-1 min-w-0 space-y-1'>
+                                  <div className='flex items-center gap-2'>
+                                    <span className='font-semibold text-primary-token'>
+                                      {pendingPreview.link.platform.name}
+                                    </span>
+                                    <span className='text-green-500 text-xs'>
+                                      ✓ Ready to add
+                                    </span>
+                                  </div>
+                                  <div className='text-xs text-tertiary-token truncate'>
+                                    {pendingPreview.link.normalizedUrl}
+                                  </div>
+                                </div>
+                                <div className='flex items-center gap-2 shrink-0'>
+                                  <Button
+                                    size='sm'
+                                    variant='ghost'
+                                    onClick={() => {
+                                      setPendingPreview(null);
+                                      setClearSignal(c => c + 1);
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size='sm'
+                                    variant='primary'
+                                    onClick={() => {
+                                      if (!pendingPreview) return;
+                                      void handleAdd(pendingPreview.link);
+                                      setPendingPreview(null);
+                                      setClearSignal(c => c + 1);
+                                    }}
+                                  >
+                                    Add
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
                           {isAddingToThis && (
                             <div className='relative rounded-xl border border-dashed border-black/10 dark:border-white/10 bg-surface-1/40 p-4 animate-pulse h-[74px] flex items-center gap-4'>
                               <div className='h-10 w-10 rounded-full bg-black/5 dark:bg-white/5' />

@@ -429,7 +429,7 @@ export async function PUT(req: Request) {
         {
           profile: responseProfile,
           warning: clerkSyncFailed
-            ? 'Profile updated but avatar sync to Clerk failed. Your profile photo will still be visible on Jovie.'
+            ? 'Profile updated, but your photo might take a little longer to refresh. Please try again in a moment if it still looks out of date.'
             : undefined,
         },
         { status: 200, headers: { 'Cache-Control': 'no-store' } }
