@@ -1,5 +1,5 @@
-import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
+import { put as uploadBlob } from '@vercel/blob';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -33,29 +33,6 @@ const ingestSchema = z.object({
 
 export const runtime = 'nodejs';
 
-function normalizeDisplayName(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  // Replace underscores/hyphens with spaces and collapse whitespace
-  const cleaned = trimmed
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\p{L}\p{N}\s'.]/gu, '')
-    .trim();
-
-  if (!cleaned) return '';
-
-  // Title-case words
-  return cleaned
-    .split(' ')
-    .filter(Boolean)
-    .map(word => {
-      const lower = word.toLowerCase();
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join(' ');
-}
-
 async function copyAvatarToBlob(
   sourceUrl: string,
   handle: string
@@ -76,11 +53,8 @@ async function copyAvatarToBlob(
       throw new Error(`Fetch failed with status ${response.status}`);
     }
 
-    const contentTypeHeader = response.headers.get('content-type');
     const contentType =
-      (contentTypeHeader
-        ? contentTypeHeader.split(';')[0].toLowerCase()
-        : '') || '';
+      response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
     if (
       !contentType ||
       !SUPPORTED_IMAGE_MIME_TYPES.includes(
@@ -251,10 +225,6 @@ export async function POST(request: Request) {
       }
 
       const displayName = extraction.displayName?.trim() || handle;
-      const normalizedDisplayName =
-        normalizeDisplayName(displayName) ||
-        normalizeDisplayName(handle) ||
-        handle;
       const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
       const hostedAvatarUrl = externalAvatarUrl
@@ -276,7 +246,7 @@ export async function POST(request: Request) {
           creatorType: 'creator',
           username: handle,
           usernameNormalized,
-          displayName: normalizedDisplayName,
+          displayName,
           avatarUrl: hostedAvatarUrl,
           isPublic: true,
           isVerified: false,
@@ -284,7 +254,6 @@ export async function POST(request: Request) {
           marketingOptOut: false,
           isClaimed: false,
           claimToken,
-          claimTokenExpiresAt,
           settings: {},
           theme: {},
           ingestionStatus: 'processing',
@@ -316,7 +285,7 @@ export async function POST(request: Request) {
             id: created.id,
             usernameNormalized,
             avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName ?? normalizedDisplayName,
+            displayName: created.displayName ?? displayName,
             avatarLockedByUser: false,
             displayNameLocked: false,
           },
@@ -366,7 +335,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     // Log full error for debugging ingestion failures
-
+    // eslint-disable-next-line no-console
     console.error('Admin ingestion failed full error', error);
 
     const errorMessage =
