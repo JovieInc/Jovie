@@ -179,14 +179,9 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     await user.tab(); // to clear button in input
     expect(screen.getByRole('button', { name: /clear input/i })).toHaveFocus();
 
-    // Continue tabbing to preview section buttons
-    await user.tab(); // to cancel button in preview
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    expect(cancelButton).toHaveFocus();
-
-    await user.tab(); // to add button
-    const addButton = screen.getByRole('button', { name: /add spotify/i });
-    expect(addButton).toHaveFocus();
+    // Next tab should move focus out of the component since preview controls live in the list
+    await user.tab();
+    expect(document.body).toHaveFocus();
   });
 
   it('dropdown opens with Enter/Space and navigates with arrow keys', async () => {
