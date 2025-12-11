@@ -676,17 +676,8 @@ export function AdminCreatorProfilesWithSidebar({
                                 <span className='sr-only'>
                                   @{profile.username}
                                 </span>
-                                <span
-                                  className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'
-                                  aria-hidden='true'
-                                >
+                                <span className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'>
                                   {profile.displayName ?? profile.username}
-                                </span>
-                                <span
-                                  className='text-[12px] text-secondary-token max-w-[180px] truncate whitespace-nowrap'
-                                  aria-hidden='true'
-                                >
-                                  @{profile.username}
                                 </span>
                               </Link>
                             </>
