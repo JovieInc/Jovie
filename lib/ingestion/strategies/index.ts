@@ -31,6 +31,15 @@ export {
   normalizeHandle as normalizeBeaconsHandle,
   validateBeaconsUrl,
 } from './beacons';
+// Laylo strategy
+export {
+  extractLaylo,
+  extractLayloHandle,
+  fetchLayloProfile,
+  isLayloUrl,
+  normalizeLayloHandle,
+  validateLayloUrl,
+} from './laylo';
 // Linktree strategy
 export {
   extractLinktree,
@@ -41,15 +50,30 @@ export {
   normalizeHandle as normalizeLinktreeHandle,
   validateLinktreeUrl,
 } from './linktree';
+// YouTube strategy
+export {
+  extractYouTube,
+  extractYouTubeHandle,
+  fetchYouTubeAboutDocument,
+  isYouTubeChannelUrl,
+  validateYouTubeChannelUrl,
+} from './youtube';
 
 // ============================================================================
 // Strategy Detection
 // ============================================================================
 
 import { isBeaconsUrl } from './beacons';
+import { isLayloUrl } from './laylo';
 import { isLinktreeUrl } from './linktree';
+import { isYouTubeChannelUrl } from './youtube';
 
-export type IngestionPlatform = 'linktree' | 'beacons' | 'unknown';
+export type IngestionPlatform =
+  | 'linktree'
+  | 'beacons'
+  | 'laylo'
+  | 'youtube'
+  | 'unknown';
 
 /**
  * Detects which ingestion platform a URL belongs to.
@@ -60,6 +84,12 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
   }
   if (isBeaconsUrl(url)) {
     return 'beacons';
+  }
+  if (isLayloUrl(url)) {
+    return 'laylo';
+  }
+  if (isYouTubeChannelUrl(url)) {
+    return 'youtube';
   }
   return 'unknown';
 }

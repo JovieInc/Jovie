@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -12,6 +13,14 @@ import {
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  extractLaylo,
+  extractLayloHandle,
+  fetchLayloProfile,
+  isLayloUrl,
+  normalizeLayloHandle,
+  validateLayloUrl,
+} from '@/lib/ingestion/strategies/laylo';
 import {
   extractLinktree,
   extractLinktreeHandle,
@@ -31,30 +40,35 @@ const ingestSchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 });
 
-export const runtime = 'nodejs';
+async function findAvailableHandle(
+  tx: DbType,
+  baseHandle: string
+): Promise<string | null> {
+  const MAX_LEN = 30;
+  const normalizedBase = baseHandle.slice(0, MAX_LEN);
+  const maxAttempts = 20;
 
-function normalizeDisplayName(raw: string): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  // Replace underscores/hyphens with spaces and collapse whitespace
-  const cleaned = trimmed
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/[^\p{L}\p{N}\s'.]/gu, '')
-    .trim();
+  for (let i = 0; i < maxAttempts; i++) {
+    const suffix = i === 0 ? '' : `-${i}`;
+    const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
+    const candidate = `${trimmedBase}${suffix}`;
+    if (!isValidHandle(candidate)) continue;
 
-  if (!cleaned) return '';
+    const [existing] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, candidate))
+      .limit(1);
 
-  // Title-case words
-  return cleaned
-    .split(' ')
-    .filter(Boolean)
-    .map(word => {
-      const lower = word.toLowerCase();
-      return lower.charAt(0).toUpperCase() + lower.slice(1);
-    })
-    .join(' ');
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return null;
 }
+
+export const runtime = 'nodejs';
 
 async function copyAvatarToBlob(
   sourceUrl: string,
@@ -76,11 +90,8 @@ async function copyAvatarToBlob(
       throw new Error(`Fetch failed with status ${response.status}`);
     }
 
-    const contentTypeHeader = response.headers.get('content-type');
     const contentType =
-      (contentTypeHeader
-        ? contentTypeHeader.split(';')[0].toLowerCase()
-        : '') || '';
+      response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
     if (
       !contentType ||
       !SUPPORTED_IMAGE_MIME_TYPES.includes(
@@ -172,30 +183,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // Strict URL validation
-    const validatedUrl = validateLinktreeUrl(parsed.data.url);
+    // Determine ingestion strategy (Laylo or Linktree)
+    const isLayloProfile = isLayloUrl(parsed.data.url);
+    const validatedUrl = isLayloProfile
+      ? validateLayloUrl(parsed.data.url)
+      : validateLinktreeUrl(parsed.data.url);
+
     if (!validatedUrl) {
       return NextResponse.json(
         {
-          error: 'Invalid Linktree URL',
-          details:
-            'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
+          error: 'Invalid profile URL',
+          details: isLayloProfile
+            ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
+            : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
         },
         { status: 400 }
       );
     }
 
     // Extract and validate handle
-    const rawHandle = extractLinktreeHandle(validatedUrl);
+    const rawHandle = isLayloProfile
+      ? extractLayloHandle(validatedUrl)
+      : extractLinktreeHandle(validatedUrl);
+
     if (!rawHandle) {
       return NextResponse.json(
-        { error: 'Unable to parse Linktree handle from URL.' },
+        { error: 'Unable to parse profile handle from URL.' },
         { status: 422 }
       );
     }
 
     // Normalize handle for storage
-    const handle = normalizeHandle(rawHandle);
+    const handle = isLayloProfile
+      ? normalizeLayloHandle(rawHandle)
+      : normalizeHandle(rawHandle);
+
     if (!isValidHandle(handle)) {
       return NextResponse.json(
         {
@@ -210,56 +232,151 @@ export async function POST(request: Request) {
     const usernameNormalized = handle;
 
     return await withSystemIngestionSession(async tx => {
-      // Race-safe duplicate check within transaction
+      // Race-safe duplicate check within transaction; update unclaimed or allocate alt handle if claimed
       const [existing] = await tx
-        .select({ id: creatorProfiles.id })
+        .select({
+          id: creatorProfiles.id,
+          isClaimed: creatorProfiles.isClaimed,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          avatarUrl: creatorProfiles.avatarUrl,
+          displayName: creatorProfiles.displayName,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          displayNameLocked: creatorProfiles.displayNameLocked,
+          claimToken: creatorProfiles.claimToken,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+        })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
         .limit(1);
 
-      if (existing) {
+      const isReingest = !!existing && !existing.isClaimed;
+
+      const finalHandle = existing
+        ? existing.isClaimed
+          ? await findAvailableHandle(tx, usernameNormalized)
+          : existing.usernameNormalized
+        : usernameNormalized;
+
+      if (!finalHandle) {
         return NextResponse.json(
           {
-            error: 'A creator profile with that handle already exists',
-            existingProfileId: existing.id,
+            error: 'Unable to allocate unique username',
+            details: 'All fallback username attempts exhausted.',
           },
           { status: 409 }
         );
       }
 
-      // Fetch and extract Linktree data
-      let html: string;
-      let extraction: ReturnType<typeof extractLinktree>;
+      if (existing && existing.isClaimed) {
+        return NextResponse.json(
+          {
+            error: 'Profile already claimed',
+            details: 'Cannot overwrite a claimed profile.',
+          },
+          { status: 409 }
+        );
+      }
+
+      // Fetch and extract profile data
+      let extraction:
+        | ReturnType<typeof extractLinktree>
+        | ReturnType<typeof extractLaylo>;
       try {
-        html = await fetchLinktreeDocument(validatedUrl);
-        extraction = extractLinktree(html);
+        if (isLayloProfile) {
+          const { profile: layloProfile, user } =
+            await fetchLayloProfile(handle);
+          extraction = extractLaylo(layloProfile, user);
+        } else {
+          const html = await fetchLinktreeDocument(validatedUrl);
+          extraction = extractLinktree(html);
+        }
       } catch (fetchError) {
         const errorMessage =
           fetchError instanceof Error
             ? fetchError.message
-            : 'Failed to fetch Linktree profile';
+            : 'Failed to fetch profile';
 
-        logger.error('Linktree fetch failed', {
+        logger.error('Profile fetch failed', {
           url: validatedUrl,
           error: errorMessage,
+          platform: isLayloProfile ? 'laylo' : 'linktree',
         });
 
         return NextResponse.json(
-          { error: 'Failed to fetch Linktree profile', details: errorMessage },
+          { error: 'Failed to fetch profile', details: errorMessage },
           { status: 502 }
         );
       }
 
       const displayName = extraction.displayName?.trim() || handle;
-      const normalizedDisplayName =
-        normalizeDisplayName(displayName) ||
-        normalizeDisplayName(handle) ||
-        handle;
       const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
       const hostedAvatarUrl = externalAvatarUrl
         ? await copyAvatarToBlob(externalAvatarUrl, handle)
         : null;
+
+      const extractionWithHostedAvatar = {
+        ...extraction,
+        avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
+      };
+
+      if (isReingest && existing) {
+        await tx
+          .update(creatorProfiles)
+          .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+          .where(eq(creatorProfiles.id, existing.id));
+
+        let mergeError: string | null = null;
+        try {
+          await normalizeAndMergeExtraction(
+            tx,
+            {
+              id: existing.id,
+              usernameNormalized: existing.usernameNormalized,
+              avatarUrl: existing.avatarUrl ?? null,
+              displayName: existing.displayName ?? displayName,
+              avatarLockedByUser: existing.avatarLockedByUser ?? false,
+              displayNameLocked: existing.displayNameLocked ?? false,
+            },
+            extractionWithHostedAvatar
+          );
+        } catch (error) {
+          mergeError =
+            error instanceof Error ? error.message : 'Link extraction failed';
+          logger.error('Link merge failed', {
+            profileId: existing.id,
+            error: mergeError,
+          });
+        }
+
+        await tx
+          .update(creatorProfiles)
+          .set({
+            ingestionStatus: mergeError ? 'failed' : 'idle',
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, existing.id));
+
+        return NextResponse.json(
+          {
+            ok: !mergeError,
+            profile: {
+              id: existing.id,
+              username: existing.usernameNormalized,
+              usernameNormalized: existing.usernameNormalized,
+              claimToken: existing.claimToken,
+            },
+            links: extraction.links.length,
+            warning: mergeError
+              ? `Profile updated but link extraction had issues: ${mergeError}`
+              : undefined,
+          },
+          {
+            status: mergeError ? 207 : 200,
+            headers: { 'Cache-Control': 'no-store' },
+          }
+        );
+      }
 
       // Generate claim token at creation time (not on read)
       const claimToken = randomUUID();
@@ -274,9 +391,9 @@ export async function POST(request: Request) {
         .values({
           // userId intentionally omitted to avoid inserting empty-string UUID
           creatorType: 'creator',
-          username: handle,
-          usernameNormalized,
-          displayName: normalizedDisplayName,
+          username: finalHandle,
+          usernameNormalized: finalHandle,
+          displayName,
           avatarUrl: hostedAvatarUrl,
           isPublic: true,
           isVerified: false,
@@ -298,6 +415,10 @@ export async function POST(request: Request) {
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
           claimToken: creatorProfiles.claimToken,
+          isClaimed: creatorProfiles.isClaimed,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          displayNameLocked: creatorProfiles.displayNameLocked,
         });
 
       if (!created) {
@@ -314,13 +435,13 @@ export async function POST(request: Request) {
           tx,
           {
             id: created.id,
-            usernameNormalized,
+            usernameNormalized: created.usernameNormalized,
             avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName ?? normalizedDisplayName,
-            avatarLockedByUser: false,
-            displayNameLocked: false,
+            displayName: created.displayName ?? displayName,
+            avatarLockedByUser: created.avatarLockedByUser ?? false,
+            displayNameLocked: created.displayNameLocked ?? false,
           },
-          extraction
+          extractionWithHostedAvatar
         );
       } catch (error) {
         mergeError =
@@ -365,8 +486,6 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
-    // Log full error for debugging ingestion failures
-
     console.error('Admin ingestion failed full error', error);
 
     const errorMessage =

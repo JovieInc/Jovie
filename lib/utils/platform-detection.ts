@@ -167,6 +167,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: '39E09B',
     placeholder: 'https://linktr.ee/username',
   },
+  laylo: {
+    id: 'laylo',
+    name: 'Laylo',
+    category: 'custom',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://laylo.com/username',
+  },
   // Additional social platforms
   telegram: {
     id: 'telegram',
@@ -263,7 +271,10 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
   { pattern: /music\.apple\.com/i, platformId: 'apple-music' },
-  { pattern: /music\.youtube\.com/i, platformId: 'youtube-music' },
+  {
+    pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
+    platformId: 'youtube-music',
+  },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
   { pattern: /bandcamp\.com/i, platformId: 'bandcamp' },
 
@@ -279,15 +290,17 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?reddit\.com/i, platformId: 'reddit' },
   { pattern: /(?:www\.)?pinterest\.com/i, platformId: 'pinterest' },
   { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
-  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
-  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
-  { pattern: /(?:discord\.gg|(?:www\.)?discord\.com)/i, platformId: 'discord' },
+  { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
+  { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
+  { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
   { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
   { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
+  // Website fallback - keep last
+  { pattern: /./, platformId: 'website' },
 ];
 
 /**
