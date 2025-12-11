@@ -673,10 +673,19 @@ export function AdminCreatorProfilesWithSidebar({
                                 onClick={event => event.stopPropagation()}
                                 aria-label={`@${profile.username}`}
                               >
-                                <span className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'>
+                                <span className='sr-only'>
+                                  @{profile.username}
+                                </span>
+                                <span
+                                  className='text-sm font-semibold text-primary-token max-w-[180px] truncate whitespace-nowrap'
+                                  aria-hidden='true'
+                                >
                                   {profile.displayName ?? profile.username}
                                 </span>
-                                <span className='text-[12px] text-secondary-token max-w-[180px] truncate whitespace-nowrap'>
+                                <span
+                                  className='text-[12px] text-secondary-token max-w-[180px] truncate whitespace-nowrap'
+                                  aria-hidden='true'
+                                >
                                   @{profile.username}
                                 </span>
                               </Link>
