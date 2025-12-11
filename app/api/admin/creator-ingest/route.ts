@@ -33,6 +33,29 @@ const ingestSchema = z.object({
 
 export const runtime = 'nodejs';
 
+function normalizeDisplayName(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  // Replace underscores/hyphens with spaces and collapse whitespace
+  const cleaned = trimmed
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[^\p{L}\p{N}\s'.]/gu, '')
+    .trim();
+
+  if (!cleaned) return '';
+
+  // Title-case words
+  return cleaned
+    .split(' ')
+    .filter(Boolean)
+    .map(word => {
+      const lower = word.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}
+
 async function copyAvatarToBlob(
   sourceUrl: string,
   handle: string
@@ -228,6 +251,10 @@ export async function POST(request: Request) {
       }
 
       const displayName = extraction.displayName?.trim() || handle;
+      const normalizedDisplayName =
+        normalizeDisplayName(displayName) ||
+        normalizeDisplayName(handle) ||
+        handle;
       const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
       const hostedAvatarUrl = externalAvatarUrl
@@ -249,7 +276,7 @@ export async function POST(request: Request) {
           creatorType: 'creator',
           username: handle,
           usernameNormalized,
-          displayName,
+          displayName: normalizedDisplayName,
           avatarUrl: hostedAvatarUrl,
           isPublic: true,
           isVerified: false,
@@ -288,7 +315,7 @@ export async function POST(request: Request) {
             id: created.id,
             usernameNormalized,
             avatarUrl: created.avatarUrl ?? null,
-            displayName: created.displayName ?? displayName,
+            displayName: created.displayName ?? normalizedDisplayName,
             avatarLockedByUser: false,
             displayNameLocked: false,
           },

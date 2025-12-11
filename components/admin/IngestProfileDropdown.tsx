@@ -50,7 +50,13 @@ const PLATFORM_PREFIX: Record<IngestPlatform, string> = {
   instagram: 'https://instagram.com/',
 };
 
-export function IngestProfileDropdown() {
+type IngestProfileDropdownProps = {
+  onIngestPending?: (profile: { id: string; username: string }) => void;
+};
+
+export function IngestProfileDropdown({
+  onIngestPending,
+}: IngestProfileDropdownProps) {
   const router = useRouter();
   const notifications = useNotifications();
 
@@ -60,6 +66,7 @@ export function IngestProfileDropdown() {
   const [selectedPlatform, setSelectedPlatform] =
     useState<IngestPlatform>('linktree');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const currentPlatform = PLATFORM_OPTIONS.find(p => p.id === selectedPlatform);
 
@@ -98,6 +105,7 @@ export function IngestProfileDropdown() {
         throw new Error(result.error || 'Failed to ingest profile');
       }
 
+      const profileId = result.profile?.id;
       const profileUsername = result.profile?.username;
       const successMessage = profileUsername
         ? `Created creator profile @${profileUsername}`
@@ -112,10 +120,23 @@ export function IngestProfileDropdown() {
           : undefined,
       });
 
+      if (profileId && profileUsername) {
+        onIngestPending?.({ id: profileId, username: profileUsername });
+      }
+
+      setIsSuccess(true);
+
       setUsername('');
       setUrlOverride(null);
-      setOpen(false);
+
+      // Force-refresh table immediately, then close after showing success briefly
       router.refresh();
+
+      // Keep the popover open briefly to show success
+      setTimeout(() => {
+        setOpen(false);
+        setIsSuccess(false);
+      }, 900);
     } catch (error) {
       console.error('Ingestion error', error);
       notifications.error(
@@ -123,6 +144,7 @@ export function IngestProfileDropdown() {
       );
     } finally {
       setIsLoading(false);
+      setIsSuccess(false);
     }
   };
 
@@ -179,6 +201,12 @@ export function IngestProfileDropdown() {
           </div>
 
           <form onSubmit={handleSubmit} className='space-y-3'>
+            {isSuccess && (
+              <div className='rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-200'>
+                Profile created — refreshing table…
+              </div>
+            )}
+
             <div className='space-y-1'>
               <Input
                 type='text'

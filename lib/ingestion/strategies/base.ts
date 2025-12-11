@@ -15,6 +15,39 @@ import type { ExtractedLink, ExtractionResult } from '../types';
 // Types
 // ============================================================================
 
+/**
+ * Extracts JSON content from a script tag with a given id.
+ */
+export function extractScriptJson<T = unknown>(
+  html: string,
+  scriptId: string
+): T | null {
+  try {
+    const pattern = new RegExp(
+      `<script[^>]*id=["']${scriptId}["'][^>]*>([\\s\\S]*?)<\\/script>`,
+      'i'
+    );
+    const match = pattern.exec(html);
+    if (!match || match.length < 2) {
+      return null;
+    }
+    const jsonText = match[1].trim();
+    if (!jsonText) {
+      return null;
+    }
+    return JSON.parse(jsonText) as T;
+  } catch (error) {
+    logger.warn('Failed to parse JSON from script tag', {
+      scriptId,
+      error:
+        error instanceof Error
+          ? { message: error.message, name: error.name }
+          : String(error),
+    });
+    return null;
+  }
+}
+
 export interface FetchOptions {
   /** Request timeout in milliseconds (default: 10000) */
   timeoutMs?: number;
@@ -277,6 +310,25 @@ export function extractMetaContent(
   return null;
 }
 
+const UNSUPPORTED_SCHEMES = /^(javascript|data|vbscript|file|ftp):/i;
+
+function isValidHref(href: string): boolean {
+  if (!href) return false;
+  const trimmed = href.trim();
+  if (UNSUPPORTED_SCHEMES.test(trimmed)) return false;
+  if (trimmed.startsWith('//')) return false;
+  if (!trimmed.toLowerCase().startsWith('https://')) return false;
+  try {
+    // Throws on invalid URLs
+    // normalizeUrl is heavier; basic URL parse is enough for validation here.
+     
+    new URL(trimmed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Extracts all href values from HTML, filtering out invalid ones.
  */
@@ -288,7 +340,7 @@ export function extractHrefs(html: string): string[] {
   HREF_REGEX.lastIndex = 0;
 
   while ((match = HREF_REGEX.exec(html)) !== null) {
-    const href = match[1];
+    const href = match[1]?.trim();
     if (href && isValidHref(href)) {
       hrefs.push(href);
     }
@@ -298,132 +350,78 @@ export function extractHrefs(html: string): string[] {
 }
 
 /**
- * Checks if an href is valid for extraction.
- */
-function isValidHref(href: string): boolean {
-  // Skip empty or anchors
-  if (!href || href.startsWith('#')) return false;
-
-  // Normalize and trim to prevent bypass via whitespace/newlines
-  const normalized = href.trim().toLowerCase();
-
-  // Block dangerous schemes (case-insensitive, handles whitespace bypass)
-  if (normalized.startsWith('javascript:')) return false;
-  if (normalized.startsWith('mailto:')) return false;
-  if (normalized.startsWith('tel:')) return false;
-  if (normalized.startsWith('data:')) return false;
-  if (normalized.startsWith('vbscript:')) return false;
-
-  // Require explicit https scheme (reject protocol-relative and http)
-  // Use the normalized version for the check
-  if (!normalized.startsWith('https://')) return false;
-
-  return true;
-}
-
-/**
- * Extracts and normalizes links from HTML, filtering by platform hosts to skip.
- */
-export function extractLinks(
-  html: string,
-  options: {
-    skipHosts: Set<string>;
-    sourcePlatform: string;
-    sourceSignal: string;
-  }
-): ExtractedLink[] {
-  const { skipHosts, sourcePlatform, sourceSignal } = options;
-  const links: ExtractedLink[] = [];
-  const seen = new Set<string>();
-
-  const hrefs = extractHrefs(html);
-
-  for (const rawHref of hrefs) {
-    try {
-      const normalizedHref = normalizeUrl(rawHref);
-      const parsed = new URL(normalizedHref);
-
-      // Skip internal platform links
-      if (skipHosts.has(parsed.hostname.toLowerCase())) {
-        continue;
-      }
-
-      // Skip tracking/redirect URLs
-      if (isTrackingUrl(parsed)) {
-        continue;
-      }
-
-      const detected = detectPlatform(normalizedHref);
-      if (!detected.isValid) continue;
-
-      // Dedupe by canonical identity (handles www vs non-www, trailing slashes, etc.)
-      const key = canonicalIdentity({
-        platform: detected.platform,
-        normalizedUrl: detected.normalizedUrl,
-      });
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      links.push({
-        url: detected.normalizedUrl,
-        platformId: detected.platform.id,
-        title: detected.suggestedTitle,
-        sourcePlatform,
-        evidence: {
-          sources: [sourcePlatform],
-          signals: [sourceSignal],
-        },
-      });
-    } catch {
-      // Skip unparseable URLs
-      continue;
-    }
-  }
-
-  return links;
-}
-
-/**
- * Checks if a URL is primarily a tracking/redirect URL.
- */
-function isTrackingUrl(url: URL): boolean {
-  const host = url.hostname.toLowerCase();
-
-  // Common URL shorteners and trackers
-  const trackers = [
-    'bit.ly',
-    't.co',
-    'goo.gl',
-    'ow.ly',
-    'tinyurl.com',
-    'buff.ly',
-    'lnkd.in',
-    'fb.me',
-    'click.linksynergy.com',
-    'redirect.viglink.com',
-  ];
-
-  return trackers.some(tracker => host.includes(tracker));
-}
-
-/**
- * Strips tracking parameters from a URL.
+ * Removes common tracking parameters from a URL (utm_*, fbclid, gclid, etc.).
  */
 export function stripTrackingParams(url: string): string {
   try {
     const parsed = new URL(url);
-    for (const param of TRACKING_PARAMS) {
-      parsed.searchParams.delete(param);
+    const params = parsed.searchParams;
+    for (const key of Array.from(params.keys())) {
+      if (TRACKING_PARAMS.has(key)) {
+        params.delete(key);
+      }
     }
+    parsed.search = params.toString();
     return parsed.toString();
   } catch {
     return url;
   }
 }
 
-// ============================================================================
-// Handle Validation
-// ============================================================================
+/**
+ * Extracts normalized, deduped links from HTML content.
+ */
+export interface LinkExtractionOptions {
+  skipHosts: Set<string>;
+  sourcePlatform: string;
+  sourceSignal: string;
+}
+
+/**
+ * Extracts normalized, deduped links from HTML content with platform metadata.
+ */
+export function extractLinks(
+  html: string,
+  options: LinkExtractionOptions
+): ExtractedLink[] {
+  const hrefs = extractHrefs(html);
+  const links: ExtractedLink[] = [];
+  const seen = new Set<string>();
+
+  for (const href of hrefs) {
+    try {
+      const normalizedUrl = normalizeUrl(href);
+      const host = new URL(normalizedUrl).hostname.toLowerCase();
+      if (options.skipHosts.has(host)) continue;
+
+      const detected = detectPlatform(normalizedUrl);
+      if (!detected.isValid) continue;
+
+      const cleanedUrl = stripTrackingParams(detected.normalizedUrl);
+      const key = canonicalIdentity({
+        platform: detected.platform,
+        normalizedUrl: cleanedUrl,
+      });
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      links.push({
+        url: cleanedUrl,
+        platformId: detected.platform.id,
+        title: detected.suggestedTitle,
+        sourcePlatform: options.sourcePlatform,
+        evidence: {
+          sources: [options.sourcePlatform],
+          signals: [options.sourceSignal],
+        },
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return links;
+}
 
 /**
  * Validates a handle format (alphanumeric, underscores, dots, 1-30 chars).
@@ -557,7 +555,7 @@ export function createExtractionResult(
 ): ExtractionResult {
   return {
     links,
-    displayName: displayName?.trim() || null,
-    avatarUrl: avatarUrl?.trim() || null,
+    displayName,
+    avatarUrl,
   };
 }
