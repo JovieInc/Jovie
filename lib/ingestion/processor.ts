@@ -13,7 +13,12 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { extractLaylo, fetchLayloProfile } from './strategies/laylo';
 import { extractLinktree, fetchLinktreeDocument } from './strategies/linktree';
+import {
+  extractYouTube,
+  fetchYouTubeAboutDocument,
+} from './strategies/youtube';
 import { type ExtractionResult } from './types';
 
 // Retry configuration
@@ -37,12 +42,26 @@ const linktreePayloadSchema = z.object({
   depth: z.number().int().min(0).max(3).default(0),
 });
 
+const layloPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(3).default(0),
+});
+
+const youtubePayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(1).default(0),
+});
+
 type SocialLinkRow = typeof socialLinks.$inferSelect;
 
 function mergeEvidence(
   existing: Record<string, unknown> | null,
   incoming?: { sources?: string[]; signals?: string[] }
-): Record<string, unknown> {
+): { sources: string[]; signals: string[] } {
   const baseSources =
     Array.isArray((existing as { sources?: string[] })?.sources) &&
     ((existing as { sources?: unknown[] }).sources ?? []).every(
@@ -115,8 +134,14 @@ export async function normalizeAndMergeExtraction(
       const evidence = mergeEvidence(null, link.evidence);
       const { confidence, state } = computeLinkConfidence({
         sourceType: 'ingested',
-        signals: ['linktree_profile_link'],
-        sources: ['linktree'],
+        signals:
+          evidence.signals && evidence.signals.length > 0
+            ? (evidence.signals as string[])
+            : ['ingestion_profile_link'],
+        sources:
+          evidence.sources && evidence.sources.length > 0
+            ? (evidence.sources as string[])
+            : ['ingestion'],
         usernameNormalized: profile.usernameNormalized,
         url: detected.normalizedUrl,
       });
@@ -177,7 +202,7 @@ export async function normalizeAndMergeExtraction(
         // socialLinks.confidence is a numeric column backed by a string type in Drizzle,
         // so we persist the formatted string here and use the raw number only in-memory.
         confidence: confidence.toFixed(2),
-        sourcePlatform: link.sourcePlatform ?? 'linktree',
+        sourcePlatform: link.sourcePlatform ?? 'ingestion',
         sourceType: 'ingested',
         evidence,
       };
@@ -440,7 +465,123 @@ export async function processJob(
   switch (job.jobType) {
     case 'import_linktree':
       return processLinktreeJob(tx, job.payload);
+    case 'import_laylo':
+      return processLayloJob(tx, job.payload);
+    case 'import_youtube':
+      return processYouTubeJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
+  }
+}
+
+async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
+  const parsed = youtubePayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const html = await fetchYouTubeAboutDocument(parsed.sourceUrl);
+    const extraction = extractYouTube(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'YouTube ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+async function processLayloJob(tx: DbType, jobPayload: unknown) {
+  const parsed = layloPayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const { profile: layloProfile, user } = await fetchLayloProfile(
+      profile.usernameNormalized ?? ''
+    );
+    const extraction = extractLaylo(layloProfile, user);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Laylo ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
   }
 }
