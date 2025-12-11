@@ -284,6 +284,7 @@ export async function POST(request: Request) {
           marketingOptOut: false,
           isClaimed: false,
           claimToken,
+          claimTokenExpiresAt,
           settings: {},
           theme: {},
           ingestionStatus: 'processing',
