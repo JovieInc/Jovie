@@ -1,5 +1,5 @@
-import { randomUUID } from 'crypto';
 import { put as uploadBlob } from '@vercel/blob';
+import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -53,8 +53,11 @@ async function copyAvatarToBlob(
       throw new Error(`Fetch failed with status ${response.status}`);
     }
 
+    const contentTypeHeader = response.headers.get('content-type');
     const contentType =
-      response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
+      (contentTypeHeader
+        ? contentTypeHeader.split(';')[0].toLowerCase()
+        : '') || '';
     if (
       !contentType ||
       !SUPPORTED_IMAGE_MIME_TYPES.includes(
@@ -335,7 +338,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     // Log full error for debugging ingestion failures
-    // eslint-disable-next-line no-console
+
     console.error('Admin ingestion failed full error', error);
 
     const errorMessage =

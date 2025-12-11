@@ -133,7 +133,7 @@ export function AdminCreatorProfilesWithSidebar({
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => { }),
+    () => tableMetaCtx?.setTableMeta ?? (() => {}),
     [tableMetaCtx]
   );
   const [headerElevated, setHeaderElevated] = useState(false);
@@ -428,29 +428,10 @@ export function AdminCreatorProfilesWithSidebar({
         aria-label='Creator profiles table'
       >
         <div className='w-full space-y-4'>
-          <div className='relative z-30 flex flex-wrap items-center gap-3 justify-between text-xs text-secondary-token mb-3 md:mb-4'>
-            <div className='flex items-center gap-3'>
-              <Checkbox
-                aria-label='Select all creators'
-                checked={headerCheckboxState}
-                onCheckedChange={toggleSelectAll}
-              />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant='secondary' size='sm' disabled={selectedIds.size === 0}>
-                    Bulk actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='start'>
-                  <DropdownMenuItem disabled>Feature selected (coming soon)</DropdownMenuItem>
-                  <DropdownMenuItem disabled>Unverify selected (coming soon)</DropdownMenuItem>
-                  <DropdownMenuItem disabled className='text-destructive'>Delete selected (coming soon)</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <div className='hidden sm:block'>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} profiles
-              </div>
+          <div className='relative z-30 flex flex-wrap items-center justify-between gap-3 text-xs text-secondary-token mb-3 md:mb-4'>
+            <div className='hidden sm:block'>
+              Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()} profiles
             </div>
             <div className='flex flex-wrap items-center gap-3'>
               <form
@@ -484,13 +465,13 @@ export function AdminCreatorProfilesWithSidebar({
           </div>
         </div>
 
-        <div className='flex-1 overflow-auto' ref={tableContainerRef}>
-          <table className='min-w-full table-auto text-sm border-separate border-spacing-0'>
+        <div className='flex-1 overflow-auto w-full' ref={tableContainerRef}>
+          <table className='w-full min-w-full table-auto text-sm border-separate border-spacing-0'>
             <thead
               className={cn(
                 'sticky top-0 z-20 text-left text-secondary-token border-b border-surface-3/60 bg-white/85 backdrop-blur-md dark:bg-black/85',
                 headerElevated &&
-                'shadow-sm shadow-black/10 dark:shadow-black/40'
+                  'shadow-sm shadow-black/10 dark:shadow-black/40'
               )}
             >
               <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
@@ -502,7 +483,29 @@ export function AdminCreatorProfilesWithSidebar({
                   />
                 </th>
                 <th className='px-2 py-2 text-left'>
-                  Creator
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant='ghost'
+                        size='sm'
+                        className='h-8 px-2 text-xs font-semibold'
+                        disabled={selectedIds.size === 0}
+                      >
+                        Bulk actions
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align='start'>
+                      <DropdownMenuItem disabled>
+                        Feature selected (coming soon)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled>
+                        Unverify selected (coming soon)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem disabled className='text-destructive'>
+                        Delete selected (coming soon)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </th>
                 <th
                   className='px-2 py-2 text-left cursor-pointer select-none'
@@ -522,9 +525,7 @@ export function AdminCreatorProfilesWithSidebar({
                 >
                   {renderSortHeader('verified')}
                 </th>
-                <th className='px-2 py-2 text-right'>
-                  Action
-                </th>
+                <th className='px-2 py-2 text-right'>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -585,10 +586,10 @@ export function AdminCreatorProfilesWithSidebar({
                       <td className='px-2 py-3 text-xs text-tertiary-token'>
                         {profile.createdAt
                           ? new Intl.DateTimeFormat('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          }).format(profile.createdAt)
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }).format(profile.createdAt)
                           : '—'}
                       </td>
                       <td className='px-2 py-3 text-xs'>
@@ -602,7 +603,10 @@ export function AdminCreatorProfilesWithSidebar({
                         >
                           {profile.isClaimed ? (
                             <>
-                              <Star className='h-3 w-3 fill-current' aria-hidden='true' />
+                              <Star
+                                className='h-3 w-3 fill-current'
+                                aria-hidden='true'
+                              />
                               <span>Claimed</span>
                             </>
                           ) : (
