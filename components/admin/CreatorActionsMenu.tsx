@@ -84,15 +84,15 @@ export function CreatorActionsMenu({
   const stateClass = cn(
     'transition duration-200 ease-in-out transform',
     isSuccess &&
-      'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+    'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     isError &&
-      'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+    'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
   // Desktop: Show first 4 actions inline, rest in overflow menu
   if (!isMobile) {
     return (
-      <div className='flex items-center gap-1'>
+      <div className='flex w-full items-center justify-end gap-1'>
         {/* Inline Action 1: Verify/Unverify */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -144,58 +144,7 @@ export function CreatorActionsMenu({
           <TooltipContent side='top'>Toggle featured status</TooltipContent>
         </Tooltip>
 
-        {/* Inline Action 3: Marketing */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              className={cn(
-                'h-8 w-8 text-secondary-token hover:text-primary-token',
-                stateClass
-              )}
-              onClick={onToggleMarketing}
-              disabled={isLoading}
-            >
-              {profile.marketingOptOut ? (
-                <MailX className='h-4 w-4' />
-              ) : (
-                <Mail className='h-4 w-4' />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side='top'>
-            {profile.marketingOptOut
-              ? 'Marketing emails: OFF'
-              : 'Marketing emails: ON'}
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Inline Action 4: View Profile */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              className='h-8 w-8 text-secondary-token hover:text-primary-token'
-              asChild
-            >
-              <Link
-                href={`/${profile.username}`}
-                target='_blank'
-                rel='noopener noreferrer'
-                onClick={e => e.stopPropagation()}
-              >
-                <ExternalLink className='h-4 w-4' />
-              </Link>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side='top'>View public profile</TooltipContent>
-        </Tooltip>
-
-        {/* Overflow Menu: Copy Claim Link, Delete */}
+        {/* Overflow Menu: Marketing toggle, View profile, Copy Claim Link, Delete */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -209,6 +158,36 @@ export function CreatorActionsMenu({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='end' sideOffset={8}>
+            <DropdownMenuItem onClick={onToggleMarketing}>
+              {profile.marketingOptOut ? (
+                <>
+                  <Mail className='h-4 w-4 mr-2' />
+                  Enable marketing emails
+                </>
+              ) : (
+                <>
+                  <MailX className='h-4 w-4 mr-2' />
+                  Disable marketing emails
+                </>
+              )}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem asChild>
+              <Link
+                href={`/${profile.username}`}
+                target='_blank'
+                rel='noopener noreferrer'
+                onClick={e => e.stopPropagation()}
+              >
+                <ExternalLink className='h-4 w-4 mr-2' />
+                View profile
+              </Link>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
             {!profile.isClaimed && profile.claimToken && (
               <DropdownMenuItem onClick={handleCopyClaimLink}>
                 <Copy className='h-4 w-4 mr-2' />

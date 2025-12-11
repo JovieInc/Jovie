@@ -297,7 +297,8 @@ export async function PUT(req: Request) {
             return {
               creatorProfileId: profileId,
               platform: l.platform,
-              platformType: l.platformType ?? l.platform,
+              platformType:
+                detected.platform.category === 'dsp' ? 'dsp' : detected.platform.id,
               url: normalizedUrl,
               sortOrder: l.sortOrder ?? idx,
               state,

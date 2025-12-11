@@ -1,3 +1,5 @@
+-- Switch to text safely by clearing the existing enum default first
+ALTER TABLE "profile_photos" ALTER COLUMN "status" DROP DEFAULT;--> statement-breakpoint
 ALTER TABLE "profile_photos" ALTER COLUMN "status" SET DATA TYPE text;--> statement-breakpoint
 ALTER TABLE "profile_photos" ALTER COLUMN "status" SET DEFAULT 'uploading'::text;--> statement-breakpoint
 DROP TYPE "public"."photo_status";--> statement-breakpoint

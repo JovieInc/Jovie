@@ -1,6 +1,15 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import {
+  Button,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+} from '@jovie/ui';
+import { Check, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
@@ -124,7 +133,7 @@ export function AdminCreatorProfilesWithSidebar({
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
+    () => tableMetaCtx?.setTableMeta ?? (() => { }),
     [tableMetaCtx]
   );
   const [headerElevated, setHeaderElevated] = useState(false);
@@ -216,6 +225,18 @@ export function AdminCreatorProfilesWithSidebar({
     [filteredProfiles, selectedId]
   );
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const selectedCount = selectedIds.size;
+  const allSelected =
+    filteredProfiles.length > 0 && selectedCount === filteredProfiles.length;
+  const someSelected =
+    selectedCount > 0 && selectedCount < filteredProfiles.length;
+  const headerCheckboxState: boolean | 'indeterminate' = allSelected
+    ? true
+    : someSelected
+      ? 'indeterminate'
+      : false;
+
   const effectiveContact = useMemo(() => {
     if (draftContact && draftContact.id === selectedId) return draftContact;
     return mapProfileToContact(selectedProfile);
@@ -226,6 +247,36 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(true);
     setDraftContact(null);
   }, []);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (filteredProfiles.length === 0) return new Set<string>();
+      if (prev.size === filteredProfiles.length) return new Set<string>();
+      return new Set(filteredProfiles.map(p => p.id));
+    });
+  };
+
+  React.useEffect(() => {
+    setSelectedIds(prev => {
+      const next = new Set<string>();
+      filteredProfiles.forEach(profile => {
+        if (prev.has(profile.id)) next.add(profile.id);
+      });
+      return next;
+    });
+  }, [filteredProfiles]);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (isFormElement(event.target)) return;
@@ -377,16 +428,35 @@ export function AdminCreatorProfilesWithSidebar({
         aria-label='Creator profiles table'
       >
         <div className='w-full space-y-4'>
-          <div className='flex flex-wrap items-center gap-3 justify-between text-xs text-secondary-token'>
-            <div>
-              Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()} profiles
+          <div className='relative z-30 flex flex-wrap items-center gap-3 justify-between text-xs text-secondary-token mb-3 md:mb-4'>
+            <div className='flex items-center gap-3'>
+              <Checkbox
+                aria-label='Select all creators'
+                checked={headerCheckboxState}
+                onCheckedChange={toggleSelectAll}
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant='secondary' size='sm' disabled={selectedIds.size === 0}>
+                    Bulk actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='start'>
+                  <DropdownMenuItem disabled>Feature selected (coming soon)</DropdownMenuItem>
+                  <DropdownMenuItem disabled>Unverify selected (coming soon)</DropdownMenuItem>
+                  <DropdownMenuItem disabled className='text-destructive'>Delete selected (coming soon)</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className='hidden sm:block'>
+                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                {total.toLocaleString()} profiles
+              </div>
             </div>
             <div className='flex flex-wrap items-center gap-3'>
               <form
                 action={basePath}
                 method='get'
-                className='flex items-center gap-2 flex-nowrap'
+                className='relative z-40 isolate flex items-center gap-2 flex-nowrap'
               >
                 <input type='hidden' name='sort' value={sort} />
                 <input type='hidden' name='pageSize' value={pageSize} />
@@ -415,37 +485,44 @@ export function AdminCreatorProfilesWithSidebar({
         </div>
 
         <div className='flex-1 overflow-auto' ref={tableContainerRef}>
-          <table className='w-full table-fixed text-sm'>
+          <table className='min-w-full table-auto text-sm border-separate border-spacing-0'>
             <thead
               className={cn(
-                'text-left text-secondary-token border-b border-surface-3/60',
+                'sticky top-0 z-20 text-left text-secondary-token border-b border-surface-3/60 bg-white/85 backdrop-blur-md dark:bg-black/85',
                 headerElevated &&
-                  'shadow-sm shadow-black/10 dark:shadow-black/40'
+                'shadow-sm shadow-black/10 dark:shadow-black/40'
               )}
             >
               <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80'>
+                <th className='w-14 px-3 py-2 text-left'>
+                  <Checkbox
+                    aria-label='Select all creators'
+                    checked={headerCheckboxState}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </th>
+                <th className='px-2 py-2 text-left'>
                   Creator
                 </th>
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('created'))}
                 >
                   {renderSortHeader('created')}
                 </th>
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('claimed'))}
                 >
                   {renderSortHeader('claimed')}
                 </th>
                 <th
-                  className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-left backdrop-blur-sm dark:bg-black/80 cursor-pointer select-none'
+                  className='px-2 py-2 text-left cursor-pointer select-none'
                   onClick={() => router.push(createSortHref('verified'))}
                 >
                   {renderSortHeader('verified')}
                 </th>
-                <th className='sticky top-0 z-10 bg-white/80 px-2 py-2 text-right backdrop-blur-sm dark:bg-black/80'>
+                <th className='px-2 py-2 text-right'>
                   Action
                 </th>
               </tr>
@@ -463,13 +540,14 @@ export function AdminCreatorProfilesWithSidebar({
               ) : (
                 profilesWithActions.map(profile => {
                   const isSelected = profile.id === selectedId;
+                  const isChecked = selectedIds.has(profile.id);
                   return (
                     <tr
                       key={profile.id}
                       className={cn(
                         'cursor-pointer transition-colors duration-200',
                         isSelected
-                          ? 'bg-gray-200 dark:bg-gray-800'
+                          ? 'bg-gray-100 dark:bg-gray-800/70'
                           : 'hover:bg-gray-100 dark:hover:bg-gray-900/50'
                       )}
                       onClick={() => handleRowClick(profile.id)}
@@ -477,12 +555,17 @@ export function AdminCreatorProfilesWithSidebar({
                     >
                       <td
                         className={cn(
-                          'px-2 py-3 border-l border-transparent',
-                          isSelected &&
-                            'border-l-[3px] border-accent/80 bg-surface-2/60 dark:bg-white/5'
+                          'w-14 px-3 py-3 border-l border-transparent',
+                          isSelected && 'bg-surface-2/40 dark:bg-white/5'
                         )}
                       >
                         <div className='flex items-center gap-3'>
+                          <Checkbox
+                            aria-label={`Select ${profile.username}`}
+                            checked={isChecked}
+                            onClick={event => event.stopPropagation()}
+                            onCheckedChange={() => toggleSelect(profile.id)}
+                          />
                           <CreatorAvatarCell
                             profileId={profile.id}
                             username={profile.username}
@@ -502,10 +585,10 @@ export function AdminCreatorProfilesWithSidebar({
                       <td className='px-2 py-3 text-xs text-tertiary-token'>
                         {profile.createdAt
                           ? new Intl.DateTimeFormat('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            }).format(profile.createdAt)
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          }).format(profile.createdAt)
                           : '—'}
                       </td>
                       <td className='px-2 py-3 text-xs'>
@@ -517,7 +600,20 @@ export function AdminCreatorProfilesWithSidebar({
                               : 'bg-gray-50 text-secondary-token ring-1 ring-inset ring-gray-200 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10'
                           )}
                         >
-                          {profile.isClaimed ? 'Claimed' : 'Unclaimed'}
+                          {profile.isClaimed ? (
+                            <>
+                              <Star className='h-3 w-3 fill-current' aria-hidden='true' />
+                              <span>Claimed</span>
+                            </>
+                          ) : (
+                            <>
+                              <span
+                                className='h-2 w-2 rounded-full bg-gray-400 dark:bg-gray-500'
+                                aria-hidden='true'
+                              />
+                              <span>Unclaimed</span>
+                            </>
+                          )}
                         </span>
                       </td>
                       <td className='px-2 py-3 text-xs'>
@@ -531,7 +627,7 @@ export function AdminCreatorProfilesWithSidebar({
                         >
                           {profile.isVerified ? (
                             <>
-                              <span aria-hidden='true'>★</span>
+                              <Check className='h-3 w-3' aria-hidden='true' />
                               <span>Verified</span>
                             </>
                           ) : (
@@ -603,7 +699,7 @@ export function AdminCreatorProfilesWithSidebar({
           </table>
         </div>
 
-        <div className='sticky bottom-0 left-0 right-0 mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-surface-3/60 bg-white/90 px-3 py-2 text-xs text-secondary-token backdrop-blur-sm dark:bg-black/90'>
+        <div className='sticky bottom-0 left-0 right-0 mt-4 flex flex-wrap items-center justify-between gap-3 bg-white/90 px-3 py-2 text-xs text-secondary-token backdrop-blur-sm dark:bg-black/90'>
           <div className='flex items-center gap-2'>
             <span>
               Page {page} of {totalPages}

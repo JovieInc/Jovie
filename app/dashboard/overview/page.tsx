@@ -25,6 +25,7 @@ export default async function OverviewPage() {
     <DashboardOverview
       artist={artist}
       hasSocialLinks={dashboardData.hasSocialLinks}
+      hasMusicLinks={dashboardData.hasMusicLinks}
     />
   );
 }

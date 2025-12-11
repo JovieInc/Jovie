@@ -224,7 +224,7 @@ const Sidebar = React.forwardRef<
               ? 'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
               : variant === 'inset'
                 ? 'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
-                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) border-r border-subtle',
+                : 'group-data-[collapsible=icon]:w-(--sidebar-width-icon) border-r border-sidebar-border',
             className
           )}
           {...props}
@@ -613,7 +613,7 @@ const SidebarMenuAction = React.forwardRef<
         'peer-data-[size=lg]/menu-button:top-2.5',
         'group-data-[collapsible=icon]:hidden',
         showOnHover &&
-          'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground lg:opacity-0',
+        'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground lg:opacity-0',
         className
       )}
       {...props}

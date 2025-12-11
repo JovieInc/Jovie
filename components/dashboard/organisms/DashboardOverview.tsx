@@ -32,12 +32,12 @@ export function DashboardOverview({
   const isHandleClaimed = Boolean(artist.owner_user_id);
   const musicLinkFromProfile = Boolean(
     artist.spotify_url ||
-      artist.apple_music_url ||
-      artist.youtube_url ||
-      // Fallback for camelCase fields in some test fixtures
-      (artist as { spotifyUrl?: string }).spotifyUrl ||
-      (artist as { appleMusicUrl?: string }).appleMusicUrl ||
-      (artist as { youtubeUrl?: string }).youtubeUrl
+    artist.apple_music_url ||
+    artist.youtube_url ||
+    // Fallback for camelCase fields in some test fixtures
+    (artist as { spotifyUrl?: string }).spotifyUrl ||
+    (artist as { appleMusicUrl?: string }).appleMusicUrl ||
+    (artist as { youtubeUrl?: string }).youtubeUrl
   );
   const hasMusicLink = hasMusicLinks || musicLinkFromProfile;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
@@ -46,61 +46,45 @@ export function DashboardOverview({
     Boolean
   ).length;
 
-  return (
-    <div className='space-y-5'>
-      <header className='flex flex-col gap-1.5 rounded-2xl bg-transparent p-1 md:flex-row md:items-center md:justify-between'>
-        <div className='space-y-1'>
-          <h1 className='text-xl font-semibold text-primary-token'>
-            Welcome back, {artist.name || 'Artist'}
-          </h1>
-          <p className='text-sm text-secondary-token'>
-            Keep your profile polished and ready to share.
-          </p>
-        </div>
-        <div className='flex flex-wrap gap-2'>
-          <Button
-            asChild
-            variant='secondary'
-            size='sm'
-            className='rounded-full px-3 text-[13px] font-semibold'
+  const header = (
+    <header className='flex flex-col gap-1.5 rounded-2xl bg-transparent p-1 md:flex-row md:items-center md:justify-between'>
+      <div className='space-y-1'>
+        <h1 className='text-xl font-semibold text-primary-token'>
+          Welcome back, {artist.name || 'Artist'}
+        </h1>
+        <p className='text-sm text-secondary-token'>
+          Keep your profile polished and ready to share.
+        </p>
+      </div>
+      <div className='flex flex-wrap gap-2'>
+        <Button
+          asChild
+          variant='secondary'
+          size='sm'
+          className='rounded-full px-3 text-[13px] font-semibold'
+        >
+          <Link
+            href={`/${artist.handle}`}
+            target='_blank'
+            rel='noopener noreferrer'
           >
-            <Link
-              href={`/${artist.handle}`}
-              target='_blank'
-              rel='noopener noreferrer'
-            >
-              View profile
-            </Link>
-          </Button>
-          <CopyToClipboardButton
-            relativePath={`/${artist.handle}`}
-            idleLabel='Copy URL'
-            className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
-          />
-        </div>
-      </header>
+            View profile
+          </Link>
+        </Button>
+        <CopyToClipboardButton
+          relativePath={`/${artist.handle}`}
+          idleLabel='Copy URL'
+          className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
+        />
+      </div>
+    </header>
+  );
 
-      <section className='rounded-2xl border-0 bg-transparent p-1'>
-        {allTasksComplete ? (
-          <div className='flex flex-col gap-2 rounded-2xl bg-surface-1/60 p-4 shadow-none sm:flex-row sm:items-center sm:justify-between'>
-            <div className='space-y-1'>
-              <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
-                Profile ready!
-              </p>
-              <h3 className='text-lg font-semibold text-primary-token'>
-                Your profile is ready!
-              </h3>
-              <p className='text-sm text-secondary-token'>
-                Share your page and start engaging your audience.
-              </p>
-            </div>
-            <CopyToClipboardButton
-              relativePath={`/${artist.handle}`}
-              idleLabel='Copy link'
-              className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
-            />
-          </div>
-        ) : (
+  if (!allTasksComplete) {
+    return (
+      <div className='space-y-5'>
+        {header}
+        <section className='rounded-2xl border-0 bg-transparent p-1'>
           <div className='space-y-2 rounded-2xl bg-surface-1/40 p-4 shadow-none'>
             <div className='flex items-center justify-between gap-3'>
               <div className='space-y-1'>
@@ -175,7 +159,34 @@ export function DashboardOverview({
               />
             </ol>
           </div>
-        )}
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className='space-y-5'>
+      {header}
+
+      <section className='rounded-2xl border-0 bg-transparent p-1'>
+        <div className='flex flex-col gap-2 rounded-2xl bg-surface-1/60 p-4 shadow-none sm:flex-row sm:items-center sm:justify-between'>
+          <div className='space-y-1'>
+            <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
+              Profile ready!
+            </p>
+            <h3 className='text-lg font-semibold text-primary-token'>
+              Your profile is ready!
+            </h3>
+            <p className='text-sm text-secondary-token'>
+              Share your page and start engaging your audience.
+            </p>
+          </div>
+          <CopyToClipboardButton
+            relativePath={`/${artist.handle}`}
+            idleLabel='Copy link'
+            className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
+          />
+        </div>
       </section>
 
       <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>

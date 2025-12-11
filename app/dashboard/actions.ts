@@ -2,7 +2,15 @@
 
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { and, asc, count, sql as drizzleSql, eq } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  sql as drizzleSql,
+  eq,
+  or,
+  inArray,
+} from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
 import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
@@ -76,17 +84,23 @@ export interface ProfileSocialLink {
     linkType?: string | null;
   } | null;
 }
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 const DSP_PLATFORMS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'soundcloud',
-  'bandcamp',
-  'tidal',
-  'deezer',
+  'amazon-music',
   'amazon_music',
+  'apple-music',
+  'apple_music',
+  'bandcamp',
+  'deezer',
+  'netease',
   'pandora',
+  'soundcloud',
+  'spotify',
+  'tencent-music',
+  'tencent_music',
+  'tidal',
+  'youtube-music',
+  'youtube_music',
 ] as const;
 
 async function fetchDashboardDataWithSession(
@@ -204,7 +218,10 @@ async function fetchDashboardDataWithSession(
           and(
             eq(socialLinks.creatorProfileId, selected.id),
             eq(socialLinks.state, 'active'),
-            eq(socialLinks.platformType, 'dsp')
+            or(
+              eq(socialLinks.platformType, 'dsp'),
+              inArray(socialLinks.platform, DSP_PLATFORMS as unknown as string[])
+            )
           )
         )
         .then(result => Number(result?.[0]?.c ?? 0) > 0)
