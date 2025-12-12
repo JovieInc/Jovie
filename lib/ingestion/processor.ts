@@ -77,7 +77,6 @@ const beaconsPayloadSchema = z.object({
   dedupKey: z.string().optional(),
   depth: z.number().int().min(0).max(3).default(0),
 });
-
 type SocialLinkRow = typeof socialLinks.$inferSelect;
 
 type SupportedRecursiveJobType =
@@ -709,7 +708,6 @@ async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
     throw error;
   }
 }
-
 async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
   const parsed = youtubePayloadSchema.parse(jobPayload);
 
@@ -746,7 +744,6 @@ async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
       currentDepth: parsed.depth,
       extraction,
     });
-
     await tx
       .update(creatorProfiles)
       .set({ ingestionStatus: 'idle', updatedAt: new Date() })
@@ -810,7 +807,6 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
       currentDepth: parsed.depth,
       extraction,
     });
-
     await tx
       .update(creatorProfiles)
       .set({ ingestionStatus: 'idle', updatedAt: new Date() })

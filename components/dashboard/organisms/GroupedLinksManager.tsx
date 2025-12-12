@@ -100,10 +100,10 @@ const MUSIC_FIRST_ORDER = [
   'spotify-artist',
   'spotify',
   'apple-music',
+  'youtube',
   'youtube-music',
   'instagram',
   'tiktok',
-  'youtube',
   'twitter',
   'venmo',
   'website',
@@ -174,11 +174,28 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const [clearSignal, setClearSignal] = useState(0);
 
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
-  const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
+  const [pendingSuggestions, setPendingSuggestions] = useState(
+    () => suggestedLinks
+  );
+
+  const suggestedLinksSignature = useMemo(() => {
+    const keys = suggestedLinks
+      .map(s => s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`)
+      .sort();
+    return keys.join('|');
+  }, [suggestedLinks]);
+
+  const prevSuggestedLinksSignatureRef = useRef<string>(
+    suggestedLinksSignature
+  );
 
   useEffect(() => {
+    if (prevSuggestedLinksSignatureRef.current === suggestedLinksSignature) {
+      return;
+    }
+    prevSuggestedLinksSignatureRef.current = suggestedLinksSignature;
     setPendingSuggestions(suggestedLinks);
-  }, [suggestedLinks]);
+  }, [suggestedLinks, suggestedLinksSignature]);
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -480,9 +497,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   );
 
   const suggestionPills = useMemo(() => {
-    const base = SUGGESTION_PILLS.filter(
-      pill => !existingPlatforms.has(pill.id)
-    );
+    const base = SUGGESTION_PILLS.filter(pill => {
+      if (existingPlatforms.has(pill.id)) return false;
+      if (pill.id === 'youtube-music' && existingPlatforms.has('youtube')) {
+        return false;
+      }
+      return true;
+    });
     const order = isMusicProfile ? MUSIC_FIRST_ORDER : SOCIAL_FIRST_ORDER;
     const rank = new Map<string, number>();
     order.forEach((id, index) => {
@@ -768,11 +789,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 return null;
               }
 
-              const items = groupItems.sort(
-                (a, b) =>
-                  popularityIndex(a.platform.id) -
-                  popularityIndex(b.platform.id)
-              );
+              const items = groupItems
+                .slice()
+                .sort(
+                  (a, b) =>
+                    popularityIndex(a.platform.id) -
+                    popularityIndex(b.platform.id)
+                );
 
               const isAddingToThis =
                 addingLink && sectionOf(addingLink) === section;
