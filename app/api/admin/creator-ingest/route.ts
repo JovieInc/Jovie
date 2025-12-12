@@ -11,7 +11,10 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
-import { normalizeAndMergeExtraction } from '@/lib/ingestion/processor';
+import {
+  enqueueFollowupIngestionJobs,
+  normalizeAndMergeExtraction,
+} from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   extractLaylo,
@@ -340,6 +343,13 @@ export async function POST(request: Request) {
             },
             extractionWithHostedAvatar
           );
+
+          await enqueueFollowupIngestionJobs({
+            tx,
+            creatorProfileId: existing.id,
+            currentDepth: 0,
+            extraction: extractionWithHostedAvatar,
+          });
         } catch (error) {
           mergeError =
             error instanceof Error ? error.message : 'Link extraction failed';
@@ -443,6 +453,13 @@ export async function POST(request: Request) {
           },
           extractionWithHostedAvatar
         );
+
+        await enqueueFollowupIngestionJobs({
+          tx,
+          creatorProfileId: created.id,
+          currentDepth: 0,
+          extraction: extractionWithHostedAvatar,
+        });
       } catch (error) {
         mergeError =
           error instanceof Error ? error.message : 'Link extraction failed';

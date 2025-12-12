@@ -6,7 +6,7 @@
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: 'dsp' | 'social' | 'earnings' | 'custom'; // DSP = Digital Service Provider (music platforms)
+  category: 'dsp' | 'social' | 'earnings' | 'websites' | 'custom'; // DSP = Digital Service Provider (music platforms)
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -154,7 +154,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   website: {
     id: 'website',
     name: 'Website',
-    category: 'custom',
+    category: 'websites',
     icon: 'website',
     color: '6B7280',
     placeholder: 'https://your-website.com',
@@ -162,7 +162,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   linktree: {
     id: 'linktree',
     name: 'Linktree',
-    category: 'custom',
+    category: 'websites',
     icon: 'linktree',
     color: '39E09B',
     placeholder: 'https://linktr.ee/username',
@@ -170,10 +170,18 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   laylo: {
     id: 'laylo',
     name: 'Laylo',
-    category: 'custom',
+    category: 'websites',
     icon: 'link',
     color: '6B7280',
     placeholder: 'https://laylo.com/username',
+  },
+  beacons: {
+    id: 'beacons',
+    name: 'Beacons',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://beacons.ai/username',
   },
   // Additional social platforms
   telegram: {
@@ -293,6 +301,7 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
+  { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
   { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },

@@ -67,7 +67,7 @@ export interface GroupedLinksManagerProps<
 // Configurable cross-category policy (extend here to allow more platforms to span sections)
 export const CROSS_CATEGORY: Record<
   string,
-  Array<'social' | 'dsp' | 'earnings' | 'custom'>
+  Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
 > = {
   youtube: ['social', 'dsp'],
   // soundcloud: ['social', 'dsp'],
@@ -135,11 +135,12 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
   const [collapsed, setCollapsed] = useState<
-    Record<'social' | 'dsp' | 'earnings' | 'custom', boolean>
+    Record<'social' | 'dsp' | 'earnings' | 'websites' | 'custom', boolean>
   >({
     social: false,
     dsp: false,
     earnings: false,
+    websites: false,
     custom: false,
   });
 
@@ -197,14 +198,21 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [idFor, links]);
 
   const sectionOf = useCallback(
-    (link: T): 'social' | 'dsp' | 'earnings' | 'custom' =>
-      (link.platform.category as 'social' | 'dsp' | 'earnings' | 'custom') ??
-      'custom',
+    (link: T): 'social' | 'dsp' | 'earnings' | 'websites' | 'custom' =>
+      (link.platform.category as
+        | 'social'
+        | 'dsp'
+        | 'earnings'
+        | 'websites'
+        | 'custom') ?? 'custom',
     []
   );
 
   const canMoveTo = useCallback(
-    (link: T, target: 'social' | 'dsp' | 'earnings' | 'custom'): boolean => {
+    (
+      link: T,
+      target: 'social' | 'dsp' | 'earnings' | 'websites' | 'custom'
+    ): boolean => {
       const current = sectionOf(link);
       if (current === target) return true;
       const allowed = CROSS_CATEGORY[link.platform.id] ?? [];
@@ -753,211 +761,223 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
       {hasAnyLinks && (
         <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
-          {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-            const groupItems = groups[section];
-            if (groupItems.length === 0) {
-              return null;
-            }
+          {(['social', 'dsp', 'websites', 'earnings', 'custom'] as const).map(
+            section => {
+              const groupItems = groups[section];
+              if (groupItems.length === 0) {
+                return null;
+              }
 
-            const items = groupItems.sort(
-              (a, b) =>
-                popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
-            );
+              const items = groupItems.sort(
+                (a, b) =>
+                  popularityIndex(a.platform.id) -
+                  popularityIndex(b.platform.id)
+              );
 
-            const isAddingToThis =
-              addingLink && sectionOf(addingLink) === section;
-            // Hide section when search/filter yields no results, unless we're adding to it
-            if (items.length === 0 && !isAddingToThis) {
-              return null;
-            }
+              const isAddingToThis =
+                addingLink && sectionOf(addingLink) === section;
+              // Hide section when search/filter yields no results, unless we're adding to it
+              if (items.length === 0 && !isAddingToThis) {
+                return null;
+              }
 
-            return (
-              <div key={section} className='space-y-3'>
-                <header className='flex items-center justify-between pt-1'>
-                  <button
-                    type='button'
-                    className='flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-secondary-token rounded-md px-1 -mx-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
-                    onClick={() =>
-                      setCollapsed(prev => ({
-                        ...prev,
-                        [section]: !prev[section],
-                      }))
-                    }
-                    aria-expanded={!collapsed[section]}
-                    aria-controls={`links-section-${section}`}
-                  >
-                    <svg
-                      className={cn(
-                        'h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]',
-                        collapsed[section] ? '-rotate-90' : 'rotate-0'
-                      )}
-                      viewBox='0 0 20 20'
-                      aria-hidden='true'
+              return (
+                <div key={section} className='space-y-3'>
+                  <header className='flex items-center justify-between pt-1'>
+                    <button
+                      type='button'
+                      className='flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-secondary-token rounded-md px-1 -mx-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+                      onClick={() =>
+                        setCollapsed(prev => ({
+                          ...prev,
+                          [section]: !prev[section],
+                        }))
+                      }
+                      aria-expanded={!collapsed[section]}
+                      aria-controls={`links-section-${section}`}
                     >
-                      <path
-                        d='M6 8l4 4 4-4'
-                        stroke='currentColor'
-                        strokeWidth='2'
-                        fill='none'
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                      />
-                    </svg>
-                    {labelFor(section)}
-                    <span className='ml-2 inline-flex items-center rounded-full bg-surface-2 text-secondary-token px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-subtle'>
-                      {items.length}
-                    </span>
-                    {section === 'earnings' && tippingEnabled && (
-                      <span
+                      <svg
                         className={cn(
-                          'ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25',
-                          tippingJustEnabled && 'animate-pulse'
+                          'h-4 w-4 transition-transform duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]',
+                          collapsed[section] ? '-rotate-90' : 'rotate-0'
                         )}
+                        viewBox='0 0 20 20'
+                        aria-hidden='true'
                       >
-                        Tipping enabled
+                        <path
+                          d='M6 8l4 4 4-4'
+                          stroke='currentColor'
+                          strokeWidth='2'
+                          fill='none'
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                        />
+                      </svg>
+                      {labelFor(section)}
+                      <span className='ml-2 inline-flex items-center rounded-full bg-surface-2 text-secondary-token px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-subtle'>
+                        {items.length}
                       </span>
-                    )}
-                  </button>
-                  <div className='flex items-center gap-2'>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className='inline-flex h-5 w-5 items-center justify-center rounded-md text-tertiary hover:text-secondary ring-1 ring-transparent hover:ring-subtle cursor-help transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90 active:scale-[0.97]'>
-                          <svg
-                            viewBox='0 0 20 20'
-                            className='h-3.5 w-3.5'
-                            aria-hidden='true'
-                          >
-                            <path
-                              d='M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.75-4.5h1.5v-1.2c0-.62.32-.96 1.02-1.3.94-.45 1.48-1.13 1.48-2.13 0-1.7-1.38-2.87-3.25-2.87-1.7 0-3 .9-3.33 2.35l1.45.38c.17-.74.82-1.2 1.83-1.2 1 0 1.7.56 1.7 1.34 0 .58-.25.89-.97 1.23-.98.46-1.43 1.07-1.43 2.1v1.5Zm0 2.25h1.5v-1.5h-1.5v1.5Z'
-                              fill='currentColor'
-                            />
-                          </svg>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side='top' className='max-w-xs text-wrap'>
-                        Links are ordered automatically based on popularity.
-                        Some links (like YouTube) can appear in both Music &
-                        Social.
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </header>
-                <AnimatePresence initial={false}>
-                  {!collapsed[section] && (
-                    <motion.div
-                      key={`${section}-grid`}
-                      id={`links-section-${section}`}
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.24, ease: [0.33, 1, 0.68, 1] }}
-                      className='overflow-visible'
-                    >
-                      <SortableContext items={items.map(idFor)}>
-                        <div
-                          className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-2 overflow-visible'
-                          role='list'
+                      {section === 'earnings' && tippingEnabled && (
+                        <span
+                          className={cn(
+                            'ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25',
+                            tippingJustEnabled && 'animate-pulse'
+                          )}
                         >
-                          {items.map(link => {
-                            const linkId = idFor(link as T);
-                            return (
-                              <SortableRow
-                                key={linkId}
-                                id={linkId}
-                                link={link as T}
-                                index={links.findIndex(
-                                  l => l.normalizedUrl === link.normalizedUrl
-                                )}
-                                draggable={
-                                  section !== 'earnings' && items.length > 1
-                                }
-                                onToggle={handleToggle}
-                                onRemove={handleRemove}
-                                onEdit={handleEdit}
-                                visible={linkIsVisible(link as T)}
-                                openMenuId={openMenuId}
-                                onAnyMenuOpen={handleAnyMenuOpen}
-                                isLastAdded={lastAddedId === linkId}
+                          Tipping enabled
+                        </span>
+                      )}
+                    </button>
+                    <div className='flex items-center gap-2'>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className='inline-flex h-5 w-5 items-center justify-center rounded-md text-tertiary hover:text-secondary ring-1 ring-transparent hover:ring-subtle cursor-help transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-90 active:scale-[0.97]'>
+                            <svg
+                              viewBox='0 0 20 20'
+                              className='h-3.5 w-3.5'
+                              aria-hidden='true'
+                            >
+                              <path
+                                d='M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.75-4.5h1.5v-1.2c0-.62.32-.96 1.02-1.3.94-.45 1.48-1.13 1.48-2.13 0-1.7-1.38-2.87-3.25-2.87-1.7 0-3 .9-3.33 2.35l1.45.38c.17-.74.82-1.2 1.83-1.2 1 0 1.7.56 1.7 1.34 0 .58-.25.89-.97 1.23-.98.46-1.43 1.07-1.43 2.1v1.5Zm0 2.25h1.5v-1.5h-1.5v1.5Z'
+                                fill='currentColor'
                               />
-                            );
-                          })}
-                          {pendingPreview &&
-                            sectionOf(pendingPreview.link as T) === section && (
-                              <div className='relative rounded-xl border border-subtle bg-surface-1 p-4 flex items-start gap-3'>
-                                <div
-                                  className='flex h-9 w-9 items-center justify-center rounded-lg'
-                                  style={{
-                                    backgroundColor: `#${pendingPreview.link.platform.color}26`,
-                                    color: `#${pendingPreview.link.platform.color}`,
-                                  }}
-                                  aria-hidden='true'
-                                >
-                                  <SocialIcon
-                                    platform={pendingPreview.link.platform.icon}
-                                    className='h-4 w-4'
-                                  />
-                                </div>
-                                <div className='flex-1 min-w-0 space-y-1'>
-                                  <div className='flex items-center gap-2'>
-                                    <span className='font-semibold text-primary-token'>
-                                      {pendingPreview.link.platform.name}
-                                    </span>
-                                    <span className='text-green-500 text-xs'>
-                                      ✓ Ready to add
-                                    </span>
-                                  </div>
-                                  <div className='text-xs text-tertiary-token truncate'>
-                                    {pendingPreview.link.normalizedUrl}
-                                  </div>
-                                </div>
-                                <div className='flex items-center gap-2 shrink-0'>
-                                  <Button
-                                    size='sm'
-                                    variant='ghost'
-                                    onClick={() => {
-                                      setPendingPreview(null);
-                                      setClearSignal(c => c + 1);
+                            </svg>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side='top'
+                          className='max-w-xs text-wrap'
+                        >
+                          Links are ordered automatically based on popularity.
+                          Some links (like YouTube) can appear in both Music &
+                          Social.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </header>
+                  <AnimatePresence initial={false}>
+                    {!collapsed[section] && (
+                      <motion.div
+                        key={`${section}-grid`}
+                        id={`links-section-${section}`}
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{
+                          duration: 0.24,
+                          ease: [0.33, 1, 0.68, 1],
+                        }}
+                        className='overflow-visible'
+                      >
+                        <SortableContext items={items.map(idFor)}>
+                          <div
+                            className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-2 overflow-visible'
+                            role='list'
+                          >
+                            {items.map(link => {
+                              const linkId = idFor(link as T);
+                              return (
+                                <SortableRow
+                                  key={linkId}
+                                  id={linkId}
+                                  link={link as T}
+                                  index={links.findIndex(
+                                    l => l.normalizedUrl === link.normalizedUrl
+                                  )}
+                                  draggable={
+                                    section !== 'earnings' && items.length > 1
+                                  }
+                                  onToggle={handleToggle}
+                                  onRemove={handleRemove}
+                                  onEdit={handleEdit}
+                                  visible={linkIsVisible(link as T)}
+                                  openMenuId={openMenuId}
+                                  onAnyMenuOpen={handleAnyMenuOpen}
+                                  isLastAdded={lastAddedId === linkId}
+                                />
+                              );
+                            })}
+                            {pendingPreview &&
+                              sectionOf(pendingPreview.link as T) ===
+                                section && (
+                                <div className='relative rounded-xl border border-subtle bg-surface-1 p-4 flex items-start gap-3'>
+                                  <div
+                                    className='flex h-9 w-9 items-center justify-center rounded-lg'
+                                    style={{
+                                      backgroundColor: `#${pendingPreview.link.platform.color}26`,
+                                      color: `#${pendingPreview.link.platform.color}`,
                                     }}
+                                    aria-hidden='true'
                                   >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size='sm'
-                                    variant='primary'
-                                    onClick={() => {
-                                      if (!pendingPreview) return;
-                                      void handleAdd(pendingPreview.link);
-                                      setPendingPreview(null);
-                                      setClearSignal(c => c + 1);
-                                    }}
-                                  >
-                                    Add
-                                  </Button>
+                                    <SocialIcon
+                                      platform={
+                                        pendingPreview.link.platform.icon
+                                      }
+                                      className='h-4 w-4'
+                                    />
+                                  </div>
+                                  <div className='flex-1 min-w-0 space-y-1'>
+                                    <div className='flex items-center gap-2'>
+                                      <span className='font-semibold text-primary-token'>
+                                        {pendingPreview.link.platform.name}
+                                      </span>
+                                      <span className='text-green-500 text-xs'>
+                                        ✓ Ready to add
+                                      </span>
+                                    </div>
+                                    <div className='text-xs text-tertiary-token truncate'>
+                                      {pendingPreview.link.normalizedUrl}
+                                    </div>
+                                  </div>
+                                  <div className='flex items-center gap-2 shrink-0'>
+                                    <Button
+                                      size='sm'
+                                      variant='ghost'
+                                      onClick={() => {
+                                        setPendingPreview(null);
+                                        setClearSignal(c => c + 1);
+                                      }}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      size='sm'
+                                      variant='primary'
+                                      onClick={() => {
+                                        if (!pendingPreview) return;
+                                        void handleAdd(pendingPreview.link);
+                                        setPendingPreview(null);
+                                        setClearSignal(c => c + 1);
+                                      }}
+                                    >
+                                      Add
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            {isAddingToThis && (
+                              <div className='relative rounded-xl border border-dashed border-black/10 dark:border-white/10 bg-surface-1/40 p-4 animate-pulse h-[74px] flex items-center gap-4'>
+                                <div className='h-10 w-10 rounded-full bg-black/5 dark:bg-white/5' />
+                                <div className='flex-1 space-y-2'>
+                                  <div className='h-4 w-1/3 bg-black/5 dark:bg-white/5 rounded' />
+                                  <div className='h-3 w-1/4 bg-black/5 dark:bg-white/5 rounded' />
                                 </div>
                               </div>
                             )}
-                          {isAddingToThis && (
-                            <div className='relative rounded-xl border border-dashed border-black/10 dark:border-white/10 bg-surface-1/40 p-4 animate-pulse h-[74px] flex items-center gap-4'>
-                              <div className='h-10 w-10 rounded-full bg-black/5 dark:bg-white/5' />
-                              <div className='flex-1 space-y-2'>
-                                <div className='h-4 w-1/3 bg-black/5 dark:bg-white/5 rounded' />
-                                <div className='h-3 w-1/4 bg-black/5 dark:bg-white/5 rounded' />
+                            {items.length === 0 && (
+                              <div className='col-span-full p-3 text-sm text-tertiary italic'>
+                                No {labelFor(section)} links match your search
                               </div>
-                            </div>
-                          )}
-                          {items.length === 0 && (
-                            <div className='col-span-full p-3 text-sm text-tertiary italic'>
-                              No {labelFor(section)} links match your search
-                            </div>
-                          )}
-                        </div>
-                      </SortableContext>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
+                            )}
+                          </div>
+                        </SortableContext>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            }
+          )}
         </DndContext>
       )}
     </section>
@@ -1192,10 +1212,11 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
 
 function groupLinks<T extends DetectedLink = DetectedLink>(
   links: T[]
-): Record<'social' | 'dsp' | 'earnings' | 'custom', T[]> {
+): Record<'social' | 'dsp' | 'earnings' | 'websites' | 'custom', T[]> {
   // Preserve incoming order; categories are only for grouping/drag between types.
   const social: T[] = [];
   const dsp: T[] = [];
+  const websites: T[] = [];
   const earnings: T[] = [];
   const custom: T[] = [];
 
@@ -1204,10 +1225,12 @@ function groupLinks<T extends DetectedLink = DetectedLink>(
     const category = (l.platform.category ?? 'custom') as
       | 'social'
       | 'dsp'
+      | 'websites'
       | 'earnings'
       | 'custom';
     if (category === 'social') social.push(l);
     else if (category === 'dsp') dsp.push(l);
+    else if (category === 'websites') websites.push(l);
     else if (category === 'earnings') earnings.push(l);
     else custom.push(l);
   }
@@ -1215,17 +1238,22 @@ function groupLinks<T extends DetectedLink = DetectedLink>(
   return {
     social,
     dsp,
+    websites,
     earnings,
     custom,
   };
 }
 
-function labelFor(section: 'social' | 'dsp' | 'earnings' | 'custom'): string {
+function labelFor(
+  section: 'social' | 'dsp' | 'earnings' | 'websites' | 'custom'
+): string {
   switch (section) {
     case 'social':
       return 'Social';
     case 'dsp':
       return 'Music Service';
+    case 'websites':
+      return 'Websites';
     case 'earnings':
       return 'Earnings';
     default:

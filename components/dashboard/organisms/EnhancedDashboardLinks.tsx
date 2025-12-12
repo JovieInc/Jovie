@@ -1,6 +1,7 @@
 'use client';
 
 import { useFeatureGate } from '@statsig/react-bindings';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/dashboard/actions';
@@ -14,7 +15,7 @@ import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { GroupedLinksManager } from './GroupedLinksManager';
 
 // Define platform types
-type PlatformType = 'social' | 'dsp' | 'earnings' | 'custom';
+type PlatformType = 'social' | 'dsp' | 'earnings' | 'websites' | 'custom';
 
 function getPlatformCategory(platform: string): PlatformType {
   const dspPlatforms = new Set([
@@ -28,6 +29,8 @@ function getPlatformCategory(platform: string): PlatformType {
     'amazon_music',
     'pandora',
   ]);
+
+  const websitePlatforms = new Set(['website', 'linktree', 'laylo', 'beacons']);
 
   const earningsPlatforms = new Set([
     'patreon',
@@ -53,6 +56,7 @@ function getPlatformCategory(platform: string): PlatformType {
   if (dspPlatforms.has(platform)) return 'dsp';
   if (earningsPlatforms.has(platform)) return 'earnings';
   if (socialPlatforms.has(platform)) return 'social';
+  if (websitePlatforms.has(platform)) return 'websites';
   return 'custom';
 }
 
@@ -122,6 +126,7 @@ export function EnhancedDashboardLinks({
 }: {
   initialLinks: ProfileSocialLink[];
 }) {
+  const router = useRouter();
   const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -140,6 +145,10 @@ export function EnhancedDashboardLinks({
   });
   const linkIngestionGate = useFeatureGate(STATSIG_FLAGS.LINK_INGESTION);
   const suggestionsEnabled = linkIngestionGate?.value ?? false;
+
+  const [autoRefreshUntilMs, setAutoRefreshUntilMs] = useState<number | null>(
+    null
+  );
 
   const buildPlatformMeta = useCallback((link: ProfileSocialLink): Platform => {
     const displayName = getSocialPlatformLabel(link.platform as SocialPlatform);
@@ -269,6 +278,28 @@ export function EnhancedDashboardLinks({
     );
   }, [convertDbLinksToSuggestions, suggestionInitialLinks]);
 
+  useEffect(() => {
+    if (!autoRefreshUntilMs) return;
+
+    const intervalMs = 2000;
+    const intervalId = window.setInterval(() => {
+      if (!autoRefreshUntilMs) {
+        window.clearInterval(intervalId);
+        return;
+      }
+      if (Date.now() >= autoRefreshUntilMs) {
+        setAutoRefreshUntilMs(null);
+        window.clearInterval(intervalId);
+        return;
+      }
+      router.refresh();
+    }, intervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [autoRefreshUntilMs, router]);
+
   // Save links to database (debounced)
   const debouncedSave = useMemo(
     () =>
@@ -348,6 +379,24 @@ export function EnhancedDashboardLinks({
           // Keep normalized links locally; server IDs will be applied on next load
           setLinks(normalized);
 
+          if (suggestionsEnabled) {
+            const hasIngestableLink = normalized.some(item => {
+              const url = item.normalizedUrl.toLowerCase();
+              return (
+                url.includes('youtube.com') ||
+                url.includes('youtu.be') ||
+                url.includes('linktr.ee') ||
+                url.includes('laylo.com') ||
+                url.includes('beacons.ai')
+              );
+            });
+
+            if (hasIngestableLink) {
+              setAutoRefreshUntilMs(Date.now() + 20000);
+              router.refresh();
+            }
+          }
+
           const now = new Date();
           setSaveStatus({
             saving: false,
@@ -371,7 +420,7 @@ export function EnhancedDashboardLinks({
           toast.error(message || 'Failed to save links. Please try again.');
         }
       }, 500),
-    [profileId]
+    [profileId, router, suggestionsEnabled]
   );
 
   // Cancel pending saves when profileId changes to prevent saving to wrong profile
