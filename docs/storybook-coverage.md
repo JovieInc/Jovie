@@ -105,7 +105,6 @@ The following components are **not suitable for Storybook** due to their nature:
 - `components/dashboard/organisms/GroupedLinksManager.tsx` - Complex server actions
 - `components/dashboard/organisms/EnhancedDashboardLinks.tsx` - Server actions
 - `components/dashboard/organisms/AccountSettingsSection.tsx` - Clerk integration
-- `components/dashboard/organisms/ProfileSettings.tsx` - Server actions
 
 ### Provider Components
 - `components/providers/*` - Context providers, not visual

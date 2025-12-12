@@ -7,7 +7,7 @@ test.describe('ProfileLinkCard E2E Tests', () => {
 
     // Navigate to dashboard where ProfileLinkCard should be visible
     // Note: This test assumes authentication is handled or mocked appropriately
-    await page.goto('/dashboard', {
+    await page.goto('/app/dashboard', {
       waitUntil: 'domcontentloaded',
       timeout: 10000,
     });

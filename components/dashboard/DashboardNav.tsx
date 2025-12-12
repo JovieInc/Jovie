@@ -1,34 +1,32 @@
 'use client';
 
 import {
-  ArrowLeftIcon,
   BanknotesIcon,
   BellIcon,
   ChartPieIcon,
   Cog6ToothIcon,
   HomeIcon,
   IdentificationIcon,
-  LinkIcon,
   PaintBrushIcon,
   RocketLaunchIcon,
   ShieldCheckIcon,
   SparklesIcon,
+  UserCircleIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
-import { Divider } from '@/components/atoms/Divider';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
+import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 interface DashboardNavProps {
@@ -39,35 +37,28 @@ interface DashboardNavProps {
 const primaryNavigation = [
   {
     name: 'Overview',
-    href: '/dashboard/overview',
+    href: '/app/dashboard/overview',
     id: 'overview',
     icon: HomeIcon,
     description: 'Dashboard overview and quick stats',
   },
   {
-    name: 'Links',
-    href: '/dashboard/links',
+    name: 'Profile',
+    href: '/app/dashboard/profile',
     id: 'links',
-    icon: LinkIcon,
-    description: 'Manage your social and streaming links',
+    icon: UserCircleIcon,
+    description: 'Update your profile and links',
   },
   {
     name: 'Contacts',
-    href: '/dashboard/contacts',
+    href: '/app/dashboard/contacts',
     id: 'contacts',
     icon: IdentificationIcon,
     description: 'Manage your team and contact routes',
   },
   {
-    name: 'Analytics',
-    href: '/dashboard/analytics',
-    id: 'analytics',
-    icon: ChartPieIcon,
-    description: 'Track your performance and engagement',
-  },
-  {
     name: 'Audience',
-    href: '/dashboard/audience',
+    href: '/app/dashboard/audience',
     id: 'audience',
     icon: UsersIcon,
     description: 'Understand your audience demographics',
@@ -80,23 +71,22 @@ const navShortcuts: Record<string, string> = {
   overview: '1',
   links: '2',
   contacts: '3',
-  analytics: '4',
-  audience: '5',
-  tipping: '6',
-  settings: '7',
+  audience: '4',
+  tipping: '5',
+  settings: '6',
 };
 
 const secondaryNavigation = [
   {
     name: 'Earnings',
-    href: '/dashboard/tipping',
+    href: '/app/dashboard/tipping',
     id: 'tipping',
     icon: BanknotesIcon,
     description: 'Manage tips and monetization',
   },
   {
     name: 'Settings',
-    href: '/settings',
+    href: '/app/settings',
     id: 'settings',
     icon: Cog6ToothIcon,
     description: 'Configure your account and preferences',
@@ -105,50 +95,44 @@ const secondaryNavigation = [
 
 const settingsNavigation = [
   {
-    name: 'Back to app',
-    href: '/dashboard/overview',
-    id: 'back',
-    icon: ArrowLeftIcon,
-  },
-  {
     name: 'Profile',
-    href: '/settings/profile',
+    href: '/app/settings/profile',
     id: 'profile',
     icon: IdentificationIcon,
   },
   {
     name: 'Account',
-    href: '/settings/account',
+    href: '/app/settings/account',
     id: 'account',
     icon: ShieldCheckIcon,
   },
   {
     name: 'Appearance',
-    href: '/settings/appearance',
+    href: '/app/settings/appearance',
     id: 'appearance',
     icon: PaintBrushIcon,
   },
   {
     name: 'Notifications',
-    href: '/settings/notifications',
+    href: '/app/settings/notifications',
     id: 'notifications',
     icon: BellIcon,
   },
   {
     name: 'Remove Branding',
-    href: '/settings/remove-branding',
+    href: '/app/settings/remove-branding',
     id: 'remove-branding',
     icon: SparklesIcon,
   },
   {
     name: 'Ad Pixels',
-    href: '/settings/ad-pixels',
+    href: '/app/settings/ad-pixels',
     id: 'ad-pixels',
     icon: RocketLaunchIcon,
   },
   {
     name: 'Billing',
-    href: '/settings/billing',
+    href: '/app/settings/billing',
     id: 'billing',
     icon: BanknotesIcon,
   },
@@ -157,28 +141,29 @@ const settingsNavigation = [
 const adminNavigation: typeof primaryNavigation = [
   {
     name: 'Overview',
-    href: '/admin',
+    href: '/app/admin',
     id: 'admin_overview',
     icon: ShieldCheckIcon,
     description: 'Internal metrics and operations',
   },
   {
     name: 'Users',
-    href: '/admin/users',
+    href: '/app/admin/users',
     id: 'admin_users',
     icon: UsersIcon,
     description: 'Manage creator profiles and verification',
   },
   {
     name: 'Activity',
-    href: '/admin/activity',
+    href: '/app/admin/activity',
     id: 'admin_activity',
     icon: ChartPieIcon,
     description: 'Review recent system and creator activity',
   },
 ];
 
-export function DashboardNav({ collapsed = false }: DashboardNavProps) {
+export function DashboardNav(_props: DashboardNavProps) {
+  void _props;
   const { isAdmin } = useDashboardData();
   const pathname = usePathname();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
@@ -186,7 +171,7 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
     ? primaryNavigation
     : primaryNavigation.filter(item => item.id !== 'contacts');
 
-  const isInSettings = pathname.startsWith('/settings');
+  const isInSettings = pathname.startsWith('/app/settings');
   const navSections = isInSettings
     ? [settingsNavigation]
     : [primaryItems, secondaryNavigation];
@@ -198,17 +183,17 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       {items.map(item => {
         const isActive =
           pathname === item.href ||
-          (pathname.startsWith(`${item.href}/`) && item.href !== '/admin');
+          (pathname.startsWith(`${item.href}/`) && item.href !== '/app/admin');
         const shortcut = navShortcuts[item.id];
         const tooltip = shortcut
           ? {
-            children: (
-              <div className='flex items-center gap-2'>
-                <span>{item.name}</span>
-                <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
-              </div>
-            ),
-          }
+              children: (
+                <div className='flex items-center gap-2'>
+                  <span>{item.name}</span>
+                  <Kbd className='text-[10px] px-1.5 py-0.5'>{shortcut}</Kbd>
+                </div>
+              ),
+            }
           : item.name;
 
         return (
@@ -217,9 +202,9 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
               <Link
                 href={item.href}
                 aria-current={isActive ? 'page' : undefined}
-                className='flex h-8 w-full min-w-0 items-center gap-2 px-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0'
+                className='flex w-full min-w-0 items-center gap-2 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0'
               >
-                <item.icon className='size-5' aria-hidden='true' />
+                <item.icon className='size-4' aria-hidden='true' />
                 <span className='truncate group-data-[collapsible=icon]:hidden'>
                   {item.name}
                 </span>
@@ -248,16 +233,10 @@ export function DashboardNav({ collapsed = false }: DashboardNavProps) {
       </SidebarGroup>
       {/* Admin Navigation Block (admins only) */}
       {isAdmin && (
-        <div className='mt-1.5'>
-          <Divider className='mb-2' inset={!collapsed} />
-          <SidebarGroup>
-            <SidebarGroupLabel className='px-2 text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-              Admin
-            </SidebarGroupLabel>
-            <SidebarGroupContent className='mt-0.5'>
-              {renderSection(adminNavigation)}
-            </SidebarGroupContent>
-          </SidebarGroup>
+        <div className='mt-4'>
+          <SidebarCollapsibleGroup label='Admin' defaultOpen>
+            {renderSection(adminNavigation)}
+          </SidebarCollapsibleGroup>
         </div>
       )}
     </nav>

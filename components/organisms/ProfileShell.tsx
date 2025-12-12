@@ -117,6 +117,20 @@ export function ProfileShell({
   }, [pathname, mode]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!artist?.id) return;
+
+    fetch('/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: artist.id }),
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
+    });
+  }, [artist.id]);
+
+  useEffect(() => {
     const handlePopState = () => setIsTipNavigating(false);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);

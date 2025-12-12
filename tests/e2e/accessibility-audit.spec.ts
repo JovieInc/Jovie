@@ -218,17 +218,17 @@ test.describe('Accessibility Audit', () => {
 
     // Dashboard/admin pages (require auth - will be skipped if not signed in)
     const authRoutes = [
-      '/dashboard',
-      '/settings',
-      '/dashboard/links',
+      '/app/dashboard',
+      '/app/settings',
+      '/app/dashboard/links',
       '/account',
-      '/admin/users',
-      '/admin/activity',
-      '/admin',
-      '/dashboard/analytics',
-      '/dashboard/audience',
-      '/dashboard/contacts',
-      '/dashboard/tipping',
+      '/app/admin/users',
+      '/app/admin/activity',
+      '/app/admin',
+      '/app/dashboard/analytics',
+      '/app/dashboard/audience',
+      '/app/dashboard/contacts',
+      '/app/dashboard/tipping',
     ];
 
     const routes = publicRoutes;
@@ -296,9 +296,9 @@ test.describe('Accessibility Audit', () => {
     }
 
     const authRoutes = [
-      '/dashboard',
-      '/settings',
-      '/dashboard/links',
+      '/app/dashboard',
+      '/app/settings',
+      '/app/dashboard/links',
       '/account',
     ];
 

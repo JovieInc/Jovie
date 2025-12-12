@@ -132,8 +132,7 @@ describe('DashboardOverview', () => {
     renderDashboard(profile, true);
 
     // Completion UI
-    expect(screen.getByText('Profile ready!')).toBeInTheDocument();
-    expect(screen.getByText('Your profile is ready!')).toBeInTheDocument();
+    expect(screen.getByText(/Your profile is ready!?/i)).toBeInTheDocument();
 
     // Copy flow - there are two Copy URL buttons (header and completion section), use the first one
     const copyBtns = screen.getAllByRole('button', { name: 'Copy URL' });

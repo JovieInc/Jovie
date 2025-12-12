@@ -4,7 +4,10 @@ import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { deleteContact, saveContact } from '@/app/dashboard/contacts/actions';
+import {
+  deleteContact,
+  saveContact,
+} from '@/app/app/dashboard/contacts/actions';
 import { Input } from '@/components/atoms/Input';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { track } from '@/lib/analytics';

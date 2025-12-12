@@ -17,14 +17,14 @@ export function StatusBarMock({ className }: StatusBarMockProps) {
       <span className='text-[10px] font-semibold text-primary-token'>9:41</span>
       <div className='flex items-center gap-1'>
         <div className='flex items-end gap-0.5'>
-          <div className='w-0.5 h-1 bg-gray-900 dark:bg-gray-100 rounded' />
-          <div className='w-0.5 h-1.5 bg-gray-900 dark:bg-gray-100 rounded' />
-          <div className='w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded' />
-          <div className='w-0.5 h-2.5 bg-gray-900 dark:bg-gray-100 rounded' />
+          <div className='w-0.5 h-1 rounded bg-(--fg)' />
+          <div className='w-0.5 h-1.5 rounded bg-(--fg)' />
+          <div className='w-0.5 h-2 rounded bg-(--fg)' />
+          <div className='w-0.5 h-2.5 rounded bg-(--fg)' />
         </div>
-        <div className='w-5 h-3 border border-gray-900 dark:border-gray-100 rounded-sm relative'>
-          <div className='w-full h-full bg-green-500 rounded-sm scale-x-80 origin-left' />
-          <div className='absolute -right-0.5 top-0.5 w-0.5 h-2 bg-gray-900 dark:bg-gray-100 rounded-r-sm' />
+        <div className='w-5 h-3 rounded-sm relative border border-(--fg)'>
+          <div className='w-full h-full rounded-sm scale-x-80 origin-left bg-accent' />
+          <div className='absolute -right-0.5 top-0.5 w-0.5 h-2 rounded-r-sm bg-(--fg)' />
         </div>
       </div>
     </div>

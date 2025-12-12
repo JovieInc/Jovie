@@ -16,12 +16,16 @@ export function SectionHeader({
   className,
 }: SectionHeaderProps) {
   return (
-    <div className={className ?? 'px-6 py-4 border-b border-subtle'}>
+    <div className={className ?? 'px-6 py-5 border-b border-subtle'}>
       <div className='flex items-center justify-between'>
         <div>
-          <h3 className='text-lg font-medium text-primary-token'>{title}</h3>
+          <h3 className='text-base font-semibold tracking-tight text-primary-token'>
+            {title}
+          </h3>
           {description ? (
-            <p className='text-sm text-secondary-token mt-1'>{description}</p>
+            <p className='mt-1 text-sm leading-6 text-secondary-token'>
+              {description}
+            </p>
           ) : null}
         </div>
         {right ? <div className='flex items-center gap-2'>{right}</div> : null}

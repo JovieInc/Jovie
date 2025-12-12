@@ -1,9 +1,13 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
+import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
+import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { DashboardActivityFeed } from '@/components/dashboard/organisms/DashboardActivityFeed';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
+import { APP_URL } from '@/constants/app';
 import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
@@ -22,7 +26,7 @@ export function DashboardOverview({
       <StarterEmptyState
         title='We could not load your profile'
         description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
-        primaryAction={{ label: 'Refresh dashboard', href: '/dashboard' }}
+        primaryAction={{ label: 'Refresh dashboard', href: '/app/dashboard' }}
         secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
         testId='dashboard-missing-profile'
       />
@@ -32,12 +36,12 @@ export function DashboardOverview({
   const isHandleClaimed = Boolean(artist.owner_user_id);
   const musicLinkFromProfile = Boolean(
     artist.spotify_url ||
-    artist.apple_music_url ||
-    artist.youtube_url ||
-    // Fallback for camelCase fields in some test fixtures
-    (artist as { spotifyUrl?: string }).spotifyUrl ||
-    (artist as { appleMusicUrl?: string }).appleMusicUrl ||
-    (artist as { youtubeUrl?: string }).youtubeUrl
+      artist.apple_music_url ||
+      artist.youtube_url ||
+      // Fallback for camelCase fields in some test fixtures
+      (artist as { spotifyUrl?: string }).spotifyUrl ||
+      (artist as { appleMusicUrl?: string }).appleMusicUrl ||
+      (artist as { youtubeUrl?: string }).youtubeUrl
   );
   const hasMusicLink = hasMusicLinks || musicLinkFromProfile;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
@@ -45,6 +49,13 @@ export function DashboardOverview({
   const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
     Boolean
   ).length;
+
+  const profileUrl = (() => {
+    if (!artist.handle) return undefined;
+    const base = APP_URL.replace(/\/+$/, '');
+    const path = artist.handle.replace(/^\/+/, '');
+    return `${base}/${path}`;
+  })();
 
   const header = (
     <header className='flex flex-col gap-1.5 rounded-2xl bg-transparent p-1 md:flex-row md:items-center md:justify-between'>
@@ -57,6 +68,7 @@ export function DashboardOverview({
         </p>
       </div>
       <div className='flex flex-wrap gap-2'>
+        <DashboardRefreshButton ariaLabel='Refresh dashboard' />
         <Button
           asChild
           variant='secondary'
@@ -84,6 +96,11 @@ export function DashboardOverview({
     return (
       <div className='space-y-5'>
         {header}
+
+        <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
+          <AnalyticsCards profileUrl={profileUrl} />
+        </section>
+
         <section className='rounded-2xl border-0 bg-transparent p-1'>
           <div className='space-y-2 rounded-2xl bg-surface-1/40 p-4 shadow-none'>
             <div className='flex items-center justify-between gap-3'>
@@ -115,7 +132,7 @@ export function DashboardOverview({
                 incompleteLabel='Secure your unique profile URL'
                 action={
                   <Link
-                    href='/settings'
+                    href='/app/settings'
                     aria-label='Claim handle'
                     className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
                   >
@@ -132,7 +149,7 @@ export function DashboardOverview({
                 incompleteLabel='Connect Spotify, Apple Music, or YouTube'
                 action={
                   <Link
-                    href='/dashboard/links'
+                    href='/app/dashboard/profile'
                     aria-label='Add music link'
                     className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
                   >
@@ -149,7 +166,7 @@ export function DashboardOverview({
                 incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
                 action={
                   <Link
-                    href='/dashboard/links'
+                    href='/app/dashboard/profile'
                     aria-label='Add social links'
                     className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
                   >
@@ -168,25 +185,14 @@ export function DashboardOverview({
     <div className='space-y-5'>
       {header}
 
-      <section className='rounded-2xl border-0 bg-transparent p-1'>
-        <div className='flex flex-col gap-2 rounded-2xl bg-surface-1/60 p-4 shadow-none sm:flex-row sm:items-center sm:justify-between'>
-          <div className='space-y-1'>
-            <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
-              Profile ready!
-            </p>
-            <h3 className='text-lg font-semibold text-primary-token'>
-              Your profile is ready!
-            </h3>
-            <p className='text-sm text-secondary-token'>
-              Share your page and start engaging your audience.
-            </p>
-          </div>
-          <CopyToClipboardButton
-            relativePath={`/${artist.handle}`}
-            idleLabel='Copy link'
-            className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
-          />
+      <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
+        <div className='space-y-3'>
+          <CompletionBanner />
         </div>
+      </section>
+
+      <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
+        <AnalyticsCards profileUrl={profileUrl} />
       </section>
 
       <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>

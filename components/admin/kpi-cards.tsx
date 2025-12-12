@@ -54,10 +54,7 @@ export function KpiCards({ mrrUsd, activeSubscribers }: KpiCardsProps) {
   return (
     <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-5'>
       {kpiData.map(kpi => (
-        <Card
-          key={kpi.id}
-          className='border-subtle bg-surface-1/80 backdrop-blur-sm'
-        >
+        <Card key={kpi.id} className='border-subtle bg-surface-1'>
           <CardHeader className='flex flex-row items-start justify-between space-y-0 pb-3'>
             <CardTitle className='text-sm font-medium text-secondary-token'>
               {kpi.label}

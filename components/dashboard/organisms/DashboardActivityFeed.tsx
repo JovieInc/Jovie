@@ -1,5 +1,6 @@
 'use client';
 
+import { BoltIcon } from '@heroicons/react/24/outline';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
@@ -98,31 +99,37 @@ export function DashboardActivityFeed({
   }
 
   return (
-    <div className='rounded-2xl bg-transparent p-1'>
-      <div className='flex items-center justify-between px-1'>
-        <div>
-          <p className='text-[11px] uppercase tracking-[0.22em] text-secondary-token'>
-            Activity feed
-          </p>
-          <h3 className='text-base font-semibold text-primary-token'>
-            Recent actions
+    <div className='space-y-4'>
+      <div className='flex items-start justify-between gap-4'>
+        <div className='min-w-0'>
+          <h3 className='text-sm font-semibold leading-5 text-primary-token'>
+            Activity
           </h3>
         </div>
-        <span className='rounded-full bg-surface-2 px-3 py-1 text-[11px] font-semibold text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-2 rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-secondary-token'>
+          <span
+            aria-hidden='true'
+            className='h-1.5 w-1.5 rounded-full bg-emerald-500'
+          />
           Live
         </span>
       </div>
 
       {error ? (
-        <p className='mt-4 text-sm text-red-500'>{error}</p>
+        <div className='rounded-xl border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-500'>
+          {error}
+        </div>
       ) : isLoading ? (
-        <div className='mt-4 space-y-3' aria-busy='true'>
+        <div
+          className='space-y-3 rounded-xl border border-subtle bg-surface-1/20 p-4'
+          aria-busy='true'
+        >
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className='flex items-center gap-3' aria-hidden='true'>
               <LoadingSkeleton
                 height='h-8'
                 width='h-8'
-                rounded='full'
+                rounded='lg'
                 className='w-8'
               />
               <div className='flex-1 space-y-2'>
@@ -133,31 +140,50 @@ export function DashboardActivityFeed({
           ))}
         </div>
       ) : activities.length === 0 ? (
-        <div className='mt-4 space-y-3 rounded-2xl bg-surface-1/40 p-4 shadow-none ring-1 ring-black/5 dark:ring-white/5 text-sm text-secondary-token'>
-          <div className='space-y-1'>
-            <p className='text-sm font-semibold text-primary-token'>
-              No activity yet
-            </p>
-            <p>Share your profile link to start tracking fan activity.</p>
+        <div className='rounded-xl border border-subtle bg-surface-1/20 p-4'>
+          <div className='flex items-start gap-3'>
+            <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1'>
+              <BoltIcon className='h-5 w-5 text-secondary-token' />
+            </div>
+
+            <div className='min-w-0 flex-1'>
+              <p className='text-sm font-semibold leading-5 text-primary-token'>
+                No activity yet
+              </p>
+              <p className='mt-1 text-sm leading-5 text-secondary-token'>
+                Share your profile link to start tracking fan activity.
+              </p>
+
+              {profileHandle ? (
+                <div className='mt-3'>
+                  <CopyToClipboardButton
+                    relativePath={`/${profileHandle}`}
+                    idleLabel='Copy link'
+                    className='rounded-md border border-subtle bg-transparent px-3 text-[13px] font-semibold text-primary-token hover:bg-surface-2'
+                  />
+                </div>
+              ) : null}
+            </div>
           </div>
-          {profileHandle ? (
-            <CopyToClipboardButton
-              relativePath={`/${profileHandle}`}
-              idleLabel='Copy profile link'
-              className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
-            />
-          ) : null}
         </div>
       ) : (
-        <ul className='mt-4 space-y-3 text-sm text-primary-token'>
+        <ul className='space-y-2'>
           {activities.map(activity => (
-            <li key={activity.id} className='flex items-center gap-3'>
-              <span aria-hidden='true' className='text-xl'>
+            <li
+              key={activity.id}
+              className='flex items-start gap-3 rounded-xl border border-subtle bg-surface-1/20 p-3'
+            >
+              <span
+                aria-hidden='true'
+                className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-subtle bg-surface-1 text-lg'
+              >
                 {activity.icon}
               </span>
-              <div>
-                <p>{activity.description}</p>
-                <p className='text-xs text-secondary-token'>
+              <div className='min-w-0 flex-1'>
+                <p className='text-sm leading-5 text-primary-token'>
+                  {activity.description}
+                </p>
+                <p className='mt-1 text-xs leading-4 text-secondary-token'>
                   {formatTimeAgo(activity.timestamp)}
                 </p>
               </div>

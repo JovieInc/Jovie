@@ -212,7 +212,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   }
 
   // Revalidate dashboard to show updated billing status
-  revalidatePath('/dashboard');
+  revalidatePath('/app/dashboard');
 }
 
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
@@ -246,7 +246,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
   }
 
   await processSubscription(subscription, userId);
-  revalidatePath('/dashboard');
+  revalidatePath('/app/dashboard');
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -280,7 +280,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   await processSubscription(subscription, userId);
-  revalidatePath('/dashboard');
+  revalidatePath('/app/dashboard');
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -328,7 +328,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   }
 
   console.log('User downgraded to free plan:', { userId });
-  revalidatePath('/dashboard');
+  revalidatePath('/app/dashboard');
 }
 
 async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
@@ -355,7 +355,7 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
 
       if (userId) {
         await processSubscription(subscription, userId);
-        revalidatePath('/dashboard');
+        revalidatePath('/app/dashboard');
       }
     }
   } catch (error) {

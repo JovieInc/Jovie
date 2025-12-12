@@ -7,10 +7,10 @@ import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
  *
  * This test verifies the complete onboarding flow:
  * 1. Programmatic sign-in via Clerk
- * 2. Navigate to /dashboard
+ * 2. Navigate to /app/dashboard
  * 3. Get redirected to /onboarding
  * 4. Claim an available handle
- * 5. Submit and end up on /dashboard
+ * 5. Submit and end up on /app/dashboard
  *
  * Requirements:
  * - E2E_ONBOARDING_FULL=1 environment variable
@@ -84,7 +84,7 @@ test.describe('Onboarding Happy Path', () => {
     );
 
     // Step 3: Navigate to dashboard - should redirect to onboarding for new users
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Wait for redirect to onboarding page
     await page.waitForURL('**/onboarding', {
@@ -138,7 +138,7 @@ test.describe('Onboarding Happy Path', () => {
 
     // Step 5: Submit form and wait for redirect to dashboard overview
     await Promise.all([
-      page.waitForURL('**/dashboard/overview', {
+      page.waitForURL('**/app/dashboard/overview', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       }),
@@ -168,22 +168,22 @@ test.describe('Onboarding Happy Path', () => {
       timeout: 5_000,
     });
 
-    // Verify we can navigate to the Links page from the dashboard nav
-    const linksNav = page.getByRole('link', { name: 'Links' });
-    await expect(linksNav).toBeVisible({ timeout: 5_000 });
+    // Verify we can navigate to the Profile page from the dashboard nav
+    const profileNav = page.getByRole('link', { name: 'Profile' });
+    await expect(profileNav).toBeVisible({ timeout: 5_000 });
 
     await Promise.all([
-      page.waitForURL('**/dashboard/links', {
+      page.waitForURL('**/app/dashboard/profile', {
         timeout: 10_000,
         waitUntil: 'domcontentloaded',
       }),
-      linksNav.click(),
+      profileNav.click(),
     ]);
 
     await expect(
       page
         .locator('h1, h2')
-        .filter({ hasText: /manage links/i })
+        .filter({ hasText: /profile/i })
         .first()
     ).toBeVisible({ timeout: 5_000 });
 
@@ -239,10 +239,10 @@ test.describe('Onboarding Happy Path', () => {
     );
 
     // Navigate to dashboard - should NOT redirect to onboarding
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Verify we stay on dashboard (no redirect to onboarding)
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 5_000 });
+    await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 5_000 });
 
     // Verify dashboard loaded
     const dashboardElement = page.locator('h1, h2').filter({

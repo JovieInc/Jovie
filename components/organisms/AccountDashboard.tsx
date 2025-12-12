@@ -22,7 +22,7 @@ export function AccountDashboard() {
         {/* Billing & Subscription */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <CreditCardIcon className='h-8 w-8 text-blue-500' />
             </div>
             <div className='ml-4'>
@@ -36,7 +36,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/billing'>Manage Billing</Link>
+              <Link href='/app/settings/billing'>Manage Billing</Link>
             </Button>
           </div>
         </div>
@@ -44,7 +44,7 @@ export function AccountDashboard() {
         {/* Profile Settings */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <UserIcon className='h-8 w-8 text-green-500' />
             </div>
             <div className='ml-4'>
@@ -58,7 +58,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/settings'>Edit Profile</Link>
+              <Link href='/app/settings/profile'>Edit Profile</Link>
             </Button>
           </div>
         </div>
@@ -66,7 +66,7 @@ export function AccountDashboard() {
         {/* General Settings */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <CogIcon className='h-8 w-8 text-purple-500' />
             </div>
             <div className='ml-4'>
@@ -80,7 +80,7 @@ export function AccountDashboard() {
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/settings'>View Settings</Link>
+              <Link href='/app/settings'>View Settings</Link>
             </Button>
           </div>
         </div>

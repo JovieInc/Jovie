@@ -26,11 +26,11 @@ import {
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { label: 'Overview', href: '/admin', icon: LayoutDashboard },
-  { label: 'Users', href: '/admin/users', icon: Users },
-  { label: 'Usage', href: '/admin#usage', icon: BarChart2 },
-  { label: 'Reliability', href: '/admin#errors', icon: ShieldCheck },
-  { label: 'Activity', href: '/admin/activity', icon: Activity },
+  { label: 'Overview', href: '/app/admin', icon: LayoutDashboard },
+  { label: 'Users', href: '/app/admin/users', icon: Users },
+  { label: 'Usage', href: '/app/admin#usage', icon: BarChart2 },
+  { label: 'Reliability', href: '/app/admin#errors', icon: ShieldCheck },
+  { label: 'Activity', href: '/app/admin/activity', icon: Activity },
 ];
 
 interface AdminSidebarProps {
@@ -61,8 +61,8 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild size='lg' className='gap-3'>
-              <Link href='/admin' className='flex items-center gap-3'>
-                <div className='flex aspect-square size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground shadow-sm'>
+              <Link href='/app/admin' className='flex items-center gap-3'>
+                <div className='flex aspect-square size-9 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground'>
                   <Image
                     src='/brand/Jovie-Logo-Icon.svg'
                     alt='Jovie'
@@ -73,7 +73,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                 </div>
                 <div className='grid flex-1 text-left leading-tight'>
                   <span className='truncate text-sm font-semibold'>Jovie</span>
-                  <span className='truncate text-xs text-sidebar-foreground/80'>
+                  <span className='truncate text-xs text-sidebar-muted'>
                     Admin Console
                   </span>
                 </div>
@@ -98,14 +98,14 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
-                    className='font-medium text-secondary-token hover:text-primary-token'
+                    className='font-medium'
                   >
                     <Link
                       href={item.href}
                       aria-current={isActive ? 'page' : undefined}
                       className='flex w-full min-w-0 items-center gap-3'
                     >
-                      <item.icon className='size-4 text-secondary-token' />
+                      <item.icon className='size-4' />
                       <span className={cn('truncate')}>{item.label}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -119,7 +119,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <div className='flex items-center gap-2 rounded-lg border border-sidebar-border bg-sidebar/60 px-3 py-2 text-xs text-sidebar-foreground/90'>
+            <div className='flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent px-3 py-2 text-xs text-sidebar-foreground'>
               <AlertTriangle className='size-4 text-amber-500' />
               <span>Public preview. Do not add secrets here.</span>
             </div>

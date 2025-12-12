@@ -1,6 +1,6 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { getDashboardData } from '@/app/dashboard/actions';
+import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { ThemeToggle } from '@/components/site/ThemeToggle';
@@ -25,7 +25,7 @@ export default async function OnboardingPage({
 
   const dashboardData = await getDashboardData();
   if (!dashboardData.needsOnboarding) {
-    redirect('/dashboard/overview');
+    redirect('/app/dashboard/overview');
   }
 
   const existingProfile = dashboardData.selectedProfile;

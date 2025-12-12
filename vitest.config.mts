@@ -14,6 +14,12 @@ export default defineConfig({
     exclude: ['tests/e2e/**', 'tests/performance/**', 'node_modules/**', '.next/**'],
     // Use forks pool to prevent JS heap OOM in worker threads
     pool: 'forks',
+    poolOptions: {
+      forks: {
+        minForks: 1,
+        maxForks: 1,
+      },
+    },
     // Isolate tests to prevent cross-contamination but allow within-file parallelism
     isolate: true,
     // Coverage optimization
@@ -35,13 +41,39 @@ export default defineConfig({
     hookTimeout: 10000,
     globals: true,
     // Reduce overhead by limiting concurrent tests per worker
-    maxConcurrency: 5,
+    maxConcurrency: 1,
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-      '@jovie/ui': path.resolve(__dirname, './packages/ui'),
-    },
+    alias: [
+      {
+        find: /^@\/app\/app\//,
+        replacement: `${path.resolve(__dirname, './app/app')}/`,
+      },
+      {
+        find: /^@\/app\/api\//,
+        replacement: `${path.resolve(__dirname, './app/api')}/`,
+      },
+      {
+        find: /^@\/app\/\(marketing\)\//,
+        replacement: `${path.resolve(__dirname, './app/(marketing)')}/`,
+      },
+      {
+        find: /^@\/app\//,
+        replacement: `${path.resolve(__dirname, './app/app')}/`,
+      },
+      {
+        find: /^@\//,
+        replacement: `${path.resolve(__dirname, './')}/`,
+      },
+      {
+        find: /^@jovie\/ui\//,
+        replacement: `${path.resolve(__dirname, './packages/ui')}/`,
+      },
+      {
+        find: /^@jovie\/ui$/,
+        replacement: path.resolve(__dirname, './packages/ui'),
+      },
+    ],
   },
   // Build optimizations
   build: {

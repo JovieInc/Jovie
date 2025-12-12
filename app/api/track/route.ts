@@ -1,14 +1,28 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { clickEvents, creatorProfiles, socialLinks } from '@/lib/db/schema';
+import {
+  audienceMembers,
+  clickEvents,
+  creatorProfiles,
+  socialLinks,
+} from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { LinkType } from '@/types/db';
+import {
+  createFingerprint,
+  deriveIntentLevel,
+  getActionWeight,
+  trimHistory,
+} from '../audience/lib/audience-utils';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
+
+export const runtime = 'nodejs';
 
 /**
  * Rate Limiting Status: NOT IMPLEMENTED
@@ -37,6 +51,32 @@ function isValidURL(url: string): boolean {
     return false;
   }
 }
+
+function inferAudienceDeviceType(
+  userAgent: string | null
+): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
+  if (!userAgent) return 'unknown';
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
+  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
+    return 'mobile';
+  }
+  return 'desktop';
+}
+
+const ACTION_ICONS: Record<string, string> = {
+  listen: '🎧',
+  social: '📸',
+  tip: '💸',
+  other: '🔗',
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  listen: 'listened',
+  social: 'tapped a social link',
+  tip: 'sent a tip',
+  other: 'clicked a link',
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,17 +127,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate target is a valid URL
-    if (!isValidURL(target)) {
+    const looksLikeUrl =
+      typeof target === 'string' &&
+      (target.includes('://') || target.startsWith('www.'));
+    if (looksLikeUrl && !isValidURL(target)) {
       return NextResponse.json(
         { error: 'Invalid target URL format' },
         { status: 400 }
       );
     }
+    if (typeof target !== 'string' || target.trim().length === 0) {
+      return NextResponse.json({ error: 'Invalid target' }, { status: 400 });
+    }
 
     const userAgent = request.headers.get('user-agent');
     const platformDetected = detectPlatformFromUA(userAgent || undefined);
     const ipAddress = extractClientIP(request.headers);
+    const referrer = request.headers.get('referer') ?? undefined;
+    const geoCity = request.headers.get('x-vercel-ip-city') ?? undefined;
+    const geoCountry =
+      request.headers.get('x-vercel-ip-country') ??
+      request.headers.get('cf-ipcountry') ??
+      undefined;
+    const audienceDeviceType = inferAudienceDeviceType(userAgent);
+    const fingerprint = createFingerprint(ipAddress, userAgent);
 
     // Find the creator profile
     const [profile] = await db
@@ -110,19 +163,158 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    // Record the click event
-    const [clickEvent] = await db
-      .insert(clickEvents)
-      .values({
-        creatorProfileId: profile.id,
-        linkType: linkType as 'listen' | 'social' | 'tip' | 'other', // Cast to enum type
-        linkId: linkId || null,
-        ipAddress: ipAddress,
-        userAgent: userAgent,
-        deviceType: platformDetected,
-        metadata: { target },
-      })
-      .returning({ id: clickEvents.id });
+    const [clickEvent] = await withSystemIngestionSession(async tx => {
+      const [existingMember] = await tx
+        .select({
+          id: audienceMembers.id,
+          visits: audienceMembers.visits,
+          engagementScore: audienceMembers.engagementScore,
+          latestActions: audienceMembers.latestActions,
+          geoCity: audienceMembers.geoCity,
+          geoCountry: audienceMembers.geoCountry,
+          deviceType: audienceMembers.deviceType,
+          spotifyConnected: audienceMembers.spotifyConnected,
+        })
+        .from(audienceMembers)
+        .where(
+          and(
+            eq(audienceMembers.creatorProfileId, profile.id),
+            eq(audienceMembers.fingerprint, fingerprint)
+          )
+        )
+        .limit(1);
+
+      const resolvedMember = await (async () => {
+        if (existingMember) {
+          return existingMember;
+        }
+
+        const [inserted] = await tx
+          .insert(audienceMembers)
+          .values({
+            creatorProfileId: profile.id,
+            fingerprint,
+            type: 'anonymous',
+            displayName: 'Visitor',
+            firstSeenAt: new Date(),
+            lastSeenAt: new Date(),
+            visits: 0,
+            engagementScore: 0,
+            intentLevel: 'low',
+            deviceType: audienceDeviceType,
+            referrerHistory: referrer
+              ? [{ url: referrer.trim(), timestamp: new Date().toISOString() }]
+              : [],
+            latestActions: [],
+            geoCity: geoCity ?? null,
+            geoCountry: geoCountry ?? null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: [
+              audienceMembers.creatorProfileId,
+              audienceMembers.fingerprint,
+            ],
+            where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
+          })
+          .returning({
+            id: audienceMembers.id,
+            visits: audienceMembers.visits,
+            engagementScore: audienceMembers.engagementScore,
+            latestActions: audienceMembers.latestActions,
+            geoCity: audienceMembers.geoCity,
+            geoCountry: audienceMembers.geoCountry,
+            deviceType: audienceMembers.deviceType,
+            spotifyConnected: audienceMembers.spotifyConnected,
+          });
+
+        if (inserted) {
+          return inserted;
+        }
+
+        const [loaded] = await tx
+          .select({
+            id: audienceMembers.id,
+            visits: audienceMembers.visits,
+            engagementScore: audienceMembers.engagementScore,
+            latestActions: audienceMembers.latestActions,
+            geoCity: audienceMembers.geoCity,
+            geoCountry: audienceMembers.geoCountry,
+            deviceType: audienceMembers.deviceType,
+            spotifyConnected: audienceMembers.spotifyConnected,
+          })
+          .from(audienceMembers)
+          .where(
+            and(
+              eq(audienceMembers.creatorProfileId, profile.id),
+              eq(audienceMembers.fingerprint, fingerprint)
+            )
+          )
+          .limit(1);
+
+        if (!loaded) {
+          throw new Error('Unable to resolve audience member');
+        }
+
+        return loaded;
+      })();
+
+      const now = new Date();
+      const existingActions = Array.isArray(resolvedMember.latestActions)
+        ? resolvedMember.latestActions
+        : [];
+      const actionEntry = {
+        label: ACTION_LABELS[linkType] ?? 'interacted',
+        type: linkType,
+        platform: target,
+        emoji: ACTION_ICONS[linkType] ?? '⭐',
+        timestamp: now.toISOString(),
+      };
+      const latestActions = trimHistory([actionEntry, ...existingActions], 5);
+      const actionCount = latestActions.length;
+      const weight = getActionWeight(linkType);
+      const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
+      const intentLevel = deriveIntentLevel(
+        resolvedMember.visits ?? 0,
+        actionCount
+      );
+
+      await tx
+        .update(audienceMembers)
+        .set({
+          lastSeenAt: now,
+          updatedAt: now,
+          engagementScore: updatedScore,
+          intentLevel,
+          latestActions,
+          deviceType: audienceDeviceType,
+          geoCity: geoCity ?? resolvedMember.geoCity ?? null,
+          geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
+          spotifyConnected:
+            Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
+        })
+        .where(eq(audienceMembers.id, resolvedMember.id));
+
+      const [insertedClickEvent] = await tx
+        .insert(clickEvents)
+        .values({
+          creatorProfileId: profile.id,
+          linkType: linkType as 'listen' | 'social' | 'tip' | 'other',
+          linkId: linkId || null,
+          ipAddress,
+          userAgent,
+          referrer,
+          country: geoCountry,
+          city: geoCity,
+          deviceType: platformDetected,
+          metadata: { target },
+          audienceMemberId: resolvedMember.id,
+        })
+        .returning({ id: clickEvents.id });
+
+      return insertedClickEvent ? [insertedClickEvent] : [];
+    });
 
     if (!clickEvent) {
       await captureError(
@@ -142,13 +334,17 @@ export async function POST(request: NextRequest) {
 
     // Increment social link click count if applicable
     if (linkType === 'social' && linkId) {
-      await db
-        .update(socialLinks)
-        .set({
-          clicks: drizzleSql`${socialLinks.clicks} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(socialLinks.id, linkId));
+      try {
+        await db
+          .update(socialLinks)
+          .set({
+            clicks: drizzleSql`${socialLinks.clicks} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(eq(socialLinks.id, linkId));
+      } catch {
+        // Ignore failures (often blocked by RLS for public requests)
+      }
     }
 
     return NextResponse.json({ success: true, id: clickEvent.id });

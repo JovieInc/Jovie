@@ -1,9 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { type ReactNode, useMemo } from 'react';
 
-import { DashboardTopBar } from '@/components/dashboard/layout/DashboardTopBar';
+import { Copyright } from '@/components/atoms/Copyright';
+import { DashboardThemeToggleButton } from '@/components/dashboard/atoms/DashboardThemeToggleButton';
+import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 
 import { AdminSidebar } from './AdminSidebar';
@@ -42,10 +45,33 @@ export function AdminShell({ children }: AdminShellProps) {
       <div className='flex h-svh w-full overflow-hidden bg-base text-primary-token'>
         <AdminSidebar />
         <SidebarInset className='flex flex-1 flex-col overflow-hidden'>
-          <DashboardTopBar breadcrumbs={breadcrumbs} />
+          <DashboardHeader
+            breadcrumbs={breadcrumbs}
+            action={<DashboardThemeToggleButton />}
+            className='bg-bg-base/75 backdrop-blur supports-backdrop-filter:bg-bg-base/65'
+          />
           <main className='min-h-0 flex-1 overflow-auto'>
-            <div className='w-full px-0 py-6'>{children}</div>
+            <div className='w-full px-0 py-6 pb-20'>{children}</div>
           </main>
+          <footer className='sticky bottom-0 z-20 border-t border-subtle bg-bg-base/75 backdrop-blur supports-backdrop-filter:bg-bg-base/65'>
+            <div className='flex h-12 w-full items-center gap-3 px-4 text-xs text-secondary-token sm:px-6 lg:px-8'>
+              <Copyright variant='light' />
+              <div className='ml-auto flex items-center gap-3'>
+                <Link
+                  href='/legal/privacy'
+                  className='transition-colors hover:text-primary-token'
+                >
+                  Privacy
+                </Link>
+                <Link
+                  href='/legal/terms'
+                  className='transition-colors hover:text-primary-token'
+                >
+                  Terms
+                </Link>
+              </div>
+            </div>
+          </footer>
         </SidebarInset>
       </div>
     </SidebarProvider>
