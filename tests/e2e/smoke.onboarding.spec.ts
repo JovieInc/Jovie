@@ -5,8 +5,10 @@ import { expect, test } from '@playwright/test';
 // This is deterministic and requires no external inbox/service.
 
 test.describe('Onboarding smoke', () => {
-  test('unauthenticated /dashboard redirects to /sign-in', async ({ page }) => {
-    const res = await page.goto('/dashboard', {
+  test('unauthenticated /app/dashboard redirects to /sign-in', async ({
+    page,
+  }) => {
+    const res = await page.goto('/app/dashboard', {
       waitUntil: 'domcontentloaded',
     });
     // Should land on sign-in
@@ -99,7 +101,7 @@ test.describe('Onboarding smoke', () => {
       );
 
       // 3) Navigate to dashboard — app should redirect to onboarding if needed
-      await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+      await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
       // Use waitForURL for deterministic waiting
       await page.waitForURL('**/onboarding', {
@@ -142,7 +144,7 @@ test.describe('Onboarding smoke', () => {
       await submit.click();
 
       // Wait for URL change to dashboard overview
-      await page.waitForURL('**/dashboard/overview', {
+      await page.waitForURL('**/app/dashboard/overview', {
         timeout: 15_000,
         waitUntil: 'domcontentloaded',
       });

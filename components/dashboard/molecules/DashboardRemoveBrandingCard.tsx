@@ -14,35 +14,38 @@ export function DashboardRemoveBrandingCard({
     <Link
       href='/billing/remove-branding'
       className={cn(
-        'group relative block overflow-hidden rounded-xl border border-subtle/40 bg-surface-1/85 px-4 py-4 text-primary-token shadow-sm backdrop-blur-sm',
-        'transition-all duration-180 ease-out hover:-translate-y-0.25 hover:bg-surface-2/85 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base',
+        'group relative block overflow-hidden rounded-xl border border-sidebar-border bg-sidebar-surface px-3 py-3 text-primary-token',
+        'transition-colors duration-150 ease-out hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
         'group-data-[collapsible=icon]:hidden',
         className
       )}
     >
       <div className='space-y-2'>
-        {/* Hero row: benefit + price pill */}
-        <div className='flex items-center justify-between gap-2'>
-          <h3 className='text-sm font-semibold tracking-tight text-primary-token'>
-            Remove Jovie branding
-          </h3>
-          <span className='inline-flex items-center rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-secondary-token'>
-            $5/mo
-          </span>
-        </div>
-
-        {/* Meta row: subtle upgrade labels + chevron */}
-        <div className='flex items-center justify-between gap-2 text-[11px] text-tertiary-token'>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex items-center gap-2'>
-            <span className='uppercase tracking-wide'>Upgrade</span>
-            <span className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary-token'>
+            <span className='inline-flex items-center rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sidebar-muted'>
               Pro
             </span>
+            <span className='text-[10px] font-medium text-sidebar-muted'>
+              From $5/mo
+            </span>
           </div>
-          <div className='flex items-center gap-1 text-secondary-token'>
-            <span>Details</span>
-            <ChevronRightIcon className='h-3.5 w-3.5' aria-hidden='true' />
+
+          <div className='sm:shrink-0'>
+            <div className='inline-flex w-full items-center justify-center gap-1 rounded-md bg-sidebar-accent px-2 py-1 text-[11px] font-semibold text-sidebar-accent-foreground sm:w-auto'>
+              <span>Upgrade</span>
+              <ChevronRightIcon className='h-3.5 w-3.5' aria-hidden='true' />
+            </div>
           </div>
+        </div>
+
+        <div className='space-y-0.5'>
+          <h3 className='text-[13px] font-semibold leading-5 text-sidebar-foreground'>
+            Remove Jovie branding
+          </h3>
+          <p className='line-clamp-2 text-[12px] leading-5 text-sidebar-muted'>
+            Give your fans a cleaner, fully custom experience.
+          </p>
         </div>
       </div>
     </Link>

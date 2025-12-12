@@ -55,7 +55,7 @@ test.describe('Core User Journeys', () => {
   });
 
   test('Dashboard redirects unauthenticated users', async ({ page }) => {
-    await page.goto('/dashboard', {
+    await page.goto('/app/dashboard', {
       waitUntil: 'domcontentloaded',
       timeout: 10000,
     });

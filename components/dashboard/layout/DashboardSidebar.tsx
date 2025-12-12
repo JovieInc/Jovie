@@ -1,7 +1,9 @@
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ComponentPropsWithoutRef } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import {
@@ -29,6 +31,8 @@ export function DashboardSidebar({
 }: DashboardSidebarProps) {
   const { state } = useSidebar();
   const isCollapsed = state === 'closed';
+  const pathname = usePathname();
+  const isInSettings = pathname.startsWith('/app/settings');
 
   const dashboardData = useDashboardData();
   const username =
@@ -43,17 +47,6 @@ export function DashboardSidebar({
       className={cn(
         '[--sidebar-width:236px]',
         '[--sidebar-width-icon:56px]',
-        '[--sidebar:#f1f1f4]',
-        '[--sidebar-foreground:#23252a]',
-        '[--sidebar-accent:#e6e8ee]',
-        '[--sidebar-accent-foreground:#0f1115]',
-        '[--sidebar-border:#e2e4ea]',
-        '[--sidebar-ring:#50e3c2]',
-        'dark:[--sidebar:#0f1115]',
-        'dark:[--sidebar-foreground:#c6ccd8]',
-        'dark:[--sidebar-accent:#171b22]',
-        'dark:[--sidebar-accent-foreground:#f2f4f8]',
-        'dark:[--sidebar-border:#1c1f26]',
         'transition-[width] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]',
         className
       )}
@@ -61,31 +54,47 @@ export function DashboardSidebar({
     >
       <SidebarHeader className='relative pb-0'>
         <div className='group/toggle flex items-center gap-2 px-2 py-1'>
-          <Link
-            href='/dashboard/overview'
-            aria-label='Go to dashboard'
-            className={cn(
-              'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:opacity-105 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-              'group-data-[collapsible=icon]:justify-center'
-            )}
-          >
-            <div className='flex items-center justify-center'>
-              <Image
-                src='/brand/Jovie-Logo-Icon.svg'
-                alt='Jovie'
-                width={20}
-                height={20}
-                className='h-7 w-7 rounded-full'
-              />
-            </div>
-            <span className='sr-only group-data-[collapsible=icon]:hidden'>
-              Dashboard
-            </span>
-          </Link>
+          {isInSettings ? (
+            <Link
+              href='/app/dashboard/overview'
+              aria-label='Back'
+              className={cn(
+                'inline-flex h-8 items-center gap-1.5 rounded-md px-2 py-0.5 text-[13px] font-medium transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                'group-data-[collapsible=icon]:justify-center'
+              )}
+            >
+              <ArrowLeftIcon className='h-4 w-4' aria-hidden='true' />
+              <span className='truncate group-data-[collapsible=icon]:hidden'>
+                Back
+              </span>
+            </Link>
+          ) : (
+            <Link
+              href='/app/dashboard/overview'
+              aria-label='Go to dashboard'
+              className={cn(
+                'flex h-9 flex-1 items-center gap-3 rounded-md px-1 py-1 transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                'group-data-[collapsible=icon]:justify-center'
+              )}
+            >
+              <div className='flex items-center justify-center'>
+                <Image
+                  src='/brand/Jovie-Logo-Icon.svg'
+                  alt='Jovie'
+                  width={20}
+                  height={20}
+                  className='h-7 w-7 rounded-full'
+                />
+              </div>
+              <span className='sr-only group-data-[collapsible=icon]:hidden'>
+                Dashboard
+              </span>
+            </Link>
+          )}
           <SidebarTrigger
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             className={cn(
-              'h-8 w-8 shrink-0 border border-subtle bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'ml-auto h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
               'group-data-[state=closed]:hidden'
             )}
           />
@@ -116,7 +125,7 @@ export function DashboardSidebar({
             <UserButton
               showUserInfo={!isCollapsed}
               profileHref={profileHref}
-              settingsHref='/settings'
+              settingsHref='/app/settings'
             />
           </div>
         </div>

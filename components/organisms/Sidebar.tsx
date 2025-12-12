@@ -263,7 +263,7 @@ const SidebarTrigger = React.forwardRef<
       }}
       {...props}
     >
-      <PanelLeft />
+      <PanelLeft className='h-4 w-4' />
       <span className='sr-only'>Toggle Sidebar</span>
     </Button>
   );
@@ -327,7 +327,7 @@ const SidebarInput = React.forwardRef<
       ref={ref}
       data-sidebar='input'
       className={cn(
-        'h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+        'h-8 w-full bg-sidebar-input-background border border-sidebar-input-border shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
         className
       )}
       {...props}
@@ -377,7 +377,7 @@ function SidebarSeparator({
   return (
     <Divider
       data-sidebar='separator'
-      className={cn('mx-2 w-auto', className)}
+      className={cn('mx-2 w-auto border-sidebar-border', className)}
       {...props}
     />
   );
@@ -504,12 +504,11 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-lg px-2.5 py-1.5 text-left text-[13px] tracking-[0.03em] font-normal leading-5 outline-none transition-all duration-150 ease-out text-sidebar-foreground/60 hover:text-sidebar-foreground/90 data-[active=true]:text-sidebar-foreground hover:bg-black/5 dark:hover:bg-white/5 data-[active=true]:bg-black/8 dark:data-[active=true]:bg-white/10 disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-black/5 dark:data-[state=open]:hover:bg-white/5 active:scale-[0.97] active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 [&>svg]:h-[15px] [&>svg]:w-[15px] [&>svg]:shrink-0 [&>svg]:transition-all [&>svg]:duration-150 group-data-[collapsible=icon]:[&>svg]:h-[15px] group-data-[collapsible=icon]:[&>svg]:w-[15px]',
+  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-2.5 py-1.5 text-left text-[13px] tracking-[0.03em] font-normal leading-5 outline-none transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
   {
     variants: {
       variant: {
-        default:
-          'hover:bg-black/5 dark:hover:bg-white/5 data-[active=true]:bg-black/8 dark:data-[active=true]:bg-white/10 data-[active=true]:text-sidebar-foreground',
+        default: 'hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent',
         outline:
           'bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]',
       },
@@ -613,7 +612,7 @@ const SidebarMenuAction = React.forwardRef<
         'peer-data-[size=lg]/menu-button:top-2.5',
         'group-data-[collapsible=icon]:hidden',
         showOnHover &&
-        'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground lg:opacity-0',
+          'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground lg:opacity-0',
         className
       )}
       {...props}
@@ -725,8 +724,8 @@ const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-foreground/50',
-        'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground',
+        'flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-muted outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors',
+        'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground hover:[&>svg]:text-sidebar-foreground',
         size === 'sm' && 'text-xs',
         size === 'md' && 'text-sm',
         'group-data-[collapsible=icon]:hidden',

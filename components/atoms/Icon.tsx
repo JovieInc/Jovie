@@ -5,7 +5,16 @@ export type IconName = keyof typeof icons;
 
 // Normalize various icon naming conventions (kebab-case, underscores, "Icon" suffix)
 function resolveIconName(name: string): IconName | undefined {
+  const aliasMap: Record<string, string> = {
+    MoreHorizontal: 'Ellipsis',
+    MoreVertical: 'EllipsisVertical',
+  };
+
   const cleaned = name.endsWith('Icon') ? name.slice(0, -4) : name;
+
+  const aliased = aliasMap[cleaned];
+  if (aliased && aliased in icons) return aliased as IconName;
+
   if (cleaned in icons) return cleaned as IconName;
 
   const pascal = cleaned

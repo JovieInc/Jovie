@@ -13,10 +13,10 @@ test.describe('Dashboard Routing', () => {
   });
 
   test('should navigate to overview page by default', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app/dashboard');
 
     // Should redirect to overview
-    await expect(page).toHaveURL('/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard/overview');
 
     // Check that overview content is visible
     await expect(page.getByText('Dashboard')).toBeVisible();
@@ -24,10 +24,10 @@ test.describe('Dashboard Routing', () => {
   });
 
   test('should deep link directly to settings page', async ({ page }) => {
-    await page.goto('/settings');
+    await page.goto('/app/settings');
 
     // URL should remain as settings
-    await expect(page).toHaveURL('/settings');
+    await expect(page).toHaveURL('/app/settings');
 
     // Check that settings content is visible
     await expect(page.getByText('Settings')).toBeVisible();
@@ -37,74 +37,69 @@ test.describe('Dashboard Routing', () => {
   });
 
   test('should deep link directly to analytics page', async ({ page }) => {
-    await page.goto('/dashboard/analytics');
+    await page.goto('/app/dashboard/analytics');
 
-    // URL should remain as analytics
-    await expect(page).toHaveURL('/dashboard/analytics');
+    // Analytics page is no longer a dedicated route; it should redirect
+    await expect(page).toHaveURL('/app/dashboard/overview');
 
-    // Check that analytics content is visible
-    await expect(page.getByText('Analytics')).toBeVisible();
-    await expect(page.getByText('Track your performance')).toBeVisible();
+    // Check that overview content is visible
+    await expect(page.getByText('Welcome back')).toBeVisible();
   });
 
   test('redirects to settings when clicking settings', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/app/dashboard');
     await page.getByRole('button', { name: 'Open user menu' }).click();
     await page.getByRole('menuitem', { name: /account settings/i }).click();
-    await expect(page).toHaveURL(/\/settings/);
+    await expect(page).toHaveURL(/\/app\/settings/);
   });
 
   test('should navigate between dashboard pages', async ({ page }) => {
-    await page.goto('/dashboard/overview');
+    await page.goto('/app/dashboard/overview');
 
-    // Navigate to links page
-    await page.getByText('Links').click();
-    await expect(page).toHaveURL('/dashboard/links');
-    await expect(page.getByText('Manage Links')).toBeVisible();
+    // Navigate to profile page
+    await page.getByText('Profile').click();
+    await expect(page).toHaveURL('/app/dashboard/profile');
 
     // Navigate to audience page
     await page.getByText('Audience').click();
-    await expect(page).toHaveURL('/dashboard/audience');
+    await expect(page).toHaveURL('/app/dashboard/audience');
     await expect(
       page.getByText('Understand and grow your audience')
     ).toBeVisible();
 
-    // Navigate to tipping page
-    await page.getByText('Tipping').click();
-    await expect(page).toHaveURL('/dashboard/tipping');
-    await expect(
-      page.getByText('Tipping functionality is coming soon')
-    ).toBeVisible();
+    // Navigate to earnings page
+    await page.getByText('Earnings').click();
+    await expect(page).toHaveURL('/app/dashboard/tipping');
 
     // Navigate back to overview
     await page.getByText('Overview').click();
-    await expect(page).toHaveURL('/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard/overview');
     await expect(page.getByText('Dashboard')).toBeVisible();
   });
 
   test('browser back/forward navigation should work correctly', async ({
     page,
   }) => {
-    await page.goto('/dashboard/overview');
+    await page.goto('/app/dashboard/overview');
 
-    // Navigate to links page
-    await page.getByText('Links').click();
-    await expect(page).toHaveURL('/dashboard/links');
+    // Navigate to profile page
+    await page.getByText('Profile').click();
+    await expect(page).toHaveURL('/app/dashboard/profile');
 
     // Navigate to settings page
     await page.getByText('Settings').click();
-    await expect(page).toHaveURL('/settings');
+    await expect(page).toHaveURL('/app/settings');
 
     // Go back to links
     await page.goBack();
-    await expect(page).toHaveURL('/dashboard/links');
+    await expect(page).toHaveURL('/app/dashboard/profile');
 
     // Go back to overview
     await page.goBack();
-    await expect(page).toHaveURL('/dashboard/overview');
+    await expect(page).toHaveURL('/app/dashboard/overview');
 
     // Go forward to links
     await page.goForward();
-    await expect(page).toHaveURL('/dashboard/links');
+    await expect(page).toHaveURL('/app/dashboard/profile');
   });
 });

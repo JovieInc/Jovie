@@ -21,7 +21,8 @@
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.3",
       "vite": "^6.3.5",
-      "drizzle-orm": "0.45.0"
+      "drizzle-orm": "0.45.0",
+      "jsdom": "26.1.0"
     }
   },
   "scripts": {
@@ -35,10 +36,10 @@
     "check": "pnpm run validate && pnpm run build && pnpm run test",
     "check:ci": "pnpm run validate && pnpm run test:ci",
     "validate": "pnpm run format:check && pnpm run lint && pnpm run typecheck",
-    "test": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --config=vitest.config.mts",
-    "test:ci": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --config=vitest.config.mts --reporter=verbose --coverage",
+    "test": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.mts",
+    "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.mts --reporter=verbose --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
-    "test:fast": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --config=vitest.config.fast.mts",
+    "test:fast": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.fast.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",

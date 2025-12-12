@@ -78,10 +78,36 @@ export default defineConfig({
   },
 
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-      '@jovie/ui': path.resolve(__dirname, './packages/ui'),
-    },
+    alias: [
+      {
+        find: /^@\/app\/app\//,
+        replacement: `${path.resolve(__dirname, './app/app')}/`,
+      },
+      {
+        find: /^@\/app\/api\//,
+        replacement: `${path.resolve(__dirname, './app/api')}/`,
+      },
+      {
+        find: /^@\/app\/\(marketing\)\//,
+        replacement: `${path.resolve(__dirname, './app/(marketing)')}/`,
+      },
+      {
+        find: /^@\/app\//,
+        replacement: `${path.resolve(__dirname, './app/app')}/`,
+      },
+      {
+        find: /^@\//,
+        replacement: `${path.resolve(__dirname, './')}/`,
+      },
+      {
+        find: /^@jovie\/ui\//,
+        replacement: `${path.resolve(__dirname, './packages/ui')}/`,
+      },
+      {
+        find: /^@jovie\/ui$/,
+        replacement: path.resolve(__dirname, './packages/ui'),
+      },
+    ],
   },
 
   // Build optimizations for test files

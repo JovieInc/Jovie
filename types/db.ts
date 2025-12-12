@@ -144,6 +144,7 @@ export interface CreatorProfile {
   creator_type: CreatorType;
   username: string;
   display_name: string | null;
+  venmo_handle?: string | null;
   avatar_locked_by_user?: boolean;
   display_name_locked?: boolean;
   ingestion_status?: IngestionStatus;
@@ -481,6 +482,7 @@ export function convertDrizzleCreatorProfileToArtist(
     spotify_url: profile.spotifyUrl || undefined,
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
+    venmo_handle: profile.venmoHandle || undefined,
     published: profile.isPublic ?? false,
     is_verified: profile.isVerified ?? false,
     is_featured: profile.isFeatured ?? false,

@@ -3,8 +3,9 @@
 import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useMemo, useState } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
-import { useTableMeta } from '@/app/dashboard/DashboardLayoutClient';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
+import { Icon } from '@/components/atoms/Icon';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
@@ -76,6 +77,7 @@ const MEMBER_COLUMNS = [
   { key: 'displayName', label: 'User' },
   { key: 'type', label: 'Type' },
   { key: 'location', label: 'Location' },
+  { key: 'device', label: 'Device' },
   { key: 'visits', label: 'Visits' },
   { key: 'actions', label: 'Actions' },
   { key: 'lastSeen', label: 'Last seen' },
@@ -104,11 +106,21 @@ type ColumnKey = MemberColumnKey | SubscriberColumnKey;
 const DEFAULT_MEMBER_SORT: MemberSortColumn = 'lastSeen';
 const DEFAULT_SUBSCRIBER_SORT: SubscriberSortColumn = 'createdAt';
 
-const INTENT_BADGES: Record<IntentLevel, { label: string; tone: string }> = {
-  high: { label: '🔥 High intent', tone: 'text-accent' },
-  medium: { label: '⚡ Medium intent', tone: 'text-warning-token' },
-  low: { label: '• Low intent', tone: 'text-secondary-token' },
-};
+const INTENT_BADGES: Record<IntentLevel, { label: string; className: string }> =
+  {
+    high: {
+      label: '🔥 High intent',
+      className: 'border border-subtle bg-surface-2/60 text-primary-token',
+    },
+    medium: {
+      label: '⚡ Medium intent',
+      className: 'border border-subtle bg-surface-2/40 text-secondary-token',
+    },
+    low: {
+      label: '• Low intent',
+      className: 'border border-subtle bg-transparent text-secondary-token',
+    },
+  };
 
 function formatCountryLabel(code: string | null): string {
   if (!code) return 'Unknown';
@@ -162,6 +174,39 @@ function formatLongDate(value: string | null) {
     day: 'numeric',
     year: 'numeric',
   }).format(parsed);
+}
+
+type DeviceIndicator = {
+  iconName: string;
+  label: string;
+};
+
+function getDeviceIndicator(deviceType: string | null): DeviceIndicator | null {
+  if (!deviceType) return null;
+  const normalized = deviceType.toLowerCase();
+
+  if (
+    normalized.includes('mobile') ||
+    normalized.includes('phone') ||
+    normalized.includes('ios') ||
+    normalized.includes('android')
+  ) {
+    return { iconName: 'Smartphone', label: 'Mobile' };
+  }
+
+  if (normalized.includes('tablet') || normalized.includes('ipad')) {
+    return { iconName: 'Tablet', label: 'Tablet' };
+  }
+
+  if (
+    normalized.includes('desktop') ||
+    normalized.includes('computer') ||
+    normalized.includes('laptop')
+  ) {
+    return { iconName: 'Monitor', label: 'Desktop' };
+  }
+
+  return null;
 }
 
 export function DashboardAudience() {
@@ -401,7 +446,12 @@ export function DashboardAudience() {
           </div>
         </div>
         <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
-          <div className='grid grid-cols-6 gap-4 border-b border-subtle px-4 py-3'>
+          <div
+            className='grid gap-4 border-b border-subtle px-4 py-3'
+            style={{
+              gridTemplateColumns: `repeat(${activeColumns.length}, minmax(0, 1fr))`,
+            }}
+          >
             {activeColumns.map(col => (
               <LoadingSkeleton
                 key={col.key}
@@ -415,7 +465,10 @@ export function DashboardAudience() {
             {Array.from({ length: 5 }).map((_, i) => (
               <li
                 key={i}
-                className='grid grid-cols-6 gap-4 px-4 py-3'
+                className='grid gap-4 px-4 py-3'
+                style={{
+                  gridTemplateColumns: `repeat(${activeColumns.length}, minmax(0, 1fr))`,
+                }}
                 aria-hidden='true'
               >
                 {activeColumns.map(col => (
@@ -449,7 +502,12 @@ export function DashboardAudience() {
   const formatIntentBadge = (intent: IntentLevel) => {
     const badge = INTENT_BADGES[intent];
     return (
-      <span className={cn('text-xs font-semibold uppercase', badge.tone)}>
+      <span
+        className={cn(
+          'inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[11px] font-medium tracking-wide',
+          badge.className
+        )}
+      >
         {badge.label}
       </span>
     );
@@ -458,27 +516,29 @@ export function DashboardAudience() {
   return (
     <div className='space-y-6'>
       <div>
-        <h1 className='text-2xl font-bold text-primary-token'>Audience CRM</h1>
-        <p className='text-secondary-token mt-1'>
+        <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
+          Audience CRM
+        </h1>
+        <p className='mt-1 text-sm leading-6 text-secondary-token'>
           {isAudienceV2Enabled
             ? 'Every visitor, anonymous or identified, lives in this table.'
             : 'Notification signups from your notification modal.'}
         </p>
       </div>
 
-      <div className='w-full overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-sm'>
+      <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm ring-1 ring-black/5 dark:ring-white/10'>
         <SectionHeader
           title='Audience'
           description='Track visitors, high-intent fans, and actions on your profile.'
           right={
-            <span className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-secondary-token'>
+            <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
               {total} {total === 1 ? 'person' : 'people'}
             </span>
           }
         />
 
         {error ? (
-          <div className='px-6 py-4 text-sm text-red-500 bg-surface-2/60'>
+          <div className='border-b border-subtle bg-surface-2/60 px-6 py-4 text-sm text-red-500'>
             {error}
           </div>
         ) : isLoading ? (
@@ -492,135 +552,166 @@ export function DashboardAudience() {
         ) : (
           <div className='w-full overflow-x-auto'>
             <table className='min-w-full divide-y divide-subtle'>
-              <thead className='sticky top-0 bg-surface-1/80 backdrop-blur-sm'>
+              <thead className='sticky top-0 bg-surface-1/70 backdrop-blur-sm'>
                 <tr>
                   {activeColumns.map(column => {
-                    const isActiveSort = activeSortColumn === column.key;
+                    const sortKey = sortableColumnMap[column.key];
+                    const isSortable = Boolean(sortKey);
+                    const isActiveSort =
+                      isSortable && activeSortColumn === column.key;
                     return (
                       <th
                         key={column.key}
-                        className='px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-secondary-token'
+                        className='px-6 py-3 text-left text-[11px] font-medium tracking-wide text-secondary-token'
                       >
-                        <button
-                          type='button'
-                          className='flex items-center gap-1 text-left'
-                          onClick={() => handleHeaderClick(column.key)}
-                        >
-                          <span>{column.label}</span>
-                          <span
-                            aria-hidden='true'
-                            className={cn(
-                              'text-[11px] transition-opacity',
-                              isActiveSort ? 'opacity-100' : 'opacity-50'
-                            )}
+                        {isSortable ? (
+                          <button
+                            type='button'
+                            className='inline-flex items-center gap-1 rounded-sm text-left transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
+                            onClick={() => handleHeaderClick(column.key)}
                           >
-                            {isActiveSort
-                              ? activeSortDirection === 'asc'
-                                ? '▲'
-                                : '▼'
-                              : ''}
+                            <span>{column.label}</span>
+                            <span
+                              aria-hidden='true'
+                              className={cn(
+                                'text-[10px] transition-opacity',
+                                isActiveSort ? 'opacity-100' : 'opacity-50'
+                              )}
+                            >
+                              {isActiveSort
+                                ? activeSortDirection === 'asc'
+                                  ? '▲'
+                                  : '▼'
+                                : ''}
+                            </span>
+                          </button>
+                        ) : (
+                          <span className='inline-flex items-center'>
+                            {column.label}
                           </span>
-                        </button>
+                        )}
                       </th>
                     );
                   })}
                 </tr>
               </thead>
               <tbody className='divide-y divide-subtle'>
-                {rows.map(row => (
-                  <tr
-                    key={row.id}
-                    className='hover:bg-surface-2/30 cursor-pointer'
-                    onClick={() => setSelectedMember(row)}
-                  >
-                    {isAudienceV2Enabled ? (
-                      <>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='font-semibold'>
-                            {row.displayName || 'Visitor'}
-                          </div>
-                          <div className='text-xs text-secondary-token'>
-                            {row.type === 'anonymous'
-                              ? 'Visitor'
-                              : row.type === 'email'
-                                ? (row.email ?? 'Email fan')
-                                : row.type === 'sms'
-                                  ? (row.phone ?? 'SMS fan')
-                                  : 'Connected fan'}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <span className='text-xs uppercase text-secondary-token'>
-                            {row.type}
-                          </span>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='inline-flex items-center gap-2 text-secondary-token'>
-                            <span aria-hidden='true' className='text-lg'>
-                              {flagFromCountry(row.geoCountry)}
+                {rows.map(row => {
+                  const deviceIndicator = getDeviceIndicator(row.deviceType);
+
+                  return (
+                    <tr
+                      key={row.id}
+                      className={cn(
+                        'cursor-pointer transition-colors hover:bg-surface-2/40 focus-within:bg-surface-2/40',
+                        selectedMember?.id === row.id && 'bg-surface-2/40'
+                      )}
+                      onClick={() => setSelectedMember(row)}
+                    >
+                      {isAudienceV2Enabled ? (
+                        <>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <div className='font-semibold'>
+                              {row.displayName || 'Visitor'}
+                            </div>
+                            <div className='text-xs text-secondary-token'>
+                              {row.type === 'anonymous'
+                                ? 'Visitor'
+                                : row.type === 'email'
+                                  ? (row.email ?? 'Email fan')
+                                  : row.type === 'sms'
+                                    ? (row.phone ?? 'SMS fan')
+                                    : 'Connected fan'}
+                            </div>
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/40 px-2 py-0.5 text-[11px] font-medium text-secondary-token capitalize'>
+                              {row.type}
                             </span>
-                            <span>{row.locationLabel || 'Unknown'}</span>
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='flex flex-col gap-1'>
-                            <span className='font-semibold'>{row.visits}</span>
-                            {formatIntentBadge(row.intentLevel)}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='flex gap-2'>
-                            {row.latestActions.slice(0, 3).map(action => (
-                              <span
-                                key={`${row.id}-${action.label}`}
-                                className='text-lg'
-                                aria-label={action.label}
-                              >
-                                {action.emoji ?? '⭐'}
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <div className='inline-flex items-center gap-2 text-secondary-token'>
+                              <span aria-hidden='true' className='text-lg'>
+                                {flagFromCountry(row.geoCountry)}
                               </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {formatTimeAgo(row.lastSeenAt)}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {row.displayName || 'Contact'}
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {row.phone ?? '—'}
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='inline-flex items-center gap-2 text-secondary-token'>
-                            <span aria-hidden='true' className='text-lg'>
-                              {flagFromCountry(row.geoCountry)}
-                            </span>
-                            <span>{row.locationLabel}</span>
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {formatLongDate(row.lastSeenAt)}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
+                              <span>{row.locationLabel || 'Unknown'}</span>
+                            </div>
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            {deviceIndicator ? (
+                              <Icon
+                                name={deviceIndicator.iconName}
+                                className='h-4 w-4 text-secondary-token'
+                                aria-label={deviceIndicator.label}
+                                role='img'
+                              />
+                            ) : (
+                              <span className='text-secondary-token'>—</span>
+                            )}
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <div className='flex flex-col gap-1'>
+                              <span className='font-semibold'>
+                                {row.visits}
+                              </span>
+                              {formatIntentBadge(row.intentLevel)}
+                            </div>
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <div className='flex gap-2'>
+                              {row.latestActions.slice(0, 3).map(action => (
+                                <span
+                                  key={`${row.id}-${action.label}`}
+                                  className='text-[15px] text-primary-token/90'
+                                  aria-label={action.label}
+                                >
+                                  {action.emoji ?? '⭐'}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            {formatTimeAgo(row.lastSeenAt)}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            {row.displayName || 'Contact'}
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            {row.phone ?? '—'}
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            <div className='inline-flex items-center gap-2 text-secondary-token'>
+                              <span aria-hidden='true' className='text-lg'>
+                                {flagFromCountry(row.geoCountry)}
+                              </span>
+                              <span>{row.locationLabel}</span>
+                            </div>
+                          </td>
+                          <td className='px-6 py-4 text-sm text-primary-token'>
+                            {formatLongDate(row.lastSeenAt)}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
 
         {!isLoading && rows.length > 0 && (
-          <div className='flex items-center justify-between px-6 py-3 text-xs font-medium uppercase tracking-wider text-secondary-token'>
-            <span>{paginationLabel()}</span>
+          <div className='flex items-center justify-between border-t border-subtle px-6 py-3 text-xs font-medium text-secondary-token'>
+            <span className='tracking-wide'>{paginationLabel()}</span>
             <div className='flex gap-2'>
               <Button
                 variant='ghost'
                 size='sm'
                 disabled={page <= 1}
+                className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
                 onClick={() => setPage(prev => Math.max(1, prev - 1))}
               >
                 Previous
@@ -629,6 +720,7 @@ export function DashboardAudience() {
                 variant='ghost'
                 size='sm'
                 disabled={page >= totalPages}
+                className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
                 onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
               >
                 Next
@@ -639,7 +731,7 @@ export function DashboardAudience() {
       </div>
 
       {selectedMember && (
-        <div className='rounded-lg border border-subtle bg-surface-1/80 p-6 shadow-sm'>
+        <div className='rounded-xl border border-subtle bg-surface-1/80 p-6 shadow-sm ring-1 ring-black/5 dark:ring-white/10'>
           <div className='flex items-center justify-between'>
             <div>
               <p className='text-xs uppercase tracking-wider text-secondary-token'>

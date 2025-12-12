@@ -7,11 +7,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { useTheme } from 'next-themes';
 import { useEffect, useRef, useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
@@ -57,7 +55,6 @@ export function UserButton({
   const { isLoaded, user } = useUser();
   const { signOut } = useClerk();
   const router = useRouter();
-  const { theme, resolvedTheme, setTheme } = useTheme();
   const { showToast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
@@ -188,8 +185,8 @@ export function UserButton({
       ? `/${user.username}`
       : artist?.handle
         ? `/${artist.handle}`
-        : '/settings');
-  const settingsUrl = settingsHref ?? '/settings';
+        : '/app/settings');
+  const settingsUrl = settingsHref ?? '/app/settings';
   const navigateTo = (href: string | undefined) => {
     if (!href) return;
     setIsMenuOpen(false);
@@ -349,11 +346,9 @@ export function UserButton({
     }
   };
 
-  const themeOptions = ['light', 'dark', 'system'] as const;
-  const rawIndex = themeOptions.findIndex(option =>
-    option === 'system' ? theme === 'system' : resolvedTheme === option
-  );
-  const activeIndex = rawIndex === -1 ? 0 : rawIndex;
+  const jovieUsername =
+    user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
+  const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
 
   return (
     <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
@@ -362,7 +357,7 @@ export function UserButton({
           <button
             type='button'
             className={cn(
-              'flex w-full items-center gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2 text-left transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+              'flex w-full items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-surface px-3 py-2 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             )}
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
@@ -397,7 +392,7 @@ export function UserButton({
           <Button
             variant='ghost'
             size='icon'
-            className='h-10 w-10 rounded-full border border-subtle bg-surface-1 hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent'
+            className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
             <Avatar
@@ -413,11 +408,13 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[248px] rounded-xl border border-subtle bg-surface-1 text-primary-token p-3 shadow-lg backdrop-blur-md font-sans text-[13px] leading-[18px] space-y-1 dark:bg-surface-1'
+        className='w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-sidebar-border bg-sidebar-surface p-2 font-sans text-[13px] leading-[18px] text-sidebar-foreground shadow-lg'
       >
-        {/* Identity block - name first, email once, smaller */}
-        <DropdownMenuLabel className='px-0 py-0 mb-1'>
-          <div className='flex items-center gap-3 px-2 py-2'>
+        <DropdownMenuItem
+          onClick={handleProfile}
+          className='cursor-pointer rounded-lg px-2 py-2 focus:bg-sidebar-surface-hover hover:bg-sidebar-surface-hover'
+        >
+          <div className='flex w-full items-center gap-3'>
             <Avatar
               src={userImageUrl}
               alt={displayName || 'User avatar'}
@@ -426,52 +423,46 @@ export function UserButton({
               className='shrink-0'
             />
             <div className='min-w-0 flex-1'>
-              <div className='flex items-center gap-1.5'>
-                <span className='truncate text-sm font-medium text-primary-token'>
+              <div className='flex items-center gap-2'>
+                <span className='truncate text-sm font-medium text-sidebar-foreground'>
                   {displayName}
                 </span>
                 {billingStatus.isPro && (
                   <Badge
                     variant='secondary'
                     size='sm'
-                    className='shrink-0 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wider bg-linear-to-r from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-500/30'
+                    className='shrink-0 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wider'
                   >
                     Pro
                   </Badge>
                 )}
               </div>
-              {contactEmail && (
-                <p className='truncate text-xs text-secondary-token/75 mt-0.5'>
-                  {contactEmail}
+              {formattedUsername && (
+                <p className='truncate text-xs text-sidebar-muted mt-0.5'>
+                  {formattedUsername}
                 </p>
               )}
             </div>
+            <Icon
+              name='ExternalLink'
+              className='h-4 w-4 shrink-0 text-sidebar-muted'
+              aria-hidden='true'
+            />
           </div>
-        </DropdownMenuLabel>
+        </DropdownMenuItem>
 
-        <div className='h-1' />
+        <div className='h-2' />
 
         {/* Primary actions group */}
         <DropdownMenuItem
-          onClick={handleProfile}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
-        >
-          <Icon
-            name='User'
-            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
-          />
-          <span className='flex-1'>Profile</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
           onClick={handleSettings}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover'
         >
           <Icon
             name='Settings'
-            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
+            className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
           />
-          <span className='flex-1'>Account settings</span>
+          <span className='flex-1'>Settings</span>
         </DropdownMenuItem>
 
         {/* Billing - only show for Pro users */}
@@ -489,11 +480,11 @@ export function UserButton({
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2 disabled:opacity-70 disabled:cursor-not-allowed'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
               name='CreditCard'
-              className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
+              className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
             />
             <span className='flex-1'>
               {isManageBillingLoading ? 'Opening…' : 'Manage billing'}
@@ -501,91 +492,28 @@ export function UserButton({
           </DropdownMenuItem>
         ) : null}
 
-        <div className='h-1' />
-
-        {/* Theme toggle - inline row: label left, pill right */}
-        <div className='flex items-center justify-between px-2.5 py-2'>
-          <span className='text-[13px] font-medium text-primary-token'>
-            Theme
-          </span>
-          <div className='relative h-7 w-[84px] rounded-full border border-subtle bg-surface-2 p-0.5'>
-            <div
-              className='pointer-events-none absolute top-0.5 h-6 w-6 rounded-full bg-black dark:bg-white shadow-sm transition-all duration-200 ease-out'
-              style={{
-                left: `calc(${activeIndex * 28}px + 2px)`,
-              }}
-            />
-            <div
-              role='radiogroup'
-              aria-label='Theme mode'
-              className='relative flex h-full'
-            >
-              {themeOptions.map(option => {
-                const isActive =
-                  (option === 'system' && theme === 'system') ||
-                  (option !== 'system' && resolvedTheme === option);
-                const label =
-                  option === 'light'
-                    ? 'Light'
-                    : option === 'dark'
-                      ? 'Dark'
-                      : 'Auto';
-                const icon =
-                  option === 'dark'
-                    ? 'Moon'
-                    : option === 'light'
-                      ? 'Sun'
-                      : 'Monitor';
-
-                return (
-                  <button
-                    key={option}
-                    type='button'
-                    role='radio'
-                    aria-checked={isActive}
-                    aria-label={label}
-                    onClick={() => setTheme(option)}
-                    className={cn(
-                      'relative z-10 flex h-6 w-7 items-center justify-center rounded-full transition-colors duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-                      isActive
-                        ? 'text-white dark:text-black'
-                        : 'text-secondary-token hover:text-primary-token'
-                    )}
-                  >
-                    <Icon
-                      name={icon}
-                      className='h-3.5 w-3.5'
-                      aria-hidden='true'
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
         {/* Feedback */}
         <DropdownMenuItem
           onClick={() => {
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-primary-token transition-all duration-150 hover:bg-surface-2 focus:bg-surface-2'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover'
         >
           <Icon
             name='MessageSquare'
-            className='h-4 w-4 text-secondary-token group-hover:text-primary-token transition-colors'
+            className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
           />
           <span className='flex-1'>Send feedback</span>
         </DropdownMenuItem>
 
-        <div className='h-1' />
+        <div className='h-2' />
 
         {/* Sign out - pinned at bottom */}
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-all duration-150 hover:bg-red-500/10 focus:bg-red-500/10 disabled:opacity-60 disabled:cursor-not-allowed'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 focus:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>

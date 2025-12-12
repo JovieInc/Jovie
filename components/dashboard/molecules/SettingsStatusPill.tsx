@@ -1,0 +1,25 @@
+'use client';
+
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+
+export type SettingsStatusPillState = 'saving' | 'saved';
+
+export interface SettingsStatusPillProps {
+  state: SettingsStatusPillState;
+  className?: string;
+}
+
+export function SettingsStatusPill({
+  state,
+  className,
+}: SettingsStatusPillProps) {
+  return (
+    <div
+      className={cn('text-xs text-secondary-token', className)}
+      aria-live='polite'
+    >
+      {state === 'saving' ? 'Saving…' : 'Saved'}
+    </div>
+  );
+}

@@ -407,7 +407,7 @@ export function AppleStyleOnboardingForm({
   }, [handle, handleInput, profileReadyHandle]);
 
   const goToDashboard = useCallback(() => {
-    router.push('/dashboard/overview');
+    router.push('/app/dashboard/overview');
     router.refresh();
   }, [router]);
 

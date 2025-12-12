@@ -233,6 +233,16 @@ export async function PUT(req: Request) {
         )
       );
 
+      const dbProfileUpdates = { ...sanitizedProfileUpdates } as Record<
+        string,
+        unknown
+      >;
+
+      if (Object.hasOwn(dbProfileUpdates, 'venmo_handle')) {
+        dbProfileUpdates.venmoHandle = dbProfileUpdates.venmo_handle;
+        delete dbProfileUpdates.venmo_handle;
+      }
+
       const displayNameForUserUpdate =
         typeof profileUpdates.displayName === 'string'
           ? profileUpdates.displayName.trim()
@@ -379,7 +389,7 @@ export async function PUT(req: Request) {
       // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
       const updateResult = await db
         .update(creatorProfiles)
-        .set({ ...sanitizedProfileUpdates, updatedAt: new Date() })
+        .set({ ...dbProfileUpdates, updatedAt: new Date() })
         .from(users)
         // @ts-expect-error Drizzle dual-version type mismatch; runtime SQL is correct
         .where(

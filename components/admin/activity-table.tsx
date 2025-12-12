@@ -21,19 +21,20 @@ interface ActivityTableProps {
 
 export function ActivityTable({ items }: ActivityTableProps) {
   return (
-    <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm overflow-hidden'>
-      <CardHeader>
+    <Card className='h-full border-subtle bg-surface-1/80 overflow-hidden'>
+      <CardHeader className='space-y-1'>
         <CardTitle className='text-lg'>Recent activity</CardTitle>
+        <p className='text-xs text-secondary-token'>Last 7 days.</p>
       </CardHeader>
-      <CardContent>
+      <CardContent className='px-0 pt-0'>
         <div className='overflow-x-auto'>
           <table className='w-full border-collapse text-sm'>
             <thead className='text-left text-secondary-token'>
               <tr className='border-b border-subtle/60 text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='px-2 py-2'>User</th>
-                <th className='px-2 py-2'>Action</th>
-                <th className='px-2 py-2'>Timestamp</th>
-                <th className='px-2 py-2 text-right'>Status</th>
+                <th className='px-4 py-3'>User</th>
+                <th className='px-4 py-3'>Action</th>
+                <th className='hidden px-4 py-3 md:table-cell'>Timestamp</th>
+                <th className='px-4 py-3 text-right'>Status</th>
               </tr>
             </thead>
             <tbody className='divide-y divide-subtle/60'>
@@ -41,24 +42,30 @@ export function ActivityTable({ items }: ActivityTableProps) {
                 <tr>
                   <td
                     colSpan={4}
-                    className='px-2 py-6 text-center text-sm text-secondary-token'
+                    className='px-4 py-10 text-center text-sm text-secondary-token'
                   >
                     No recent activity found.
                   </td>
                 </tr>
               ) : (
                 items.map(item => (
-                  <tr key={item.id} className='hover:bg-surface-2/60'>
-                    <td className='px-2 py-3 font-medium text-primary-token'>
+                  <tr
+                    key={item.id}
+                    className='hover:bg-surface-2/60 transition-colors'
+                  >
+                    <td className='px-4 py-3 font-medium text-primary-token whitespace-nowrap'>
                       {item.user}
                     </td>
-                    <td className='px-2 py-3 text-secondary-token'>
-                      {item.action}
+                    <td className='px-4 py-3 text-secondary-token'>
+                      <span className='block truncate'>{item.action}</span>
+                      <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
+                        {item.timestamp}
+                      </span>
                     </td>
-                    <td className='px-2 py-3 text-secondary-token'>
+                    <td className='hidden px-4 py-3 text-secondary-token md:table-cell whitespace-nowrap'>
                       {item.timestamp}
                     </td>
-                    <td className='px-2 py-3 text-right'>
+                    <td className='px-4 py-3 text-right whitespace-nowrap'>
                       <Badge variant={statusVariant[item.status]} size='sm'>
                         {item.status === 'success' && 'Success'}
                         {item.status === 'warning' && 'Needs review'}

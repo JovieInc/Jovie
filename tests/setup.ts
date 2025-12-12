@@ -1,8 +1,8 @@
+// Import test matchers (lightweight, always needed)
+import * as matchers from '@testing-library/jest-dom/matchers';
 import { cleanup } from '@testing-library/react';
 import { afterEach, expect } from 'vitest';
 
-// Import test matchers (lightweight, always needed)
-import * as matchers from '@testing-library/jest-dom/matchers';
 expect.extend(matchers);
 
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
@@ -15,20 +15,17 @@ global.console = {
   ...console,
   debug: () => {},
   warn: () => {},
-  error: () => {},
 };
 
+// Load browser globals (always needed for jsdom)
+export { setupBrowserGlobals } from './setup-browser';
 // Load database setup ONLY for integration tests
 // Integration tests should import './setup-db' explicitly
 // Unit tests skip this entirely
 export { setupDatabase } from './setup-db';
-
 // Load component mocks ONLY for component tests
 // Tests that need these should import './setup-mocks' explicitly
 export { setupComponentMocks } from './setup-mocks';
-
-// Load browser globals (always needed for jsdom)
-export { setupBrowserGlobals } from './setup-browser';
 
 // Auto-load browser globals for all tests (lightweight)
 import './setup-browser';

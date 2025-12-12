@@ -189,6 +189,14 @@ export const UniversalLinkInput = forwardRef<
     const inputRef = useRef<HTMLDivElement>(null);
     const urlInputRef = useRef<HTMLInputElement>(null);
 
+    const onPreviewChangeRef = useRef<
+      ((link: DetectedLink | null, isDuplicate: boolean) => void) | undefined
+    >(onPreviewChange);
+
+    useEffect(() => {
+      onPreviewChangeRef.current = onPreviewChange;
+    }, [onPreviewChange]);
+
     // Artist search mode state
     const [searchMode, setSearchMode] = useState<ArtistSearchProvider | null>(
       null
@@ -323,7 +331,7 @@ export const UniversalLinkInput = forwardRef<
 
     const brandColor = detectedLink?.platform.color
       ? `#${detectedLink.platform.color}`
-      : '#6b7280'; // fallback gray-500
+      : '#6b7280'; // fallback neutral
 
     // Use shared color utilities for brand icon styling
     const isDarkBrand = isBrandDark(brandColor);
@@ -336,13 +344,14 @@ export const UniversalLinkInput = forwardRef<
       : false;
 
     useEffect(() => {
-      if (!onPreviewChange) return;
+      const callback = onPreviewChangeRef.current;
+      if (!callback) return;
       if (!detectedLink || !detectedLink.isValid) {
-        onPreviewChange(null, false);
+        callback(null, false);
         return;
       }
-      onPreviewChange(detectedLink, isPlatformDuplicate);
-    }, [detectedLink, isPlatformDuplicate, onPreviewChange]);
+      callback(detectedLink, isPlatformDuplicate);
+    }, [detectedLink, isPlatformDuplicate]);
 
     useEffect(() => {
       if (!clearSignal) return;
@@ -793,6 +802,18 @@ export const UniversalLinkInput = forwardRef<
 
     return (
       <div className='relative w-full' ref={inputRef}>
+        <div className='mb-1 flex flex-wrap items-center gap-2'>
+          <label
+            htmlFor='link-url-input'
+            className='text-xs font-medium text-secondary-token'
+          >
+            Link URL
+          </label>
+          <div className='text-xs text-secondary-token'>
+            💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more
+            for automatic detection
+          </div>
+        </div>
         {/* URL Input with platform selector */}
         <div className='relative flex'>
           {/* Platform selector dropdown */}
@@ -895,7 +916,7 @@ export const UniversalLinkInput = forwardRef<
           </DropdownMenu>
 
           <label htmlFor='link-url-input' className='sr-only'>
-            Enter link URL
+            Link URL
           </label>
           <Input
             ref={urlInputRef}
@@ -961,7 +982,7 @@ export const UniversalLinkInput = forwardRef<
 
         {/* Validation hint */}
         {url && !detectedLink?.isValid && (
-          <div className='text-xs text-secondary-token' role='status'>
+          <div className='hidden text-xs text-secondary-token' role='status'>
             💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more
             for automatic detection
           </div>

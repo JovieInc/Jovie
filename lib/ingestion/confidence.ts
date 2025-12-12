@@ -4,7 +4,12 @@ type ConfidenceSignal =
   | 'manual_user'
   | 'manual_admin'
   | 'kept_after_claim'
+  | 'ingestion_profile_link'
   | 'linktree_profile_link'
+  | 'laylo_profile_link'
+  | 'beacons_profile_link'
+  | 'youtube_about_link'
+  | 'youtube_official_artist'
   | 'instagram_bio'
   | 'spotify_presence'
   | 'handle_similarity';
@@ -13,7 +18,12 @@ const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   manual_user: 0.6,
   manual_admin: 0.5,
   kept_after_claim: 0.2,
+  ingestion_profile_link: 0.1,
   linktree_profile_link: 0.2,
+  laylo_profile_link: 0.2,
+  beacons_profile_link: 0.2,
+  youtube_about_link: 0.3,
+  youtube_official_artist: 0.15,
   instagram_bio: 0.25,
   spotify_presence: 0.3,
   handle_similarity: 0.15,

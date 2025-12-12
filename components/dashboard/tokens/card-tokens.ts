@@ -65,16 +65,16 @@ export const cardTokens = {
   // Enhanced variant compositions with Linear-level sophistication
   variants: {
     default:
-      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 hover:border-default transition-all duration-300 ease-out',
+      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 transition-all duration-300 ease-out',
 
     interactive:
       'bg-surface-1 backdrop-blur-sm rounded-xl border border-subtle p-6 text-left shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-xl hover:shadow-black/12 dark:hover:shadow-black/35 hover:ring-1 hover:ring-interactive/20 hover:border-interactive hover:bg-surface-2 transition-all duration-300 ease-out group transform hover:-translate-y-1 cursor-pointer',
 
     settings:
-      'bg-surface-1 rounded-xl border border-subtle p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 hover:border-default transition-all duration-300 ease-out',
+      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 transition-all duration-300 ease-out',
 
     analytics:
-      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:border-interactive transition-all duration-300 ease-out group',
+      'relative overflow-hidden bg-surface-1/70 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-sm shadow-black/8 dark:shadow-black/35 ring-1 ring-inset ring-white/5 dark:ring-white/10 hover:bg-surface-1/80 hover:shadow-md hover:shadow-black/10 dark:hover:shadow-black/40 transition-all duration-300 ease-out',
 
     'empty-state':
       'bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden shadow-sm shadow-black/5 dark:shadow-black/20',

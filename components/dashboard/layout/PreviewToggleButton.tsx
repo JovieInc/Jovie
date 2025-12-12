@@ -1,9 +1,9 @@
 'use client';
 
 import { DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
-import { usePreviewPanel } from '@/app/dashboard/PreviewPanelContext';
-import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export function PreviewToggleButton() {
   const { isOpen, toggle } = usePreviewPanel();
@@ -11,20 +11,18 @@ export function PreviewToggleButton() {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Button
-          variant='ghost'
-          size='icon'
+        <DashboardHeaderActionButton
+          ariaLabel={isOpen ? 'Hide preview' : 'Show preview'}
+          pressed={isOpen}
           onClick={toggle}
-          aria-label={isOpen ? 'Hide preview' : 'Show preview'}
-          aria-pressed={isOpen}
-          className={cn('h-9 w-9', isOpen && 'bg-accent/10 text-accent')}
-        >
-          <DevicePhoneMobileIcon className='h-5 w-5' />
-        </Button>
+          icon={
+            <DevicePhoneMobileIcon className='h-4 w-4' aria-hidden='true' />
+          }
+        />
       </TooltipTrigger>
       <TooltipContent side='bottom'>
         {isOpen ? 'Hide preview' : 'Show preview'}
-        <kbd className='ml-1.5 inline-flex items-center rounded border border-white/20 bg-white/10 px-1 text-[10px] font-medium'>
+        <kbd className='ml-1.5 inline-flex items-center rounded border border-subtle bg-surface-2 px-1 text-[10px] font-medium text-secondary-token'>
           Space
         </kbd>
       </TooltipContent>

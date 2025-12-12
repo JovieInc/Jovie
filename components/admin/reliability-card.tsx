@@ -18,7 +18,7 @@ export function ReliabilityCard({ summary }: ReliabilityCardProps) {
     : '—';
 
   return (
-    <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
+    <Card className='h-full border-subtle bg-surface-1'>
       <CardHeader className='flex flex-row items-start justify-between'>
         <CardTitle className='text-lg'>Reliability</CardTitle>
         <span className='rounded-full border border-subtle bg-surface-2 px-3 py-1 text-xs font-medium text-emerald-600 dark:text-emerald-300'>

@@ -27,9 +27,9 @@ export async function invalidateProfileCache(
   }
 
   // Invalidate dashboard pages that display profile data
-  revalidatePath('/dashboard');
-  revalidatePath('/dashboard/overview');
-  revalidatePath('/settings');
+  revalidatePath('/app/dashboard');
+  revalidatePath('/app/dashboard/overview');
+  revalidatePath('/app/settings');
 }
 
 /**

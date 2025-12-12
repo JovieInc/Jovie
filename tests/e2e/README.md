@@ -108,7 +108,7 @@ When writing new E2E tests:
 
    ```typescript
    // Good: Use waitForURL
-   await page.waitForURL('**/dashboard', { timeout: 10_000 });
+   await page.waitForURL('**/app/dashboard', { timeout: 10_000 });
 
    // Good: Use expect.poll
    await expect

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -21,6 +22,18 @@ const visitSchema = z.object({
   geoCountry: z.string().optional(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
 });
+
+function inferDeviceType(
+  userAgent: string | null
+): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
+  if (!userAgent) return 'unknown';
+  const ua = userAgent.toLowerCase();
+  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
+  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
+    return 'mobile';
+  }
+  return 'desktop';
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -44,6 +57,20 @@ export async function POST(request: NextRequest) {
       deviceType,
     } = parsed.data;
 
+    const resolvedUserAgent =
+      userAgent ?? request.headers.get('user-agent') ?? undefined;
+    const resolvedIpAddress =
+      ipAddress ?? extractClientIP(request.headers) ?? undefined;
+    const resolvedReferrer =
+      referrer ?? request.headers.get('referer') ?? undefined;
+    const resolvedGeoCity =
+      geoCity ?? request.headers.get('x-vercel-ip-city') ?? undefined;
+    const resolvedGeoCountry =
+      geoCountry ??
+      request.headers.get('x-vercel-ip-country') ??
+      request.headers.get('cf-ipcountry') ??
+      undefined;
+
     const [profile] = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
@@ -57,11 +84,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fingerprint = createFingerprint(ipAddress, userAgent);
-    const normalizedDevice = deviceType ?? 'unknown';
+    const fingerprint = createFingerprint(resolvedIpAddress, resolvedUserAgent);
+    const normalizedDevice =
+      deviceType ?? inferDeviceType(resolvedUserAgent ?? null);
     const now = new Date();
-    const referrerEntry = referrer
-      ? [{ url: referrer.trim(), timestamp: now.toISOString() }]
+    const referrerEntry = resolvedReferrer
+      ? [{ url: resolvedReferrer.trim(), timestamp: now.toISOString() }]
       : [];
 
     await withSystemIngestionSession(async tx => {
@@ -98,8 +126,9 @@ export async function POST(request: NextRequest) {
         [...referrerEntry, ...previousReferrers],
         3
       );
-      const geoCityValue = geoCity ?? existing?.geoCity ?? null;
-      const geoCountryValue = geoCountry ?? existing?.geoCountry ?? null;
+      const geoCityValue = resolvedGeoCity ?? existing?.geoCity ?? null;
+      const geoCountryValue =
+        resolvedGeoCountry ?? existing?.geoCountry ?? null;
 
       if (existing) {
         await tx

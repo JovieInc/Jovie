@@ -107,7 +107,7 @@ test.describe('Synthetic Monitoring - Golden Path', () => {
 
       // CRITICAL PATH 5: Dashboard access
       console.log('[Synthetic] Step 5: Dashboard access test');
-      await expect(page).toHaveURL('/dashboard', { timeout: 45000 });
+      await expect(page).toHaveURL('/app/dashboard', { timeout: 45000 });
 
       const dashboardWelcome = page.locator('[data-test="dashboard-welcome"]');
       await expect(dashboardWelcome).toBeVisible({ timeout: 15000 });

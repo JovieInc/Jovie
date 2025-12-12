@@ -5,6 +5,7 @@ import {
   StatsigClient,
   type StatsigPlugin,
   StatsigProvider,
+  useClientAsyncInit,
 } from '@statsig/react-bindings';
 import { usePathname } from 'next/navigation';
 import React from 'react';
@@ -13,6 +14,31 @@ import { publicEnv } from '@/lib/env-public';
 export interface MyStatsigProps {
   children: React.ReactNode;
   userId?: string | null;
+}
+
+interface MyStatsigEnabledProps {
+  children: React.ReactNode;
+  sdkKey: string;
+  user: { userID: string };
+  plugins: StatsigPlugin<StatsigClient>[];
+}
+
+function MyStatsigEnabled({
+  children,
+  sdkKey,
+  user,
+  plugins,
+}: MyStatsigEnabledProps) {
+  const { client } = useClientAsyncInit(sdkKey, user, {
+    logLevel: LogLevel.Debug,
+    plugins,
+  });
+
+  return (
+    <StatsigProvider client={client} loadingComponent={<div />}>
+      {children}
+    </StatsigProvider>
+  );
 }
 
 export function MyStatsig({ children, userId }: MyStatsigProps) {
@@ -31,7 +57,7 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
 
   // Dynamically import session replay plugin only on client and for dashboard
   React.useEffect(() => {
-    if (!pathname.startsWith('/dashboard')) {
+    if (!pathname.startsWith('/app/dashboard')) {
       setPlugins([]);
       return;
     }
@@ -58,15 +84,8 @@ export function MyStatsig({ children, userId }: MyStatsigProps) {
   }
 
   return (
-    <StatsigProvider
-      sdkKey={sdkKey}
-      user={user}
-      options={{
-        logLevel: LogLevel.Debug,
-        plugins,
-      }}
-    >
+    <MyStatsigEnabled sdkKey={sdkKey} user={user} plugins={plugins}>
       {children}
-    </StatsigProvider>
+    </MyStatsigEnabled>
   );
 }

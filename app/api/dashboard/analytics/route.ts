@@ -1,38 +1,100 @@
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
-import { getUserAnalytics } from '@/lib/db/queries/analytics';
+import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
+import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
 
-type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
+type TimeRange = AnalyticsRange;
+
+type CacheEntry = {
+  payload: unknown;
+  expiresAt: number;
+};
+
+const TTL_MS = 5_000;
+const cache = new Map<string, CacheEntry>();
+const inflight = new Map<string, Promise<unknown>>();
+
+function isRange(value: string): value is TimeRange {
+  return (
+    value === '1d' ||
+    value === '7d' ||
+    value === '30d' ||
+    value === '90d' ||
+    value === 'all'
+  );
+}
+
+function isView(value: string): value is DashboardAnalyticsView {
+  return value === 'traffic' || value === 'full';
+}
+
+function getCacheKey(
+  userId: string,
+  view: DashboardAnalyticsView,
+  range: TimeRange
+): string {
+  return `dashboard-analytics:${userId}:${view}:${range}`;
+}
 
 export async function GET(request: Request) {
   try {
     return await withDbSession(async userId => {
       // Parse query parameters
       const { searchParams } = new URL(request.url);
-      const range = (searchParams.get('range') as TimeRange) || '30d';
+      const rangeParam = searchParams.get('range');
+      const viewParam = searchParams.get('view');
+      const refreshParam = searchParams.get('refresh');
 
-      // Get analytics data for the current user
-      const analytics = await getUserAnalytics(userId, range);
+      const range: TimeRange =
+        rangeParam && isRange(rangeParam) ? rangeParam : '30d';
+      const view: DashboardAnalyticsView =
+        viewParam && isView(viewParam) ? viewParam : 'full';
+      const forceRefresh = refreshParam === '1';
 
-      // Normalize to snake_case for client expectations
-      const payload = {
-        total_clicks: analytics.totalClicks ?? 0,
-        spotify_clicks: analytics.spotifyClicks ?? 0,
-        social_clicks: analytics.socialClicks ?? 0,
-        recent_clicks: analytics.recentClicks ?? 0,
-        // New fields for MVP simplified analytics
-        profile_views: analytics.profileViewsInRange ?? 0,
-        top_countries: (analytics.topCountries || []).map(c => ({
-          country: c.country,
-          count: c.count,
-        })),
-        top_referrers: (analytics.topReferrers || []).map(r => ({
-          referrer: r.referrer,
-          count: r.count,
-        })),
-      } as const;
+      const key = getCacheKey(userId, view, range);
+      const now = Date.now();
+      const cached = cache.get(key);
 
-      return NextResponse.json(payload, { status: 200 });
+      if (!forceRefresh && cached && cached.expiresAt > now) {
+        const response = NextResponse.json(cached.payload, { status: 200 });
+        response.headers.set('Cache-Control', 'private, max-age=0');
+        return response;
+      }
+
+      const existing = inflight.get(key);
+      const promise =
+        !forceRefresh && existing
+          ? existing
+          : (async () => {
+              const analytics = await getUserDashboardAnalytics(
+                userId,
+                range,
+                view
+              );
+              const payload = {
+                ...analytics,
+                top_cities: analytics.top_cities ?? [],
+                top_countries: analytics.top_countries ?? [],
+                top_referrers: analytics.top_referrers ?? [],
+              } as const;
+              return payload;
+            })();
+
+      if (!forceRefresh && !existing) {
+        inflight.set(key, promise);
+      }
+
+      try {
+        const payload = await promise;
+        cache.set(key, { payload, expiresAt: Date.now() + TTL_MS });
+        const response = NextResponse.json(payload, { status: 200 });
+        response.headers.set('Cache-Control', 'private, max-age=0');
+        return response;
+      } finally {
+        if (inflight.get(key) === promise) {
+          inflight.delete(key);
+        }
+      }
     });
   } catch (error) {
     console.error('Error in analytics API:', error);
@@ -47,10 +109,10 @@ export async function GET(request: Request) {
     ) {
       return NextResponse.json(
         {
-          total_clicks: 0,
-          spotify_clicks: 0,
-          social_clicks: 0,
-          recent_clicks: 0,
+          profile_views: 0,
+          top_cities: [],
+          top_countries: [],
+          top_referrers: [],
         },
         { status: 200 }
       );

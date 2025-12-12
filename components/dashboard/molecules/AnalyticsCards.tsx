@@ -1,67 +1,52 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChartBarIcon, MapPinIcon } from '@heroicons/react/24/outline';
+import { useEffect, useMemo, useState } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import type {
+  AnalyticsRange,
+  DashboardAnalyticsResponse,
+} from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
-interface AnalyticsData {
-  total_clicks: number;
-  spotify_clicks: number;
-  social_clicks: number;
-  recent_clicks: number;
-}
+type CityRange = Extract<AnalyticsRange, '7d' | '30d'>;
 
 interface AnalyticsCardsProps {
   profileUrl?: string;
 }
 
 export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>();
-  const [data, setData] = useState<AnalyticsData>({
-    total_clicks: 0,
-    spotify_clicks: 0,
-    social_clicks: 0,
-    recent_clicks: 0,
-  });
+  const [range, setRange] = useState<CityRange>('7d');
 
   // Animated display values for a subtle count-up effect
-  const [displayValues, setDisplayValues] = useState<AnalyticsData>({
-    total_clicks: 0,
-    spotify_clicks: 0,
-    social_clicks: 0,
-    recent_clicks: 0,
-  });
+  const [displayValues, setDisplayValues] =
+    useState<DashboardAnalyticsResponse>({
+      profile_views: 0,
+      top_cities: [],
+      top_countries: [],
+      top_referrers: [],
+    });
   const [copied, setCopied] = useState(false);
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(undefined);
-      const res = await fetch('/api/dashboard/analytics', {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error(`Failed to fetch analytics (${res.status})`);
-      const json: AnalyticsData = await res.json();
-      setData(json);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Unable to fetch analytics data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAnalytics();
-  }, []);
+  const { data, error, loading, refresh } = useDashboardAnalytics({
+    range,
+    view: 'traffic',
+  });
 
   // Run count-up animation when data changes
   useEffect(() => {
     const duration = 800; // ms
     const startValues = { ...displayValues };
-    const endValues = { ...data };
+    const endValues = {
+      profile_views: data?.profile_views ?? 0,
+      top_cities: data?.top_cities ?? [],
+      top_countries: data?.top_countries ?? [],
+      top_referrers: data?.top_referrers ?? [],
+      view: data?.view,
+    };
     const startTime = performance.now();
     let raf = 0;
 
@@ -69,23 +54,15 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
       const t = Math.min(1, (now - startTime) / duration);
       // easeOutCubic
       const eased = 1 - Math.pow(1 - t, 3);
-      const next: AnalyticsData = {
-        total_clicks: Math.round(
-          startValues.total_clicks +
-            (endValues.total_clicks - startValues.total_clicks) * eased
+      const next: DashboardAnalyticsResponse = {
+        profile_views: Math.round(
+          startValues.profile_views +
+            (endValues.profile_views - startValues.profile_views) * eased
         ),
-        spotify_clicks: Math.round(
-          startValues.spotify_clicks +
-            (endValues.spotify_clicks - startValues.spotify_clicks) * eased
-        ),
-        social_clicks: Math.round(
-          startValues.social_clicks +
-            (endValues.social_clicks - startValues.social_clicks) * eased
-        ),
-        recent_clicks: Math.round(
-          startValues.recent_clicks +
-            (endValues.recent_clicks - startValues.recent_clicks) * eased
-        ),
+        top_cities: endValues.top_cities,
+        top_countries: endValues.top_countries,
+        top_referrers: endValues.top_referrers,
+        view: endValues.view,
       };
       setDisplayValues(next);
       if (t < 1) {
@@ -96,46 +73,99 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    data.total_clicks,
-    data.spotify_clicks,
-    data.social_clicks,
-    data.recent_clicks,
-  ]);
+  }, [data]);
 
-  const cards = [
-    {
-      id: 'total_clicks',
-      title: 'Total Clicks',
-      value: displayValues.total_clicks,
-      metadata: 'Last 30 days',
-    },
-    {
-      id: 'spotify_clicks',
-      title: 'Spotify Clicks',
-      value: displayValues.spotify_clicks,
-      metadata: 'Music platform clicks',
-    },
-    {
-      id: 'social_clicks',
-      title: 'Social Clicks',
-      value: displayValues.social_clicks,
-      metadata: 'Social media clicks',
-    },
-    {
-      id: 'recent_activity',
-      title: 'Recent Activity',
-      value: displayValues.recent_clicks,
-      metadata: 'Last 7 days',
-    },
-  ];
+  const cityRows = useMemo(() => {
+    const cities = displayValues.top_cities ?? [];
+    return cities.slice(0, 5);
+  }, [displayValues.top_cities]);
+
+  const referrerRows = useMemo(() => {
+    const referrers = displayValues.top_referrers ?? [];
+    return referrers.slice(0, 5);
+  }, [displayValues.top_referrers]);
+
+  const formatReferrerLabel = (value: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return 'Direct';
+
+    try {
+      const url = new URL(trimmed);
+      return url.host || trimmed;
+    } catch {
+      return trimmed;
+    }
+  };
+
+  const profileViewsLabel = useMemo(() => {
+    const value = displayValues.profile_views ?? 0;
+    return Intl.NumberFormat().format(value);
+  }, [displayValues.profile_views]);
+
+  const topCitiesLabel = useMemo(() => {
+    const value = cityRows.length;
+    return Intl.NumberFormat().format(value);
+  }, [cityRows.length]);
+
+  const topCitiesContent = (
+    <div className='grid grid-cols-1 gap-2'>
+      {cityRows.length === 0 ? (
+        <div className='rounded-xl border border-subtle bg-surface-2/20 px-3 py-3'>
+          <p className='text-sm text-tertiary-token'>No city data yet.</p>
+        </div>
+      ) : (
+        cityRows.map(row => (
+          <div
+            key={row.city}
+            className='flex items-center justify-between rounded-xl border border-subtle bg-surface-2/25 px-3 py-2'
+          >
+            <p className='text-sm font-medium text-primary-token'>{row.city}</p>
+            <p className='text-sm tabular-nums text-secondary-token'>
+              {row.count}
+            </p>
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  const rangeToggle = (
+    <div
+      role='group'
+      aria-label='Traffic window'
+      className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/5 dark:ring-white/10 backdrop-blur-sm'
+    >
+      {(
+        [
+          { id: '7d', label: '7d' },
+          { id: '30d', label: '30d' },
+        ] as const
+      ).map(opt => {
+        const active = range === opt.id;
+        return (
+          <button
+            key={opt.id}
+            type='button'
+            onClick={() => setRange(opt.id)}
+            aria-pressed={active}
+            className={
+              active
+                ? 'h-6 rounded-full bg-surface-1 px-2.5 text-xs font-semibold text-primary-token shadow-sm shadow-black/10 dark:shadow-black/40'
+                : 'h-6 rounded-full px-2.5 text-xs font-medium text-secondary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token'
+            }
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-        {cards.map(card => (
-          <SkeletonCard key={card.id} />
-        ))}
+      <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
+        <SkeletonCard />
+        <SkeletonCard />
       </div>
     );
   }
@@ -143,9 +173,9 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
   if (error) {
     return (
       <div className='flex flex-col items-center justify-center p-8 text-center space-y-4'>
-        <div className='w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center'>
+        <div className='w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center'>
           <svg
-            className='w-6 h-6 text-orange-600 dark:text-orange-400'
+            className='w-6 h-6 text-accent-token'
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
@@ -159,17 +189,17 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
           </svg>
         </div>
         <div>
-          <h3 className='text-sm font-medium text-primary mb-1'>
+          <h3 className='text-sm font-medium text-primary-token mb-1'>
             Analytics temporarily unavailable
           </h3>
-          <p className='text-xs text-secondary'>
+          <p className='text-xs text-secondary-token'>
             We couldn&apos;t fetch your analytics data right now
           </p>
         </div>
         <button
-          onClick={fetchAnalytics}
+          onClick={() => refresh()}
           disabled={loading}
-          className='inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary bg-surface-2 hover:bg-surface-3 border border-subtle rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+          className='inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary-token bg-surface-2 hover:bg-surface-3 border border-subtle rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base disabled:opacity-50 disabled:cursor-not-allowed'
         >
           {loading ? (
             <>
@@ -200,10 +230,9 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
   }
 
   const allZero =
-    data.total_clicks === 0 &&
-    data.spotify_clicks === 0 &&
-    data.social_clicks === 0 &&
-    data.recent_clicks === 0;
+    (data?.profile_views ?? 0) === 0 &&
+    (data?.top_cities?.length ?? 0) === 0 &&
+    (data?.top_referrers?.length ?? 0) === 0;
 
   const handleCopy = async () => {
     if (!profileUrl) return;
@@ -220,7 +249,7 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
     return (
       <EmptyState
         type='analytics'
-        title='📊 No profile views yet'
+        title='No profile views yet'
         description='Share your profile link to start tracking clicks and engagement from your fans.'
         actionLabel={copied ? 'Copied!' : 'Copy Profile Link'}
         onAction={profileUrl ? handleCopy : undefined}
@@ -229,15 +258,60 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
   }
 
   return (
-    <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-      {cards.map(card => (
-        <AnalyticsCard
-          key={card.id}
-          title={card.title}
-          value={card.value}
-          metadata={card.metadata}
-        />
-      ))}
+    <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
+      <AnalyticsCard
+        title='Profile views'
+        value={profileViewsLabel}
+        metadata='All-time'
+        icon={ChartBarIcon}
+        iconClassName='text-sky-600 dark:text-sky-400'
+        iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
+      />
+
+      <AnalyticsCard
+        title='Top cities'
+        value={topCitiesLabel}
+        metadata={`Traffic window: ${range === '7d' ? 'Last 7 days' : 'Last 30 days'}`}
+        icon={MapPinIcon}
+        iconClassName='text-violet-600 dark:text-violet-400'
+        iconChipClassName='bg-violet-500/10 dark:bg-violet-500/15'
+        headerRight={rangeToggle}
+      >
+        {topCitiesContent}
+      </AnalyticsCard>
+
+      <DashboardCard variant='analytics' className='sm:col-span-2'>
+        <div className='flex items-center justify-between gap-3'>
+          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+            Traffic from
+          </p>
+          {rangeToggle}
+        </div>
+
+        <div className='mt-3 grid grid-cols-1 gap-2'>
+          {referrerRows.length === 0 ? (
+            <div className='rounded-xl border border-subtle bg-surface-2/20 px-3 py-3'>
+              <p className='text-sm text-tertiary-token'>
+                No traffic source data yet.
+              </p>
+            </div>
+          ) : (
+            referrerRows.map(row => (
+              <div
+                key={row.referrer}
+                className='flex items-center justify-between rounded-xl border border-subtle bg-surface-2/25 px-3 py-2'
+              >
+                <p className='text-sm font-medium text-primary-token'>
+                  {formatReferrerLabel(row.referrer)}
+                </p>
+                <p className='text-sm tabular-nums text-secondary-token'>
+                  {row.count}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </DashboardCard>
     </div>
   );
 }

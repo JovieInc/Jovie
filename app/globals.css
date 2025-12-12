@@ -327,9 +327,9 @@ body {
     /* interactive/hover */
     --color-bg-surface-3: #262626;
     /* pressed/active */
-    --color-border-subtle: #262626;
+    --color-border-subtle: #1f1f1f;
     /* subtle borders */
-    --color-border-default: #404040;
+    --color-border-default: #303030;
     /* default borders */
     --color-text-primary-token: #f5f5f5;
     --color-text-secondary-token: #a3a3a3;
@@ -482,37 +482,22 @@ body {
   }
 }
 
-:root {
-  --sidebar: hsl(0 0% 98%);
-  --sidebar-foreground: hsl(240 5.3% 26.1%);
-  --sidebar-primary: hsl(240 5.9% 10%);
-  --sidebar-primary-foreground: hsl(0 0% 98%);
-  --sidebar-accent: hsl(240 4.8% 95.9%);
-  --sidebar-accent-foreground: hsl(240 5.9% 10%);
-  --sidebar-border: hsl(220 13% 91%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
-}
-
-.dark {
-  --sidebar: hsl(240 5.9% 10%);
-  --sidebar-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-primary: hsl(224.3 76.3% 48%);
-  --sidebar-primary-foreground: hsl(0 0% 100%);
-  --sidebar-accent: hsl(240 3.7% 15.9%);
-  --sidebar-accent-foreground: hsl(240 4.8% 95.9%);
-  --sidebar-border: hsl(240 3.7% 15.9%);
-  --sidebar-ring: hsl(217.2 91.2% 59.8%);
-}
-
 @theme inline {
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar: rgb(var(--sidebar-background));
+  --color-sidebar-foreground: rgb(var(--sidebar-foreground));
+  --color-sidebar-primary: rgb(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: rgb(var(--sidebar-primary-foreground));
+  --color-sidebar-accent: rgb(var(--sidebar-accent));
+  --color-sidebar-accent-foreground: rgb(var(--sidebar-accent-foreground));
+  --color-sidebar-border: rgb(var(--sidebar-border));
+  --color-sidebar-ring: rgb(var(--sidebar-ring));
+
+  --color-sidebar-muted: rgb(var(--sidebar-muted));
+  --color-sidebar-muted-foreground: rgb(var(--sidebar-muted-foreground));
+  --color-sidebar-surface: rgb(var(--sidebar-surface));
+  --color-sidebar-surface-hover: rgb(var(--sidebar-surface-hover));
+  --color-sidebar-input-background: rgb(var(--sidebar-input-background));
+  --color-sidebar-input-border: rgb(var(--sidebar-input-border));
 
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);

@@ -24,7 +24,7 @@ export function SetupTaskItem({
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
             complete
               ? 'bg-surface-1 text-secondary-token ring-1 ring-inset ring-subtle'
-              : 'bg-accent/15 text-accent ring-1 ring-inset ring-accent/40'
+              : 'bg-accent/15 text-accent ring-1 ring-inset ring-interactive/20'
           }`}
           aria-hidden='true'
         >

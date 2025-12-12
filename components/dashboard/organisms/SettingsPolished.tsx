@@ -9,10 +9,22 @@ import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { useCallback, useState } from 'react';
+import {
+  type ComponentType,
+  type FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Input } from '@/components/atoms/Input';
 import { Textarea } from '@/components/atoms/Textarea';
+import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/AccountSettingsSection';
+import { SettingsProGateCard } from '@/components/dashboard/organisms/SettingsProGateCard';
+import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_URL } from '@/constants/app';
@@ -22,7 +34,7 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-import { cn } from '@/lib/utils';
+import { cn, debounce } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';
 
@@ -46,12 +58,26 @@ export function SettingsPolished({
   const { isPro } = billingStatus;
   const [isMarketingSaving, setIsMarketingSaving] = useState(false);
   const [isPixelSaving, setIsPixelSaving] = useState(false);
-  const [isProfileSaving, setIsProfileSaving] = useState(false);
   const [isBillingLoading, setIsBillingLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: artist.handle || '',
     displayName: artist.name || '',
   });
+
+  const [profileSaveStatus, setProfileSaveStatus] = useState<{
+    saving: boolean;
+    success: boolean | null;
+    error: string | null;
+  }>({
+    saving: false,
+    success: null,
+    error: null,
+  });
+
+  const lastProfileSavedRef = useRef<{
+    displayName: string;
+    username: string;
+  } | null>(null);
 
   const [marketingEmails, setMarketingEmails] = useState(true); // Default to true, should be loaded from user preferences
 
@@ -211,78 +237,110 @@ export function SettingsPolished({
 
   const handleBilling = async () => {
     setIsBillingLoading(true);
-    await router.push('/settings/billing');
+    await router.push('/app/settings/billing');
   };
 
-  const handleProfileSave = async () => {
-    const displayName = formData.displayName.trim();
-    const username = formData.username.trim();
+  const saveProfile = useCallback(
+    async (next: { displayName: string; username: string }) => {
+      const displayName = next.displayName.trim();
+      const username = next.username.trim();
 
-    if (!displayName) {
-      showToast({ type: 'error', message: 'Display name cannot be empty.' });
-      return;
-    }
+      if (!displayName || !username) {
+        return;
+      }
 
-    setIsProfileSaving(true);
-    try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            username,
-            displayName,
+      const lastSaved = lastProfileSavedRef.current;
+      if (
+        lastSaved &&
+        lastSaved.displayName === displayName &&
+        lastSaved.username === username
+      ) {
+        return;
+      }
+
+      setProfileSaveStatus({ saving: true, success: null, error: null });
+
+      try {
+        const response = await fetch('/api/dashboard/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      });
-
-      const data = (await response.json().catch(() => ({}))) as {
-        profile?: {
-          username?: string;
-          usernameNormalized?: string;
-          displayName?: string;
-          bio?: string | null;
-        };
-        error?: string;
-      };
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update profile');
-      }
-
-      if (data.profile && onArtistUpdate) {
-        onArtistUpdate({
-          ...artist,
-          handle: data.profile.username ?? artist.handle,
-          name: data.profile.displayName ?? artist.name,
-          tagline: data.profile.bio ?? artist.tagline,
+          body: JSON.stringify({
+            updates: {
+              username,
+              displayName,
+            },
+          }),
         });
+
+        const data = (await response.json().catch(() => ({}))) as {
+          profile?: {
+            username?: string;
+            usernameNormalized?: string;
+            displayName?: string;
+            bio?: string | null;
+          };
+          error?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to update profile');
+        }
+
+        lastProfileSavedRef.current = { displayName, username };
+
+        if (data.profile && onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            handle: data.profile.username ?? artist.handle,
+            name: data.profile.displayName ?? artist.name,
+            tagline: data.profile.bio ?? artist.tagline,
+          });
+        }
+
+        setFormData(prev => ({
+          ...prev,
+          username: data.profile?.username ?? username,
+          displayName: data.profile?.displayName ?? displayName,
+        }));
+
+        setProfileSaveStatus({ saving: false, success: true, error: null });
+        router.refresh();
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : 'Failed to update profile';
+        setProfileSaveStatus({ saving: false, success: false, error: message });
+        showToast({ type: 'error', message });
       }
+    },
+    [artist, onArtistUpdate, router, showToast]
+  );
 
-      setFormData(prev => ({
-        ...prev,
-        username: data.profile?.username ?? username,
-        displayName: data.profile?.displayName ?? displayName,
-      }));
+  useEffect(() => {
+    lastProfileSavedRef.current = {
+      displayName: artist.name || '',
+      username: artist.handle || '',
+    };
+    setProfileSaveStatus({ saving: false, success: null, error: null });
+  }, [artist.handle, artist.name]);
 
-      showToast({ type: 'success', message: 'Profile updated successfully.' });
-      router.refresh();
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : 'Failed to update profile';
-      showToast({ type: 'error', message });
-    } finally {
-      setIsProfileSaving(false);
-    }
-  };
+  const debouncedProfileSave = useMemo(
+    () =>
+      debounce(async (...args: unknown[]) => {
+        const [next] = args as [{ displayName: string; username: string }];
+        await saveProfile(next);
+      }, 900),
+    [saveProfile]
+  );
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  useEffect(() => {
+    return () => {
+      debouncedProfileSave.flush();
+    };
+  }, [debouncedProfileSave]);
 
   const handlePixelInputChange = (field: string, value: string) => {
     setPixelData(prev => ({ ...prev, [field]: value }));
@@ -344,7 +402,7 @@ export function SettingsPolished({
   }, []);
 
   const handlePixelSubmit = useCallback(
-    async (e: React.FormEvent) => {
+    async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       setIsPixelSaving(true);
 
@@ -380,95 +438,134 @@ export function SettingsPolished({
 
   const appDomain = APP_URL.replace(/^https?:\/\//, '');
 
+  useEffect(() => {
+    if (!profileSaveStatus.success) return;
+    const timeoutId = window.setTimeout(() => {
+      setProfileSaveStatus(prev => ({ ...prev, success: null }));
+    }, 1500);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [profileSaveStatus.success]);
+
   const renderProfileSection = () => (
-    <DashboardCard variant='settings'>
+    <DashboardCard variant='settings' className='relative'>
+      {profileSaveStatus.saving ? (
+        <SettingsStatusPill state='saving' className='absolute right-6 top-6' />
+      ) : profileSaveStatus.success ? (
+        <SettingsStatusPill state='saved' className='absolute right-6 top-6' />
+      ) : null}
       <div className='flex flex-col gap-6'>
         <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div>
-            <h3 className='text-lg font-medium text-primary mb-2'>
-              Profile Photo
-            </h3>
+            <p className='text-sm text-secondary-token'>
+              Photo, name, username.
+            </p>
           </div>
         </div>
 
-        <div className='flex flex-col items-center justify-center gap-4'>
-          <div className='w-48 h-48'>
-            <AvatarUploadable
-              src={artist.image_url}
-              alt={artist.name || 'Profile photo'}
-              name={artist.name || artist.handle}
-              size='display-xl'
-              uploadable
-              showHoverOverlay
-              onUpload={handleAvatarUpload}
-              onSuccess={handleAvatarUpdate}
-              onError={message => showToast({ type: 'error', message })}
-              maxFileSize={maxAvatarSize}
-              acceptedTypes={acceptedAvatarTypes}
-              className='mx-auto animate-in fade-in duration-300'
-            />
-          </div>
-          <p className='text-sm text-secondary text-center'>
-            Drag & drop or click to upload. Watch the ring animation for status.
-          </p>
-        </div>
-
-        <div className='space-y-6'>
-          {/* Username */}
+        <div className='grid gap-6 lg:grid-cols-[240px,1fr]'>
           <div>
-            <label
-              htmlFor='username'
-              className='block text-sm font-medium text-primary mb-2'
-            >
-              Username
-            </label>
-            <div className='relative'>
-              <div className='flex rounded-lg shadow-sm'>
-                <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary text-sm select-none'>
-                  {appDomain}/
-                </span>
-                <Input
-                  type='text'
-                  name='username'
-                  id='username'
-                  value={formData.username}
-                  onChange={e => handleInputChange('username', e.target.value)}
-                  placeholder='yourname'
-                  className='flex-1 min-w-0'
-                  inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm transition-colors'
-                />
+            <div className='flex justify-center'>
+              <AvatarUploadable
+                src={artist.image_url}
+                alt={artist.name || 'Profile photo'}
+                name={artist.name || artist.handle}
+                size='display-xl'
+                uploadable
+                showHoverOverlay
+                onUpload={handleAvatarUpload}
+                onSuccess={handleAvatarUpdate}
+                onError={message => showToast({ type: 'error', message })}
+                maxFileSize={maxAvatarSize}
+                acceptedTypes={acceptedAvatarTypes}
+                className='mx-auto animate-in fade-in duration-300'
+              />
+            </div>
+            <p className='text-sm text-secondary text-center mt-3'>
+              Drag & drop or click to upload.
+            </p>
+          </div>
+
+          <div className='space-y-6'>
+            <div>
+              <label
+                htmlFor='username'
+                className='block text-xs font-medium text-primary-token mb-2'
+              >
+                Username
+              </label>
+              <div className='mb-2 text-xs text-secondary-token/70'>
+                Used in your profile URL
+              </div>
+              <div className='relative'>
+                <div className='flex rounded-lg shadow-sm'>
+                  <span className='inline-flex items-center px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 text-secondary-token text-sm select-none'>
+                    {appDomain}/
+                  </span>
+                  <Input
+                    type='text'
+                    name='username'
+                    id='username'
+                    value={formData.username}
+                    onChange={e => {
+                      const nextValue = e.target.value;
+                      setFormData(prev => {
+                        const next = { ...prev, username: nextValue };
+                        setProfileSaveStatus(s => ({
+                          ...s,
+                          success: null,
+                          error: null,
+                        }));
+                        debouncedProfileSave({
+                          displayName: next.displayName,
+                          username: next.username,
+                        });
+                        return next;
+                      });
+                    }}
+                    onBlur={() => debouncedProfileSave.flush()}
+                    placeholder='yourname'
+                    className='flex-1 min-w-0'
+                    inputClassName='block w-full px-3 py-2 rounded-none rounded-r-lg border border-subtle bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm transition-colors'
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Display Name */}
-          <div>
-            <label
-              htmlFor='displayName'
-              className='block text-sm font-medium text-primary mb-2'
-            >
-              Display Name
-            </label>
-            <Input
-              type='text'
-              name='displayName'
-              id='displayName'
-              value={formData.displayName}
-              onChange={e => handleInputChange('displayName', e.target.value)}
-              placeholder='The name your fans will see'
-              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
-            />
-          </div>
-
-          <div className='flex justify-end pt-2'>
-            <Button
-              type='button'
-              onClick={handleProfileSave}
-              loading={isProfileSaving}
-              className={SETTINGS_BUTTON_CLASS}
-            >
-              Save profile
-            </Button>
+            <div>
+              <label
+                htmlFor='displayName'
+                className='block text-xs font-medium text-primary-token mb-2'
+              >
+                Display Name
+              </label>
+              <Input
+                type='text'
+                name='displayName'
+                id='displayName'
+                value={formData.displayName}
+                onChange={e => {
+                  const nextValue = e.target.value;
+                  setFormData(prev => {
+                    const next = { ...prev, displayName: nextValue };
+                    setProfileSaveStatus(s => ({
+                      ...s,
+                      success: null,
+                      error: null,
+                    }));
+                    debouncedProfileSave({
+                      displayName: next.displayName,
+                      username: next.username,
+                    });
+                    return next;
+                  });
+                }}
+                onBlur={() => debouncedProfileSave.flush()}
+                placeholder='The name your fans will see'
+                inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -508,31 +605,16 @@ export function SettingsPolished({
               value: 'light',
               label: 'Light',
               description: 'Bright and clean.',
-              preview: {
-                bg: 'bg-white',
-                sidebar: 'bg-gray-50',
-                accent: 'bg-gray-100',
-              },
             },
             {
               value: 'dark',
               label: 'Dark',
               description: 'Bold and focused.',
-              preview: {
-                bg: 'bg-gray-900',
-                sidebar: 'bg-gray-800',
-                accent: 'bg-gray-700',
-              },
             },
             {
               value: 'system',
               label: 'System',
               description: 'Match device settings.',
-              preview: {
-                bg: 'bg-gradient-to-br from-white to-gray-900',
-                sidebar: 'bg-gradient-to-br from-gray-50 to-gray-800',
-                accent: 'bg-gradient-to-br from-gray-100 to-gray-700',
-              },
             },
           ].map(option => (
             <button
@@ -542,7 +624,7 @@ export function SettingsPolished({
               }
               className={cn(
                 'group relative flex flex-col p-4 rounded-xl border-2 transition-all duration-300 ease-in-out',
-                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                'hover:translate-y-[-2px] hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base',
                 theme === option.value
                   ? 'border-accent/70 bg-surface-2'
                   : 'border-subtle hover:border-accent/50'
@@ -550,27 +632,48 @@ export function SettingsPolished({
             >
               {/* Miniature Dashboard Preview */}
               <div className='relative w-full h-20 rounded-lg overflow-hidden mb-3'>
-                <div className={`w-full h-full ${option.preview.bg}`}>
-                  {/* Sidebar */}
-                  <div
-                    className={`absolute left-0 top-0 w-6 h-full ${option.preview.sidebar} rounded-r`}
-                  />
-                  {/* Content area with some mock elements */}
-                  <div className='absolute left-8 top-2 right-2 bottom-2 space-y-1'>
-                    <div
-                      className={`h-2 ${option.preview.accent} rounded w-1/3`}
-                    />
-                    <div
-                      className={`h-1.5 ${option.preview.accent} rounded w-1/2 opacity-60`}
-                    />
-                    <div
-                      className={`h-1.5 ${option.preview.accent} rounded w-2/3 opacity-40`}
-                    />
+                {option.value === 'system' ? (
+                  <div className='flex w-full h-full'>
+                    <div className='relative flex-1 bg-surface-1'>
+                      {/* Sidebar */}
+                      <div className='absolute left-0 top-0 w-3.5 h-full bg-surface-2 rounded-r' />
+                      {/* Content area with some mock elements */}
+                      <div className='absolute left-5 top-2 right-2 bottom-2 space-y-1'>
+                        <div className='h-2 bg-surface-3 rounded w-1/3' />
+                        <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
+                        <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
+                      </div>
+                    </div>
+                    <div className='dark relative flex-1 bg-surface-1'>
+                      {/* Sidebar */}
+                      <div className='absolute left-0 top-0 w-3.5 h-full bg-surface-2 rounded-r' />
+                      {/* Content area with some mock elements */}
+                      <div className='absolute left-5 top-2 right-2 bottom-2 space-y-1'>
+                        <div className='h-2 bg-surface-3 rounded w-1/3' />
+                        <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
+                        <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div
+                    className={cn(
+                      'relative w-full h-full bg-surface-1',
+                      option.value === 'dark' && 'dark'
+                    )}
+                  >
+                    {/* Sidebar */}
+                    <div className='absolute left-0 top-0 w-6 h-full bg-surface-2 rounded-r' />
+                    {/* Content area with some mock elements */}
+                    <div className='absolute left-8 top-2 right-2 bottom-2 space-y-1'>
+                      <div className='h-2 bg-surface-3 rounded w-1/3' />
+                      <div className='h-1.5 bg-surface-3 rounded w-1/2 opacity-60' />
+                      <div className='h-1.5 bg-surface-3 rounded w-2/3 opacity-40' />
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Option Info */}
               <div className='text-left'>
                 <h4 className='font-medium text-primary text-sm mb-1'>
                   {option.label}
@@ -580,11 +683,10 @@ export function SettingsPolished({
                 </p>
               </div>
 
-              {/* Animated Checkmark Overlay */}
               {theme === option.value && (
                 <div className='absolute top-2 right-2 w-5 h-5 bg-accent-token rounded-full flex items-center justify-center animate-in zoom-in-95 fade-in duration-200'>
                   <svg
-                    className='w-3 h-3 text-white'
+                    className='w-3 h-3 text-accent-foreground'
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
@@ -613,40 +715,16 @@ export function SettingsPolished({
   const renderRemoveBrandingSection = () => {
     return (
       <DashboardCard variant='settings'>
-        <div className='flex items-start justify-between'>
-          <div className='flex-1'>
-            <h3 className='text-lg font-medium text-primary mb-2'>
-              Hide Jovie Branding
-            </h3>
-            <p className='text-sm text-secondary max-w-md'>
-              When enabled, Jovie branding will be removed from your profile
-              page, giving your fans a fully custom experience.
-            </p>
-          </div>
-
-          <div className='ml-6'>
-            <button
-              type='button'
-              className={cn(
-                'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-                hideBranding ? 'bg-accent' : 'bg-surface-3',
-                isSavingBranding && 'opacity-50 cursor-not-allowed'
-              )}
-              onClick={() => handleBrandingToggle(!hideBranding)}
-              disabled={isSavingBranding}
-              role='switch'
-              aria-checked={hideBranding}
-              aria-label='Hide Jovie branding'
-            >
-              <span
-                className={cn(
-                  'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                  hideBranding ? 'translate-x-6' : 'translate-x-1'
-                )}
-              />
-            </button>
-          </div>
-        </div>
+        <SettingsToggleRow
+          title='Hide Jovie Branding'
+          description='When enabled, Jovie branding will be removed from your profile page, giving your fans a fully custom experience.'
+          checked={hideBranding}
+          onCheckedChange={enabled => {
+            void handleBrandingToggle(enabled);
+          }}
+          disabled={isSavingBranding}
+          ariaLabel='Hide Jovie branding'
+        />
 
         {hideBranding && (
           <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
@@ -677,7 +755,7 @@ export function SettingsPolished({
           <div>
             <label
               htmlFor='facebookPixel'
-              className='block text-sm font-medium text-primary mb-2'
+              className='block text-xs font-medium text-primary-token mb-2'
             >
               Facebook Pixel ID
             </label>
@@ -689,14 +767,14 @@ export function SettingsPolished({
                 handlePixelInputChange('facebookPixel', e.target.value)
               }
               placeholder='1234567890'
-              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
           <div>
             <label
               htmlFor='googleAdsConversion'
-              className='block text-sm font-medium text-primary mb-2'
+              className='block text-xs font-medium text-primary-token mb-2'
             >
               Google Ads Conversion ID
             </label>
@@ -708,14 +786,14 @@ export function SettingsPolished({
                 handlePixelInputChange('googleAdsConversion', e.target.value)
               }
               placeholder='AW-123456789'
-              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
           <div>
             <label
               htmlFor='tiktokPixel'
-              className='block text-sm font-medium text-primary mb-2'
+              className='block text-xs font-medium text-primary-token mb-2'
             >
               TikTok Pixel ID
             </label>
@@ -727,14 +805,14 @@ export function SettingsPolished({
                 handlePixelInputChange('tiktokPixel', e.target.value)
               }
               placeholder='ABCDEF1234567890'
-              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
+              inputClassName='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm transition-colors'
             />
           </div>
 
           <div>
             <label
               htmlFor='customPixel'
-              className='block text-sm font-medium text-primary mb-2'
+              className='block text-xs font-medium text-primary-token mb-2'
             >
               Additional Snippet
             </label>
@@ -746,9 +824,9 @@ export function SettingsPolished({
                 handlePixelInputChange('customPixel', e.target.value)
               }
               placeholder='<script>/* your tag */</script>'
-              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
+              className='block w-full px-3 py-2 border border-subtle rounded-lg bg-surface-1 text-primary placeholder:text-secondary focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-1 focus-visible:ring-offset-bg-base focus-visible:border-transparent sm:text-sm shadow-sm resize-none transition-colors'
             />
-            <p className='mt-2 text-sm text-secondary'>
+            <p className='mt-2 text-xs text-secondary-token/70'>
               For other ad networks or tag managers.
             </p>
           </div>
@@ -769,40 +847,16 @@ export function SettingsPolished({
 
   const renderNotificationsSection = () => (
     <DashboardCard variant='settings'>
-      <div className='flex items-start justify-between'>
-        <div className='flex-1'>
-          <h3 className='text-lg font-medium text-primary mb-2'>
-            Marketing Emails
-          </h3>
-          <p className='text-sm text-secondary max-w-md'>
-            Receive updates about new features, tips, and promotional offers
-            from Jovie.
-          </p>
-        </div>
-
-        <div className='ml-6'>
-          <button
-            type='button'
-            className={cn(
-              'relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-              marketingEmails ? 'bg-accent' : 'bg-surface-3',
-              isMarketingSaving && 'opacity-50 cursor-not-allowed'
-            )}
-            onClick={() => handleMarketingToggle(!marketingEmails)}
-            disabled={isMarketingSaving}
-            role='switch'
-            aria-checked={marketingEmails}
-            aria-label='Toggle marketing emails'
-          >
-            <span
-              className={cn(
-                'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
-                marketingEmails ? 'translate-x-6' : 'translate-x-1'
-              )}
-            />
-          </button>
-        </div>
-      </div>
+      <SettingsToggleRow
+        title='Marketing Emails'
+        description='Receive updates about new features, tips, and promotional offers from Jovie.'
+        checked={marketingEmails}
+        onCheckedChange={enabled => {
+          void handleMarketingToggle(enabled);
+        }}
+        disabled={isMarketingSaving}
+        ariaLabel='Toggle marketing emails'
+      />
     </DashboardCard>
   );
 
@@ -831,27 +885,17 @@ export function SettingsPolished({
   const renderProUpgradeCard = (
     title: string,
     description: string,
-    icon: React.ComponentType<{ className?: string }>
-  ) => {
-    const Icon = icon;
-    return (
-      <DashboardCard variant='settings'>
-        <div className='text-center py-4'>
-          <Icon className='mx-auto h-12 w-12 text-secondary mb-4' />
-          <h3 className='text-lg font-medium text-primary mb-2'>{title}</h3>
-          <p className='text-sm text-secondary mb-4'>{description}</p>
-          <Button
-            onClick={handleBilling}
-            loading={isBillingLoading || billingStatus.loading}
-            className={SETTINGS_BUTTON_CLASS}
-            variant='primary'
-          >
-            Upgrade to Pro
-          </Button>
-        </div>
-      </DashboardCard>
-    );
-  };
+    icon: ComponentType<{ className?: string }>
+  ) => (
+    <SettingsProGateCard
+      title={title}
+      description={description}
+      icon={icon}
+      onUpgrade={handleBilling}
+      loading={isBillingLoading || billingStatus.loading}
+      buttonClassName={SETTINGS_BUTTON_CLASS}
+    />
+  );
 
   const sections = [
     {
@@ -938,15 +982,14 @@ export function SettingsPolished({
   return (
     <div className='space-y-8 pb-8'>
       {visibleSections.map(section => (
-        <section id={section.id} key={section.id} className='scroll-mt-4'>
-          <div className='mb-6'>
-            <h1 className='text-2xl font-semibold tracking-tight text-primary'>
-              {section.title}
-            </h1>
-            <p className='mt-1 text-sm text-secondary'>{section.description}</p>
-          </div>
+        <SettingsSection
+          key={section.id}
+          id={section.id}
+          title={section.title}
+          description={section.description}
+        >
           {section.render()}
-        </section>
+        </SettingsSection>
       ))}
     </div>
   );

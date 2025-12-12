@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 

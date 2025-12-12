@@ -41,7 +41,7 @@ export function MetricsChart({ points }: MetricsChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
+      <Card className='h-full border-subtle bg-surface-1'>
         <CardHeader className='flex flex-row items-start justify-between'>
           <div>
             <CardTitle className='text-lg'>Daily active users</CardTitle>
@@ -71,7 +71,7 @@ export function MetricsChart({ points }: MetricsChartProps) {
   const deltaPct = start.value > 0 ? (delta / start.value) * 100 : 0;
 
   return (
-    <Card className='h-full border-subtle bg-surface-1/80 backdrop-blur-sm'>
+    <Card className='h-full border-subtle bg-surface-1'>
       <CardHeader className='flex flex-row items-start justify-between'>
         <div>
           <CardTitle className='text-lg'>Daily active users</CardTitle>
@@ -86,7 +86,7 @@ export function MetricsChart({ points }: MetricsChartProps) {
         </div>
       </CardHeader>
       <CardContent className='space-y-4'>
-        <div className='relative h-64 w-full overflow-hidden rounded-xl border border-subtle bg-gradient-to-b from-surface-0 via-surface-1 to-surface-2 p-4'>
+        <div className='relative h-64 w-full overflow-hidden rounded-xl border border-subtle bg-linear-to-b from-surface-0 via-surface-1 to-surface-2 p-4'>
           <svg
             viewBox='0 0 100 100'
             role='img'

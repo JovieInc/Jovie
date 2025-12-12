@@ -17,7 +17,7 @@ export function DashboardTopBar({
 }: DashboardTopBarProps) {
   return (
     <header className='sticky top-0 z-20 border-b border-subtle bg-surface-0 backdrop-blur supports-backdrop-filter:bg-surface-0'>
-      <div className='mx-auto flex h-12 max-w-7xl items-center gap-2 px-4 sm:px-6 lg:px-8'>
+      <div className='flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
         <nav
           aria-label='Breadcrumb'
           className='flex items-center gap-1 text-sm text-secondary-token'

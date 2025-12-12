@@ -126,7 +126,7 @@ export async function signOutUser(page: Page) {
   }
 
   // Wait for sign out to complete
-  await page.waitForURL(url => !url.pathname.includes('/dashboard'), {
+  await page.waitForURL(url => !url.pathname.includes('/app/dashboard'), {
     timeout: 10000,
   });
 }

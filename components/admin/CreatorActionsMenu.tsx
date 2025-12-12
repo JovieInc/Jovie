@@ -7,9 +7,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
 } from '@jovie/ui';
 import {
   Check,
@@ -28,6 +25,12 @@ import { useCallback, useState } from 'react';
 
 import type { CreatorActionStatus } from '@/components/admin/useCreatorActions';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import {
+  geistTableMenuContentClass,
+  geistTableMenuDestructiveItemClass,
+  geistTableMenuItemClass,
+  geistTableMenuSeparatorClass,
+} from '@/lib/ui/geist-table-menu';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -84,54 +87,53 @@ export function CreatorActionsMenu({
   const stateClass = cn(
     'transition duration-200 ease-in-out transform',
     isSuccess &&
-    'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+      'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     isError &&
-    'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+      'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
   // Desktop: Show first 4 actions inline, rest in overflow menu
   if (!isMobile) {
     return (
       <div className='flex w-full items-center justify-end gap-1'>
-        {/* Inline Action 1: Verify/Unverify */}
-        <Tooltip>
-          <TooltipTrigger asChild>
+        {/* Overflow Menu: Verify/Feature + other actions */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
               type='button'
               size='icon'
               variant='ghost'
-              className={cn(
-                'h-8 w-8 text-secondary-token hover:text-primary-token',
-                stateClass
-              )}
-              onClick={onToggleVerification}
+              className='h-8 w-8 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
               disabled={isLoading}
             >
-              {profile.isVerified ? (
-                <X className='h-4 w-4' />
-              ) : (
-                <Check className='h-4 w-4' />
-              )}
+              <MoreHorizontal className='h-4 w-4' />
             </Button>
-          </TooltipTrigger>
-          <TooltipContent side='top'>
-            {profile.isVerified ? 'Unverify creator' : 'Verify creator'}
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Inline Action 2: Featured */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              className={cn(
-                'h-8 w-8 text-secondary-token hover:text-primary-token',
-                stateClass
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align='end'
+            sideOffset={8}
+            className={geistTableMenuContentClass}
+          >
+            <DropdownMenuItem
+              onClick={onToggleVerification}
+              className={geistTableMenuItemClass}
+            >
+              {profile.isVerified ? (
+                <>
+                  <X className='h-4 w-4' />
+                  Unverify creator
+                </>
+              ) : (
+                <>
+                  <Check className='h-4 w-4' />
+                  Verify creator
+                </>
               )}
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
               onClick={onToggleFeatured}
-              disabled={isLoading}
+              className={geistTableMenuItemClass}
             >
               <Star
                 className={cn(
@@ -139,69 +141,59 @@ export function CreatorActionsMenu({
                   profile.isFeatured && 'fill-yellow-400 text-yellow-400'
                 )}
               />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side='top'>Toggle featured status</TooltipContent>
-        </Tooltip>
+              {profile.isFeatured ? 'Unfeature' : 'Feature'}
+            </DropdownMenuItem>
 
-        {/* Overflow Menu: Marketing toggle, View profile, Copy Claim Link, Delete */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type='button'
-              size='icon'
-              variant='ghost'
-              className='h-8 w-8 text-secondary-token hover:text-primary-token'
-              disabled={isLoading}
+            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+
+            <DropdownMenuItem
+              onClick={onToggleMarketing}
+              className={geistTableMenuItemClass}
             >
-              <MoreHorizontal className='h-4 w-4' />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='end' sideOffset={8}>
-            <DropdownMenuItem onClick={onToggleMarketing}>
               {profile.marketingOptOut ? (
                 <>
-                  <Mail className='h-4 w-4 mr-2' />
+                  <Mail className='h-4 w-4' />
                   Enable marketing emails
                 </>
               ) : (
                 <>
-                  <MailX className='h-4 w-4 mr-2' />
+                  <MailX className='h-4 w-4' />
                   Disable marketing emails
                 </>
               )}
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem asChild>
+            <DropdownMenuItem asChild className={geistTableMenuItemClass}>
               <Link
                 href={`/${profile.username}`}
                 target='_blank'
                 rel='noopener noreferrer'
                 onClick={e => e.stopPropagation()}
               >
-                <ExternalLink className='h-4 w-4 mr-2' />
+                <ExternalLink className='h-4 w-4' />
                 View profile
               </Link>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
-
             {!profile.isClaimed && profile.claimToken && (
-              <DropdownMenuItem onClick={handleCopyClaimLink}>
-                <Copy className='h-4 w-4 mr-2' />
+              <DropdownMenuItem
+                onClick={handleCopyClaimLink}
+                className={geistTableMenuItemClass}
+              >
+                <Copy className='h-4 w-4' />
                 {copySuccess ? 'Copied!' : 'Copy claim link'}
               </DropdownMenuItem>
             )}
-            {!profile.isClaimed && profile.claimToken && (
-              <DropdownMenuSeparator />
-            )}
+
+            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
             <DropdownMenuItem
               onClick={onDelete}
-              className='text-destructive focus:text-destructive'
+              className={cn(
+                geistTableMenuItemClass,
+                geistTableMenuDestructiveItemClass
+              )}
             >
-              <Trash2 className='h-4 w-4 mr-2' />
+              <Trash2 className='h-4 w-4' />
               {profile.isClaimed ? 'Delete user' : 'Delete creator'}
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -225,76 +217,95 @@ export function CreatorActionsMenu({
           <MoreVertical className='h-4 w-4 ml-1' />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align='end' sideOffset={8} className='w-48'>
-        <DropdownMenuItem onClick={onToggleVerification}>
+      <DropdownMenuContent
+        align='end'
+        sideOffset={8}
+        className={cn('w-56', geistTableMenuContentClass)}
+      >
+        <DropdownMenuItem
+          onClick={onToggleVerification}
+          className={geistTableMenuItemClass}
+        >
           {profile.isVerified ? (
             <>
-              <X className='h-4 w-4 mr-2' />
+              <X className='h-4 w-4' />
               Unverify creator
             </>
           ) : (
             <>
-              <Check className='h-4 w-4 mr-2' />
+              <Check className='h-4 w-4' />
               Verify creator
             </>
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onToggleFeatured}>
+        <DropdownMenuItem
+          onClick={onToggleFeatured}
+          className={geistTableMenuItemClass}
+        >
           <Star
             className={cn(
-              'h-4 w-4 mr-2',
+              'h-4 w-4',
               profile.isFeatured && 'fill-yellow-400 text-yellow-400'
             )}
           />
           {profile.isFeatured ? 'Unfeature' : 'Feature'}
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={onToggleMarketing}>
+        <DropdownMenuItem
+          onClick={onToggleMarketing}
+          className={geistTableMenuItemClass}
+        >
           {profile.marketingOptOut ? (
             <>
-              <Mail className='h-4 w-4 mr-2' />
+              <Mail className='h-4 w-4' />
               Enable marketing emails
             </>
           ) : (
             <>
-              <MailX className='h-4 w-4 mr-2' />
+              <MailX className='h-4 w-4' />
               Disable marketing emails
             </>
           )}
         </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
 
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild className={geistTableMenuItemClass}>
           <Link
             href={`/${profile.username}`}
             target='_blank'
             rel='noopener noreferrer'
             onClick={e => e.stopPropagation()}
           >
-            <ExternalLink className='h-4 w-4 mr-2' />
+            <ExternalLink className='h-4 w-4' />
             View profile
           </Link>
         </DropdownMenuItem>
 
         {!profile.isClaimed && profile.claimToken && (
           <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleCopyClaimLink}>
-              <Copy className='h-4 w-4 mr-2' />
+            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+            <DropdownMenuItem
+              onClick={handleCopyClaimLink}
+              className={geistTableMenuItemClass}
+            >
+              <Copy className='h-4 w-4' />
               {copySuccess ? 'Copied!' : 'Copy claim link'}
             </DropdownMenuItem>
           </>
         )}
 
-        <DropdownMenuSeparator />
+        <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
 
         <DropdownMenuItem
           onClick={onDelete}
-          className='text-destructive focus:text-destructive'
+          className={cn(
+            geistTableMenuItemClass,
+            geistTableMenuDestructiveItemClass
+          )}
         >
-          <Trash2 className='h-4 w-4 mr-2' />
+          <Trash2 className='h-4 w-4' />
           {profile.isClaimed ? 'Delete user' : 'Delete creator'}
         </DropdownMenuItem>
       </DropdownMenuContent>

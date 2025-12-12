@@ -61,6 +61,7 @@ const DB_CONFIG = {
 } as const;
 
 const positiveTableExistenceCache = new Set<string>();
+let lastTableExistenceDatabaseUrl: string | null = null;
 
 // Enhanced logging for database operations
 function logDbError(
@@ -383,6 +384,11 @@ export async function withTransaction<T>(
 }
 
 export async function doesTableExist(tableName: string): Promise<boolean> {
+  if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
+    positiveTableExistenceCache.clear();
+    lastTableExistenceDatabaseUrl = env.DATABASE_URL;
+  }
+
   if (positiveTableExistenceCache.has(tableName)) {
     return true;
   }

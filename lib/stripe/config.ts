@@ -26,47 +26,56 @@ interface PriceMapping {
 
 // Current active price mappings
 // These will be updated when switching from intro to standard pricing
-export const PRICE_MAPPINGS: Record<string, PriceMapping> = {
-  // Introductory pricing (currently active)
-  [INTRO_MONTHLY_PRICE_ID]: {
-    priceId: INTRO_MONTHLY_PRICE_ID,
-    plan: 'pro_lite',
-    amount: 500, // $5.00 in cents
-    currency: 'usd',
-    interval: 'month',
-    isIntroductory: true,
-    description: 'Pro Lite Monthly (Intro)',
-  },
-  [env.STRIPE_PRICE_INTRO_YEARLY || '']: {
-    priceId: env.STRIPE_PRICE_INTRO_YEARLY || '',
-    plan: 'pro_lite',
-    amount: 2500, // $25.00 in cents
-    currency: 'usd',
-    interval: 'year',
-    isIntroductory: true,
-    description: 'Pro Lite Yearly (Intro)',
-  },
+const buildPriceMappings = (): Record<string, PriceMapping> => {
+  const mappings: PriceMapping[] = [
+    {
+      priceId: INTRO_MONTHLY_PRICE_ID,
+      plan: 'pro_lite',
+      amount: 500,
+      currency: 'usd',
+      interval: 'month',
+      isIntroductory: true,
+      description: 'Pro Lite Monthly (Intro)',
+    },
+    {
+      priceId: env.STRIPE_PRICE_INTRO_YEARLY || '',
+      plan: 'pro_lite',
+      amount: 2500,
+      currency: 'usd',
+      interval: 'year',
+      isIntroductory: true,
+      description: 'Pro Lite Yearly (Intro)',
+    },
+    {
+      priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
+      plan: 'pro',
+      amount: 1200,
+      currency: 'usd',
+      interval: 'month',
+      isIntroductory: false,
+      description: 'Pro Monthly (Standard)',
+    },
+    {
+      priceId: env.STRIPE_PRICE_STANDARD_YEARLY || '',
+      plan: 'pro',
+      amount: 4800,
+      currency: 'usd',
+      interval: 'year',
+      isIntroductory: false,
+      description: 'Pro Yearly (Standard)',
+    },
+  ];
 
-  // Standard pricing (inactive, for future cutover)
-  [env.STRIPE_PRICE_STANDARD_MONTHLY || '']: {
-    priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
-    plan: 'pro',
-    amount: 1200, // $12.00 in cents
-    currency: 'usd',
-    interval: 'month',
-    isIntroductory: false,
-    description: 'Pro Monthly (Standard)',
-  },
-  [env.STRIPE_PRICE_STANDARD_YEARLY || '']: {
-    priceId: env.STRIPE_PRICE_STANDARD_YEARLY || '',
-    plan: 'pro',
-    amount: 4800, // $48.00 in cents
-    currency: 'usd',
-    interval: 'year',
-    isIntroductory: false,
-    description: 'Pro Yearly (Standard)',
-  },
+  return mappings
+    .filter(mapping => Boolean(mapping.priceId))
+    .reduce<Record<string, PriceMapping>>((acc, mapping) => {
+      acc[mapping.priceId] = mapping;
+      return acc;
+    }, {});
 };
+
+export const PRICE_MAPPINGS: Record<string, PriceMapping> =
+  buildPriceMappings();
 
 /**
  * Get plan type from Stripe price ID
@@ -82,9 +91,12 @@ export function getPlanFromPriceId(priceId: string): PlanType | null {
  * Returns only introductory prices for now
  */
 export function getActivePriceIds(): string[] {
-  return Object.values(PRICE_MAPPINGS)
-    .filter(mapping => mapping.isIntroductory && mapping.priceId)
-    .map(mapping => mapping.priceId);
+  const allMappings = Object.values(PRICE_MAPPINGS);
+  const hasIntro = allMappings.some(mapping => mapping.isIntroductory);
+  const activeMappings = hasIntro
+    ? allMappings.filter(mapping => mapping.isIntroductory)
+    : allMappings.filter(mapping => !mapping.isIntroductory);
+  return activeMappings.map(mapping => mapping.priceId);
 }
 
 /**
@@ -99,9 +111,12 @@ export function getPriceMappingDetails(priceId: string): PriceMapping | null {
  * Filters based on what's currently active
  */
 export function getAvailablePricing() {
-  return Object.values(PRICE_MAPPINGS)
-    .filter(mapping => mapping.isIntroductory && mapping.priceId)
-    .sort((a, b) => a.amount - b.amount); // Sort by price, lowest first
+  const allMappings = Object.values(PRICE_MAPPINGS);
+  const hasIntro = allMappings.some(mapping => mapping.isIntroductory);
+  const activeMappings = hasIntro
+    ? allMappings.filter(mapping => mapping.isIntroductory)
+    : allMappings.filter(mapping => !mapping.isIntroductory);
+  return activeMappings.sort((a, b) => a.amount - b.amount);
 }
 
 /**
