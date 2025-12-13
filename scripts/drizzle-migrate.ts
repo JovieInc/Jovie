@@ -10,7 +10,7 @@
  * - Handles environment variable validation
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/neon-serverless';
@@ -237,6 +237,12 @@ async function runMigrations() {
 
     // Create connection pool with Neon serverless driver
     pool = new Pool({ connectionString: databaseUrl });
+
+    pool.on('connect', (client: PoolClient) => {
+      client
+        .query("SET app.allow_schema_changes = 'true'")
+        .catch(() => undefined);
+    });
 
     db = drizzle(pool);
 
