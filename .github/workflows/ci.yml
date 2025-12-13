@@ -632,6 +632,7 @@ jobs:
         run: |
           echo "Running canary health check on main deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
+          health_url="${deployment_url%/}/api/health"
 
           # Wait a moment for deployment to be ready
           sleep 10
@@ -642,7 +643,7 @@ jobs:
           max_attempts=6
           response_code="000"
           while [ $attempt -le $max_attempts ]; do
-            response_code=$(curl -s -o /dev/null -A "$USER_AGENT" -w "%{http_code}" "$deployment_url" || echo "000")
+            response_code=$(curl -s -o /dev/null -A "$USER_AGENT" -H "Accept: application/json" -w "%{http_code}" "$health_url" || echo "000")
 
             if [ "$response_code" = "200" ]; then
               break
@@ -665,11 +666,16 @@ jobs:
             exit 1
           fi
 
-          # Basic health check - verify site loads and key elements exist
-          # Check for key content (adjust selector as needed)
-          page_content=$(curl -s -A "$USER_AGENT" "$deployment_url" || echo "")
-          if [[ ! "$page_content" =~ "Jovie" ]]; then
-            echo "❌ Canary failed: Key content missing"
+          health_content=$(curl -s -A "$USER_AGENT" -H "Accept: application/json" "$health_url" || echo "")
+          if [[ ! "$health_content" =~ '"status":"ok"' ]]; then
+            echo "❌ Canary failed: Health status not ok"
+            echo "Health response: $health_content"
+            exit 1
+          fi
+
+          if [[ ! "$health_content" =~ '"database":\{"ok":true' ]]; then
+            echo "❌ Canary failed: Database health not ok"
+            echo "Health response: $health_content"
             exit 1
           fi
 
