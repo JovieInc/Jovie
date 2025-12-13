@@ -33,6 +33,8 @@
     "lint:fix": "eslint --fix .",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo",
     "pre-push": "pnpm run tailwind:check && pnpm run typecheck && pnpm run lint",
+    "ship": "pnpm run migration:guard && pnpm run migration:validate && pnpm run drizzle:migrate && pnpm run drizzle:check && pnpm run typecheck && pnpm run lint && pnpm run test",
+    "ship:pr": "tsx scripts/ship-pr.ts",
     "check": "pnpm run validate && pnpm run build && pnpm run test",
     "check:ci": "pnpm run validate && pnpm run test:ci",
     "validate": "pnpm run format:check && pnpm run lint && pnpm run typecheck",
