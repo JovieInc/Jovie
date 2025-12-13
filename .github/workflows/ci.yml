@@ -74,8 +74,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
-      db_url: ${{ steps.finalize-urls.outputs.db_url }}
-      db_url_pooled: ${{ steps.finalize-urls.outputs.db_url_pooled }}
+      branch_name: ${{ steps.sanitize-branch.outputs.name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -115,8 +114,9 @@ jobs:
             exit 1
           fi
 
-          echo "db_url=$DB_URL" >> $GITHUB_OUTPUT
-          echo "db_url_pooled=$DB_URL_POOLED" >> $GITHUB_OUTPUT
+          # Intentionally do NOT expose DB_URL via job outputs.
+          # GitHub will drop outputs that look like secrets, which breaks downstream jobs.
+          echo "Neon DB URL resolved for this job."
 
   drizzle-migration-guard:
     name: Migration Guard
@@ -189,10 +189,20 @@ jobs:
           echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
+      - name: Resolve Neon DB URL (job-local)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve_neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.neon-db.outputs.branch_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db job outputs"
             echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
@@ -426,10 +436,20 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
+      - name: Resolve Neon DB URL (job-local)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: resolve_neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ needs.neon-db.outputs.branch_name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
       - name: Resolve DATABASE_URL for E2E
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
-          CANDIDATE="${{ needs.neon-db.outputs.db_url }}"
+          CANDIDATE="${{ steps.resolve_neon.outputs.db_url }}"
           SRC=""
           if [ -n "$CANDIDATE" ]; then
             echo "Using Neon DB URL from neon-db job outputs"
