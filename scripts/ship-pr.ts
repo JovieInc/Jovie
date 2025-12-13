@@ -111,6 +111,14 @@ function cmdStdout(command: string): string {
   }).trim();
 }
 
+function tryCmdStdout(command: string): string | undefined {
+  try {
+    return cmdStdout(command);
+  } catch {
+    return undefined;
+  }
+}
+
 function runOrThrow(command: string, args: string[], dryRun: boolean): void {
   const pretty = [command, ...args].join(' ');
   console.log(pretty);
@@ -124,6 +132,15 @@ function runOrThrow(command: string, args: string[], dryRun: boolean): void {
 
   if (res.status !== 0) {
     throw new Error(`Command failed (${res.status ?? 'unknown'}): ${pretty}`);
+  }
+}
+
+function hasUpstreamConfigured(): boolean {
+  try {
+    cmdStdout('git rev-parse --abbrev-ref --symbolic-full-name @{u}');
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -152,10 +169,28 @@ function buildPrBody(opts: {
   return `## Goal\n\n${goal}\n\n## KPI (if applicable)\n\n${kpi}\n\n## Rollback plan\n\n${rollback}`;
 }
 
+function findAvailableBranchName(desiredBranch: string): string {
+  const exists = (branch: string): boolean => {
+    try {
+      cmdStdout(`git rev-parse --verify ${branch}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!exists(desiredBranch)) return desiredBranch;
+  for (let i = 2; i <= 50; i += 1) {
+    const candidate = `${desiredBranch}-${i}`;
+    if (!exists(candidate)) return candidate;
+  }
+  throw new Error(`Branch name collision: ${desiredBranch} (and -2..-50)`);
+}
+
 function main(): void {
   const opts = parseArgs(process.argv.slice(2));
 
-  const currentBranch = cmdStdout('git rev-parse --abbrev-ref HEAD');
+  let currentBranch = cmdStdout('git rev-parse --abbrev-ref HEAD');
 
   if (currentBranch === 'production') {
     throw new Error(
@@ -176,23 +211,7 @@ function main(): void {
 
   const desiredBranch = `${type}/${slug}`;
 
-  const resolvedBranch = (() => {
-    if (currentBranch !== 'main') return desiredBranch;
-    try {
-      cmdStdout(`git rev-parse --verify ${desiredBranch}`);
-      for (let i = 2; i <= 50; i += 1) {
-        const candidate = `${desiredBranch}-${i}`;
-        try {
-          cmdStdout(`git rev-parse --verify ${candidate}`);
-        } catch {
-          return candidate;
-        }
-      }
-      throw new Error(`Branch name collision: ${desiredBranch} (and -2..-50)`);
-    } catch {
-      return desiredBranch;
-    }
-  })();
+  const resolvedBranch = findAvailableBranchName(desiredBranch);
 
   if (currentBranch === 'main') {
     const status = cmdStdout('git status --porcelain');
@@ -206,6 +225,14 @@ function main(): void {
     }
 
     runOrThrow('git', ['checkout', '-b', resolvedBranch], opts.dryRun);
+    currentBranch = resolvedBranch;
+  }
+
+  if (currentBranch !== 'main' && currentBranch !== resolvedBranch) {
+    if (opts.type || opts.slug) {
+      runOrThrow('git', ['checkout', '-b', resolvedBranch], opts.dryRun);
+      currentBranch = resolvedBranch;
+    }
   }
 
   runOrThrow('pnpm', ['ship'], opts.dryRun);
@@ -213,27 +240,34 @@ function main(): void {
   runOrThrow('git', ['add', '-A'], opts.dryRun);
 
   const hasStaged = cmdStdout('git diff --cached --name-only');
-  if (!hasStaged) {
-    console.log('No staged changes after pnpm ship; nothing to commit.');
-    return;
+  if (hasStaged) {
+    runOrThrow('git', ['commit', '-m', `${type}: ${slug}`], opts.dryRun);
+  } else {
+    console.log('No staged changes after pnpm ship; skipping commit.');
   }
 
-  runOrThrow('git', ['commit', '-m', `${type}: ${slug}`], opts.dryRun);
-
   if (!opts.noPush) {
-    runOrThrow('git', ['push', '-u', 'origin', 'HEAD'], opts.dryRun);
+    const pushArgs = hasUpstreamConfigured()
+      ? ['push', 'origin', 'HEAD']
+      : ['push', '-u', 'origin', 'HEAD'];
+    runOrThrow('git', pushArgs, opts.dryRun);
   }
 
   if (!opts.noPr) {
-    let prExists = false;
-    try {
-      cmdStdout('gh pr view --json number');
-      prExists = true;
-    } catch {
-      prExists = false;
-    }
+    const prJson = tryCmdStdout('gh pr view --json number,state');
+    const prState = (() => {
+      if (!prJson) return undefined;
+      try {
+        const parsed = JSON.parse(prJson) as { state?: string };
+        return parsed.state;
+      } catch {
+        return undefined;
+      }
+    })();
 
-    if (!prExists) {
+    const hasOpenPr = prState === 'OPEN';
+
+    if (!hasOpenPr) {
       runOrThrow(
         'gh',
         [
