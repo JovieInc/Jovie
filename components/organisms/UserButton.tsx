@@ -27,19 +27,17 @@ interface UserButtonProps {
   showUserInfo?: boolean;
 }
 
-type PricingInterval = 'day' | 'week' | 'month' | 'year' | string;
+interface StripeRedirectResponse {
+  url?: string;
+}
 
 interface PricingOption {
-  interval: PricingInterval;
+  interval: 'month' | 'year';
   priceId: string;
 }
 
 interface PricingOptionsResponse {
   pricingOptions: PricingOption[];
-}
-
-interface StripeRedirectResponse {
-  url?: string;
 }
 
 const ANALYTICS_CONTEXT = {
@@ -179,6 +177,74 @@ export function UserButton({
     }
   };
 
+  const handleUpgradeToPro = async () => {
+    if (isUpgradeLoading) return;
+    setIsUpgradeLoading(true);
+
+    try {
+      track('billing_upgrade_clicked', {
+        ...ANALYTICS_CONTEXT,
+        plan: billingStatus.plan ?? 'unknown',
+      });
+
+      const pricingResponse = await fetch('/api/stripe/pricing-options');
+      if (!pricingResponse.ok) {
+        throw new Error('Failed to load pricing options');
+      }
+
+      const pricingData =
+        (await pricingResponse.json()) as PricingOptionsResponse;
+      const monthPrice = pricingData.pricingOptions.find(
+        option => option.interval === 'month'
+      );
+
+      if (!monthPrice) {
+        throw new Error('Monthly pricing option missing');
+      }
+
+      const checkoutResponse = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: monthPrice.priceId }),
+      });
+
+      if (!checkoutResponse.ok) {
+        throw new Error('Failed to create checkout session');
+      }
+
+      const checkout =
+        (await checkoutResponse.json()) as StripeRedirectResponse;
+      if (!checkout.url) {
+        throw new Error('Checkout URL missing from response');
+      }
+
+      track('billing_upgrade_checkout_redirected', {
+        ...ANALYTICS_CONTEXT,
+        interval: monthPrice.interval,
+      });
+
+      redirectToUrl(checkout.url);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Unable to start upgrade';
+
+      track('billing_upgrade_failed', {
+        ...ANALYTICS_CONTEXT,
+        plan: billingStatus.plan ?? 'unknown',
+        reason: message,
+      });
+
+      showToast({
+        type: 'error',
+        message:
+          "We couldn't start your upgrade just now. Please try again in a moment.",
+        duration: 6000,
+      });
+    } finally {
+      setIsUpgradeLoading(false);
+    }
+  };
+
   const profileUrl =
     profileHref ??
     (user?.username
@@ -266,86 +332,6 @@ export function UserButton({
     }
   };
 
-  const handleUpgrade = async () => {
-    if (isUpgradeLoading) return;
-    setIsUpgradeLoading(true);
-
-    try {
-      track('billing_upgrade_clicked', {
-        ...ANALYTICS_CONTEXT,
-        currentPlan: billingStatus.plan ?? 'free',
-      });
-
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      if (!pricingResponse.ok)
-        throw new Error('Failed to fetch pricing options');
-
-      const { pricingOptions } =
-        (await pricingResponse.json()) as PricingOptionsResponse;
-
-      if (!Array.isArray(pricingOptions) || pricingOptions.length === 0) {
-        throw new Error('No pricing options available');
-      }
-
-      const preferredPlan =
-        pricingOptions.find(option => option.interval === 'month') ||
-        pricingOptions[0];
-
-      if (!preferredPlan?.priceId) {
-        throw new Error('Pricing option missing price identifier');
-      }
-
-      track('billing_upgrade_checkout_requested', {
-        ...ANALYTICS_CONTEXT,
-        interval: preferredPlan.interval,
-      });
-
-      const checkoutResponse = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: preferredPlan.priceId }),
-      });
-
-      if (!checkoutResponse.ok)
-        throw new Error('Failed to create checkout session');
-      const checkout =
-        (await checkoutResponse.json()) as StripeRedirectResponse;
-
-      if (!checkout.url) {
-        throw new Error('Checkout URL missing from response');
-      }
-
-      track('billing_upgrade_checkout_redirected', {
-        ...ANALYTICS_CONTEXT,
-        interval: preferredPlan.interval,
-      });
-
-      redirectToUrl(checkout.url);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to start upgrade checkout';
-
-      track('billing_upgrade_failed', {
-        ...ANALYTICS_CONTEXT,
-        currentPlan: billingStatus.plan ?? 'free',
-        reason: message,
-      });
-
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't start the upgrade checkout. We're opening the pricing page so you can retry in a moment.",
-        duration: 6000,
-      });
-
-      router.push('/pricing');
-    } finally {
-      setIsUpgradeLoading(false);
-    }
-  };
-
   const jovieUsername =
     user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
   const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
@@ -377,7 +363,7 @@ export function UserButton({
                     size='sm'
                     className='shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide'
                   >
-                    Pro
+                    Standard
                   </Badge>
                 )}
               </div>
@@ -408,7 +394,7 @@ export function UserButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-sidebar-border bg-sidebar-surface p-2 font-sans text-[13px] leading-[18px] text-sidebar-foreground shadow-lg'
+        className='w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-sidebar-border bg-sidebar-surface p-2 font-sans text-[13px] leading-[18px] text-sidebar-foreground shadow-md backdrop-blur-none'
       >
         <DropdownMenuItem
           onClick={handleProfile}
@@ -490,7 +476,21 @@ export function UserButton({
               {isManageBillingLoading ? 'Opening…' : 'Manage billing'}
             </span>
           </DropdownMenuItem>
-        ) : null}
+        ) : (
+          <DropdownMenuItem
+            onClick={handleUpgradeToPro}
+            disabled={isUpgradeLoading}
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover disabled:cursor-not-allowed disabled:opacity-70'
+          >
+            <Icon
+              name='Sparkles'
+              className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
+            />
+            <span className='flex-1'>
+              {isUpgradeLoading ? 'Opening…' : 'Upgrade to Pro'}
+            </span>
+          </DropdownMenuItem>
+        )}
 
         {/* Feedback */}
         <DropdownMenuItem
@@ -520,21 +520,6 @@ export function UserButton({
             {isLoading ? 'Signing out…' : 'Sign out'}
           </span>
         </DropdownMenuItem>
-
-        {/* Upgrade CTA - text-only button, theme-aware colors */}
-        {!billingStatus.isPro && !billingStatus.loading && (
-          <div className='pt-2 pb-1 px-1'>
-            <Button
-              type='button'
-              onClick={handleUpgrade}
-              disabled={isUpgradeLoading}
-              variant='primary'
-              className='w-full justify-center rounded-lg text-[13px] font-semibold'
-            >
-              {isUpgradeLoading ? 'Upgrading…' : 'Upgrade to Pro'}
-            </Button>
-          </div>
-        )}
       </DropdownMenuContent>
       <FeedbackModal
         isOpen={isFeedbackOpen}

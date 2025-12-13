@@ -109,27 +109,29 @@ export function DashboardSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className='mt-auto'>
-        <SidebarSeparator className='mx-0' />
-        <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
-          <DashboardRemoveBrandingCard />
-        </div>
-        <div className='px-2 py-3'>
-          <div
-            className={cn(
-              isCollapsed
-                ? 'flex items-center justify-center'
-                : 'flex items-center'
-            )}
-          >
-            <UserButton
-              showUserInfo={!isCollapsed}
-              profileHref={profileHref}
-              settingsHref='/app/settings'
-            />
+      {!isInSettings && (
+        <SidebarFooter className='mt-auto'>
+          <SidebarSeparator className='mx-0' />
+          <div className='px-2 pt-3 group-data-[collapsible=icon]:hidden'>
+            <DashboardRemoveBrandingCard />
           </div>
-        </div>
-      </SidebarFooter>
+          <div className='px-2 py-3'>
+            <div
+              className={cn(
+                isCollapsed
+                  ? 'flex items-center justify-center'
+                  : 'flex items-center'
+              )}
+            >
+              <UserButton
+                showUserInfo={!isCollapsed}
+                profileHref={profileHref}
+                settingsHref='/app/settings'
+              />
+            </div>
+          </div>
+        </SidebarFooter>
+      )}
       <SidebarRail />
     </Sidebar>
   );

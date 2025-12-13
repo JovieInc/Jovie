@@ -1,11 +1,9 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
-import { AnalyticsCards } from '@/components/dashboard/molecules/AnalyticsCards';
-import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
-import { DashboardActivityFeed } from '@/components/dashboard/organisms/DashboardActivityFeed';
+import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { APP_URL } from '@/constants/app';
 import type { Artist } from '@/types/db';
@@ -57,54 +55,69 @@ export function DashboardOverview({
     return `${base}/${path}`;
   })();
 
+  const greetingName = (() => {
+    const raw = (artist.name || 'Artist').trim();
+    const first = raw.split(/\s+/)[0];
+    return first || 'Artist';
+  })();
+
   const header = (
-    <header className='flex flex-col gap-1.5 rounded-2xl bg-transparent p-1 md:flex-row md:items-center md:justify-between'>
-      <div className='space-y-1'>
-        <h1 className='text-xl font-semibold text-primary-token'>
-          Welcome back, {artist.name || 'Artist'}
-        </h1>
+    <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-1'>
+      <div className='space-y-0.5'>
+        <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
+          <h1 className='text-xl font-semibold text-primary-token'>
+            Welcome back, {greetingName}
+          </h1>
+          <div className='flex items-center gap-1.5'>
+            <Button
+              asChild
+              variant='secondary'
+              size='sm'
+              className='h-8 w-8 rounded-full p-0'
+            >
+              <Link
+                href={`/${artist.handle}`}
+                aria-label='View profile'
+                target='_blank'
+                rel='noopener noreferrer'
+              >
+                <Icon
+                  name='ArrowUpRight'
+                  className='h-4 w-4'
+                  aria-hidden='true'
+                />
+                <span className='sr-only'>View profile</span>
+              </Link>
+            </Button>
+            <CopyToClipboardButton
+              relativePath={`/${artist.handle}`}
+              idleLabel='Copy URL'
+              iconName='Copy'
+              className='h-8 w-8 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+            />
+          </div>
+        </div>
         <p className='text-sm text-secondary-token'>
           Keep your profile polished and ready to share.
         </p>
-      </div>
-      <div className='flex flex-wrap gap-2'>
-        <DashboardRefreshButton ariaLabel='Refresh dashboard' />
-        <Button
-          asChild
-          variant='secondary'
-          size='sm'
-          className='rounded-full px-3 text-[13px] font-semibold'
-        >
-          <Link
-            href={`/${artist.handle}`}
-            target='_blank'
-            rel='noopener noreferrer'
-          >
-            View profile
-          </Link>
-        </Button>
-        <CopyToClipboardButton
-          relativePath={`/${artist.handle}`}
-          idleLabel='Copy URL'
-          className='rounded-full border border-subtle px-3 text-[13px] font-semibold bg-transparent text-primary-token hover:bg-surface-2'
-        />
       </div>
     </header>
   );
 
   if (!allTasksComplete) {
     return (
-      <div className='space-y-5'>
+      <div className='space-y-2'>
         {header}
 
-        <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
-          <AnalyticsCards profileUrl={profileUrl} />
-        </section>
+        <DashboardOverviewMetricsClient
+          profileId={artist.id}
+          profileUrl={profileUrl}
+        />
 
         <section className='rounded-2xl border-0 bg-transparent p-1'>
-          <div className='space-y-2 rounded-2xl bg-surface-1/40 p-4 shadow-none'>
-            <div className='flex items-center justify-between gap-3'>
-              <div className='space-y-1'>
+          <div className='space-y-2 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
+            <div className='flex items-center justify-between gap-2.5'>
+              <div className='space-y-0.5'>
                 <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
                   Complete your setup
                 </p>
@@ -123,7 +136,7 @@ export function DashboardOverview({
               </p>
             </div>
 
-            <ol className='grid list-none grid-cols-1 gap-3 pl-0 md:grid-cols-3'>
+            <ol className='grid list-none grid-cols-1 gap-2.5 pl-0 md:grid-cols-3'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'
@@ -182,25 +195,14 @@ export function DashboardOverview({
   }
 
   return (
-    <div className='space-y-5'>
+    <div className='space-y-2'>
       {header}
 
-      <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
-        <div className='space-y-3'>
-          <CompletionBanner />
-        </div>
-      </section>
-
-      <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
-        <AnalyticsCards profileUrl={profileUrl} />
-      </section>
-
-      <section className='rounded-2xl bg-surface-1/40 p-4 shadow-none'>
-        <DashboardActivityFeed
-          profileId={artist.id}
-          profileHandle={artist.handle}
-        />
-      </section>
+      <DashboardOverviewMetricsClient
+        profileId={artist.id}
+        profileUrl={profileUrl}
+        showActivity
+      />
     </div>
   );
 }

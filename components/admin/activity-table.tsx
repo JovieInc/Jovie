@@ -21,7 +21,7 @@ interface ActivityTableProps {
 
 export function ActivityTable({ items }: ActivityTableProps) {
   return (
-    <Card className='h-full border-subtle bg-surface-1/80 overflow-hidden'>
+    <Card className='h-full border-subtle bg-surface-1/80'>
       <CardHeader className='space-y-1'>
         <CardTitle className='text-lg'>Recent activity</CardTitle>
         <p className='text-xs text-secondary-token'>Last 7 days.</p>
@@ -30,14 +30,22 @@ export function ActivityTable({ items }: ActivityTableProps) {
         <div className='overflow-x-auto'>
           <table className='w-full border-collapse text-sm'>
             <thead className='text-left text-secondary-token'>
-              <tr className='border-b border-subtle/60 text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='px-4 py-3'>User</th>
-                <th className='px-4 py-3'>Action</th>
-                <th className='hidden px-4 py-3 md:table-cell'>Timestamp</th>
-                <th className='px-4 py-3 text-right'>Status</th>
+              <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3'>
+                  User
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3'>
+                  Action
+                </th>
+                <th className='sticky top-0 z-10 hidden bg-surface-1/80 px-4 py-3 md:table-cell'>
+                  Timestamp
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3 text-right'>
+                  Status
+                </th>
               </tr>
             </thead>
-            <tbody className='divide-y divide-subtle/60'>
+            <tbody>
               {items.length === 0 ? (
                 <tr>
                   <td
@@ -51,7 +59,7 @@ export function ActivityTable({ items }: ActivityTableProps) {
                 items.map(item => (
                   <tr
                     key={item.id}
-                    className='hover:bg-surface-2/60 transition-colors'
+                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2/60 transition-colors'
                   >
                     <td className='px-4 py-3 font-medium text-primary-token whitespace-nowrap'>
                       {item.user}

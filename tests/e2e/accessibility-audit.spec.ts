@@ -222,6 +222,7 @@ test.describe('Accessibility Audit', () => {
       '/app/settings',
       '/app/dashboard/links',
       '/account',
+      '/app/admin/creators',
       '/app/admin/users',
       '/app/admin/activity',
       '/app/admin',

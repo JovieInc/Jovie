@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { track } from '@/lib/analytics';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -13,6 +14,7 @@ export interface CopyToClipboardButtonProps {
   successLabel?: string;
   errorLabel?: string;
   className?: string;
+  iconName?: string;
 }
 
 export function CopyToClipboardButton({
@@ -21,6 +23,7 @@ export function CopyToClipboardButton({
   successLabel = '✓ Copied!',
   errorLabel = 'Failed to copy',
   className,
+  iconName,
 }: CopyToClipboardButtonProps) {
   const [status, setStatus] = useState<CopyStatus>('idle');
 
@@ -102,11 +105,34 @@ export function CopyToClipboardButton({
         onClick={onCopy}
         className={className}
       >
-        {status === 'success'
-          ? successLabel
-          : status === 'error'
-            ? errorLabel
-            : idleLabel}
+        {iconName ? (
+          <>
+            <Icon
+              name={
+                status === 'success'
+                  ? 'Check'
+                  : status === 'error'
+                    ? 'X'
+                    : iconName
+              }
+              className='h-4 w-4'
+              aria-hidden='true'
+            />
+            <span className='sr-only'>
+              {status === 'success'
+                ? successLabel
+                : status === 'error'
+                  ? errorLabel
+                  : idleLabel}
+            </span>
+          </>
+        ) : status === 'success' ? (
+          successLabel
+        ) : status === 'error' ? (
+          errorLabel
+        ) : (
+          idleLabel
+        )}
       </Button>
       <span className='sr-only' aria-live='polite' role='status'>
         {status === 'success'

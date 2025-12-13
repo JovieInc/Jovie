@@ -110,6 +110,7 @@ export async function GET(request: Request) {
       return NextResponse.json(
         {
           profile_views: 0,
+          unique_users: 0,
           top_cities: [],
           top_countries: [],
           top_referrers: [],

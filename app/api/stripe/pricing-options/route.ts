@@ -16,7 +16,6 @@ export async function GET() {
       currency: option.currency,
       interval: option.interval,
       description: option.description,
-      isIntroductory: option.isIntroductory,
     }));
 
     return NextResponse.json({

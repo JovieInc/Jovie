@@ -44,6 +44,8 @@ export default function SidebarDemoPage() {
     isAdmin: false,
     tippingStats: {
       tipClicks: 120,
+      qrTipClicks: 0,
+      linkTipClicks: 120,
       tipsSubmitted: 80,
       totalReceivedCents: 42000,
       monthReceivedCents: 0,

@@ -6,6 +6,8 @@ import {
   BarChart2,
   LayoutDashboard,
   ShieldCheck,
+  User,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import Image from 'next/image';
@@ -27,7 +29,9 @@ import { cn } from '@/lib/utils';
 
 const navItems = [
   { label: 'Overview', href: '/app/admin', icon: LayoutDashboard },
-  { label: 'Users', href: '/app/admin/users', icon: Users },
+  { label: 'Waitlist', href: '/app/admin/waitlist', icon: UserPlus },
+  { label: 'Creators', href: '/app/admin/creators', icon: Users },
+  { label: 'Users', href: '/app/admin/users', icon: User },
   { label: 'Usage', href: '/app/admin#usage', icon: BarChart2 },
   { label: 'Reliability', href: '/app/admin#errors', icon: ShieldCheck },
   { label: 'Activity', href: '/app/admin/activity', icon: Activity },

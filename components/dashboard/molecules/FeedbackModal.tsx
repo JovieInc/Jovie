@@ -81,7 +81,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
   );
 
   return (
-    <Dialog open={isOpen} onClose={handleClose} size='sm'>
+    <Dialog open={isOpen} onClose={handleClose} size='sm' hideClose>
       {isSubmitted ? (
         <div className='px-6 py-8 text-center'>
           <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'>
@@ -99,8 +99,8 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
         <>
           <div className='flex items-start justify-between gap-4'>
             <div>
-              <DialogTitle>Send feedback</DialogTitle>
-              <DialogDescription className='text-sm text-secondary-token'>
+              <DialogTitle className='text-balance'>Send feedback</DialogTitle>
+              <DialogDescription className='mt-1 text-sm text-secondary-token'>
                 Tell us what would make this dashboard feel even more
                 effortless.
               </DialogDescription>
@@ -111,7 +111,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               size='icon'
               onClick={handleClose}
               disabled={isSubmitting}
-              className='-mr-1 -mt-1 text-secondary-token hover:text-primary-token'
+              className='-mr-2 -mt-2 text-secondary-token hover:text-primary-token'
             >
               <X className='h-4 w-4' aria-hidden='true' />
               <span className='sr-only'>Close</span>
@@ -149,6 +149,7 @@ export function FeedbackModal({ isOpen, onClose }: FeedbackModalProps) {
               onClick={handleSubmit}
               disabled={!feedback.trim() || isSubmitting}
               loading={isSubmitting}
+              className='font-medium'
             >
               Send feedback
             </Button>

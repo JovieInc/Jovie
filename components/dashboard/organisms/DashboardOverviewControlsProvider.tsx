@@ -1,0 +1,54 @@
+'use client';
+
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useMemo,
+  useState,
+} from 'react';
+import type { AnalyticsRange } from '@/types/analytics';
+
+type DashboardOverviewRange = Extract<AnalyticsRange, '7d' | '30d'>;
+
+type DashboardOverviewControlsValue = {
+  range: DashboardOverviewRange;
+  setRange: (range: DashboardOverviewRange) => void;
+  refreshSignal: number;
+  triggerRefresh: () => void;
+};
+
+const DashboardOverviewControlsContext =
+  createContext<DashboardOverviewControlsValue | null>(null);
+
+export interface DashboardOverviewControlsProviderProps {
+  children: ReactNode;
+  defaultRange?: DashboardOverviewRange;
+}
+
+export function DashboardOverviewControlsProvider({
+  children,
+  defaultRange = '7d',
+}: DashboardOverviewControlsProviderProps) {
+  const [range, setRange] = useState<DashboardOverviewRange>(defaultRange);
+  const [refreshSignal, setRefreshSignal] = useState(0);
+
+  const triggerRefresh = useCallback(() => {
+    setRefreshSignal(prev => prev + 1);
+  }, []);
+
+  const value = useMemo<DashboardOverviewControlsValue>(() => {
+    return {
+      range,
+      setRange,
+      refreshSignal,
+      triggerRefresh,
+    };
+  }, [range, refreshSignal, triggerRefresh]);
+
+  return (
+    <DashboardOverviewControlsContext.Provider value={value}>
+      {children}
+    </DashboardOverviewControlsContext.Provider>
+  );
+}

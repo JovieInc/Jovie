@@ -7,11 +7,8 @@
 
 import { env } from '@/lib/env';
 
-const INTRO_MONTHLY_PRICE_ID =
-  env.STRIPE_PRICE_INTRO_MONTHLY || process.env.STRIPE_PRICE_PRO || '';
-
 // Plan types supported by the application
-export type PlanType = 'pro_lite' | 'pro';
+export type PlanType = 'standard';
 
 // Price mapping interface
 interface PriceMapping {
@@ -20,49 +17,27 @@ interface PriceMapping {
   amount: number;
   currency: string;
   interval: 'month' | 'year';
-  isIntroductory: boolean;
   description: string;
 }
 
 // Current active price mappings
-// These will be updated when switching from intro to standard pricing
 const buildPriceMappings = (): Record<string, PriceMapping> => {
   const mappings: PriceMapping[] = [
     {
-      priceId: INTRO_MONTHLY_PRICE_ID,
-      plan: 'pro_lite',
+      priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
+      plan: 'standard',
       amount: 500,
       currency: 'usd',
       interval: 'month',
-      isIntroductory: true,
-      description: 'Pro Lite Monthly (Intro)',
-    },
-    {
-      priceId: env.STRIPE_PRICE_INTRO_YEARLY || '',
-      plan: 'pro_lite',
-      amount: 2500,
-      currency: 'usd',
-      interval: 'year',
-      isIntroductory: true,
-      description: 'Pro Lite Yearly (Intro)',
-    },
-    {
-      priceId: env.STRIPE_PRICE_STANDARD_MONTHLY || '',
-      plan: 'pro',
-      amount: 1200,
-      currency: 'usd',
-      interval: 'month',
-      isIntroductory: false,
-      description: 'Pro Monthly (Standard)',
+      description: 'Standard Monthly',
     },
     {
       priceId: env.STRIPE_PRICE_STANDARD_YEARLY || '',
-      plan: 'pro',
-      amount: 4800,
+      plan: 'standard',
+      amount: 5000,
       currency: 'usd',
       interval: 'year',
-      isIntroductory: false,
-      description: 'Pro Yearly (Standard)',
+      description: 'Standard Yearly',
     },
   ];
 
@@ -88,15 +63,9 @@ export function getPlanFromPriceId(priceId: string): PlanType | null {
 
 /**
  * Get all currently active price IDs for checkout
- * Returns only introductory prices for now
  */
 export function getActivePriceIds(): string[] {
-  const allMappings = Object.values(PRICE_MAPPINGS);
-  const hasIntro = allMappings.some(mapping => mapping.isIntroductory);
-  const activeMappings = hasIntro
-    ? allMappings.filter(mapping => mapping.isIntroductory)
-    : allMappings.filter(mapping => !mapping.isIntroductory);
-  return activeMappings.map(mapping => mapping.priceId);
+  return Object.values(PRICE_MAPPINGS).map(mapping => mapping.priceId);
 }
 
 /**
@@ -111,26 +80,22 @@ export function getPriceMappingDetails(priceId: string): PriceMapping | null {
  * Filters based on what's currently active
  */
 export function getAvailablePricing() {
-  const allMappings = Object.values(PRICE_MAPPINGS);
-  const hasIntro = allMappings.some(mapping => mapping.isIntroductory);
-  const activeMappings = hasIntro
-    ? allMappings.filter(mapping => mapping.isIntroductory)
-    : allMappings.filter(mapping => !mapping.isIntroductory);
-  return activeMappings.sort((a, b) => a.amount - b.amount);
+  return Object.values(PRICE_MAPPINGS).sort((a, b) => a.amount - b.amount);
 }
 
 /**
  * Check if a user should have pro features based on their plan
  */
 export function isProPlan(plan: string | null): boolean {
-  return plan === 'pro_lite' || plan === 'pro';
+  return plan === 'standard';
 }
 
 /**
  * Check if a plan has advanced features (only full 'pro' plan)
  */
-export function hasAdvancedFeatures(plan: string | null): boolean {
-  return plan === 'pro';
+export function hasAdvancedFeatures(_plan: string | null): boolean {
+  void _plan;
+  return false;
 }
 
 /**
@@ -138,10 +103,8 @@ export function hasAdvancedFeatures(plan: string | null): boolean {
  */
 export function getPlanDisplayName(plan: string | null): string {
   switch (plan) {
-    case 'pro_lite':
-      return 'Pro (Intro Pricing)';
-    case 'pro':
-      return 'Pro';
+    case 'standard':
+      return 'Standard';
     default:
       return 'Free';
   }

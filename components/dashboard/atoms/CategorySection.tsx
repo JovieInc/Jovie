@@ -1,9 +1,12 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
+export type CategorySectionVariant = 'card' | 'flat';
+
 export interface CategorySectionProps {
   title: string;
   children: ReactNode;
+  variant?: CategorySectionVariant;
   className?: string;
   gridClassName?: string;
 }
@@ -11,13 +14,16 @@ export interface CategorySectionProps {
 export function CategorySection({
   title,
   children,
+  variant = 'card',
   className,
   gridClassName,
 }: CategorySectionProps) {
   return (
     <section
       className={cn(
-        'rounded-xl border border-subtle bg-surface-1/60 p-3',
+        variant === 'flat'
+          ? 'py-2'
+          : 'rounded-xl border border-subtle bg-surface-1/60 p-3',
         className
       )}
     >
@@ -27,7 +33,12 @@ export function CategorySection({
         </h3>
       </div>
       <div
-        className={cn('mt-2 flex flex-wrap items-start gap-2', gridClassName)}
+        className={cn(
+          variant === 'flat'
+            ? 'mt-2 flex flex-wrap items-start gap-1.5'
+            : 'mt-2 flex flex-wrap items-start gap-2',
+          gridClassName
+        )}
       >
         {children}
       </div>

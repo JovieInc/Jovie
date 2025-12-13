@@ -111,6 +111,28 @@ export function ProfileShell({
   const notificationsEnabled = notificationsGate.value || forceNotifications;
   const mode = searchParams?.get('mode') ?? 'profile';
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!artist?.handle) return;
+    if (mode !== 'tip') return;
+
+    const source = searchParams?.get('source');
+
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        handle: artist.handle,
+        linkType: 'tip',
+        target: 'tip_page',
+        source,
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
+    });
+  }, [artist.handle, mode, searchParams]);
+
   // Reset tip loading on navigation/back
   useEffect(() => {
     setIsTipNavigating(false);

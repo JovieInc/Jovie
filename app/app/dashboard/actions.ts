@@ -38,6 +38,8 @@ export interface DashboardData {
   isAdmin: boolean;
   tippingStats: {
     tipClicks: number;
+    qrTipClicks: number;
+    linkTipClicks: number;
     tipsSubmitted: number;
     totalReceivedCents: number;
     monthReceivedCents: number;
@@ -46,6 +48,8 @@ export interface DashboardData {
 
 const createEmptyTippingStats = () => ({
   tipClicks: 0,
+  qrTipClicks: 0,
+  linkTipClicks: 0,
   tipsSubmitted: 0,
   totalReceivedCents: 0,
   monthReceivedCents: 0,
@@ -307,7 +311,11 @@ async function fetchDashboardDataWithSession(
       .where(eq(tips.creatorProfileId, selected.id));
 
     const [clickStats] = await dbClient
-      .select({ c: count() })
+      .select({
+        total: count(),
+        qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
+        link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
+      })
       .from(clickEvents)
       .where(
         and(
@@ -317,7 +325,9 @@ async function fetchDashboardDataWithSession(
       );
 
     const tippingStats = {
-      tipClicks: Number(clickStats?.c ?? 0),
+      tipClicks: Number(clickStats?.total ?? 0),
+      qrTipClicks: Number(clickStats?.qr ?? 0),
+      linkTipClicks: Number(clickStats?.link ?? 0),
       tipsSubmitted: Number(tipTotalsRaw?.tipsSubmitted ?? 0),
       totalReceivedCents: Number(tipTotalsRaw?.totalReceived ?? 0),
       monthReceivedCents: Number(tipTotalsRaw?.monthReceived ?? 0),

@@ -93,7 +93,7 @@ export function BillingDashboard() {
       {/* Subscription Status Card */}
       <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
         <div className='flex items-center'>
-          <div className='flex-shrink-0'>
+          <div className='shrink-0'>
             {billingInfo?.isPro ? (
               <CheckCircleIcon className='h-8 w-8 text-green-500' />
             ) : (
@@ -102,12 +102,14 @@ export function BillingDashboard() {
           </div>
           <div className='ml-4'>
             <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-              {billingInfo?.isPro ? 'Pro Subscription Active' : 'Free Plan'}
+              {billingInfo?.isPro
+                ? 'Standard Subscription Active'
+                : 'Free Plan'}
             </h3>
             <p className='text-sm text-gray-600 dark:text-gray-400'>
               {billingInfo?.isPro
-                ? 'You have access to all Pro features'
-                : 'Upgrade to Pro to unlock premium features'}
+                ? 'Branding is removed from your profile'
+                : 'Upgrade to Standard to remove branding'}
             </p>
             {billingInfo?.stripeSubscriptionId && (
               <p className='text-xs text-gray-500 dark:text-gray-500 mt-1'>
@@ -142,11 +144,10 @@ export function BillingDashboard() {
             <>
               <div>
                 <h4 className='text-sm font-medium text-gray-900 dark:text-white mb-2'>
-                  Upgrade to Pro
+                  Upgrade to Standard
                 </h4>
                 <p className='text-sm text-gray-600 dark:text-gray-400 mb-3'>
-                  Get access to advanced features, analytics, and priority
-                  support
+                  Remove Jovie branding from your profile
                 </p>
                 <UpgradeButton priceId={defaultPriceId} />
               </div>
@@ -158,24 +159,12 @@ export function BillingDashboard() {
       {/* Features Overview */}
       <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
         <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-4'>
-          Pro Features
+          Standard Features
         </h3>
         <ul className='space-y-2 text-sm text-gray-600 dark:text-gray-400'>
           <li className='flex items-center'>
             <CheckCircleIcon className='h-4 w-4 text-green-500 mr-2' />
-            Advanced analytics and insights
-          </li>
-          <li className='flex items-center'>
-            <CheckCircleIcon className='h-4 w-4 text-green-500 mr-2' />
-            Custom branding and themes
-          </li>
-          <li className='flex items-center'>
-            <CheckCircleIcon className='h-4 w-4 text-green-500 mr-2' />
-            Priority customer support
-          </li>
-          <li className='flex items-center'>
-            <CheckCircleIcon className='h-4 w-4 text-green-500 mr-2' />
-            Unlimited link tracking
+            Remove Jovie branding
           </li>
         </ul>
       </div>

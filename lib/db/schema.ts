@@ -329,6 +329,7 @@ export const notificationSubscriptions = pgTable('notification_subscriptions', {
   email: text('email'),
   phone: text('phone'),
   countryCode: text('country_code'),
+  city: text('city'),
   ipAddress: text('ip_address'),
   source: text('source'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

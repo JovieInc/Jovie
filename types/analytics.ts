@@ -19,6 +19,7 @@ export type AnalyticsReferrerRow = {
 
 export type DashboardAnalyticsResponse = {
   profile_views: number;
+  unique_users?: number;
   top_cities: AnalyticsCityRow[];
   top_countries: AnalyticsCountryRow[];
   top_referrers: AnalyticsReferrerRow[];

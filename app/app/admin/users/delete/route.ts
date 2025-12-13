@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    const redirectUrl = new URL('/admin/users', request.url);
+    const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
     console.error('Admin delete creator/user error:', error);
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const redirectUrl = new URL('/admin/users', request.url);
+    const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 }
