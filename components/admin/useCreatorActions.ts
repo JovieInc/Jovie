@@ -77,7 +77,7 @@ export function useCreatorActions(
       }));
 
       try {
-        const response = await fetch('/admin/users/toggle-featured', {
+        const response = await fetch('/app/admin/creators/toggle-featured', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ export function useCreatorActions(
       }));
 
       try {
-        const response = await fetch('/admin/users/toggle-marketing', {
+        const response = await fetch('/app/admin/creators/toggle-marketing', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -244,7 +244,7 @@ export function useCreatorActions(
       }));
 
       try {
-        const response = await fetch('/admin/users/delete', {
+        const response = await fetch('/app/admin/creators/delete', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -281,7 +281,9 @@ export function useCreatorActions(
         };
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : 'Failed to delete creator/user';
+          error instanceof Error
+            ? error.message
+            : 'Failed to delete creator/user';
         setStatuses(prev => ({
           ...prev,
           [profileId]: 'error',

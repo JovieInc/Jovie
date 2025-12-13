@@ -44,6 +44,8 @@ const baseDashboardData: DashboardData = {
   isAdmin: false,
   tippingStats: {
     tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
@@ -79,7 +81,6 @@ describe('DashboardNav', () => {
     const { getByRole } = renderDashboardNav();
 
     expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
-    expect(getByRole('link', { name: 'Settings' })).toBeDefined();
   });
 
   it('applies active state to current page', () => {

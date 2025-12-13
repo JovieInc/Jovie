@@ -55,7 +55,7 @@ interface AdminCreatorProfilesWithSidebarProps {
   search: string;
   sort: AdminCreatorProfilesSort;
   mode?: ContactSidebarMode;
-  /** Base path for pagination/sort links. Defaults to '/admin/users' */
+  /** Base path for pagination/sort links. Defaults to '/app/admin/creators' */
   basePath?: string;
 }
 
@@ -114,7 +114,7 @@ export function AdminCreatorProfilesWithSidebar({
   search,
   sort,
   mode = 'admin',
-  basePath = '/admin/users',
+  basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
   const {
@@ -429,15 +429,20 @@ export function AdminCreatorProfilesWithSidebar({
   ]);
 
   return (
-    <div className='flex min-h-0 flex-col gap-4 md:flex-row md:items-stretch'>
-      <div className='mx-4 flex-1 min-h-0 overflow-hidden rounded-xl border border-default bg-surface-1 shadow-sm shadow-black/5 dark:shadow-black/30 sm:mx-6 lg:mx-8'>
+    <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
+      <div className='flex-1 min-h-0 overflow-hidden rounded-lg border border-subtle bg-surface-1'>
         <div
           className='min-h-0 flex-1 overflow-auto flex flex-col'
           ref={tableContainerRef}
           tabIndex={0}
           onKeyDown={handleKeyDown}
         >
-          <div className='sticky top-0 z-30 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
+          <div
+            className={cn(
+              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+              headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
+            )}
+          >
             <div className='flex h-14 w-full items-center gap-3 px-4'>
               <div className='hidden sm:block text-xs text-secondary-token'>
                 Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -489,7 +494,7 @@ export function AdminCreatorProfilesWithSidebar({
               <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -502,7 +507,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </th>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -542,7 +547,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </th>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -552,7 +557,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </th>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -562,7 +567,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </th>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -572,7 +577,7 @@ export function AdminCreatorProfilesWithSidebar({
                 </th>
                 <th
                   className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-14 z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
                       'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
@@ -778,7 +783,7 @@ export function AdminCreatorProfilesWithSidebar({
               )}
             </tbody>
           </table>
-          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1 px-3 py-2 text-xs text-secondary-token backdrop-blur-sm'>
+          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/80 px-3 py-2 text-xs text-secondary-token backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
             <div className='flex items-center gap-2'>
               <span>
                 Page {page} of {totalPages}

@@ -14,6 +14,13 @@ import type {
   SubscriptionStatus,
 } from './db';
 
+export type {
+  AudienceAction,
+  AudienceIntentLevel,
+  AudienceMember,
+  AudienceMemberType,
+  AudienceReferrer,
+} from './audience';
 // Contact / CRM types
 export type {
   Contact,

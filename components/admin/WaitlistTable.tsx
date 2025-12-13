@@ -65,14 +65,16 @@ export function WaitlistTable({
     params.set('page', String(targetPage));
     params.set('pageSize', String(pageSize));
     const query = params.toString();
-    return query.length > 0 ? `/admin/waitlist?${query}` : '/admin/waitlist';
+    return query.length > 0
+      ? `/app/admin/waitlist?${query}`
+      : '/app/admin/waitlist';
   };
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
   const nextHref = canNext ? buildHref(page + 1) : undefined;
 
   return (
-    <Card className='border-subtle bg-surface-1/80 overflow-hidden'>
+    <Card className='border-subtle bg-surface-1/80'>
       <CardHeader className='space-y-1'>
         <CardTitle className='text-lg'>Waitlist entries</CardTitle>
         <p className='text-xs text-secondary-token'>
@@ -90,17 +92,31 @@ export function WaitlistTable({
         <div className='overflow-x-auto'>
           <table className='w-full border-collapse text-sm'>
             <thead className='text-left text-secondary-token'>
-              <tr className='border-b border-subtle/60 text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='px-2 py-2'>Name</th>
-                <th className='px-2 py-2'>Email</th>
-                <th className='px-2 py-2'>Primary Social</th>
-                <th className='px-2 py-2'>Spotify</th>
-                <th className='px-2 py-2'>Heard About</th>
-                <th className='px-2 py-2'>Status</th>
-                <th className='px-2 py-2'>Created</th>
+              <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Name
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Email
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Primary Social
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Spotify
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Heard About
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Status
+                </th>
+                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
+                  Created
+                </th>
               </tr>
             </thead>
-            <tbody className='divide-y divide-subtle/60'>
+            <tbody>
               {entries.length === 0 ? (
                 <tr>
                   <td
@@ -123,7 +139,10 @@ export function WaitlistTable({
                       : entry.heardAbout;
 
                   return (
-                    <tr key={entry.id} className='hover:bg-surface-2/60'>
+                    <tr
+                      key={entry.id}
+                      className='border-b border-subtle last:border-b-0 hover:bg-surface-2/60'
+                    >
                       <td className='px-2 py-3 font-medium text-primary-token'>
                         {entry.fullName}
                       </td>

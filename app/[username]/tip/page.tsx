@@ -1,7 +1,7 @@
 'use client';
 
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
@@ -13,18 +13,23 @@ interface Props {
 
 export default function TipPage({ params }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const tippingGate = useFeatureGate(STATSIG_FLAGS.TIPPING);
 
   useEffect(() => {
     // Get the username from params and redirect
     params.then(({ username }) => {
       if (tippingGate.value) {
-        router.replace(`/${username}?mode=tip`);
+        const source = searchParams?.get('source');
+        const sourceParam = source
+          ? `&source=${encodeURIComponent(source)}`
+          : '';
+        router.replace(`/${username}?mode=tip${sourceParam}`);
       } else {
         router.replace(`/${username}`);
       }
     });
-  }, [params, router, tippingGate.value]);
+  }, [params, router, tippingGate.value, searchParams]);
 
   // Show loading while redirecting
   return (

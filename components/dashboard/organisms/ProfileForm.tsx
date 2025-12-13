@@ -7,11 +7,7 @@ import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 // flags import removed - pre-launch
-import {
-  Artist,
-  CreatorProfile,
-  convertCreatorProfileToArtist,
-} from '@/types/db';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface ProfileFormProps {
   artist: Artist;
@@ -78,15 +74,19 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     setSuccess(false);
 
     try {
+      const settingsUpdates = hasRemoveBrandingFeature
+        ? { hide_branding: formData.hide_branding }
+        : undefined;
+
       const res = await fetch('/api/dashboard/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId: artist.id,
           updates: {
-            display_name: formData.name,
+            displayName: formData.name,
             bio: formData.tagline,
-            avatar_url: formData.image_url || null,
+            avatarUrl: formData.image_url || null,
+            ...(settingsUpdates ? { settings: settingsUpdates } : {}),
           },
         }),
       });
@@ -97,8 +97,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         throw new Error(err?.error ?? 'Failed to update profile');
       }
       const json: { profile: unknown } = await res.json();
-      const updatedArtist = convertCreatorProfileToArtist(
-        json.profile as CreatorProfile
+      const updatedArtist = convertDrizzleCreatorProfileToArtist(
+        json.profile as Parameters<
+          typeof convertDrizzleCreatorProfileToArtist
+        >[0]
       );
       onUpdate(updatedArtist);
       setSuccess(true);

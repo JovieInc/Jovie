@@ -85,7 +85,8 @@ export async function toggleCreatorVerifiedAction(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/admin');
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
 }
 
 export async function updateCreatorAvatarAsAdmin(
@@ -110,7 +111,8 @@ export async function updateCreatorAvatarAsAdmin(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/admin');
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
 }
 
 export async function toggleCreatorFeaturedAction(
@@ -138,7 +140,8 @@ export async function toggleCreatorFeaturedAction(
     .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
 
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
-  revalidatePath('/admin');
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
   revalidatePath('/'); // Featured creators show on homepage
 }
 
@@ -167,7 +170,8 @@ export async function toggleCreatorMarketingAction(
     })
     .where(eq(creatorProfiles.id, profileId));
 
-  revalidatePath('/admin');
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
 }
 
 export async function deleteCreatorOrUserAction(
@@ -208,5 +212,6 @@ export async function deleteCreatorOrUserAction(
     await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
   }
 
-  revalidatePath('/admin');
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
 }

@@ -49,16 +49,16 @@ export function AccountDashboard() {
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                Profile Settings
+                Creator Profile
               </h3>
               <p className='text-sm text-gray-700 dark:text-gray-300'>
-                Update your profile information and preferences
+                Update your public profile and links
               </p>
             </div>
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/app/settings/profile'>Edit Profile</Link>
+              <Link href='/app/dashboard/profile'>Edit Profile</Link>
             </Button>
           </div>
         </div>

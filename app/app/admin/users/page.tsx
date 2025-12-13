@@ -1,16 +1,12 @@
 import type { Metadata } from 'next';
 
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
-import {
-  type AdminCreatorProfilesSort,
-  getAdminCreatorProfiles,
-} from '@/lib/admin/creator-profiles';
+import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
+import { getAdminUsers } from '@/lib/admin/users';
 
 interface AdminUsersPageProps {
   searchParams?: {
     page?: string;
     q?: string;
-    sort?: string;
     pageSize?: string;
   };
 }
@@ -36,36 +32,33 @@ export default async function AdminUsersPage({
       ? pageSizeParam
       : 20;
 
-  const sortParam = searchParams?.sort;
-  const sort: AdminCreatorProfilesSort =
-    sortParam === 'created_asc' ||
-    sortParam === 'verified_desc' ||
-    sortParam === 'verified_asc' ||
-    sortParam === 'claimed_desc' ||
-    sortParam === 'claimed_asc'
-      ? sortParam
-      : 'created_desc';
-
-  const {
-    profiles,
-    page: currentPage,
-    pageSize: resolvedPageSize,
-    total,
-  } = await getAdminCreatorProfiles({
+  const { users, total } = await getAdminUsers({
     page,
     pageSize,
     search,
-    sort,
   });
 
   return (
-    <AdminCreatorProfilesWithSidebar
-      profiles={profiles}
-      page={currentPage}
-      pageSize={resolvedPageSize}
-      total={total}
-      search={search}
-      sort={sort}
-    />
+    <div className='space-y-8'>
+      <header className='space-y-2'>
+        <p className='text-xs uppercase tracking-wide text-tertiary-token'>
+          Internal
+        </p>
+        <h1 className='text-3xl font-semibold text-primary-token'>Users</h1>
+        <p className='text-sm text-secondary-token'>
+          Signed up users and billing status.
+        </p>
+      </header>
+
+      <section className='-mx-4 sm:-mx-6 lg:-mx-8'>
+        <AdminUsersTable
+          users={users}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          search={search}
+        />
+      </section>
+    </div>
   );
 }

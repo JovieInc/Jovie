@@ -36,7 +36,7 @@ export function SettingsProGateCard({
           className={buttonClassName}
           variant='primary'
         >
-          Upgrade to Pro
+          Upgrade to Standard
         </Button>
       </div>
     </DashboardCard>

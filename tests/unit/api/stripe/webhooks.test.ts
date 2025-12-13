@@ -11,7 +11,7 @@ const {
   mockGetPlanFromPriceId,
 } = vi.hoisted(() => {
   const mockGetPlan = vi.fn<(priceId: string) => string | null>(
-    () => 'pro_lite'
+    () => 'standard'
   );
 
   return {

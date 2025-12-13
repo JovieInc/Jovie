@@ -12,12 +12,15 @@ export type PlatformPillState =
   | 'hidden'
   | 'loading';
 
+export type PlatformPillTone = 'default' | 'faded';
+
 export interface PlatformPillProps {
   platformIcon: string;
   platformName: string;
   primaryText: string;
   secondaryText?: string;
   state?: PlatformPillState;
+  tone?: PlatformPillTone;
   badgeText?: string;
   suffix?: React.ReactNode;
   trailing?: React.ReactNode;
@@ -33,6 +36,7 @@ export function PlatformPill({
   primaryText,
   secondaryText,
   state = 'connected',
+  tone = 'default',
   badgeText,
   suffix,
   trailing,
@@ -69,31 +73,46 @@ export function PlatformPill({
     [iconMeta]
   );
 
-  const borderColor = React.useMemo(() => {
-    if (state === 'ready') return hexToRgba('#22c55e', 0.55);
-    if (state === 'error') return hexToRgba('#ef4444', 0.55);
+  const borderColors = React.useMemo(() => {
+    if (state === 'ready') {
+      const color = hexToRgba('#22c55e', tone === 'faded' ? 0.35 : 0.55);
+      return { base: color, hover: hexToRgba('#22c55e', 0.65) };
+    }
+    if (state === 'error') {
+      const color = hexToRgba('#ef4444', tone === 'faded' ? 0.35 : 0.55);
+      return { base: color, hover: hexToRgba('#ef4444', 0.65) };
+    }
 
-    const isTooDark = isBrandDark(brandHex);
-    const base = isTooDark ? '#9ca3af' : brandHex;
-    return hexToRgba(base, 0.55);
-  }, [brandHex, state]);
+    const baseAlpha = tone === 'faded' ? 0.24 : 0.55;
+    const hoverAlpha = tone === 'faded' ? 0.55 : 0.75;
+    return {
+      base: hexToRgba(brandHex, baseAlpha),
+      hover: hexToRgba(brandHex, hoverAlpha),
+    };
+  }, [brandHex, state, tone]);
 
   const isTikTok = platformIcon.toLowerCase() === 'tiktok';
   const tikTokGradient = 'linear-gradient(135deg, #25F4EE, #FE2C55)';
 
   const wrapperStyle: React.CSSProperties = React.useMemo(() => {
+    const cssVars: React.CSSProperties = {
+      '--pill-border': borderColors.base,
+      '--pill-border-hover': borderColors.hover,
+    } as React.CSSProperties;
+
     if (!isTikTok || state === 'ready' || state === 'error') {
-      return { borderColor };
+      return cssVars;
     }
 
     const surface = 'var(--surface-1, rgba(17, 17, 17, 0.92))';
     return {
+      ...cssVars,
       borderColor: 'transparent',
       backgroundImage: `linear-gradient(${surface}, ${surface}), ${tikTokGradient}`,
       backgroundOrigin: 'border-box',
       backgroundClip: 'padding-box, border-box',
     };
-  }, [borderColor, isTikTok, state, tikTokGradient]);
+  }, [borderColors.base, borderColors.hover, isTikTok, state, tikTokGradient]);
 
   const iconFg = React.useMemo(() => {
     if (state === 'loading') return '#6b7280';
@@ -134,12 +153,16 @@ export function PlatformPill({
       onClick={isInteractive ? onClick : undefined}
       onKeyDown={handleKeyDown}
       className={cn(
-        'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-3 py-1 text-xs font-medium text-tertiary-token',
-        'bg-surface-1/60 backdrop-blur-sm',
-        'transform-gpu transition-all hover:bg-surface-2/60 hover:text-secondary-token hover:-translate-y-px hover:shadow-sm hover:shadow-black/10 dark:hover:shadow-black/40',
+        'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-3 py-1 text-xs font-medium',
+        'border-(--pill-border) hover:border-(--pill-border-hover)',
+        'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
+        'text-tertiary-token hover:text-secondary-token',
+        'transform-gpu transition-all hover:bg-surface-2 dark:hover:bg-surface-2/60 hover:-translate-y-px hover:shadow-sm hover:shadow-black/10 dark:hover:shadow-black/40',
         isInteractive
           ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.98]'
           : 'cursor-default',
+        tone === 'faded' &&
+          'bg-surface-1/40 hover:bg-surface-1 text-tertiary-token/70 hover:text-secondary-token',
         state === 'hidden' && 'opacity-60',
         state === 'loading' && 'animate-pulse',
         className
@@ -162,7 +185,7 @@ export function PlatformPill({
 
       <span
         className='flex shrink-0 items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors'
-        style={{ ...iconChipStyle, borderColor }}
+        style={{ ...iconChipStyle }}
         aria-hidden='true'
       >
         <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />

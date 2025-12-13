@@ -24,7 +24,37 @@ type CacheEntry = {
 const DEFAULT_TTL_MS = 5_000;
 
 const clientCache = new Map<string, CacheEntry>();
-const inflight = new Map<string, Promise<DashboardAnalyticsResponse>>();
+
+type FetchAnalyticsError = Error & { status?: number };
+
+function getErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+  const maybeStatus = (error as { status?: unknown }).status;
+  return typeof maybeStatus === 'number' ? maybeStatus : null;
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = (error as { name?: unknown }).name;
+  return name === 'AbortError';
+}
+
+async function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const id = window.setTimeout(resolve, ms);
+    const onAbort = () => {
+      window.clearTimeout(id);
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
 
 function getKeyWithView(
   range: AnalyticsRange,
@@ -59,7 +89,11 @@ async function fetchAnalytics(
   });
 
   if (!res.ok) {
-    throw new Error(`Failed to fetch analytics (${res.status})`);
+    const error = new Error(
+      `Failed to fetch analytics (${res.status})`
+    ) as FetchAnalyticsError;
+    error.status = res.status;
+    throw error;
   }
 
   const json = (await res.json()) as unknown;
@@ -141,26 +175,34 @@ export function useDashboardAnalytics(
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const existing = inflight.get(key);
-      const promise =
-        !forceRefresh && existing
-          ? existing
-          : (async () => {
-              const result = await fetchAnalytics(
+      try {
+        const run = async (): Promise<DashboardAnalyticsResponse> => {
+          try {
+            return await fetchAnalytics(
+              range,
+              view,
+              controller.signal,
+              forceRefresh
+            );
+          } catch (error) {
+            if (controller.signal.aborted || isAbortError(error)) throw error;
+
+            const status = getErrorStatus(error);
+            if (status === 401 && !forceRefresh) {
+              await sleep(200, controller.signal);
+              return await fetchAnalytics(
                 range,
                 view,
                 controller.signal,
                 forceRefresh
               );
-              return result;
-            })();
+            }
 
-      if (!forceRefresh && !existing) {
-        inflight.set(key, promise);
-      }
+            throw error;
+          }
+        };
 
-      try {
-        const result = await promise;
+        const result = await run();
         const updatedAt = Date.now();
         clientCache.set(key, {
           data: result,
@@ -176,7 +218,7 @@ export function useDashboardAnalytics(
           lastUpdatedAt: updatedAt,
         });
       } catch (error) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || isAbortError(error)) return;
         const message =
           error instanceof Error ? error.message : 'Unable to load analytics';
         setState(prev => ({
@@ -185,10 +227,6 @@ export function useDashboardAnalytics(
           loading: false,
           refreshing: false,
         }));
-      } finally {
-        if (inflight.get(key) === promise) {
-          inflight.delete(key);
-        }
       }
     },
     [range, ttlMs, view]

@@ -1,6 +1,6 @@
 import { and, count, sql as drizzleSql, eq, gte, isNotNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { clickEvents, users } from '@/lib/db/schema';
+import { audienceMembers, clickEvents, users } from '@/lib/db/schema';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -302,7 +302,7 @@ export async function getUserDashboardAnalytics(
   const recentThreshold = new Date();
   recentThreshold.setDate(recentThreshold.getDate() - 7);
 
-  const [cities, countries, referrers] = await Promise.all([
+  const [cities, countries, referrers, uniqueUsers] = await Promise.all([
     db
       .select({ city: clickEvents.city, count: count() })
       .from(clickEvents)
@@ -341,11 +341,26 @@ export async function getUserDashboardAnalytics(
       .groupBy(clickEvents.referrer)
       .orderBy(drizzleSql`count DESC`)
       .limit(5),
+
+    db
+      .select({ count: count() })
+      .from(audienceMembers)
+      .where(
+        and(
+          eq(audienceMembers.creatorProfileId, creatorProfile.id),
+          gte(audienceMembers.lastSeenAt, startDate),
+          isNotNull(audienceMembers.fingerprint)
+        )
+      )
+      .limit(1),
   ]);
+
+  const uniqueUsersCount = Number(uniqueUsers?.[0]?.count ?? 0);
 
   const base: DashboardAnalyticsResponse = {
     view,
     profile_views: creatorProfile.profileViews ?? 0,
+    unique_users: uniqueUsersCount,
     top_cities: cities
       .filter(row => Boolean(row.city))
       .map(row => ({ city: row.city as string, count: Number(row.count) })),

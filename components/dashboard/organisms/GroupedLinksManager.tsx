@@ -617,7 +617,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       aria-label='Links Manager'
       ref={containerRef}
     >
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 space-y-4'>
+      <div className='mb-6 rounded-xl border border-subtle bg-surface-1 p-4 space-y-4'>
         {/* Hint message with animation */}
         <AnimatePresence>
           {hint && (
@@ -698,23 +698,57 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         />
 
         {/* Links summary + completion indicator */}
-        <div className='flex items-center justify-end text-xs text-secondary-token/75'>
-          {completionPercent >= 100 ? (
-            <span className='inline-flex items-center gap-2'>
-              <Icon name='CheckCircle' className='h-4 w-4 text-accent' />
-              <span className='whitespace-nowrap'>
-                You’re set with {links.length} links
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='min-w-0'>
+            {suggestionPills.length > 0 ? (
+              <div className='relative' aria-label='Quick link suggestions'>
+                <div
+                  className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitMaskImage:
+                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+                    maskImage:
+                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+                  }}
+                >
+                  {suggestionPills.map(pill => (
+                    <PlatformPill
+                      key={pill.id}
+                      platformIcon={pill.simpleIconId}
+                      platformName={pill.label}
+                      primaryText={pill.label}
+                      suffix='+'
+                      tone='faded'
+                      onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
+                      className='whitespace-nowrap shrink-0'
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className='text-xs text-secondary-token/75 sm:text-right'>
+            {completionPercent >= 100 ? (
+              <span className='inline-flex items-center gap-2'>
+                <Icon name='CheckCircle' className='h-4 w-4 text-accent' />
+                <span className='whitespace-nowrap'>
+                  You’re set with {links.length} links
+                </span>
               </span>
-            </span>
-          ) : (
-            <span className='inline-flex items-center gap-2'>
-              <span className='whitespace-nowrap'>
-                {filteredCount} {filteredCount === 1 ? 'link' : 'links'} •{' '}
-                {completionPercent}% to target
+            ) : (
+              <span className='inline-flex items-center gap-2'>
+                <span className='whitespace-nowrap'>
+                  {filteredCount} {filteredCount === 1 ? 'link' : 'links'} •{' '}
+                  {completionPercent}% to target
+                </span>
+                <span className='text-tertiary-token/80'>(most add 4–6)</span>
               </span>
-              <span className='text-tertiary-token/80'>(most add 4–6)</span>
-            </span>
-          )}
+            )}
+          </div>
         </div>
 
         {suggestionsEnabled && pendingSuggestions.length > 0 && (
@@ -765,35 +799,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             })}
           </CategorySection>
         )}
-
-        {suggestionPills.length > 0 && (
-          <div className='relative' aria-label='Quick link suggestions'>
-            <div
-              className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pt-2 pb-1 [&::-webkit-scrollbar]:hidden'
-              style={{
-                WebkitOverflowScrolling: 'touch',
-                scrollbarWidth: 'none',
-                msOverflowStyle: 'none',
-                WebkitMaskImage:
-                  'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
-                maskImage:
-                  'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
-              }}
-            >
-              {suggestionPills.map(pill => (
-                <PlatformPill
-                  key={pill.id}
-                  platformIcon={pill.simpleIconId}
-                  platformName={pill.label}
-                  primaryText={pill.label}
-                  suffix='+'
-                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='opacity-60 hover:opacity-100 focus-visible:opacity-100 whitespace-nowrap shrink-0'
-                />
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {!hasAnyLinks && (
@@ -810,107 +815,110 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
       {hasAnyLinks && (
         <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
-          {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-            const groupItems = groups[section];
+          <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1/40 divide-y divide-(--color-border-subtle)'>
+            {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
+              const groupItems = groups[section];
 
-            const items = groupItems
-              .slice()
-              .sort(
-                (a, b) =>
-                  popularityIndex(a.platform.id) -
-                  popularityIndex(b.platform.id)
-              );
+              const items = groupItems
+                .slice()
+                .sort(
+                  (a, b) =>
+                    popularityIndex(a.platform.id) -
+                    popularityIndex(b.platform.id)
+                );
 
-            const isAddingToThis =
-              addingLink && sectionOf(addingLink) === section;
-            if (items.length === 0 && !isAddingToThis) {
-              return null;
-            }
+              const isAddingToThis =
+                addingLink && sectionOf(addingLink) === section;
+              if (items.length === 0 && !isAddingToThis) {
+                return null;
+              }
 
-            return (
-              <CategorySection
-                key={section}
-                title={labelFor(section)}
-                className='space-y-0'
-              >
-                <SortableContext items={items.map(idFor)}>
-                  {items.map(link => {
-                    const linkId = idFor(link as T);
-                    return (
-                      <SortableRow
-                        key={linkId}
-                        id={linkId}
-                        link={link as T}
-                        index={links.findIndex(
-                          l => l.normalizedUrl === link.normalizedUrl
-                        )}
-                        draggable={items.length > 1}
-                        onToggle={handleToggle}
-                        onRemove={handleRemove}
-                        onEdit={handleEdit}
-                        visible={linkIsVisible(link as T)}
-                        openMenuId={openMenuId}
-                        onAnyMenuOpen={handleAnyMenuOpen}
-                        isLastAdded={lastAddedId === linkId}
-                        buildPillLabel={buildPillLabel}
+              return (
+                <CategorySection
+                  key={section}
+                  title={labelFor(section)}
+                  variant='flat'
+                  className='px-3'
+                >
+                  <SortableContext items={items.map(idFor)}>
+                    {items.map(link => {
+                      const linkId = idFor(link as T);
+                      return (
+                        <SortableRow
+                          key={linkId}
+                          id={linkId}
+                          link={link as T}
+                          index={links.findIndex(
+                            l => l.normalizedUrl === link.normalizedUrl
+                          )}
+                          draggable={items.length > 1}
+                          onToggle={handleToggle}
+                          onRemove={handleRemove}
+                          onEdit={handleEdit}
+                          visible={linkIsVisible(link as T)}
+                          openMenuId={openMenuId}
+                          onAnyMenuOpen={handleAnyMenuOpen}
+                          isLastAdded={lastAddedId === linkId}
+                          buildPillLabel={buildPillLabel}
+                        />
+                      );
+                    })}
+
+                    {pendingPreview &&
+                    sectionOf(pendingPreview.link as T) === section ? (
+                      <LinkPill
+                        platformIcon={pendingPreview.link.platform.icon}
+                        platformName={pendingPreview.link.platform.name}
+                        primaryText={buildPillLabel(pendingPreview.link)}
+                        secondaryText={buildSecondaryText(pendingPreview.link)}
+                        state='ready'
+                        badgeText='Ready to add'
+                        menuId='pending-preview'
+                        isMenuOpen={openMenuId === 'pending-preview'}
+                        onMenuOpenChange={next =>
+                          handleAnyMenuOpen(next ? 'pending-preview' : null)
+                        }
+                        menuItems={[
+                          {
+                            id: 'add',
+                            label: 'Add',
+                            iconName: 'Plus',
+                            onSelect: () => {
+                              void handleAdd(pendingPreview.link);
+                              setPendingPreview(null);
+                              setClearSignal(c => c + 1);
+                            },
+                          },
+                          {
+                            id: 'cancel',
+                            label: 'Cancel',
+                            iconName: 'X',
+                            onSelect: () => {
+                              setPendingPreview(null);
+                              setClearSignal(c => c + 1);
+                            },
+                          },
+                        ]}
                       />
-                    );
-                  })}
+                    ) : null}
 
-                  {pendingPreview &&
-                  sectionOf(pendingPreview.link as T) === section ? (
-                    <LinkPill
-                      platformIcon={pendingPreview.link.platform.icon}
-                      platformName={pendingPreview.link.platform.name}
-                      primaryText={buildPillLabel(pendingPreview.link)}
-                      secondaryText={buildSecondaryText(pendingPreview.link)}
-                      state='ready'
-                      badgeText='Ready to add'
-                      menuId='pending-preview'
-                      isMenuOpen={openMenuId === 'pending-preview'}
-                      onMenuOpenChange={next =>
-                        handleAnyMenuOpen(next ? 'pending-preview' : null)
-                      }
-                      menuItems={[
-                        {
-                          id: 'add',
-                          label: 'Add',
-                          iconName: 'Plus',
-                          onSelect: () => {
-                            void handleAdd(pendingPreview.link);
-                            setPendingPreview(null);
-                            setClearSignal(c => c + 1);
-                          },
-                        },
-                        {
-                          id: 'cancel',
-                          label: 'Cancel',
-                          iconName: 'X',
-                          onSelect: () => {
-                            setPendingPreview(null);
-                            setClearSignal(c => c + 1);
-                          },
-                        },
-                      ]}
-                    />
-                  ) : null}
-
-                  {isAddingToThis && (
-                    <LinkPill
-                      platformIcon='website'
-                      platformName='Loading'
-                      primaryText='Adding…'
-                      state='loading'
-                      menuId={`loading-${section}`}
-                      isMenuOpen={false}
-                      onMenuOpenChange={() => {}}
-                      menuItems={[]}
-                    />
-                  )}
-                </SortableContext>
-              </CategorySection>
-            );
-          })}
+                    {isAddingToThis && (
+                      <LinkPill
+                        platformIcon='website'
+                        platformName='Loading'
+                        primaryText='Adding…'
+                        state='loading'
+                        menuId={`loading-${section}`}
+                        isMenuOpen={false}
+                        onMenuOpenChange={() => {}}
+                        menuItems={[]}
+                      />
+                    )}
+                  </SortableContext>
+                </CategorySection>
+              );
+            })}
+          </div>
         </DndContext>
       )}
     </section>

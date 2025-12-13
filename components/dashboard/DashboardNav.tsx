@@ -1,10 +1,11 @@
 'use client';
 
 import {
+  ArrowTopRightOnSquareIcon,
   BanknotesIcon,
   BellIcon,
   ChartPieIcon,
-  Cog6ToothIcon,
+  DocumentDuplicateIcon,
   HomeIcon,
   IdentificationIcon,
   PaintBrushIcon,
@@ -23,11 +24,16 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuActions,
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
+import { track } from '@/lib/analytics';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface DashboardNavProps {
   collapsed?: boolean;
@@ -73,7 +79,6 @@ const navShortcuts: Record<string, string> = {
   contacts: '3',
   audience: '4',
   tipping: '5',
-  settings: '6',
 };
 
 const secondaryNavigation = [
@@ -84,22 +89,9 @@ const secondaryNavigation = [
     icon: BanknotesIcon,
     description: 'Manage tips and monetization',
   },
-  {
-    name: 'Settings',
-    href: '/app/settings',
-    id: 'settings',
-    icon: Cog6ToothIcon,
-    description: 'Configure your account and preferences',
-  },
 ];
 
 const settingsNavigation = [
-  {
-    name: 'Profile',
-    href: '/app/settings/profile',
-    id: 'profile',
-    icon: IdentificationIcon,
-  },
   {
     name: 'Account',
     href: '/app/settings/account',
@@ -147,11 +139,18 @@ const adminNavigation: typeof primaryNavigation = [
     description: 'Internal metrics and operations',
   },
   {
+    name: 'Creators',
+    href: '/app/admin/creators',
+    id: 'admin_creators',
+    icon: UsersIcon,
+    description: 'Manage creator profiles and verification',
+  },
+  {
     name: 'Users',
     href: '/app/admin/users',
     id: 'admin_users',
-    icon: UsersIcon,
-    description: 'Manage creator profiles and verification',
+    icon: UserCircleIcon,
+    description: 'Review signed up users and billing status',
   },
   {
     name: 'Activity',
@@ -164,9 +163,13 @@ const adminNavigation: typeof primaryNavigation = [
 
 export function DashboardNav(_props: DashboardNavProps) {
   void _props;
-  const { isAdmin } = useDashboardData();
+  const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
+  const notifications = useNotifications();
   const contactsGate = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+  const username =
+    selectedProfile?.usernameNormalized ?? selectedProfile?.username;
+  const publicProfileHref = username ? `/${username}` : undefined;
   const primaryItems = contactsGate.value
     ? primaryNavigation
     : primaryNavigation.filter(item => item.id !== 'contacts');
@@ -210,6 +213,86 @@ export function DashboardNav(_props: DashboardNavProps) {
                 </span>
               </Link>
             </SidebarMenuButton>
+            {item.href === '/app/dashboard/profile' && publicProfileHref ? (
+              <SidebarMenuActions showOnHover>
+                <SidebarMenuAction
+                  type='button'
+                  aria-label='Copy public profile link'
+                  onClick={async () => {
+                    const url = `${getBaseUrl()}${publicProfileHref}`;
+
+                    const fallbackCopy = (text: string): boolean => {
+                      try {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.left = '-999999px';
+                        textarea.style.top = '-999999px';
+                        document.body.appendChild(textarea);
+                        textarea.focus();
+                        textarea.select();
+                        const successful = document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        return successful;
+                      } catch {
+                        return false;
+                      }
+                    };
+
+                    try {
+                      let copySuccess = false;
+                      if (
+                        navigator.clipboard &&
+                        navigator.clipboard.writeText
+                      ) {
+                        await navigator.clipboard.writeText(url);
+                        copySuccess = true;
+                      } else {
+                        copySuccess = fallbackCopy(url);
+                      }
+
+                      if (!copySuccess) {
+                        throw new Error('copy_failed');
+                      }
+
+                      notifications.success('Copied to clipboard');
+                      track('profile_copy_url_click', {
+                        status: 'success',
+                        source: 'dashboard_nav',
+                      });
+                    } catch {
+                      const success = fallbackCopy(url);
+                      if (success) {
+                        notifications.success('Copied to clipboard');
+                        track('profile_copy_url_click', {
+                          status: 'success',
+                          source: 'dashboard_nav',
+                        });
+                        return;
+                      }
+
+                      notifications.error('Failed to copy');
+                      track('profile_copy_url_click', {
+                        status: 'error',
+                        source: 'dashboard_nav',
+                      });
+                    }
+                  }}
+                >
+                  <DocumentDuplicateIcon aria-hidden='true' />
+                </SidebarMenuAction>
+                <SidebarMenuAction asChild>
+                  <Link
+                    href={publicProfileHref}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    aria-label='Open public profile in a new tab'
+                  >
+                    <ArrowTopRightOnSquareIcon aria-hidden='true' />
+                  </Link>
+                </SidebarMenuAction>
+              </SidebarMenuActions>
+            ) : null}
           </SidebarMenuItem>
         );
       })}
@@ -231,8 +314,7 @@ export function DashboardNav(_props: DashboardNavProps) {
           ))}
         </SidebarGroupContent>
       </SidebarGroup>
-      {/* Admin Navigation Block (admins only) */}
-      {isAdmin && (
+      {isAdmin && !isInSettings && (
         <div className='mt-4'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
             {renderSection(adminNavigation)}

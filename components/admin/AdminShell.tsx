@@ -51,7 +51,9 @@ export function AdminShell({ children }: AdminShellProps) {
             className='bg-bg-base/75 backdrop-blur supports-backdrop-filter:bg-bg-base/65'
           />
           <main className='min-h-0 flex-1 overflow-auto'>
-            <div className='w-full px-0 py-6 pb-20'>{children}</div>
+            <div className='h-full min-h-0 w-full px-4 py-6 pb-20 sm:px-6 lg:px-8'>
+              {children}
+            </div>
           </main>
           <footer className='sticky bottom-0 z-20 border-t border-subtle bg-bg-base/75 backdrop-blur supports-backdrop-filter:bg-bg-base/65'>
             <div className='flex h-12 w-full items-center gap-3 px-4 text-xs text-secondary-token sm:px-6 lg:px-8'>

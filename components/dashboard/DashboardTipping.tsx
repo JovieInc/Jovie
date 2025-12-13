@@ -12,12 +12,6 @@ import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
-
-const formatCurrency = (cents: number) => currencyFormatter.format(cents / 100);
 const formatCount = (value: number) => value.toLocaleString();
 
 export function DashboardTipping() {
@@ -84,12 +78,12 @@ export function DashboardTipping() {
   const tipHandle = artist.handle ?? '';
   const displayHandle = tipHandle || 'your-handle';
   const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
-  const tipShareUrl = `https://jov.ie${tipRelativePath}`;
+  const tipRelativePathLink = `${tipRelativePath}?source=link`;
+  const tipShareUrlQr = `https://jov.ie${tipRelativePath}?source=qr`;
   const qrDisplaySize = 180;
   const qrDownloadSize = 420;
-  const qrDownloadUrl = getQrCodeUrl(tipShareUrl, qrDownloadSize);
-  const { totalReceivedCents, monthReceivedCents, tipClicks, tipsSubmitted } =
-    dashboardData.tippingStats;
+  const qrDownloadUrl = getQrCodeUrl(tipShareUrlQr, qrDownloadSize);
+  const { tipClicks, qrTipClicks, linkTipClicks } = dashboardData.tippingStats;
 
   return (
     <div className='space-y-6'>
@@ -102,7 +96,7 @@ export function DashboardTipping() {
 
       {/* Venmo Handle Setup — hidden when already connected unless editing */}
       {hasVenmoHandle && !isEditing ? (
-        <div className='flex items-center justify-between rounded-lg border border-subtle bg-surface-1 px-4 py-3 shadow-sm'>
+        <div className='flex w-full flex-wrap items-center justify-between gap-4 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
           <div className='flex items-center gap-2 text-sm text-primary-token'>
             <WalletIcon className='h-5 w-5 text-accent' />
             <span className='font-mono rounded-md bg-surface-2 px-2 py-1'>
@@ -115,7 +109,7 @@ export function DashboardTipping() {
           </Button>
         </div>
       ) : (
-        <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
+        <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
           <SectionHeader
             title='Venmo Handle'
             description='Your handle will appear on your profile so fans can tip you directly.'
@@ -195,59 +189,55 @@ export function DashboardTipping() {
         aria-hidden={!hasVenmoHandle ? true : undefined}
         inert={hasVenmoHandle ? undefined : true}
       >
-        <div className='grid gap-6 lg:grid-cols-[1.45fr_1fr]'>
-          <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
-            <SectionHeader
-              title='Earnings Summary'
-              description='Track what fans have contributed via Venmo tips.'
-            />
-            <div className='px-6 pb-6'>
-              <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-                <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-                  <p className='text-sm text-secondary-token'>Total Received</p>
-                  <p className='text-2xl font-bold text-primary-token'>
-                    {formatCurrency(totalReceivedCents)}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-                  <p className='text-sm text-secondary-token'>This Month</p>
-                  <p className='text-2xl font-bold text-primary-token'>
-                    {formatCurrency(monthReceivedCents)}
-                  </p>
-                </div>
-                <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-                  <p className='text-sm text-secondary-token'>Tips Received</p>
-                  <p className='text-2xl font-bold text-primary-token'>
-                    {formatCount(tipsSubmitted)}
-                  </p>
-                </div>
+        <div className='grid gap-6 lg:grid-cols-12'>
+          <div className='space-y-3 lg:col-span-12'>
+            <div className='space-y-1'>
+              <h2 className='text-base font-semibold tracking-tight text-primary-token'>
+                Activity
+              </h2>
+              <p className='text-sm leading-6 text-secondary-token'>
+                Track how fans reach your tipping page.
+              </p>
+            </div>
+
+            <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
+                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+                  QR code scans
+                </p>
+                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                  {formatCount(qrTipClicks)}
+                </p>
+                <p className='mt-2 text-sm text-secondary-token'>
+                  Fans who scanned your tip QR.
+                </p>
               </div>
-              <div className='mt-4 grid grid-cols-1 gap-4 md:grid-cols-2'>
-                <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-                  <p className='text-sm text-secondary-token'>
-                    Tip link clicks &amp; QR scans
-                  </p>
-                  <p className='text-2xl font-bold text-primary-token'>
-                    {formatCount(tipClicks)}
-                  </p>
-                  <p className='mt-1 text-xs text-secondary-token'>
-                    Shows how many times fans opened your tipping page.
-                  </p>
-                </div>
-                <div className='rounded-lg border border-subtle bg-surface-2/60 p-4'>
-                  <p className='text-sm text-secondary-token'>Tips submitted</p>
-                  <p className='text-2xl font-bold text-primary-token'>
-                    {formatCount(tipsSubmitted)}
-                  </p>
-                  <p className='mt-1 text-xs text-secondary-token'>
-                    Venmo conversions captured on Jovie.
-                  </p>
-                </div>
+              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
+                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+                  Link clicks
+                </p>
+                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                  {formatCount(linkTipClicks)}
+                </p>
+                <p className='mt-2 text-sm text-secondary-token'>
+                  Fans who clicked your tip link.
+                </p>
+              </div>
+              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
+                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+                  Total
+                </p>
+                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                  {formatCount(tipClicks)}
+                </p>
+                <p className='mt-2 text-sm text-secondary-token'>
+                  QR + link opens combined.
+                </p>
               </div>
             </div>
           </div>
-          <div className='space-y-6'>
-            <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
+          <div className='grid gap-6 lg:col-span-12 lg:grid-cols-2'>
+            <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
               <SectionHeader
                 title='Share your tip link'
                 description='Send fans directly to jov.ie so they can tip instantly.'
@@ -256,10 +246,10 @@ export function DashboardTipping() {
                 <div className='space-y-3'>
                   <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2 px-4 py-2 text-sm font-mono text-primary-token'>
                     <span className='min-w-0 flex-1 truncate'>
-                      {tipShareUrl}
+                      https://jov.ie{tipRelativePathLink}
                     </span>
                     <CopyToClipboardButton
-                      relativePath={tipRelativePath}
+                      relativePath={tipRelativePathLink}
                       idleLabel='Copy link'
                       successLabel='✓ Copied!'
                       errorLabel='Copy failed'
@@ -275,7 +265,7 @@ export function DashboardTipping() {
                 </div>
               </div>
             </div>
-            <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
+            <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
               <SectionHeader
                 title='Downloadable QR'
                 description='Perfect for merch tables, receipts, or posters.'
@@ -283,7 +273,7 @@ export function DashboardTipping() {
               <div className='px-6 pb-6'>
                 <div className='flex flex-col items-center gap-3'>
                   <QRCodeCard
-                    data={tipShareUrl}
+                    data={tipShareUrlQr}
                     qrSize={qrDisplaySize}
                     title='Scan to tip'
                     description='Opens your Jovie tip page.'
@@ -305,21 +295,6 @@ export function DashboardTipping() {
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-        <div className='w-full overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
-          <SectionHeader title='Recent Earnings' />
-          <div className='px-6 pb-6'>
-            <div className='space-y-3'>
-              <p className='text-secondary-token'>
-                No earnings yet. When you receive tips, they&apos;ll appear
-                here.
-              </p>
-              <p className='text-xs text-secondary-token'>
-                Soon you can forward Venmo receipts to us to tie every
-                conversion back to your dashboard.
-              </p>
             </div>
           </div>
         </div>

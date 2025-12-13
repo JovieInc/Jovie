@@ -164,8 +164,6 @@ export function EnhancedDashboardLinks({
   const [profileUsername, setProfileUsername] = useState<string>(
     dashboardData.selectedProfile?.username ?? ''
   );
-  const [avatarSaving, setAvatarSaving] = useState<boolean>(false);
-  const avatarTriggerRef = useRef<HTMLDivElement | null>(null);
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({
     saving: false,
@@ -399,7 +397,6 @@ export function EnhancedDashboardLinks({
   const handleAvatarUpload = useCallback(
     async (file: File): Promise<string> => {
       try {
-        setAvatarSaving(true);
         const blobUrl = await uploadAvatar(file);
         const result = await updateProfile({ avatarUrl: blobUrl });
         const nextAvatar = result.profile.avatarUrl ?? blobUrl;
@@ -415,7 +412,7 @@ export function EnhancedDashboardLinks({
         router.refresh();
         return nextAvatar;
       } finally {
-        setAvatarSaving(false);
+        // no-op
       }
     },
     [router, updateProfile, uploadAvatar]
@@ -963,20 +960,16 @@ export function EnhancedDashboardLinks({
         </div>
 
         {profileId && artist && (
-          <div className='rounded-2xl border border-subtle bg-surface-1 p-5 md:p-6'>
-            <div className='mb-5 flex items-start justify-between gap-4'>
+          <div className='w-full max-w-3xl rounded-xl border border-subtle bg-surface-1 p-3 md:p-4'>
+            <div className='mb-3 flex items-start justify-between gap-3'>
               <div className='min-w-0'>
-                <div className='text-sm font-semibold text-primary-token'>
+                <div className='text-sm font-medium text-primary-token'>
                   Profile details
                 </div>
-                <div className='mt-0.5 text-xs text-secondary-token'>
-                  Photo, name, username.
-                </div>
               </div>
-
               {profileSaveStatus.saving || profileSaveStatus.success ? (
                 <div
-                  className='shrink-0 rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token'
+                  className='shrink-0 rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token/80'
                   aria-live='polite'
                 >
                   {profileSaveStatus.saving
@@ -988,96 +981,82 @@ export function EnhancedDashboardLinks({
               ) : null}
             </div>
 
-            <div className='grid gap-6 md:grid-cols-[160px,1fr]'>
-              <div className='flex flex-col items-start gap-3'>
-                <AvatarUploadable
-                  ref={avatarTriggerRef}
-                  src={avatarUrl}
-                  alt={`Avatar for @${artist.handle}`}
-                  name={artist.name}
-                  size='xl'
-                  uploadable
-                  onUpload={handleAvatarUpload}
-                  onError={message => {
-                    toast.error(
-                      message || 'Failed to upload avatar. Please try again.'
-                    );
-                  }}
-                  maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-                  acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-                  showHoverOverlay
-                  className='shrink-0'
-                />
-                <button
-                  type='button'
-                  className='inline-flex items-center justify-center rounded-md border border-subtle bg-surface-2 px-3 py-1.5 text-xs font-medium text-primary-token transition-colors hover:bg-surface-2/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token/20 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1 disabled:opacity-60'
-                  onClick={() => avatarTriggerRef.current?.click()}
-                  disabled={avatarSaving}
-                >
-                  Change photo
-                </button>
-                <div className='text-xs text-secondary-token/70'>
-                  {avatarSaving ? 'Updating photo…' : 'PNG, JPG, or WebP.'}
-                </div>
-              </div>
+            <div className='grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start'>
+              <AvatarUploadable
+                src={avatarUrl}
+                alt={`Avatar for @${artist.handle}`}
+                name={artist.name}
+                size='display-lg'
+                uploadable
+                onUpload={handleAvatarUpload}
+                onError={message => {
+                  toast.error(
+                    message || 'Failed to upload avatar. Please try again.'
+                  );
+                }}
+                maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+                acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+                showHoverOverlay
+                className='shrink-0'
+              />
 
-              <div className='grid w-full gap-4 md:max-w-xl md:border-l md:border-subtle md:pl-6'>
-                <div className='grid gap-1.5'>
-                  <label
-                    htmlFor='profile-display-name'
-                    className='text-xs font-medium tracking-wide text-secondary-token'
-                  >
-                    Display name
-                  </label>
-                  <Input
-                    id='profile-display-name'
-                    type='text'
-                    value={profileDisplayName}
-                    onChange={e => {
-                      const nextValue = e.target.value;
-                      setProfileDisplayName(nextValue);
-                      setProfileSaveStatus(prev => ({
-                        ...prev,
-                        success: null,
-                        error: null,
-                      }));
-                      debouncedProfileSave({
-                        displayName: nextValue,
-                        username: profileUsername,
-                      });
-                    }}
-                    onBlur={() => debouncedProfileSave.flush()}
-                  />
-                </div>
-                <div className='grid gap-1.5'>
-                  <label
-                    htmlFor='profile-username'
-                    className='text-xs font-medium tracking-wide text-secondary-token'
-                  >
-                    Username
-                  </label>
-                  <div className='text-xs text-secondary-token/70'>
-                    Used in your profile URL
+              <div className='grid min-w-0 w-full gap-3 sm:border-l sm:border-subtle sm:pl-4'>
+                <div className='grid gap-1.5 sm:grid-cols-2 sm:gap-3'>
+                  <div className='grid gap-1.5'>
+                    <label
+                      htmlFor='profile-display-name'
+                      className='text-xs font-medium text-secondary-token'
+                    >
+                      Display name
+                    </label>
+                    <Input
+                      id='profile-display-name'
+                      type='text'
+                      value={profileDisplayName}
+                      onChange={e => {
+                        const nextValue = e.target.value;
+                        setProfileDisplayName(nextValue);
+                        setProfileSaveStatus(prev => ({
+                          ...prev,
+                          success: null,
+                          error: null,
+                        }));
+                        debouncedProfileSave({
+                          displayName: nextValue,
+                          username: profileUsername,
+                        });
+                      }}
+                      onBlur={() => debouncedProfileSave.flush()}
+                    />
                   </div>
-                  <Input
-                    id='profile-username'
-                    type='text'
-                    value={profileUsername}
-                    onChange={e => {
-                      const nextValue = e.target.value;
-                      setProfileUsername(nextValue);
-                      setProfileSaveStatus(prev => ({
-                        ...prev,
-                        success: null,
-                        error: null,
-                      }));
-                      debouncedProfileSave({
-                        displayName: profileDisplayName,
-                        username: nextValue,
-                      });
-                    }}
-                    onBlur={() => debouncedProfileSave.flush()}
-                  />
+
+                  <div className='grid gap-1.5'>
+                    <label
+                      htmlFor='profile-username'
+                      className='text-xs font-medium text-secondary-token'
+                    >
+                      Username
+                    </label>
+                    <Input
+                      id='profile-username'
+                      type='text'
+                      value={profileUsername}
+                      onChange={e => {
+                        const nextValue = e.target.value;
+                        setProfileUsername(nextValue);
+                        setProfileSaveStatus(prev => ({
+                          ...prev,
+                          success: null,
+                          error: null,
+                        }));
+                        debouncedProfileSave({
+                          displayName: profileDisplayName,
+                          username: nextValue,
+                        });
+                      }}
+                      onBlur={() => debouncedProfileSave.flush()}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

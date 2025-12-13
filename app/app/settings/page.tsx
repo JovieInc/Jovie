@@ -1,6 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getDashboardDataCached } from '../dashboard/actions';
 
 export default async function SettingsPage() {
@@ -17,7 +16,7 @@ export default async function SettingsPage() {
       redirect('/onboarding');
     }
 
-    return <DashboardSettings focusSection='profile' />;
+    redirect('/app/settings/account');
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
       throw error;

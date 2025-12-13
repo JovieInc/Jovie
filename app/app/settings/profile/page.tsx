@@ -1,6 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { getDashboardDataCached } from '../../dashboard/actions';
 
 export default async function SettingsProfilePage() {
@@ -15,5 +14,5 @@ export default async function SettingsProfilePage() {
     redirect('/onboarding');
   }
 
-  return <DashboardSettings focusSection='profile' />;
+  redirect('/app/settings/account');
 }

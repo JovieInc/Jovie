@@ -86,12 +86,22 @@ export async function POST(request: NextRequest) {
       linkType,
       target,
       linkId,
+      source,
     }: {
       handle: string;
       linkType: LinkType;
       target: string;
       linkId?: string;
+      source?: unknown;
     } = body;
+
+    const resolvedSource = (() => {
+      if (typeof source !== 'string') return undefined;
+      const normalized = source.trim().toLowerCase();
+      if (normalized === 'qr') return 'qr';
+      if (normalized === 'link') return 'link';
+      return undefined;
+    })();
 
     // Validate required fields
     if (!handle || !linkType || !target) {
@@ -308,7 +318,9 @@ export async function POST(request: NextRequest) {
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
-          metadata: { target },
+          metadata: resolvedSource
+            ? { target, source: resolvedSource }
+            : { target },
           audienceMemberId: resolvedMember.id,
         })
         .returning({ id: clickEvents.id });

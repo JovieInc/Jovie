@@ -67,20 +67,21 @@ export default function DashboardLayoutClient({
   const [, startTransition] = useTransition();
   const pathname = usePathname();
   const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
-  const isAppAdminRoute = pathname?.startsWith('/app/admin') ?? false;
   const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
   });
 
   // Routes that should use full width layout
-  const isFullWidthRoute = pathname?.startsWith('/app/admin/users') ?? false;
+  const isFullWidthRoute =
+    pathname?.startsWith('/app/admin/creators') ||
+    pathname?.startsWith('/app/admin/users');
   const isContactTableRoute =
-    pathname?.startsWith('/app/admin/users') ||
+    pathname?.startsWith('/app/admin/creators') ||
     pathname?.startsWith('/app/dashboard/audience');
   const isProfileRoute =
     pathname?.startsWith('/app/dashboard/profile') ?? false;
-  const useFullWidth = fullWidth || isFullWidthRoute || isAppAdminRoute;
+  const useFullWidth = fullWidth || isFullWidthRoute;
   const resolvedPreviewEnabled = previewEnabled && isAppDashboardRoute;
 
   // Build a simple breadcrumb from the current path
@@ -264,11 +265,19 @@ function DashboardLayoutInner({
             </>
           }
         />
-        <main className='flex-1 min-h-0 overflow-auto'>
+        <main
+          className={
+            isContactTableRoute
+              ? 'flex-1 min-h-0 overflow-hidden'
+              : 'flex-1 min-h-0 overflow-auto'
+          }
+        >
           <div
             className={
               useFullWidth
-                ? 'w-full px-0 py-6'
+                ? isContactTableRoute
+                  ? 'w-full h-full min-h-0 p-4 sm:p-6'
+                  : 'w-full px-4 sm:px-6 py-6'
                 : 'container mx-auto max-w-7xl p-6'
             }
           >
