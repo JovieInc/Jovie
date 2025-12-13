@@ -636,16 +636,38 @@ jobs:
           # Wait a moment for deployment to be ready
           sleep 10
 
-          # Basic health check - verify site loads and key elements exist
-          response_code=$(curl -s -o /dev/null -w "%{http_code}" "$deployment_url" || echo "000")
+          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
+
+          attempt=1
+          max_attempts=6
+          response_code="000"
+          while [ $attempt -le $max_attempts ]; do
+            response_code=$(curl -s -o /dev/null -A "$USER_AGENT" -w "%{http_code}" "$deployment_url" || echo "000")
+
+            if [ "$response_code" = "200" ]; then
+              break
+            fi
+
+            if [ "$response_code" = "429" ]; then
+              sleep_seconds=$((attempt * 5))
+              echo "⚠ Canary got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+              continue
+            fi
+
+            echo "❌ Canary failed: HTTP $response_code"
+            exit 1
+          done
 
           if [ "$response_code" != "200" ]; then
-            echo "❌ Canary failed: HTTP $response_code"
+            echo "❌ Canary failed after retries: HTTP $response_code"
             exit 1
           fi
 
+          # Basic health check - verify site loads and key elements exist
           # Check for key content (adjust selector as needed)
-          page_content=$(curl -s "$deployment_url" || echo "")
+          page_content=$(curl -s -A "$USER_AGENT" "$deployment_url" || echo "")
           if [[ ! "$page_content" =~ "Jovie" ]]; then
             echo "❌ Canary failed: Key content missing"
             exit 1
