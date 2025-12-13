@@ -85,9 +85,9 @@ jobs:
           RAW="${{ github.head_ref || github.ref_name }}"
 
           # Avoid collisions with protected long-lived branches in Neon.
-          # On push to main/production we want a unique ephemeral branch per run.
+          # For push to main/production we reuse the long-lived Neon branches.
           if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "production") ]]; then
-            RAW="ci-${{ github.ref_name }}-${{ github.run_id }}"
+            RAW="${{ github.ref_name }}"
           fi
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
@@ -587,7 +587,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
       name: Main Staging
-      url: https://main.jov.ie
+      url: https://preview.jov.ie
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
