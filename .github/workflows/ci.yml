@@ -646,9 +646,14 @@ jobs:
           # Vercel Deployment Protection / Bot protection bypass for automation
           # See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
           BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=""
+          BYPASS_ARGS=()
           if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS="-H x-vercel-protection-bypass:$BYPASS_SECRET -H x-vercel-set-bypass-cookie:true -c $COOKIE_JAR -b $COOKIE_JAR"
+            BYPASS_ARGS+=(
+              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
+              -H "x-vercel-set-bypass-cookie: true"
+              -c "$COOKIE_JAR"
+              -b "$COOKIE_JAR"
+            )
           else
             echo "⚠ VERCEL_AUTOMATION_BYPASS_SECRET not set; canary may hit Vercel Security Checkpoint (HTTP 429)."
           fi
@@ -657,7 +662,7 @@ jobs:
           max_attempts=8
           response_code="000"
           while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" $BYPASS_ARGS -w "\n%{http_code}" "$health_url" || echo "\n000")
+            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
             response_code="${response##*$'\n'}"
 
             if [ "$response_code" = "200" ]; then
@@ -685,7 +690,7 @@ jobs:
               max_attempts=5
               response_code="000"
               while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" $BYPASS_ARGS -w "\n%{http_code}" "$health_url" || echo "\n000")
+                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
                 response_code="${response##*$'\n'}"
 
                 if [ "$response_code" = "200" ]; then
@@ -717,7 +722,7 @@ jobs:
             fi
           fi
 
-          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" $BYPASS_ARGS "$health_url" || echo "")
+          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "$health_url" || echo "")
           if [[ ! "$health_content" =~ '"status":"ok"' ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
