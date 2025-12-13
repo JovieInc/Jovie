@@ -522,7 +522,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v5
-        with: { node-version: 20 }
+        with:
+          node-version: 20
+          package-manager-cache: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
