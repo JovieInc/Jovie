@@ -68,9 +68,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Only run for push and PRs to production (or full-ci label)
+    # Only run for push and PRs to production (or testing label)
     # Skip for merge queue and PRs to main to keep the fast lane truly fast
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -133,7 +133,7 @@ jobs:
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -162,8 +162,8 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
-    # Drizzle check is NOT required for merge queue (main) - only run on push or PRs to production/full-ci
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Drizzle check is NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -177,7 +177,7 @@ jobs:
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'drizzle'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -186,7 +186,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping Drizzle check as no DB/schema paths were changed."
-          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
@@ -272,8 +272,8 @@ jobs:
   ci-build:
     name: Build
     needs: [ci-fast-checks]
-    # Build is NOT required for merge queue (main) - only run on push or PRs to production/full-ci
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Build is NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -287,7 +287,7 @@ jobs:
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'build'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -297,7 +297,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping full CI as no critical paths were changed."
-          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -329,8 +329,8 @@ jobs:
   ci-unit-tests:
     name: Unit Tests
     needs: [ci-fast-checks]
-    # Unit tests are NOT required for merge queue (main) - only run on push or PRs to production/full-ci
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # Unit tests are NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -344,7 +344,7 @@ jobs:
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'test'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -354,7 +354,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping unit tests as no critical paths were changed."
-          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       # Continue with CI steps only if relevant changes detected or full-ci label present
@@ -394,8 +394,8 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, neon-db]
-    # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with full-ci label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'full-ci'))) }}
+    # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with testing label
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -408,7 +408,7 @@ jobs:
         uses: ./.github/actions/check-path-changes
         with:
           job-type: 'e2e'
-          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-ci') }}
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
           base-ref: ${{ github.base_ref }}
           event-name: ${{ github.event_name }}
           is-fork: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -418,7 +418,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci != 'true'
         run: |
           echo "Skipping E2E tests as no critical paths were changed."
-          echo "To force a full CI run, add the 'full-ci' label to the PR."
+          echo "To force a full CI run, add the 'testing' label to the PR."
           exit 0
 
       # Continue with CI steps only if relevant changes detected or full-ci label present

@@ -6,7 +6,7 @@ inputs:
     description: 'Type of job (build, test, e2e, drizzle)'
     required: true
   full-ci-label:
-    description: 'Whether full-ci label is present'
+    description: 'Whether testing label is present (force full CI)'
     required: false
     default: 'false'
   base-ref:
@@ -33,9 +33,9 @@ runs:
       id: check
       shell: bash
       run: |
-        # Force run if full-ci label is present
+        # Force run if the configured force-full-CI label is present
         if [[ "${{ inputs.full-ci-label }}" == "true" ]]; then
-          echo "Forcing full CI run due to 'full-ci' label"
+          echo "Forcing full CI run due to 'testing' label"
           echo "run_full_ci=true" >> $GITHUB_OUTPUT
           exit 0
         fi
