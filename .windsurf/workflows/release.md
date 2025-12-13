@@ -66,16 +66,9 @@ When PR merges to `production`:
 This happens if someone merged a PR to production with `--merge` instead of `--squash`.
 
 **To fix:**
-```bash
-# 1. Temporarily disable production ruleset
-gh api repos/JovieInc/Jovie/rulesets/7143910 -X PUT -f enforcement="disabled"
 
-# 2. Force-sync production to main
-git fetch origin
-git push origin origin/main:production --force
+Do not bypass branch protections or force-push.
 
-# 3. Re-enable production ruleset
-gh api repos/JovieInc/Jovie/rulesets/7143910 -X PUT -f enforcement="active"
-```
+If `production` diverges, stop and resolve via a normal PR-based workflow (or manual maintainer intervention), ensuring history and migrations remain consistent.
 
 **Prevention:** The production ruleset now only allows squash merges (`allowed_merge_methods: ["squash"]`).
