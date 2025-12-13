@@ -4,7 +4,7 @@ import { Container } from '@/components/site/Container';
 
 export function NewHomeHero() {
   return (
-    <section className='relative overflow-hidden min-h-[100svh] flex items-center py-16 sm:py-20 lg:py-24'>
+    <section className='relative overflow-hidden min-h-svh flex items-center py-16 sm:py-20 lg:py-24'>
       {/* Subtle gradient background + vignette */}
       <div className='absolute inset-0 -z-10'>
         <div className='absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.25),transparent)]' />
