@@ -492,7 +492,7 @@ jobs:
         run: npx playwright install chromium firefox --with-deps
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: pnpm run e2e:smoke --trace=retain-on-failure
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
