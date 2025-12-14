@@ -12,7 +12,7 @@ export default function LegalLayout({
 }) {
   return (
     <div className='flex min-h-screen flex-col bg-white dark:bg-[#0a0a0b]'>
-      <Header />
+      <Header hideNav />
       <main className='flex-1 py-16 sm:py-20'>
         <Container size='lg'>{children}</Container>
       </main>

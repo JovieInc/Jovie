@@ -144,6 +144,46 @@ describeFn('GroupedLinksManager', () => {
     nextAddPayload = null;
   });
 
+  it('adds multiple links when clicked quickly (no stale state overwrites)', async () => {
+    vi.useFakeTimers();
+    const onLinksChange = vi.fn();
+
+    renderWithProviders(
+      <GroupedLinksManager initialLinks={[]} onLinksChange={onLinksChange} />
+    );
+
+    // ignore initial mount call
+    onLinksChange.mockClear();
+
+    nextAddPayload = igSocial({
+      normalizedUrl: 'https://instagram.com/a',
+      originalUrl: 'https://instagram.com/a',
+    });
+    fireEvent.click(screen.getByText('mock-add'));
+
+    nextAddPayload = ytSocial({
+      platform: {
+        ...ytSocial().platform,
+        category: 'dsp',
+      },
+      normalizedUrl: 'https://music.youtube.com/channel/a',
+      originalUrl: 'https://music.youtube.com/channel/a',
+    });
+    fireEvent.click(screen.getByText('mock-add'));
+
+    // handleAdd includes a 600ms delay; advance timers so both complete
+    await vi.advanceTimersByTimeAsync(650);
+
+    const last = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
+    expect(last).toHaveLength(2);
+    const urls = last.map(l => l.normalizedUrl).sort();
+    expect(urls).toEqual(
+      ['https://instagram.com/a', 'https://music.youtube.com/channel/a'].sort()
+    );
+
+    vi.useRealTimers();
+  });
+
   it('calls onLinksChange on mount with initial links', () => {
     const onLinksChange = vi.fn();
     renderWithProviders(

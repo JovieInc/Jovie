@@ -312,7 +312,7 @@ async function fetchDashboardDataWithSession(
 
     const [clickStats] = await dbClient
       .select({
-        total: count(),
+        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
         qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
         link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
       })

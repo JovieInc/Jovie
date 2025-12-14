@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { APP_URL } from '@/constants/app';
+import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema';
@@ -186,12 +186,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: 'Subscription successful',
       email_dispatched: dispatchResult?.delivered.includes('email') ?? false,
       duration_ms: Math.round(Date.now() - runtimeStart),
     });
+
+    response.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 365,
+      path: '/',
+    });
+
+    return response;
   } catch (error) {
     // Track unexpected error
     await trackServerEvent('notifications_subscribe_error', {

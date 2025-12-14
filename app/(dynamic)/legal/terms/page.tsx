@@ -1,5 +1,20 @@
+import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
+import { APP_NAME, APP_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
+
+export const metadata: Metadata = {
+  title: `Terms of Service | ${APP_NAME}`,
+  description:
+    'Jovie is a creative workspace governed by clear, fair policies so you can focus on sharing your music.',
+  alternates: {
+    canonical: `${APP_URL}/legal/terms`,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default async function TermsPage() {
   const doc = await getLegalDocument('terms');

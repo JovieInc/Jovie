@@ -5,34 +5,34 @@ import { Container } from '@/components/site/Container';
 // Geist Design System colors
 const geistColors = {
   blue: {
-    icon: 'text-[#0070F3]',
-    bg: 'bg-[#0070F3]/10',
-    border: 'border-[#0070F3]/20',
+    icon: 'text-[color:var(--accent-analytics)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
   purple: {
-    icon: 'text-[#7928CA]',
-    bg: 'bg-[#7928CA]/10',
-    border: 'border-[#7928CA]/20',
+    icon: 'text-[color:var(--accent-conv)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
   teal: {
-    icon: 'text-[#00A8A8]',
-    bg: 'bg-[#00A8A8]/10',
-    border: 'border-[#00A8A8]/20',
+    icon: 'text-[color:var(--accent-pro)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
   pink: {
-    icon: 'text-[#FF0080]',
-    bg: 'bg-[#FF0080]/10',
-    border: 'border-[#FF0080]/20',
+    icon: 'text-[color:var(--accent-links)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
   amber: {
-    icon: 'text-[#F5A623]',
-    bg: 'bg-[#F5A623]/10',
-    border: 'border-[#F5A623]/20',
+    icon: 'text-[color:var(--accent-beauty)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
   green: {
-    icon: 'text-[#00C853]',
-    bg: 'bg-[#00C853]/10',
-    border: 'border-[#00C853]/20',
+    icon: 'text-[color:var(--accent-speed)]',
+    bg: 'bg-surface-0',
+    border: 'border-subtle',
   },
 };
 
@@ -55,6 +55,27 @@ const features = [
           strokeLinecap='round'
           strokeLinejoin='round'
           d='M13 10V3L4 14h7v7l9-11h-7z'
+        />
+      </svg>
+    ),
+  },
+  {
+    title: 'Conversion-focused analytics',
+    description:
+      'Track clicks to conversions, referrers, and countries to optimize your profile performance.',
+    color: 'green' as keyof typeof geistColors,
+    icon: (
+      <svg
+        className='w-5 h-5'
+        fill='none'
+        viewBox='0 0 24 24'
+        stroke='currentColor'
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
         />
       </svg>
     ),
@@ -102,27 +123,6 @@ const features = [
     ),
   },
   {
-    title: 'Clean light/dark modes',
-    description:
-      'Desktop to mobile QR handoff for a seamless experience across all devices and preferences.',
-    color: 'pink' as keyof typeof geistColors,
-    icon: (
-      <svg
-        className='w-5 h-5'
-        fill='none'
-        viewBox='0 0 24 24'
-        stroke='currentColor'
-        strokeWidth={2}
-      >
-        <path
-          strokeLinecap='round'
-          strokeLinejoin='round'
-          d='M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z'
-        />
-      </svg>
-    ),
-  },
-  {
     title: 'App deep links',
     description:
       'Skip browser and login friction by opening native apps directly for better user experience.',
@@ -144,10 +144,10 @@ const features = [
     ),
   },
   {
-    title: 'Conversion-focused analytics',
+    title: 'Clean light/dark modes',
     description:
-      'Track clicks to conversions, referrers, and countries to optimize your profile performance.',
-    color: 'green' as keyof typeof geistColors,
+      'Desktop to mobile QR handoff for a seamless experience across all devices and preferences.',
+    color: 'pink' as keyof typeof geistColors,
     icon: (
       <svg
         className='w-5 h-5'
@@ -159,7 +159,7 @@ const features = [
         <path
           strokeLinecap='round'
           strokeLinejoin='round'
-          d='M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
+          d='M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z'
         />
       </svg>
     ),
@@ -168,41 +168,41 @@ const features = [
 
 export function NewFeaturesSection() {
   return (
-    <section className='py-20 bg-white dark:bg-[#0a0a0b]'>
+    <section id='features' className='py-20 sm:py-24 bg-base'>
       <Container>
         {/* Section header */}
-        <div className='text-center mb-16'>
-          <h2 className='text-3xl md:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white'>
-            Features <span className='text-[#0070F3]'>included forever</span>
+        <div className='text-center mb-12 sm:mb-16'>
+          <h2 className='text-3xl md:text-4xl font-semibold tracking-tight text-primary-token'>
+            Features <span className='text-accent-token'>included forever</span>
           </h2>
-          <p className='mt-4 text-base text-gray-500 dark:text-gray-400 max-w-xl mx-auto'>
+          <p className='mt-4 text-base text-secondary-token max-w-xl mx-auto'>
             Everything you need to convert fans, included in the free plan.
           </p>
         </div>
 
         {/* Feature grid - Linear style cards */}
-        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-          {features.map((feature, index) => {
+        <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'>
+          {features.map(feature => {
             const colorClasses = geistColors[feature.color];
             return (
               <div
-                key={index}
-                className='group relative p-6 rounded-xl border border-gray-200 dark:border-white/8 bg-gray-50 dark:bg-white/2 hover:border-gray-300 dark:hover:border-white/12 hover:bg-gray-100/50 dark:hover:bg-white/4 transition-all duration-200'
+                key={feature.title}
+                className='group relative p-6 rounded-2xl border border-subtle bg-surface-1 hover:bg-surface-2 hover:border-default transition-colors duration-200'
               >
                 {/* Icon with Geist color */}
                 <div
-                  className={`inline-flex items-center justify-center w-10 h-10 rounded-lg ${colorClasses.bg} ${colorClasses.border} border mb-4`}
+                  className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${colorClasses.bg} ${colorClasses.border} border mb-4`}
                 >
                   <span className={colorClasses.icon}>{feature.icon}</span>
                 </div>
 
                 {/* Title */}
-                <h3 className='text-base font-semibold text-gray-900 dark:text-white mb-2'>
+                <h3 className='text-base font-semibold text-primary-token mb-2'>
                   {feature.title}
                 </h3>
 
                 {/* Description */}
-                <p className='text-sm text-gray-500 dark:text-gray-400 leading-relaxed'>
+                <p className='text-sm text-secondary-token leading-relaxed'>
                   {feature.description}
                 </p>
               </div>

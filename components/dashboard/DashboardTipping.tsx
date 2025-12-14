@@ -86,37 +86,82 @@ export function DashboardTipping() {
   const { tipClicks, qrTipClicks, linkTipClicks } = dashboardData.tippingStats;
 
   return (
-    <div className='space-y-6'>
-      <div>
-        <h1 className='text-2xl font-bold text-primary-token'>Earnings</h1>
-        <p className='mt-1 text-secondary-token'>
-          Connect your payout handle and view your earnings history
-        </p>
+    <div className='space-y-5'>
+      <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
+        <div>
+          <h1 className='text-2xl font-bold text-primary-token'>Earnings</h1>
+          <p className='mt-1 text-secondary-token'>
+            Connect your payout handle and view your earnings history
+          </p>
+        </div>
+        {hasVenmoHandle ? (
+          isEditing ? (
+            <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
+              <WalletIcon className='h-4 w-4 text-accent' />
+              <span className='text-sm font-medium text-primary-token'>
+                Venmo
+              </span>
+              <div className='flex items-center gap-2'>
+                <span className='text-sm text-secondary-token'>@</span>
+                <Input
+                  type='text'
+                  value={venmoHandle}
+                  onChange={e => setVenmoHandle(e.target.value)}
+                  placeholder='your-username'
+                  autoFocus
+                  className='h-8 w-48 sm:w-56'
+                />
+              </div>
+              <Button
+                onClick={handleSaveVenmo}
+                disabled={isSaving || !venmoHandle.trim()}
+                variant='primary'
+                size='sm'
+                className='h-8 px-3'
+              >
+                {isSaving ? 'Saving…' : 'Update'}
+              </Button>
+              <Button
+                onClick={handleCancel}
+                disabled={isSaving}
+                variant='ghost'
+                size='sm'
+                className='h-8 px-2'
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
+              <WalletIcon className='h-4 w-4 text-accent' />
+              <span className='rounded-md bg-surface-2 px-2 py-1 font-mono text-sm text-primary-token'>
+                {artist.venmo_handle}
+              </span>
+              <span className='text-sm text-secondary-token'>Connected</span>
+              <Button
+                onClick={() => setIsEditing(true)}
+                variant='ghost'
+                size='sm'
+                className='h-8 px-2'
+              >
+                Edit
+              </Button>
+            </div>
+          )
+        ) : null}
       </div>
 
       {/* Venmo Handle Setup — hidden when already connected unless editing */}
-      {hasVenmoHandle && !isEditing ? (
-        <div className='flex w-full flex-wrap items-center justify-between gap-4 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
-          <div className='flex items-center gap-2 text-sm text-primary-token'>
-            <WalletIcon className='h-5 w-5 text-accent' />
-            <span className='font-mono rounded-md bg-surface-2 px-2 py-1'>
-              {artist.venmo_handle}
-            </span>
-            <span className='text-secondary-token'>Connected</span>
-          </div>
-          <Button onClick={() => setIsEditing(true)} variant='ghost' size='sm'>
-            Edit
-          </Button>
-        </div>
-      ) : (
-        <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
+      {!hasVenmoHandle ? (
+        <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
           <SectionHeader
             title='Venmo Handle'
             description='Your handle will appear on your profile so fans can tip you directly.'
             right={<WalletIcon className='h-6 w-6 text-accent' />}
+            className='px-5 py-4 border-b border-subtle'
           />
 
-          <div className='px-6 pb-6'>
+          <div className='px-5 py-4'>
             <div className='space-y-4'>
               <div>
                 <label
@@ -155,16 +200,6 @@ export function DashboardTipping() {
                       ? 'Update'
                       : 'Connect'}
                 </Button>
-                {hasVenmoHandle ? (
-                  <Button
-                    onClick={handleCancel}
-                    disabled={isSaving}
-                    variant='ghost'
-                    size='sm'
-                  >
-                    Cancel
-                  </Button>
-                ) : null}
               </div>
               {saveSuccess && (
                 <div
@@ -178,18 +213,18 @@ export function DashboardTipping() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Tipping content - Blurred and inert when no Venmo handle */}
       <div
         className={cn(
-          'space-y-6',
+          'space-y-5',
           !hasVenmoHandle && 'filter blur-sm pointer-events-none select-none'
         )}
         aria-hidden={!hasVenmoHandle ? true : undefined}
         inert={hasVenmoHandle ? undefined : true}
       >
-        <div className='grid gap-6 lg:grid-cols-12'>
+        <div className='grid gap-5 lg:grid-cols-12'>
           <div className='space-y-3 lg:col-span-12'>
             <div className='space-y-1'>
               <h2 className='text-base font-semibold tracking-tight text-primary-token'>
@@ -201,58 +236,60 @@ export function DashboardTipping() {
             </div>
 
             <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+              <div className='rounded-xl border border-subtle bg-surface-1/40 p-4'>
+                <p className='text-[11px] font-medium uppercase tracking-wide text-secondary-token'>
                   QR code scans
                 </p>
-                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                <p className='mt-2 text-3xl font-semibold tabular-nums tracking-tight text-primary-token'>
                   {formatCount(qrTipClicks)}
                 </p>
-                <p className='mt-2 text-sm text-secondary-token'>
+                <p className='mt-2 text-xs leading-5 text-secondary-token'>
                   Fans who scanned your tip QR.
                 </p>
               </div>
-              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+              <div className='rounded-xl border border-subtle bg-surface-1/40 p-4'>
+                <p className='text-[11px] font-medium uppercase tracking-wide text-secondary-token'>
                   Link clicks
                 </p>
-                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                <p className='mt-2 text-3xl font-semibold tabular-nums tracking-tight text-primary-token'>
                   {formatCount(linkTipClicks)}
                 </p>
-                <p className='mt-2 text-sm text-secondary-token'>
+                <p className='mt-2 text-xs leading-5 text-secondary-token'>
                   Fans who clicked your tip link.
                 </p>
               </div>
-              <div className='rounded-xl border border-subtle bg-surface-1/50 p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.18em] text-secondary-token'>
+              <div className='rounded-xl border border-subtle bg-surface-1/40 p-4'>
+                <p className='text-[11px] font-medium uppercase tracking-wide text-secondary-token'>
                   Total
                 </p>
-                <p className='mt-2 text-3xl font-semibold text-primary-token'>
+                <p className='mt-2 text-3xl font-semibold tabular-nums tracking-tight text-primary-token'>
                   {formatCount(tipClicks)}
                 </p>
-                <p className='mt-2 text-sm text-secondary-token'>
+                <p className='mt-2 text-xs leading-5 text-secondary-token'>
                   QR + link opens combined.
                 </p>
               </div>
             </div>
           </div>
-          <div className='grid gap-6 lg:col-span-12 lg:grid-cols-2'>
-            <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
+          <div className='grid gap-5 lg:col-span-12 lg:grid-cols-2'>
+            <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
               <SectionHeader
                 title='Share your tip link'
                 description='Send fans directly to jov.ie so they can tip instantly.'
+                className='px-5 py-4 border-b border-subtle'
               />
-              <div className='px-6 pb-6'>
+              <div className='px-5 py-4'>
                 <div className='space-y-3'>
-                  <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2 px-4 py-2 text-sm font-mono text-primary-token'>
+                  <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2/60 px-3 py-2 text-sm font-mono text-primary-token'>
                     <span className='min-w-0 flex-1 truncate'>
                       https://jov.ie{tipRelativePathLink}
                     </span>
                     <CopyToClipboardButton
                       relativePath={tipRelativePathLink}
                       idleLabel='Copy link'
-                      successLabel='✓ Copied!'
+                      successLabel='Copied'
                       errorLabel='Copy failed'
+                      className='h-8 px-3'
                     />
                   </div>
                   <p className='text-xs text-secondary-token'>
@@ -265,20 +302,23 @@ export function DashboardTipping() {
                 </div>
               </div>
             </div>
-            <div className='rounded-2xl bg-surface-1/40 p-3 shadow-none'>
+            <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
               <SectionHeader
                 title='Downloadable QR'
                 description='Perfect for merch tables, receipts, or posters.'
+                className='px-5 py-4 border-b border-subtle'
               />
-              <div className='px-6 pb-6'>
+              <div className='px-5 py-4'>
                 <div className='flex flex-col items-center gap-3'>
-                  <QRCodeCard
-                    data={tipShareUrlQr}
-                    qrSize={qrDisplaySize}
-                    title='Scan to tip'
-                    description='Opens your Jovie tip page.'
-                  />
-                  <div className='flex flex-wrap items-center justify-center gap-3'>
+                  <div className='w-full rounded-xl border border-subtle bg-surface-2/40 px-4 py-5'>
+                    <QRCodeCard
+                      data={tipShareUrlQr}
+                      qrSize={qrDisplaySize}
+                      title='Scan to tip'
+                      description='Opens your Jovie tip page.'
+                    />
+                  </div>
+                  <div className='flex flex-col items-center justify-center gap-2 text-center'>
                     <Button variant='secondary' size='sm' asChild>
                       <a
                         href={qrDownloadUrl}

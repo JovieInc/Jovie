@@ -4,6 +4,9 @@ export const APP_NAME = 'Jovie';
 export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie';
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
+export const AUDIENCE_ANON_COOKIE = 'jv_aid';
+export const AUDIENCE_IDENTIFIED_COOKIE = 'jv_identified';
+export const AUDIENCE_SPOTIFY_PREFERRED_COOKIE = 'jv_pref_spotify';
 export const DSPS = {
   spotify: 'spotify',
   apple_music: 'apple_music',

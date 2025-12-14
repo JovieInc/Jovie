@@ -13,22 +13,27 @@ export function LegalMarkdownReader({
     <article className={cn('relative', className)}>
       <div
         className={cn(
-          'prose prose-neutral dark:prose-invert max-w-none prose-base',
+          'max-w-none text-[15px] leading-7 text-neutral-900 dark:text-white',
           // Headings
-          'prose-headings:font-semibold prose-headings:tracking-tight',
-          'prose-h1:text-2xl prose-h1:mb-2',
-          'prose-h2:text-xl prose-h2:mt-12 prose-h2:mb-4 prose-h2:pb-3 prose-h2:border-b prose-h2:border-neutral-200 dark:prose-h2:border-neutral-800',
-          'prose-h3:text-base prose-h3:font-semibold prose-h3:mt-8 prose-h3:mb-3',
+          '[&_h1]:scroll-mt-24 [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:mb-2 [&_h1]:text-neutral-900 dark:[&_h1]:text-white',
+          '[&_h2]:scroll-mt-24 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:mt-12 [&_h2]:mb-4 [&_h2]:pb-3 [&_h2]:border-b [&_h2]:border-neutral-200 dark:[&_h2]:border-neutral-800 [&_h2]:text-neutral-900 dark:[&_h2]:text-white',
+          '[&_h3]:scroll-mt-24 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:tracking-tight [&_h3]:mt-8 [&_h3]:mb-3 [&_h3]:text-neutral-900 dark:[&_h3]:text-white',
           // Paragraphs
-          'prose-p:text-[15px] prose-p:leading-7 prose-p:text-neutral-600 dark:prose-p:text-neutral-400 prose-p:mb-4',
+          '[&_p]:text-[15px] [&_p]:leading-7 [&_p]:text-neutral-600 dark:[&_p]:text-neutral-400 [&_p]:mb-4',
+          // Blockquotes (Geist-like)
+          '[&_blockquote]:my-6 [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-neutral-200 dark:[&_blockquote]:border-white/10 [&_blockquote]:bg-neutral-50 dark:[&_blockquote]:bg-white/5 [&_blockquote]:px-4 [&_blockquote]:py-3',
+          '[&_blockquote_p]:mb-3 [&_blockquote_p]:text-neutral-700 dark:[&_blockquote_p]:text-neutral-300',
+          '[&_blockquote_p:last-child]:mb-0 [&_blockquote_p:last-child]:mt-3 [&_blockquote_p:last-child]:text-sm [&_blockquote_p:last-child]:text-neutral-500 dark:[&_blockquote_p:last-child]:text-neutral-400',
+          '[&_blockquote_a]:font-medium [&_blockquote_a]:underline [&_blockquote_a]:underline-offset-4 [&_blockquote_a]:decoration-neutral-300 dark:[&_blockquote_a]:decoration-neutral-600 hover:[&_blockquote_a]:decoration-neutral-500',
           // Lists
-          'prose-ul:my-4 prose-ul:space-y-2',
-          'prose-li:text-[15px] prose-li:leading-7 prose-li:text-neutral-600 dark:prose-li:text-neutral-400 prose-li:pl-1',
-          'prose-li:marker:text-neutral-400 dark:prose-li:marker:text-neutral-600',
+          '[&_ul]:my-4 [&_ul]:pl-5 [&_ul]:list-disc [&_ul]:space-y-2',
+          '[&_ol]:my-4 [&_ol]:pl-5 [&_ol]:list-decimal [&_ol]:space-y-2',
+          '[&_li]:text-[15px] [&_li]:leading-7 [&_li]:text-neutral-600 dark:[&_li]:text-neutral-400 [&_li]:pl-1',
+          '[&_li::marker]:text-neutral-400 dark:[&_li::marker]:text-neutral-600',
           // Links
-          'prose-a:text-neutral-900 dark:prose-a:text-white prose-a:underline prose-a:underline-offset-4 prose-a:decoration-neutral-300 dark:prose-a:decoration-neutral-600 hover:prose-a:decoration-neutral-500',
+          '[&_a]:text-neutral-900 dark:[&_a]:text-white [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-neutral-300 dark:[&_a]:decoration-neutral-600 hover:[&_a]:decoration-neutral-500',
           // Strong
-          'prose-strong:text-neutral-900 dark:prose-strong:text-white prose-strong:font-medium'
+          '[&_strong]:text-neutral-900 dark:[&_strong]:text-white [&_strong]:font-medium'
         )}
         dangerouslySetInnerHTML={{ __html: html }}
       />

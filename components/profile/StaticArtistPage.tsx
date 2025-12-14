@@ -8,6 +8,8 @@ import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
+type PrimaryAction = 'subscribe' | 'listen';
+
 interface StaticArtistPageProps {
   mode: string;
   artist: Artist;
@@ -17,12 +19,16 @@ interface StaticArtistPageProps {
   showTipButton: boolean;
   showBackButton: boolean;
   showFooter?: boolean;
+  primaryAction?: PrimaryAction;
+  spotifyPreferred?: boolean;
 }
 
 function renderContent(
   mode: string,
   artist: Artist,
-  socialLinks: LegacySocialLink[]
+  socialLinks: LegacySocialLink[],
+  primaryAction: PrimaryAction,
+  spotifyPreferred: boolean
 ) {
   const mapSocialPlatformToDSPKey = (platform: string): string | null => {
     const normalized = platform.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -163,6 +169,42 @@ function renderContent(
         );
       }
 
+      if (primaryAction === 'subscribe') {
+        return (
+          <div className='space-y-4'>
+            <div className='flex justify-center'>
+              <Link
+                href={`/${artist.handle}/subscribe`}
+                prefetch={false}
+                className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
+                aria-label='Subscribe to updates'
+              >
+                Subscribe
+              </Link>
+            </div>
+          </div>
+        );
+      }
+
+      const spotifyDsp = mergedDSPs.find(dsp => dsp.key === 'spotify');
+      if (spotifyPreferred && spotifyDsp) {
+        return (
+          <div className='space-y-4'>
+            <div className='flex justify-center'>
+              <a
+                href={spotifyDsp.url}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
+                aria-label='Open in Spotify'
+              >
+                Open in Spotify
+              </a>
+            </div>
+          </div>
+        );
+      }
+
       return (
         <div className='space-y-4'>
           <div className='flex justify-center'>
@@ -190,6 +232,8 @@ export function StaticArtistPage({
   showTipButton,
   showBackButton,
   showFooter = true,
+  primaryAction = 'listen',
+  spotifyPreferred = false,
 }: StaticArtistPageProps) {
   return (
     <div className='w-full'>
@@ -203,7 +247,15 @@ export function StaticArtistPage({
         showBackButton={showBackButton}
         showFooter={showFooter}
       >
-        <div>{renderContent(mode, artist, socialLinks)}</div>
+        <div>
+          {renderContent(
+            mode,
+            artist,
+            socialLinks,
+            primaryAction,
+            spotifyPreferred
+          )}
+        </div>
       </ArtistPageShell>
     </div>
   );

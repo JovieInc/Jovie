@@ -1,14 +1,15 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 import { isAdminEmail } from '@/lib/admin/roles';
+import { db, waitlistEntries } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { stripe } from '@/lib/stripe/client';
 
 export const runtime = 'nodejs';
 
 interface AdminOverviewResponse {
   mrrUsd: number;
-  activeSubscribers: number;
+  waitlistCount: number;
 }
 
 export async function GET() {
@@ -24,10 +25,11 @@ export async function GET() {
     }
 
     const mrrData = await getStripeMrr();
+    const waitlistCount = await getWaitlistCount();
 
     const body: AdminOverviewResponse = {
       mrrUsd: mrrData.mrrUsd,
-      activeSubscribers: mrrData.activeSubscribers,
+      waitlistCount,
     };
 
     return NextResponse.json(body);
@@ -45,53 +47,24 @@ async function getStripeMrr(): Promise<{
   activeSubscribers: number;
 }> {
   try {
-    let mrrCents = 0;
-    let activeSubscribers = 0;
-    let startingAfter: string | undefined;
-
-    for (;;) {
-      const page = await stripe.subscriptions.list({
-        status: 'active',
-        expand: ['data.items.price'],
-        limit: 100,
-        ...(startingAfter ? { starting_after: startingAfter } : {}),
-      });
-
-      for (const sub of page.data) {
-        if (!Array.isArray(sub.items.data) || sub.items.data.length === 0)
-          continue;
-
-        activeSubscribers += 1;
-
-        for (const item of sub.items.data) {
-          const price = item.price;
-          if (!price || typeof price.unit_amount !== 'number') continue;
-
-          const amount = price.unit_amount;
-          const interval = price.recurring?.interval;
-
-          if (interval === 'month') {
-            mrrCents += amount;
-          } else if (interval === 'year') {
-            mrrCents += Math.round(amount / 12);
-          }
-        }
-      }
-
-      if (!page.has_more || page.data.length === 0) {
-        break;
-      }
-
-      startingAfter = page.data[page.data.length - 1]?.id;
-      if (!startingAfter) break;
-    }
-
-    return {
-      mrrUsd: mrrCents / 100,
-      activeSubscribers,
-    };
+    const { getAdminStripeOverviewMetrics } = await import(
+      '@/lib/admin/stripe-metrics'
+    );
+    return await getAdminStripeOverviewMetrics();
   } catch (error) {
     console.error('Error computing Stripe MRR for admin overview:', error);
     return { mrrUsd: 0, activeSubscribers: 0 };
+  }
+}
+
+async function getWaitlistCount(): Promise<number> {
+  try {
+    const [row] = await db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(waitlistEntries);
+    return Number(row?.count ?? 0);
+  } catch (error) {
+    console.error('Error computing waitlist count for admin overview:', error);
+    return 0;
   }
 }

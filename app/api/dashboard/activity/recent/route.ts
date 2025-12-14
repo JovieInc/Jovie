@@ -47,8 +47,21 @@ function getActorLabel(actor: ActorKind): string {
   return 'Someone';
 }
 
+function safeDecodeLocationPart(value: string): string {
+  if (!value) return value;
+  const maybeEncoded = value.includes('%') || value.includes('+');
+  if (!maybeEncoded) return value;
+  try {
+    return decodeURIComponent(value.replace(/\+/g, ' '));
+  } catch {
+    return value;
+  }
+}
+
 function formatLocation(parts: Array<string | null | undefined>): string {
-  const filtered = parts.filter(Boolean) as string[];
+  const filtered = (parts.filter(Boolean) as string[]).map(
+    safeDecodeLocationPart
+  );
   if (filtered.length === 0) return '';
   return ` from ${filtered.join(', ')}`;
 }
@@ -225,7 +238,7 @@ export async function GET(request: NextRequest) {
 
       const subscribeActivities: ActivityRow[] = subscribeRows.map(row => {
         const locationLabel = row.city
-          ? ` from ${row.city}`
+          ? ` from ${safeDecodeLocationPart(row.city)}`
           : row.countryCode
             ? ` from ${row.countryCode.toUpperCase()}`
             : '';

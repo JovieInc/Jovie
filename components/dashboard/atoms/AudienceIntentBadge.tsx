@@ -13,19 +13,19 @@ const INTENT_BADGES: Record<
   { label: string; className: string; dotClassName: string }
 > = {
   high: {
-    label: 'High intent',
-    className: 'border border-subtle bg-surface-2/60 text-primary-token',
-    dotClassName: 'bg-primary-token',
-  },
-  medium: {
-    label: 'Medium intent',
+    label: 'High',
     className: 'border border-subtle bg-surface-2/40 text-secondary-token',
     dotClassName: 'bg-secondary-token',
   },
+  medium: {
+    label: 'Medium',
+    className: 'border border-subtle bg-transparent text-tertiary-token',
+    dotClassName: 'bg-tertiary-token',
+  },
   low: {
-    label: 'Low intent',
-    className: 'border border-subtle bg-transparent text-secondary-token',
-    dotClassName: 'bg-secondary-token/40',
+    label: 'Low',
+    className: 'border border-subtle bg-transparent text-tertiary-token',
+    dotClassName: 'bg-tertiary-token/60',
   },
 };
 

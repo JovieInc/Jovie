@@ -75,12 +75,15 @@ export default function DashboardLayoutClient({
   // Routes that should use full width layout
   const isFullWidthRoute =
     pathname?.startsWith('/app/admin/creators') ||
-    pathname?.startsWith('/app/admin/users');
+    pathname?.startsWith('/app/admin/users') ||
+    pathname?.startsWith('/app/dashboard/audience');
   const isContactTableRoute =
     pathname?.startsWith('/app/admin/creators') ||
     pathname?.startsWith('/app/dashboard/audience');
   const isProfileRoute =
     pathname?.startsWith('/app/dashboard/profile') ?? false;
+  const isAudienceRoute =
+    pathname?.startsWith('/app/dashboard/audience') ?? false;
   const useFullWidth = fullWidth || isFullWidthRoute;
   const resolvedPreviewEnabled = previewEnabled && isAppDashboardRoute;
 
@@ -187,6 +190,7 @@ export default function DashboardLayoutClient({
               useFullWidth={useFullWidth}
               isContactTableRoute={isContactTableRoute}
               isProfileRoute={isProfileRoute}
+              isAudienceRoute={isAudienceRoute}
               previewEnabled={resolvedPreviewEnabled}
             >
               {children}
@@ -204,6 +208,7 @@ function DashboardLayoutInner({
   useFullWidth,
   isContactTableRoute,
   isProfileRoute,
+  isAudienceRoute,
   previewEnabled,
   children,
 }: {
@@ -211,6 +216,7 @@ function DashboardLayoutInner({
   useFullWidth: boolean;
   isContactTableRoute: boolean;
   isProfileRoute: boolean;
+  isAudienceRoute: boolean;
   previewEnabled: boolean;
   children: React.ReactNode;
 }) {
@@ -276,7 +282,9 @@ function DashboardLayoutInner({
             className={
               useFullWidth
                 ? isContactTableRoute
-                  ? 'w-full h-full min-h-0 p-4 sm:p-6'
+                  ? isAudienceRoute
+                    ? 'w-full h-full min-h-0'
+                    : 'w-full h-full min-h-0 p-4 sm:p-6'
                   : 'w-full px-4 sm:px-6 py-6'
                 : 'container mx-auto max-w-7xl p-6'
             }

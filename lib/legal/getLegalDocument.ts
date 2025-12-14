@@ -1,9 +1,6 @@
-import { promises as fs } from 'fs';
-import { toString } from 'mdast-util-to-string';
 import path from 'path';
-import { remark } from 'remark';
-import remarkHtml from 'remark-html';
-import { visit } from 'unist-util-visit';
+import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
+import type { TocEntry as DocsTocEntry, MarkdownDocument } from '@/types/docs';
 
 const LEGAL_DOCS = {
   privacy: {
@@ -18,37 +15,12 @@ const LEGAL_DOCS = {
 
 export type LegalDocumentSlug = keyof typeof LEGAL_DOCS;
 
-export interface TocEntry {
-  id: string;
-  title: string;
-  level: number;
-}
+export type TocEntry = DocsTocEntry;
 
-export interface LegalDocument {
+export interface LegalDocument extends MarkdownDocument {
   slug: LegalDocumentSlug;
   title: string;
-  html: string;
-  toc: TocEntry[];
 }
-
-const slugifyHeading = (value: string): string => {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-};
-
-type HeadingNode = {
-  depth?: number;
-  data?: {
-    hProperties?: {
-      id?: string;
-      [key: string]: unknown;
-    };
-    [key: string]: unknown;
-  };
-};
 
 export async function getLegalDocument(
   slug: LegalDocumentSlug
@@ -58,40 +30,11 @@ export async function getLegalDocument(
     throw new Error(`Unknown legal document slug: ${slug}`);
   }
 
-  const absolutePath = path.join(process.cwd(), docInfo.file);
-  const raw = await fs.readFile(absolutePath, 'utf-8');
-
-  const processor = remark().use(remarkHtml);
-  const ast = processor.parse(raw);
-
-  const toc: TocEntry[] = [];
-  visit(ast, 'heading', node => {
-    const heading = node as HeadingNode;
-    if (!heading.depth) return;
-
-    const title = toString(node as Parameters<typeof toString>[0]).trim();
-    if (!title) return;
-    if (heading.depth > 3) return;
-
-    const headingId = slugifyHeading(title);
-    if (!headingId) return;
-
-    const data = heading.data ?? {};
-    const hProperties = data.hProperties ?? {};
-    hProperties.id = headingId;
-    data.hProperties = hProperties;
-    heading.data = data;
-
-    toc.push({ id: headingId, title, level: heading.depth });
-  });
-
-  const transformed = await processor.run(ast);
-  const htmlResult = processor.stringify(transformed as never);
+  const doc = await getMarkdownDocument(docInfo.file);
 
   return {
     slug,
     title: docInfo.title,
-    html: htmlResult.toString(),
-    toc,
+    ...doc,
   };
 }

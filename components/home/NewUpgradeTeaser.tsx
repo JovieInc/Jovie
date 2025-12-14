@@ -7,33 +7,31 @@ import { Container } from '@/components/site/Container';
 
 export function NewUpgradeTeaser() {
   return (
-    <section className='py-16 sm:py-20 bg-white dark:bg-[#0a0a0b]'>
+    <section className='py-16 sm:py-20 bg-base'>
       <Container>
         <div className='max-w-lg mx-auto'>
-          <div className='relative rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 p-8 sm:p-10'>
+          <div className='relative rounded-xl border border-subtle bg-surface-1 p-8 sm:p-10'>
             {/* Badge */}
             <div className='flex justify-center mb-6'>
-              <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 rounded-full'>
+              <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-secondary-token bg-surface-2 border border-subtle rounded-full'>
                 Standard
               </span>
             </div>
 
             {/* Heading */}
-            <h3 className='text-center text-lg sm:text-xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100'>
+            <h3 className='text-center text-lg sm:text-xl font-semibold tracking-tight text-primary-token'>
               Remove Jovie branding
             </h3>
 
             {/* Pricing */}
             <div className='mt-4 flex items-baseline justify-center gap-2'>
-              <span className='text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white'>
+              <span className='text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token'>
                 $5
               </span>
-              <span className='text-sm text-neutral-500 dark:text-neutral-400'>
-                /month
-              </span>
+              <span className='text-sm text-secondary-token'>/month</span>
             </div>
 
-            <p className='mt-2 text-center text-sm text-neutral-500 dark:text-neutral-400'>
+            <p className='mt-2 text-center text-sm text-secondary-token'>
               or $50/year{' '}
               <span className='text-emerald-600 dark:text-emerald-400 font-medium'>
                 — save 2 months
@@ -55,7 +53,7 @@ export function NewUpgradeTeaser() {
             </div>
 
             {/* Footer note */}
-            <p className='mt-4 text-center text-xs text-neutral-400 dark:text-neutral-500'>
+            <p className='mt-4 text-center text-xs text-tertiary-token'>
               Cancel anytime. No questions asked.
             </p>
           </div>

@@ -6,6 +6,7 @@ import { Artist } from '@/types/db';
 
 export interface ProfilePreviewProps {
   username: string;
+  displayName: string;
   avatarUrl?: string | null;
   links: Array<{
     id: string;
@@ -19,17 +20,20 @@ export interface ProfilePreviewProps {
 
 export function ProfilePreview({
   username,
+  displayName,
   avatarUrl,
   links,
   className,
 }: ProfilePreviewProps) {
+  const resolvedDisplayName = displayName.trim() ? displayName : username;
+
   // Create a mock artist object that matches the Artist type exactly
   const mockArtist: Artist = {
     id: 'preview',
     owner_user_id: 'preview-owner',
     handle: username,
     spotify_id: '',
-    name: username,
+    name: resolvedDisplayName,
     image_url: avatarUrl || undefined,
     tagline: 'This is a preview of how your profile will appear to visitors',
     theme: {},
