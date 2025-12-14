@@ -1,11 +1,19 @@
 import 'server-only';
 
-import { count, desc, ilike, or, type SQL } from 'drizzle-orm';
+import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 
 export type AdminUserPlan = 'free' | 'pro';
+
+export type AdminUsersSort =
+  | 'created_desc'
+  | 'created_asc'
+  | 'name_desc'
+  | 'name_asc'
+  | 'email_desc'
+  | 'email_asc';
 
 export interface AdminUserRow {
   id: string;
@@ -24,6 +32,7 @@ export interface GetAdminUsersParams {
   page?: number;
   pageSize?: number;
   search?: string;
+  sort?: AdminUsersSort;
 }
 
 export interface GetAdminUsersResult {
@@ -68,6 +77,27 @@ export async function getAdminUsers(
   const sanitizedSearch = sanitizeSearchInput(params.search);
   const likePattern = sanitizedSearch ? `%${sanitizedSearch}%` : null;
 
+  const sort: AdminUsersSort = params.sort ?? 'created_desc';
+  const [sortColumn, sortDirection] = (() => {
+    switch (sort) {
+      case 'created_asc':
+        return [users.createdAt, 'asc'] as const;
+      case 'created_desc':
+        return [users.createdAt, 'desc'] as const;
+      case 'name_asc':
+        return [users.name, 'asc'] as const;
+      case 'name_desc':
+        return [users.name, 'desc'] as const;
+      case 'email_asc':
+        return [users.email, 'asc'] as const;
+      case 'email_desc':
+        return [users.email, 'desc'] as const;
+    }
+  })();
+
+  const orderByClause =
+    sortDirection === 'asc' ? asc(sortColumn) : desc(sortColumn);
+
   const whereClause: SQL | undefined = likePattern
     ? or(ilike(users.email, likePattern), ilike(users.name, likePattern))
     : undefined;
@@ -88,7 +118,7 @@ export async function getAdminUsers(
         })
         .from(users)
         .where(whereClause)
-        .orderBy(desc(users.createdAt))
+        .orderBy(orderByClause)
         .limit(pageSize)
         .offset(offset),
       db.select({ value: count() }).from(users).where(whereClause),

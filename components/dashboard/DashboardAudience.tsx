@@ -1,21 +1,32 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import {
+  Button,
+  Checkbox,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
+import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
+import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { Icon } from '@/components/atoms/Icon';
+import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
 import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
 import {
   AUDIENCE_MEMBER_SIDEBAR_WIDTH,
   AudienceMemberSidebar,
 } from '@/components/dashboard/organisms/AudienceMemberSidebar';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
 import {
-  flagFromCountry,
   formatCountryLabel,
   formatLongDate,
   formatTimeAgo,
@@ -50,6 +61,46 @@ type AudienceSubscribersPayload = {
 type AudienceResponsePayload =
   | AudienceMembersPayload
   | AudienceSubscribersPayload;
+
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+    return false;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeDecodeLocationPart(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  const maybeEncoded = trimmed.includes('%') || trimmed.includes('+');
+  if (!maybeEncoded) return trimmed;
+
+  try {
+    return decodeURIComponent(trimmed.replace(/\+/g, ' '));
+  } catch {
+    return trimmed;
+  }
+}
+
+function resolveAudienceActionIcon(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized.includes('visit')) return 'Eye';
+  if (normalized.includes('view')) return 'Eye';
+  if (normalized.includes('tip')) return 'HandCoins';
+  if (normalized.includes('purchase')) return 'CreditCard';
+  if (normalized.includes('subscribe')) return 'Bell';
+  if (normalized.includes('follow')) return 'UserPlus';
+  if (normalized.includes('click')) return 'MousePointerClick';
+  if (normalized.includes('link')) return 'Link';
+  return 'Sparkles';
+}
 
 const MEMBER_COLUMNS = [
   { key: 'displayName', label: 'User' },
@@ -86,6 +137,7 @@ const DEFAULT_SUBSCRIBER_SORT: SubscriberSortColumn = 'createdAt';
 
 export function DashboardAudience() {
   const dashboardData = useDashboardData();
+  const notifications = useNotifications();
   const artist = useMemo<Artist | null>(
     () =>
       dashboardData.selectedProfile
@@ -101,7 +153,7 @@ export function DashboardAudience() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
   const [memberSortColumn, setMemberSortColumn] =
     useState<MemberSortColumn>(DEFAULT_MEMBER_SORT);
   const [subscriberSortColumn, setSubscriberSortColumn] =
@@ -117,11 +169,38 @@ export function DashboardAudience() {
     null
   );
   const { setTableMeta } = useTableMeta();
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const [headerElevated, setHeaderElevated] = useState(false);
+  const [openMenuRowId, setOpenMenuRowId] = useState<string | null>(null);
+
+  const rowIds = useMemo(() => rows.map(row => row.id), [rows]);
+  const {
+    selectedIds,
+    selectedCount,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
 
   useEffect(() => {
     setPage(1);
     setSelectedMember(null);
-  }, [artist?.id, isAudienceV2Enabled]);
+    clearSelection();
+  }, [artist?.id, isAudienceV2Enabled, clearSelection]);
+
+  useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      setHeaderElevated(container.scrollTop > 0);
+    };
+
+    handleScroll();
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const activeSortColumn = isAudienceV2Enabled
     ? memberSortColumn
@@ -173,9 +252,9 @@ export function DashboardAudience() {
           const normalized: AudienceRow[] = (memberPayload.members ?? []).map(
             member => {
               const typed = member as AudienceRow;
-              const locationParts = [typed.geoCity, typed.geoCountry].filter(
-                Boolean
-              );
+              const locationParts = [typed.geoCity, typed.geoCountry]
+                .filter(Boolean)
+                .map(part => safeDecodeLocationPart(part as string));
               const locationLabel = locationParts.length
                 ? locationParts.join(', ')
                 : 'Unknown';
@@ -184,10 +263,7 @@ export function DashboardAudience() {
                 ...typed,
                 locationLabel,
                 latestActions: Array.isArray(typed.latestActions)
-                  ? typed.latestActions.map(action => ({
-                      ...action,
-                      emoji: action.emoji ?? '⭐',
-                    }))
+                  ? typed.latestActions
                   : [],
                 referrerHistory: Array.isArray(typed.referrerHistory)
                   ? typed.referrerHistory
@@ -307,6 +383,55 @@ export function DashboardAudience() {
     handleSort(sortKey);
   };
 
+  const selectedRows = useMemo(
+    () => rows.filter(row => selectedIds.has(row.id)),
+    [rows, selectedIds]
+  );
+
+  const copySelectedEmails = async (): Promise<void> => {
+    const emails = selectedRows
+      .map(row => row.email)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0
+      );
+
+    if (emails.length === 0) {
+      notifications.error('No emails available for selected rows');
+      return;
+    }
+
+    const success = await copyTextToClipboard(emails.join('\n'));
+    if (success) {
+      notifications.success(`Copied ${emails.length} email(s)`);
+      return;
+    }
+
+    notifications.error('Failed to copy emails');
+  };
+
+  const copySelectedPhones = async (): Promise<void> => {
+    const phones = selectedRows
+      .map(row => row.phone)
+      .filter(
+        (value): value is string =>
+          typeof value === 'string' && value.length > 0
+      );
+
+    if (phones.length === 0) {
+      notifications.error('No phone numbers available for selected rows');
+      return;
+    }
+
+    const success = await copyTextToClipboard(phones.join('\n'));
+    if (success) {
+      notifications.success(`Copied ${phones.length} phone number(s)`);
+      return;
+    }
+
+    notifications.error('Failed to copy phone numbers');
+  };
+
   if (!artist) {
     return null;
   }
@@ -382,7 +507,7 @@ export function DashboardAudience() {
   return (
     <div className='flex h-full min-h-0 flex-col'>
       <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
-        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4'>
+        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
           <div>
             <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
               Audience CRM
@@ -401,107 +526,198 @@ export function DashboardAudience() {
 
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
-          <div className='flex-1 min-h-0 overflow-auto'>
+          <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
             {error ? (
-              <div className='border-b border-subtle bg-surface-2/40 px-4 py-3 text-sm text-red-500'>
+              <div className='border-b border-subtle bg-surface-2/40 px-4 py-3 text-sm text-red-500 sm:px-6'>
                 {error}
               </div>
             ) : isLoading ? (
-              <div className='px-4 py-10 text-sm text-secondary-token'>
+              <div className='px-4 py-10 text-sm text-secondary-token sm:px-6'>
                 Loading audience data...
               </div>
             ) : rows.length === 0 ? (
-              <div className='px-4 py-10 text-sm text-secondary-token'>
+              <div className='px-4 py-10 text-sm text-secondary-token sm:px-6'>
                 {paginationLabel()}
               </div>
             ) : (
               <table className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'>
-                <thead className='sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md'>
+                <thead
+                  className={cn(
+                    'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
+                    headerElevated &&
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                  )}
+                >
                   <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                    {activeColumns.map(column => {
+                    <th className='w-14 border-b border-subtle px-4 py-3 text-left sm:px-6'>
+                      <Checkbox
+                        aria-label='Select all'
+                        checked={headerCheckboxState}
+                        onCheckedChange={() => toggleSelectAll()}
+                      />
+                    </th>
+
+                    {activeColumns.map((column, index) => {
                       const sortKey = sortableColumnMap[column.key];
                       const isSortable = Boolean(sortKey);
-                      const isActiveSort =
-                        isSortable && activeSortColumn === column.key;
+                      const direction =
+                        isSortable && sortKey && activeSortColumn === sortKey
+                          ? activeSortDirection
+                          : undefined;
                       return (
                         <th
                           key={column.key}
-                          className='border-b border-subtle px-4 py-3 text-left'
+                          className='border-b border-subtle px-4 py-3 text-left sm:px-6'
                         >
-                          {isSortable ? (
-                            <button
-                              type='button'
-                              className='inline-flex w-full items-center gap-1 rounded-sm text-left font-semibold transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
-                              onClick={() => handleHeaderClick(column.key)}
-                            >
-                              <span>{column.label}</span>
-                              <span
-                                aria-hidden='true'
+                          <div className='flex items-center justify-between gap-2'>
+                            {isSortable ? (
+                              <SortableHeaderButton
+                                label={column.label}
+                                direction={direction}
+                                onClick={() => handleHeaderClick(column.key)}
+                              />
+                            ) : (
+                              <span className='inline-flex items-center font-semibold'>
+                                {column.label}
+                              </span>
+                            )}
+
+                            {index === 0 ? (
+                              <div
                                 className={cn(
-                                  'text-[10px] transition-opacity',
-                                  isActiveSort ? 'opacity-100' : 'opacity-50'
+                                  'inline-flex items-center transition-all duration-150',
+                                  selectedCount > 0
+                                    ? 'opacity-100 translate-y-0'
+                                    : 'pointer-events-none opacity-0 -translate-y-0.5'
                                 )}
                               >
-                                {isActiveSort
-                                  ? activeSortDirection === 'asc'
-                                    ? '▲'
-                                    : '▼'
-                                  : ''}
-                              </span>
-                            </button>
-                          ) : (
-                            <span className='inline-flex items-center font-semibold'>
-                              {column.label}
-                            </span>
-                          )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant='secondary'
+                                      size='sm'
+                                      className='normal-case'
+                                    >
+                                      Bulk actions
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align='end'>
+                                    <DropdownMenuItem
+                                      disabled={selectedCount === 0}
+                                      onClick={() => {
+                                        void copySelectedEmails();
+                                      }}
+                                    >
+                                      Copy emails
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={selectedCount === 0}
+                                      onClick={() => {
+                                        void copySelectedPhones();
+                                      }}
+                                    >
+                                      Copy phone numbers
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={selectedCount === 0}
+                                      onClick={() => clearSelection()}
+                                    >
+                                      Clear selection
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            ) : null}
+                          </div>
                         </th>
                       );
                     })}
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(row => {
+                  {rows.map((row, index) => {
                     const deviceIndicator = getDeviceIndicator(row.deviceType);
+                    const isChecked = selectedIds.has(row.id);
+                    const rowNumber = (page - 1) * pageSize + index + 1;
 
                     return (
                       <tr
                         key={row.id}
                         className={cn(
-                          'cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
+                          'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
                           selectedMember?.id === row.id && 'bg-surface-2'
                         )}
                         onClick={() => setSelectedMember(row)}
+                        onContextMenu={event => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setOpenMenuRowId(row.id);
+                        }}
                       >
+                        <td className='w-14 px-4 py-3 align-middle sm:px-6'>
+                          <div
+                            className='relative flex h-7 w-7 items-center justify-center'
+                            onClick={event => event.stopPropagation()}
+                          >
+                            <span
+                              className={cn(
+                                'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+                                isChecked
+                                  ? 'opacity-0'
+                                  : 'opacity-100 group-hover:opacity-0'
+                              )}
+                              aria-hidden='true'
+                            >
+                              {rowNumber}
+                            </span>
+                            <div
+                              className={cn(
+                                'absolute inset-0 transition-opacity',
+                                isChecked
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              )}
+                            >
+                              <Checkbox
+                                aria-label={`Select ${row.displayName || 'row'}`}
+                                checked={isChecked}
+                                onCheckedChange={() => toggleSelect(row.id)}
+                              />
+                            </div>
+                          </div>
+                        </td>
                         {isAudienceV2Enabled ? (
                           <>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <div className='font-semibold'>
                                 {row.displayName || 'Visitor'}
                               </div>
-                              <div className='text-xs text-secondary-token'>
-                                {row.type === 'anonymous'
-                                  ? 'Visitor'
-                                  : row.type === 'email'
+                              {row.type !== 'anonymous' ? (
+                                <div className='text-xs text-secondary-token'>
+                                  {row.type === 'email'
                                     ? (row.email ?? 'Email fan')
                                     : row.type === 'sms'
                                       ? (row.phone ?? 'SMS fan')
                                       : 'Connected fan'}
-                              </div>
+                                </div>
+                              ) : null}
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/40 px-2 py-0.5 text-[11px] font-medium text-secondary-token capitalize'>
                                 {row.type}
                               </span>
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <div className='inline-flex items-center gap-2 text-secondary-token'>
-                                <span aria-hidden='true' className='text-lg'>
-                                  {flagFromCountry(row.geoCountry)}
-                                </span>
+                                <Icon
+                                  name='MapPin'
+                                  className='h-4 w-4 text-tertiary-token'
+                                  aria-hidden='true'
+                                />
                                 <span>{row.locationLabel || 'Unknown'}</span>
                               </div>
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               {deviceIndicator ? (
                                 <Icon
                                   name={deviceIndicator.iconName}
@@ -513,49 +729,101 @@ export function DashboardAudience() {
                                 <span className='text-secondary-token'>—</span>
                               )}
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
-                              <div className='flex flex-col gap-1'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
+                              <div className='flex items-center gap-2'>
                                 <span className='font-semibold'>
                                   {row.visits}
                                 </span>
                                 {formatIntentBadge(row.intentLevel)}
                               </div>
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
-                              <div className='flex gap-2'>
-                                {row.latestActions.slice(0, 3).map(action => (
-                                  <span
-                                    key={`${row.id}-${action.label}`}
-                                    className='text-[15px] text-primary-token/90'
-                                    aria-label={action.label}
-                                  >
-                                    {action.emoji ?? '⭐'}
-                                  </span>
-                                ))}
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
+                              <div className='flex items-center gap-2'>
+                                {row.latestActions
+                                  .slice(0, 3)
+                                  .map((action, actionIndex) => {
+                                    const iconName = resolveAudienceActionIcon(
+                                      action.label
+                                    );
+                                    return (
+                                      <span
+                                        key={`${row.id}-${action.label}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${actionIndex}`}
+                                        className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
+                                        title={action.label}
+                                      >
+                                        <Icon
+                                          name={iconName}
+                                          className='h-3.5 w-3.5'
+                                          aria-hidden='true'
+                                        />
+                                        <span className='sr-only'>
+                                          {action.label}
+                                        </span>
+                                      </span>
+                                    );
+                                  })}
                               </div>
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
-                              {formatTimeAgo(row.lastSeenAt)}
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
+                              <div className='flex items-center justify-between gap-2'>
+                                <span>{formatTimeAgo(row.lastSeenAt)}</span>
+                                <div
+                                  className={cn(
+                                    'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                                    openMenuRowId === row.id &&
+                                      'opacity-100 pointer-events-auto'
+                                  )}
+                                  onClick={event => event.stopPropagation()}
+                                >
+                                  <AudienceRowActionsMenu
+                                    row={row}
+                                    open={openMenuRowId === row.id}
+                                    onOpenChange={open =>
+                                      setOpenMenuRowId(open ? row.id : null)
+                                    }
+                                  />
+                                </div>
+                              </div>
                             </td>
                           </>
                         ) : (
                           <>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               {row.displayName || 'Contact'}
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               {row.phone ?? '—'}
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <div className='inline-flex items-center gap-2 text-secondary-token'>
-                                <span aria-hidden='true' className='text-lg'>
-                                  {flagFromCountry(row.geoCountry)}
-                                </span>
+                                <Icon
+                                  name='MapPin'
+                                  className='h-4 w-4 text-tertiary-token'
+                                  aria-hidden='true'
+                                />
                                 <span>{row.locationLabel}</span>
                               </div>
                             </td>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
-                              {formatLongDate(row.lastSeenAt)}
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
+                              <div className='flex items-center justify-between gap-2'>
+                                <span>{formatLongDate(row.lastSeenAt)}</span>
+                                <div
+                                  className={cn(
+                                    'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                                    openMenuRowId === row.id &&
+                                      'opacity-100 pointer-events-auto'
+                                  )}
+                                  onClick={event => event.stopPropagation()}
+                                >
+                                  <AudienceRowActionsMenu
+                                    row={row}
+                                    open={openMenuRowId === row.id}
+                                    onOpenChange={open =>
+                                      setOpenMenuRowId(open ? row.id : null)
+                                    }
+                                  />
+                                </div>
+                              </div>
                             </td>
                           </>
                         )}
@@ -567,14 +835,21 @@ export function DashboardAudience() {
             )}
           </div>
 
-          {!isLoading && rows.length > 0 && (
-            <div className='shrink-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-3 py-2 text-xs text-secondary-token backdrop-blur-md'>
-              <span className='tracking-wide'>{paginationLabel()}</span>
+          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-4 py-2 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+            <span className='tracking-wide'>{paginationLabel()}</span>
+            <div className='flex items-center gap-3'>
+              <AdminPageSizeSelect
+                initialPageSize={pageSize}
+                onPageSizeChange={nextPageSize => {
+                  setPageSize(nextPageSize);
+                  setPage(1);
+                }}
+              />
               <div className='flex gap-2'>
                 <Button
                   variant='ghost'
                   size='sm'
-                  disabled={page <= 1}
+                  disabled={page <= 1 || total === 0}
                   className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
                   onClick={() => setPage(prev => Math.max(1, prev - 1))}
                 >
@@ -583,7 +858,7 @@ export function DashboardAudience() {
                 <Button
                   variant='ghost'
                   size='sm'
-                  disabled={page >= totalPages}
+                  disabled={page >= totalPages || total === 0}
                   className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
                   onClick={() =>
                     setPage(prev => Math.min(totalPages, prev + 1))
@@ -593,7 +868,7 @@ export function DashboardAudience() {
                 </Button>
               </div>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

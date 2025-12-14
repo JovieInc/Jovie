@@ -35,8 +35,8 @@ test.describe('Onboarding Handle Race Conditions', () => {
       });
     });
 
-    // Navigate to onboarding page
-    await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+    // Navigate to homepage claim form (works unauthenticated)
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
   });
 
   test('handle availability state matches last typed value', async ({
@@ -45,7 +45,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test simulates rapid typing across different handles
     // to ensure the final availability state matches the last input
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Choose your handle');
     await expect(handleInput).toBeVisible();
 
     // Simulate rapid typing sequence: taken1 -> available1 -> taken2 -> available2
@@ -67,8 +67,8 @@ test.describe('Onboarding Handle Race Conditions', () => {
       await page.waitForTimeout(50);
     }
 
-    // Wait for debouncing to complete (component uses 500ms debounce)
-    await page.waitForTimeout(600);
+    // Wait for debouncing to complete (component uses ~450ms debounce)
+    await page.waitForTimeout(650);
 
     // Final state should match the last typed value
     const lastHandle = typingSequence[typingSequence.length - 1];
@@ -78,18 +78,19 @@ test.describe('Onboarding Handle Race Conditions', () => {
 
     // Check availability indicator matches expected state
     if (lastHandle.expectedAvailable) {
-      // Should show green checkmark for available handle (look for the specific green circle)
-      await expect(page.locator('.bg-green-500')).toBeVisible();
-
       // Submit button should be enabled
-      const submitButton = page.getByRole('button', { name: 'Create Profile' });
+      const submitButton = page.getByRole('button', {
+        name: `Claim @${lastHandle.handle}`,
+      });
       await expect(submitButton).toBeEnabled();
     } else {
       // Should show error for unavailable handle
       await expect(page.locator('text="Handle already taken"')).toBeVisible();
 
       // Submit button should be disabled
-      const submitButton = page.getByRole('button', { name: 'Create Profile' });
+      const submitButton = page.getByRole('button', {
+        name: 'Request Early Access',
+      });
       await expect(submitButton).toBeDisabled();
     }
   });
@@ -100,7 +101,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test specifically checks that a taken handle doesn't show as available
     // even if there are race conditions with previous requests
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Choose your handle');
     await expect(handleInput).toBeVisible();
 
     // Type sequence: available1 -> taken1 rapidly
@@ -109,18 +110,17 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await handleInput.fill('taken1');
 
     // Wait for all requests to complete
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(650);
 
     // Final state must show taken1 as unavailable
     await expect(handleInput).toHaveValue('taken1');
     await expect(page.locator('text="Handle already taken"')).toBeVisible();
 
     // Submit button must be disabled for taken handle
-    const submitButton = page.getByRole('button', { name: 'Create Profile' });
+    const submitButton = page.getByRole('button', {
+      name: 'Request Early Access',
+    });
     await expect(submitButton).toBeDisabled();
-
-    // No green checkmark should be visible
-    await expect(page.locator('.bg-green-500')).not.toBeVisible();
   });
 
   test('handles rapid sequential handle checks with different results', async ({
@@ -128,7 +128,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test rapid sequence of different handles to stress test the race condition protection
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Choose your handle');
     await expect(handleInput).toBeVisible();
 
     const rapidSequence = [
@@ -147,15 +147,16 @@ test.describe('Onboarding Handle Race Conditions', () => {
     }
 
     // Wait for debouncing and all network requests to settle
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(900);
 
     // Verify final state
     const finalHandle = rapidSequence[rapidSequence.length - 1];
     await expect(handleInput).toHaveValue(finalHandle);
 
     // Since final handle is available, should show as such
-    await expect(page.locator('.bg-green-500')).toBeVisible();
-    const submitButton = page.getByRole('button', { name: 'Create Profile' });
+    const submitButton = page.getByRole('button', {
+      name: `Claim @${finalHandle}`,
+    });
     await expect(submitButton).toBeEnabled();
   });
 
@@ -190,7 +191,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Choose your handle');
     await expect(handleInput).toBeVisible();
 
     // Type rapidly to trigger request cancellation
@@ -201,7 +202,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     }
 
     // Wait for final request to complete
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(900);
 
     // Verify final state
     await expect(handleInput).toHaveValue('final');
@@ -218,25 +219,28 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test that the UI doesn't flicker or show inconsistent states
 
-    const handleInput = page.getByLabel('Enter your desired handle');
-    const submitButton = page.getByRole('button', { name: 'Create Profile' });
+    const handleInput = page.getByLabel('Choose your handle');
+    const submitButton = page.getByRole('button', {
+      name: 'Request Early Access',
+    });
 
     await expect(handleInput).toBeVisible();
 
     // Start with a taken handle
     await handleInput.fill('taken1');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(650);
 
     // Verify initial state - taken handle
     await expect(submitButton).toBeDisabled();
 
     // Quickly switch to available handle
     await handleInput.fill('available1');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(650);
 
     // Verify final state - available handle
-    await expect(submitButton).toBeEnabled();
-    await expect(page.locator('.bg-green-500')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Claim @available1' })
+    ).toBeEnabled();
 
     // No error message should be visible for available handle
     await expect(page.locator('text="Handle already taken"')).not.toBeVisible();
@@ -253,8 +257,8 @@ test.describe('Onboarding Handle Race Conditions', () => {
       requestCount++;
 
       if (requestCount === 1) {
-        // First request fails
-        await route.fulfill({ status: 500, body: 'Server Error' });
+        // First request fails at the network layer
+        await route.abort();
       } else {
         // Subsequent requests succeed
         const url = new URL(request.url());
@@ -269,22 +273,24 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByLabel('Choose your handle');
     await expect(handleInput).toBeVisible();
 
     // Type handle that will cause network error
     await handleInput.fill('errorhandle');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(650);
 
     // Should show network error
     await expect(page.locator('text="Network error"')).toBeVisible();
 
     // Type new handle that succeeds
     await handleInput.fill('recovery');
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(650);
 
     // Should recover and show success state
-    await expect(page.locator('.bg-green-500')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Claim @recovery' })
+    ).toBeEnabled();
     await expect(page.locator('text="Network error"')).not.toBeVisible();
   });
 });

@@ -26,11 +26,11 @@ export function ThemeToggle({
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`flex gap-x-1.5 rounded-full bg-gray-600/5 p-1 ring-1 ring-gray-600/5 dark:bg-black/30 dark:ring-white/5 ${className}`}
+        className={`inline-flex items-center gap-px rounded-full border border-neutral-200 bg-white p-[2px] dark:border-white/10 dark:bg-black/30 ${className}`}
       >
-        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
-        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
-        <div className='size-5 rounded-full bg-gray-300/50 dark:bg-gray-700/50' />
+        <div className='h-7 w-7 rounded-full bg-gray-100 dark:bg-white/10' />
+        <div className='h-7 w-7 rounded-full bg-gray-100 dark:bg-white/10' />
+        <div className='h-7 w-7 rounded-full bg-gray-100 dark:bg-white/10' />
       </div>
     ) : (
       <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
@@ -113,15 +113,15 @@ export function ThemeToggle({
 
   if (appearance === 'segmented') {
     const baseBtn =
-      'relative size-5 flex-none rounded-full outline-none transition-colors text-gray-400 hover:text-gray-800 dark:text-gray-500 dark:hover:text-gray-300';
+      'relative flex h-7 w-7 flex-none items-center justify-center rounded-full text-secondary-token outline-none transition-colors hover:bg-gray-100 hover:text-primary-token dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
     const activeBtn =
-      'bg-white text-gray-800 shadow-[0_1px_5px_-4px_rgba(19,19,22,0.4),0_2px_5px_rgba(34,42,53,0.06)] ring-1 ring-gray-900/10 dark:bg-gray-800 dark:text-gray-300 dark:ring-white/20';
+      'z-10 bg-gray-100 text-primary-token ring-1 ring-inset ring-neutral-200 dark:bg-white/10 dark:ring-white/10';
 
     return (
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`flex gap-x-1.5 rounded-full bg-gray-600/5 p-1 ring-1 ring-gray-600/5 dark:bg-black/30 dark:ring-white/5 ${className}`}
+        className={`inline-flex items-center gap-px rounded-full border border-neutral-200 bg-white p-[2px] dark:border-white/10 dark:bg-black/30 ${className}`}
       >
         <button
           type='button'
@@ -134,7 +134,7 @@ export function ThemeToggle({
             viewBox='0 0 20 20'
             fill='none'
             aria-hidden='true'
-            className='size-5'
+            className='h-3.5 w-3.5'
           >
             <circle
               cx='10'
@@ -166,7 +166,7 @@ export function ThemeToggle({
             viewBox='0 0 20 20'
             fill='none'
             aria-hidden='true'
-            className='size-5'
+            className='h-3.5 w-3.5'
           >
             <path
               stroke='currentColor'
@@ -190,7 +190,7 @@ export function ThemeToggle({
             viewBox='0 0 20 20'
             fill='none'
             aria-hidden='true'
-            className='size-5'
+            className='h-3.5 w-3.5'
           >
             <path
               stroke='currentColor'

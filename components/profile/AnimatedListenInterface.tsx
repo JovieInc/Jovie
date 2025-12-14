@@ -3,7 +3,10 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
-import { LISTEN_COOKIE } from '@/constants/app';
+import {
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  LISTEN_COOKIE,
+} from '@/constants/app';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
 import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -54,6 +57,10 @@ export function AnimatedListenInterface({
     try {
       // Save preference
       document.cookie = `${LISTEN_COOKIE}=${dsp.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+
+      if (dsp.key === 'spotify') {
+        document.cookie = `${AUDIENCE_SPOTIFY_PREFERRED_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+      }
       try {
         localStorage.setItem(LISTEN_COOKIE, dsp.key);
       } catch {}
@@ -190,7 +197,7 @@ export function AnimatedListenInterface({
               >
                 {/* Shimmer effect overlay */}
                 <motion.div
-                  className='absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent'
+                  className='absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/20 to-transparent'
                   animate={
                     prefersReducedMotion
                       ? { opacity: selectedDSP === dsp.key ? 0.2 : 0 }

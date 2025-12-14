@@ -1,5 +1,20 @@
+import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
+import { APP_NAME, APP_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
+
+export const metadata: Metadata = {
+  title: `Privacy Policy | ${APP_NAME}`,
+  description:
+    'We collect only what is essential, guard it with modern controls, and keep you in the loop about every change.',
+  alternates: {
+    canonical: `${APP_URL}/legal/privacy`,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default async function PrivacyPage() {
   const doc = await getLegalDocument('privacy');

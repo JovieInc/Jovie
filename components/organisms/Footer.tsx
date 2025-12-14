@@ -40,9 +40,9 @@ export function Footer({
   // Variant-specific configurations
   const variantConfigs = {
     marketing: {
-      containerClass: 'bg-neutral-950 text-white dark:bg-black',
+      containerClass: 'bg-black text-white',
       contentClass:
-        'mx-auto max-w-7xl px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3',
+        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
       colorVariant: 'dark' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -59,22 +59,20 @@ export function Footer({
       themeAppearance: 'icon' as const,
     },
     minimal: {
-      containerClass:
-        'border-t border-gray-200/50 dark:border-white/10 bg-white dark:bg-gray-900',
+      containerClass: 'border-t border-subtle bg-base',
       contentClass:
-        'flex flex-col md:flex-row items-center justify-between gap-6 py-8 md:h-16 md:py-0 w-full',
+        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 py-5 md:h-16 md:py-0',
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
       showLinks: true,
-      themeAppearance: 'icon' as const,
+      themeAppearance: 'segmented' as const,
     },
     regular: {
       // Clerk-like footer: subtle border top, compact spacing, segmented theme selector
-      containerClass:
-        'border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#0a0a0b]',
+      containerClass: 'border-t border-subtle bg-base',
       contentClass:
-        'mx-auto max-w-7xl px-4 pt-6 pb-6 flex items-center justify-between',
+        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 pb-6 flex items-center justify-between',
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -101,6 +99,7 @@ export function Footer({
         <div className='md:hidden absolute bottom-2 right-4 text-[11px]'>
           <FooterNavigation
             variant={config.colorVariant}
+            ariaLabel='Legal'
             links={[{ href: '/legal/privacy', label: 'Privacy' }]}
           />
         </div>
@@ -109,6 +108,7 @@ export function Footer({
         <div className='hidden md:block fixed bottom-4 left-4 z-10'>
           <FooterNavigation
             variant={config.colorVariant}
+            ariaLabel='Legal'
             links={[{ href: '/legal/privacy', label: 'Privacy' }]}
           />
         </div>
@@ -135,10 +135,8 @@ export function Footer({
     ];
 
     return (
-      <footer
-        className={`border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#0a0a0b] ${className}`}
-      >
-        <div className='mx-auto max-w-7xl px-4 pt-10 pb-6'>
+      <footer className={`border-t border-subtle bg-base ${className}`}>
+        <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-10 pb-6'>
           <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
             {/* Brand */}
             <div>
@@ -147,7 +145,7 @@ export function Footer({
 
             {/* Product */}
             <div>
-              <h3 className='text-sm font-semibold text-gray-900 dark:text-white mb-3'>
+              <h3 className='text-sm font-semibold text-primary-token mb-3'>
                 Product
               </h3>
               <ul className='space-y-2'>
@@ -155,7 +153,7 @@ export function Footer({
                   <li key={`${link.href}-${link.label}`}>
                     <Link
                       href={link.href}
-                      className='text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
+                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
                     >
                       {link.label}
                     </Link>
@@ -166,7 +164,7 @@ export function Footer({
 
             {/* Company */}
             <div>
-              <h3 className='text-sm font-semibold text-gray-900 dark:text-white mb-3'>
+              <h3 className='text-sm font-semibold text-primary-token mb-3'>
                 Company
               </h3>
               <ul className='space-y-2'>
@@ -174,7 +172,7 @@ export function Footer({
                   <li key={`${link.href}-${link.label}`}>
                     <Link
                       href={link.href}
-                      className='text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
+                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
                     >
                       {link.label}
                     </Link>
@@ -185,7 +183,7 @@ export function Footer({
 
             {/* Legal */}
             <div>
-              <h3 className='text-sm font-semibold text-gray-900 dark:text-white mb-3'>
+              <h3 className='text-sm font-semibold text-primary-token mb-3'>
                 Legal
               </h3>
               <ul className='space-y-2'>
@@ -193,7 +191,7 @@ export function Footer({
                   <li key={`${link.href}-${link.label}`}>
                     <Link
                       href={link.href}
-                      className='text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors'
+                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
                     >
                       {link.label}
                     </Link>
@@ -203,9 +201,9 @@ export function Footer({
             </div>
           </div>
 
-          <div className='mt-8 border-t border-gray-200 dark:border-gray-800 pt-5 flex items-center justify-between'>
+          <div className='mt-8 border-t border-subtle pt-5 flex items-center justify-between'>
             <div className='flex flex-col'>
-              <Copyright variant='light' />
+              <Copyright variant='light' className='text-secondary-token' />
             </div>
             {showThemeToggle && (
               <div className='flex items-center'>
@@ -224,18 +222,39 @@ export function Footer({
       <div className={config.contentClass}>
         {config.layout === 'horizontal' && (
           <>
-            <div className='flex flex-col items-center md:items-start space-y-2'>
-              <Copyright variant={config.colorVariant} />
+            <div
+              className={`flex flex-col items-center md:items-start ${variant === 'minimal' ? 'space-y-1' : 'space-y-2'}`}
+            >
+              <Copyright
+                variant={config.colorVariant}
+                className={
+                  variant === 'minimal'
+                    ? 'text-[11px] tracking-tight text-secondary-token'
+                    : undefined
+                }
+              />
               {variant === 'minimal' && (
-                <p className='text-xs text-gray-400 dark:text-gray-500'>
+                <p className='text-[11px] tracking-tight text-tertiary-token'>
                   Made for musicians, by musicians
                 </p>
               )}
             </div>
 
-            <div className='flex items-center gap-4'>
+            <div
+              className={`flex items-center ${variant === 'minimal' ? 'gap-2' : 'gap-4'}`}
+            >
               {config.showLinks && (
-                <FooterNavigation variant={config.colorVariant} links={links} />
+                <FooterNavigation
+                  variant={config.colorVariant}
+                  ariaLabel={variant === 'minimal' ? 'Legal' : undefined}
+                  links={links}
+                  className={variant === 'minimal' ? 'gap-2' : ''}
+                  linkClassName={
+                    variant === 'minimal'
+                      ? 'text-[11px] tracking-tight font-medium'
+                      : ''
+                  }
+                />
               )}
               {showThemeToggle && (
                 <div className='flex items-center'>

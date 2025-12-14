@@ -1,10 +1,15 @@
 import { unstable_cache } from 'next/cache';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { PAGE_SUBTITLES } from '@/constants/app';
+import {
+  AUDIENCE_IDENTIFIED_COOKIE,
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  PAGE_SUBTITLES,
+} from '@/constants/app';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
   getCreatorProfileWithLinks,
@@ -116,6 +121,12 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const { mode = 'profile', claim_token: claimTokenParam } =
     resolvedSearchParams || {};
 
+  const cookieStore = await cookies();
+  const isIdentified =
+    cookieStore.get(AUDIENCE_IDENTIFIED_COOKIE)?.value === '1';
+  const spotifyPreferred =
+    cookieStore.get(AUDIENCE_SPOTIFY_PREFERRED_COOKIE)?.value === '1';
+
   const normalizedUsername = username.toLowerCase();
   const { profile, links, contacts, status } =
     await getProfileAndLinks(normalizedUsername);
@@ -199,6 +210,8 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         subtitle={getSubtitle(mode)}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
+        primaryAction={isIdentified ? 'listen' : 'subscribe'}
+        spotifyPreferred={spotifyPreferred}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

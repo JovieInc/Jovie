@@ -1,0 +1,114 @@
+import { promises as fs } from 'fs';
+import { toString } from 'mdast-util-to-string';
+import path from 'path';
+import { cache } from 'react';
+import { remark } from 'remark';
+import remarkHtml from 'remark-html';
+import { visit } from 'unist-util-visit';
+import type { MarkdownDocument, TocEntry } from '@/types/docs';
+
+const slugifyHeading = (value: string): string => {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+};
+
+type HeadingNode = {
+  depth?: number;
+  data?: {
+    hProperties?: {
+      id?: string;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
+  };
+};
+
+export async function getMarkdownDocument(
+  relativePath: string
+): Promise<MarkdownDocument> {
+  if (process.env.NODE_ENV === 'development') {
+    return getMarkdownDocumentUncached(relativePath);
+  }
+  return getMarkdownDocumentCached(relativePath);
+}
+
+async function getMarkdownDocumentUncached(
+  relativePath: string
+): Promise<MarkdownDocument> {
+  const absolutePath = path.join(process.cwd(), relativePath);
+  const raw = await fs.readFile(absolutePath, 'utf-8');
+
+  const processor = remark().use(remarkHtml);
+  const ast = processor.parse(raw);
+
+  const toc: TocEntry[] = [];
+  visit(ast, 'heading', node => {
+    const heading = node as HeadingNode;
+    if (!heading.depth) return;
+
+    const title = toString(node as Parameters<typeof toString>[0]).trim();
+    if (!title) return;
+    if (heading.depth > 3) return;
+
+    const headingId = slugifyHeading(title);
+    if (!headingId) return;
+
+    const data = heading.data ?? {};
+    const hProperties = data.hProperties ?? {};
+    hProperties.id = headingId;
+    data.hProperties = hProperties;
+    heading.data = data;
+
+    toc.push({ id: headingId, title, level: heading.depth });
+  });
+
+  const transformed = await processor.run(ast);
+  const htmlResult = processor.stringify(transformed as never);
+
+  return {
+    html: htmlResult.toString(),
+    toc,
+  };
+}
+
+const getMarkdownDocumentCached = cache(
+  async (relativePath: string): Promise<MarkdownDocument> => {
+    const absolutePath = path.join(process.cwd(), relativePath);
+    const raw = await fs.readFile(absolutePath, 'utf-8');
+
+    const processor = remark().use(remarkHtml);
+    const ast = processor.parse(raw);
+
+    const toc: TocEntry[] = [];
+    visit(ast, 'heading', node => {
+      const heading = node as HeadingNode;
+      if (!heading.depth) return;
+
+      const title = toString(node as Parameters<typeof toString>[0]).trim();
+      if (!title) return;
+      if (heading.depth > 3) return;
+
+      const headingId = slugifyHeading(title);
+      if (!headingId) return;
+
+      const data = heading.data ?? {};
+      const hProperties = data.hProperties ?? {};
+      hProperties.id = headingId;
+      data.hProperties = hProperties;
+      heading.data = data;
+
+      toc.push({ id: headingId, title, level: heading.depth });
+    });
+
+    const transformed = await processor.run(ast);
+    const htmlResult = processor.stringify(transformed as never);
+
+    return {
+      html: htmlResult.toString(),
+      toc,
+    };
+  }
+);

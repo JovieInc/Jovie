@@ -1,6 +1,7 @@
-import Link from 'next/link';
-import { TocEntry } from '@/lib/legal/getLegalDocument';
+'use client';
+
 import { cn } from '@/lib/utils';
+import type { TocEntry } from '@/types/docs';
 
 export interface LegalSidebarProps {
   toc: TocEntry[];
@@ -12,6 +13,14 @@ export function LegalSidebar({ toc, className }: LegalSidebarProps) {
     return null;
   }
 
+  const handleJump = (id: string) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  };
+
   return (
     <nav
       aria-label='Document navigation'
@@ -21,9 +30,10 @@ export function LegalSidebar({ toc, className }: LegalSidebarProps) {
         On this page
       </p>
       {toc.map(entry => (
-        <Link
+        <button
           key={entry.id}
-          href={`#${entry.id}`}
+          type='button'
+          onClick={() => handleJump(entry.id)}
           className={cn(
             'block px-3 py-1.5 text-sm rounded-md transition-colors',
             'text-neutral-600 dark:text-neutral-400',
@@ -32,7 +42,7 @@ export function LegalSidebar({ toc, className }: LegalSidebarProps) {
           )}
         >
           {entry.title}
-        </Link>
+        </button>
       ))}
     </nav>
   );

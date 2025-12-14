@@ -3,7 +3,10 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 // Lazy import deep links to avoid loading heavy code upfront
-import { LISTEN_COOKIE } from '@/constants/app';
+import {
+  AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
+  LISTEN_COOKIE,
+} from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
 import { Artist } from '@/types/db';
@@ -60,6 +63,10 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
     try {
       // Save preference
       document.cookie = `${LISTEN_COOKIE}=${dsp.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+
+      if (dsp.key === 'spotify') {
+        document.cookie = `${AUDIENCE_SPOTIFY_PREFERRED_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+      }
       try {
         localStorage.setItem(LISTEN_COOKIE, dsp.key);
       } catch {}

@@ -482,6 +482,53 @@ body {
   }
 }
 
+@media print {
+  @page {
+    margin: 18mm;
+  }
+
+  html[data-doc-page="true"],
+  html[data-doc-page="true"] body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html[data-doc-page="true"] main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  html[data-doc-page="true"] .min-h-screen,
+  html[data-doc-page="true"] .h-screen {
+    min-height: auto !important;
+    height: auto !important;
+  }
+
+  html[data-doc-page="true"] .overflow-hidden {
+    overflow: visible !important;
+  }
+
+  html[data-doc-page="true"] [data-testid="header-nav"],
+  html[data-doc-page="true"] footer,
+  html[data-doc-page="true"] [data-doc-toolbar],
+  html[data-doc-page="true"] [data-doc-sidebar] {
+    display: none !important;
+  }
+
+  html[data-doc-page="true"] a {
+    color: #000000 !important;
+    text-decoration: underline !important;
+    text-underline-offset: 3px;
+  }
+
+  html[data-doc-page="true"] * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+}
+
 @theme inline {
   --color-sidebar: rgb(var(--sidebar-background));
   --color-sidebar-foreground: rgb(var(--sidebar-foreground));

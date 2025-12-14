@@ -1,6 +1,5 @@
 'use client';
 
-import { buttonVariants } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
 import { cn } from '@/lib/utils';
@@ -21,20 +20,15 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     const isExternal = external ?? /^https?:\/\//.test(href);
     const palette =
       tone === 'light'
-        ? 'text-muted-foreground hover:text-foreground'
+        ? 'text-secondary-token hover:text-primary-token'
         : 'text-white/70 hover:text-white';
 
-    const linkClassName = buttonVariants({
-      variant: 'ghost',
-      size: 'sm',
-      className: cn(
-        'h-auto px-0 py-0 text-sm font-medium transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        'rounded-md',
-        palette,
-        className
-      ),
-    });
+    const linkClassName = cn(
+      'inline-flex items-center rounded-md px-0 py-0 text-sm font-medium transition-colors',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
+      palette,
+      className
+    );
 
     return (
       <Link

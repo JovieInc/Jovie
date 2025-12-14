@@ -54,9 +54,9 @@ export function BillingDashboard() {
   if (loading) {
     return (
       <div className='animate-pulse'>
-        <div className='h-8 bg-gray-200 dark:bg-gray-700 rounded mb-4'></div>
-        <div className='h-32 bg-gray-200 dark:bg-gray-700 rounded mb-4'></div>
-        <div className='h-10 bg-gray-200 dark:bg-gray-700 rounded'></div>
+        <div className='mb-4 h-8 rounded bg-muted'></div>
+        <div className='mb-4 h-32 rounded bg-muted'></div>
+        <div className='h-10 rounded bg-muted'></div>
       </div>
     );
   }
@@ -82,37 +82,37 @@ export function BillingDashboard() {
     <div className='space-y-6'>
       {/* Header */}
       <div>
-        <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
+        <h1 className='text-3xl font-bold text-foreground'>
           Billing & Subscription
         </h1>
-        <p className='mt-2 text-gray-600 dark:text-gray-400'>
+        <p className='mt-2 text-muted-foreground'>
           Manage your subscription and billing information
         </p>
       </div>
 
       {/* Subscription Status Card */}
-      <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
+      <div className='rounded-lg border border-border bg-muted/30 p-6'>
         <div className='flex items-center'>
           <div className='shrink-0'>
             {billingInfo?.isPro ? (
-              <CheckCircleIcon className='h-8 w-8 text-green-500' />
+              <CheckCircleIcon className='h-8 w-8 text-emerald-500' />
             ) : (
-              <ExclamationTriangleIcon className='h-8 w-8 text-yellow-500' />
+              <ExclamationTriangleIcon className='h-8 w-8 text-amber-500' />
             )}
           </div>
           <div className='ml-4'>
-            <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
+            <h3 className='text-lg font-medium text-foreground'>
               {billingInfo?.isPro
                 ? 'Standard Subscription Active'
                 : 'Free Plan'}
             </h3>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <p className='text-sm text-muted-foreground'>
               {billingInfo?.isPro
                 ? 'Branding is removed from your profile'
                 : 'Upgrade to Standard to remove branding'}
             </p>
             {billingInfo?.stripeSubscriptionId && (
-              <p className='text-xs text-gray-500 dark:text-gray-500 mt-1'>
+              <p className='mt-1 text-xs text-muted-foreground'>
                 Subscription ID: {billingInfo.stripeSubscriptionId}
               </p>
             )}
@@ -121,8 +121,8 @@ export function BillingDashboard() {
       </div>
 
       {/* Actions */}
-      <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
-        <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-4'>
+      <div className='rounded-lg border border-border bg-muted/30 p-6'>
+        <h3 className='mb-4 text-lg font-medium text-foreground'>
           Billing Actions
         </h3>
 
@@ -130,10 +130,10 @@ export function BillingDashboard() {
           {billingInfo?.isPro ? (
             <>
               <div>
-                <h4 className='text-sm font-medium text-gray-900 dark:text-white mb-2'>
+                <h4 className='mb-2 text-sm font-medium text-foreground'>
                   Manage Subscription
                 </h4>
-                <p className='text-sm text-gray-600 dark:text-gray-400 mb-3'>
+                <p className='mb-3 text-sm text-muted-foreground'>
                   Update payment methods, view invoices, or cancel your
                   subscription
                 </p>
@@ -143,10 +143,10 @@ export function BillingDashboard() {
           ) : (
             <>
               <div>
-                <h4 className='text-sm font-medium text-gray-900 dark:text-white mb-2'>
+                <h4 className='mb-2 text-sm font-medium text-foreground'>
                   Upgrade to Standard
                 </h4>
-                <p className='text-sm text-gray-600 dark:text-gray-400 mb-3'>
+                <p className='mb-3 text-sm text-muted-foreground'>
                   Remove Jovie branding from your profile
                 </p>
                 <UpgradeButton priceId={defaultPriceId} />
@@ -157,13 +157,13 @@ export function BillingDashboard() {
       </div>
 
       {/* Features Overview */}
-      <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
-        <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-4'>
+      <div className='rounded-lg border border-border bg-muted/30 p-6'>
+        <h3 className='mb-4 text-lg font-medium text-foreground'>
           Standard Features
         </h3>
-        <ul className='space-y-2 text-sm text-gray-600 dark:text-gray-400'>
+        <ul className='space-y-2 text-sm text-muted-foreground'>
           <li className='flex items-center'>
-            <CheckCircleIcon className='h-4 w-4 text-green-500 mr-2' />
+            <CheckCircleIcon className='mr-2 h-4 w-4 text-emerald-500' />
             Remove Jovie branding
           </li>
         </ul>

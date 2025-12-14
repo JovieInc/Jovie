@@ -131,6 +131,9 @@ export function AdminCreatorProfilesWithSidebar({
   } = useCreatorActions(profiles);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openMenuProfileId, setOpenMenuProfileId] = useState<string | null>(
+    null
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
   const tableMetaCtx = useOptionalTableMeta();
@@ -614,6 +617,11 @@ export function AdminCreatorProfilesWithSidebar({
                         isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
                       )}
                       onClick={() => handleRowClick(profile.id)}
+                      onContextMenu={event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setOpenMenuProfileId(profile.id);
+                      }}
                       aria-selected={isSelected}
                     >
                       <td className='w-14 px-4 py-3 align-middle'>
@@ -729,11 +737,21 @@ export function AdminCreatorProfilesWithSidebar({
                         className='px-4 py-3 align-middle text-right'
                         onClick={e => e.stopPropagation()}
                       >
-                        <div className='opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'>
+                        <div
+                          className={cn(
+                            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                            openMenuProfileId === profile.id &&
+                              'opacity-100 pointer-events-auto'
+                          )}
+                        >
                           <CreatorActionsMenu
                             profile={profile}
                             isMobile={isMobile}
                             status={verificationStatuses[profile.id] ?? 'idle'}
+                            open={openMenuProfileId === profile.id}
+                            onOpenChange={open =>
+                              setOpenMenuProfileId(open ? profile.id : null)
+                            }
                             onToggleVerification={async () => {
                               const result = await toggleVerification(
                                 profile.id,

@@ -1,5 +1,9 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import {
+  AUDIENCE_ANON_COOKIE,
+  AUDIENCE_IDENTIFIED_COOKIE,
+} from '@/constants/app';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
@@ -166,6 +170,26 @@ export default clerkMiddleware(async (auth, req) => {
 
     if (showBanner) {
       res.headers.set('x-show-cookie-banner', '1');
+    }
+
+    if (!req.cookies.get(AUDIENCE_ANON_COOKIE)?.value) {
+      res.cookies.set(AUDIENCE_ANON_COOKIE, crypto.randomUUID(), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
+
+    if (userId && res.cookies.get(AUDIENCE_IDENTIFIED_COOKIE)?.value !== '1') {
+      res.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
     }
 
     // Add performance monitoring headers

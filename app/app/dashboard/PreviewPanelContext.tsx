@@ -19,6 +19,7 @@ export interface PreviewPanelLink {
 
 export interface PreviewPanelData {
   username: string;
+  displayName: string;
   avatarUrl: string | null;
   links: PreviewPanelLink[];
   profilePath: string;
