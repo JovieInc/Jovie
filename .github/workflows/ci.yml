@@ -739,13 +739,13 @@ jobs:
           fi
 
           health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "$health_url" || echo "")
-          if [[ ! "$health_content" =~ '"status":"ok"' ]]; then
+          if [[ "$health_content" != *'"status":"ok"'* ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
             exit 1
           fi
 
-          if [[ ! "$health_content" =~ '"database":\{"ok":true' ]]; then
+          if [[ "$health_content" != *'"database":{"ok":true'* ]]; then
             echo "❌ Canary failed: Database health not ok"
             echo "Health response: $health_content"
             exit 1
