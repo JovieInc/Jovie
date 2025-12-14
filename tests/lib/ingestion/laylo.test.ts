@@ -7,6 +7,14 @@ import {
   validateLayloUrl,
 } from '@/lib/ingestion/strategies/laylo';
 
+const getHostname = (value: string): string | null => {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
 describe('Laylo strategy', () => {
   it('validates laylo profile URLs', () => {
     expect(isLayloUrl('https://laylo.com/mochakk')).toBe(true);
@@ -39,7 +47,9 @@ describe('Laylo strategy', () => {
     expect(result.displayName).toBe('MOCHAKK');
     expect(result.avatarUrl).toBe(user.imageUrl);
 
-    const layloLink = result.links.find(link => link.url.includes('laylo.com'));
+    const layloLink = result.links.find(
+      link => getHostname(link.url) === 'laylo.com'
+    );
     expect(layloLink?.sourcePlatform).toBe('laylo');
 
     const socials = result.links.filter(

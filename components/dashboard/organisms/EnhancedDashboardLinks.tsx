@@ -38,6 +38,31 @@ type ProfileUpdateResponse = {
 // Define platform types
 type PlatformType = 'social' | 'dsp' | 'earnings' | 'websites' | 'custom';
 
+function getHostnameForUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    return parsed.hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+function isIngestableUrl(value: string): boolean {
+  const hostname = getHostnameForUrl(value);
+  if (!hostname) return false;
+
+  if (hostname === 'youtu.be') return true;
+  if (hostname === 'linktr.ee') return true;
+  if (hostname === 'laylo.com') return true;
+  if (hostname === 'beacons.ai') return true;
+
+  if (hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) {
+    return true;
+  }
+
+  return false;
+}
+
 function getPlatformCategory(platform: string): PlatformType {
   const dspPlatforms = new Set([
     'spotify',
@@ -657,14 +682,7 @@ export function EnhancedDashboardLinks({
 
           if (suggestionsEnabled) {
             const hasIngestableLink = normalized.some(item => {
-              const url = item.normalizedUrl.toLowerCase();
-              return (
-                url.includes('youtube.com') ||
-                url.includes('youtu.be') ||
-                url.includes('linktr.ee') ||
-                url.includes('laylo.com') ||
-                url.includes('beacons.ai')
-              );
+              return isIngestableUrl(item.normalizedUrl);
             });
 
             if (hasIngestableLink) {

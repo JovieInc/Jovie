@@ -3,10 +3,19 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 
+const getHostname = (value: string): string | null => {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+};
+
 // Mock platform detection
 vi.mock('@/lib/utils/platform-detection', () => ({
   detectPlatform: (url: string) => {
-    if (url.includes('spotify.com')) {
+    const hostname = getHostname(url);
+    if (hostname === 'spotify.com' || hostname?.endsWith('.spotify.com')) {
       return {
         platform: {
           id: 'spotify',
@@ -19,7 +28,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
         isValid: true,
       };
     }
-    if (url.includes('instagram.com')) {
+    if (hostname === 'instagram.com' || hostname?.endsWith('.instagram.com')) {
       return {
         platform: {
           id: 'instagram',
