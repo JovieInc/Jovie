@@ -143,7 +143,7 @@ export const currencyCodeEnum = pgEnum('currency_code', [
 export const photoStatusEnum = pgEnum('photo_status', [
   'uploading',
   'processing',
-  'completed',
+  'ready',
   'failed',
 ]);
 
@@ -151,6 +151,7 @@ export const photoStatusEnum = pgEnum('photo_status', [
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').unique().notNull(),
+  name: text('name'),
   email: text('email').unique(),
   isPro: boolean('is_pro').default(false),
   stripeCustomerId: text('stripe_customer_id').unique(),
@@ -179,6 +180,7 @@ export const creatorProfiles = pgTable('creator_profiles', {
   usernameNormalized: text('username_normalized').notNull(),
   displayName: text('display_name'),
   bio: text('bio'),
+  venmoHandle: text('venmo_handle'),
   avatarUrl: text('avatar_url'),
   spotifyUrl: text('spotify_url'),
   appleMusicUrl: text('apple_music_url'),
@@ -327,6 +329,7 @@ export const notificationSubscriptions = pgTable('notification_subscriptions', {
   email: text('email'),
   phone: text('phone'),
   countryCode: text('country_code'),
+  city: text('city'),
   ipAddress: text('ip_address'),
   source: text('source'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

@@ -1,6 +1,11 @@
 import { and, count, sql as drizzleSql, eq, gte, isNotNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { clickEvents, users } from '@/lib/db/schema';
+import { audienceMembers, clickEvents, users } from '@/lib/db/schema';
+import type {
+  AnalyticsRange,
+  DashboardAnalyticsResponse,
+  DashboardAnalyticsView,
+} from '@/types/analytics';
 
 type TimeRange = '1d' | '7d' | '30d' | '90d' | 'all';
 
@@ -13,6 +18,7 @@ interface AnalyticsData {
   topLinks: { id: string; url: string; clicks: number }[];
   // New for MVP simplified analytics
   profileViewsInRange: number;
+  topCities: { city: string; count: number }[];
   topCountries: { country: string; count: number }[];
   topReferrers: { referrer: string; count: number }[];
 }
@@ -140,6 +146,21 @@ export async function getAnalyticsData(
     .orderBy(drizzleSql`count DESC`)
     .limit(5);
 
+  // New: top cities within selected range
+  const cities = await db
+    .select({ city: clickEvents.city, count: count() })
+    .from(clickEvents)
+    .where(
+      and(
+        eq(clickEvents.creatorProfileId, creatorProfileId),
+        gte(clickEvents.createdAt, startDate),
+        isNotNull(clickEvents.city)
+      )
+    )
+    .groupBy(clickEvents.city)
+    .orderBy(drizzleSql`count DESC`)
+    .limit(5);
+
   // New: top referrers within selected range
   const referrers = await db
     .select({ referrer: clickEvents.referrer, count: count() })
@@ -147,8 +168,7 @@ export async function getAnalyticsData(
     .where(
       and(
         eq(clickEvents.creatorProfileId, creatorProfileId),
-        gte(clickEvents.createdAt, startDate),
-        isNotNull(clickEvents.referrer)
+        gte(clickEvents.createdAt, startDate)
       )
     )
     .groupBy(clickEvents.referrer)
@@ -170,18 +190,22 @@ export async function getAnalyticsData(
       clicks: Number(row.count),
     })),
     profileViewsInRange,
+    topCities: cities
+      .filter(row => Boolean(row.city))
+      .map(row => ({
+        city: row.city as string,
+        count: Number(row.count),
+      })),
     topCountries: countries
       .filter(row => Boolean(row.country))
       .map(row => ({
         country: row.country as string,
         count: Number(row.count),
       })),
-    topReferrers: referrers
-      .filter(row => Boolean(row.referrer))
-      .map(row => ({
-        referrer: row.referrer as string,
-        count: Number(row.count),
-      })),
+    topReferrers: referrers.map(row => ({
+      referrer: (row.referrer ?? '') as string,
+      count: Number(row.count),
+    })),
   };
 }
 
@@ -211,7 +235,173 @@ export async function getUserAnalytics(
     throw new Error('Creator profile not found');
   }
 
-  return getAnalyticsData(creatorProfile.id, range);
+  const analytics = await getAnalyticsData(creatorProfile.id, range);
+
+  return {
+    ...analytics,
+    // Profile page visits increment creator_profiles.profile_views.
+    // The click_events table tracks link clicks; it is not a reliable proxy for views.
+    profileViewsInRange: creatorProfile.profileViews ?? 0,
+  };
+}
+
+function toStartDate(range: AnalyticsRange): Date {
+  const now = new Date();
+  let startDate = new Date();
+
+  switch (range) {
+    case '1d':
+      startDate.setDate(now.getDate() - 1);
+      break;
+    case '7d':
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case '30d':
+      startDate.setDate(now.getDate() - 30);
+      break;
+    case '90d':
+      startDate.setDate(now.getDate() - 90);
+      break;
+    case 'all':
+      startDate = new Date(0);
+      break;
+  }
+
+  return startDate;
+}
+
+export async function getUserDashboardAnalytics(
+  clerkUserId: string,
+  range: AnalyticsRange,
+  view: DashboardAnalyticsView
+): Promise<DashboardAnalyticsResponse> {
+  const found = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkUserId))
+    .limit(1);
+
+  const appUserId = found?.[0]?.id;
+  if (!appUserId) {
+    throw new Error('User not found for Clerk ID');
+  }
+
+  const creatorProfile = await db.query.creatorProfiles.findFirst({
+    columns: {
+      id: true,
+      profileViews: true,
+    },
+    where: (profiles, { eq }) => eq(profiles.userId, appUserId),
+  });
+
+  if (!creatorProfile) {
+    throw new Error('Creator profile not found');
+  }
+
+  const startDate = toStartDate(range);
+  const recentThreshold = new Date();
+  recentThreshold.setDate(recentThreshold.getDate() - 7);
+
+  const [cities, countries, referrers, uniqueUsers] = await Promise.all([
+    db
+      .select({ city: clickEvents.city, count: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, creatorProfile.id),
+          gte(clickEvents.createdAt, startDate),
+          isNotNull(clickEvents.city)
+        )
+      )
+      .groupBy(clickEvents.city)
+      .orderBy(drizzleSql`count DESC`)
+      .limit(5),
+    db
+      .select({ country: clickEvents.country, count: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, creatorProfile.id),
+          gte(clickEvents.createdAt, startDate),
+          isNotNull(clickEvents.country)
+        )
+      )
+      .groupBy(clickEvents.country)
+      .orderBy(drizzleSql`count DESC`)
+      .limit(5),
+    db
+      .select({ referrer: clickEvents.referrer, count: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, creatorProfile.id),
+          gte(clickEvents.createdAt, startDate)
+        )
+      )
+      .groupBy(clickEvents.referrer)
+      .orderBy(drizzleSql`count DESC`)
+      .limit(5),
+
+    db
+      .select({ count: count() })
+      .from(audienceMembers)
+      .where(
+        and(
+          eq(audienceMembers.creatorProfileId, creatorProfile.id),
+          gte(audienceMembers.lastSeenAt, startDate),
+          isNotNull(audienceMembers.fingerprint)
+        )
+      )
+      .limit(1),
+  ]);
+
+  const uniqueUsersCount = Number(uniqueUsers?.[0]?.count ?? 0);
+
+  const base: DashboardAnalyticsResponse = {
+    view,
+    profile_views: creatorProfile.profileViews ?? 0,
+    unique_users: uniqueUsersCount,
+    top_cities: cities
+      .filter(row => Boolean(row.city))
+      .map(row => ({ city: row.city as string, count: Number(row.count) })),
+    top_countries: countries
+      .filter(row => Boolean(row.country))
+      .map(row => ({
+        country: row.country as string,
+        count: Number(row.count),
+      })),
+    top_referrers: referrers.map(row => ({
+      referrer: (row.referrer ?? '') as string,
+      count: Number(row.count),
+    })),
+  };
+
+  if (view === 'traffic') {
+    return base;
+  }
+
+  const [counts] = await db
+    .select({
+      total: count(),
+      spotify: drizzleSql<number>`count(*) filter (where ${clickEvents.linkType} = 'listen')`,
+      social: drizzleSql<number>`count(*) filter (where ${clickEvents.linkType} = 'social')`,
+      recent: drizzleSql<number>`count(*) filter (where ${clickEvents.createdAt} >= ${recentThreshold})`,
+    })
+    .from(clickEvents)
+    .where(
+      and(
+        eq(clickEvents.creatorProfileId, creatorProfile.id),
+        gte(clickEvents.createdAt, startDate)
+      )
+    );
+
+  return {
+    ...base,
+    total_clicks: Number(counts?.total ?? 0),
+    spotify_clicks: Number(counts?.spotify ?? 0),
+    social_clicks: Number(counts?.social ?? 0),
+    recent_clicks: Number(counts?.recent ?? 0),
+  };
 }
 
 // Function to record a click event

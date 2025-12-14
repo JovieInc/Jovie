@@ -10,22 +10,51 @@ vi.mock('@clerk/elements/common', () => ({
   Field: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='field'>{children}</div>
   ),
+  Label: ({
+    children,
+    className,
+  }: {
+    children?: React.ReactNode;
+    className?: string;
+  }) => (
+    <label data-testid='clerk-label' className={className}>
+      {children}
+    </label>
+  ),
   Input: ({
     type,
     children,
     asChild,
+    autoSubmit,
+    length,
+    'aria-label': ariaLabel,
   }: {
     type: string;
     children?: React.ReactNode;
     asChild?: boolean;
+    autoSubmit?: boolean;
+    length?: number;
+    'aria-label'?: string;
   }) => (
-    <div data-testid='clerk-input' data-type={type} data-aschild={asChild}>
+    <div
+      data-testid='clerk-input'
+      data-type={type}
+      data-aschild={asChild}
+      data-auto-submit={autoSubmit}
+      data-length={length}
+      aria-label={ariaLabel}
+    >
       {children}
     </div>
   ),
   FieldError: ({ className }: { className?: string }) => (
     <div data-testid='field-error' className={className} />
   ),
+  Loading: ({
+    children,
+  }: {
+    children: (isLoading: boolean) => React.ReactNode;
+  }) => children(false),
 }));
 
 vi.mock('@clerk/elements/sign-in', () => ({
@@ -55,12 +84,19 @@ vi.mock('@clerk/elements/sign-in', () => ({
   Action: ({
     children,
     className,
+    'aria-busy': ariaBusy,
   }: {
     submit?: boolean;
+    navigate?: string;
     children: React.ReactNode;
     className?: string;
+    'aria-busy'?: boolean;
   }) => (
-    <button data-testid='signin-action' className={className}>
+    <button
+      data-testid='signin-action'
+      className={className}
+      aria-busy={ariaBusy}
+    >
       {children}
     </button>
   ),
@@ -116,11 +152,11 @@ describe('OtpSignInForm', () => {
     expect(buttons[0]).toHaveTextContent('Continue with Email');
   });
 
-  it('displays "Continue" button in verifications step', () => {
+  it('displays "Verify Code" button in verifications step', () => {
     render(<OtpSignInForm />);
 
     const buttons = screen.getAllByTestId('signin-action');
-    expect(buttons[1]).toHaveTextContent('Continue');
+    expect(buttons[1]).toHaveTextContent('Verify Code');
   });
 
   it('uses semantic design tokens for global error', () => {
@@ -144,19 +180,29 @@ describe('OtpSignInForm', () => {
     expect(inputs[0]).toHaveAttribute('data-type', 'email');
   });
 
-  it('renders code input field for OTP', () => {
+  it('renders OTP input with type="otp" and autoSubmit', () => {
     render(<OtpSignInForm />);
 
     const inputs = screen.getAllByTestId('clerk-input');
-    expect(inputs[1]).toHaveAttribute('data-type', 'text');
+    const otpInput = inputs[1];
+    expect(otpInput).toHaveAttribute('data-type', 'otp');
+    expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });
 
-  it('uses AuthInput component with asChild pattern', () => {
+  it('has screen reader labels for form fields', () => {
     render(<OtpSignInForm />);
 
-    const inputs = screen.getAllByTestId('clerk-input');
-    inputs.forEach(input => {
-      expect(input).toHaveAttribute('data-aschild', 'true');
+    const labels = screen.getAllByTestId('clerk-label');
+    expect(labels.length).toBeGreaterThan(0);
+    labels.forEach(label => {
+      expect(label).toHaveClass('sr-only');
     });
+  });
+
+  it('has aria-live region for global errors', () => {
+    render(<OtpSignInForm />);
+
+    const errorContainer = screen.getByRole('alert');
+    expect(errorContainer).toHaveAttribute('aria-live', 'polite');
   });
 });

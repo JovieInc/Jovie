@@ -1,6 +1,6 @@
 'use client';
 
-import { useUser } from '@clerk/nextjs';
+import { ClerkProvider, useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { ThemeProvider } from 'next-themes';
 import React, { useEffect } from 'react';
@@ -29,12 +29,14 @@ const LazyProviders = dynamic<LazyProvidersProps>(
 interface ClientProvidersProps {
   children: React.ReactNode;
   initialThemeMode?: ThemeMode;
+  publishableKey: string;
 }
 
-export function ClientProviders({
+// Inner component that uses Clerk hooks (must be inside ClerkProvider)
+function ClientProvidersInner({
   children,
   initialThemeMode = 'system',
-}: ClientProvidersProps) {
+}: Omit<ClientProvidersProps, 'publishableKey'>) {
   const { user } = useUser();
 
   useEffect(() => {
@@ -82,5 +84,36 @@ export function ClientProviders({
         </MyStatsig>
       </ThemeProvider>
     </React.StrictMode>
+  );
+}
+
+// Clerk appearance config
+const clerkAppearance = {
+  elements: {
+    rootBox: 'bg-base text-primary',
+    card: 'bg-surface-1 border border-subtle dark:border-default',
+    headerTitle: 'text-primary',
+    headerSubtitle: 'text-secondary',
+    formFieldInput: 'bg-surface-0 border border-default focus-ring-themed',
+    formButtonPrimary: 'btn btn-primary btn-md',
+    socialButtonsBlockButton: 'btn btn-secondary btn-md',
+    footerActionText: 'text-secondary',
+    footerActionLink: 'text-accent-token',
+  },
+};
+
+// Main export - wraps children with ClerkProvider (client-side only)
+// Uses hydration guard to prevent SSR of ClerkProvider which accesses window
+export function ClientProviders({
+  children,
+  initialThemeMode = 'system',
+  publishableKey,
+}: ClientProvidersProps) {
+  return (
+    <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
+      <ClientProvidersInner initialThemeMode={initialThemeMode}>
+        {children}
+      </ClientProvidersInner>
+    </ClerkProvider>
   );
 }

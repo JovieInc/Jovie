@@ -109,7 +109,7 @@ test.describe('Dashboard Access Control', () => {
     );
 
     // Complete onboarding for User A
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
     const handleInputA = page.getByLabel('Enter your desired handle');
@@ -128,7 +128,7 @@ test.describe('Dashboard Access Control', () => {
 
     // Submit and wait for dashboard
     await Promise.all([
-      page.waitForURL('**/dashboard', { timeout: 15_000 }),
+      page.waitForURL('**/app/dashboard**', { timeout: 15_000 }),
       submitButtonA.click(),
     ]);
 
@@ -183,7 +183,7 @@ test.describe('Dashboard Access Control', () => {
     );
 
     // Complete onboarding for User B
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
     const handleInputB = page.getByLabel('Enter your desired handle');
@@ -199,7 +199,7 @@ test.describe('Dashboard Access Control', () => {
       .toBe(true);
 
     await Promise.all([
-      page.waitForURL('**/dashboard', { timeout: 15_000 }),
+      page.waitForURL('**/app/dashboard**', { timeout: 15_000 }),
       submitButtonB.click(),
     ]);
 
@@ -259,10 +259,10 @@ test.describe('Dashboard Access Control', () => {
     expect(currentUserIdAfterSignIn).toBe(userAClerkId);
 
     // === Step 4: Verify User A can only see their own data in dashboard ===
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Should stay on dashboard (not redirect to onboarding)
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 5_000 });
+    await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 5_000 });
 
     // Verify User A sees their own data
     await expect(page.locator(`text=/${userAHandle}/i`).first()).toBeVisible({
@@ -301,17 +301,17 @@ test.describe('Dashboard Access Control', () => {
     // but this tests against potential future parameter-based access
 
     // Go back to dashboard and verify still seeing only User A's data
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await expect(page.locator(`text=/${userAHandle}/i`).first()).toBeVisible({
       timeout: 5_000,
     });
 
     // Try various potential attack vectors via URL manipulation
     const attackUrls = [
-      `/dashboard?user=${userBClerkId}`,
-      `/dashboard?profile=${userBHandle}`,
-      `/dashboard#user=${userBClerkId}`,
-      `/dashboard/${userBHandle}`,
+      `/app/dashboard?user=${userBClerkId}`,
+      `/app/dashboard?profile=${userBHandle}`,
+      `/app/dashboard#user=${userBClerkId}`,
+      `/app/dashboard/${userBHandle}`,
     ];
 
     for (const attackUrl of attackUrls) {
@@ -325,7 +325,7 @@ test.describe('Dashboard Access Control', () => {
       expect(userBDataVisible).toBe(0);
 
       // Should still show User A's data or be on a safe page
-      const isOnDashboard = page.url().includes('/dashboard');
+      const isOnDashboard = page.url().includes('/app/dashboard');
       if (isOnDashboard) {
         await expect(
           page.locator(`text=/${userAHandle}/i`).first()
@@ -375,7 +375,7 @@ test.describe('Dashboard Access Control', () => {
     test.setTimeout(30_000);
 
     // Try to access dashboard without authentication
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
 
     // Should redirect to sign-in page
     await page.waitForURL('**/sign-in**', { timeout: 10_000 });

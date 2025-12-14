@@ -8,6 +8,7 @@ const {
   mockAuth,
   mockInsert,
   mockUpdate,
+  mockSelect,
   mockEq,
   sharpMock,
   sharpMetadataMock,
@@ -15,6 +16,7 @@ const {
   mockAuth: vi.fn(),
   mockInsert: vi.fn(),
   mockUpdate: vi.fn(),
+  mockSelect: vi.fn(),
   mockEq: vi.fn(),
   sharpMock: vi.fn(),
   sharpMetadataMock: vi.fn(),
@@ -26,19 +28,36 @@ vi.mock('@clerk/nextjs/server', () => ({
 }));
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: async (
-    operation: (userId: string) => Promise<unknown>
-  ): Promise<unknown> => {
+  withDbSession: async (operation: (userId: string) => Promise<unknown>) => {
     const { userId } = await mockAuth();
-    if (!userId) {
-      throw new Error('Unauthorized');
-    }
+    if (!userId) throw new Error('Unauthorized');
     return operation(userId);
+  },
+  withDbSessionTx: async (
+    operation: (
+      tx: {
+        select: typeof mockSelect;
+        insert: typeof mockInsert;
+        update: typeof mockUpdate;
+        execute: typeof mockInsert;
+      },
+      userId: string
+    ) => Promise<unknown>
+  ) => {
+    const { userId } = await mockAuth();
+    if (!userId) throw new Error('Unauthorized');
+    const tx = {
+      select: mockSelect,
+      insert: mockInsert,
+      update: mockUpdate,
+      execute: vi.fn(),
+    };
+    return operation(tx as never, userId);
   },
 }));
 
 vi.mock('@/lib/db', () => {
-  const select = vi.fn().mockReturnValue({
+  const select = mockSelect.mockReturnValue({
     from: vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue([{ id: 'internal-user-id' }]),
@@ -92,7 +111,9 @@ vi.mock('sharp', () => {
     const pipeline = {
       clone: vi.fn(),
       resize: vi.fn(),
-      webp: vi.fn(),
+      avif: vi.fn(),
+      toColourspace: vi.fn(),
+      withMetadata: vi.fn(),
       toBuffer: vi.fn(),
       metadata: sharpMetadataMock,
       rotate: vi.fn(),
@@ -100,7 +121,9 @@ vi.mock('sharp', () => {
 
     pipeline.clone.mockImplementation(createPipeline);
     pipeline.resize.mockReturnValue(pipeline);
-    pipeline.webp.mockReturnValue(pipeline);
+    pipeline.avif.mockReturnValue(pipeline);
+    pipeline.toColourspace.mockReturnValue(pipeline);
+    pipeline.withMetadata.mockReturnValue(pipeline);
     pipeline.rotate.mockReturnValue(pipeline);
     pipeline.toBuffer.mockImplementation(
       async (options?: { resolveWithObject?: boolean }) => {
@@ -177,6 +200,9 @@ describe('/api/images/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     sharpMetadataMock.mockResolvedValue({ width: 800, height: 800 });
+
+    // Default authenticated user; individual tests override as needed
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
     // Default: magic bytes validation passes for valid image types
     mockValidateMagicBytes.mockReturnValue(true);
@@ -258,7 +284,7 @@ describe('/api/images/upload', () => {
     expect(data.code).toBe('INVALID_FILE');
   });
 
-  it('should reject files larger than 4MB', async () => {
+  it('should reject files larger than 25MB', async () => {
     // Mock authenticated user
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
 
@@ -266,7 +292,7 @@ describe('/api/images/upload', () => {
     const file = createValidImageFile(
       'large.jpg',
       'image/jpeg',
-      5 * 1024 * 1024 + 1
+      30 * 1024 * 1024 // 30MB > 25MB limit
     );
     formData.append('file', file);
 
@@ -276,7 +302,7 @@ describe('/api/images/upload', () => {
     expect(response.status).toBe(400);
 
     const data = await response.json();
-    expect(data.error).toBe('File too large. Maximum 4MB allowed.');
+    expect(data.error).toBe('File too large. Maximum 25MB allowed.');
   });
 
   it('should successfully process valid image upload', async () => {
@@ -293,10 +319,10 @@ describe('/api/images/upload', () => {
     const response = await POST(request);
     const data = await response.json();
 
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
 
-    expect(data).toHaveProperty('id', 'test-photo-id');
-    expect(data).toHaveProperty('status', 'completed');
+    expect(data).toHaveProperty('jobId', 'test-photo-id');
+    expect(data).toHaveProperty('status', 'ready');
     expect(data).toHaveProperty('blobUrl');
     expect(data).toHaveProperty('smallUrl');
   });
@@ -311,7 +337,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept PNG images', async () => {
@@ -324,7 +350,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept WebP images', async () => {
@@ -337,7 +363,7 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept HEIC images and normalize output', async () => {
@@ -350,9 +376,9 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
     const data = await response.json();
-    expect(data.blobUrl).toContain('.webp');
+    expect(data.blobUrl).toContain('.avif');
   });
 
   it('should reject files with spoofed MIME type (magic bytes mismatch)', async () => {
@@ -389,7 +415,7 @@ describe('/api/images/upload', () => {
 
     const response = await POST(request);
     // Should pass magic bytes validation and proceed to processing
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 
   it('should accept files with valid PNG magic bytes', async () => {
@@ -402,6 +428,6 @@ describe('/api/images/upload', () => {
     const request = createMultipartRequest(formData);
 
     const response = await POST(request);
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(202);
   });
 });

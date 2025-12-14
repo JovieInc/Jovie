@@ -59,6 +59,14 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/username/sync', () => syncHoisted);
 
+vi.mock('@/lib/cache/profile', () => ({
+  invalidateProfileCache: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/validation/username', () => ({
+  validateUsername: vi.fn(() => ({ isValid: true })),
+}));
+
 describe('PUT /api/dashboard/profile', () => {
   const mockUpdateUser = clerkClientMock.users.updateUser;
   const mockUpdateUserProfileImage =
@@ -133,7 +141,9 @@ describe('PUT /api/dashboard/profile', () => {
     expect(mockUpdateUserProfileImage).toHaveBeenCalledTimes(1);
     const payload = mockUpdateUserProfileImage.mock.calls[0]?.[1];
     expect(payload?.file).toBeInstanceOf(Blob);
-    expect(fetchMock).toHaveBeenCalledWith('https://example.com/upload.png');
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/upload.png', {
+      signal: expect.any(AbortSignal),
+    });
 
     fetchMock.mockRestore();
   });

@@ -31,7 +31,7 @@ export async function updateCreatorProfileAction(
 ): Promise<{ success: boolean; data?: CreatorProfile; error?: string }> {
   try {
     const updated = await updateProfile(userId, updates);
-    revalidatePath('/dashboard/profile');
+    revalidatePath('/app/dashboard/profile');
     return { success: true, data: updated };
   } catch (error) {
     console.error('Error updating creator profile:', error);

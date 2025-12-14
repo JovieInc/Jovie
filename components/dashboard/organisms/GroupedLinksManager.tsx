@@ -8,7 +8,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, {
   useCallback,
@@ -17,16 +17,25 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
+import { Icon } from '@/components/atoms/Icon';
+import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
-import { getBrandIconStyles } from '@/lib/utils/color';
+// getBrandIconStyles reserved for future brand-colored icons
+import '@/lib/utils/color';
 import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
-import { LinkActions } from '../atoms/LinkActions';
+import { CategorySection } from '../atoms/CategorySection';
+import {
+  LinkPill,
+  type LinkPillMenuItem,
+  type LinkPillState,
+} from '../atoms/LinkPill';
+
+type LinkSection = 'social' | 'dsp' | 'earnings' | 'custom';
 
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
@@ -65,7 +74,7 @@ export interface GroupedLinksManagerProps<
 // Configurable cross-category policy (extend here to allow more platforms to span sections)
 export const CROSS_CATEGORY: Record<
   string,
-  Array<'social' | 'dsp' | 'custom'>
+  Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
 > = {
   youtube: ['social', 'dsp'],
   // soundcloud: ['social', 'dsp'],
@@ -78,6 +87,7 @@ interface SuggestionPillConfig {
 }
 
 const SUGGESTION_PILLS: SuggestionPillConfig[] = [
+  { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
   { id: 'spotify', label: 'Spotify', simpleIconId: 'spotify' },
   { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
   {
@@ -94,12 +104,13 @@ const SUGGESTION_PILLS: SuggestionPillConfig[] = [
 ];
 
 const MUSIC_FIRST_ORDER = [
+  'spotify-artist',
   'spotify',
   'apple-music',
+  'youtube',
   'youtube-music',
   'instagram',
   'tiktok',
-  'youtube',
   'twitter',
   'venmo',
   'website',
@@ -130,139 +141,107 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   suggestionsEnabled = false,
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
-  const [collapsed, setCollapsed] = useState<
-    Record<'social' | 'dsp' | 'earnings' | 'custom', boolean>
-  >({ social: false, dsp: false, earnings: false, custom: false });
+
+  // Ensure only one action menu is open at a time
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const handleAnyMenuOpen = useCallback((id: string | null) => {
+    setOpenMenuId(id);
+  }, []);
+
+  // Pointer sensors for drag-and-drop (hook must be top-level)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [collapsedInitialized, setCollapsedInitialized] = useState(false);
-  const [tippingEnabled, setTippingEnabled] = useState<boolean>(false);
-  const [tippingJustEnabled, setTippingJustEnabled] = useState<boolean>(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future collapse animation
+  const [_collapsedInitialized, _setCollapsedInitialized] = useState(false);
   const [ytPrompt, setYtPrompt] = useState<{
     candidate: DetectedLink;
     target: 'social' | 'dsp';
   } | null>(null);
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [addingLink, setAddingLink] = useState<T | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<{
+    link: DetectedLink;
+    isDuplicate: boolean;
+  } | null>(null);
+  const [clearSignal, setClearSignal] = useState(0);
 
-  const [searchQuery, setSearchQuery] = useState('');
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
-  const [pendingSuggestions, setPendingSuggestions] = useState(suggestedLinks);
+  const [pendingSuggestions, setPendingSuggestions] = useState(
+    () => suggestedLinks
+  );
 
-  useEffect(() => {
-    setPendingSuggestions(suggestedLinks);
+  const suggestedLinksSignature = useMemo(() => {
+    const keys = suggestedLinks
+      .map(s => s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`)
+      .sort();
+    return keys.join('|');
   }, [suggestedLinks]);
 
-  const matchesSearch = useCallback(
-    (l: T): boolean => {
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase();
-      const suggestedTitle = (
-        (l as unknown as { suggestedTitle?: string }).suggestedTitle ||
-        (l.platform.name ?? '')
-      ).toLowerCase();
-      const url = (
-        (l as unknown as { normalizedUrl?: string }).normalizedUrl ||
-        (l as unknown as { originalUrl?: string }).originalUrl ||
-        ''
-      ).toLowerCase();
-      const platformId = (l.platform.id ?? '').toLowerCase();
-
-      return (
-        suggestedTitle.includes(q) || url.includes(q) || platformId.includes(q)
-      );
-    },
-    [searchQuery]
+  const prevSuggestedLinksSignatureRef = useRef<string>(
+    suggestedLinksSignature
   );
+
+  useEffect(() => {
+    if (prevSuggestedLinksSignatureRef.current === suggestedLinksSignature) {
+      return;
+    }
+    prevSuggestedLinksSignatureRef.current = suggestedLinksSignature;
+    setPendingSuggestions(suggestedLinks);
+  }, [suggestedLinks, suggestedLinksSignature]);
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
-  const linkIsVisible = (l: T): boolean =>
-    ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
-
-  useEffect(() => {
-    if (!collapsedInitialized) {
-      const initialCollapsed = {
-        social: groups.social.length === 0,
-        dsp: groups.dsp.length === 0,
-        earnings: groups.earnings.length === 0,
-        custom: groups.custom.length === 0,
-      };
-
-      const timer = setTimeout(() => {
-        setCollapsed(initialCollapsed);
-        setCollapsedInitialized(true);
-      }, 50);
-
-      return () => clearTimeout(timer);
-    } else {
-      setCollapsed(prev => {
-        const next = { ...prev };
-
-        if (groups.social.length === 0 && !prev.social) {
-          next.social = true;
-        }
-        if (groups.dsp.length === 0 && !prev.dsp) {
-          next.dsp = true;
-        }
-        if (groups.earnings.length === 0 && !prev.earnings) {
-          next.earnings = true;
-        }
-        if (groups.custom.length === 0 && !prev.custom) {
-          next.custom = true;
-        }
-
-        // Avoid triggering a render loop when nothing actually changed
-        if (
-          next.social === prev.social &&
-          next.dsp === prev.dsp &&
-          next.earnings === prev.earnings &&
-          next.custom === prev.custom
-        ) {
-          return prev;
-        }
-
-        return next;
-      });
-    }
-
-    const enabled = groups.earnings.length > 0;
-    if (enabled && !tippingEnabled) {
-      setTippingJustEnabled(true);
-      window.setTimeout(() => setTippingJustEnabled(false), 1500);
-    }
-    setTippingEnabled(enabled);
-  }, [groups, collapsedInitialized, tippingEnabled]);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 },
-    })
+  // Stable ids for DnD + menu control
+  const idFor = useCallback(
+    (link: T): string =>
+      `${link.platform.id}::${link.normalizedUrl || link.originalUrl || ''}`,
+    []
   );
 
-  const idFor = (l: T) => `${l.platform.id}::${l.normalizedUrl}`;
   const mapIdToIndex = useMemo(() => {
     const m = new Map<string, number>();
-    links.forEach((l, i) => m.set(`${l.platform.id}::${l.normalizedUrl}`, i));
+    links.forEach((l, idx) => {
+      m.set(idFor(l), idx);
+    });
     return m;
-  }, [links]);
+  }, [idFor, links]);
 
-  const sectionOf = (l: T) =>
-    (l.platform.category ?? 'custom') as
+  const sectionOf = useCallback((link: T): LinkSection => {
+    const category = (link.platform.category ?? 'custom') as
       | 'social'
       | 'dsp'
       | 'earnings'
+      | 'websites'
       | 'custom';
 
-  const canMoveTo = (
-    l: T,
-    target: 'social' | 'dsp' | 'custom' | 'earnings'
-  ): boolean => {
-    if (target === 'earnings') return false;
-    const allowed =
-      CROSS_CATEGORY[l.platform.id as keyof typeof CROSS_CATEGORY];
-    if (!allowed) return false;
-    return allowed.includes(target as 'social' | 'dsp' | 'custom');
-  };
+    if (category === 'social') return 'social';
+    if (category === 'dsp') return 'dsp';
+    if (category === 'earnings') return 'earnings';
+    return 'custom';
+  }, []);
+
+  const canMoveTo = useCallback(
+    (link: T, target: LinkSection): boolean => {
+      const current = sectionOf(link);
+      if (current === target) return true;
+      const allowed = CROSS_CATEGORY[link.platform.id] ?? [];
+      return allowed.includes(target);
+    },
+    [sectionOf]
+  );
+
+  useEffect(() => {
+    if (!lastAddedId) return;
+    const timer = window.setTimeout(() => setLastAddedId(null), 1400);
+    return () => window.clearTimeout(timer);
+  }, [lastAddedId]);
+
+  const linkIsVisible = (l: T): boolean =>
+    ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
 
   useEffect(() => {
     onLinksChange?.(links);
@@ -367,11 +346,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       return;
     }
 
+    setAddingLink(enriched);
+    // Show pulsing placeholder for a moment to indicate creation
+    await new Promise(resolve => setTimeout(resolve, 600));
+
     const next = [...links, enriched];
     setLinks(next);
+    setLastAddedId(idFor(enriched as T));
     onLinkAdded?.([enriched as T]);
-
-    setCollapsed(prev => ({ ...prev, [section]: false }));
+    setAddingLink(null);
 
     try {
       if ((enriched as DetectedLink).platform.id === 'venmo') {
@@ -413,6 +396,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       );
       if (!hasDuplicate) {
         setLinks(prev => [...prev, nextLink]);
+        setLastAddedId(idFor(nextLink));
       }
       onLinkAdded?.([nextLink]);
     }
@@ -448,6 +432,15 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     });
   }
 
+  function handleEdit(idx: number) {
+    const link = links[idx];
+    if (!link) return;
+    // Set the URL in the input field for editing
+    setPrefillUrl(link.normalizedUrl || link.originalUrl);
+    // Remove the link from the list so user can re-add it with changes
+    setLinks(prev => prev.filter((_, i) => i !== idx));
+  }
+
   function onDragEnd(ev: DragEndEvent) {
     const { active, over } = ev;
     if (!over) return;
@@ -481,16 +474,93 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
 
     const next = [...links];
+    const nextCategory = (() => {
+      if (
+        toSection === 'social' ||
+        toSection === 'dsp' ||
+        toSection === 'earnings'
+      ) {
+        return toSection;
+      }
+      const currentCategory = (from.platform.category ?? 'custom') as
+        | 'social'
+        | 'dsp'
+        | 'earnings'
+        | 'websites'
+        | 'custom';
+      if (
+        currentCategory === 'earnings' ||
+        currentCategory === 'websites' ||
+        currentCategory === 'custom'
+      ) {
+        return currentCategory;
+      }
+      return 'custom';
+    })();
+
     const updated = {
       ...from,
-      platform: { ...from.platform, category: toSection },
+      platform: { ...from.platform, category: nextCategory },
     } as T;
     next.splice(fromIdx, 1);
     next.splice(toIdx, 0, updated);
     setLinks(next);
     onLinksChange?.(next);
-    setCollapsed(prev => ({ ...prev, [toSection]: false }));
   }
+
+  const buildPillLabel = useCallback((link: DetectedLink): string => {
+    const platform = link.platform.name || link.platform.id;
+    const identity = compactUrlDisplay(
+      link.platform.id,
+      link.normalizedUrl
+    ).trim();
+    const suggested = (link.suggestedTitle || '').trim();
+
+    const cleanSuggested = (() => {
+      if (!suggested) return '';
+      const onIdx = suggested.toLowerCase().indexOf(' on ');
+      if (onIdx !== -1) {
+        return suggested.slice(0, onIdx).trim();
+      }
+      return suggested;
+    })();
+
+    const pickShortest = (candidates: string[]): string => {
+      const filtered = candidates
+        .map(s => s.trim())
+        .filter(Boolean)
+        .filter(s => s.length <= 28);
+      if (filtered.length === 0) return platform;
+      return filtered.reduce((best, next) =>
+        next.length < best.length ? next : best
+      );
+    };
+
+    // Prefer @handles when present.
+    if (identity.startsWith('@')) {
+      return pickShortest([identity]);
+    }
+
+    // Website-style labels should just be the host.
+    if (link.platform.id === 'website' && identity) {
+      return pickShortest([identity, platform]);
+    }
+
+    // For DSPs, the URL identity is usually just the host; prefer platform name / suggested.
+    if (link.platform.category === 'dsp') {
+      return pickShortest([cleanSuggested, platform]);
+    }
+
+    if (!identity) {
+      return pickShortest([cleanSuggested, platform]);
+    }
+
+    return pickShortest([
+      cleanSuggested,
+      `${platform} • ${identity}`,
+      platform,
+    ]);
+  }, []);
 
   const existingPlatforms = useMemo(
     () => new Set(links.map(l => l.platform.id)),
@@ -498,9 +568,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   );
 
   const suggestionPills = useMemo(() => {
-    const base = SUGGESTION_PILLS.filter(
-      pill => !existingPlatforms.has(pill.id)
-    );
+    const base = SUGGESTION_PILLS.filter(pill => {
+      if (existingPlatforms.has(pill.id)) return false;
+      if (pill.id === 'youtube-music' && existingPlatforms.has('youtube')) {
+        return false;
+      }
+      return true;
+    });
     const order = isMusicProfile ? MUSIC_FIRST_ORDER : SOCIAL_FIRST_ORDER;
     const rank = new Map<string, number>();
     order.forEach((id, index) => {
@@ -517,7 +591,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [existingPlatforms, isMusicProfile]);
 
   const hasAnyLinks = links.length > 0;
-  const filteredCount = links.filter(matchesSearch).length;
+  const filteredCount = links.length;
 
   const COMPLETION_TARGET = 6;
   const completionPercent = hasAnyLinks
@@ -529,241 +603,205 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       )
     : 0;
 
+  const buildSecondaryText = useCallback(
+    (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
+      const identity = canonicalIdentity(link);
+      return identity.startsWith('@') ? identity : undefined;
+    },
+    []
+  );
+
   return (
     <section
       className={cn('space-y-4', className)}
       aria-label='Links Manager'
       ref={containerRef}
     >
-      {/* Hint message with animation */}
-      <AnimatePresence>
-        {hint && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.2 }}
-            className='mb-4 rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
-            role='status'
-            aria-live='polite'
-          >
-            {hint}
-          </motion.div>
-        )}
-      </AnimatePresence>
-      {ytPrompt && (
-        <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
-          <div className='text-primary-token'>
-            You already added{' '}
-            {ytPrompt.candidate.platform.name || ytPrompt.candidate.platform.id}{' '}
-            in this section. Do you also want to add it as{' '}
-            {ytPrompt.target === 'dsp'
-              ? 'a music service'
-              : labelFor(ytPrompt.target)}
-            ?
-          </div>
-          <div className='shrink-0 flex items-center gap-2'>
-            <Button
-              size='sm'
-              variant='primary'
-              onClick={() => {
-                if (!ytPrompt) return;
-                const adjusted = {
-                  ...ytPrompt.candidate,
-                  platform: {
-                    ...ytPrompt.candidate.platform,
-                    category: ytPrompt.target,
-                  },
-                } as unknown as T;
-                const next = [...links, adjusted];
-                setLinks(next);
-                setYtPrompt(null);
-                onLinkAdded?.([adjusted]);
-              }}
+      <div className='mb-6 rounded-xl border border-subtle bg-surface-1 p-4 space-y-4'>
+        {/* Hint message with animation */}
+        <AnimatePresence>
+          {hint && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
+              role='status'
+              aria-live='polite'
             >
-              Add as {labelFor(ytPrompt.target)}
-            </Button>
-            <Button
-              size='sm'
-              variant='outline'
-              onClick={() => setYtPrompt(null)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-      {/* Combined search + add input */}
-      <UniversalLinkInput
-        onAdd={handleAdd}
-        existingPlatforms={links
-          .filter(l => l.platform.id !== 'youtube')
-          .map(l => l.platform.id)}
-        creatorName={creatorName}
-        prefillUrl={prefillUrl}
-        onPrefillConsumed={() => setPrefillUrl(undefined)}
-        onQueryChange={setSearchQuery}
-      />
-
-      {/* Links summary + completion indicator */}
-      <div className='mt-2 space-y-1 text-xs text-secondary-token'>
-        <div className='flex items-center justify-between'>
-          <span>
-            {filteredCount} {filteredCount === 1 ? 'link' : 'links'} found
-          </span>
-        </div>
-        {hasAnyLinks && !searchQuery.trim() && (
-          <div className='mt-1 flex flex-col gap-1'>
-            <div className='flex items-center justify-between'>
-              <span>{`You're ${completionPercent}% done`}</span>
-              <span>Most creators add 4–6 links.</span>
+              {hint}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {ytPrompt && (
+          <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
+            <div className='text-primary-token'>
+              You already added{' '}
+              {ytPrompt.candidate.platform.name ||
+                ytPrompt.candidate.platform.id}{' '}
+              in this section. Do you also want to add it as{' '}
+              {ytPrompt.target === 'dsp'
+                ? 'a music service'
+                : labelFor(ytPrompt.target)}
+              ?
             </div>
-            <div
-              className='h-1.5 w-full rounded-full bg-surface-2 overflow-hidden'
-              aria-hidden='true'
-            >
-              <div
-                className='h-full rounded-full bg-accent transition-all'
-                style={{ width: `${completionPercent}%` }}
-              />
+            <div className='shrink-0 flex items-center gap-2'>
+              <Button
+                size='sm'
+                variant='primary'
+                onClick={() => {
+                  if (!ytPrompt) return;
+                  const adjusted = {
+                    ...ytPrompt.candidate,
+                    platform: {
+                      ...ytPrompt.candidate.platform,
+                      category: ytPrompt.target,
+                    },
+                  } as unknown as T;
+                  const next = [...links, adjusted];
+                  setLinks(next);
+                  setYtPrompt(null);
+                  onLinkAdded?.([adjusted]);
+                }}
+              >
+                Add as {labelFor(ytPrompt.target)}
+              </Button>
+              <Button
+                size='sm'
+                variant='outline'
+                onClick={() => setYtPrompt(null)}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
         )}
-      </div>
+        {/* Combined search + add input */}
+        <UniversalLinkInput
+          onAdd={handleAdd}
+          existingPlatforms={links
+            .filter(l => l.platform.id !== 'youtube')
+            .map(l => l.platform.id)}
+          creatorName={creatorName}
+          prefillUrl={prefillUrl}
+          onPrefillConsumed={() => setPrefillUrl(undefined)}
+          onQueryChange={() => {}}
+          onPreviewChange={(link, isDuplicate) => {
+            if (!link || isDuplicate) {
+              setPendingPreview(null);
+              return;
+            }
+            setPendingPreview({ link, isDuplicate });
+          }}
+          clearSignal={clearSignal}
+        />
 
-      {suggestionsEnabled && pendingSuggestions.length > 0 && (
-        <div className='mt-3 rounded-lg border border-subtle bg-surface-1 p-3 space-y-3'>
-          <div className='flex items-center justify-between'>
-            <div className='text-sm font-semibold text-primary-token'>
-              Suggested links
-            </div>
-            <span className='text-xs text-secondary-token'>
-              {pendingSuggestions.length} pending
-            </span>
+        {/* Links summary + completion indicator */}
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='min-w-0'>
+            {suggestionPills.length > 0 ? (
+              <div className='relative' aria-label='Quick link suggestions'>
+                <div
+                  className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none',
+                    WebkitMaskImage:
+                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+                    maskImage:
+                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+                  }}
+                >
+                  {suggestionPills.map(pill => (
+                    <PlatformPill
+                      key={pill.id}
+                      platformIcon={pill.simpleIconId}
+                      platformName={pill.label}
+                      primaryText={pill.label}
+                      suffix='+'
+                      tone='faded'
+                      onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
+                      className='whitespace-nowrap shrink-0'
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
-          <div className='grid gap-3 sm:grid-cols-2'>
+
+          <div className='text-xs text-secondary-token/75 sm:text-right'>
+            {completionPercent >= 100 ? (
+              <span className='inline-flex items-center gap-2'>
+                <Icon name='CheckCircle' className='h-4 w-4 text-accent' />
+                <span className='whitespace-nowrap'>
+                  You’re set with {links.length} links
+                </span>
+              </span>
+            ) : (
+              <span className='inline-flex items-center gap-2'>
+                <span className='whitespace-nowrap'>
+                  {filteredCount} {filteredCount === 1 ? 'link' : 'links'} •{' '}
+                  {completionPercent}% to target
+                </span>
+                <span className='text-tertiary-token/80'>(most add 4–6)</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {suggestionsEnabled && pendingSuggestions.length > 0 && (
+          <CategorySection title='SUGGESTED' className='space-y-0'>
             {pendingSuggestions.map(suggestion => {
-              const iconMeta = getPlatformIcon(suggestion.platform.icon);
-              const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
+              const id = `suggestion::${suggestionKey(suggestion)}`;
               const rawConfidence = (suggestion as { confidence?: number })
                 .confidence;
               const confidence: number | null =
                 typeof rawConfidence === 'number' ? rawConfidence : null;
+              const badgeText =
+                typeof confidence === 'number'
+                  ? `Suggested • ${Math.round(confidence * 100)}%`
+                  : 'Suggested';
+
               return (
-                <div
+                <LinkPill
                   key={suggestionKey(suggestion)}
-                  className='rounded-lg border border-subtle bg-surface-2 p-3 flex flex-col gap-2'
-                >
-                  <div className='flex items-start gap-2'>
-                    <span
-                      className='flex h-8 w-8 items-center justify-center rounded-md'
-                      style={{
-                        backgroundColor: `${brandHex}22`,
-                        color: brandHex,
-                      }}
-                    >
-                      <SocialIcon
-                        platform={suggestion.platform.icon}
-                        className='h-4 w-4'
-                      />
-                    </span>
-                    <div className='min-w-0 flex-1'>
-                      <div className='text-sm font-medium text-primary-token truncate'>
-                        {suggestion.suggestedTitle}
-                      </div>
-                      <div className='text-xs text-tertiary-token truncate'>
-                        {suggestion.normalizedUrl}
-                      </div>
-                      {typeof confidence === 'number' && (
-                        <div className='mt-1 inline-flex items-center gap-1 rounded-full bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token ring-1 ring-subtle'>
-                          Confidence {Math.round(confidence * 100)}%
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className='flex items-center gap-2'>
-                    <Button
-                      size='sm'
-                      className='flex-1'
-                      onClick={() =>
-                        void handleAcceptSuggestionClick(suggestion)
-                      }
-                    >
-                      Add
-                    </Button>
-                    <Button
-                      size='sm'
-                      variant='ghost'
-                      onClick={() =>
-                        void handleDismissSuggestionClick(suggestion)
-                      }
-                    >
-                      Dismiss
-                    </Button>
-                  </div>
-                </div>
+                  platformIcon={suggestion.platform.icon}
+                  platformName={suggestion.platform.name}
+                  primaryText={suggestion.platform.name}
+                  secondaryText={buildSecondaryText(suggestion)}
+                  state='connected'
+                  badgeText={badgeText}
+                  menuId={id}
+                  isMenuOpen={openMenuId === id}
+                  onMenuOpenChange={next => handleAnyMenuOpen(next ? id : null)}
+                  menuItems={[
+                    {
+                      id: 'add',
+                      label: 'Add',
+                      iconName: 'Plus',
+                      onSelect: () => {
+                        void handleAcceptSuggestionClick(suggestion);
+                      },
+                    },
+                    {
+                      id: 'dismiss',
+                      label: 'Dismiss',
+                      iconName: 'X',
+                      onSelect: () => {
+                        void handleDismissSuggestionClick(suggestion);
+                      },
+                    },
+                  ]}
+                />
               );
             })}
-          </div>
-        </div>
-      )}
+          </CategorySection>
+        )}
+      </div>
 
-      {suggestionPills.length > 0 && !searchQuery.trim() && (
-        <div className='mt-3 relative' aria-label='Quick link suggestions'>
-          <div
-            className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
-            style={{
-              WebkitOverflowScrolling: 'touch',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitMaskImage:
-                'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
-              maskImage:
-                'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
-            }}
-          >
-            {suggestionPills.map(pill => {
-              const iconMeta = getPlatformIcon(pill.simpleIconId);
-              const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-              // Detect dark colors (like TikTok #000, X #000) and use a lighter fallback
-              const isDarkColor = (() => {
-                const hex = brandHex.replace('#', '');
-                const r = parseInt(hex.slice(0, 2), 16);
-                const g = parseInt(hex.slice(2, 4), 16);
-                const b = parseInt(hex.slice(4, 6), 16);
-                // Luminance threshold - colors below this are too dark
-                const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-                return luminance < 0.25;
-              })();
-              const iconColor = isDarkColor ? '#9ca3af' : brandHex; // gray-400 fallback
-              const borderColor = isDarkColor ? '#6b728066' : `${brandHex}66`;
-              return (
-                <button
-                  key={pill.id}
-                  type='button'
-                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-tertiary-token bg-surface-1/60 opacity-50 transition-all hover:opacity-100 hover:text-secondary-token hover:bg-surface-2/60 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 whitespace-nowrap shrink-0'
-                  style={{ borderColor }}
-                >
-                  <span
-                    className='flex items-center justify-center rounded-full bg-surface-2/60 p-0.5 transition-colors shrink-0'
-                    style={{ color: iconColor }}
-                  >
-                    <SocialIcon
-                      platform={pill.simpleIconId}
-                      className='h-3.5 w-3.5'
-                    />
-                  </span>
-                  <span className='whitespace-nowrap'>{pill.label}</span>
-                  <span className='ml-0.5 text-[10px]'>+</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {!hasAnyLinks && !searchQuery.trim() && (
+      {!hasAnyLinks && (
         <div className='mt-4 rounded-lg border border-dashed border-subtle bg-surface-1/40 px-4 py-6 text-center animate-pulse'>
           <p className='text-sm font-medium text-primary-token'>
             Add links to build your profile.
@@ -776,129 +814,111 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       )}
 
       {hasAnyLinks && (
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-            const groupItems = groups[section];
-            if (groupItems.length === 0) {
-              return null;
-            }
+        <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
+          <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1/40 divide-y divide-(--color-border-subtle)'>
+            {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
+              const groupItems = groups[section];
 
-            const items = groupItems
-              .filter(matchesSearch)
-              .sort(
-                (a, b) =>
-                  popularityIndex(a.platform.id) -
-                  popularityIndex(b.platform.id)
+              const items = groupItems
+                .slice()
+                .sort(
+                  (a, b) =>
+                    popularityIndex(a.platform.id) -
+                    popularityIndex(b.platform.id)
+                );
+
+              const isAddingToThis =
+                addingLink && sectionOf(addingLink) === section;
+              if (items.length === 0 && !isAddingToThis) {
+                return null;
+              }
+
+              return (
+                <CategorySection
+                  key={section}
+                  title={labelFor(section)}
+                  variant='flat'
+                  className='px-3'
+                >
+                  <SortableContext items={items.map(idFor)}>
+                    {items.map(link => {
+                      const linkId = idFor(link as T);
+                      return (
+                        <SortableRow
+                          key={linkId}
+                          id={linkId}
+                          link={link as T}
+                          index={links.findIndex(
+                            l => l.normalizedUrl === link.normalizedUrl
+                          )}
+                          draggable={items.length > 1}
+                          onToggle={handleToggle}
+                          onRemove={handleRemove}
+                          onEdit={handleEdit}
+                          visible={linkIsVisible(link as T)}
+                          openMenuId={openMenuId}
+                          onAnyMenuOpen={handleAnyMenuOpen}
+                          isLastAdded={lastAddedId === linkId}
+                          buildPillLabel={buildPillLabel}
+                        />
+                      );
+                    })}
+
+                    {pendingPreview &&
+                    sectionOf(pendingPreview.link as T) === section ? (
+                      <LinkPill
+                        platformIcon={pendingPreview.link.platform.icon}
+                        platformName={pendingPreview.link.platform.name}
+                        primaryText={buildPillLabel(pendingPreview.link)}
+                        secondaryText={buildSecondaryText(pendingPreview.link)}
+                        state='ready'
+                        badgeText='Ready to add'
+                        menuId='pending-preview'
+                        isMenuOpen={openMenuId === 'pending-preview'}
+                        onMenuOpenChange={next =>
+                          handleAnyMenuOpen(next ? 'pending-preview' : null)
+                        }
+                        menuItems={[
+                          {
+                            id: 'add',
+                            label: 'Add',
+                            iconName: 'Plus',
+                            onSelect: () => {
+                              void handleAdd(pendingPreview.link);
+                              setPendingPreview(null);
+                              setClearSignal(c => c + 1);
+                            },
+                          },
+                          {
+                            id: 'cancel',
+                            label: 'Cancel',
+                            iconName: 'X',
+                            onSelect: () => {
+                              setPendingPreview(null);
+                              setClearSignal(c => c + 1);
+                            },
+                          },
+                        ]}
+                      />
+                    ) : null}
+
+                    {isAddingToThis && (
+                      <LinkPill
+                        platformIcon='website'
+                        platformName='Loading'
+                        primaryText='Adding…'
+                        state='loading'
+                        menuId={`loading-${section}`}
+                        isMenuOpen={false}
+                        onMenuOpenChange={() => {}}
+                        menuItems={[]}
+                      />
+                    )}
+                  </SortableContext>
+                </CategorySection>
               );
-
-            // Hide section when search/filter yields no results
-            if (items.length === 0) {
-              return null;
-            }
-
-            return (
-              <div key={section} className='space-y-3'>
-                <header className='flex items-center justify-between'>
-                  <button
-                    type='button'
-                    className='flex items-center gap-2 text-sm font-semibold capitalize text-primary-token'
-                    onClick={() =>
-                      setCollapsed(prev => ({
-                        ...prev,
-                        [section]: !prev[section],
-                      }))
-                    }
-                    aria-expanded={!collapsed[section]}
-                    aria-controls={`links-section-${section}`}
-                  >
-                    <svg
-                      className={cn(
-                        'h-4 w-4 transition-transform',
-                        collapsed[section] ? '-rotate-90' : 'rotate-0'
-                      )}
-                      viewBox='0 0 20 20'
-                      aria-hidden='true'
-                    >
-                      <path
-                        d='M6 8l4 4 4-4'
-                        stroke='currentColor'
-                        strokeWidth='2'
-                        fill='none'
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                      />
-                    </svg>
-                    {labelFor(section)}
-                    <span className='ml-2 inline-flex items-center rounded-full bg-surface-2 text-secondary-token px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-subtle'>
-                      {items.length}
-                    </span>
-                    {section === 'earnings' && tippingEnabled && (
-                      <span
-                        className={cn(
-                          'ml-2 inline-flex items-center rounded-full bg-green-500/15 text-green-600 dark:text-green-400 px-2 py-0.5 text-[10px] font-medium ring-1 ring-green-500/25',
-                          tippingJustEnabled && 'animate-pulse'
-                        )}
-                      >
-                        Tipping enabled
-                      </span>
-                    )}
-                  </button>
-                  <div className='flex items-center gap-2'>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className='inline-flex h-5 w-5 items-center justify-center rounded-md text-tertiary hover:text-secondary ring-1 ring-transparent hover:ring-subtle cursor-help'>
-                          <svg
-                            viewBox='0 0 20 20'
-                            className='h-3.5 w-3.5'
-                            aria-hidden='true'
-                          >
-                            <path
-                              d='M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.75-4.5h1.5v-1.2c0-.62.32-.96 1.02-1.3.94-.45 1.48-1.13 1.48-2.13 0-1.7-1.38-2.87-3.25-2.87-1.7 0-3 .9-3.33 2.35l1.45.38c.17-.74.82-1.2 1.83-1.2 1 0 1.7.56 1.7 1.34 0 .58-.25.89-.97 1.23-.98.46-1.43 1.07-1.43 2.1v1.5Zm0 2.25h1.5v-1.5h-1.5v1.5Z'
-                              fill='currentColor'
-                            />
-                          </svg>
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side='top' className='max-w-xs text-wrap'>
-                        Links are ordered automatically based on popularity.
-                        Some links (like YouTube) can appear in both Music &
-                        Social.
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                </header>
-                <SortableContext items={items.map(idFor)}>
-                  <ul
-                    id={`links-section-${section}`}
-                    className={cn(
-                      'divide-y divide-subtle dark:divide-white/10 rounded-lg border border-subtle dark:border-white/10 bg-surface-1',
-                      collapsed[section] && 'hidden'
-                    )}
-                  >
-                    {items.map(link => (
-                      <SortableRow
-                        key={idFor(link as T)}
-                        id={idFor(link as T)}
-                        link={link as T}
-                        index={links.findIndex(
-                          l => l.normalizedUrl === link.normalizedUrl
-                        )}
-                        draggable={section !== 'earnings' && items.length > 1}
-                        onToggle={handleToggle}
-                        onRemove={handleRemove}
-                        visible={linkIsVisible(link as T)}
-                      />
-                    ))}
-                    {items.length === 0 && (
-                      <li className='p-3 text-sm text-tertiary italic'>
-                        No {labelFor(section)} links match your search
-                      </li>
-                    )}
-                  </ul>
-                </SortableContext>
-              </div>
-            );
-          })}
+            })}
+          </div>
         </DndContext>
       )}
     </section>
@@ -907,6 +927,9 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
 function buildPrefillUrl(platformId: string): string {
   switch (platformId) {
+    case 'spotify-artist':
+      // Special case: triggers search mode in UniversalLinkInput
+      return '__SEARCH_MODE__:spotify';
     case 'spotify':
       return 'https://open.spotify.com/artist/';
     case 'apple-music':
@@ -936,8 +959,13 @@ interface SortableRowProps<T extends DetectedLink> {
   index: number;
   onToggle: (idx: number) => void;
   onRemove: (idx: number) => void;
+  onEdit: (idx: number) => void;
   visible: boolean;
   draggable?: boolean;
+  openMenuId: string | null;
+  onAnyMenuOpen: (id: string | null) => void;
+  isLastAdded: boolean;
+  buildPillLabel: (link: DetectedLink) => string;
 }
 
 /**
@@ -950,8 +978,13 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
   index,
   onToggle,
   onRemove,
+  onEdit,
   visible,
   draggable = true,
+  openMenuId,
+  onAnyMenuOpen,
+  isLastAdded,
+  buildPillLabel,
 }: SortableRowProps<T>) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({
@@ -959,8 +992,9 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       disabled: !draggable,
     });
 
-  // Create a properly typed pointer down handler for the drag handle
-  const handleDragHandlePointerDown = React.useCallback(
+  // Reserved for future drag handle pointer down handler
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleDragHandlePointerDown = React.useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {
       if (listeners?.onPointerDown) {
         listeners.onPointerDown(e);
@@ -969,66 +1003,83 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
     [listeners]
   );
 
-  // Track dark theme for icon color inversion
-  const [isDarkTheme, setIsDarkTheme] = React.useState(false);
-  React.useEffect(() => {
-    const root = document.documentElement;
-    const update = () => setIsDarkTheme(root.classList.contains('dark'));
-    update();
-    const mo = new MutationObserver(update);
-    mo.observe(root, { attributes: true, attributeFilter: ['class'] });
-    return () => mo.disconnect();
-  }, []);
+  const cardStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
-  // Use shared color utilities for brand icon styling
-  const iconMeta = getPlatformIcon(link.platform.icon);
-  const brandHex = iconMeta?.hex ? `#${iconMeta.hex}` : '#6b7280';
-  const { iconColor, iconBg } = getBrandIconStyles(brandHex, isDarkTheme);
+  const urlDisplay = compactUrlDisplay(link.platform.id, link.normalizedUrl);
+  const identity = canonicalIdentity(link);
+  const secondaryText = identity.startsWith('@') ? identity : undefined;
+
+  const pillState: LinkPillState = !visible
+    ? 'hidden'
+    : link.isValid === false
+      ? 'error'
+      : 'connected';
+
+  const badgeText = !visible
+    ? 'Hidden'
+    : pillState === 'error'
+      ? 'Needs fix'
+      : isLastAdded
+        ? 'New'
+        : undefined;
+
+  const menuItems: LinkPillMenuItem[] = [
+    {
+      id: 'edit',
+      label: 'Edit',
+      iconName: 'Pencil',
+      onSelect: () => onEdit(index),
+    },
+    {
+      id: 'toggle',
+      label: visible ? 'Hide' : 'Show',
+      iconName: visible ? 'EyeOff' : 'Eye',
+      onSelect: () => onToggle(index),
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      iconName: 'Trash',
+      variant: 'destructive',
+      onSelect: () => onRemove(index),
+    },
+  ];
 
   return (
-    <li
+    <div
       ref={setNodeRef}
-      className='group relative p-3 text-sm text-secondary-token flex items-center justify-between gap-3 hover:bg-surface-2/50 rounded-lg transition-colors'
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-      }}
       {...attributes}
+      className={cn('relative')}
+      style={cardStyle}
+      {...listeners}
     >
-      <div className='min-w-0 flex items-start gap-3 flex-1'>
-        <div
-          className='flex items-center justify-center w-7 h-7 rounded-lg shrink-0 mt-0.5 transition-all group-hover:scale-[1.04] group-hover:ring-1 group-hover:ring-subtle'
-          style={{ backgroundColor: iconBg, color: iconColor }}
-          aria-hidden='true'
-        >
-          <SocialIcon platform={link.platform.icon} className='w-4 h-4' />
-        </div>
-        <div className='min-w-0 flex-1'>
-          <div className='text-primary-token font-medium truncate'>
-            {link.suggestedTitle}
-          </div>
-          <div className='text-xs text-tertiary-token/80 truncate'>
-            {link.normalizedUrl}
-          </div>
-        </div>
-      </div>
+      <LinkPill
+        platformIcon={link.platform.icon}
+        platformName={link.platform.name || link.platform.id}
+        primaryText={buildPillLabel(link)}
+        secondaryText={secondaryText}
+        state={pillState}
+        badgeText={badgeText}
+        shimmerOnMount={isLastAdded}
+        menuItems={menuItems}
+        menuId={id}
+        isMenuOpen={openMenuId === id}
+        onMenuOpenChange={next => onAnyMenuOpen(next ? id : null)}
+        className='max-w-full'
+      />
 
-      <div className='flex items-center gap-1'>
-        <LinkActions
-          onToggle={() => onToggle(index)}
-          onRemove={() => onRemove(index)}
-          isVisible={visible}
-          showDragHandle={draggable}
-          onDragHandlePointerDown={handleDragHandlePointerDown}
-        />
-      </div>
-    </li>
+      <div className='sr-only'>{urlDisplay}</div>
+    </div>
   );
 });
 
 function groupLinks<T extends DetectedLink = DetectedLink>(
   links: T[]
-): Record<'social' | 'dsp' | 'earnings' | 'custom', T[]> {
+): Record<LinkSection, T[]> {
+  // Preserve incoming order; categories are only for grouping/drag between types.
   const social: T[] = [];
   const dsp: T[] = [];
   const earnings: T[] = [];
@@ -1039,6 +1090,7 @@ function groupLinks<T extends DetectedLink = DetectedLink>(
     const category = (l.platform.category ?? 'custom') as
       | 'social'
       | 'dsp'
+      | 'websites'
       | 'earnings'
       | 'custom';
     if (category === 'social') social.push(l);
@@ -1047,26 +1099,87 @@ function groupLinks<T extends DetectedLink = DetectedLink>(
     else custom.push(l);
   }
 
-  const byStable = (a: T, b: T) =>
-    (a.normalizedUrl || '').localeCompare(b.normalizedUrl || '');
-
   return {
-    social: social.sort(byStable),
-    dsp: dsp.sort(byStable),
-    earnings: earnings.sort(byStable),
-    custom: custom.sort(byStable),
+    social,
+    dsp,
+    earnings,
+    custom,
   };
 }
 
-function labelFor(section: 'social' | 'dsp' | 'earnings' | 'custom'): string {
+function labelFor(section: LinkSection): string {
   switch (section) {
     case 'social':
-      return 'Social';
+      return 'SOCIAL';
     case 'dsp':
-      return 'Music Service';
+      return 'MUSIC SERVICE';
     case 'earnings':
-      return 'Earnings';
+      return 'MONETIZATION';
     default:
-      return 'Custom';
+      return 'CUSTOM';
+  }
+}
+
+function compactUrlDisplay(platformId: string, url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  const withScheme = (() => {
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  })();
+
+  try {
+    const parsed = new URL(withScheme);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = parsed.pathname.replace(/\/+$/, '');
+    const segments = path.split('/').filter(Boolean);
+    const first = segments[0] ?? '';
+    const second = segments[1] ?? '';
+
+    const atOr = (value: string): string =>
+      value.startsWith('@') ? value : `@${value}`;
+
+    if (platformId === 'tiktok') {
+      if (!first) return host;
+      return first.startsWith('@') ? first : atOr(first);
+    }
+
+    if (
+      platformId === 'instagram' ||
+      platformId === 'twitter' ||
+      platformId === 'x' ||
+      platformId === 'venmo'
+    ) {
+      if (!first) return host;
+      return first.startsWith('@') ? first : atOr(first);
+    }
+
+    if (platformId === 'snapchat') {
+      if (!first) return host;
+      if (first === 'add' && second) return atOr(second);
+      return first.startsWith('@') ? first : atOr(first);
+    }
+
+    if (platformId === 'youtube') {
+      if (first.startsWith('@')) return first;
+      if (
+        (first === 'channel' || first === 'c' || first === 'user') &&
+        second
+      ) {
+        return atOr(second);
+      }
+      return first ? first : host;
+    }
+
+    if (platformId === 'website') {
+      return host;
+    }
+
+    return host;
+  } catch {
+    const withoutScheme = trimmed.replace(/^https?:\/\//, '');
+    const beforePath = withoutScheme.split('/')[0];
+    return beforePath || trimmed;
   }
 }

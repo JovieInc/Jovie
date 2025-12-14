@@ -208,7 +208,7 @@ export async function completeOnboarding({
     await syncCanonicalUsernameFromApp(userId, completion.username);
 
     if (redirectToDashboard) {
-      redirect('/dashboard/overview');
+      redirect('/app/dashboard/overview');
     }
 
     return completion;

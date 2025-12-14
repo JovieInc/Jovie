@@ -15,6 +15,31 @@ describe('computeLinkConfidence', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.75);
   });
 
+  it('scores youtube about links as suggested when confidence meets threshold', () => {
+    const result = computeLinkConfidence({
+      sourceType: 'ingested',
+      signals: ['youtube_about_link'],
+      sources: ['youtube_about'],
+      url: 'https://linktr.ee/example',
+    });
+
+    expect(result.confidence).toBeGreaterThanOrEqual(0.3);
+    expect(result.state).toBe('suggested');
+  });
+
+  it('scores beacons profile links as low confidence by default', () => {
+    const result = computeLinkConfidence({
+      sourceType: 'ingested',
+      signals: ['beacons_profile_link'],
+      sources: ['beacons'],
+      url: 'https://beacons.ai/example',
+    });
+
+    expect(result.state).toBe('rejected');
+    expect(result.confidence).toBeGreaterThan(0.1);
+    expect(result.confidence).toBeLessThan(0.3);
+  });
+
   it('keeps lightweight ingested linktree hints as low confidence', () => {
     const result = computeLinkConfidence({
       sourceType: 'ingested',

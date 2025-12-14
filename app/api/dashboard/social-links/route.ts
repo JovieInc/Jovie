@@ -5,8 +5,19 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
-import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
+import {
+  enqueueBeaconsIngestionJob,
+  enqueueLayloIngestionJob,
+  enqueueLinktreeIngestionJob,
+  enqueueYouTubeIngestionJob,
+} from '@/lib/ingestion/jobs';
+import {
+  isBeaconsUrl,
+  validateBeaconsUrl,
+} from '@/lib/ingestion/strategies/beacons';
+import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
+import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { isValidSocialPlatform } from '@/types';
 // flags import removed - pre-launch
@@ -297,7 +308,7 @@ export async function PUT(req: Request) {
             return {
               creatorProfileId: profileId,
               platform: l.platform,
-              platformType: l.platformType ?? l.platform,
+              platformType: detected.platform.category,
               url: normalizedUrl,
               sortOrder: l.sortOrder ?? idx,
               state,
@@ -323,6 +334,38 @@ export async function PUT(req: Request) {
       const linktreeTargets = links.filter(
         link => link.platform === 'linktree' || isLinktreeUrl(link.url)
       );
+      const beaconsTargets = links
+        .map(link => {
+          const validated = validateBeaconsUrl(link.url);
+          if (!validated) return null;
+          return link.platform === 'beacons' || isBeaconsUrl(validated)
+            ? { ...link, url: validated }
+            : null;
+        })
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
+      const layloTargets = links.filter(
+        link => link.platform === 'laylo' || isLayloUrl(link.url)
+      );
+      const youtubeTargets = links
+        .map(link => {
+          const validated = validateYouTubeChannelUrl(link.url);
+          return validated ? { ...link, url: validated } : null;
+        })
+        .filter((link): link is NonNullable<typeof link> => Boolean(link));
+
+      if (beaconsTargets.length > 0) {
+        await Promise.all(
+          beaconsTargets.map(link =>
+            enqueueBeaconsIngestionJob({
+              creatorProfileId: profileId,
+              sourceUrl: link.url,
+            }).catch(err => {
+              console.error('Failed to enqueue beacons ingestion job', err);
+              return null;
+            })
+          )
+        );
+      }
 
       if (linktreeTargets.length > 0) {
         await Promise.all(
@@ -332,6 +375,34 @@ export async function PUT(req: Request) {
               sourceUrl: link.url,
             }).catch(err => {
               console.error('Failed to enqueue linktree ingestion job', err);
+              return null;
+            })
+          )
+        );
+      }
+
+      if (layloTargets.length > 0) {
+        await Promise.all(
+          layloTargets.map(link =>
+            enqueueLayloIngestionJob({
+              creatorProfileId: profileId,
+              sourceUrl: link.url,
+            }).catch(err => {
+              console.error('Failed to enqueue laylo ingestion job', err);
+              return null;
+            })
+          )
+        );
+      }
+
+      if (youtubeTargets.length > 0) {
+        await Promise.all(
+          youtubeTargets.map(link =>
+            enqueueYouTubeIngestionJob({
+              creatorProfileId: profileId,
+              sourceUrl: link.url,
+            }).catch(err => {
+              console.error('Failed to enqueue youtube ingestion job', err);
               return null;
             })
           )

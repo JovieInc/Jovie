@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
@@ -119,7 +125,7 @@ describe('DashboardOverview', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows completion banner and supports copy-to-clipboard with aria-live status', async () => {
+  it('supports copy-to-clipboard with aria-live status', async () => {
     vi.useFakeTimers();
 
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -131,14 +137,14 @@ describe('DashboardOverview', () => {
     });
     renderDashboard(profile, true);
 
-    // Completion UI
-    expect(screen.getByText('Profile ready!')).toBeInTheDocument();
-    expect(screen.getByText('Your profile is ready!')).toBeInTheDocument();
-
-    // Copy flow - there are two Copy URL buttons (header and completion section), use the first one
-    const copyBtns = screen.getAllByRole('button', { name: 'Copy URL' });
-    expect(copyBtns.length).toBeGreaterThanOrEqual(1);
-    const copyBtn = copyBtns[0];
+    // Copy flow - header copy control is icon-only (sr-only label)
+    const headerEl = screen
+      .getByText('Keep your profile polished and ready to share.')
+      .closest('header');
+    expect(headerEl).not.toBeNull();
+    const copyBtn = within(headerEl as HTMLElement).getByRole('button', {
+      name: 'Copy URL',
+    });
     fireEvent.click(copyBtn);
 
     // Clipboard called with computed profile URL
@@ -169,7 +175,8 @@ describe('DashboardOverview', () => {
     vi.advanceTimersByTime(2000);
     // Flush microtask to reflect state reset
     await Promise.resolve();
-    const resetBtns = screen.getAllByRole('button', { name: 'Copy URL' });
-    expect(resetBtns.length).toBeGreaterThanOrEqual(1);
+    expect(
+      within(headerEl as HTMLElement).getByRole('button', { name: 'Copy URL' })
+    ).toBeInTheDocument();
   });
 });

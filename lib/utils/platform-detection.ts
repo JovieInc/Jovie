@@ -6,7 +6,7 @@
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: 'dsp' | 'social' | 'custom'; // DSP = Digital Service Provider (music platforms)
+  category: 'dsp' | 'social' | 'earnings' | 'websites' | 'custom'; // DSP = Digital Service Provider (music platforms)
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -87,6 +87,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: 'FF5500',
     placeholder: 'https://soundcloud.com/username',
   },
+  'amazon-music': {
+    id: 'amazon-music',
+    name: 'Amazon Music',
+    category: 'dsp',
+    icon: 'amazon',
+    color: 'FF9900',
+    placeholder: 'https://music.amazon.com/artists/...',
+  },
   bandcamp: {
     id: 'bandcamp',
     name: 'Bandcamp',
@@ -94,6 +102,22 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     icon: 'bandcamp',
     color: '629AA0',
     placeholder: 'https://username.bandcamp.com',
+  },
+  'tencent-music': {
+    id: 'tencent-music',
+    name: 'Tencent Music',
+    category: 'dsp',
+    icon: 'qq',
+    color: '12B7F5',
+    placeholder: 'https://y.qq.com/n/ryqq/singer/...',
+  },
+  netease: {
+    id: 'netease',
+    name: 'Netease Music',
+    category: 'dsp',
+    icon: 'neteasecloudmusic',
+    color: 'C20C0C',
+    placeholder: 'https://music.163.com/#/artist?id=...',
   },
   youtube: {
     id: 'youtube',
@@ -122,7 +146,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   venmo: {
     id: 'venmo',
     name: 'Venmo',
-    category: 'social',
+    category: 'earnings',
     icon: 'venmo',
     color: '3D95CE',
     placeholder: 'https://venmo.com/username',
@@ -130,7 +154,7 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   website: {
     id: 'website',
     name: 'Website',
-    category: 'custom',
+    category: 'websites',
     icon: 'website',
     color: '6B7280',
     placeholder: 'https://your-website.com',
@@ -138,10 +162,26 @@ const PLATFORMS: Record<string, PlatformInfo> = {
   linktree: {
     id: 'linktree',
     name: 'Linktree',
-    category: 'custom',
+    category: 'websites',
     icon: 'linktree',
     color: '39E09B',
     placeholder: 'https://linktr.ee/username',
+  },
+  laylo: {
+    id: 'laylo',
+    name: 'Laylo',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://laylo.com/username',
+  },
+  beacons: {
+    id: 'beacons',
+    name: 'Beacons',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://beacons.ai/username',
   },
   // Additional social platforms
   telegram: {
@@ -239,7 +279,10 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
   { pattern: /music\.apple\.com/i, platformId: 'apple-music' },
-  { pattern: /music\.youtube\.com/i, platformId: 'youtube-music' },
+  {
+    pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
+    platformId: 'youtube-music',
+  },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
   { pattern: /bandcamp\.com/i, platformId: 'bandcamp' },
 
@@ -255,15 +298,18 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?reddit\.com/i, platformId: 'reddit' },
   { pattern: /(?:www\.)?pinterest\.com/i, platformId: 'pinterest' },
   { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
-  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
-  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
-  { pattern: /(?:discord\.gg|(?:www\.)?discord\.com)/i, platformId: 'discord' },
+  { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
+  { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
+  { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
+  { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
   { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
   { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
+  // Website fallback - keep last
+  { pattern: /./, platformId: 'website' },
 ];
 
 /**
@@ -339,6 +385,23 @@ const DOMAIN_MISSPELLINGS: Record<string, string> = {
  */
 export function normalizeUrl(url: string): string {
   try {
+    const lowered = url.trim().toLowerCase();
+    const dangerousSchemes = [
+      'javascript:',
+      'data:',
+      'vbscript:',
+      'file:',
+      'mailto:',
+    ];
+    if (dangerousSchemes.some(scheme => lowered.startsWith(scheme))) {
+      throw new Error('Unsafe scheme');
+    }
+    // Block encoded control characters that can lead to injection
+    const encodedControlPattern = /%(0a|0d|09|00)/i;
+    if (encodedControlPattern.test(lowered)) {
+      throw new Error('Unsafe encoded control characters');
+    }
+
     // Normalize stray spaces around dots
     url = url.replace(/\s*\.\s*/g, '.');
 
@@ -636,7 +699,54 @@ function generateSuggestedTitle(
  */
 function validateUrl(url: string, platform: PlatformInfo): boolean {
   try {
+    const lowered = url.trim().toLowerCase();
+    const dangerousSchemes = [
+      'javascript:',
+      'data:',
+      'vbscript:',
+      'file:',
+      'mailto:',
+    ];
+    if (dangerousSchemes.some(scheme => lowered.startsWith(scheme))) {
+      return false;
+    }
+    if (/%(0a|0d|09|00)/i.test(lowered)) {
+      return false;
+    }
+
     new URL(url); // Basic URL validation
+
+    const pathParts = new URL(url).pathname.split('/').filter(Boolean);
+    const requiresHandle = new Set([
+      'instagram',
+      'twitter',
+      'tiktok',
+      'facebook',
+      'linkedin',
+      'venmo',
+      'soundcloud',
+      'twitch',
+      'threads',
+      'snapchat',
+      'discord',
+      'telegram',
+      'reddit',
+      'pinterest',
+      'onlyfans',
+      'linktree',
+      'bandcamp',
+      'line',
+      'viber',
+      'rumble',
+      'youtube',
+    ]);
+    if (requiresHandle.has(platform.id)) {
+      const last = pathParts[pathParts.length - 1] ?? '';
+      // must have at least one non-separator character (not just @)
+      if (!last.replace(/^@/, '').trim()) {
+        return false;
+      }
+    }
 
     // Platform-specific validation rules
     switch (platform.id) {

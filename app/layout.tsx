@@ -1,4 +1,3 @@
-import { ClerkProvider } from '@clerk/nextjs';
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
@@ -173,34 +172,7 @@ export default async function RootLayout({
 
   const bodyClassName = `${inter.variable} font-sans bg-base text-primary-token`;
 
-  const authenticatedBody = (
-    <>
-      <ClerkProvider
-        publishableKey={publishableKey}
-        appearance={{
-          elements: {
-            rootBox: 'bg-base text-primary',
-            card: 'bg-surface-1 border border-subtle dark:border-default',
-            headerTitle: 'text-primary',
-            headerSubtitle: 'text-secondary',
-            formFieldInput:
-              'bg-surface-0 border border-default focus-ring-themed',
-            formButtonPrimary: 'btn btn-primary btn-md',
-            socialButtonsBlockButton: 'btn btn-secondary btn-md',
-            footerActionText: 'text-secondary',
-            footerActionLink: 'text-accent-token',
-          },
-        }}
-      >
-        <ClientProviders>{children}</ClientProviders>
-      </ClerkProvider>
-
-      {showCookieBanner && <CookieBannerSection />}
-      {/* <SpeedInsights /> */}
-      {shouldInjectToolbar && <VercelToolbar />}
-    </>
-  );
-
+  // Early return if no publishable key
   if (!publishableKey) {
     if (
       process.env.NODE_ENV === 'test' ||
@@ -228,10 +200,19 @@ export default async function RootLayout({
     );
   }
 
+  // publishableKey is guaranteed to be defined here
   return (
     <html lang='en' suppressHydrationWarning>
       {headContent}
-      <body className={bodyClassName}>{authenticatedBody}</body>
+      <body className={bodyClassName}>
+        <ClientProviders publishableKey={publishableKey}>
+          {children}
+        </ClientProviders>
+
+        {showCookieBanner && <CookieBannerSection />}
+        {/* <SpeedInsights /> */}
+        {shouldInjectToolbar && <VercelToolbar />}
+      </body>
     </html>
   );
 }

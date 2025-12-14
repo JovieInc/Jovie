@@ -1,12 +1,49 @@
 'use client';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Note: Using any for Clerk types as they're not exported from @clerk/nextjs
 import { useSession, useUser } from '@clerk/nextjs';
+
+type ClerkEmailVerification = {
+  status?: 'verified' | 'unverified' | string;
+};
+
+interface ClerkEmailAddressResource {
+  id: string;
+  emailAddress: string;
+  verification?: ClerkEmailVerification | null;
+  prepareVerification: (args: { strategy: 'email_code' }) => Promise<unknown>;
+  attemptVerification: (args: {
+    code: string;
+  }) => Promise<ClerkEmailAddressResource>;
+  destroy: () => Promise<void>;
+}
+
+type ClerkSessionActivity = {
+  browserName?: string | null;
+  city?: string | null;
+  country?: string | null;
+};
+
+interface ClerkSessionResource {
+  id: string;
+  latestActivity?: ClerkSessionActivity | null;
+  lastActiveAt?: Date | null;
+  revoke: () => Promise<void>;
+}
+
+interface ClerkUserResource {
+  primaryEmailAddressId: string | null;
+  emailAddresses: ClerkEmailAddressResource[];
+  getSessions: () => Promise<ClerkSessionResource[]>;
+  createEmailAddress: (args: {
+    email: string;
+  }) => Promise<ClerkEmailAddressResource>;
+  update: (args: { primaryEmailAddressId: string }) => Promise<unknown>;
+  reload: () => Promise<void>;
+}
+
 import {
   CheckCircleIcon,
   EnvelopeIcon,
-  KeyIcon,
   ShieldExclamationIcon,
   SignalSlashIcon,
 } from '@heroicons/react/24/outline';
@@ -59,34 +96,28 @@ export function AccountSettingsSection() {
   const { session: activeSession } = useSession();
   const { showToast } = useToast();
 
+  const typedUser = user as unknown as ClerkUserResource | null;
+
   const [newEmail, setNewEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
-  const [pendingEmail, setPendingEmail] = useState<any>(null);
+  const [pendingEmail, setPendingEmail] =
+    useState<ClerkEmailAddressResource | null>(null);
   const [emailStatus, setEmailStatus] = useState<
     'idle' | 'sending' | 'code' | 'verifying'
   >('idle');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [syncingEmailId, setSyncingEmailId] = useState<string | null>(null);
 
-  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<ClerkSessionResource[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [endingSessionId, setEndingSessionId] = useState<string | null>(null);
-
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [signOutOthers, setSignOutOthers] = useState(true);
-  const [passwordStatus, setPasswordStatus] = useState<'idle' | 'saving'>(
-    'idle'
-  );
-  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
     async function loadSessions() {
-      if (!isLoaded || !user) {
+      if (!isLoaded || !typedUser) {
         return;
       }
 
@@ -94,7 +125,7 @@ export function AccountSettingsSection() {
       setSessionsError(null);
 
       try {
-        const userSessions = await user.getSessions();
+        const userSessions = await typedUser.getSessions();
         if (!cancelled) {
           setSessions(userSessions ?? []);
         }
@@ -115,12 +146,12 @@ export function AccountSettingsSection() {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, user]);
+  }, [isLoaded, typedUser]);
 
-  const primaryEmailId = user?.primaryEmailAddressId ?? null;
+  const primaryEmailId = typedUser?.primaryEmailAddressId ?? null;
   const sortedEmails = useMemo(() => {
-    if (!user) return [] as any[];
-    const addresses = [...user.emailAddresses];
+    if (!typedUser) return [] as ClerkEmailAddressResource[];
+    const addresses = [...typedUser.emailAddresses];
     return addresses.sort((a, b) => {
       if (a.id === primaryEmailId) return -1;
       if (b.id === primaryEmailId) return 1;
@@ -130,7 +161,7 @@ export function AccountSettingsSection() {
       if (!aVerified && bVerified) return 1;
       return a.emailAddress.localeCompare(b.emailAddress);
     });
-  }, [user, primaryEmailId]);
+  }, [typedUser, primaryEmailId]);
 
   const resetEmailForm = () => {
     setNewEmail('');
@@ -157,13 +188,15 @@ export function AccountSettingsSection() {
 
   const handleStartEmailUpdate = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!user) return;
+    if (!typedUser) return;
 
     setEmailStatus('sending');
     setEmailError(null);
 
     try {
-      const createdEmail = await user.createEmailAddress({ email: newEmail });
+      const createdEmail = await typedUser.createEmailAddress({
+        email: newEmail,
+      });
       setPendingEmail(createdEmail);
       await createdEmail.prepareVerification({ strategy: 'email_code' });
       setEmailStatus('code');
@@ -181,7 +214,7 @@ export function AccountSettingsSection() {
   const handleVerifyEmail = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!user || !pendingEmail) {
+    if (!typedUser || !pendingEmail) {
       return;
     }
 
@@ -198,9 +231,9 @@ export function AccountSettingsSection() {
       }
 
       setSyncingEmailId(verifiedEmail.id);
-      await user.update({ primaryEmailAddressId: verifiedEmail.id });
+      await typedUser.update({ primaryEmailAddressId: verifiedEmail.id });
       await syncEmailToDatabase(verifiedEmail.emailAddress);
-      await user.reload();
+      await typedUser.reload();
       resetEmailForm();
       setSyncingEmailId(null);
       showToast({
@@ -215,14 +248,14 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handleMakePrimary = async (email: any) => {
-    if (!user) return;
+  const handleMakePrimary = async (email: ClerkEmailAddressResource) => {
+    if (!typedUser) return;
     setSyncingEmailId(email.id);
 
     try {
-      await user.update({ primaryEmailAddressId: email.id });
+      await typedUser.update({ primaryEmailAddressId: email.id });
       await syncEmailToDatabase(email.emailAddress);
-      await user.reload();
+      await typedUser.reload();
       showToast({
         type: 'success',
         message: 'Primary email updated.',
@@ -235,12 +268,12 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handleRemoveEmail = async (email: any) => {
-    if (!user) return;
+  const handleRemoveEmail = async (email: ClerkEmailAddressResource) => {
+    if (!typedUser) return;
     setSyncingEmailId(email.id);
     try {
       await email.destroy();
-      await user.reload();
+      await typedUser.reload();
       showToast({ type: 'success', message: 'Email removed.' });
     } catch (error) {
       const message = extractErrorMessage(error);
@@ -250,41 +283,7 @@ export function AccountSettingsSection() {
     }
   };
 
-  const handlePasswordUpdate = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!user) return;
-
-    if (newPassword !== confirmPassword) {
-      setPasswordError('New passwords do not match.');
-      return;
-    }
-
-    setPasswordStatus('saving');
-    setPasswordError(null);
-
-    try {
-      await user.updatePassword({
-        currentPassword,
-        newPassword,
-        signOutOfOtherSessions: signOutOthers,
-      });
-
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      showToast({
-        type: 'success',
-        message: 'Password updated successfully.',
-      });
-    } catch (error) {
-      const message = extractErrorMessage(error);
-      setPasswordError(message);
-    } finally {
-      setPasswordStatus('idle');
-    }
-  };
-
-  const handleEndSession = async (session: any) => {
+  const handleEndSession = async (session: ClerkSessionResource) => {
     setEndingSessionId(session.id);
     try {
       await session.revoke();
@@ -467,80 +466,6 @@ export function AccountSettingsSection() {
             </form>
           </div>
         </div>
-      </DashboardCard>
-
-      <DashboardCard variant='settings'>
-        <div className='flex items-start justify-between gap-6'>
-          <div className='flex-1'>
-            <h3 className='text-lg font-semibold text-primary flex items-center gap-2'>
-              <KeyIcon className='h-5 w-5 text-accent' />
-              Password & security
-            </h3>
-            <p className='mt-1 text-sm text-secondary max-w-lg'>
-              Choose a strong password to safeguard your account. You can also
-              automatically sign out sessions on other devices after updating
-              it.
-            </p>
-          </div>
-        </div>
-
-        <form onSubmit={handlePasswordUpdate} className='mt-6 space-y-4'>
-          <FormField label='Current password' required>
-            <Input
-              type='password'
-              value={currentPassword}
-              onChange={event => setCurrentPassword(event.target.value)}
-              placeholder='Enter your current password'
-              required
-            />
-          </FormField>
-
-          <FormField label='New password' required>
-            <Input
-              type='password'
-              value={newPassword}
-              onChange={event => setNewPassword(event.target.value)}
-              placeholder='Create a new password'
-              required
-            />
-          </FormField>
-
-          <FormField label='Confirm new password' required>
-            <Input
-              type='password'
-              value={confirmPassword}
-              onChange={event => setConfirmPassword(event.target.value)}
-              placeholder='Re-enter new password'
-              required
-            />
-          </FormField>
-
-          <label className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3 text-sm text-secondary'>
-            <input
-              type='checkbox'
-              className='mt-1'
-              checked={signOutOthers}
-              onChange={event => setSignOutOthers(event.target.checked)}
-            />
-            <span>
-              Sign out other sessions after updating my password
-              <span className='block text-xs text-tertiary mt-1'>
-                Recommended if you suspect someone else has access to your
-                account.
-              </span>
-            </span>
-          </label>
-
-          {passwordError && (
-            <p className='text-sm text-red-500'>{passwordError}</p>
-          )}
-
-          <div className='flex justify-end gap-2'>
-            <Button type='submit' disabled={passwordStatus === 'saving'}>
-              {passwordStatus === 'saving' ? 'Updating…' : 'Update password'}
-            </Button>
-          </div>
-        </form>
       </DashboardCard>
 
       <DashboardCard variant='settings'>

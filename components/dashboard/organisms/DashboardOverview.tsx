@@ -1,28 +1,30 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { CompletionBanner } from '@/components/dashboard/molecules/CompletionBanner';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
-import { DashboardActivityFeed } from '@/components/dashboard/organisms/DashboardActivityFeed';
+import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
+import { APP_URL } from '@/constants/app';
 import type { Artist } from '@/types/db';
 
 interface DashboardOverviewProps {
   artist: Artist | null;
   hasSocialLinks: boolean;
+  hasMusicLinks?: boolean;
 }
 
 export function DashboardOverview({
   artist,
   hasSocialLinks,
+  hasMusicLinks = false,
 }: DashboardOverviewProps) {
   if (!artist) {
     return (
       <StarterEmptyState
         title='We could not load your profile'
         description='The dashboard data did not include your Jovie profile. Refresh or reopen onboarding to finish setup.'
-        primaryAction={{ label: 'Refresh dashboard', href: '/dashboard' }}
+        primaryAction={{ label: 'Refresh dashboard', href: '/app/dashboard' }}
         secondaryAction={{ label: 'Restart onboarding', href: '/onboarding' }}
         testId='dashboard-missing-profile'
       />
@@ -30,102 +32,111 @@ export function DashboardOverview({
   }
 
   const isHandleClaimed = Boolean(artist.owner_user_id);
-  const hasMusicLink = Boolean(
-    artist.spotify_url || artist.apple_music_url || artist.youtube_url
+  const musicLinkFromProfile = Boolean(
+    artist.spotify_url ||
+      artist.apple_music_url ||
+      artist.youtube_url ||
+      // Fallback for camelCase fields in some test fixtures
+      (artist as { spotifyUrl?: string }).spotifyUrl ||
+      (artist as { appleMusicUrl?: string }).appleMusicUrl ||
+      (artist as { youtubeUrl?: string }).youtubeUrl
   );
+  const hasMusicLink = hasMusicLinks || musicLinkFromProfile;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
   const totalSteps = 3;
   const completedCount = [isHandleClaimed, hasMusicLink, hasSocialLinks].filter(
     Boolean
   ).length;
 
-  return (
-    <div className='space-y-6'>
-      <div className='rounded-3xl border border-white/5 bg-linear-to-r from-[#0f111a] via-[#0a0c15] to-[#0f111a] p-6 shadow-[0_25px_70px_rgba(5,10,25,0.35)]'>
-        <div className='flex flex-col gap-4 md:flex-row md:items-center md:justify-between'>
-          <div>
-            <p className='text-xs uppercase tracking-[0.3em] text-tertiary-token/70'>
-              Dashboard
-            </p>
-            <h1 className='text-2xl font-semibold text-white'>
-              Welcome back, {artist.name || 'Artist'}
-            </h1>
-            <p className='text-sm text-secondary-token'>
-              Keep your profile polished and ready to share.
-            </p>
-          </div>
-          <div className='flex flex-wrap gap-3'>
-            <Button asChild variant='secondary' size='sm'>
+  const profileUrl = (() => {
+    if (!artist.handle) return undefined;
+    const base = APP_URL.replace(/\/+$/, '');
+    const path = artist.handle.replace(/^\/+/, '');
+    return `${base}/${path}`;
+  })();
+
+  const greetingName = (() => {
+    const raw = (artist.name || 'Artist').trim();
+    const first = raw.split(/\s+/)[0];
+    return first || 'Artist';
+  })();
+
+  const header = (
+    <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-1'>
+      <div className='space-y-0.5'>
+        <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
+          <h1 className='text-xl font-semibold text-primary-token'>
+            Welcome back, {greetingName}
+          </h1>
+          <div className='flex items-center gap-1.5'>
+            <Button
+              asChild
+              variant='secondary'
+              size='sm'
+              className='h-8 w-8 rounded-full p-0'
+            >
               <Link
                 href={`/${artist.handle}`}
+                aria-label='View profile'
                 target='_blank'
                 rel='noopener noreferrer'
               >
-                View live profile
+                <Icon
+                  name='ArrowUpRight'
+                  className='h-4 w-4'
+                  aria-hidden='true'
+                />
+                <span className='sr-only'>View profile</span>
               </Link>
             </Button>
-            <CopyToClipboardButton relativePath={`/${artist.handle}`} />
+            <CopyToClipboardButton
+              relativePath={`/${artist.handle}`}
+              idleLabel='Copy URL'
+              iconName='Copy'
+              className='h-8 w-8 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+            />
           </div>
         </div>
+        <p className='text-sm text-secondary-token'>
+          Keep your profile polished and ready to share.
+        </p>
       </div>
+    </header>
+  );
 
-      <DashboardCard variant='settings' className='h-full'>
-        <DashboardActivityFeed profileId={artist.id} />
-      </DashboardCard>
+  if (!allTasksComplete) {
+    return (
+      <div className='space-y-2'>
+        {header}
 
-      <DashboardCard variant='settings'>
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
-            <p className='text-xs uppercase tracking-[0.25em] text-tertiary-token/70'>
-              Setup
-            </p>
-            <h3 className='text-lg font-semibold text-primary-token'>
-              {allTasksComplete ? 'Profile ready!' : 'Complete your setup'}
-            </h3>
-            <p className='text-sm text-secondary-token'>
-              {allTasksComplete
-                ? 'Everything essential is live—share your profile.'
-                : 'Finish the essentials to unlock the full experience.'}
-            </p>
-          </div>
-          <div className='text-sm font-semibold text-secondary-token'>
-            {completedCount}/{totalSteps} done
-          </div>
-        </div>
+        <DashboardOverviewMetricsClient
+          profileId={artist.id}
+          profileUrl={profileUrl}
+        />
 
-        {allTasksComplete ? (
-          <div className='mt-4 space-y-4'>
-            <CompletionBanner />
-            <div className='flex flex-wrap gap-3'>
-              <Button asChild size='sm'>
-                <Link
-                  href={`/${artist.handle}`}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  View profile
-                </Link>
-              </Button>
-              <CopyToClipboardButton relativePath={`/${artist.handle}`} />
-            </div>
-          </div>
-        ) : (
-          <div className='mt-4 space-y-4'>
-            <div
-              role='progressbar'
-              aria-valuenow={completedCount}
-              aria-valuemin={0}
-              aria-valuemax={totalSteps}
-              aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
-              className='relative h-3 overflow-hidden rounded-full bg-surface-2'
-            >
-              <div
-                className='absolute inset-y-0 left-0 rounded-full bg-accent transition-all duration-300 ease-in-out'
-                style={{ width: `${(completedCount / totalSteps) * 100}%` }}
-              />
+        <section className='rounded-2xl border-0 bg-transparent p-1'>
+          <div className='space-y-2 rounded-2xl bg-surface-1/40 p-3 shadow-none'>
+            <div className='flex items-center justify-between gap-2.5'>
+              <div className='space-y-0.5'>
+                <p className='text-xs uppercase tracking-[0.18em] text-secondary-token'>
+                  Complete your setup
+                </p>
+                <h3 className='text-lg font-semibold text-primary-token'>
+                  Finish the essentials
+                </h3>
+                <p className='text-sm text-secondary-token'>
+                  {completedCount}/{totalSteps} complete
+                </p>
+              </div>
+              <p
+                className='sr-only'
+                aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}
+              >
+                {completedCount} of {totalSteps} tasks done
+              </p>
             </div>
 
-            <ol className='space-y-3 list-none pl-0'>
+            <ol className='grid list-none grid-cols-1 gap-2.5 pl-0 md:grid-cols-3'>
               <SetupTaskItem
                 index={1}
                 title='Claim your handle'
@@ -133,9 +144,13 @@ export function DashboardOverview({
                 completeLabel='Handle claimed'
                 incompleteLabel='Secure your unique profile URL'
                 action={
-                  <Button asChild size='sm' variant='primary'>
-                    <Link href='/dashboard/settings'>Claim handle</Link>
-                  </Button>
+                  <Link
+                    href='/app/settings'
+                    aria-label='Claim handle'
+                    className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
+                  >
+                    Claim handle
+                  </Link>
                 }
               />
 
@@ -146,9 +161,13 @@ export function DashboardOverview({
                 completeLabel='Music link added'
                 incompleteLabel='Connect Spotify, Apple Music, or YouTube'
                 action={
-                  <Button asChild size='sm' variant='primary'>
-                    <Link href='/dashboard/links'>Add music link</Link>
-                  </Button>
+                  <Link
+                    href='/app/dashboard/profile'
+                    aria-label='Add music link'
+                    className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
+                  >
+                    Add music link
+                  </Link>
                 }
               />
 
@@ -159,15 +178,31 @@ export function DashboardOverview({
                 completeLabel='Social links added'
                 incompleteLabel='Connect Instagram, TikTok, Twitter, etc.'
                 action={
-                  <Button asChild size='sm' variant='primary'>
-                    <Link href='/dashboard/links'>Add social links</Link>
-                  </Button>
+                  <Link
+                    href='/app/dashboard/profile'
+                    aria-label='Add social links'
+                    className='rounded-full px-3 text-[13px] font-semibold text-primary-token underline-offset-2 hover:underline'
+                  >
+                    Add social links
+                  </Link>
                 }
               />
             </ol>
           </div>
-        )}
-      </DashboardCard>
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className='space-y-2'>
+      {header}
+
+      <DashboardOverviewMetricsClient
+        profileId={artist.id}
+        profileUrl={profileUrl}
+        showActivity
+      />
     </div>
   );
 }

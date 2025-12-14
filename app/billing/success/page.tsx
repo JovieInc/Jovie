@@ -41,7 +41,7 @@ export default function CheckoutSuccessPage() {
 
       <div className='mt-8 flex flex-col sm:flex-row gap-4 justify-center'>
         <Button asChild>
-          <Link href='/dashboard'>Go to Dashboard</Link>
+          <Link href='/app/dashboard'>Go to Dashboard</Link>
         </Button>
 
         <Button variant='outline' asChild>

@@ -40,7 +40,7 @@ export interface AvatarProps {
   /** Custom className */
   className?: string;
   /** Custom styling */
-  style?: React.CSSProperties;
+  style?: React.ComponentPropsWithoutRef<'div'>['style'];
 }
 
 // Size mappings with consistent design system values
@@ -203,7 +203,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           {initials}
         </span>
         {verified && (
-          <span className='absolute -bottom-0.5 -right-0.5 rounded-full bg-black/80 dark:bg-black/80 px-0.5 py-0.5 shadow-sm'>
+          <span className='absolute -bottom-0.5 -right-0.5'>
             <VerifiedBadge size={badgeSize} />
           </span>
         )}
@@ -255,7 +255,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
       )}
 
       {verified && (
-        <span className='absolute -bottom-0.5 -right-0.5 rounded-full bg-black/80 dark:bg-black/80 px-0.5 py-0.5 shadow-sm'>
+        <span className='absolute -bottom-0.5 -right-0.5'>
           <VerifiedBadge size={badgeSize} />
         </span>
       )}

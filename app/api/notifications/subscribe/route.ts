@@ -20,6 +20,7 @@ const subscribeSchema = z
       .regex(/^\+?[0-9]{7,20}$/, 'Please provide a valid phone number')
       .optional(),
     country_code: z.string().min(2).max(2).optional(),
+    city: z.string().min(1).max(120).optional(),
     source: z.string().default('profile_bell'),
   })
   .refine(
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { artist_id, email, phone, channel, source, country_code } =
+    const { artist_id, email, phone, channel, source, country_code, city } =
       result.data;
 
     const artistProfile = await db.query.creatorProfiles.findFirst({
@@ -99,8 +100,12 @@ export async function POST(request: NextRequest) {
       request.headers.get('cf-ipcountry') ||
       null;
 
+    const geoCity = request.headers.get('x-vercel-ip-city') || null;
+
     const countryCode =
       (geoCountry || country_code)?.slice(0, 2)?.toUpperCase() || null;
+
+    const cityValue = (city || geoCity)?.trim() || null;
 
     const normalizedEmail =
       channel === 'email' && email ? email.trim().toLowerCase() : null;
@@ -127,6 +132,7 @@ export async function POST(request: NextRequest) {
         email: normalizedEmail,
         phone: channel === 'phone' ? normalizedPhone : null,
         countryCode,
+        city: cityValue,
         ipAddress,
         source,
       })

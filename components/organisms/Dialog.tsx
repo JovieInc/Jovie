@@ -27,6 +27,7 @@ interface DialogProps extends Omit<UiDialogRootProps, 'open' | 'onOpenChange'> {
   open: boolean;
   onClose: () => void;
   size?: DialogSize;
+  hideClose?: boolean;
   className?: string;
   children: React.ReactNode;
 }
@@ -35,6 +36,7 @@ export function Dialog({
   open,
   onClose,
   size = 'lg',
+  hideClose = false,
   className,
   children,
   ...props
@@ -49,7 +51,10 @@ export function Dialog({
       }}
       {...props}
     >
-      <UiDialogContent className={cn(sizes[size], className)}>
+      <UiDialogContent
+        hideClose={hideClose}
+        className={cn(sizes[size], className)}
+      >
         {children}
       </UiDialogContent>
     </UiDialog>

@@ -14,6 +14,13 @@ import type {
   SubscriptionStatus,
 } from './db';
 
+export type {
+  AudienceAction,
+  AudienceIntentLevel,
+  AudienceMember,
+  AudienceMemberType,
+  AudienceReferrer,
+} from './audience';
 // Contact / CRM types
 export type {
   Contact,
@@ -28,6 +35,7 @@ export type {
   PublicContact,
   PublicContactChannel,
 } from './contacts';
+export type { DashboardBreadcrumbItem } from './dashboard';
 // Re-export shared enums and types from db.ts
 export type {
   // Core interfaces

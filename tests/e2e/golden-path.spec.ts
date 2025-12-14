@@ -69,7 +69,7 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // STEP 4: Navigate to profile (if user has one)
     const profileLink = page
-      .locator('text="View Profile"')
+      .getByRole('link', { name: 'View profile' })
       .or(page.locator('text="Public Profile"'));
     if (await profileLink.isVisible()) {
       await profileLink.click();

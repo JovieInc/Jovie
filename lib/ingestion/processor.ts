@@ -1,4 +1,4 @@
-import { and, asc, eq, lte } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, isNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   creatorProfiles,
@@ -13,7 +13,27 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
-import { extractLinktree, fetchLinktreeDocument } from './strategies/linktree';
+import {
+  extractBeacons,
+  fetchBeaconsDocument,
+  isBeaconsUrl,
+  validateBeaconsUrl,
+} from './strategies/beacons';
+import {
+  extractLaylo,
+  fetchLayloProfile,
+  validateLayloUrl,
+} from './strategies/laylo';
+import {
+  extractLinktree,
+  fetchLinktreeDocument,
+  validateLinktreeUrl,
+} from './strategies/linktree';
+import {
+  extractYouTube,
+  fetchYouTubeAboutDocument,
+  isYouTubeChannelUrl,
+} from './strategies/youtube';
 import { type ExtractionResult } from './types';
 
 // Retry configuration
@@ -37,12 +57,175 @@ const linktreePayloadSchema = z.object({
   depth: z.number().int().min(0).max(3).default(0),
 });
 
+const layloPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(3).default(0),
+});
+
+const youtubePayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(1).default(0),
+});
+
+const beaconsPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(3).default(0),
+});
 type SocialLinkRow = typeof socialLinks.$inferSelect;
+
+type SupportedRecursiveJobType =
+  | 'import_linktree'
+  | 'import_laylo'
+  | 'import_youtube'
+  | 'import_beacons';
+
+const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
+  import_linktree: 3,
+  import_laylo: 3,
+  import_youtube: 1,
+  import_beacons: 3,
+};
+
+async function enqueueIngestionJobTx(params: {
+  tx: DbType;
+  jobType: SupportedRecursiveJobType;
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth: number;
+}): Promise<string | null> {
+  const { tx, jobType, creatorProfileId, sourceUrl, depth } = params;
+
+  const maxDepth = MAX_DEPTH_BY_JOB_TYPE[jobType];
+  if (depth > maxDepth) return null;
+
+  const detected = detectPlatform(sourceUrl);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = {
+    creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth,
+  };
+
+  const existing = await tx
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, jobType),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${creatorProfileId}`,
+        or(
+          eq(ingestionJobs.dedupKey, dedupKey),
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${dedupKey}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await tx
+    .insert(ingestionJobs)
+    .values({
+      jobType,
+      payload,
+      dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 0,
+      attempts: 0,
+      maxAttempts: 3,
+      updatedAt: new Date(),
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+export async function enqueueFollowupIngestionJobs(params: {
+  tx: DbType;
+  creatorProfileId: string;
+  currentDepth: number;
+  extraction: ExtractionResult;
+}): Promise<void> {
+  const { tx, creatorProfileId, currentDepth, extraction } = params;
+
+  const nextDepth = currentDepth + 1;
+
+  for (const link of extraction.links) {
+    const url = link.url;
+    if (!url) continue;
+
+    // YouTube
+    if (isYouTubeChannelUrl(url)) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_youtube',
+        creatorProfileId,
+        sourceUrl: url,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    // Beacons
+    const validatedBeacons = validateBeaconsUrl(url);
+    if (validatedBeacons && isBeaconsUrl(validatedBeacons)) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_beacons',
+        creatorProfileId,
+        sourceUrl: validatedBeacons,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    // Linktree / Laylo (string checks are cheap; validation occurs inside fetch)
+    const validatedLinktree = validateLinktreeUrl(url);
+    if (validatedLinktree) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_linktree',
+        creatorProfileId,
+        sourceUrl: validatedLinktree,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    const validatedLaylo = validateLayloUrl(url);
+    if (validatedLaylo) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_laylo',
+        creatorProfileId,
+        sourceUrl: validatedLaylo,
+        depth: nextDepth,
+      });
+    }
+  }
+}
 
 function mergeEvidence(
   existing: Record<string, unknown> | null,
   incoming?: { sources?: string[]; signals?: string[] }
-): Record<string, unknown> {
+): { sources: string[]; signals: string[] } {
   const baseSources =
     Array.isArray((existing as { sources?: string[] })?.sources) &&
     ((existing as { sources?: unknown[] }).sources ?? []).every(
@@ -115,8 +298,14 @@ export async function normalizeAndMergeExtraction(
       const evidence = mergeEvidence(null, link.evidence);
       const { confidence, state } = computeLinkConfidence({
         sourceType: 'ingested',
-        signals: ['linktree_profile_link'],
-        sources: ['linktree'],
+        signals:
+          evidence.signals && evidence.signals.length > 0
+            ? (evidence.signals as string[])
+            : ['ingestion_profile_link'],
+        sources:
+          evidence.sources && evidence.sources.length > 0
+            ? (evidence.sources as string[])
+            : ['ingestion'],
         usernameNormalized: profile.usernameNormalized,
         url: detected.normalizedUrl,
       });
@@ -168,7 +357,7 @@ export async function normalizeAndMergeExtraction(
       const insertPayload: typeof socialLinks.$inferInsert = {
         creatorProfileId: profile.id,
         platform: detected.platform.id,
-        platformType: detected.platform.id,
+        platformType: detected.platform.category,
         url: detected.normalizedUrl,
         displayText: link.title,
         sortOrder: sortStart + inserted,
@@ -177,7 +366,7 @@ export async function normalizeAndMergeExtraction(
         // socialLinks.confidence is a numeric column backed by a string type in Drizzle,
         // so we persist the formatted string here and use the raw number only in-memory.
         confidence: confidence.toFixed(2),
-        sourcePlatform: link.sourcePlatform ?? 'linktree',
+        sourcePlatform: link.sourcePlatform ?? 'ingestion',
         sourceType: 'ingested',
         evidence,
       };
@@ -249,20 +438,41 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
     .set({ ingestionStatus: 'processing', updatedAt: new Date() })
     .where(eq(creatorProfiles.id, profile.id));
 
-  const html = await fetchLinktreeDocument(parsed.sourceUrl);
-  const extraction = extractLinktree(html);
-  const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+  try {
+    const html = await fetchLinktreeDocument(parsed.sourceUrl);
+    const extraction = extractLinktree(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
 
-  return {
-    ...result,
-    sourceUrl: parsed.sourceUrl,
-    extractedLinks: extraction.links.length,
-  };
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Linktree ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
 }
 
 /**
@@ -426,7 +636,198 @@ export async function processJob(
   switch (job.jobType) {
     case 'import_linktree':
       return processLinktreeJob(tx, job.payload);
+    case 'import_laylo':
+      return processLayloJob(tx, job.payload);
+    case 'import_youtube':
+      return processYouTubeJob(tx, job.payload);
+    case 'import_beacons':
+      return processBeaconsJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
+  }
+}
+
+async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
+  const parsed = beaconsPayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const html = await fetchBeaconsDocument(parsed.sourceUrl);
+    const extraction = extractBeacons(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Beacons ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
+  const parsed = youtubePayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const html = await fetchYouTubeAboutDocument(parsed.sourceUrl);
+    const extraction = extractYouTube(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'YouTube ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+async function processLayloJob(tx: DbType, jobPayload: unknown) {
+  const parsed = layloPayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const { profile: layloProfile, user } = await fetchLayloProfile(
+      profile.usernameNormalized ?? ''
+    );
+    const extraction = extractLaylo(layloProfile, user);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Laylo ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
   }
 }

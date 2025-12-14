@@ -1,67 +1,57 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ChartBarIcon, UserGroupIcon } from '@heroicons/react/24/outline';
+import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
 import { EmptyState } from '@/components/organisms/EmptyState';
+import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
-interface AnalyticsData {
-  total_clicks: number;
-  spotify_clicks: number;
-  social_clicks: number;
-  recent_clicks: number;
-}
+type CityRange = Extract<AnalyticsRange, '7d' | '30d'>;
 
 interface AnalyticsCardsProps {
   profileUrl?: string;
+  range?: CityRange;
+  refreshSignal?: number;
 }
 
-export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | undefined>();
-  const [data, setData] = useState<AnalyticsData>({
-    total_clicks: 0,
-    spotify_clicks: 0,
-    social_clicks: 0,
-    recent_clicks: 0,
-  });
+export function AnalyticsCards({
+  profileUrl,
+  range = '7d',
+  refreshSignal,
+}: AnalyticsCardsProps) {
+  const lastRefreshSignalRef = useRef<number>(
+    typeof refreshSignal === 'number' ? refreshSignal : 0
+  );
 
   // Animated display values for a subtle count-up effect
-  const [displayValues, setDisplayValues] = useState<AnalyticsData>({
-    total_clicks: 0,
-    spotify_clicks: 0,
-    social_clicks: 0,
-    recent_clicks: 0,
-  });
+  const [displayProfileViews, setDisplayProfileViews] = useState(0);
   const [copied, setCopied] = useState(false);
 
-  const fetchAnalytics = async () => {
-    try {
-      setLoading(true);
-      setError(undefined);
-      const res = await fetch('/api/dashboard/analytics', {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error(`Failed to fetch analytics (${res.status})`);
-      const json: AnalyticsData = await res.json();
-      setData(json);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Unable to fetch analytics data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, error, loading, refreshing, refresh } = useDashboardAnalytics({
+    range,
+    view: 'traffic',
+  });
 
   useEffect(() => {
-    fetchAnalytics();
-  }, []);
+    if (typeof refreshSignal !== 'number') return;
+    if (lastRefreshSignalRef.current === refreshSignal) return;
+    lastRefreshSignalRef.current = refreshSignal;
+    void refresh();
+  }, [refresh, refreshSignal]);
+
+  const rangeLabel = useMemo(() => {
+    return range === '7d' ? 'Last 7 days' : 'Last 30 days';
+  }, [range]);
 
   // Run count-up animation when data changes
   useEffect(() => {
     const duration = 800; // ms
-    const startValues = { ...displayValues };
-    const endValues = { ...data };
+    const startValue = displayProfileViews;
+    const endValue = data?.profile_views ?? 0;
     const startTime = performance.now();
     let raf = 0;
 
@@ -69,25 +59,10 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
       const t = Math.min(1, (now - startTime) / duration);
       // easeOutCubic
       const eased = 1 - Math.pow(1 - t, 3);
-      const next: AnalyticsData = {
-        total_clicks: Math.round(
-          startValues.total_clicks +
-            (endValues.total_clicks - startValues.total_clicks) * eased
-        ),
-        spotify_clicks: Math.round(
-          startValues.spotify_clicks +
-            (endValues.spotify_clicks - startValues.spotify_clicks) * eased
-        ),
-        social_clicks: Math.round(
-          startValues.social_clicks +
-            (endValues.social_clicks - startValues.social_clicks) * eased
-        ),
-        recent_clicks: Math.round(
-          startValues.recent_clicks +
-            (endValues.recent_clicks - startValues.recent_clicks) * eased
-        ),
-      };
-      setDisplayValues(next);
+      const nextValue = Math.round(
+        startValue + (endValue - startValue) * eased
+      );
+      setDisplayProfileViews(nextValue);
       if (t < 1) {
         raf = requestAnimationFrame(step);
       }
@@ -96,114 +71,68 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    data.total_clicks,
-    data.spotify_clicks,
-    data.social_clicks,
-    data.recent_clicks,
-  ]);
+  }, [data]);
 
-  const cards = [
-    {
-      id: 'total_clicks',
-      title: 'Total Clicks',
-      value: displayValues.total_clicks,
-      metadata: 'Last 30 days',
-    },
-    {
-      id: 'spotify_clicks',
-      title: 'Spotify Clicks',
-      value: displayValues.spotify_clicks,
-      metadata: 'Music platform clicks',
-    },
-    {
-      id: 'social_clicks',
-      title: 'Social Clicks',
-      value: displayValues.social_clicks,
-      metadata: 'Social media clicks',
-    },
-    {
-      id: 'recent_activity',
-      title: 'Recent Activity',
-      value: displayValues.recent_clicks,
-      metadata: 'Last 7 days',
-    },
-  ];
+  const profileViewsLabel = useMemo(() => {
+    const value = displayProfileViews;
+    return Intl.NumberFormat().format(value);
+  }, [displayProfileViews]);
 
-  if (loading) {
-    return (
-      <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-        {cards.map(card => (
-          <SkeletonCard key={card.id} />
-        ))}
-      </div>
-    );
-  }
+  const uniqueUsersLabel = useMemo(() => {
+    const value = data?.unique_users ?? 0;
+    return Intl.NumberFormat().format(value);
+  }, [data?.unique_users]);
 
-  if (error) {
-    return (
-      <div className='flex flex-col items-center justify-center p-8 text-center space-y-4'>
-        <div className='w-12 h-12 rounded-full bg-orange-100 dark:bg-orange-900/20 flex items-center justify-center'>
-          <svg
-            className='w-6 h-6 text-orange-600 dark:text-orange-400'
-            fill='none'
-            stroke='currentColor'
-            viewBox='0 0 24 24'
-          >
-            <path
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth='2'
-              d='M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z'
-            />
-          </svg>
-        </div>
-        <div>
-          <h3 className='text-sm font-medium text-primary mb-1'>
-            Analytics temporarily unavailable
-          </h3>
-          <p className='text-xs text-secondary'>
-            We couldn&apos;t fetch your analytics data right now
+  const showInitialSkeleton = loading && !data;
+  const showEmpty =
+    !showInitialSkeleton &&
+    !error &&
+    (data?.profile_views ?? 0) === 0 &&
+    (data?.unique_users ?? 0) === 0;
+
+  const errorCards = (
+    <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
+      <DashboardCard variant='analytics'>
+        <div className='flex h-full min-h-[164px] flex-col justify-between'>
+          <div className='space-y-2'>
+            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+              Profile views
+            </p>
+            <p className='text-sm font-medium text-primary-token'>
+              Analytics temporarily unavailable
+            </p>
+            <p className='text-xs text-secondary-token'>
+              We couldn&apos;t fetch your analytics data right now
+            </p>
+          </div>
+
+          <p className='mt-4 text-xs text-tertiary-token'>
+            Refresh to try again.
           </p>
         </div>
-        <button
-          onClick={fetchAnalytics}
-          disabled={loading}
-          className='inline-flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary bg-surface-2 hover:bg-surface-3 border border-subtle rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-        >
-          {loading ? (
-            <>
-              <div className='w-3 h-3 border border-current border-t-transparent rounded-full animate-spin'></div>
-              Retrying...
-            </>
-          ) : (
-            <>
-              <svg
-                className='w-3 h-3'
-                fill='none'
-                stroke='currentColor'
-                viewBox='0 0 24 24'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  strokeWidth='2'
-                  d='M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
-                />
-              </svg>
-              Try again
-            </>
-          )}
-        </button>
-      </div>
-    );
-  }
+      </DashboardCard>
 
-  const allZero =
-    data.total_clicks === 0 &&
-    data.spotify_clicks === 0 &&
-    data.social_clicks === 0 &&
-    data.recent_clicks === 0;
+      <DashboardCard variant='analytics'>
+        <div className='flex h-full min-h-[164px] flex-col justify-between'>
+          <div className='space-y-2'>
+            <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+              Audience
+            </p>
+            <p className='text-sm font-medium text-primary-token'>
+              Analytics temporarily unavailable
+            </p>
+            <p className='text-xs text-secondary-token'>
+              We couldn&apos;t fetch your analytics data right now
+            </p>
+          </div>
+
+          <p className='mt-4 text-xs text-tertiary-token'>
+            Refresh to try again.
+          </p>
+        </div>
+      </DashboardCard>
+    </div>
+  );
 
   const handleCopy = async () => {
     if (!profileUrl) return;
@@ -216,28 +145,62 @@ export function AnalyticsCards({ profileUrl }: AnalyticsCardsProps) {
     }
   };
 
-  if (allZero) {
-    return (
-      <EmptyState
-        type='analytics'
-        title='📊 No profile views yet'
-        description='Share your profile link to start tracking clicks and engagement from your fans.'
-        actionLabel={copied ? 'Copied!' : 'Copy Profile Link'}
-        onAction={profileUrl ? handleCopy : undefined}
-      />
-    );
-  }
-
   return (
-    <div className='grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4'>
-      {cards.map(card => (
-        <AnalyticsCard
-          key={card.id}
-          title={card.title}
-          value={card.value}
-          metadata={card.metadata}
-        />
-      ))}
+    <div className='space-y-3'>
+      <div className='min-h-[196px]'>
+        {showInitialSkeleton ? (
+          <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : error ? (
+          errorCards
+        ) : showEmpty ? (
+          <div className='min-h-[196px]'>
+            <EmptyState
+              type='analytics'
+              title='No profile views yet'
+              description='Share your profile link to start tracking clicks and engagement from your fans.'
+              actionLabel={copied ? 'Copied!' : 'Copy Profile Link'}
+              onAction={profileUrl ? handleCopy : undefined}
+            />
+          </div>
+        ) : (
+          <div
+            className={refreshing ? 'opacity-70 transition-opacity' : undefined}
+          >
+            <div className='grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2'>
+              <AnalyticsCard
+                title='Profile views'
+                value={profileViewsLabel}
+                metadata={rangeLabel}
+                icon={ChartBarIcon}
+                iconClassName='text-sky-600 dark:text-sky-400'
+                iconChipClassName='bg-sky-500/10 dark:bg-sky-500/15'
+              />
+
+              <AnalyticsCard
+                title='Audience'
+                value={uniqueUsersLabel}
+                metadata={rangeLabel}
+                icon={UserGroupIcon}
+                iconClassName='text-emerald-600 dark:text-emerald-400'
+                iconChipClassName='bg-emerald-500/10 dark:bg-emerald-500/15'
+              >
+                <div className='flex items-center justify-between'>
+                  <p className='text-xs text-tertiary-token'>Unique users</p>
+                  <Link
+                    href='/app/dashboard/audience'
+                    className='text-xs font-semibold text-primary-token underline-offset-2 hover:underline'
+                  >
+                    View audience
+                  </Link>
+                </div>
+              </AnalyticsCard>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

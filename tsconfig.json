@@ -26,7 +26,7 @@
       "@/atoms/*": ["./components/atoms/*"],
       "@/molecules/*": ["./components/molecules/*"],
       "@/organisms/*": ["./components/organisms/*"],
-      "@/app/*": ["./app/*"],
+      "@/app/*": ["./app/app/*", "./app/*"],
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],
       "@jovie/ui": ["packages/ui"],
@@ -44,7 +44,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions",
-    ".next/types/**/*",
+    ".next/dev/**/*",
     "vitest.config.ts",
     "vitest.config.fast.ts",
     "**/*.stories.*",

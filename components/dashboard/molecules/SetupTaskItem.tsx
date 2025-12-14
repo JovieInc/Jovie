@@ -18,38 +18,28 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): JSX.Element {
   return (
-    <li className='flex items-center gap-3 p-3 rounded-lg border border-subtle'>
-      <div className='flex-shrink-0'>
+    <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1/70 p-4 shadow-sm'>
+      <div className='flex items-center gap-2'>
         <div
-          className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${
-            complete ? 'bg-accent border-accent' : 'border-surface-3'
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+            complete
+              ? 'bg-surface-1 text-secondary-token ring-1 ring-inset ring-subtle'
+              : 'bg-accent/15 text-accent ring-1 ring-inset ring-interactive/20'
           }`}
+          aria-hidden='true'
         >
-          {complete && (
-            <svg
-              className='w-3 h-3 text-white'
-              fill='currentColor'
-              viewBox='0 0 20 20'
-              aria-hidden='true'
-            >
-              <path
-                fillRule='evenodd'
-                d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                clipRule='evenodd'
-              />
-            </svg>
-          )}
+          {complete ? '✓' : index}
         </div>
-      </div>
-      <div className='flex-1'>
-        <p className='text-sm font-medium text-primary-token'>
-          {index}. {title}
-        </p>
-        <p className='text-xs text-secondary-token'>
-          {complete ? completeLabel : incompleteLabel}
+        <p className='truncate text-sm font-semibold text-primary-token'>
+          {title}
         </p>
       </div>
-      {!complete && action}
+      <span className='truncate text-[13px] leading-relaxed text-secondary-token'>
+        {complete ? completeLabel : incompleteLabel}
+      </span>
+      {!complete && action ? (
+        <div className='mt-auto flex shrink-0'>{action}</div>
+      ) : null}
     </li>
   );
 }

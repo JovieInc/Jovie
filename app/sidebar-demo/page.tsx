@@ -32,17 +32,22 @@ export default function SidebarDemoPage() {
   };
 
   const mockDashboardData: DashboardData = {
-    user: { id: 'user-demo' },
+    user: {
+      id: 'demo-user',
+    },
     creatorProfiles: [],
     selectedProfile: null,
     needsOnboarding: false,
     sidebarCollapsed: false,
     hasSocialLinks: true,
+    hasMusicLinks: false,
     isAdmin: false,
     tippingStats: {
-      tipClicks: 0,
-      tipsSubmitted: 0,
-      totalReceivedCents: 0,
+      tipClicks: 120,
+      qrTipClicks: 0,
+      linkTipClicks: 120,
+      tipsSubmitted: 80,
+      totalReceivedCents: 42000,
       monthReceivedCents: 0,
     },
   };

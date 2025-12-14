@@ -1,21 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { useMemo, useState } from 'react';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRefreshButton';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
+import type { AnalyticsRange } from '@/types/analytics';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-type Range = '1d' | '7d' | '30d';
-
-type ApiPayload = {
-  total_clicks: number;
-  spotify_clicks: number;
-  social_clicks: number;
-  recent_clicks: number;
-  profile_views: number;
-  top_countries: { country: string; count: number }[];
-  top_referrers: { referrer: string; count: number }[];
-};
+type Range = Extract<AnalyticsRange, '1d' | '7d' | '30d'>;
 
 export function DashboardAnalytics() {
   const dashboardData = useDashboardData();
@@ -26,34 +20,11 @@ export function DashboardAnalytics() {
   );
 
   const [range, setRange] = useState<Range>('7d');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<ApiPayload | null>(null);
 
-  useEffect(() => {
-    let active = true;
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`/api/dashboard/analytics?range=${range}`, {
-          cache: 'no-store',
-        });
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-        const json: ApiPayload = await res.json();
-        if (active) setData(json);
-      } catch (e) {
-        console.error(e);
-        if (active) setError('Unable to load analytics');
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
-    fetchData();
-    return () => {
-      active = false;
-    };
-  }, [range]);
+  const { data, error, loading, refresh } = useDashboardAnalytics({
+    range,
+    view: 'full',
+  });
 
   const rangeLabel = useMemo(() => {
     if (range === '1d') return 'Last 24 hours';
@@ -70,7 +41,15 @@ export function DashboardAnalytics() {
           <h1 className='text-2xl font-bold text-primary-token'>Analytics</h1>
           <p className='text-secondary-token mt-1'>MVP overview</p>
         </div>
-        <RangeToggle value={range} onChange={setRange} />
+        <div className='flex items-center gap-2'>
+          <DashboardRefreshButton
+            ariaLabel='Refresh analytics'
+            onRefreshed={() => {
+              void refresh();
+            }}
+          />
+          <RangeToggle value={range} onChange={setRange} />
+        </div>
       </div>
 
       {/* Main card: Profile Views */}
@@ -89,7 +68,9 @@ export function DashboardAnalytics() {
           )}
         </div>
         {loading && (
-          <div className='mt-6 h-8 w-40 bg-surface-2 rounded animate-pulse' />
+          <div className='mt-6'>
+            <LoadingSkeleton height='h-8' width='w-40' rounded='md' />
+          </div>
         )}
         {error && <p className='mt-4 text-sm text-destructive'>{error}</p>}
       </DashboardCard>
@@ -101,11 +82,11 @@ export function DashboardAnalytics() {
             Top Countries
           </h3>
           {loading ? (
-            <ul className='space-y-3'>
+            <ul className='space-y-3' aria-hidden='true'>
               {Array.from({ length: 5 }).map((_, i) => (
                 <li key={i} className='flex items-center justify-between'>
-                  <span className='h-4 w-32 bg-surface-2 rounded animate-pulse' />
-                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                  <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
+                  <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                 </li>
               ))}
             </ul>
@@ -138,11 +119,11 @@ export function DashboardAnalytics() {
             Top Referrers
           </h3>
           {loading ? (
-            <ul className='space-y-3'>
+            <ul className='space-y-3' aria-hidden='true'>
               {Array.from({ length: 5 }).map((_, i) => (
                 <li key={i} className='flex items-center justify-between'>
-                  <span className='h-4 w-36 bg-surface-2 rounded animate-pulse' />
-                  <span className='h-4 w-10 bg-surface-2 rounded animate-pulse' />
+                  <LoadingSkeleton height='h-4' width='w-36' rounded='md' />
+                  <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
                 </li>
               ))}
             </ul>
@@ -201,7 +182,7 @@ function RangeToggle({
             role='tab'
             aria-selected={active}
             onClick={() => onChange(opt.value)}
-            className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            className={`relative rounded-full px-3 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base ${
               active
                 ? 'bg-surface-3 text-primary-token shadow-sm'
                 : 'text-secondary-token hover:text-primary-token hover:bg-surface-2'

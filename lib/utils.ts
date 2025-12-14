@@ -8,12 +8,18 @@ export function cn(...inputs: ClassValue[]) {
 export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
-): ((...args: Parameters<T>) => void) & { cancel: () => void } {
+): ((...args: Parameters<T>) => void) & {
+  cancel: () => void;
+  flush: () => void;
+} {
   let timeout: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: Parameters<T> | null = null;
   const debounced = (...args: Parameters<T>) => {
+    lastArgs = args;
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => {
       timeout = null;
+      lastArgs = null;
       func(...args);
     }, wait);
   };
@@ -21,10 +27,21 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
     if (timeout) {
       clearTimeout(timeout);
       timeout = null;
+      lastArgs = null;
+    }
+  };
+  debounced.flush = () => {
+    if (timeout && lastArgs) {
+      clearTimeout(timeout);
+      timeout = null;
+      const args = lastArgs;
+      lastArgs = null;
+      func(...args);
     }
   };
   return debounced as ((...args: Parameters<T>) => void) & {
     cancel: () => void;
+    flush: () => void;
   };
 }
 

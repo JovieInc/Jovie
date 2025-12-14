@@ -71,7 +71,7 @@ test.describe('New user completes onboarding and sees live profile', () => {
       { email: testEmail, password: testPassword }
     );
 
-    await page.goto('/dashboard', { waitUntil: 'domcontentloaded' });
+    await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', {
       timeout: 10_000,
       waitUntil: 'domcontentloaded',
@@ -94,12 +94,12 @@ test.describe('New user completes onboarding and sees live profile', () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole('button', { name: 'Go to Dashboard' }).click();
-    await page.waitForURL('**/dashboard/overview**', { timeout: 15_000 });
+    await page.waitForURL('**/app/dashboard/overview**', { timeout: 15_000 });
 
     const updatedName = `${displayName} Published`;
     await page.getByLabel('Display name').fill(updatedName);
     await page.getByRole('button', { name: 'Save & Publish' }).click();
-    await page.waitForURL('**/dashboard/overview**', { timeout: 15_000 });
+    await page.waitForURL('**/app/dashboard/overview**', { timeout: 15_000 });
     await expect(page.getByLabel('Display name')).toHaveValue(updatedName);
 
     await page.goto(`/${handle}`, { waitUntil: 'domcontentloaded' });

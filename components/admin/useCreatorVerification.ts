@@ -68,7 +68,7 @@ export function useCreatorVerification(
       }));
 
       try {
-        const response = await fetch('/admin/users/toggle-verify', {
+        const response = await fetch('/app/admin/creators/toggle-verify', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

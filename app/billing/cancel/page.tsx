@@ -44,7 +44,7 @@ export default function CheckoutCancelPage() {
         <UpgradeButton>Try Again</UpgradeButton>
 
         <Button variant='outline' asChild>
-          <Link href='/dashboard'>Back to Dashboard</Link>
+          <Link href='/app/dashboard'>Back to Dashboard</Link>
         </Button>
       </div>
 

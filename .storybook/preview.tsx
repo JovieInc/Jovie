@@ -30,6 +30,19 @@ const preview: Preview = {
         { name: 'gray', value: '#f3f4f6' },
       ],
     },
+    a11y: {
+      config: {
+        rules: [
+          {
+            id: 'color-contrast',
+            enabled: true,
+          },
+        ],
+      },
+      options: {
+        runOnly: ['wcag2a', 'wcag2aa'],
+      },
+    },
   },
   tags: ['autodocs'],
   decorators: [

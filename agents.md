@@ -9,6 +9,44 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **Branches & PRs:** Always work on feature branches from `main` and follow sections 1–2 for branching and PR expectations.
 - **Guardrails:** Before making product changes, skim sections 8–13 for architecture, runtime/auth/DB rules, testing expectations, and CI/CD/landmine guidance.
 
+## ⛔ CRITICAL: Production Merge Prohibition
+
+**AI agents must NEVER merge PRs to the `production` branch.**
+
+This includes:
+- Running `gh pr merge` on any PR targeting `production`
+- Running `gh pr review --approve` on production PRs
+- Enabling auto-merge on production PRs
+- Any action that results in code being deployed to production
+
+**Production merges require explicit human approval and action.** AI agents may:
+- Create PRs targeting `main`
+- Merge PRs to `main` (with auto-merge label, after CI passes)
+- Create promotion PRs from `main` → `production` (via workflow trigger)
+- Monitor CI status on production PRs
+
+But **only the human operator** may approve and merge to `production`.
+
+## ⛔ CRITICAL: Repository Settings & Branch Protection Prohibition
+
+**AI agents must NEVER modify repository settings, branch protection rules, or rulesets.**
+
+This includes:
+- Modifying branch protection rules via GitHub API or CLI
+- Changing ruleset configurations (`.github/rulesets/*.yml`)
+- Disabling or bypassing linear history requirements
+- Adding admin bypass permissions
+- Modifying required status checks
+- Changing merge method restrictions (squash, rebase, merge)
+- Any `gh api` calls that modify repository or branch settings
+
+**Repository configuration changes require explicit human approval.** If a workflow or process requires a settings change, AI agents must:
+1. Document the proposed change and rationale
+2. Request human approval before proceeding
+3. Never execute the change autonomously
+
+Violations of this rule can cause merge conflicts, break CI/CD pipelines, and compromise repository integrity.
+
 ## 0. Analytics & Feature Flags (Statsig-only)
 
 - Statsig is the **only** product analytics and feature flag platform used in this repo.

@@ -1,10 +1,29 @@
+import { put as uploadBlob } from '@vercel/blob';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
-import { normalizeAndMergeExtraction } from '@/lib/ingestion/processor';
+import {
+  AVATAR_MAX_FILE_SIZE_BYTES,
+  buildSeoFilename,
+  SUPPORTED_IMAGE_MIME_TYPES,
+} from '@/lib/images/config';
+import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import {
+  enqueueFollowupIngestionJobs,
+  normalizeAndMergeExtraction,
+} from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  extractLaylo,
+  extractLayloHandle,
+  fetchLayloProfile,
+  isLayloUrl,
+  normalizeLayloHandle,
+  validateLayloUrl,
+} from '@/lib/ingestion/strategies/laylo';
 import {
   extractLinktree,
   extractLinktreeHandle,
@@ -24,7 +43,126 @@ const ingestSchema = z.object({
   idempotencyKey: z.string().uuid().optional(),
 });
 
+async function findAvailableHandle(
+  tx: DbType,
+  baseHandle: string
+): Promise<string | null> {
+  const MAX_LEN = 30;
+  const normalizedBase = baseHandle.slice(0, MAX_LEN);
+  const maxAttempts = 20;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const suffix = i === 0 ? '' : `-${i}`;
+    const trimmedBase = normalizedBase.slice(0, MAX_LEN - suffix.length);
+    const candidate = `${trimmedBase}${suffix}`;
+    if (!isValidHandle(candidate)) continue;
+
+    const [existing] = await tx
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, candidate))
+      .limit(1);
+
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
 export const runtime = 'nodejs';
+
+async function copyAvatarToBlob(
+  sourceUrl: string,
+  handle: string
+): Promise<string | null> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+    return null;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const response = await fetch(sourceUrl, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      throw new Error(`Fetch failed with status ${response.status}`);
+    }
+
+    const contentType =
+      response.headers.get('content-type')?.split(';')[0].toLowerCase() ?? '';
+    if (
+      !contentType ||
+      !SUPPORTED_IMAGE_MIME_TYPES.includes(
+        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+      )
+    ) {
+      throw new Error(`Unsupported content type: ${contentType}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    if (arrayBuffer.byteLength > AVATAR_MAX_FILE_SIZE_BYTES) {
+      throw new Error('Avatar exceeds max size');
+    }
+    const buffer = Buffer.from(arrayBuffer);
+
+    if (
+      !validateMagicBytes(
+        buffer,
+        contentType as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+      )
+    ) {
+      throw new Error('Magic bytes validation failed');
+    }
+
+    const sharp = (await import('sharp')).default;
+    const baseImage = sharp(buffer, { failOnError: false })
+      .rotate()
+      .withMetadata({ orientation: undefined });
+
+    const optimized = await baseImage
+      .resize({
+        width: 512,
+        height: 512,
+        fit: 'cover',
+        position: 'centre',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: 65, effort: 4 })
+      .toBuffer();
+
+    const path = `avatars/ingestion/${handle}/${buildSeoFilename({
+      originalFilename: 'avatar',
+      photoId: randomUUID(),
+    })}.avif`;
+
+    const blob = await uploadBlob(path, optimized, {
+      access: 'public',
+      token,
+      contentType: 'image/avif',
+      cacheControlMaxAge: 60 * 60 * 24 * 365,
+      addRandomSuffix: false,
+    });
+
+    if (!blob?.url) {
+      throw new Error('Blob upload returned no URL');
+    }
+
+    return blob.url;
+  } catch (error) {
+    logger.warn('Failed to copy avatar to blob', {
+      sourceUrl,
+      handle,
+      error,
+    });
+    return null;
+  }
+}
 
 /**
  * Admin endpoint to ingest a Linktree profile.
@@ -48,30 +186,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // Strict URL validation
-    const validatedUrl = validateLinktreeUrl(parsed.data.url);
+    // Determine ingestion strategy (Laylo or Linktree)
+    const isLayloProfile = isLayloUrl(parsed.data.url);
+    const validatedUrl = isLayloProfile
+      ? validateLayloUrl(parsed.data.url)
+      : validateLinktreeUrl(parsed.data.url);
+
     if (!validatedUrl) {
       return NextResponse.json(
         {
-          error: 'Invalid Linktree URL',
-          details:
-            'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
+          error: 'Invalid profile URL',
+          details: isLayloProfile
+            ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
+            : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
         },
         { status: 400 }
       );
     }
 
     // Extract and validate handle
-    const rawHandle = extractLinktreeHandle(validatedUrl);
+    const rawHandle = isLayloProfile
+      ? extractLayloHandle(validatedUrl)
+      : extractLinktreeHandle(validatedUrl);
+
     if (!rawHandle) {
       return NextResponse.json(
-        { error: 'Unable to parse Linktree handle from URL.' },
+        { error: 'Unable to parse profile handle from URL.' },
         { status: 422 }
       );
     }
 
     // Normalize handle for storage
-    const handle = normalizeHandle(rawHandle);
+    const handle = isLayloProfile
+      ? normalizeLayloHandle(rawHandle)
+      : normalizeHandle(rawHandle);
+
     if (!isValidHandle(handle)) {
       return NextResponse.json(
         {
@@ -86,48 +235,158 @@ export async function POST(request: Request) {
     const usernameNormalized = handle;
 
     return await withSystemIngestionSession(async tx => {
-      // Race-safe duplicate check within transaction
+      // Race-safe duplicate check within transaction; update unclaimed or allocate alt handle if claimed
       const [existing] = await tx
-        .select({ id: creatorProfiles.id })
+        .select({
+          id: creatorProfiles.id,
+          isClaimed: creatorProfiles.isClaimed,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          avatarUrl: creatorProfiles.avatarUrl,
+          displayName: creatorProfiles.displayName,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          displayNameLocked: creatorProfiles.displayNameLocked,
+          claimToken: creatorProfiles.claimToken,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+        })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.usernameNormalized, usernameNormalized))
         .limit(1);
 
-      if (existing) {
+      const isReingest = !!existing && !existing.isClaimed;
+
+      const finalHandle = existing
+        ? existing.isClaimed
+          ? await findAvailableHandle(tx, usernameNormalized)
+          : existing.usernameNormalized
+        : usernameNormalized;
+
+      if (!finalHandle) {
         return NextResponse.json(
           {
-            error: 'A creator profile with that handle already exists',
-            existingProfileId: existing.id,
+            error: 'Unable to allocate unique username',
+            details: 'All fallback username attempts exhausted.',
           },
           { status: 409 }
         );
       }
 
-      // Fetch and extract Linktree data
-      let html: string;
-      let extraction: ReturnType<typeof extractLinktree>;
+      if (existing && existing.isClaimed) {
+        return NextResponse.json(
+          {
+            error: 'Profile already claimed',
+            details: 'Cannot overwrite a claimed profile.',
+          },
+          { status: 409 }
+        );
+      }
+
+      // Fetch and extract profile data
+      let extraction:
+        | ReturnType<typeof extractLinktree>
+        | ReturnType<typeof extractLaylo>;
       try {
-        html = await fetchLinktreeDocument(validatedUrl);
-        extraction = extractLinktree(html);
+        if (isLayloProfile) {
+          const { profile: layloProfile, user } =
+            await fetchLayloProfile(handle);
+          extraction = extractLaylo(layloProfile, user);
+        } else {
+          const html = await fetchLinktreeDocument(validatedUrl);
+          extraction = extractLinktree(html);
+        }
       } catch (fetchError) {
         const errorMessage =
           fetchError instanceof Error
             ? fetchError.message
-            : 'Failed to fetch Linktree profile';
+            : 'Failed to fetch profile';
 
-        logger.error('Linktree fetch failed', {
+        logger.error('Profile fetch failed', {
           url: validatedUrl,
           error: errorMessage,
+          platform: isLayloProfile ? 'laylo' : 'linktree',
         });
 
         return NextResponse.json(
-          { error: 'Failed to fetch Linktree profile', details: errorMessage },
+          { error: 'Failed to fetch profile', details: errorMessage },
           { status: 502 }
         );
       }
 
       const displayName = extraction.displayName?.trim() || handle;
-      const avatarUrl = extraction.avatarUrl?.trim() || null;
+      const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
+
+      const hostedAvatarUrl = externalAvatarUrl
+        ? await copyAvatarToBlob(externalAvatarUrl, handle)
+        : null;
+
+      const extractionWithHostedAvatar = {
+        ...extraction,
+        avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
+      };
+
+      if (isReingest && existing) {
+        await tx
+          .update(creatorProfiles)
+          .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+          .where(eq(creatorProfiles.id, existing.id));
+
+        let mergeError: string | null = null;
+        try {
+          await normalizeAndMergeExtraction(
+            tx,
+            {
+              id: existing.id,
+              usernameNormalized: existing.usernameNormalized,
+              avatarUrl: existing.avatarUrl ?? null,
+              displayName: existing.displayName ?? displayName,
+              avatarLockedByUser: existing.avatarLockedByUser ?? false,
+              displayNameLocked: existing.displayNameLocked ?? false,
+            },
+            extractionWithHostedAvatar
+          );
+
+          await enqueueFollowupIngestionJobs({
+            tx,
+            creatorProfileId: existing.id,
+            currentDepth: 0,
+            extraction: extractionWithHostedAvatar,
+          });
+        } catch (error) {
+          mergeError =
+            error instanceof Error ? error.message : 'Link extraction failed';
+          logger.error('Link merge failed', {
+            profileId: existing.id,
+            error: mergeError,
+          });
+        }
+
+        await tx
+          .update(creatorProfiles)
+          .set({
+            ingestionStatus: mergeError ? 'failed' : 'idle',
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, existing.id));
+
+        return NextResponse.json(
+          {
+            ok: !mergeError,
+            profile: {
+              id: existing.id,
+              username: existing.usernameNormalized,
+              usernameNormalized: existing.usernameNormalized,
+              claimToken: existing.claimToken,
+            },
+            links: extraction.links.length,
+            warning: mergeError
+              ? `Profile updated but link extraction had issues: ${mergeError}`
+              : undefined,
+          },
+          {
+            status: mergeError ? 207 : 200,
+            headers: { 'Cache-Control': 'no-store' },
+          }
+        );
+      }
 
       // Generate claim token at creation time (not on read)
       const claimToken = randomUUID();
@@ -140,12 +399,12 @@ export async function POST(request: Request) {
       const [created] = await tx
         .insert(creatorProfiles)
         .values({
-          userId: null,
+          // userId intentionally omitted to avoid inserting empty-string UUID
           creatorType: 'creator',
-          username: handle,
-          usernameNormalized,
+          username: finalHandle,
+          usernameNormalized: finalHandle,
           displayName,
-          avatarUrl,
+          avatarUrl: hostedAvatarUrl,
           isPublic: true,
           isVerified: false,
           isFeatured: false,
@@ -156,7 +415,6 @@ export async function POST(request: Request) {
           settings: {},
           theme: {},
           ingestionStatus: 'processing',
-          lastIngestionError: null,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -167,6 +425,10 @@ export async function POST(request: Request) {
           displayName: creatorProfiles.displayName,
           avatarUrl: creatorProfiles.avatarUrl,
           claimToken: creatorProfiles.claimToken,
+          isClaimed: creatorProfiles.isClaimed,
+          claimTokenExpiresAt: creatorProfiles.claimTokenExpiresAt,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          displayNameLocked: creatorProfiles.displayNameLocked,
         });
 
       if (!created) {
@@ -183,14 +445,21 @@ export async function POST(request: Request) {
           tx,
           {
             id: created.id,
-            usernameNormalized,
+            usernameNormalized: created.usernameNormalized,
             avatarUrl: created.avatarUrl ?? null,
             displayName: created.displayName ?? displayName,
-            avatarLockedByUser: false,
-            displayNameLocked: false,
+            avatarLockedByUser: created.avatarLockedByUser ?? false,
+            displayNameLocked: created.displayNameLocked ?? false,
           },
-          extraction
+          extractionWithHostedAvatar
         );
+
+        await enqueueFollowupIngestionJobs({
+          tx,
+          creatorProfileId: created.id,
+          currentDepth: 0,
+          extraction: extractionWithHostedAvatar,
+        });
       } catch (error) {
         mergeError =
           error instanceof Error ? error.message : 'Link extraction failed';
@@ -205,7 +474,6 @@ export async function POST(request: Request) {
         .update(creatorProfiles)
         .set({
           ingestionStatus: mergeError ? 'failed' : 'idle',
-          lastIngestionError: mergeError,
           updatedAt: new Date(),
         })
         .where(eq(creatorProfiles.id, created.id));
@@ -235,10 +503,15 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
+    console.error('Admin ingestion failed full error', error);
+
     const errorMessage =
       error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error('Admin ingestion failed', { error: errorMessage });
+    logger.error('Admin ingestion failed', {
+      error: errorMessage,
+      raw: error,
+    });
 
     // Check for unique constraint violation (race condition fallback)
     if (

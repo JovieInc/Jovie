@@ -7,11 +7,7 @@ import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 // flags import removed - pre-launch
-import {
-  Artist,
-  CreatorProfile,
-  convertCreatorProfileToArtist,
-} from '@/types/db';
+import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface ProfileFormProps {
   artist: Artist;
@@ -78,15 +74,19 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
     setSuccess(false);
 
     try {
+      const settingsUpdates = hasRemoveBrandingFeature
+        ? { hide_branding: formData.hide_branding }
+        : undefined;
+
       const res = await fetch('/api/dashboard/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          profileId: artist.id,
           updates: {
-            display_name: formData.name,
+            displayName: formData.name,
             bio: formData.tagline,
-            avatar_url: formData.image_url || null,
+            avatarUrl: formData.image_url || null,
+            ...(settingsUpdates ? { settings: settingsUpdates } : {}),
           },
         }),
       });
@@ -97,8 +97,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         throw new Error(err?.error ?? 'Failed to update profile');
       }
       const json: { profile: unknown } = await res.json();
-      const updatedArtist = convertCreatorProfileToArtist(
-        json.profile as CreatorProfile
+      const updatedArtist = convertDrizzleCreatorProfileToArtist(
+        json.profile as Parameters<
+          typeof convertDrizzleCreatorProfileToArtist
+        >[0]
       );
       onUpdate(updatedArtist);
       setSuccess(true);
@@ -228,8 +230,8 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
                   hide_branding: !formData.hide_branding,
                 })
               }
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 ${
-                formData.hide_branding ? 'bg-surface-3' : 'bg-indigo-600'
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base ${
+                formData.hide_branding ? 'bg-surface-3' : 'bg-accent'
               }`}
               disabled={loading}
               aria-pressed={!formData.hide_branding}
@@ -240,7 +242,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
               }
             >
               <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                className={`inline-block h-4 w-4 transform rounded-full bg-surface-1 transition-transform ${
                   formData.hide_branding ? 'translate-x-1' : 'translate-x-6'
                 }`}
                 aria-hidden='true'

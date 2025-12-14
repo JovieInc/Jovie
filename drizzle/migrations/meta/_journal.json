@@ -64,6 +64,55 @@
       "when": 1733555000000,
       "tag": "0008_populate_dedup_key_column",
       "breakpoints": false
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1733600000000,
+      "tag": "0009_allow_system_ingestion",
+      "breakpoints": false
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1733650000000,
+      "tag": "0010_avatar_public_access",
+      "breakpoints": false
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1733750000000,
+      "tag": "0011_creator_user_nullable",
+      "breakpoints": false
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1733850000000,
+      "tag": "0012_profile_photos_policies",
+      "breakpoints": false
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1765364223569,
+      "tag": "0013_nappy_roland_deschain",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1765515464537,
+      "tag": "0014_narrow_meltdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1765577073366,
+      "tag": "0015_goofy_nightcrawler",
+      "breakpoints": true
     }
   ]
 }

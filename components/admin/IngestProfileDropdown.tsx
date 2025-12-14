@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { useNotifications } from '@/lib/hooks/useNotifications';
@@ -44,23 +44,44 @@ const PLATFORM_OPTIONS: PlatformOption[] = [
   },
 ];
 
-export function IngestProfileDropdown() {
+const PLATFORM_PREFIX: Record<IngestPlatform, string> = {
+  linktree: 'https://linktr.ee/',
+  beacons: 'https://beacons.ai/',
+  instagram: 'https://instagram.com/',
+};
+
+type IngestProfileDropdownProps = {
+  onIngestPending?: (profile: { id: string; username: string }) => void;
+};
+
+export function IngestProfileDropdown({
+  onIngestPending,
+}: IngestProfileDropdownProps) {
   const router = useRouter();
   const notifications = useNotifications();
 
   const [open, setOpen] = useState(false);
-  const [url, setUrl] = useState('');
+  const [username, setUsername] = useState('');
+  const [urlOverride, setUrlOverride] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] =
     useState<IngestPlatform>('linktree');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const currentPlatform = PLATFORM_OPTIONS.find(p => p.id === selectedPlatform);
+
+  const effectiveUrl = useMemo(() => {
+    if (urlOverride) return urlOverride.trim();
+    const prefix = PLATFORM_PREFIX[selectedPlatform];
+    const trimmed = username.trim().replace(/^@/, '');
+    return trimmed ? `${prefix}${trimmed}` : '';
+  }, [selectedPlatform, urlOverride, username]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!url.trim()) {
-      notifications.error('Please enter a URL');
+    if (!effectiveUrl) {
+      notifications.error('Please enter a handle');
       return;
     }
 
@@ -70,7 +91,7 @@ export function IngestProfileDropdown() {
       const response = await fetch('/api/admin/creator-ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ url: effectiveUrl }),
       });
 
       const result = (await response.json()) as {
@@ -84,6 +105,7 @@ export function IngestProfileDropdown() {
         throw new Error(result.error || 'Failed to ingest profile');
       }
 
+      const profileId = result.profile?.id;
       const profileUsername = result.profile?.username;
       const successMessage = profileUsername
         ? `Created creator profile @${profileUsername}`
@@ -98,9 +120,23 @@ export function IngestProfileDropdown() {
           : undefined,
       });
 
-      setUrl('');
-      setOpen(false);
+      if (profileId && profileUsername) {
+        onIngestPending?.({ id: profileId, username: profileUsername });
+      }
+
+      setIsSuccess(true);
+
+      setUsername('');
+      setUrlOverride(null);
+
+      // Force-refresh table immediately, then close after showing success briefly
       router.refresh();
+
+      // Keep the popover open briefly to show success
+      setTimeout(() => {
+        setOpen(false);
+        setIsSuccess(false);
+      }, 900);
     } catch (error) {
       console.error('Ingestion error', error);
       notifications.error(
@@ -108,6 +144,7 @@ export function IngestProfileDropdown() {
       );
     } finally {
       setIsLoading(false);
+      setIsSuccess(false);
     }
   };
 
@@ -127,7 +164,7 @@ export function IngestProfileDropdown() {
                 Ingest profile
               </p>
               <p className='text-xs text-secondary-token'>
-                Import from external platform
+                Import from external platform (auto-builds URL)
               </p>
             </div>
             <Badge
@@ -164,15 +201,44 @@ export function IngestProfileDropdown() {
           </div>
 
           <form onSubmit={handleSubmit} className='space-y-3'>
-            <Input
-              type='url'
-              placeholder={currentPlatform?.placeholder}
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-              disabled={isLoading}
-              autoFocus
-              className='w-full'
-            />
+            {isSuccess && (
+              <div className='rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-800/60 dark:bg-green-950/30 dark:text-green-200'>
+                Profile created — refreshing table…
+              </div>
+            )}
+
+            <div className='space-y-1'>
+              <Input
+                type='text'
+                placeholder='username'
+                value={username}
+                onChange={e => {
+                  setUsername(e.target.value);
+                  setUrlOverride(null);
+                }}
+                disabled={isLoading}
+                autoFocus
+                className='w-full'
+              />
+              <p className='text-xs text-secondary-token'>
+                {currentPlatform?.label} URL:{' '}
+                <span className='font-mono'>{effectiveUrl || '—'}</span>
+              </p>
+            </div>
+
+            <div className='space-y-1'>
+              <label className='text-xs text-secondary-token'>
+                Or paste full URL
+              </label>
+              <Input
+                type='url'
+                placeholder={currentPlatform?.placeholder}
+                value={urlOverride ?? ''}
+                onChange={e => setUrlOverride(e.target.value || null)}
+                disabled={isLoading}
+                className='w-full'
+              />
+            </div>
 
             <div className='flex justify-end gap-2'>
               <Button
@@ -188,7 +254,7 @@ export function IngestProfileDropdown() {
                 type='submit'
                 size='sm'
                 variant='primary'
-                disabled={isLoading || !url.trim()}
+                disabled={isLoading || !effectiveUrl}
               >
                 {isLoading ? 'Ingesting...' : 'Ingest'}
               </Button>

@@ -9,8 +9,8 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useSearchParams } from 'next/navigation';
-import React, { useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
@@ -105,9 +105,58 @@ export function ProfileShell({
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const forceNotifications = searchParams?.get('preview') === '1';
   const notificationsEnabled = notificationsGate.value || forceNotifications;
+  const mode = searchParams?.get('mode') ?? 'profile';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!artist?.handle) return;
+    if (mode !== 'tip') return;
+
+    const source = searchParams?.get('source');
+
+    fetch('/api/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        handle: artist.handle,
+        linkType: 'tip',
+        target: 'tip_page',
+        source,
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
+    });
+  }, [artist.handle, mode, searchParams]);
+
+  // Reset tip loading on navigation/back
+  useEffect(() => {
+    setIsTipNavigating(false);
+  }, [pathname, mode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!artist?.id) return;
+
+    fetch('/api/audience/visit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId: artist.id }),
+      keepalive: true,
+    }).catch(() => {
+      // Ignore tracking errors
+    });
+  }, [artist.id]);
+
+  useEffect(() => {
+    const handlePopState = () => setIsTipNavigating(false);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
   const [notificationsState, setNotificationsState] =
     useState<ProfileNotificationsState>('idle');
   const [channel, setChannel] = useState<NotificationChannel>('phone');
@@ -578,9 +627,9 @@ export function ProfileShell({
                       <div className='flex-shrink-0'>
                         <CTAButton
                           href={`/${artist.handle}?mode=tip`}
-                          variant='ghost'
+                          variant='primary'
                           size='sm'
-                          className='px-3 py-1.5 text-xs rounded-full bg-white/10 hover:bg-white/20 dark:bg-white/5 dark:hover:bg-white/10 border border-gray-200/30 dark:border-white/10 backdrop-blur-sm'
+                          className='px-3 py-1.5 text-xs rounded-full bg-black text-white hover:bg-neutral-900 dark:bg-white dark:text-black dark:hover:bg-gray-100 border border-transparent shadow-sm'
                           isLoading={isTipNavigating}
                           onClick={() => setIsTipNavigating(true)}
                         >

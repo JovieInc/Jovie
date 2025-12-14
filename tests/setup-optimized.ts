@@ -147,6 +147,19 @@ vi.mock('@jovie/ui', async () => {
   };
 });
 
+vi.mock('next/navigation', () => {
+  return {
+    useRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn().mockResolvedValue(undefined),
+    }),
+    usePathname: () => '/',
+    useSearchParams: () => new URLSearchParams(),
+  };
+});
+
 // Mock notification hook to avoid needing actual toast provider
 vi.mock('@/lib/hooks/useNotifications', () => ({
   useNotifications: () => ({

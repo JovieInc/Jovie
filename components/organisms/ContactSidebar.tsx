@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Input, Label } from '@jovie/ui';
-import { ExternalLink, Plus, X } from 'lucide-react';
+import { Copy, ExternalLink, Plus, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
@@ -12,6 +12,34 @@ import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { Contact, ContactSidebarMode, ContactSocialLink } from '@/types';
+
+type HeaderIconButtonProps = {
+  children: React.ReactNode;
+  ariaLabel: string;
+  onClick?: () => void;
+  asChild?: boolean;
+};
+
+function HeaderIconButton({
+  children,
+  ariaLabel,
+  onClick,
+  asChild = false,
+}: HeaderIconButtonProps) {
+  return (
+    <Button
+      type='button'
+      asChild={asChild}
+      variant='ghost'
+      size='icon'
+      className='h-8 w-8 text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+      aria-label={ariaLabel}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  );
+}
 
 export interface ContactSidebarProps {
   contact: Contact | null;
@@ -109,6 +137,19 @@ export function ContactSidebar({
     [contact, onAvatarUpload, onContactChange]
   );
 
+  const handleCopyProfileUrl = useCallback(async () => {
+    if (!contact?.username) return;
+    try {
+      const url = new URL(
+        `/${contact.username}`,
+        window.location.origin
+      ).toString();
+      await navigator.clipboard.writeText(url);
+    } catch (error) {
+      console.error('Failed to copy profile URL', error);
+    }
+  }, [contact]);
+
   const handleNameChange = (field: 'firstName' | 'lastName', value: string) => {
     handleFieldChange(current => ({ ...current, [field]: value }));
   };
@@ -179,7 +220,7 @@ export function ContactSidebar({
       aria-hidden={!isOpen}
       data-testid='contact-sidebar'
       className={cn(
-        'relative flex h-full flex-col border-l border-subtle bg-surface-1/80 text-sm text-primary-token shadow-sm transition-[width,opacity,transform] duration-200 ease-out overflow-hidden',
+        'relative flex h-full min-h-screen flex-col bg-sidebar-surface text-sidebar-foreground border-l border-sidebar-border transition-[width,opacity,transform] duration-200 ease-out overflow-hidden',
         'w-0 opacity-0 translate-x-4 pointer-events-none',
         isOpen &&
           'pointer-events-auto w-full opacity-100 translate-x-0 md:w-[340px] lg:w-[360px]'
@@ -187,52 +228,52 @@ export function ContactSidebar({
       onKeyDown={handleKeyDown}
       role='complementary'
     >
-      <div className='flex items-start justify-between border-b border-subtle px-4 py-3'>
-        <div>
-          <p className='text-xs uppercase tracking-wide text-tertiary-token'>
-            Contact
-          </p>
-          <h2 className='text-sm font-semibold text-primary-token'>
-            {hasContact ? fullName || 'Unnamed contact' : 'No contact selected'}
-          </h2>
+      <div className='flex items-center justify-between border-b border-sidebar-border px-3 py-2'>
+        <p className='text-xs uppercase tracking-wide text-sidebar-muted leading-none'>
+          Contact
+        </p>
+        <div className='flex items-center gap-1'>
           {hasContact && contact?.username && (
-            <div className='mt-1'>
-              <Button
-                asChild
-                variant='ghost'
-                size='sm'
-                className='h-6 px-2 text-[11px] text-secondary-token hover:text-primary-token'
+            <HeaderIconButton
+              ariaLabel='Copy profile link'
+              onClick={handleCopyProfileUrl}
+            >
+              <Copy className='h-4 w-4' aria-hidden />
+            </HeaderIconButton>
+          )}
+          {hasContact && contact?.username && (
+            <HeaderIconButton
+              ariaLabel='Refresh profile'
+              onClick={() => window.location.reload()}
+            >
+              <RefreshCw className='h-4 w-4' aria-hidden />
+            </HeaderIconButton>
+          )}
+          {hasContact && contact?.username && (
+            <HeaderIconButton ariaLabel='Open profile' asChild>
+              <Link
+                href={`/${contact.username}`}
+                target='_blank'
+                rel='noopener noreferrer'
               >
-                <Link
-                  href={`/${contact.username}`}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                >
-                  <span className='inline-flex items-center gap-1'>
-                    View profile
-                    <ExternalLink className='h-3 w-3' aria-hidden />
-                  </span>
-                </Link>
-              </Button>
-            </div>
+                <ExternalLink className='h-4 w-4' aria-hidden />
+              </Link>
+            </HeaderIconButton>
+          )}
+          {onClose && (
+            <HeaderIconButton
+              ariaLabel='Close contact sidebar'
+              onClick={onClose}
+            >
+              <X className='h-4 w-4' aria-hidden='true' />
+            </HeaderIconButton>
           )}
         </div>
-        {onClose && (
-          <Button
-            type='button'
-            size='icon'
-            variant='ghost'
-            aria-label='Close contact sidebar'
-            onClick={onClose}
-          >
-            <X className='h-4 w-4' />
-          </Button>
-        )}
       </div>
 
       <div className='flex-1 space-y-6 overflow-auto px-4 py-4'>
         {!contact ? (
-          <p className='text-xs text-secondary-token'>
+          <p className='text-xs text-sidebar-muted'>
             Select a row in the table and press Space to view contact details.
           </p>
         ) : (
@@ -262,7 +303,7 @@ export function ContactSidebar({
               )}
               <div className='min-w-0 flex-1'>
                 <div className='text-sm font-medium truncate'>{fullName}</div>
-                <div className='text-xs text-secondary-token truncate'>
+                <div className='text-xs text-sidebar-muted truncate'>
                   {formatUsername(contact.username) || 'No username'}
                 </div>
               </div>
@@ -270,24 +311,41 @@ export function ContactSidebar({
 
             {/* Name and username fields */}
             <div className='space-y-3'>
-              <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-                <Label className='text-xs text-tertiary-token'>
-                  First name
-                </Label>
+              <div className='grid grid-cols-[96px,minmax(0,1fr)] items-start gap-2'>
+                <Label className='text-xs text-sidebar-muted pt-2'>Name</Label>
                 {isEditable ? (
-                  <Input
-                    value={contact.firstName ?? ''}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      handleNameChange('firstName', event.target.value)
-                    }
-                    placeholder='First name'
-                  />
+                  <div className='grid grid-cols-2 gap-2 min-w-0'>
+                    <div className='min-w-0'>
+                      <Label className='sr-only'>First name</Label>
+                      <Input
+                        value={contact.firstName ?? ''}
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ) => handleNameChange('firstName', event.target.value)}
+                        placeholder='First'
+                      />
+                    </div>
+                    <div className='min-w-0'>
+                      <Label className='sr-only'>Last name</Label>
+                      <Input
+                        value={contact.lastName ?? ''}
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ) => handleNameChange('lastName', event.target.value)}
+                        placeholder='Last'
+                      />
+                    </div>
+                  </div>
                 ) : (
                   <div className='min-h-9 flex items-center text-sm'>
-                    {contact.firstName ? (
-                      <span>{contact.firstName}</span>
+                    {contact.firstName || contact.lastName ? (
+                      <span>
+                        {[contact.firstName, contact.lastName]
+                          .filter(Boolean)
+                          .join(' ')}
+                      </span>
                     ) : (
-                      <span className='text-tertiary-token italic'>
+                      <span className='text-sidebar-muted italic'>
                         Not provided
                       </span>
                     )}
@@ -296,30 +354,7 @@ export function ContactSidebar({
               </div>
 
               <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-                <Label className='text-xs text-tertiary-token'>Last name</Label>
-                {isEditable ? (
-                  <Input
-                    value={contact.lastName ?? ''}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      handleNameChange('lastName', event.target.value)
-                    }
-                    placeholder='Last name'
-                  />
-                ) : (
-                  <div className='min-h-9 flex items-center text-sm'>
-                    {contact.lastName ? (
-                      <span>{contact.lastName}</span>
-                    ) : (
-                      <span className='text-tertiary-token italic'>
-                        Not provided
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-                <Label className='text-xs text-tertiary-token'>Username</Label>
+                <Label className='text-xs text-sidebar-muted'>Username</Label>
                 {isEditable ? (
                   <Input
                     value={formatUsername(contact.username)}
@@ -333,7 +368,7 @@ export function ContactSidebar({
                     {contact.username ? (
                       <span>{formatUsername(contact.username)}</span>
                     ) : (
-                      <span className='text-tertiary-token italic'>
+                      <span className='text-sidebar-muted italic'>
                         Not provided
                       </span>
                     )}
@@ -343,9 +378,9 @@ export function ContactSidebar({
             </div>
 
             {/* Social links */}
-            <div className='space-y-2'>
+            <div className='space-y-2 bg-sidebar-surface border border-sidebar-border p-3'>
               <div className='flex items-center justify-between'>
-                <Label className='text-xs text-tertiary-token'>
+                <Label className='text-xs text-sidebar-muted'>
                   Social links
                 </Label>
                 {isEditable && (
@@ -367,7 +402,7 @@ export function ContactSidebar({
               </div>
 
               {contact.socialLinks.length === 0 && !isAddingLink ? (
-                <p className='text-xs text-secondary-token'>
+                <p className='text-xs text-sidebar-muted'>
                   No social links yet.{' '}
                   {isEditable ? 'Use the + button to add one.' : ''}
                 </p>
@@ -388,7 +423,7 @@ export function ContactSidebar({
                         href={link.url}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-xs text-primary-token shadow-sm transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                        className='inline-flex items-center gap-1 rounded-full border border-sidebar-border bg-sidebar-surface px-2.5 py-1 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
                       >
                         <SocialIcon
                           platform={platformId}
@@ -397,13 +432,13 @@ export function ContactSidebar({
                         />
                         <span className='max-w-[140px] truncate'>{label}</span>
                         <ExternalLink
-                          className='h-3 w-3 text-tertiary-token'
+                          className='h-3 w-3 text-sidebar-muted'
                           aria-hidden
                         />
                         {isEditable && (
                           <button
                             type='button'
-                            className='ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent'
+                            className='ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-sidebar-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
                             aria-label={`Remove ${label} link`}
                             onClick={event => {
                               event.preventDefault();
@@ -420,9 +455,9 @@ export function ContactSidebar({
               )}
 
               {isEditable && isAddingLink && (
-                <div className='mt-2 space-y-2 rounded-lg border border-dashed border-subtle bg-surface-0/60 p-3'>
+                <div className='mt-2 space-y-2 rounded-lg border border-dashed border-sidebar-border bg-sidebar-surface p-3'>
                   <div className='grid grid-cols-[96px,minmax(0,1fr)] items-center gap-2'>
-                    <Label className='text-xs text-tertiary-token'>URL</Label>
+                    <Label className='text-xs text-sidebar-muted'>URL</Label>
                     <Input
                       type='url'
                       value={newLinkUrl}

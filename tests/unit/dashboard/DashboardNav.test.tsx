@@ -1,15 +1,19 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DashboardData } from '@/app/dashboard/actions';
-import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
+import type { DashboardData } from '@/app/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value
-const mockUsePathname = vi.fn(() => '/dashboard/overview');
+const mockUsePathname = vi.fn(() => '/app/dashboard/overview');
 vi.mock('next/navigation', () => ({
   usePathname: () => mockUsePathname(),
+}));
+
+vi.mock('@statsig/react-bindings', () => ({
+  useFeatureGate: () => ({ value: true }),
 }));
 
 // Mock @jovie/ui Tooltip components
@@ -36,9 +40,12 @@ const baseDashboardData: DashboardData = {
   needsOnboarding: false,
   sidebarCollapsed: false,
   hasSocialLinks: false,
+  hasMusicLinks: false,
   isAdmin: false,
   tippingStats: {
     tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
     tipsSubmitted: 0,
     totalReceivedCents: 0,
     monthReceivedCents: 0,
@@ -65,8 +72,8 @@ describe('DashboardNav', () => {
     const { getByRole } = renderDashboardNav();
 
     expect(getByRole('link', { name: 'Overview' })).toBeDefined();
-    expect(getByRole('link', { name: 'Links' })).toBeDefined();
-    expect(getByRole('link', { name: 'Analytics' })).toBeDefined();
+    expect(getByRole('link', { name: 'Profile' })).toBeDefined();
+    expect(getByRole('link', { name: 'Contacts' })).toBeDefined();
     expect(getByRole('link', { name: 'Audience' })).toBeDefined();
   });
 
@@ -74,21 +81,20 @@ describe('DashboardNav', () => {
     const { getByRole } = renderDashboardNav();
 
     expect(getByRole('link', { name: 'Earnings' })).toBeDefined();
-    expect(getByRole('link', { name: 'Settings' })).toBeDefined();
   });
 
   it('applies active state to current page', () => {
-    const { container } = renderDashboardNav();
+    const { getByRole } = renderDashboardNav();
 
-    const activeLink = container.querySelector('[href="/dashboard/overview"]');
-    expect(activeLink?.getAttribute('data-active')).toBe('true');
+    const activeLink = getByRole('link', { name: 'Overview' });
+    expect(activeLink.getAttribute('aria-current')).toBe('page');
   });
 
   it('handles collapsed state', () => {
     const { container } = renderDashboardNav({}, { defaultOpen: false });
 
     const overviewLink = container.querySelector(
-      '[href="/dashboard/overview"]'
+      '[href="/app/dashboard/overview"]'
     );
     expect(overviewLink).toBeDefined();
     expect(overviewLink?.className).toContain('justify-center');
@@ -100,23 +106,21 @@ describe('DashboardNav', () => {
     const nav = container.querySelector('nav');
     const menus = nav?.querySelectorAll('[data-sidebar="menu"]') ?? [];
 
-    expect(menus.length).toBeGreaterThanOrEqual(2);
+    expect(menus.length).toBeGreaterThanOrEqual(1);
 
     const primaryMenuParent = (menus[0] as HTMLElement | undefined)
       ?.parentElement;
-    const secondaryMenuParent = (menus[1] as HTMLElement | undefined)
-      ?.parentElement;
+    const primaryGroup = primaryMenuParent?.parentElement;
 
-    expect(primaryMenuParent?.className).toContain('mb-6');
-    expect(secondaryMenuParent?.className).toContain('mb-4');
+    expect(primaryGroup?.className).toMatch(/space-y-1/);
   });
 
   it('renders with different pathname', () => {
-    mockUsePathname.mockReturnValueOnce('/dashboard/links');
+    mockUsePathname.mockReturnValueOnce('/app/dashboard/profile');
 
-    const { container } = renderDashboardNav();
+    const { getByRole } = renderDashboardNav();
 
-    const linksLink = container.querySelector('[href="/dashboard/links"]');
-    expect(linksLink?.getAttribute('data-active')).toBe('true');
+    const profileLink = getByRole('link', { name: 'Profile' });
+    expect(profileLink.getAttribute('aria-current')).toBe('page');
   });
 });

@@ -101,15 +101,27 @@ export default clerkMiddleware(async (auth, req) => {
       pathname === '/signup' ||
       pathname === '/sign-up';
 
+    const normalizeRedirectPath = (path: string): string => {
+      if (path.startsWith('/dashboard')) {
+        return path.replace(/^\/dashboard/, '/app/dashboard');
+      }
+      if (path.startsWith('/settings')) {
+        return path.replace(/^\/settings/, '/app/settings');
+      }
+      return path;
+    };
+
     if (userId && isAuthPath) {
       // If the user is already signed in and hits any auth page, check for redirect_url
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
       if (redirectUrl && redirectUrl.startsWith('/')) {
         // Honor the redirect_url if it's a valid internal path (e.g., /claim/token)
-        res = NextResponse.redirect(new URL(redirectUrl, req.url));
+        res = NextResponse.redirect(
+          new URL(normalizeRedirectPath(redirectUrl), req.url)
+        );
       } else {
         // Default to dashboard
-        res = NextResponse.redirect(new URL('/dashboard', req.url));
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -123,21 +135,29 @@ export default clerkMiddleware(async (auth, req) => {
       res = NextResponse.redirect(url);
     } else if (userId) {
       // Handle authenticated user redirects
-      if (req.nextUrl.pathname === '/') {
-        res = NextResponse.redirect(new URL('/dashboard', req.url));
+      if (pathname.startsWith('/dashboard')) {
+        res = NextResponse.redirect(
+          new URL(normalizeRedirectPath(pathname), req.url)
+        );
+      } else if (req.nextUrl.pathname === '/') {
+        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else {
         res = NextResponse.next();
       }
     } else {
       // Handle unauthenticated users
       if (
+        pathname.startsWith('/app') ||
         pathname.startsWith('/dashboard') ||
         pathname.startsWith('/account') ||
         pathname.startsWith('/billing')
       ) {
         // Redirect unauthenticated users to sign-in
         const signInUrl = new URL('/signin', req.url);
-        signInUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
+        signInUrl.searchParams.set(
+          'redirect_url',
+          normalizeRedirectPath(req.nextUrl.pathname)
+        );
         res = NextResponse.redirect(signInUrl);
       } else {
         res = NextResponse.next();

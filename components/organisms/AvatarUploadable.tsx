@@ -68,9 +68,9 @@ const DEFAULT_MAX_FILE_SIZE = AVATAR_MAX_FILE_SIZE_BYTES; // API enforced
 const DEFAULT_ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;
 
 const STATUS_COLORS = {
-  uploading: 'text-accent-token',
-  success: 'text-primary-token',
-  error: 'text-destructive',
+  uploading: 'text-indigo-500',
+  success: 'text-green-500',
+  error: 'text-red-500',
   idle: 'text-secondary-token',
 } as const;
 
@@ -165,17 +165,17 @@ function ProgressRing({
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='rounded-full bg-surface-0 text-primary-token ring-1 ring-(--color-border-subtle) shadow-sm'>
+          <div className='rounded-full bg-white text-green-600 ring-1 ring-green-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
             <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='rounded-full bg-surface-0 text-destructive ring-1 ring-(--color-border-subtle) shadow-sm'>
+          <div className='rounded-full bg-white text-red-600 ring-1 ring-red-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
             <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'uploading' && (
-          <div className='rounded-full bg-(--color-accent) text-(--color-accent-foreground) ring-1 ring-accent shadow-sm animate-pulse'>
+          <div className='rounded-full bg-indigo-500 text-white ring-1 ring-indigo-100 shadow-sm animate-pulse transition-all duration-200 ease-out'>
             <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
@@ -220,6 +220,7 @@ export const AvatarUploadable = React.memo(
     const [uploadStatus, setUploadStatus] = useState<
       'idle' | 'uploading' | 'success' | 'error'
     >('idle');
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const statusResetTimeoutRef = useRef<number | null>(null);
@@ -253,6 +254,41 @@ export const AvatarUploadable = React.memo(
       [clearStatusReset]
     );
 
+    const setPreviewFromFile = useCallback((file: File) => {
+      const canUseObjectUrl =
+        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
+
+      if (!canUseObjectUrl) {
+        return;
+      }
+
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(prev => {
+        if (
+          prev &&
+          prev.startsWith('blob:') &&
+          typeof URL.revokeObjectURL === 'function'
+        ) {
+          URL.revokeObjectURL(prev);
+        }
+        return url;
+      });
+    }, []);
+
+    useEffect(
+      () => () => {
+        if (
+          previewUrl &&
+          previewUrl.startsWith('blob:') &&
+          typeof URL !== 'undefined' &&
+          typeof URL.revokeObjectURL === 'function'
+        ) {
+          URL.revokeObjectURL(previewUrl);
+        }
+      },
+      [previewUrl]
+    );
+
     const handleFileUpload = useCallback(
       async (file: File) => {
         if (!onUpload) return;
@@ -272,6 +308,7 @@ export const AvatarUploadable = React.memo(
 
         setIsUploading(true);
         setUploadStatus('uploading');
+        setPreviewFromFile(file);
         track('avatar_upload_start', {
           file_size: file.size,
           file_type: file.type,
@@ -280,6 +317,7 @@ export const AvatarUploadable = React.memo(
         try {
           const imageUrl = await onUpload(file);
           setUploadStatus('success');
+          setPreviewUrl(imageUrl);
           onSuccess?.(imageUrl);
           track('avatar_upload_success', { file_size: file.size });
           resetStatus(2000);
@@ -306,6 +344,8 @@ export const AvatarUploadable = React.memo(
             message: errorMessage,
             retryable: isRetryable,
           });
+          // Revert preview to previous image on failure
+          setPreviewUrl(null);
           resetStatus(3000);
         } finally {
           setIsUploading(false);
@@ -320,6 +360,7 @@ export const AvatarUploadable = React.memo(
         onSuccess,
         onUpload,
         resetStatus,
+        setPreviewFromFile,
       ]
     );
 
@@ -430,7 +471,7 @@ export const AvatarUploadable = React.memo(
         aria-busy={isUploading}
       >
         <Avatar
-          src={src}
+          src={previewUrl ?? src}
           className={cn(
             'transition-all duration-200 ease-out',
             isInteractive &&
@@ -446,8 +487,7 @@ export const AvatarUploadable = React.memo(
             className={cn(
               'absolute inset-0 flex items-center justify-center rounded-full',
               'bg-surface-3/80 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] backdrop-blur',
-              'opacity-0 transition-opacity duration-200 group-hover:opacity-100',
-              avatarProps.rounded !== 'full' && 'rounded-lg'
+              'opacity-0 transition-opacity duration-200 group-hover:opacity-100'
             )}
             aria-hidden='true'
             data-testid='avatar-uploadable-hover-overlay'
@@ -461,8 +501,7 @@ export const AvatarUploadable = React.memo(
             className={cn(
               'absolute inset-0 flex items-center justify-center rounded-full',
               'bg-[color:var(--color-accent)]/90 text-[color:var(--color-accent-foreground)]',
-              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200',
-              avatarProps.rounded !== 'full' && 'rounded-lg'
+              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200'
             )}
             aria-hidden='true'
             data-testid='avatar-uploadable-drag-overlay'

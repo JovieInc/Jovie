@@ -61,7 +61,7 @@ export const LinksEmpty: Story = {
     icon: <LinkIcon className='h-6 w-6' />,
     primaryAction: {
       label: 'Add First Link',
-      href: '/dashboard/links',
+      href: '/dashboard/profile',
     },
     className: 'w-96',
   },

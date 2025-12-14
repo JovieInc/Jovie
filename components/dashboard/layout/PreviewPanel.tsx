@@ -6,10 +6,11 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import { usePreviewPanel } from '@/app/dashboard/PreviewPanelContext';
+import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
-import { cn } from '@/lib/utils';
+import { RightDrawer } from '@/components/organisms/RightDrawer';
 
 const PREVIEW_PANEL_WIDTH = 400;
 
@@ -24,37 +25,27 @@ export function PreviewPanel() {
   const { username, avatarUrl, links, profilePath } = previewData;
 
   return (
-    <aside
-      aria-hidden={!isOpen}
-      className={cn(
-        'fixed top-0 right-0 z-40 h-svh flex flex-col',
-        'bg-surface-1 border-l border-subtle shadow-xl',
-        'transition-[transform,opacity] duration-300 ease-out',
-        isOpen
-          ? 'translate-x-0 opacity-100'
-          : 'translate-x-full opacity-0 pointer-events-none'
-      )}
-      style={{ width: PREVIEW_PANEL_WIDTH }}
+    <RightDrawer
+      isOpen={isOpen}
+      width={PREVIEW_PANEL_WIDTH}
+      ariaLabel='Live Preview'
+      className='bg-sidebar-surface border-sidebar-border'
     >
       {/* Header */}
-      <div className='flex items-center justify-between px-4 py-3 border-b border-subtle shrink-0'>
-        <h2 className='text-lg font-semibold text-primary-token'>
+      <div className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'>
+        <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
-        <Button
-          variant='ghost'
-          size='icon'
+        <DashboardHeaderActionButton
+          ariaLabel='Close preview'
           onClick={close}
-          aria-label='Close preview'
-          className='h-8 w-8'
-        >
-          <XMarkIcon className='h-5 w-5' />
-        </Button>
+          icon={<XMarkIcon className='h-4 w-4' aria-hidden='true' />}
+        />
       </div>
 
       {/* Preview Content */}
       <div className='flex-1 min-h-0 overflow-hidden p-4'>
-        <div className='h-full w-full overflow-hidden rounded-xl border border-subtle bg-base'>
+        <div className='h-full w-full overflow-hidden rounded-2xl border border-subtle bg-bg-base'>
           <ProfilePreview
             username={username}
             avatarUrl={avatarUrl}
@@ -66,11 +57,11 @@ export function PreviewPanel() {
 
       {/* Footer - URL Preview */}
       <div className='shrink-0 border-t border-subtle p-4'>
-        <h3 className='text-sm font-medium text-primary-token mb-2'>
+        <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>
         <div className='flex flex-col gap-2'>
-          <div className='bg-surface-2 rounded-lg px-3 py-2 text-sm text-primary-token font-mono truncate'>
+          <div className='rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-[12px] text-primary-token font-mono truncate'>
             {typeof window !== 'undefined'
               ? `${window.location.origin}${profilePath}`
               : 'Loading...'}
@@ -84,7 +75,8 @@ export function PreviewPanel() {
             <Button
               asChild
               size='sm'
-              className='flex-1 whitespace-nowrap bg-white text-black hover:bg-gray-100 dark:bg-white dark:text-black dark:hover:bg-gray-100'
+              variant='secondary'
+              className='flex-1 whitespace-nowrap'
             >
               <Link
                 href={profilePath}
@@ -101,7 +93,7 @@ export function PreviewPanel() {
           Share this link with your audience
         </p>
       </div>
-    </aside>
+    </RightDrawer>
   );
 }
 

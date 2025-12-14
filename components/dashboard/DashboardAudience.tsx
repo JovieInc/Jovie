@@ -3,47 +3,28 @@
 import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
 import { useEffect, useMemo, useState } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
-import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
+import { Icon } from '@/components/atoms/Icon';
+import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
+import {
+  AUDIENCE_MEMBER_SIDEBAR_WIDTH,
+  AudienceMemberSidebar,
+} from '@/components/dashboard/organisms/AudienceMemberSidebar';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn } from '@/lib/utils';
+import {
+  flagFromCountry,
+  formatCountryLabel,
+  formatLongDate,
+  formatTimeAgo,
+  getDeviceIndicator,
+} from '@/lib/utils/audience';
+import type { AudienceMember } from '@/types';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-type AudienceMemberType =
-  | 'anonymous'
-  | 'email'
-  | 'sms'
-  | 'spotify'
-  | 'customer';
-export type IntentLevel = 'high' | 'medium' | 'low';
-
-type AudienceAction = {
-  label: string;
-  emoji?: string;
-  platform?: string;
-  timestamp?: string;
-};
-
-type AudienceRow = {
-  id: string;
-  type: AudienceMemberType;
-  displayName: string | null;
-  locationLabel: string;
-  geoCity: string | null;
-  geoCountry: string | null;
-  visits: number;
-  engagementScore: number;
-  intentLevel: IntentLevel;
-  latestActions: AudienceAction[];
-  referrerHistory: { url: string; timestamp?: string }[];
-  email: string | null;
-  phone: string | null;
-  spotifyConnected: boolean;
-  purchaseCount: number;
-  tags: string[];
-  deviceType: string | null;
-  lastSeenAt: string | null;
-};
+type AudienceRow = AudienceMember;
 
 type SubscriberRow = {
   id: string;
@@ -74,6 +55,7 @@ const MEMBER_COLUMNS = [
   { key: 'displayName', label: 'User' },
   { key: 'type', label: 'Type' },
   { key: 'location', label: 'Location' },
+  { key: 'device', label: 'Device' },
   { key: 'visits', label: 'Visits' },
   { key: 'actions', label: 'Actions' },
   { key: 'lastSeen', label: 'Last seen' },
@@ -101,66 +83,6 @@ type ColumnKey = MemberColumnKey | SubscriberColumnKey;
 
 const DEFAULT_MEMBER_SORT: MemberSortColumn = 'lastSeen';
 const DEFAULT_SUBSCRIBER_SORT: SubscriberSortColumn = 'createdAt';
-
-const INTENT_BADGES: Record<IntentLevel, { label: string; tone: string }> = {
-  high: { label: '🔥 High intent', tone: 'text-accent' },
-  medium: { label: '⚡ Medium intent', tone: 'text-warning-token' },
-  low: { label: '• Low intent', tone: 'text-secondary-token' },
-};
-
-function formatCountryLabel(code: string | null): string {
-  if (!code) return 'Unknown';
-  const upper = code.slice(0, 2).toUpperCase();
-  return /^[A-Z]{2}$/.test(upper) ? upper : 'Unknown';
-}
-
-function flagFromCountry(code: string | null): string {
-  if (!code || code.length < 2) return '🏳️';
-  const upper = code.slice(0, 2).toUpperCase();
-  const first = upper.codePointAt(0);
-  const second = upper.codePointAt(1);
-
-  if (!first || !second) return '🏳️';
-  if (first < 65 || first > 90 || second < 65 || second > 90) {
-    return '🏳️';
-  }
-
-  return String.fromCodePoint(0x1f1e6 + (first - 65), 0x1f1e6 + (second - 65));
-}
-
-function formatTimeAgo(value: string | null): string {
-  if (!value) return '—';
-  const timestamp = new Date(value);
-  if (Number.isNaN(timestamp.getTime())) return '—';
-
-  const diff = Date.now() - timestamp.getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (seconds < 60) {
-    return 'just now';
-  }
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-  return `${days}d ago`;
-}
-
-function formatLongDate(value: string | null) {
-  if (!value) return '—';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '—';
-  return new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(parsed);
-}
 
 export function DashboardAudience() {
   const dashboardData = useDashboardData();
@@ -194,6 +116,7 @@ export function DashboardAudience() {
   const [selectedMember, setSelectedMember] = useState<AudienceRow | null>(
     null
   );
+  const { setTableMeta } = useTableMeta();
 
   useEffect(() => {
     setPage(1);
@@ -324,6 +247,24 @@ export function DashboardAudience() {
     isAudienceV2Enabled,
   ]);
 
+  // Expose row count, toggle handler, and right panel width for contact sidebar
+  useEffect(() => {
+    const toggle = () => {
+      if (rows.length === 0) return;
+      setSelectedMember(current => (current ? null : (rows[0] ?? null)));
+    };
+
+    setTableMeta({
+      rowCount: rows.length,
+      toggle: rows.length > 0 ? toggle : null,
+      rightPanelWidth: selectedMember ? AUDIENCE_MEMBER_SIDEBAR_WIDTH : 0,
+    });
+
+    return () => {
+      setTableMeta({ rowCount: null, toggle: null, rightPanelWidth: null });
+    };
+  }, [rows, selectedMember, setTableMeta]);
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const activeColumns = isAudienceV2Enabled
@@ -370,6 +311,58 @@ export function DashboardAudience() {
     return null;
   }
 
+  if (isLoading) {
+    return (
+      <div className='space-y-6' aria-busy='true'>
+        <div>
+          <LoadingSkeleton height='h-6' width='w-40' rounded='md' />
+          <div className='mt-2 flex gap-2'>
+            <LoadingSkeleton height='h-4' width='w-24' rounded='full' />
+            <LoadingSkeleton height='h-4' width='w-16' rounded='full' />
+          </div>
+        </div>
+        <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
+          <div
+            className='grid gap-4 border-b border-subtle px-4 py-3'
+            style={{
+              gridTemplateColumns: `repeat(${activeColumns.length}, minmax(0, 1fr))`,
+            }}
+          >
+            {activeColumns.map(col => (
+              <LoadingSkeleton
+                key={col.key}
+                height='h-4'
+                width='w-24'
+                rounded='md'
+              />
+            ))}
+          </div>
+          <ul>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li
+                key={i}
+                className='grid gap-4 border-b border-subtle px-4 py-3 last:border-b-0'
+                style={{
+                  gridTemplateColumns: `repeat(${activeColumns.length}, minmax(0, 1fr))`,
+                }}
+                aria-hidden='true'
+              >
+                {activeColumns.map(col => (
+                  <LoadingSkeleton
+                    key={`${col.key}-${i}`}
+                    height='h-4'
+                    width='w-32'
+                    rounded='md'
+                  />
+                ))}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   const paginationLabel = () => {
     if (total === 0) {
       return isAudienceV2Enabled
@@ -382,307 +375,233 @@ export function DashboardAudience() {
     return `Showing ${start}–${end} of ${total} readers`;
   };
 
-  const formatIntentBadge = (intent: IntentLevel) => {
-    const badge = INTENT_BADGES[intent];
-    return (
-      <span className={cn('text-xs font-semibold uppercase', badge.tone)}>
-        {badge.label}
-      </span>
-    );
-  };
+  const formatIntentBadge = (intent: AudienceRow['intentLevel']) => (
+    <AudienceIntentBadge intentLevel={intent} />
+  );
 
   return (
-    <div className='space-y-6'>
-      <div>
-        <h1 className='text-2xl font-bold text-primary-token'>Audience CRM</h1>
-        <p className='text-secondary-token mt-1'>
-          {isAudienceV2Enabled
-            ? 'Every visitor, anonymous or identified, lives in this table.'
-            : 'Notification signups from your notification modal.'}
-        </p>
+    <div className='flex h-full min-h-0 flex-col'>
+      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
+        <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4'>
+          <div>
+            <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
+              Audience CRM
+            </h1>
+            <p className='mt-1 text-sm leading-6 text-secondary-token'>
+              {isAudienceV2Enabled
+                ? 'Every visitor, anonymous or identified, lives in this table.'
+                : 'Notification signups from your notification modal.'}
+            </p>
+          </div>
+          <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
+            {total} {total === 1 ? 'person' : 'people'}
+          </span>
+        </div>
       </div>
 
-      <div className='w-full overflow-hidden rounded-lg border border-subtle bg-surface-1 shadow-sm'>
-        <SectionHeader
-          title='Audience'
-          description='Track visitors, high-intent fans, and actions on your profile.'
-          right={
-            <span className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-secondary-token'>
-              {total} {total === 1 ? 'person' : 'people'}
-            </span>
-          }
-        />
-
-        {error ? (
-          <div className='px-6 py-4 text-sm text-red-500 bg-surface-2/60'>
-            {error}
-          </div>
-        ) : isLoading ? (
-          <div className='px-6 py-10 text-sm text-secondary-token'>
-            Loading audience data...
-          </div>
-        ) : rows.length === 0 ? (
-          <div className='px-6 py-10 text-sm text-secondary-token'>
-            {paginationLabel()}
-          </div>
-        ) : (
-          <div className='w-full overflow-x-auto'>
-            <table className='min-w-full divide-y divide-subtle'>
-              <thead className='sticky top-0 bg-surface-1/80 backdrop-blur-sm'>
-                <tr>
-                  {activeColumns.map(column => {
-                    const isActiveSort = activeSortColumn === column.key;
-                    return (
-                      <th
-                        key={column.key}
-                        className='px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-secondary-token'
-                      >
-                        <button
-                          type='button'
-                          className='flex items-center gap-1 text-left'
-                          onClick={() => handleHeaderClick(column.key)}
+      <div className='flex-1 min-h-0 overflow-hidden'>
+        <div className='flex h-full min-h-0 flex-col bg-surface-1'>
+          <div className='flex-1 min-h-0 overflow-auto'>
+            {error ? (
+              <div className='border-b border-subtle bg-surface-2/40 px-4 py-3 text-sm text-red-500'>
+                {error}
+              </div>
+            ) : isLoading ? (
+              <div className='px-4 py-10 text-sm text-secondary-token'>
+                Loading audience data...
+              </div>
+            ) : rows.length === 0 ? (
+              <div className='px-4 py-10 text-sm text-secondary-token'>
+                {paginationLabel()}
+              </div>
+            ) : (
+              <table className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'>
+                <thead className='sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md'>
+                  <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+                    {activeColumns.map(column => {
+                      const sortKey = sortableColumnMap[column.key];
+                      const isSortable = Boolean(sortKey);
+                      const isActiveSort =
+                        isSortable && activeSortColumn === column.key;
+                      return (
+                        <th
+                          key={column.key}
+                          className='border-b border-subtle px-4 py-3 text-left'
                         >
-                          <span>{column.label}</span>
-                          <span
-                            aria-hidden='true'
-                            className={cn(
-                              'text-[11px] transition-opacity',
-                              isActiveSort ? 'opacity-100' : 'opacity-50'
-                            )}
-                          >
-                            {isActiveSort
-                              ? activeSortDirection === 'asc'
-                                ? '▲'
-                                : '▼'
-                              : ''}
-                          </span>
-                        </button>
-                      </th>
+                          {isSortable ? (
+                            <button
+                              type='button'
+                              className='inline-flex w-full items-center gap-1 rounded-sm text-left font-semibold transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive'
+                              onClick={() => handleHeaderClick(column.key)}
+                            >
+                              <span>{column.label}</span>
+                              <span
+                                aria-hidden='true'
+                                className={cn(
+                                  'text-[10px] transition-opacity',
+                                  isActiveSort ? 'opacity-100' : 'opacity-50'
+                                )}
+                              >
+                                {isActiveSort
+                                  ? activeSortDirection === 'asc'
+                                    ? '▲'
+                                    : '▼'
+                                  : ''}
+                              </span>
+                            </button>
+                          ) : (
+                            <span className='inline-flex items-center font-semibold'>
+                              {column.label}
+                            </span>
+                          )}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(row => {
+                    const deviceIndicator = getDeviceIndicator(row.deviceType);
+
+                    return (
+                      <tr
+                        key={row.id}
+                        className={cn(
+                          'cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
+                          selectedMember?.id === row.id && 'bg-surface-2'
+                        )}
+                        onClick={() => setSelectedMember(row)}
+                      >
+                        {isAudienceV2Enabled ? (
+                          <>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <div className='font-semibold'>
+                                {row.displayName || 'Visitor'}
+                              </div>
+                              <div className='text-xs text-secondary-token'>
+                                {row.type === 'anonymous'
+                                  ? 'Visitor'
+                                  : row.type === 'email'
+                                    ? (row.email ?? 'Email fan')
+                                    : row.type === 'sms'
+                                      ? (row.phone ?? 'SMS fan')
+                                      : 'Connected fan'}
+                              </div>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/40 px-2 py-0.5 text-[11px] font-medium text-secondary-token capitalize'>
+                                {row.type}
+                              </span>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <div className='inline-flex items-center gap-2 text-secondary-token'>
+                                <span aria-hidden='true' className='text-lg'>
+                                  {flagFromCountry(row.geoCountry)}
+                                </span>
+                                <span>{row.locationLabel || 'Unknown'}</span>
+                              </div>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              {deviceIndicator ? (
+                                <Icon
+                                  name={deviceIndicator.iconName}
+                                  className='h-4 w-4 text-secondary-token'
+                                  aria-label={deviceIndicator.label}
+                                  role='img'
+                                />
+                              ) : (
+                                <span className='text-secondary-token'>—</span>
+                              )}
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <div className='flex flex-col gap-1'>
+                                <span className='font-semibold'>
+                                  {row.visits}
+                                </span>
+                                {formatIntentBadge(row.intentLevel)}
+                              </div>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <div className='flex gap-2'>
+                                {row.latestActions.slice(0, 3).map(action => (
+                                  <span
+                                    key={`${row.id}-${action.label}`}
+                                    className='text-[15px] text-primary-token/90'
+                                    aria-label={action.label}
+                                  >
+                                    {action.emoji ?? '⭐'}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              {formatTimeAgo(row.lastSeenAt)}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              {row.displayName || 'Contact'}
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              {row.phone ?? '—'}
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              <div className='inline-flex items-center gap-2 text-secondary-token'>
+                                <span aria-hidden='true' className='text-lg'>
+                                  {flagFromCountry(row.geoCountry)}
+                                </span>
+                                <span>{row.locationLabel}</span>
+                              </div>
+                            </td>
+                            <td className='px-4 py-3 align-middle text-sm text-primary-token'>
+                              {formatLongDate(row.lastSeenAt)}
+                            </td>
+                          </>
+                        )}
+                      </tr>
                     );
                   })}
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-subtle'>
-                {rows.map(row => (
-                  <tr
-                    key={row.id}
-                    className='hover:bg-surface-2/30 cursor-pointer'
-                    onClick={() => setSelectedMember(row)}
-                  >
-                    {isAudienceV2Enabled ? (
-                      <>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='font-semibold'>
-                            {row.displayName || 'Visitor'}
-                          </div>
-                          <div className='text-xs text-secondary-token'>
-                            {row.type === 'anonymous'
-                              ? 'Visitor'
-                              : row.type === 'email'
-                                ? (row.email ?? 'Email fan')
-                                : row.type === 'sms'
-                                  ? (row.phone ?? 'SMS fan')
-                                  : 'Connected fan'}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <span className='text-xs uppercase text-secondary-token'>
-                            {row.type}
-                          </span>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='inline-flex items-center gap-2 text-secondary-token'>
-                            <span aria-hidden='true' className='text-lg'>
-                              {flagFromCountry(row.geoCountry)}
-                            </span>
-                            <span>{row.locationLabel || 'Unknown'}</span>
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='flex flex-col gap-1'>
-                            <span className='font-semibold'>{row.visits}</span>
-                            {formatIntentBadge(row.intentLevel)}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='flex gap-2'>
-                            {row.latestActions.slice(0, 3).map(action => (
-                              <span
-                                key={`${row.id}-${action.label}`}
-                                className='text-lg'
-                                aria-label={action.label}
-                              >
-                                {action.emoji ?? '⭐'}
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {formatTimeAgo(row.lastSeenAt)}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {row.displayName || 'Contact'}
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {row.phone ?? '—'}
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          <div className='inline-flex items-center gap-2 text-secondary-token'>
-                            <span aria-hidden='true' className='text-lg'>
-                              {flagFromCountry(row.geoCountry)}
-                            </span>
-                            <span>{row.locationLabel}</span>
-                          </div>
-                        </td>
-                        <td className='px-6 py-4 text-sm text-primary-token'>
-                          {formatLongDate(row.lastSeenAt)}
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            )}
           </div>
-        )}
 
-        {!isLoading && rows.length > 0 && (
-          <div className='flex items-center justify-between px-6 py-3 text-xs font-medium uppercase tracking-wider text-secondary-token'>
-            <span>{paginationLabel()}</span>
-            <div className='flex gap-2'>
-              <Button
-                variant='ghost'
-                size='sm'
-                disabled={page <= 1}
-                onClick={() => setPage(prev => Math.max(1, prev - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                variant='ghost'
-                size='sm'
-                disabled={page >= totalPages}
-                onClick={() => setPage(prev => Math.min(totalPages, prev + 1))}
-              >
-                Next
-              </Button>
+          {!isLoading && rows.length > 0 && (
+            <div className='shrink-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/75 px-3 py-2 text-xs text-secondary-token backdrop-blur-md'>
+              <span className='tracking-wide'>{paginationLabel()}</span>
+              <div className='flex gap-2'>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  disabled={page <= 1}
+                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                  onClick={() => setPage(prev => Math.max(1, prev - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  disabled={page >= totalPages}
+                  className='rounded-md border border-subtle bg-transparent text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+                  onClick={() =>
+                    setPage(prev => Math.min(totalPages, prev + 1))
+                  }
+                >
+                  Next
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {selectedMember && (
-        <div className='rounded-lg border border-subtle bg-surface-1/80 p-6 shadow-sm'>
-          <div className='flex items-center justify-between'>
-            <div>
-              <p className='text-xs uppercase tracking-wider text-secondary-token'>
-                Member detail
-              </p>
-              <h3 className='text-lg font-semibold text-primary-token'>
-                {selectedMember.displayName || 'Visitor'}
-              </h3>
-            </div>
-            <Button
-              variant='ghost'
-              size='sm'
-              onClick={() => setSelectedMember(null)}
-            >
-              Close
-            </Button>
-          </div>
-
-          <div className='mt-5 grid gap-4 sm:grid-cols-2'>
-            <div>
-              <p className='text-sm text-secondary-token'>Location</p>
-              <p className='text-sm text-primary-token'>
-                {selectedMember.locationLabel}
-              </p>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Device</p>
-              <p className='text-sm text-primary-token'>
-                {selectedMember.deviceType ?? 'Unknown'}
-              </p>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Visits</p>
-              <p className='text-sm text-primary-token'>
-                {selectedMember.visits}
-              </p>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Last seen</p>
-              <p className='text-sm text-primary-token'>
-                {formatLongDate(selectedMember.lastSeenAt)}
-              </p>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Intent</p>
-              {formatIntentBadge(selectedMember.intentLevel)}
-            </div>
-          </div>
-
-          <div className='mt-6 grid gap-4 sm:grid-cols-2'>
-            <div>
-              <p className='text-sm text-secondary-token'>Email</p>
-              <p className='text-sm text-primary-token'>
-                {selectedMember.email ?? '—'}
-              </p>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Phone</p>
-              <p className='text-sm text-primary-token'>
-                {selectedMember.phone ?? '—'}
-              </p>
-            </div>
-          </div>
-
-          <div className='mt-6 space-y-3'>
-            <div>
-              <p className='text-sm text-secondary-token'>Recent actions</p>
-              <ul className='mt-2 space-y-2 text-sm text-primary-token'>
-                {selectedMember.latestActions.length === 0 && (
-                  <li className='text-secondary-token'>No actions yet.</li>
-                )}
-                {selectedMember.latestActions.map(action => (
-                  <li
-                    key={
-                      action.timestamp ?? `${action.label}-${selectedMember.id}`
-                    }
-                  >
-                    <span className='mr-2'>{action.emoji ?? '⭐'}</span>
-                    {action.label}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <p className='text-sm text-secondary-token'>Referrers</p>
-              <ul className='mt-2 space-y-2 text-sm text-primary-token'>
-                {selectedMember.referrerHistory.length === 0 ? (
-                  <li className='text-secondary-token'>
-                    No referrer data yet.
-                  </li>
-                ) : (
-                  selectedMember.referrerHistory.map(ref => (
-                    <li key={`${ref.url}-${ref.timestamp}`}>
-                      <p className='font-medium'>{ref.url}</p>
-                      {ref.timestamp && (
-                        <p className='text-xs text-secondary-token'>
-                          {formatTimeAgo(ref.timestamp)}
-                        </p>
-                      )}
-                    </li>
-                  ))
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
+      <AudienceMemberSidebar
+        member={selectedMember}
+        isOpen={Boolean(selectedMember)}
+        onClose={() => setSelectedMember(null)}
+      />
     </div>
   );
 }

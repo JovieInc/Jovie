@@ -20,8 +20,8 @@ export function BrandingBadge() {
   // Since Clerk billing integration varies, we'll check for the plan in publicMetadata
   const userPlan = user?.publicMetadata?.plan || 'free';
 
-  // Hide branding for Pro users
-  if (userPlan === 'pro') {
+  // Hide branding for paid users
+  if (userPlan === 'standard' || userPlan === 'pro') {
     return null;
   }
 

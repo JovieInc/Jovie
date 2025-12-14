@@ -72,36 +72,28 @@ export function EmptyState({
 
   return (
     <div
-      className={`bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden ${className}`}
+      className={`rounded-2xl border border-subtle bg-surface-1/40 p-6 text-center ${className}`}
     >
-      {/* Background gradient */}
-      <div
-        className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-50`}
-      />
-
-      {/* Content */}
-      <div className='relative'>
-        {/* Icon */}
-        <div className='mx-auto mb-4 w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center'>
-          <IconComponent className='h-8 w-8 text-accent-token' />
+      <div className='mx-auto flex max-w-lg flex-col items-center gap-3'>
+        <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
+          <IconComponent className='h-5 w-5 text-secondary-token' />
         </div>
 
-        {/* Title */}
-        <h3 className='text-lg font-semibold text-primary mb-2'>
-          {title || config.title}
-        </h3>
+        <div className='space-y-1'>
+          <h3 className='text-[14px] font-semibold leading-5 text-primary-token'>
+            {title || config.title}
+          </h3>
+          <p className='text-[13px] leading-5 text-secondary-token'>
+            {description || config.description}
+          </p>
+        </div>
 
-        {/* Description */}
-        <p className='text-secondary mb-6 max-w-md mx-auto'>
-          {description || config.description}
-        </p>
-
-        {/* Action button */}
         {onAction && (
           <Button
             onClick={onAction}
-            variant='primary'
-            className='transform hover:scale-105 transition-transform duration-200'
+            variant='secondary'
+            size='sm'
+            className='rounded-md px-3 text-[13px] font-semibold'
           >
             {actionLabel || config.actionLabel}
           </Button>

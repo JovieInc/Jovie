@@ -3,6 +3,7 @@ import 'server-only';
 import { clerkClient } from '@clerk/nextjs/server';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { validateClerkUserId } from '@/lib/auth/session';
+import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -140,6 +141,11 @@ export async function syncCanonicalUsernameFromApp(
 
   const canonical = outcome.canonicalUsername;
 
+  // Get old username from metadata for cache invalidation
+  const oldUsername = (
+    user.privateMetadata as { jovie_username_normalized?: string }
+  )?.jovie_username_normalized;
+
   await client.users.updateUser(clerkUserId, {
     username: canonical,
     privateMetadata: {
@@ -147,6 +153,11 @@ export async function syncCanonicalUsernameFromApp(
       jovie_username_normalized: canonical,
     },
   });
+
+  // Invalidate caches for both old and new usernames
+  if (outcome.changed) {
+    await invalidateUsernameChange(canonical, oldUsername);
+  }
 }
 
 export async function syncUsernameFromClerkEvent(

@@ -70,22 +70,23 @@ const TooltipContent = React.forwardRef<
         ref={ref}
         sideOffset={sideOffset}
         className={cn(
-          // Base layout
-          'z-50 select-none inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium',
-          // Surface + border with light/dark support (Geist-like pill)
-          'bg-surface-1/95 text-primary-token border border-subtle shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-[10px]',
-          // Animation with reduced motion support
-          'animate-in fade-in-0 zoom-in-95',
-          'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-          // Direction-based slide animations
-          'data-[side=bottom]:slide-in-from-top-2',
-          'data-[side=left]:slide-in-from-right-2',
-          'data-[side=right]:slide-in-from-left-2',
-          'data-[side=top]:slide-in-from-bottom-2',
+          // Base layout + spacing
+          'z-50 inline-flex select-none items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium leading-tight',
+          // Ephemeral surface: translucent, blurred, no border
+          'max-w-xs bg-neutral-900/80 text-neutral-100/90 backdrop-blur-xl shadow-[0_18px_60px_-18px_rgba(0,0,0,0.5)]',
+          'dark:bg-white/14 dark:text-white/90',
+          // Calm animation: slight fade + drift
+          'animate-in data-[state=open]:duration-150 data-[state=open]:ease-out',
+          'data-[state=closed]:animate-out data-[state=closed]:duration-120 data-[state=closed]:ease-in',
+          'fade-in-0 data-[state=closed]:fade-out-0',
+          'data-[side=bottom]:slide-in-from-top-1',
+          'data-[side=left]:slide-in-from-right-1',
+          'data-[side=right]:slide-in-from-left-1',
+          'data-[side=top]:slide-in-from-bottom-1',
+          'will-change-[transform,opacity]',
           // Reduced motion override
           'motion-reduce:animate-none motion-reduce:data-[state=closed]:animate-none',
-          // Motion-reduced fade fallback
-          'motion-reduce:transition-opacity motion-reduce:duration-200',
+          'motion-reduce:transition-opacity motion-reduce:duration-150',
           className
         )}
         // Accessibility: ensure proper collision avoidance
@@ -100,9 +101,8 @@ const TooltipContent = React.forwardRef<
         {showArrow && (
           <TooltipPrimitive.Arrow
             className={cn(
-              'fill-surface-1',
-              // Ensure arrow matches content background in both light and dark modes
-              'drop-shadow-sm'
+              'fill-neutral-900/80 dark:fill-white/14',
+              'drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)] opacity-90'
             )}
           />
         )}

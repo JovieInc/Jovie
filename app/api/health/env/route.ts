@@ -172,8 +172,14 @@ export async function GET(request: Request) {
       timestamp: now,
       details: {
         environment: process.env.NODE_ENV || 'unknown',
-        platform: process.platform || 'unknown',
-        nodeVersion: process.version || 'unknown',
+        platform:
+          typeof process !== 'undefined' && 'platform' in process
+            ? process.platform
+            : 'unknown',
+        nodeVersion:
+          typeof process !== 'undefined' && 'version' in process
+            ? process.version
+            : 'unknown',
         startupValidationCompleted: false,
         currentValidation: {
           valid: false,

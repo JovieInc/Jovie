@@ -12,7 +12,7 @@ export function AccountDashboard() {
         <h1 className='text-3xl font-bold text-gray-900 dark:text-white'>
           Account Settings
         </h1>
-        <p className='mt-2 text-gray-600 dark:text-gray-400'>
+        <p className='mt-2 text-gray-700 dark:text-gray-300'>
           Manage your account preferences and settings
         </p>
       </div>
@@ -22,21 +22,21 @@ export function AccountDashboard() {
         {/* Billing & Subscription */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <CreditCardIcon className='h-8 w-8 text-blue-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                 Billing & Subscription
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Manage your subscription and payment methods
               </p>
             </div>
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/billing'>Manage Billing</Link>
+              <Link href='/app/settings/billing'>Manage Billing</Link>
             </Button>
           </div>
         </div>
@@ -44,21 +44,21 @@ export function AccountDashboard() {
         {/* Profile Settings */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <UserIcon className='h-8 w-8 text-green-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
-                Profile Settings
+                Creator Profile
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
-                Update your profile information and preferences
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
+                Update your public profile and links
               </p>
             </div>
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/dashboard/settings'>Edit Profile</Link>
+              <Link href='/app/dashboard/profile'>Edit Profile</Link>
             </Button>
           </div>
         </div>
@@ -66,21 +66,21 @@ export function AccountDashboard() {
         {/* General Settings */}
         <div className='bg-white dark:bg-gray-800 shadow rounded-lg p-6'>
           <div className='flex items-center'>
-            <div className='flex-shrink-0'>
+            <div className='shrink-0'>
               <CogIcon className='h-8 w-8 text-purple-500' />
             </div>
             <div className='ml-4'>
               <h3 className='text-lg font-medium text-gray-900 dark:text-white'>
                 General Settings
               </h3>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+              <p className='text-sm text-gray-700 dark:text-gray-300'>
                 Configure app preferences and notifications
               </p>
             </div>
           </div>
           <div className='mt-4'>
             <Button variant='outline' size='sm' asChild>
-              <Link href='/dashboard/settings'>View Settings</Link>
+              <Link href='/app/settings'>View Settings</Link>
             </Button>
           </div>
         </div>
@@ -96,7 +96,7 @@ export function AccountDashboard() {
             <h4 className='text-sm font-medium text-gray-900 dark:text-white'>
               Account Status
             </h4>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <p className='text-sm text-gray-700 dark:text-gray-300'>
               Your account is active and in good standing
             </p>
           </div>
@@ -104,7 +104,7 @@ export function AccountDashboard() {
             <h4 className='text-sm font-medium text-gray-900 dark:text-white'>
               Data & Privacy
             </h4>
-            <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <p className='text-sm text-gray-700 dark:text-gray-300'>
               We protect your data according to our privacy policy
             </p>
           </div>
@@ -116,7 +116,7 @@ export function AccountDashboard() {
         <h3 className='text-lg font-medium text-gray-900 dark:text-white mb-4'>
           Need Help?
         </h3>
-        <p className='text-sm text-gray-600 dark:text-gray-400 mb-4'>
+        <p className='text-sm text-gray-700 dark:text-gray-300 mb-4'>
           Get support, view documentation, or contact our team
         </p>
         <div className='flex flex-col sm:flex-row gap-3'>

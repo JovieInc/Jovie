@@ -10,7 +10,7 @@
  * - Handles environment variable validation
  */
 
-import { neonConfig, Pool } from '@neondatabase/serverless';
+import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
 import { drizzle } from 'drizzle-orm/neon-serverless';
@@ -29,6 +29,8 @@ neonConfig.webSocketConstructor = ws;
 
 // Neon URL pattern for cleaning database URLs
 const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
+
+type DrizzleMigrationsSchema = 'drizzle' | 'public';
 
 // ANSI color codes for terminal output
 const colors = {
@@ -69,18 +71,18 @@ function getCurrentBranch(): string {
 }
 
 // Get environment from GIT_BRANCH env variable or current git branch
-function getEnvironment(): 'preview' | 'production' | 'development' {
+function getEnvironment(): 'main' | 'production' | 'development' {
   const envBranch = process.env.GIT_BRANCH;
   const gitBranch = getCurrentBranch();
   const branch = envBranch || gitBranch;
 
-  if (branch === 'production' || branch === 'main') {
+  if (branch === 'production') {
     return 'production';
-  } else if (branch === 'preview') {
-    return 'preview';
-  } else {
-    return 'development';
   }
+  if (branch === 'main') {
+    return 'main';
+  }
+  return 'development';
 }
 
 // Validate environment variables
@@ -141,7 +143,7 @@ async function confirmProductionMigration(): Promise<boolean> {
   console.log('Before proceeding:');
   console.log('  1. Ensure you have a recent database backup');
   console.log('  2. Review all pending migrations carefully');
-  console.log('  3. Consider testing on preview environment first');
+  console.log('  3. Consider testing on main/staging environment first');
   console.log('  4. Have a rollback plan ready');
   console.log('');
 
@@ -224,6 +226,7 @@ async function runMigrations() {
   // Connect to database
   let pool: Pool;
   let db: ReturnType<typeof drizzle>;
+  let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
 
   try {
     log.info('Connecting to database...');
@@ -235,6 +238,12 @@ async function runMigrations() {
     // Create connection pool with Neon serverless driver
     pool = new Pool({ connectionString: databaseUrl });
 
+    pool.on('connect', (client: PoolClient) => {
+      client
+        .query("SET app.allow_schema_changes = 'true'")
+        .catch(() => undefined);
+    });
+
     db = drizzle(pool);
 
     // Using default public schema
@@ -245,20 +254,92 @@ async function runMigrations() {
     process.exit(1);
   }
 
+  async function resolveMigrationsSchemaSafely(): Promise<DrizzleMigrationsSchema> {
+    try {
+      const [{ drizzle_table, public_table }] = (
+        await pool.query<{
+          drizzle_table: string | null;
+          public_table: string | null;
+        }>(
+          "SELECT to_regclass('drizzle.__drizzle_migrations')::text AS drizzle_table, to_regclass('public.__drizzle_migrations')::text AS public_table"
+        )
+      ).rows;
+
+      if (drizzle_table) return 'drizzle';
+      if (public_table) return 'public';
+
+      const [{ schema_exists, has_schema_create, has_db_create }] = (
+        await pool.query<{
+          schema_exists: boolean;
+          has_schema_create: boolean;
+          has_db_create: boolean;
+        }>(
+          "SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'drizzle') AS schema_exists, has_schema_privilege(current_user, 'drizzle', 'CREATE') AS has_schema_create, has_database_privilege(current_user, current_database(), 'CREATE') AS has_db_create"
+        )
+      ).rows;
+
+      if (schema_exists && has_schema_create) return 'drizzle';
+      if (has_db_create) return 'drizzle';
+
+      return 'public';
+    } catch {
+      return 'drizzle';
+    }
+  }
+
   // Run migrations
   try {
     log.info('Running migrations...');
 
+    migrationsSchema = await resolveMigrationsSchemaSafely();
+    log.info(
+      `Migrations schema: ${colors.bright}${migrationsSchema}${colors.reset}`
+    );
+
     const start = Date.now();
     await migrate(db, {
       migrationsFolder: './drizzle/migrations',
+      migrationsSchema,
       migrationsTable: '__drizzle_migrations',
     });
     const duration = ((Date.now() - start) / 1000).toFixed(2);
 
     log.success(`Migrations completed successfully in ${duration}s`);
   } catch (error) {
-    log.error(`Migration failed: ${error}`);
+    const err = error as unknown;
+    const details = (() => {
+      if (!err || typeof err !== 'object') return undefined;
+      const e = err as Record<string, unknown>;
+      const code = typeof e.code === 'string' ? e.code : undefined;
+      const detail = typeof e.detail === 'string' ? e.detail : undefined;
+      const hint = typeof e.hint === 'string' ? e.hint : undefined;
+      const where = typeof e.where === 'string' ? e.where : undefined;
+      const schema = typeof e.schema === 'string' ? e.schema : undefined;
+      const table = typeof e.table === 'string' ? e.table : undefined;
+      const constraint =
+        typeof e.constraint === 'string' ? e.constraint : undefined;
+
+      if (
+        !code &&
+        !detail &&
+        !hint &&
+        !where &&
+        !schema &&
+        !table &&
+        !constraint
+      ) {
+        return undefined;
+      }
+
+      return { code, detail, hint, where, schema, table, constraint };
+    })();
+
+    const message = err instanceof Error ? err.message : String(err);
+    log.error(`Migration failed: ${message}`);
+
+    if (details) {
+      log.error(`Postgres details: ${JSON.stringify(details)}`);
+    }
     process.exit(1);
   } finally {
     // Close database connection

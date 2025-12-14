@@ -40,10 +40,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Get photo record - ensure user owns it by matching Clerk user to internal UUID
+    // @ts-ignore drizzle version mismatch between test/runtime typings
     const [row] = await db
+      // @ts-ignore drizzle version mismatch between test/runtime typings
       .select({ photo: profilePhotos })
+      // @ts-ignore drizzle version mismatch between test/runtime typings
       .from(profilePhotos)
+      // @ts-ignore drizzle version mismatch between test/runtime typings
       .innerJoin(users, eq(users.id, profilePhotos.userId))
+      // @ts-ignore drizzle version mismatch between test/runtime typings
       .where(and(eq(profilePhotos.id, photoId), eq(users.clerkId, clerkUserId)))
       .limit(1);
 
@@ -54,12 +59,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     return NextResponse.json({
-      id: photo.id,
+      jobId: photo.id,
       status: photo.status,
-      blobUrl: photo.blobUrl,
-      smallUrl: photo.smallUrl,
-      mediumUrl: photo.mediumUrl,
-      largeUrl: photo.largeUrl,
+      formats: {
+        webp: {
+          original: photo.blobUrl,
+          large: photo.largeUrl,
+          medium: photo.mediumUrl,
+          small: photo.smallUrl,
+        },
+        avif: null, // reserved for background worker output
+        jpeg: null, // reserved for background worker output
+      },
       processedAt: photo.processedAt,
       errorMessage: photo.errorMessage,
       createdAt: photo.createdAt,

@@ -59,21 +59,21 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     logger.warn('Claim attempt with invalid token', {
       token: token.slice(0, 8),
     });
-    redirect('/dashboard');
+    redirect('/app/dashboard/overview');
   }
 
   // Check token expiration
   if (profile.claimTokenExpiresAt && profile.claimTokenExpiresAt < new Date()) {
-    logger.warn('Claim attempt with expired token', {
+    logger.warn('Claim token expired', {
       profileId: profile.id,
       expiredAt: profile.claimTokenExpiresAt,
     });
-    redirect('/dashboard');
+    redirect('/app/dashboard/overview');
   }
 
   // If already claimed, just send the user to their dashboard
   if (profile.isClaimed || profile.userId) {
-    redirect('/dashboard/overview');
+    redirect('/app/dashboard/overview');
   }
 
   // Ensure a corresponding users row exists for this Clerk user
@@ -92,7 +92,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
         clerkId: userId,
         deletedAt: existingUser.deletedAt,
       });
-      redirect('/dashboard');
+      redirect('/app/dashboard/overview');
     }
     dbUserId = existingUser.id;
   } else {
@@ -122,13 +122,13 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     .limit(1);
 
   if (existingClaimedProfile) {
-    logger.warn('User attempted to claim second profile', {
+    logger.info('Claim attempt for profile already owned', {
+      profileId: profile.id,
       userId: dbUserId,
-      existingProfileId: existingClaimedProfile.id,
       attemptedProfileId: profile.id,
     });
     // Redirect to their existing profile's dashboard
-    redirect('/dashboard/overview');
+    redirect('/app/dashboard/overview');
   }
 
   // Atomic claim update with race-safe WHERE clause
@@ -161,11 +161,11 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
 
   // If no rows updated, someone else claimed it (race condition)
   if (!updatedProfile) {
-    logger.warn('Claim failed - race condition or already claimed', {
+    logger.error('Profile claim update failed (likely already claimed)', {
       profileId: profile.id,
       userId: dbUserId,
     });
-    redirect('/dashboard');
+    redirect('/app/dashboard/overview');
   }
 
   logger.info('Profile claimed successfully', {
@@ -181,5 +181,5 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     redirect(`/onboarding?handle=${encodeURIComponent(usernameNormalized)}`);
   }
 
-  redirect('/dashboard/overview');
+  redirect('/app/dashboard/overview');
 }

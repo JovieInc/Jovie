@@ -49,7 +49,7 @@ export async function POST() {
 
     // Create return URL
     const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const returnUrl = `${baseUrl}/dashboard`;
+    const returnUrl = `${baseUrl}/app/dashboard`;
 
     // Create billing portal session
     const session = await createBillingPortalSession({

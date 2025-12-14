@@ -2,6 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
+  describe('Unsafe inputs', () => {
+    it('rejects dangerous schemes', () => {
+      const inputs = [
+        'javascript:alert(1)',
+        'data:text/html;base64,abc',
+        'vbscript:msgbox("x")',
+      ];
+      inputs.forEach(input => {
+        const detected = detectPlatform(input);
+        expect(detected.isValid).toBe(false);
+      });
+    });
+
+    it('rejects encoded control characters', () => {
+      const inputs = ['%0d%0ahttps://x.com/evil', 'https://example.com/%0A'];
+      inputs.forEach(input => {
+        const detected = detectPlatform(input);
+        expect(detected.isValid).toBe(false);
+      });
+    });
+
+    it('normalizeUrl throws away dangerous inputs and returns original string', () => {
+      const input = 'javascript:alert(1)';
+      expect(normalizeUrl(input)).toBe(input);
+    });
+  });
+
   describe('Domain dot-fix normalization', () => {
     it('auto-inserts missing dot for common platforms', () => {
       const cases: Array<{ input: string; expectedPrefix: string }> = [

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
 
 // Mock the toast context
@@ -23,6 +23,18 @@ global.fetch = vi.fn() as any;
 describe('AvatarUpload - Error Handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const fetchMock = global.fetch as unknown as Mock;
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: false,
+      json: () => Promise.resolve({ error: 'Upload failed' }),
+    });
+    // jsdom does not implement these by default; mock for preview logic
+    // @ts-expect-error partial URL mock for tests
+    global.URL = {
+      createObjectURL: vi.fn(() => 'blob:preview'),
+      revokeObjectURL: vi.fn(),
+    };
   });
 
   it('should show error toast for invalid file type', async () => {
@@ -59,7 +71,7 @@ describe('AvatarUpload - Error Handling', () => {
 
     const fileInput = screen.getByLabelText('Choose profile photo file');
 
-    const largeFile = new File(['x'.repeat(5 * 1024 * 1024)], 'large.jpg', {
+    const largeFile = new File(['x'.repeat(30 * 1024 * 1024)], 'large.jpg', {
       type: 'image/jpeg',
     });
 
@@ -144,8 +156,10 @@ describe('AvatarUpload - Error Handling', () => {
       />
     );
 
-    expect(screen.getByText(/Auto-optimized to WebP/i)).toBeInTheDocument();
-    expect(screen.getByText(/Max size 4MB/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Auto-optimized to AVIF\/WebP/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Max size 25MB/i)).toBeInTheDocument();
     expect(
       screen.getByText(
         'If upload fails, a default avatar will be used automatically.'

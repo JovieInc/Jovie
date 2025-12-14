@@ -1,11 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { useDashboardData } from '@/app/dashboard/DashboardDataContext';
+import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
-export function DashboardSettings() {
+export interface DashboardSettingsProps {
+  focusSection?: string;
+}
+
+export function DashboardSettings({ focusSection }: DashboardSettingsProps) {
   const dashboardData = useDashboardData();
   const [artist, setArtist] = useState<Artist | null>(
     dashboardData.selectedProfile
@@ -20,16 +24,12 @@ export function DashboardSettings() {
   }
 
   return (
-    <div>
-      <div className='mb-8'>
-        <h1 className='text-2xl font-bold text-primary-token'>Settings</h1>
-        <p className='text-secondary-token mt-1'>
-          Manage your account preferences and settings
-        </p>
-      </div>
-
-      {/* Settings content */}
-      <SettingsPolished artist={artist} onArtistUpdate={setArtist} />
+    <div className='mx-auto max-w-2xl'>
+      <SettingsPolished
+        artist={artist}
+        onArtistUpdate={setArtist}
+        focusSection={focusSection}
+      />
     </div>
   );
 }
