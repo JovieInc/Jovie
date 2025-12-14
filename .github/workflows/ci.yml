@@ -715,9 +715,14 @@ jobs:
 
               if [ "$response_code" != "200" ]; then
                 if [ "$response_code" = "429" ]; then
-                  echo "⚠ Canary inconclusive: Vercel returned HTTP 429 Security Checkpoint even after retries."
-                  echo "⚠ Not failing deploy because bypass secret is unavailable."
-                  canary_inconclusive="true"
+                  if [ -z "$BYPASS_SECRET" ]; then
+                    echo "⚠ Canary inconclusive: Vercel returned HTTP 429 Security Checkpoint even after retries."
+                    echo "⚠ Not failing deploy because bypass secret is unavailable."
+                    canary_inconclusive="true"
+                  else
+                    echo "❌ Canary failed: HTTP 429 Security Checkpoint even though bypass secret is set."
+                    exit 1
+                  fi
                 else
                   echo "❌ Canary fallback failed after retries: HTTP $response_code"
                   exit 1
