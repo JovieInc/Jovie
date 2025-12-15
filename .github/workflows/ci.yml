@@ -74,7 +74,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache TypeScript artifacts
         if: ${{ matrix.check == 'typecheck' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/tsbuildinfo
           key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('tsconfig.json', 'pnpm-lock.yaml') }}
@@ -83,7 +83,7 @@ jobs:
             ${{ runner.os }}-tsc-
       - name: Cache ESLint artifacts
         if: ${{ matrix.check == 'lint' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .cache/eslint
           key: ${{ runner.os }}-eslint-${{ hashFiles('pnpm-lock.yaml', 'eslint.config.js', '.eslintrc*') }}
@@ -286,7 +286,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -348,7 +348,7 @@ jobs:
 
       - name: Cache Next build cache
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: .next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}
@@ -512,7 +512,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
