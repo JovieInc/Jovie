@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogoIcon } from '@/components/atoms/LogoIcon';
+import { Combobox } from '@/components/organisms/Combobox';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
+import {
+  type SpotifyArtistResult,
+  useArtistSearch,
+} from '@/lib/hooks/useArtistSearch';
 
 interface FormErrors {
   fullName?: string[];
@@ -51,16 +56,63 @@ export default function WaitlistPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
-  const [spotifyUrl, setSpotifyUrl] = useState('');
   const [heardAbout, setHeardAbout] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [selectedArtist, setSelectedArtist] =
+    useState<SpotifyArtistResult | null>(null);
+
+  const {
+    results: artistResults,
+    state: artistSearchState,
+    error: artistSearchError,
+    search: searchArtists,
+    clear: clearArtistResults,
+  } = useArtistSearch({ debounceMs: 250 });
 
   useEffect(() => {
     setIsHydrating(false);
   }, []);
+
+  const spotifyOptions = artistResults.map(artist => ({
+    id: artist.id,
+    name: artist.name,
+    imageUrl: artist.imageUrl,
+  }));
+
+  const handleArtistInputChange = (value: string) => {
+    setSelectedArtist(null);
+    setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+
+    if (value.trim()) {
+      searchArtists(value);
+    } else {
+      clearArtistResults();
+    }
+  };
+
+  const handleArtistSelect = (
+    option: {
+      id: string;
+      name: string;
+      imageUrl?: string;
+    } | null
+  ) => {
+    if (!option) {
+      setSelectedArtist(null);
+      setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+      return;
+    }
+
+    const matchedArtist = artistResults.find(artist => artist.id === option.id);
+
+    if (matchedArtist) {
+      setSelectedArtist(matchedArtist);
+      setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,10 +138,6 @@ export default function WaitlistPage() {
       errors.primarySocialUrl = ['Please enter a valid URL'];
     }
 
-    if (spotifyUrl.trim() && !isValidUrl(spotifyUrl)) {
-      errors.spotifyUrl = ['Please enter a valid Spotify URL'];
-    }
-
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       return;
@@ -105,7 +153,7 @@ export default function WaitlistPage() {
           fullName,
           email,
           primarySocialUrl: normalizeUrl(primarySocialUrl),
-          spotifyUrl: spotifyUrl ? normalizeUrl(spotifyUrl) : null,
+          spotifyUrl: selectedArtist?.url || null,
           heardAbout: heardAbout || null,
           selectedPlan, // Quietly track which pricing tier user clicked
         }),
@@ -130,6 +178,15 @@ export default function WaitlistPage() {
       setIsSubmitting(false);
     }
   };
+
+  const isSearchingArtists = artistSearchState === 'loading';
+  const selectedArtistOption = selectedArtist
+    ? {
+        id: selectedArtist.id,
+        name: selectedArtist.name,
+        imageUrl: selectedArtist.imageUrl,
+      }
+    : null;
 
   if (isSubmitted) {
     return (
@@ -277,15 +334,32 @@ export default function WaitlistPage() {
             </p>
           )}
 
-          <input
-            type='text'
-            id='spotifyUrl'
-            value={spotifyUrl}
-            onChange={e => setSpotifyUrl(e.target.value)}
-            className={INPUT_CLASSES}
-            placeholder='open.spotify.com/artist/... (optional)'
-            disabled={isSubmitting}
-          />
+          <div className='space-y-2'>
+            <Combobox
+              options={spotifyOptions}
+              value={selectedArtistOption}
+              onChange={handleArtistSelect}
+              onInputChange={handleArtistInputChange}
+              placeholder='Search for your artist on Spotify (optional)'
+              label='Search for your artist on Spotify (optional)'
+              isLoading={isSearchingArtists}
+              error={artistSearchError}
+              showCta={false}
+            />
+            <p className='text-xs text-[#6b6f76]'>
+              Find your Spotify artist profile so we can tailor your onboarding.
+            </p>
+            {selectedArtist && (
+              <p className='text-xs text-white'>
+                Selected: {selectedArtist.name}
+              </p>
+            )}
+            {fieldErrors.spotifyUrl && (
+              <p className='text-sm text-red-400'>
+                {fieldErrors.spotifyUrl[0]}
+              </p>
+            )}
+          </div>
 
           <input
             type='text'
