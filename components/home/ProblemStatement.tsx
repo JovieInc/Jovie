@@ -23,13 +23,13 @@ export function ProblemStatement() {
           </div>
 
           <h2 className='text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
-            Musicians lose fans to bad link-in-bio experiences
+            Musicians lose fans to bad profile experiences
           </h2>
 
           <div className='mt-12 space-y-8 text-lg leading-relaxed text-gray-600 dark:text-white/70'>
             <p className='text-xl'>
               73% of fans abandon music discovery when they hit slow, cluttered,
-              or confusing link-in-bio pages.
+              or confusing profile pages.
             </p>
 
             <div className='grid grid-cols-1 md:grid-cols-3 gap-8 mt-16'>

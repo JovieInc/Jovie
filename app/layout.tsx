@@ -27,14 +27,14 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description:
-    'Link in bio for music artists. Connect your music, social media, and merch in one link. No design needed.',
+    'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
   keywords: [
-    'link in bio',
+    'artist profile',
     'music artist',
     'spotify',
     'social media',
     'music promotion',
-    'artist profile',
+    'creator profile',
     'music marketing',
     'streaming',
     'music links',
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     title: APP_NAME,
     description:
-      'Link in bio for music artists. Connect your music, social media, and merch in one link. No design needed.',
+      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
     siteName: APP_NAME,
     images: [
       {
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: APP_NAME,
     description:
-      'Link in bio for music artists. Connect your music, social media, and merch in one link. No design needed.',
+      'Artist profiles for music artists. Connect your music, social media, and merch in one place. No design needed.',
     images: [`${APP_URL}/og/default.png`],
     creator: '@jovie',
   },
@@ -159,7 +159,7 @@ export default async function RootLayout({
             url: APP_URL,
             logo: `${APP_URL}/brand/jovie-logo.svg`,
             description:
-              'Link in bio for music artists. Connect your music, social media, and merch in one link.',
+              'Artist profiles for music artists. Connect your music, social media, and merch in one place.',
             sameAs: [
               'https://twitter.com/jovie',
               'https://instagram.com/jovie',

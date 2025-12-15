@@ -64,6 +64,7 @@ const waitlistRequestSchema = z.object({
   primarySocialUrl: z.string().url('Invalid URL format'),
   spotifyUrl: z.string().url('Invalid Spotify URL').optional().nullable(),
   heardAbout: z.string().max(1000).optional().nullable(),
+  selectedPlan: z.string().optional().nullable(), // free|pro|growth|branding
 });
 
 export async function POST(request: Request) {
@@ -77,8 +78,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, errors }, { status: 400 });
     }
 
-    const { fullName, email, primarySocialUrl, spotifyUrl, heardAbout } =
-      parseResult.data;
+    const {
+      fullName,
+      email,
+      primarySocialUrl,
+      spotifyUrl,
+      heardAbout,
+      selectedPlan,
+    } = parseResult.data;
 
     // Detect platform and normalize primary social URL
     const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
@@ -98,6 +105,7 @@ export async function POST(request: Request) {
       spotifyUrl: spotifyUrl ?? null,
       spotifyUrlNormalized,
       heardAbout: heardAbout ?? null,
+      selectedPlan: selectedPlan ?? null, // Quietly track pricing tier interest
       status: 'new',
     });
 

@@ -3,7 +3,7 @@ import { APP_NAME } from '@/constants/app';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${APP_NAME} - Link in bio for music artists`,
+    name: `${APP_NAME} - Artist profiles for music artists`,
     short_name: 'Jovie',
     description:
       'Connect your music, social media, and merch in one link. No design needed. Live in under 90 seconds.',
@@ -53,14 +53,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '1200x630',
         type: 'image/png',
         form_factor: 'wide',
-        label: `${APP_NAME} - Link in bio for music artists`,
+        label: `${APP_NAME} - Artist profiles for music artists`,
       },
       {
         src: '/og/default.png',
         sizes: '1200x630',
         type: 'image/png',
         form_factor: 'narrow',
-        label: `${APP_NAME} - Link in bio for music artists`,
+        label: `${APP_NAME} - Artist profiles for music artists`,
       },
     ],
     shortcuts: [

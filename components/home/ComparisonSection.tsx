@@ -2,7 +2,7 @@ export function SocialProofSection() {
   const testimonials = [
     {
       quote:
-        'Jovie turned my link-in-bio from a dead end into a conversion machine. My streams went up 47% in the first month.',
+        'Jovie turned my profile from a dead end into a conversion machine. My streams went up 47% in the first month.',
       author: 'Sarah Chen',
       role: 'Indie Artist',
       avatar: 'SC',
@@ -10,7 +10,7 @@ export function SocialProofSection() {
     },
     {
       quote:
-        'Finally, a link-in-bio that actually works. My fans can find my music instantly without getting lost.',
+        'Finally, a profile that actually works. My fans can find my music instantly without getting lost.',
       author: 'Marcus Rodriguez',
       role: 'Hip-Hop Producer',
       avatar: 'MR',
@@ -87,7 +87,7 @@ export function SocialProofSection() {
           <div className='grid grid-cols-1 md:grid-cols-3 gap-8'>
             {testimonials.map(testimonial => (
               <div key={testimonial.author} className='relative group'>
-                <div className='absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500' />
+                <div className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500' />
                 <div className='relative bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-8 hover:border-white/20 transition-all duration-300'>
                   <div className='mb-6'>
                     <span className='inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400'>
@@ -100,7 +100,7 @@ export function SocialProofSection() {
                   </blockquote>
 
                   <div className='flex items-center'>
-                    <div className='w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm'>
+                    <div className='w-10 h-10 rounded-full bg-linear-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm'>
                       {testimonial.avatar}
                     </div>
                     <div className='ml-3'>

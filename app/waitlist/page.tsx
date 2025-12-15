@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogoIcon } from '@/components/atoms/LogoIcon';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
@@ -43,6 +44,9 @@ function isValidUrl(url: string): boolean {
 }
 
 export default function WaitlistPage() {
+  const searchParams = useSearchParams();
+  const selectedPlan = searchParams.get('plan') || null; // free|pro|growth|branding - quietly tracked
+
   const [isHydrating, setIsHydrating] = useState(true);
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -103,6 +107,7 @@ export default function WaitlistPage() {
           primarySocialUrl: normalizeUrl(primarySocialUrl),
           spotifyUrl: spotifyUrl ? normalizeUrl(spotifyUrl) : null,
           heardAbout: heardAbout || null,
+          selectedPlan, // Quietly track which pricing tier user clicked
         }),
       });
 

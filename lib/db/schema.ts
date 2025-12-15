@@ -489,6 +489,7 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   spotifyUrl: text('spotify_url'),
   spotifyUrlNormalized: text('spotify_url_normalized'),
   heardAbout: text('heard_about'),
+  selectedPlan: text('selected_plan'), // free|pro|growth|branding - quietly tracks pricing tier interest
   status: waitlistStatusEnum('status').default('new').notNull(),
   primarySocialFollowerCount: integer('primary_social_follower_count'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

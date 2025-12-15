@@ -119,7 +119,7 @@ export function Footer({
   // Regular footer: full links grid (brand + Product, Company, Legal)
   if (variant === 'regular') {
     const productLinks = [
-      { href: '/link-in-bio', label: 'Link in Bio' },
+      { href: '/link-in-bio', label: 'Profile' },
       { href: '/pricing', label: 'Pricing' },
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
