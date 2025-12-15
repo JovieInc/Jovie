@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { isSafeExternalUrl } from '@/lib/utils/url-encryption';
 
 /**
  * Platform detection for waitlist primary social URL
@@ -61,15 +62,37 @@ function normalizeSpotifyUrl(url: string): string {
 const waitlistRequestSchema = z.object({
   fullName: z.string().min(1, 'Full name is required').max(200),
   email: z.string().email('Invalid email address'),
-  primarySocialUrl: z.string().url('Invalid URL format'),
-  spotifyUrl: z.string().url('Invalid Spotify URL').optional().nullable(),
+  primarySocialUrl: z
+    .string()
+    .max(2048)
+    .url('Invalid URL format')
+    .refine(value => isSafeExternalUrl(value), {
+      message: 'Invalid URL format',
+    }),
+  spotifyUrl: z
+    .string()
+    .max(2048)
+    .url('Invalid Spotify URL')
+    .optional()
+    .nullable()
+    .refine(value => (value ? isSafeExternalUrl(value) : true), {
+      message: 'Invalid Spotify URL',
+    }),
   heardAbout: z.string().max(1000).optional().nullable(),
   selectedPlan: z.string().optional().nullable(), // free|pro|growth|branding
 });
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid JSON' },
+        { status: 400 }
+      );
+    }
 
     // Validate request body
     const parseResult = waitlistRequestSchema.safeParse(body);
@@ -87,22 +110,27 @@ export async function POST(request: Request) {
       selectedPlan,
     } = parseResult.data;
 
+    const primarySocialUrlTrimmed = primarySocialUrl.trim();
+    const spotifyUrlTrimmed = spotifyUrl ? spotifyUrl.trim() : null;
+
     // Detect platform and normalize primary social URL
-    const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
+    const { platform, normalizedUrl } = detectPlatformFromUrl(
+      primarySocialUrlTrimmed
+    );
 
     // Normalize Spotify URL if provided
-    const spotifyUrlNormalized = spotifyUrl
-      ? normalizeSpotifyUrl(spotifyUrl)
+    const spotifyUrlNormalized = spotifyUrlTrimmed
+      ? normalizeSpotifyUrl(spotifyUrlTrimmed)
       : null;
 
     // Insert waitlist entry
     await db.insert(waitlistEntries).values({
       fullName,
       email,
-      primarySocialUrl,
+      primarySocialUrl: primarySocialUrlTrimmed,
       primarySocialPlatform: platform,
       primarySocialUrlNormalized: normalizedUrl,
-      spotifyUrl: spotifyUrl ?? null,
+      spotifyUrl: spotifyUrlTrimmed,
       spotifyUrlNormalized,
       heardAbout: heardAbout ?? null,
       selectedPlan: selectedPlan ?? null, // Quietly track pricing tier interest

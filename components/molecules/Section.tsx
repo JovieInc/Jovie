@@ -37,13 +37,13 @@ export function Section({
       className={cn(
         'relative',
         paddingVariants[padding],
-        withBorder && 'border-t border-gray-200 dark:border-white/10',
+        withBorder && 'border-t border-subtle',
         className
       )}
       {...props}
     >
       {withGridBg && (
-        <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]' />
+        <div className='absolute inset-0 grid-bg dark:grid-bg-dark' />
       )}
       <Container
         size={containerSize}

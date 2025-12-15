@@ -11,6 +11,7 @@ import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { isSafeExternalUrl } from '@/lib/utils/url-encryption';
 import { LinkType } from '@/types/db';
 import {
   createFingerprint,
@@ -41,17 +42,8 @@ const VALID_LINK_TYPES = ['listen', 'social', 'tip', 'other'] as const;
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]{3,30}$/;
 
 /**
- * Validate if a string is a valid URL
+ * Infer audience device type from user agent
  */
-function isValidURL(url: string): boolean {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function inferAudienceDeviceType(
   userAgent: string | null
 ): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
@@ -80,7 +72,19 @@ const ACTION_LABELS: Record<string, string> = {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const contentLengthHeader = request.headers.get('content-length');
+    const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+    if (Number.isFinite(contentLength) && contentLength > 20_000) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
     const {
       handle,
       linkType,
@@ -93,7 +97,13 @@ export async function POST(request: NextRequest) {
       target: string;
       linkId?: string;
       source?: unknown;
-    } = body;
+    } = body as {
+      handle: string;
+      linkType: LinkType;
+      target: string;
+      linkId?: string;
+      source?: unknown;
+    };
 
     const resolvedSource = (() => {
       if (typeof source !== 'string') return undefined;
@@ -103,8 +113,11 @@ export async function POST(request: NextRequest) {
       return undefined;
     })();
 
+    const normalizedHandle = typeof handle === 'string' ? handle.trim() : '';
+    const normalizedTarget = typeof target === 'string' ? target.trim() : '';
+
     // Validate required fields
-    if (!handle || !linkType || !target) {
+    if (!normalizedHandle || !linkType || !normalizedTarget) {
       return NextResponse.json(
         {
           error:
@@ -115,7 +128,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate handle format
-    if (!USERNAME_REGEX.test(handle)) {
+    if (!USERNAME_REGEX.test(normalizedHandle)) {
       return NextResponse.json(
         {
           error:
@@ -137,17 +150,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (normalizedTarget.length > 500) {
+      return NextResponse.json({ error: 'Invalid target' }, { status: 400 });
+    }
+
     const looksLikeUrl =
-      typeof target === 'string' &&
-      (target.includes('://') || target.startsWith('www.'));
-    if (looksLikeUrl && !isValidURL(target)) {
+      normalizedTarget.includes('://') || normalizedTarget.startsWith('www.');
+    if (looksLikeUrl && !isSafeExternalUrl(normalizedTarget)) {
       return NextResponse.json(
         { error: 'Invalid target URL format' },
         { status: 400 }
       );
     }
-    if (typeof target !== 'string' || target.trim().length === 0) {
-      return NextResponse.json({ error: 'Invalid target' }, { status: 400 });
+
+    if (linkId && (typeof linkId !== 'string' || linkId.length > 64)) {
+      return NextResponse.json({ error: 'Invalid linkId' }, { status: 400 });
     }
 
     const userAgent = request.headers.get('user-agent');
@@ -166,7 +183,9 @@ export async function POST(request: NextRequest) {
     const [profile] = await db
       .select({ id: creatorProfiles.id })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
+      .where(
+        eq(creatorProfiles.usernameNormalized, normalizedHandle.toLowerCase())
+      )
       .limit(1);
 
     if (!profile) {

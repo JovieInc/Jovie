@@ -130,9 +130,7 @@ export function BenefitsSection({
             {title}
           </SectionHeading>
 
-          <p className='text-xl text-gray-600 dark:text-white/70'>
-            {description}
-          </p>
+          <p className='text-xl text-secondary-token'>{description}</p>
         </div>
 
         <div className='mx-auto max-w-6xl'>

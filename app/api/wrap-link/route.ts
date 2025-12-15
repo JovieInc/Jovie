@@ -30,7 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import { createWrappedLink } from '@/lib/services/link-wrapping';
 import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
-import { isValidUrl } from '@/lib/utils/url-encryption';
+import { isSafeExternalUrl } from '@/lib/utils/url-encryption';
 
 interface RequestBody {
   url: string;
@@ -38,6 +38,9 @@ interface RequestBody {
   customAlias?: string;
   expiresInHours?: number;
 }
+
+const CUSTOM_ALIAS_REGEX = /^[a-zA-Z0-9_-]{3,20}$/;
+const MAX_EXPIRES_IN_HOURS = 24 * 30;
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,12 +68,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
 
-    const { url, customAlias, expiresInHours } = body;
+    const url = typeof body.url === 'string' ? body.url.trim() : '';
+    const customAlias =
+      typeof body.customAlias === 'string'
+        ? body.customAlias.trim()
+        : undefined;
+    const expiresInHours =
+      typeof body.expiresInHours === 'number' ? body.expiresInHours : undefined;
     const _platform = body.platform || 'external'; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     // Validate URL
-    if (!url || !isValidUrl(url)) {
+    if (!url || !isSafeExternalUrl(url)) {
       return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+    }
+
+    if (customAlias && !CUSTOM_ALIAS_REGEX.test(customAlias)) {
+      return NextResponse.json(
+        { error: 'Invalid custom alias' },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof expiresInHours !== 'undefined' &&
+      (!Number.isFinite(expiresInHours) ||
+        expiresInHours <= 0 ||
+        expiresInHours > MAX_EXPIRES_IN_HOURS)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid expiresInHours' },
+        { status: 400 }
+      );
     }
 
     // Get user ID if authenticated

@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function SupportPage() {
   return (
     <Container className='py-24 text-center'>
-      <h1 className='text-5xl font-bold tracking-tight text-gray-900 dark:text-white'>
+      <h1 className='text-5xl font-bold tracking-tight text-primary-token'>
         We&apos;re here to help.
       </h1>
       <SupportContent />

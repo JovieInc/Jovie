@@ -59,12 +59,14 @@ export function MarketingHeader({
 
   const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';
+  const hidePricingLink = pathname === '/';
 
   return (
     <Header
       sticky={false}
       logoSize={logoSize}
       hideNav={resolvedHideNav}
+      hidePricingLink={hidePricingLink}
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid

@@ -116,6 +116,75 @@ export function isValidUrl(url: string): boolean {
   }
 }
 
+function isIPv4(hostname: string): boolean {
+  const parts = hostname.split('.');
+  if (parts.length !== 4) return false;
+  return parts.every(part => {
+    if (!/^[0-9]{1,3}$/.test(part)) return false;
+    const value = Number(part);
+    return Number.isInteger(value) && value >= 0 && value <= 255;
+  });
+}
+
+function isPrivateIPv4(hostname: string): boolean {
+  if (!isIPv4(hostname)) return false;
+  const [a, b] = hostname.split('.').map(Number);
+  if (a === 10) return true;
+  if (a === 127) return true;
+  if (a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
+
+function isPrivateIPv6(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (normalized === '::1') return true;
+  if (normalized.startsWith('fe80:')) return true;
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+  return false;
+}
+
+function isBlockedHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  if (normalized === 'localhost') return true;
+  if (normalized.endsWith('.localhost')) return true;
+  if (normalized.endsWith('.local')) return true;
+  if (normalized.endsWith('.internal')) return true;
+  return false;
+}
+
+export function isSafeExternalUrl(url: string): boolean {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.length === 0 || trimmed.length > 2048) return false;
+  if (
+    trimmed.includes('\n') ||
+    trimmed.includes('\r') ||
+    trimmed.includes('\t')
+  ) {
+    return false;
+  }
+
+  try {
+    const urlObj = new URL(trimmed);
+    if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+      return false;
+    }
+
+    const hostname = urlObj.hostname;
+    if (!hostname) return false;
+    if (isBlockedHostname(hostname)) return false;
+    if (isPrivateIPv4(hostname)) return false;
+    if (hostname.includes(':') && isPrivateIPv6(hostname)) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Extracts domain from URL
  */

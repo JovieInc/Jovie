@@ -9,6 +9,7 @@ import {
   incrementClickCount,
 } from '@/lib/services/link-wrapping';
 import { detectBot, getBotSafeHeaders } from '@/lib/utils/bot-detection';
+import { isSafeExternalUrl } from '@/lib/utils/url-encryption';
 
 export async function GET(
   request: NextRequest,
@@ -37,6 +38,10 @@ export async function GET(
       // Redirect sensitive links to interstitial page
       const interstitialUrl = new URL(`/out/${shortId}`, request.url);
       return NextResponse.redirect(interstitialUrl, { status: 302 });
+    }
+
+    if (!isSafeExternalUrl(wrappedLink.originalUrl)) {
+      return new NextResponse('Not Found', { status: 404 });
     }
 
     // Increment click count asynchronously (don't wait)

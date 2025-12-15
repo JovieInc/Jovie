@@ -121,7 +121,7 @@ export function HowItWorksSection({
     <section className={`relative py-14 sm:py-18 ${className}`}>
       {/* Section accent border */}
       {showAccentBorder && (
-        <div className='absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-cyan-500/50' />
+        <div className='absolute top-0 left-0 right-0 h-px bg-linear-to-r from-blue-500/50 via-purple-500/50 to-cyan-500/50' />
       )}
 
       <div className='mx-auto max-w-7xl px-6 lg:px-8'>
@@ -136,9 +136,7 @@ export function HowItWorksSection({
             {title}
           </SectionHeading>
 
-          <p className='text-xl text-gray-600 dark:text-white/70'>
-            {description}
-          </p>
+          <p className='text-xl text-secondary-token'>{description}</p>
         </div>
 
         <div className='mx-auto max-w-6xl'>

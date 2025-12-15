@@ -1,20 +1,19 @@
 import { notFound, redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { isAdminEmail } from '@/lib/admin/roles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { AdminAuthError, requireAdmin } from '@/lib/admin/require-admin';
 
 export default async function AdminLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  const entitlements = await getCurrentUserEntitlements();
+  try {
+    await requireAdmin();
+  } catch (error) {
+    if (error instanceof AdminAuthError && error.code === 'UNAUTHENTICATED') {
+      redirect('/signin?redirect_url=/app/admin');
+    }
 
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    redirect('/signin?redirect_url=/app/admin');
-  }
-
-  if (!isAdminEmail(entitlements.email)) {
     notFound();
   }
 

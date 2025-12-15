@@ -19,7 +19,7 @@ export function AuthActions() {
         className='inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md bg-white text-black hover:bg-neutral-200 transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-black focus-visible:ring-white/50'
         style={{ fontSynthesisWeight: 'none' }}
       >
-        Sign up
+        Get early access
       </Link>
     </div>
   );

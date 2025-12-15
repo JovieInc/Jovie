@@ -28,7 +28,7 @@ export default async function InvestorsPage() {
   const toc = doc.toc.filter(entry => entry.level === 2);
 
   return (
-    <div className='bg-white dark:bg-[#0a0a0b]'>
+    <div className='bg-base text-primary-token'>
       <div className='py-16 sm:py-20'>
         <Container size='lg'>
           <DocPage

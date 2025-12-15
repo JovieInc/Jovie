@@ -153,6 +153,7 @@ export const users = pgTable('users', {
   clerkId: text('clerk_id').unique().notNull(),
   name: text('name'),
   email: text('email').unique(),
+  isAdmin: boolean('is_admin').default(false).notNull(),
   isPro: boolean('is_pro').default(false),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),

@@ -1,9 +1,11 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-
-import { isAdminEmail } from '@/lib/admin/roles';
+import {
+  AdminAuthError,
+  getAdminAuthStatusCode,
+  requireAdmin,
+} from '@/lib/admin/require-admin';
 import { db, waitlistEntries } from '@/lib/db';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export const runtime = 'nodejs';
 
@@ -14,15 +16,7 @@ interface AdminOverviewResponse {
 
 export async function GET() {
   try {
-    const entitlements = await getCurrentUserEntitlements();
-
-    if (!entitlements.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!isAdminEmail(entitlements.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    await requireAdmin();
 
     const mrrData = await getStripeMrr();
     const waitlistCount = await getWaitlistCount();
@@ -34,6 +28,13 @@ export async function GET() {
 
     return NextResponse.json(body);
   } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: getAdminAuthStatusCode(error.code) }
+      );
+    }
+
     console.error('Error in admin overview API:', error);
     return NextResponse.json(
       { error: 'Failed to load admin overview' },

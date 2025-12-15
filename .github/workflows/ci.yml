@@ -619,7 +619,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
       name: Main Staging
-      url: https://preview.jov.ie
+      url: https://main.jov.ie
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
@@ -665,7 +665,7 @@ jobs:
           echo "Running canary health check on main deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
           health_url_primary="${deployment_url%/}/api/health"
-          health_url_fallback="https://preview.jov.ie/api/health"
+          health_url_fallback="https://main.jov.ie/api/health"
           health_url="$health_url_primary"
 
           # Wait a moment for deployment to be ready
@@ -715,7 +715,7 @@ jobs:
 
           if [ "$response_code" != "200" ]; then
             if [ "$response_code" = "429" ]; then
-              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to preview.jov.ie..."
+              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to main.jov.ie..."
               health_url="$health_url_fallback"
 
               attempt=1

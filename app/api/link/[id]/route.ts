@@ -31,7 +31,10 @@ import {
   detectBot,
   logBotDetection,
 } from '@/lib/utils/bot-detection';
-import { generateSignedToken } from '@/lib/utils/url-encryption';
+import {
+  generateSignedToken,
+  isSafeExternalUrl,
+} from '@/lib/utils/url-encryption';
 
 interface RequestBody {
   verified?: boolean;
@@ -109,6 +112,10 @@ export async function POST(
     const wrappedLink = await getWrappedLink(shortId);
 
     if (!wrappedLink) {
+      return NextResponse.json({ error: 'Link not found' }, { status: 404 });
+    }
+
+    if (!isSafeExternalUrl(wrappedLink.originalUrl)) {
       return NextResponse.json({ error: 'Link not found' }, { status: 404 });
     }
 

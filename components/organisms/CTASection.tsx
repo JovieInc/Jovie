@@ -19,8 +19,7 @@ export function CTASection({
   className = '',
 }: CTASectionProps) {
   const variantClasses = {
-    primary:
-      'border-t border-white/10 dark:border-white/10 bg-white dark:bg-black',
+    primary: 'border-t border-subtle bg-base',
     secondary: 'bg-zinc-900 text-white',
   };
 
@@ -36,20 +35,14 @@ export function CTASection({
             level={2}
             size={variant === 'secondary' ? 'xl' : 'md'}
             align={variant === 'secondary' ? 'center' : 'left'}
-            className={
-              variant === 'secondary'
-                ? 'text-white'
-                : 'text-neutral-800 dark:text-white'
-            }
+            className={variant === 'secondary' ? 'text-white' : ''}
           >
             {title}
           </SectionHeading>
           {description && (
             <p
               className={`text-lg sm:text-xl leading-relaxed ${
-                variant === 'secondary'
-                  ? 'text-white'
-                  : 'text-gray-600 dark:text-gray-300'
+                variant === 'secondary' ? 'text-white' : 'text-secondary-token'
               }`}
             >
               {description}

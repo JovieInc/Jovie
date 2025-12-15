@@ -12,33 +12,22 @@ export function NewHomeHero() {
       </div>
 
       <Container className='relative'>
-        <div className='max-w-4xl mx-auto text-center md:text-left'>
-          {/* Badge - moved below */}
-          <div className='mb-6 inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium rounded-full bg-surface-1 text-secondary-token border border-subtle'>
-            <span className='relative flex h-1.5 w-1.5'>
-              <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' />
-              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500' />
-            </span>
-            AI Powered Creator Profiles
-          </div>
+        <div className='max-w-5xl lg:max-w-6xl mx-auto text-center md:text-left'>
+          <p className='text-sm font-semibold tracking-tight text-primary-token'>
+            Jovie
+          </p>
 
           {/* Headline */}
-          <h1 className='text-4xl font-bold tracking-tight text-primary-token sm:text-6xl lg:text-7xl leading-[1.05]'>
-            <span className='md:whitespace-nowrap'>You make music.</span>
-            <br />
-            <span className='md:whitespace-nowrap'>
-              Jovie handles{' '}
-              <span className='bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent'>
-                growth.
-              </span>
-            </span>
+          <h1 className='mt-4 text-balance mx-auto md:mx-0 max-w-[28ch] text-[clamp(2.25rem,4.2vw,3.6rem)] font-semibold tracking-[-0.03em] leading-[1.05] text-primary-token'>
+            Turn bio link traffic into fans you can reach — and revenue you can
+            measure.
           </h1>
 
           {/* Subheadline */}
           <p className='mt-5 text-lg leading-relaxed text-secondary-token sm:text-xl max-w-2xl mx-auto md:mx-0'>
-            Jovie is your AI music manager,
-            <br />
-            turning attention into fans—automatically.
+            Jovie is an AI-optimized artist profile that personalizes what each
+            fan sees, captures email/SMS, and follows up automatically to drive
+            streams, merch, and ticket sales.
           </p>
 
           {/* CTA */}
@@ -47,7 +36,7 @@ export function NewHomeHero() {
               href='/waitlist'
               className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-full bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg focus-ring-themed'
             >
-              Request Early Access
+              Get early access
               <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
             </Link>
             <Link

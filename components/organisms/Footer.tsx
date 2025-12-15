@@ -9,6 +9,7 @@ export interface FooterProps {
   variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
   artistHandle?: string;
   hideBranding?: boolean;
+  hidePricingLink?: boolean;
   artistSettings?: {
     hide_branding?: boolean;
   };
@@ -24,6 +25,7 @@ export function Footer({
   variant = 'marketing',
   artistHandle,
   hideBranding = false,
+  hidePricingLink = false,
   artistSettings,
   showThemeToggle = false,
   className = '',
@@ -120,7 +122,7 @@ export function Footer({
   if (variant === 'regular') {
     const productLinks = [
       { href: '/link-in-bio', label: 'Profile' },
-      { href: '/pricing', label: 'Pricing' },
+      ...(!hidePricingLink ? [{ href: '/pricing', label: 'Pricing' }] : []),
       ...FEATURES.map(f => ({ href: f.href, label: f.title })),
     ];
 

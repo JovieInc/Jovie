@@ -23,13 +23,13 @@ export default async function ChangelogPage() {
   const contentHtml = await getChangelogHtml();
 
   return (
-    <section className='bg-white text-gray-900 dark:bg-[#0D0E12] dark:text-white py-12 md:py-16'>
+    <section className='bg-base text-primary-token py-12 md:py-16'>
       <Container>
         <header className='mb-8 md:mb-10'>
           <h1 className='text-3xl md:text-4xl font-semibold tracking-tight'>
             Changelog
           </h1>
-          <p className='mt-2 text-sm md:text-base text-gray-600 dark:text-gray-400 max-w-2xl'>
+          <p className='mt-2 max-w-2xl text-sm md:text-base text-secondary-token'>
             Updates and improvements to {APP_NAME}. We follow the Keep a
             Changelog format and semantic versioning.
           </p>

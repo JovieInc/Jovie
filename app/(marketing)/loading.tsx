@@ -4,7 +4,7 @@
  */
 export default function MarketingLoading() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0D0E12]'>
+    <div className='min-h-screen bg-base'>
       {/* Hero skeleton */}
       <section className='relative flex min-h-[80vh] flex-col items-center justify-center px-4 py-20 text-center'>
         {/* Headline placeholder */}

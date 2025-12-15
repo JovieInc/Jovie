@@ -17,17 +17,20 @@ const clickSchema = z.object({
   profileId: z.string().uuid(),
   linkId: z.string().uuid().optional(),
   linkType: z.enum(['listen', 'social', 'tip', 'other']).default('other'),
-  actionLabel: z.string().optional(),
-  platform: z.string().optional(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  referrer: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
+  actionLabel: z.string().max(200).optional(),
+  platform: z.string().max(200).optional(),
+  ipAddress: z.string().max(100).optional(),
+  userAgent: z.string().max(512).optional(),
+  referrer: z.string().max(2048).optional(),
+  city: z.string().max(100).optional(),
+  country: z.string().max(10).optional(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
-  os: z.string().optional(),
-  browser: z.string().optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  os: z.string().max(100).optional(),
+  browser: z.string().max(100).optional(),
+  metadata: z
+    .record(z.string().max(100), z.unknown())
+    .optional()
+    .refine(value => (value ? Object.keys(value).length <= 50 : true)),
   audienceMemberId: z.string().uuid().optional(),
 });
 
@@ -108,7 +111,18 @@ async function findAudienceMember(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const contentLengthHeader = request.headers.get('content-length');
+    const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+    if (Number.isFinite(contentLength) && contentLength > 20_000) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     const parsed = clickSchema.safeParse(body);
 
     if (!parsed.success) {

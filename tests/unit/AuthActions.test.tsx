@@ -9,7 +9,9 @@ describe('AuthActions', () => {
     render(<AuthActions />);
 
     expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /sign up/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /request early access/i })
+    ).toBeInTheDocument();
   });
 
   it('wraps links in a flex container', () => {

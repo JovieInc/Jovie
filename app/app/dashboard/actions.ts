@@ -12,7 +12,6 @@ import {
   or,
 } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
-import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
@@ -372,7 +371,30 @@ export async function getDashboardData(): Promise<DashboardData> {
   noStore();
 
   const entitlements = await getCurrentUserEntitlements();
-  const isAdmin = isAdminEmail(entitlements.email);
+  const isAdmin = await (async (): Promise<boolean> => {
+    if (!entitlements.isAuthenticated || !entitlements.userId) {
+      return false;
+    }
+
+    try {
+      const [row] = await db
+        .select({ isAdmin: users.isAdmin })
+        .from(users)
+        .where(eq(users.clerkId, entitlements.userId))
+        .limit(1);
+
+      if (typeof row?.isAdmin === 'boolean') {
+        return row.isAdmin;
+      }
+    } catch (error) {
+      const maybeCode = (error as { code?: string } | null)?.code;
+      if (maybeCode !== '42703') {
+        throw error;
+      }
+    }
+
+    return false;
+  })();
 
   const { userId } = await auth();
 

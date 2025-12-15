@@ -79,8 +79,7 @@ describe('SupportPage', () => {
       'text-5xl',
       'font-bold',
       'tracking-tight',
-      'text-gray-900',
-      'dark:text-white'
+      'text-primary-token'
     );
 
     const contactButton = screen.getByRole('link', {

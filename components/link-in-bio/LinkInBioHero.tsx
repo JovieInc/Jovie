@@ -13,7 +13,7 @@ export function LinkInBioHero() {
       subtitle="Your fans don't care about button colors—they care about your music. Jovie's AI tests every word, layout, and CTA behind the scenes to make sure more fans click, listen, and buy."
       icon='🚀'
       supportingText={
-        <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400'>
+        <div className='flex items-center gap-2 text-secondary-token'>
           <svg
             className='w-5 h-5 text-green-600 dark:text-green-400'
             fill='none'
@@ -33,7 +33,7 @@ export function LinkInBioHero() {
         </div>
       }
       trustIndicators={
-        <p className='text-xs text-gray-400 dark:text-white/40 font-medium'>
+        <p className='text-xs font-medium text-tertiary-token'>
           Trusted by 10,000+ artists worldwide
         </p>
       }

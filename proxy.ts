@@ -78,6 +78,23 @@ export default clerkMiddleware(async (auth, req) => {
 
     const { userId } = await auth();
 
+    const requiresAuthenticatedApi =
+      pathname.startsWith('/api/admin') ||
+      pathname.startsWith('/api/dashboard');
+
+    if (!userId && requiresAuthenticatedApi) {
+      const res = NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      res.headers.set(
+        'X-Robots-Tag',
+        'noindex, nofollow, nosnippet, noarchive'
+      );
+      res.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.headers.set('Pragma', 'no-cache');
+      res.headers.set('Expires', '0');
+      res.headers.set('Referrer-Policy', 'no-referrer');
+      return res;
+    }
+
     // Safely access geo information
     let country = '';
     let region = '';
@@ -225,7 +242,25 @@ export default clerkMiddleware(async (auth, req) => {
 
     return res;
   } catch {
-    // Fallback to basic middleware behavior if Clerk auth fails
+    const pathname = req.nextUrl.pathname;
+    const isProtectedPath =
+      pathname.startsWith('/app') ||
+      pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/account') ||
+      pathname.startsWith('/billing') ||
+      pathname.startsWith('/api/admin') ||
+      pathname.startsWith('/api/dashboard');
+
+    // Fail closed on protected paths if Clerk auth fails (misconfig/outage).
+    if (isProtectedPath) {
+      const res = new NextResponse('Service Unavailable', { status: 503 });
+      res.headers.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.headers.set('Pragma', 'no-cache');
+      res.headers.set('Expires', '0');
+      return res;
+    }
+
+    // Public routes should still render even if auth fails.
     return NextResponse.next();
   }
 });

@@ -3,6 +3,11 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AdminAuthError,
+  getAdminAuthStatusCode,
+  requireAdmin,
+} from '@/lib/admin/require-admin';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import {
@@ -177,6 +182,8 @@ async function copyAvatarToBlob(
  */
 export async function POST(request: Request) {
   try {
+    await requireAdmin();
+
     const body = await request.json().catch(() => null);
     const parsed = ingestSchema.safeParse(body);
     if (!parsed.success) {
@@ -503,6 +510,16 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: getAdminAuthStatusCode(error.code),
+          headers: { 'Cache-Control': 'no-store' },
+        }
+      );
+    }
+
     console.error('Admin ingestion failed full error', error);
 
     const errorMessage =

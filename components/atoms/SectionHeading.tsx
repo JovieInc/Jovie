@@ -37,7 +37,7 @@ export function SectionHeading({
     <Tag
       id={id}
       className={cn(
-        'font-bold tracking-tight text-gray-900 dark:text-white',
+        'font-bold tracking-tight text-primary-token',
         sizeClasses[size],
         alignClasses[align],
         className

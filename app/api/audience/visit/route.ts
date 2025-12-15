@@ -15,11 +15,11 @@ export const runtime = 'nodejs';
 
 const visitSchema = z.object({
   profileId: z.string().uuid(),
-  ipAddress: z.string().optional(),
-  userAgent: z.string().optional(),
-  referrer: z.string().optional(),
-  geoCity: z.string().optional(),
-  geoCountry: z.string().optional(),
+  ipAddress: z.string().max(100).optional(),
+  userAgent: z.string().max(512).optional(),
+  referrer: z.string().max(2048).optional(),
+  geoCity: z.string().max(100).optional(),
+  geoCountry: z.string().max(10).optional(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
 });
 
@@ -37,7 +37,18 @@ function inferDeviceType(
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const contentLengthHeader = request.headers.get('content-length');
+    const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+    if (Number.isFinite(contentLength) && contentLength > 20_000) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
+
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     const parsed = visitSchema.safeParse(body);
 
     if (!parsed.success) {

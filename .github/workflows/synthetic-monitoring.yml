@@ -18,7 +18,7 @@ name: Production Synthetic Monitoring
         type: choice
         options:
           - production
-          - preview
+          - main
 
 jobs:
   synthetic-test:
@@ -31,7 +31,7 @@ jobs:
       matrix:
         environment:
           - production
-          - preview
+          - main
 
     steps:
       - name: Safety check - only run on schedule or manual dispatch
@@ -70,8 +70,8 @@ jobs:
             echo "BASE_URL=https://jov.ie" >> $GITHUB_ENV
             echo "ENVIRONMENT=production" >> $GITHUB_ENV
           else
-            echo "BASE_URL=https://preview.jov.ie" >> $GITHUB_ENV
-            echo "ENVIRONMENT=preview" >> $GITHUB_ENV
+            echo "BASE_URL=https://main.jov.ie" >> $GITHUB_ENV
+            echo "ENVIRONMENT=main" >> $GITHUB_ENV
           fi
 
       - name: Run Golden Path Test

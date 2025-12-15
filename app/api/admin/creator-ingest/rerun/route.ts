@@ -1,6 +1,11 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  AdminAuthError,
+  getAdminAuthStatusCode,
+  requireAdmin,
+} from '@/lib/admin/require-admin';
 import { creatorProfiles } from '@/lib/db/schema';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -14,6 +19,8 @@ export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
   try {
+    await requireAdmin();
+
     const body = await request.json().catch(() => null);
     const parsed = rerunSchema.safeParse(body);
 
@@ -76,6 +83,16 @@ export async function POST(request: Request) {
       );
     });
   } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: getAdminAuthStatusCode(error.code),
+          headers: { 'Cache-Control': 'no-store' },
+        }
+      );
+    }
+
     console.error('Failed to rerun ingestion job', error);
     return NextResponse.json(
       { error: 'Failed to queue ingestion job' },

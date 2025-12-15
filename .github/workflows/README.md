@@ -29,3 +29,5 @@ Vercel preview deployments for pull requests and feature branches are handled by
 ## CI and Merge Queue
 
 The main CI workflow `ci.yml` is the gatekeeper for PRs to `main` and `production`. It includes fast checks (typecheck, lint) and full CI (build, unit, E2E). To support GitHub Merge Queue, `ci.yml` listens to the `merge_group` event so required status checks re-run in-queue before merging.
+
+Note: staging deploys from the `main` branch are served at `https://main.jov.ie`.

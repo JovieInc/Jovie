@@ -13,7 +13,7 @@ import {
 import {
   extractDomain,
   generateShortId,
-  isValidUrl,
+  isSafeExternalUrl,
   simpleDecryptUrl,
   simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
@@ -56,7 +56,7 @@ export async function createWrappedLink(
 ): Promise<WrappedLink | null> {
   const { url, userId, expiresInHours, customAlias } = options;
 
-  if (!isValidUrl(url)) {
+  if (!isSafeExternalUrl(url)) {
     throw new Error('Invalid URL provided');
   }
 
@@ -218,6 +218,10 @@ export async function getWrappedLink(
 
     // Decrypt URL
     const originalUrl = simpleDecryptUrl(data.encryptedUrl);
+
+    if (!isSafeExternalUrl(originalUrl)) {
+      return null;
+    }
 
     return {
       id: data.id,

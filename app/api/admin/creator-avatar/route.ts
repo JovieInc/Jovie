@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
+import {
+  AdminAuthError,
+  getAdminAuthStatusCode,
+  requireAdmin,
+} from '@/lib/admin/require-admin';
 
 export const runtime = 'nodejs';
 
@@ -11,6 +16,8 @@ interface AdminAvatarPayload {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdmin();
+
     const body = (await request
       .json()
       .catch(() => null)) as AdminAvatarPayload | null;
@@ -28,11 +35,14 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Admin avatar update error', error);
 
-    if (error instanceof Error) {
-      if (error.message === 'Unauthorized') {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    if (error instanceof AdminAuthError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: getAdminAuthStatusCode(error.code) }
+      );
+    }
 
+    if (error instanceof Error) {
       if (
         error.message === 'Avatar URL must use https' ||
         error.message === 'Avatar URL host is not allowed' ||
