@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogoIcon } from '@/components/atoms/LogoIcon';
+import { Combobox } from '@/components/organisms/Combobox';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
+import {
+  type SpotifyArtistResult,
+  useArtistSearch,
+} from '@/lib/hooks/useArtistSearch';
 
 interface FormErrors {
   fullName?: string[];
@@ -52,11 +57,23 @@ export default function WaitlistPage() {
   const [email, setEmail] = useState('');
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
   const [spotifyUrl, setSpotifyUrl] = useState('');
+  const [spotifyQuery, setSpotifyQuery] = useState('');
+  const [selectedSpotify, setSelectedSpotify] =
+    useState<SpotifyArtistResult | null>(null);
+  const [showSpotifyLinkEntry, setShowSpotifyLinkEntry] = useState(false);
   const [heardAbout, setHeardAbout] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+
+  const {
+    results: spotifyResults,
+    state: spotifySearchState,
+    error: spotifySearchError,
+    search: searchSpotify,
+    clear: clearSpotifySearch,
+  } = useArtistSearch({ debounceMs: 250, limit: 6 });
 
   useEffect(() => {
     setIsHydrating(false);
@@ -215,6 +232,57 @@ export default function WaitlistPage() {
     return <WaitlistSkeleton />;
   }
 
+  const spotifyOptions = spotifyResults.map(result => ({
+    id: result.id,
+    name: result.name,
+    imageUrl: result.imageUrl,
+  }));
+
+  const handleSpotifySearchChange = (value: string) => {
+    setSpotifyQuery(value);
+    setSelectedSpotify(null);
+    setSpotifyUrl('');
+    setShowSpotifyLinkEntry(false);
+    setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+
+    if (value.trim()) {
+      searchSpotify(value);
+    } else {
+      clearSpotifySearch();
+    }
+  };
+
+  const handleSpotifySelect = (option: { id: string; name: string } | null) => {
+    if (!option) {
+      setSelectedSpotify(null);
+      setSpotifyUrl('');
+      return;
+    }
+
+    const matched = spotifyResults.find(result => result.id === option.id);
+    if (matched) {
+      setSelectedSpotify(matched);
+      setSpotifyUrl(matched.url);
+      setShowSpotifyLinkEntry(false);
+      setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+    }
+  };
+
+  const toggleSpotifyLinkEntry = () => {
+    setShowSpotifyLinkEntry(prev => !prev);
+    setSelectedSpotify(null);
+    setSpotifyUrl('');
+    setSpotifyQuery('');
+    clearSpotifySearch();
+    setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+  };
+
+  const handleSpotifyUrlChange = (value: string) => {
+    setSpotifyUrl(value);
+    setSelectedSpotify(null);
+    setFieldErrors(prev => ({ ...prev, spotifyUrl: undefined }));
+  };
+
   return (
     <div className='min-h-screen flex flex-col items-center justify-center bg-[#101012] px-4'>
       {/* Logo */}
@@ -277,15 +345,75 @@ export default function WaitlistPage() {
             </p>
           )}
 
-          <input
-            type='text'
-            id='spotifyUrl'
-            value={spotifyUrl}
-            onChange={e => setSpotifyUrl(e.target.value)}
-            className={INPUT_CLASSES}
-            placeholder='open.spotify.com/artist/... (optional)'
-            disabled={isSubmitting}
-          />
+          <div className='space-y-2'>
+            <p className='text-sm text-[rgb(227,228,230)]'>
+              Spotify artist (optional)
+            </p>
+            <Combobox
+              className='text-left'
+              options={spotifyOptions}
+              value={
+                selectedSpotify
+                  ? {
+                      id: selectedSpotify.id,
+                      name: selectedSpotify.name,
+                      imageUrl: selectedSpotify.imageUrl,
+                    }
+                  : null
+              }
+              onChange={handleSpotifySelect}
+              onInputChange={handleSpotifySearchChange}
+              placeholder='Search Spotify for your artist'
+              label='Spotify artist search'
+              isLoading={spotifySearchState === 'loading'}
+              error={spotifySearchError}
+              showCta={false}
+              disabled={isSubmitting}
+            />
+
+            {selectedSpotify && !showSpotifyLinkEntry && (
+              <p className='text-xs text-[#6b6f76]'>
+                Selected: {selectedSpotify.name}
+              </p>
+            )}
+
+            {(spotifySearchState === 'empty' || spotifySearchError) &&
+              !showSpotifyLinkEntry && (
+                <p className='text-xs text-[#6b6f76]'>
+                  {spotifySearchError ||
+                    `No Spotify results for “${spotifyQuery}”. Paste your artist link instead.`}
+                </p>
+              )}
+
+            <button
+              type='button'
+              onClick={toggleSpotifyLinkEntry}
+              className='text-xs text-white underline-offset-4 hover:underline'
+              disabled={isSubmitting}
+            >
+              {showSpotifyLinkEntry
+                ? 'Back to Spotify search'
+                : "Can't find your artist? Paste the Spotify link"}
+            </button>
+
+            {showSpotifyLinkEntry && (
+              <input
+                type='text'
+                id='spotifyUrl'
+                value={spotifyUrl}
+                onChange={e => handleSpotifyUrlChange(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder='https://open.spotify.com/artist/...'
+                disabled={isSubmitting}
+              />
+            )}
+
+            {fieldErrors.spotifyUrl && (
+              <p className='text-sm text-red-400'>
+                {fieldErrors.spotifyUrl[0]}
+              </p>
+            )}
+          </div>
 
           <input
             type='text'
