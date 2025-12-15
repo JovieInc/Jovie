@@ -18,7 +18,6 @@ export const STATSIG_FLAGS = {
 
   // UI/UX Features
   ARTIST_SEARCH: 'feature_artist_search',
-  DEBUG_BANNER: 'feature_debug_banner',
   TIP_PROMO: 'feature_tip_promo',
 
   // Onboarding Features

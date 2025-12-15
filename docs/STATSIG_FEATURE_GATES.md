@@ -68,13 +68,6 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Used in**:
   - `components/home/FeatureFlaggedArtistSearch.tsx`
 
-#### `feature_debug_banner`
-- **Status**: Deprecated
-- **Default**: `false`
-- **Description**: Show debug banner (removed site-wide, kept for compatibility)
-- **Expiry**: Can be removed after Q1 2025
-- **Used in**: Legacy code only
-
 #### `feature_tip_promo`
 - **Status**: Production
 - **Default**: `true`

@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     'Highest converting profiles for music artists. Analytics you can trust, lightning-fast loading, always beautiful design. Turn fans into streams instantly.';
   const keywords = [
-    'link in bio',
+    'artist profile',
     'music artist conversion',
     'streaming optimization',
     'artist analytics',
@@ -79,7 +79,7 @@ export default function LinkInBioPage() {
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'WebPage',
-            name: `${APP_NAME} - Link in Bio for Musicians`,
+            name: `${APP_NAME} - Artist Profiles for Musicians`,
             description: 'Built to Convert, Not to Decorate',
             url: `${APP_URL}/link-in-bio`,
             publisher: {
@@ -96,7 +96,8 @@ export default function LinkInBioPage() {
               name: APP_NAME,
               applicationCategory: 'MusicApplication',
               operatingSystem: 'Web',
-              description: 'Link in bio platform optimized for music artists',
+              description:
+                'Artist profile platform optimized for music artists',
               offers: {
                 '@type': 'Offer',
                 price: '0',
@@ -110,11 +111,11 @@ export default function LinkInBioPage() {
       {/* Linear-inspired design with theme support */}
       <div className='relative min-h-screen bg-white text-gray-900 dark:bg-[#0D0E12] dark:text-white'>
         {/* Subtle grid background pattern */}
-        <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:50px_50px]' />
+        <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-size-[50px_50px]' />
 
         {/* Gradient orbs - more subtle like Linear */}
-        <div className='absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl' />
-        <div className='absolute bottom-0 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl' />
+        <div className='absolute top-0 left-1/4 w-96 h-96 bg-linear-to-r from-purple-500/10 to-blue-500/10 rounded-full blur-3xl' />
+        <div className='absolute bottom-0 right-1/4 w-96 h-96 bg-linear-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl' />
 
         {/* Hero Section */}
         <LinkInBioHero />

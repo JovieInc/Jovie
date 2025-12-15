@@ -14,6 +14,9 @@ const NewFeaturesSection = dynamic(() =>
 const NewHowItWorks = dynamic(() =>
   import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
 );
+const PricingPreview = dynamic(() =>
+  import('@/components/home/PricingPreview').then(m => m.PricingPreview)
+);
 const NewPreFooterCTA = dynamic(() =>
   import('@/components/home/NewPreFooterCTA').then(m => m.NewPreFooterCTA)
 );
@@ -26,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const description =
     "Secure your name. Share a profile that's fast, beautiful, and optimized to convert.";
   const keywords = [
-    'link in bio',
+    'creator profile',
     'music artist',
     'spotify',
     'social media',
@@ -175,9 +178,10 @@ export default function HomePage() {
 
         {/* 5. Features (what Free includes, forever) */}
         <NewFeaturesSection />
-
-        {/* 5. Upgrade teaser (lightweight, not a pricing page) */}
       </div>
+
+      {/* 6. Pricing preview (3 tiers) */}
+      <PricingPreview />
 
       {/* Pre-footer CTA */}
       <NewPreFooterCTA />

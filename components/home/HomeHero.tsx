@@ -13,8 +13,7 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
     false
   );
 
-  const defaultSubtitle =
-    subtitle ?? 'Your personalized link in bio, ready in seconds.';
+  const defaultSubtitle = subtitle ?? 'Your Jovie profile, ready in seconds.';
 
   const content = loading ? (
     <div className='flex flex-col items-center gap-4'>

@@ -38,5 +38,3 @@ export async function updateCreatorProfileAction(
     return { success: false, error: 'Failed to update profile' };
   }
 }
-
-// TODO: Implement createSocialLink function with proper database integration
