@@ -44,10 +44,7 @@ export async function setupDatabase() {
     try {
       await migrate(db, { migrationsFolder });
     } catch (error) {
-      console.warn(
-        'Migration failed, continuing with existing schema:',
-        error
-      );
+      console.warn('Migration failed, continuing with existing schema:', error);
     }
 
     await db.execute(`
