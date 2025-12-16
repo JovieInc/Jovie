@@ -38,6 +38,17 @@ function getStripeClient(): Stripe {
   return stripeClient;
 }
 
+export const stripe: Stripe = new Proxy({} as Stripe, {
+  get: (_target, prop) => {
+    const client = getStripeClient() as unknown as Record<PropertyKey, unknown>;
+    const value = client[prop];
+    if (typeof value === 'function') {
+      return (value as (...args: unknown[]) => unknown).bind(getStripeClient());
+    }
+    return value;
+  },
+});
+
 /**
  * Get or create a Stripe customer for a user
  * Idempotent operation - safe to call multiple times
