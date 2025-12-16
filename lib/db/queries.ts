@@ -33,6 +33,7 @@ export async function getCreatorProfileWithLinks(username: string) {
       id: creatorProfiles.id,
       userId: creatorProfiles.userId,
       userIsPro: users.isPro,
+      userClerkId: users.clerkId,
       creatorType: creatorProfiles.creatorType,
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,

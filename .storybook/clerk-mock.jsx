@@ -72,6 +72,13 @@ export const useAuth = () => ({
   has: () => false, // Mock billing/plan checks
 });
 
+export const useClerk = () => ({
+  signOut: () => Promise.resolve(),
+  openSignIn: () => Promise.resolve(),
+  openSignUp: () => Promise.resolve(),
+  openUserProfile: () => Promise.resolve(),
+});
+
 export const useSession = () => ({
   session: mockSession,
   isSignedIn: true,
@@ -152,6 +159,7 @@ export const Protect = ({ children, fallback, ...props }) => {
 export default {
   useUser,
   useAuth,
+  useClerk,
   useSession,
   useOrganization,
   useOrganizationList,

@@ -337,6 +337,40 @@ async function runMigrations() {
     const message = err instanceof Error ? err.message : String(err);
     log.error(`Migration failed: ${message}`);
 
+    console.error(err);
+
+    const postgresCause = (() => {
+      if (!err || typeof err !== 'object') return undefined;
+      const e = err as Record<string, unknown>;
+      const cause = e.cause;
+      if (!cause || typeof cause !== 'object') return undefined;
+      const c = cause as Record<string, unknown>;
+      const code = typeof c.code === 'string' ? c.code : undefined;
+      const causeMessage =
+        typeof c.message === 'string' ? c.message : undefined;
+      return { code, causeMessage };
+    })();
+
+    const postgresCode = details?.code ?? postgresCause?.code;
+    const postgresMessage = postgresCause?.causeMessage;
+    if (
+      postgresCode === '42701' ||
+      (postgresMessage && postgresMessage.includes('already exists'))
+    ) {
+      log.warning(
+        'Detected migration-history drift: the database schema already contains a change that a migration is trying to re-apply.'
+      );
+      log.info(
+        'Recommended fix (cleanest): point DATABASE_URL at a fresh Neon branch reset from main, then rerun pnpm drizzle:migrate.'
+      );
+      log.info(
+        'Alternative (dev only): mark the conflicting migration as applied in drizzle.__drizzle_migrations (no migration file edits).'
+      );
+      log.info(
+        'For the specific error in this run: users.is_admin already exists but migration 0017_medical_anita_blake is not recorded.'
+      );
+    }
+
     if (details) {
       log.error(`Postgres details: ${JSON.stringify(details)}`);
     }

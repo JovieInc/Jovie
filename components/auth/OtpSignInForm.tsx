@@ -6,25 +6,24 @@ import { useClerk } from '@clerk/nextjs';
 import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AuthInput, OtpInput } from './atoms';
+import { AuthButton, AuthInput, authButtonVariants, OtpInput } from './atoms';
 import { ButtonSpinner } from './ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
   'mt-2 text-sm text-red-400 text-center animate-in fade-in-0 duration-200';
-const SUBMIT_BUTTON_CLASSES =
-  'w-full rounded-md bg-[#e8e8e8] hover:bg-white disabled:opacity-70 disabled:cursor-not-allowed text-sm text-[#101012] font-medium py-3 px-4 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10]';
-const SECONDARY_BUTTON_CLASSES =
-  'w-full rounded-md border border-white/10 bg-[#17181d] px-4 py-4 text-sm font-medium text-[rgb(227,228,230)] hover:bg-[#1e2027] transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10]';
 const STEP_TRANSITION_CLASSES =
   'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
-const LINK_CLASSES =
-  'w-full text-center text-sm text-secondary hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded';
 const FOOTER_LINK_CLASSES =
-  'text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded';
+  'text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded-md';
+
+const submitButtonClassName = authButtonVariants({ variant: 'primary' });
+const secondaryButtonClassName = authButtonVariants({ variant: 'secondary' });
+const linkButtonClassName = authButtonVariants({ variant: 'link' });
 
 type AuthMethod = 'email' | 'google' | 'spotify';
 
 const LAST_AUTH_METHOD_STORAGE_KEY = 'jovie.last_auth_method';
+const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
 
 interface ClerkClientLastAuthStrategyAccess {
   client?: {
@@ -83,26 +82,9 @@ function SpotifyIcon({ className }: { className?: string }) {
       viewBox='0 0 24 24'
       aria-hidden='true'
       className={className ?? 'h-5 w-5'}
-      fill='none'
+      fill='currentColor'
     >
-      <path
-        d='M12 2.25C6.615 2.25 2.25 6.615 2.25 12C2.25 17.385 6.615 21.75 12 21.75C17.385 21.75 21.75 17.385 21.75 12C21.75 6.615 17.385 2.25 12 2.25Z'
-        fill='#ffffff'
-        stroke='#0f0f11'
-        strokeWidth='0.75'
-      />
-      <path
-        d='M16.845 10.0202C14.01 8.37019 9.34502 8.22019 6.64502 9.04519C6.28502 9.15019 5.91002 8.94019 5.80502 8.58019C5.70002 8.22019 5.91002 7.84519 6.27002 7.74019C9.37502 6.81019 14.535 6.99019 17.67 8.82019C18 9.01519 18.12 9.45019 17.925 9.78019C17.73 10.1102 17.175 10.2152 16.845 10.0202Z'
-        fill='#0f0f11'
-      />
-      <path
-        d='M16.68 12.4352C14.295 11.0102 10.665 10.5902 7.665 11.5202C7.32 11.6252 6.945 11.4302 6.84 11.0852C6.735 10.7402 6.93 10.3652 7.275 10.2602C10.68 9.21023 14.82 9.66023 17.55 11.2952C17.865 11.4902 17.97 11.8952 17.775 12.2102C17.58 12.5252 16.995 12.6302 16.68 12.4352Z'
-        fill='#0f0f11'
-      />
-      <path
-        d='M16.515 14.7602C14.43 13.5302 11.82 13.2602 8.74502 13.9952C8.40002 14.0702 8.05502 13.8452 7.98002 13.5002C7.90502 13.1552 8.13002 12.8102 8.47502 12.7352C11.85 11.9252 14.775 12.2402 17.19 13.6652C17.49 13.8452 17.595 14.2352 17.415 14.5352C17.235 14.8352 16.815 14.9402 16.515 14.7602Z'
-        fill='#0f0f11'
-      />
+      <path d='M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.48.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.32 11.28-1.08 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z' />
     </svg>
   );
 }
@@ -114,6 +96,26 @@ export function OtpSignInForm() {
   const emailFocusAttemptRef = useRef(0);
 
   useEffect(() => {
+    try {
+      const redirectUrl = new URL(window.location.href).searchParams.get(
+        'redirect_url'
+      );
+      if (
+        redirectUrl &&
+        redirectUrl.startsWith('/') &&
+        !redirectUrl.startsWith('//')
+      ) {
+        window.sessionStorage.setItem(
+          AUTH_REDIRECT_URL_STORAGE_KEY,
+          redirectUrl
+        );
+      }
+    } catch {
+      // Ignore sessionStorage access errors
+    }
+  }, []);
+
+  useEffect(() => {
     const lastStrategy = (clerk as unknown as ClerkClientLastAuthStrategyAccess)
       .client?.lastAuthenticationStrategy;
 
@@ -123,9 +125,13 @@ export function OtpSignInForm() {
       return;
     }
 
-    const stored = window.localStorage.getItem(LAST_AUTH_METHOD_STORAGE_KEY);
-    if (isAuthMethod(stored)) {
-      setLastAuthMethod(stored);
+    try {
+      const stored = window.localStorage.getItem(LAST_AUTH_METHOD_STORAGE_KEY);
+      if (isAuthMethod(stored)) {
+        setLastAuthMethod(stored);
+      }
+    } catch {
+      // Ignore localStorage access errors (e.g., blocked in private mode)
     }
   }, [clerk]);
 
@@ -151,10 +157,21 @@ export function OtpSignInForm() {
     };
   }, [isEmailOpen]);
 
-  const setLastUsedAuthMethod = useCallback((method: AuthMethod) => {
-    window.localStorage.setItem(LAST_AUTH_METHOD_STORAGE_KEY, method);
-    setLastAuthMethod(method);
+  const persistLastUsedAuthMethod = useCallback((method: AuthMethod) => {
+    try {
+      window.localStorage.setItem(LAST_AUTH_METHOD_STORAGE_KEY, method);
+    } catch {
+      // Ignore localStorage access errors
+    }
   }, []);
+
+  const setLastUsedAuthMethod = useCallback(
+    (method: AuthMethod) => {
+      persistLastUsedAuthMethod(method);
+      setLastAuthMethod(method);
+    },
+    [persistLastUsedAuthMethod]
+  );
 
   const orderedMethods = useMemo((): AuthMethod[] => {
     const base: AuthMethod[] = ['spotify', 'google', 'email'];
@@ -167,19 +184,21 @@ export function OtpSignInForm() {
     isPrimary: boolean
   ): JSX.Element => {
     const className = isPrimary
-      ? SUBMIT_BUTTON_CLASSES
-      : SECONDARY_BUTTON_CLASSES;
+      ? submitButtonClassName
+      : secondaryButtonClassName;
 
     if (method === 'email') {
       return (
         <div>
-          <button
-            type='button'
-            className={className}
-            onClick={() => setIsEmailOpen(true)}
+          <AuthButton
+            variant={isPrimary ? 'primary' : 'secondary'}
+            onClick={() => {
+              setLastUsedAuthMethod('email');
+              setIsEmailOpen(true);
+            }}
           >
             Continue with email
-          </button>
+          </AuthButton>
         </div>
       );
     }
@@ -193,7 +212,7 @@ export function OtpSignInForm() {
               className={className}
               disabled={isLoading}
               aria-busy={isLoading}
-              onClick={() => setLastUsedAuthMethod('google')}
+              onClickCapture={() => persistLastUsedAuthMethod('google')}
             >
               {isLoading ? (
                 <>
@@ -220,7 +239,7 @@ export function OtpSignInForm() {
             className={className}
             disabled={isLoading}
             aria-busy={isLoading}
-            onClick={() => setLastUsedAuthMethod('spotify')}
+            onClickCapture={() => persistLastUsedAuthMethod('spotify')}
           >
             {isLoading ? (
               <>
@@ -243,12 +262,9 @@ export function OtpSignInForm() {
     <SignIn.Root routing='path' path='/signin'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
         <CardContent className='space-y-3 p-0'>
-          <div role='alert' aria-live='polite' className='sr-only' />
-          <Clerk.GlobalError
-            role='alert'
-            aria-live='polite'
-            className='text-destructive'
-          />
+          <div className='min-h-[24px]' role='alert' aria-live='polite'>
+            <Clerk.GlobalError className='text-destructive' />
+          </div>
           <SignIn.Step name='start' aria-label='Choose a sign-in method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
               <h1 className='text-lg font-medium text-[rgb(227,228,230)] mb-0 text-center'>
@@ -270,7 +286,7 @@ export function OtpSignInForm() {
                     {isLoading => (
                       <SignIn.Action
                         submit
-                        className={SECONDARY_BUTTON_CLASSES}
+                        className={secondaryButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
                         onClick={() => setLastUsedAuthMethod('email')}
@@ -287,13 +303,13 @@ export function OtpSignInForm() {
                     )}
                   </Clerk.Loading>
 
-                  <button
-                    type='button'
-                    className={LINK_CLASSES}
+                  <AuthButton
+                    variant='link'
+                    className='text-center'
                     onClick={() => setIsEmailOpen(false)}
                   >
                     ← Back to login
-                  </button>
+                  </AuthButton>
                 </div>
               ) : (
                 <div className='pt-4 space-y-3'>
@@ -352,7 +368,7 @@ export function OtpSignInForm() {
                     {isLoading => (
                       <SignIn.Action
                         submit
-                        className={SUBMIT_BUTTON_CLASSES}
+                        className={submitButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
                       >
@@ -368,7 +384,10 @@ export function OtpSignInForm() {
                     )}
                   </Clerk.Loading>
 
-                  <SignIn.Action navigate='start' className={LINK_CLASSES}>
+                  <SignIn.Action
+                    navigate='start'
+                    className={`${linkButtonClassName} text-center`}
+                  >
                     ← Use a different email
                   </SignIn.Action>
                 </div>

@@ -122,7 +122,7 @@ export function InterstitialClient({
         onClick={handleContinue}
         disabled={isVerifying}
         className={`
-          w-full py-3 px-4 rounded-lg font-medium transition-colors
+          w-full py-3 px-4 rounded-md font-medium transition-colors
           ${
             isVerifying
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'

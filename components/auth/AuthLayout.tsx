@@ -20,7 +20,7 @@ interface AuthLayoutProps {
 }
 
 const LINK_FOCUS_CLASSES =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded-md';
 
 export function AuthLayout({
   children,
@@ -91,7 +91,7 @@ export function AuthLayout({
       {showSkipLink && (
         <Link
           href='#auth-form'
-          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded-lg'
+          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded-md'
         >
           Skip to form
         </Link>

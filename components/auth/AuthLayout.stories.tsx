@@ -19,10 +19,10 @@ const SampleForm = () => (
       <input
         type='email'
         placeholder='you@example.com'
-        className='w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-800 text-white'
+        className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
       />
     </div>
-    <button className='w-full py-2 bg-white text-black rounded-lg font-medium'>
+    <button className='w-full py-2 bg-white text-black rounded-md font-medium'>
       Continue
     </button>
   </div>
@@ -61,7 +61,7 @@ export const Waitlist: Story = {
           <input
             type='email'
             placeholder='you@example.com'
-            className='w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-800 text-white'
+            className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
           />
         </div>
         <div className='space-y-2'>
@@ -71,10 +71,10 @@ export const Waitlist: Story = {
           <input
             type='text'
             placeholder='@yourhandle'
-            className='w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-800 text-white'
+            className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
           />
         </div>
-        <button className='w-full py-2 bg-white text-black rounded-lg font-medium'>
+        <button className='w-full py-2 bg-white text-black rounded-md font-medium'>
           Join Waitlist
         </button>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import * as Clerk from '@clerk/elements/common';
+import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 const OTP_LENGTH = 6;
@@ -35,39 +36,75 @@ export function OtpInput({
   autoFocus = true,
   'aria-label': ariaLabel = 'One-time password',
 }: OtpInputProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const focusUnderlyingInput = (): void => {
+    inputRef.current?.focus();
+  };
+
+  const handlePasteCapture = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const raw = event.clipboardData.getData('text');
+    const digits = raw.replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!digits) return;
+
+    event.preventDefault();
+    focusUnderlyingInput();
+
+    const el = inputRef.current;
+    if (!el) return;
+
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      'value'
+    )?.set;
+    valueSetter?.call(el, digits);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.setSelectionRange(
+      Math.min(digits.length, OTP_LENGTH - 1),
+      digits.length
+    );
+
+    if (autoSubmit && digits.length === OTP_LENGTH) {
+      el.form?.requestSubmit();
+    }
+  };
+
   return (
-    <Clerk.Input
-      type='otp'
-      autoSubmit={autoSubmit}
-      autoFocus={autoFocus}
-      length={OTP_LENGTH}
-      className='flex justify-center gap-2'
-      aria-label={ariaLabel}
-      render={({ value, status }) => (
-        <div
-          className={cn(
-            'flex h-12 w-10 items-center justify-center rounded-lg border-2 text-xl font-mono transition-all',
-            'bg-[#23252a] text-white',
-            // Status-based styling
-            status === 'cursor'
-              ? 'border-white ring-2 ring-white/20'
-              : status === 'selected'
-                ? 'border-zinc-500'
-                : 'border-zinc-700',
-            // Focus-visible for keyboard navigation
-            'focus-within:border-white focus-within:ring-2 focus-within:ring-white/20'
-          )}
-          data-status={status}
-          role='presentation'
-        >
-          {value}
-          {status === 'cursor' && (
-            <span className='animate-pulse text-white/60' aria-hidden='true'>
-              |
-            </span>
-          )}
-        </div>
-      )}
-    />
+    <div onClick={focusUnderlyingInput} onPasteCapture={handlePasteCapture}>
+      <Clerk.Input
+        ref={inputRef}
+        type='otp'
+        autoSubmit={autoSubmit}
+        autoFocus={autoFocus}
+        length={OTP_LENGTH}
+        className='flex justify-center gap-2'
+        aria-label={ariaLabel}
+        render={({ value, status }) => (
+          <div
+            className={cn(
+              'flex h-12 w-10 items-center justify-center rounded-md border-2 text-xl font-mono transition-all',
+              'bg-[#23252a] text-white',
+              // Status-based styling
+              status === 'cursor'
+                ? 'border-white ring-2 ring-white/20'
+                : status === 'selected'
+                  ? 'border-zinc-500'
+                  : 'border-zinc-700',
+              // Focus-visible for keyboard navigation
+              'focus-within:border-white focus-within:ring-2 focus-within:ring-white/20'
+            )}
+            data-status={status}
+            role='presentation'
+          >
+            {value}
+            {status === 'cursor' && (
+              <span className='animate-pulse text-white/60' aria-hidden='true'>
+                |
+              </span>
+            )}
+          </div>
+        )}
+      />
+    </div>
   );
 }

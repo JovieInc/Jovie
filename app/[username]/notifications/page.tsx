@@ -176,7 +176,7 @@ export default function NotificationsPage() {
           <button
             type='submit'
             disabled={isSubmitting}
-            className='w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg disabled:opacity-50'
+            className='w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md disabled:opacity-50'
           >
             {isSubmitting ? 'Subscribing...' : 'Turn on notifications'}
           </button>

@@ -93,7 +93,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "storybook:build": "storybook build",
-    "storybook:test": "storybook test --watch=false"
+    "storybook:test": "test-storybook"
   },
   "dependencies": {
     "@clerk/elements": "0.23.88",

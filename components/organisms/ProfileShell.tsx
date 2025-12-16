@@ -30,6 +30,26 @@ import type {
   NotificationSubscriptionState,
 } from '@/types/notifications';
 
+function formatE164PhoneForDisplay(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return value;
+
+  if (digits.startsWith('1') && digits.length === 11) {
+    const national = digits.slice(1);
+    const part1 = national.slice(0, 3);
+    const part2 = national.slice(3, 6);
+    const part3 = national.slice(6, 10);
+    return `+1 (${part1}) ${part2}-${part3}`;
+  }
+
+  if (value.startsWith('+')) {
+    const grouped = digits.match(/.{1,3}/g);
+    return grouped ? `+${grouped.join(' ')}` : value;
+  }
+
+  return value;
+}
+
 type ProfileNotificationsState = 'idle' | 'editing' | 'success';
 
 interface ProfileNotificationsContextValue {
@@ -427,7 +447,11 @@ export function ProfileShell({
               </span>
             </p>
             {contactValue ? (
-              <p className='text-xs text-gray-500 break-all'>{contactValue}</p>
+              <p className='text-xs text-gray-500 break-all'>
+                {targetChannel === 'phone'
+                  ? formatE164PhoneForDisplay(contactValue)
+                  : contactValue}
+              </p>
             ) : null}
           </div>
           <span
@@ -627,7 +651,7 @@ export function ProfileShell({
 
                     {/* Tip Button - Right side */}
                     {showTipButton && (
-                      <div className='flex-shrink-0'>
+                      <div className='shrink-0'>
                         <CTAButton
                           href={`/${artist.handle}?mode=tip`}
                           variant='primary'

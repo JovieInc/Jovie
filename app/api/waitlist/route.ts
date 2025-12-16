@@ -1,9 +1,32 @@
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function deriveFullName(params: {
+  userFullName: string | null | undefined;
+  userUsername: string | null | undefined;
+  email: string;
+}): string {
+  const fromUser = (params.userFullName ?? '').trim();
+  if (fromUser) return fromUser;
+
+  const fromUsername = (params.userUsername ?? '').trim();
+  if (fromUsername) return fromUsername;
+
+  const localPart = params.email.split('@')[0]?.trim();
+  if (localPart) return localPart;
+
+  return 'Jovie user';
+}
 
 /**
  * Platform detection for waitlist primary social URL
@@ -59,10 +82,28 @@ function normalizeSpotifyUrl(url: string): string {
   }
 }
 
+function isMissingWaitlistSchemaError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  const mentionsWaitlist = msg.includes('waitlist_entries');
+  const missingTable =
+    msg.includes('does not exist') ||
+    msg.includes('undefined_table') ||
+    msg.includes('relation');
+  const missingColumn =
+    msg.includes('column') && msg.includes('does not exist');
+  const mentionsNewColumns =
+    msg.includes('primary_goal') || msg.includes('selected_plan');
+
+  return (
+    (mentionsWaitlist && missingTable) ||
+    (mentionsWaitlist && missingColumn) ||
+    (mentionsWaitlist && mentionsNewColumns)
+  );
+}
+
 // Request body schema
 const waitlistRequestSchema = z.object({
-  fullName: z.string().min(1, 'Full name is required').max(200),
-  email: z.string().email('Invalid email address'),
   primaryGoal: z.enum(['streams', 'merch', 'tickets']).optional().nullable(),
   primarySocialUrl: z.string().url('Invalid URL format'),
   spotifyUrl: z.string().url('Invalid Spotify URL').optional().nullable(),
@@ -70,8 +111,141 @@ const waitlistRequestSchema = z.object({
   selectedPlan: z.string().optional().nullable(), // free|pro|growth|branding
 });
 
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json(
+      { hasEntry: false, status: null },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const user = await currentUser();
+  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+  if (!emailRaw) {
+    return NextResponse.json(
+      { hasEntry: false, status: null },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const email = normalizeEmail(emailRaw);
+
+  const [entry] = await db
+    .select({ status: waitlistEntries.status })
+    .from(waitlistEntries)
+    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+    .limit(1);
+
+  return NextResponse.json(
+    {
+      hasEntry: Boolean(entry),
+      status: entry?.status ?? null,
+    },
+    { headers: NO_STORE_HEADERS }
+  );
+}
+
 export async function POST(request: Request) {
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const isDev = process.env.NODE_ENV === 'development';
+    const databaseUrl = process.env.DATABASE_URL;
+    const hasDatabaseUrl = Boolean(databaseUrl);
+
+    if (!hasDatabaseUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Waitlist is temporarily unavailable.',
+          code: 'db_not_configured',
+          debug: isDev
+            ? 'Set DATABASE_URL in .env.local and restart pnpm dev.'
+            : undefined,
+        },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const dbHost = (() => {
+      if (!isDev || !databaseUrl) return undefined;
+      try {
+        const parsed = new URL(databaseUrl);
+        return parsed.host;
+      } catch {
+        return undefined;
+      }
+    })();
+
+    let hasWaitlistTable = false;
+    try {
+      const result = await db.execute(
+        drizzleSql<{ table_exists: boolean }>`
+          SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+              AND table_name = 'waitlist_entries'
+          ) AS table_exists
+        `
+      );
+
+      hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
+    } catch (error) {
+      console.error('[Waitlist API] DB connectivity error:', error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Waitlist is temporarily unavailable.',
+          code: 'db_unreachable',
+          debug:
+            isDev && error instanceof Error
+              ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
+              : isDev
+                ? `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`
+                : undefined,
+        },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!hasWaitlistTable) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Waitlist is temporarily unavailable.',
+          code: 'waitlist_table_missing',
+          debug: isDev
+            ? `Run pnpm drizzle:migrate to create/update waitlist tables.${dbHost ? ` (host: ${dbHost})` : ''}`
+            : undefined,
+        },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const user = await currentUser();
+    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+    if (!emailRaw) {
+      return NextResponse.json(
+        { success: false, error: 'Email is required' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const email = normalizeEmail(emailRaw);
+    const fullName = deriveFullName({
+      userFullName: user?.fullName,
+      userUsername: user?.username,
+      email,
+    });
+
     const body = await request.json();
 
     // Validate request body
@@ -85,8 +259,6 @@ export async function POST(request: Request) {
     }
 
     const {
-      fullName,
-      email,
       primaryGoal,
       primarySocialUrl,
       spotifyUrl,
@@ -102,8 +274,57 @@ export async function POST(request: Request) {
       ? normalizeSpotifyUrl(spotifyUrl)
       : null;
 
+    const [existing] = await db
+      .select({ id: waitlistEntries.id, status: waitlistEntries.status })
+      .from(waitlistEntries)
+      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+      .limit(1);
+
+    if (existing) {
+      // Avoid overwriting invited/claimed/rejected states.
+      if (existing.status === 'new') {
+        const updateValues = {
+          fullName,
+          primaryGoal: primaryGoal ?? null,
+          primarySocialUrl,
+          primarySocialPlatform: platform,
+          primarySocialUrlNormalized: normalizedUrl,
+          spotifyUrl: spotifyUrl ?? null,
+          spotifyUrlNormalized,
+          heardAbout: heardAbout ?? null,
+          selectedPlan: selectedPlan ?? null,
+          updatedAt: new Date(),
+        };
+
+        try {
+          await db
+            .update(waitlistEntries)
+            .set(updateValues)
+            .where(eq(waitlistEntries.id, existing.id));
+        } catch (error) {
+          if (!isMissingWaitlistSchemaError(error)) throw error;
+          const {
+            primaryGoal: _primaryGoal,
+            selectedPlan: _selectedPlan,
+            ...fallbackValues
+          } = updateValues;
+          void _primaryGoal;
+          void _selectedPlan;
+          await db
+            .update(waitlistEntries)
+            .set(fallbackValues)
+            .where(eq(waitlistEntries.id, existing.id));
+        }
+      }
+
+      return NextResponse.json(
+        { success: true, status: existing.status },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     // Insert waitlist entry
-    await db.insert(waitlistEntries).values({
+    const insertValues = {
       fullName,
       email,
       primaryGoal: primaryGoal ?? null,
@@ -114,12 +335,49 @@ export async function POST(request: Request) {
       spotifyUrlNormalized,
       heardAbout: heardAbout ?? null,
       selectedPlan: selectedPlan ?? null, // Quietly track pricing tier interest
-      status: 'new',
-    });
+      status: 'new' as const,
+    };
 
-    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
+    try {
+      await db.insert(waitlistEntries).values(insertValues);
+    } catch (error) {
+      if (!isMissingWaitlistSchemaError(error)) throw error;
+      const {
+        primaryGoal: _primaryGoal,
+        selectedPlan: _selectedPlan,
+        ...fallbackValues
+      } = insertValues;
+      void _primaryGoal;
+      void _selectedPlan;
+      await db.insert(waitlistEntries).values(fallbackValues);
+    }
+
+    return NextResponse.json(
+      { success: true, status: 'new' },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
+
+    const isDev = process.env.NODE_ENV === 'development';
+
+    if (isMissingWaitlistSchemaError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Waitlist is temporarily unavailable.',
+          code: 'waitlist_schema_error',
+          debug:
+            isDev && error instanceof Error
+              ? error.message
+              : isDev
+                ? 'Run pnpm drizzle:migrate to update waitlist schema.'
+                : undefined,
+        },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
+
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },
       { status: 500, headers: NO_STORE_HEADERS }

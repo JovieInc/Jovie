@@ -11,14 +11,34 @@ import type {
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+function normalizePhoneToE164(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
+
+  if (normalized.startsWith('00')) {
+    normalized = `+${normalized.slice(2)}`;
+  }
+
+  if (!normalized.startsWith('+')) {
+    normalized = `+${normalized}`;
+  }
+
+  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
+
+  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
 const statusSchema = z
   .object({
     artist_id: z.string().uuid(),
     email: z.string().email().optional(),
-    phone: z
-      .string()
-      .regex(/^\+?[0-9]{7,20}$/, 'Please provide a valid phone number')
-      .optional(),
+    phone: z.string().min(1).max(64).optional(),
   })
   .refine(
     data => Boolean(data.email) || Boolean(data.phone),
@@ -27,7 +47,19 @@ const statusSchema = z
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request data',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const result = statusSchema.safeParse(body);
 
     if (!result.success) {
@@ -35,7 +67,6 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error: 'Invalid request data',
-          details: result.error.format(),
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -43,7 +74,17 @@ export async function POST(request: NextRequest) {
 
     const { artist_id, email, phone } = result.data;
     const normalizedEmail = email?.trim().toLowerCase() ?? null;
-    const normalizedPhone = phone ? phone.replace(/[\s-]/g, '') : null;
+    const normalizedPhone = phone ? normalizePhoneToE164(phone) : null;
+
+    if (phone && !normalizedPhone) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please provide a valid phone number',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const channels: NotificationSubscriptionState = {};
     const details: NotificationContactValues = {};

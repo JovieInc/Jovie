@@ -190,12 +190,11 @@ export function EnhancedDashboardLinks({
     dashboardData.selectedProfile?.username ?? ''
   );
 
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>({
-    saving: false,
-    success: null,
-    error: null,
-    lastSaved: null,
-  });
+  const [editingField, setEditingField] = useState<
+    'displayName' | 'username' | null
+  >(null);
+  const displayNameInputRef = useRef<HTMLInputElement>(null);
+  const usernameInputRef = useRef<HTMLInputElement>(null);
 
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>({
     saving: false,
@@ -229,6 +228,7 @@ export function EnhancedDashboardLinks({
       setArtist(null);
       setProfileDisplayName('');
       setProfileUsername('');
+      setEditingField(null);
       lastProfileSavedRef.current = null;
       return;
     }
@@ -250,6 +250,17 @@ export function EnhancedDashboardLinks({
       lastSaved: null,
     });
   }, [dashboardData.selectedProfile]);
+
+  useEffect(() => {
+    if (editingField === 'displayName') {
+      displayNameInputRef.current?.focus();
+      displayNameInputRef.current?.select();
+    }
+    if (editingField === 'username') {
+      usernameInputRef.current?.focus();
+      usernameInputRef.current?.select();
+    }
+  }, [editingField]);
 
   const updateProfile = useCallback(
     async (updates: ProfileUpdatePayload): Promise<ProfileUpdateResponse> => {
@@ -626,8 +637,6 @@ export function EnhancedDashboardLinks({
       });
 
       try {
-        setSaveStatus(prev => ({ ...prev, saving: true }));
-
         const payload = normalized.map((l, index) => ({
           platform: l.platform.id,
           platformType: l.platform.category,
@@ -646,12 +655,6 @@ export function EnhancedDashboardLinks({
         }));
 
         if (!profileId) {
-          setSaveStatus({
-            saving: false,
-            success: false,
-            error: 'Missing profile id; please refresh the page and try again.',
-            lastSaved: null,
-          });
           toast.error('Unable to save links. Please refresh and try again.');
           return;
         }
@@ -693,12 +696,6 @@ export function EnhancedDashboardLinks({
         }
 
         const now = new Date();
-        setSaveStatus({
-          saving: false,
-          success: true,
-          error: null,
-          lastSaved: now,
-        });
         toast.success(
           `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
         );
@@ -706,12 +703,6 @@ export function EnhancedDashboardLinks({
         console.error('Error saving links:', error);
         const message =
           error instanceof Error ? error.message : 'Failed to save links';
-        setSaveStatus({
-          saving: false,
-          success: false,
-          error: message,
-          lastSaved: null,
-        });
         toast.error(message || 'Failed to save links. Please try again.');
       }
     },
@@ -1008,31 +999,13 @@ export function EnhancedDashboardLinks({
   return (
     <div className='min-w-0 min-h-screen'>
       {/* Main content / links manager */}
-      <div className='w-full min-w-0 space-y-6'>
-        <div>
-          <h1 className='text-2xl font-bold text-primary-token'>Profile</h1>
-          <p className='mt-1 text-sm text-secondary-token'>
-            Update your profile details and manage your links. Changes save
-            automatically.
-            {saveStatus.lastSaved && (
-              <span className='ml-2 text-xs text-secondary-token'>
-                Last saved: {saveStatus.lastSaved.toLocaleTimeString()}
-              </span>
-            )}
-          </p>
-        </div>
-
+      <div className='w-full min-w-0 space-y-4'>
         {profileId && artist && (
-          <div className='w-full max-w-2xl rounded-xl border border-subtle bg-surface-1 p-3 md:p-4'>
-            <div className='mb-3 flex items-start justify-between gap-3'>
-              <div className='min-w-0'>
-                <div className='text-sm font-medium text-primary-token'>
-                  Profile details
-                </div>
-              </div>
+          <div className='mx-auto w-full max-w-2xl'>
+            <div className='flex flex-col items-center gap-3'>
               {profileSaveStatus.saving || profileSaveStatus.success ? (
                 <div
-                  className='shrink-0 rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token/80'
+                  className='rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token/80'
                   aria-live='polite'
                 >
                   {profileSaveStatus.saving
@@ -1042,9 +1015,7 @@ export function EnhancedDashboardLinks({
                       : null}
                 </div>
               ) : null}
-            </div>
 
-            <div className='grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start'>
               <AvatarUploadable
                 src={avatarUrl}
                 alt={`Avatar for @${artist.handle}`}
@@ -1060,21 +1031,16 @@ export function EnhancedDashboardLinks({
                 maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
                 acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
                 showHoverOverlay
-                className='shrink-0'
               />
 
-              <div className='grid min-w-0 w-full gap-3 sm:border-l sm:border-subtle sm:pl-4'>
-                <div className='grid gap-3'>
-                  <div className='grid gap-1.5'>
-                    <label
-                      htmlFor='profile-display-name'
-                      className='text-xs font-medium text-secondary-token'
-                    >
-                      Display name
-                    </label>
+              <div className='w-full max-w-md space-y-1.5'>
+                <div className='grid gap-1'>
+                  {editingField === 'displayName' ? (
                     <Input
+                      ref={displayNameInputRef}
                       id='profile-display-name'
                       type='text'
+                      aria-label='Display name'
                       value={profileDisplayName}
                       onChange={e => {
                         const nextValue = e.target.value;
@@ -1089,23 +1055,49 @@ export function EnhancedDashboardLinks({
                           username: profileUsername,
                         });
                       }}
-                      onBlur={() => debouncedProfileSave.flush()}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          debouncedProfileSave.flush();
+                          setEditingField(null);
+                        }
+                        if (e.key === 'Escape') {
+                          debouncedProfileSave.cancel();
+                          setProfileDisplayName(
+                            lastProfileSavedRef.current?.displayName ?? ''
+                          );
+                          setEditingField(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        debouncedProfileSave.flush();
+                        setEditingField(null);
+                      }}
                     />
-                  </div>
-
-                  <div className='grid gap-1.5'>
-                    <label
-                      htmlFor='profile-username'
-                      className='text-xs font-medium text-secondary-token'
+                  ) : (
+                    <button
+                      type='button'
+                      className='w-full rounded-md py-1.5 text-center text-base font-medium text-primary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
+                      onClick={() => setEditingField('displayName')}
+                      aria-label='Edit display name'
                     >
-                      Username
-                    </label>
+                      {profileDisplayName || 'Add display name'}
+                    </button>
+                  )}
+                </div>
+
+                <div className='grid gap-1'>
+                  {editingField === 'username' ? (
                     <Input
+                      ref={usernameInputRef}
                       id='profile-username'
                       type='text'
+                      aria-label='Username'
                       value={profileUsername}
                       onChange={e => {
-                        const nextValue = e.target.value;
+                        const rawValue = e.target.value;
+                        const nextValue = rawValue.startsWith('@')
+                          ? rawValue.slice(1)
+                          : rawValue;
                         setProfileUsername(nextValue);
                         setProfileSaveStatus(prev => ({
                           ...prev,
@@ -1117,25 +1109,39 @@ export function EnhancedDashboardLinks({
                           username: nextValue,
                         });
                       }}
-                      onBlur={() => debouncedProfileSave.flush()}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          debouncedProfileSave.flush();
+                          setEditingField(null);
+                        }
+                        if (e.key === 'Escape') {
+                          debouncedProfileSave.cancel();
+                          setProfileUsername(
+                            lastProfileSavedRef.current?.username ?? ''
+                          );
+                          setEditingField(null);
+                        }
+                      }}
+                      onBlur={() => {
+                        debouncedProfileSave.flush();
+                        setEditingField(null);
+                      }}
                     />
-                  </div>
+                  ) : (
+                    <button
+                      type='button'
+                      className='w-full rounded-md py-1 text-center text-sm font-medium text-secondary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
+                      onClick={() => setEditingField('username')}
+                      aria-label='Edit username'
+                    >
+                      {profileUsername || 'Add username'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
-
-        <div className='flex items-end justify-between gap-3 border-b border-subtle pb-2'>
-          <div>
-            <h2 className='text-base font-semibold text-primary-token'>
-              Links
-            </h2>
-            <p className='mt-0.5 text-sm text-secondary-token'>
-              Add, reorder, and hide links.
-            </p>
-          </div>
-        </div>
 
         <GroupedLinksManager
           initialLinks={links as unknown as DetectedLink[]}

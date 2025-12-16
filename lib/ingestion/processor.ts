@@ -41,6 +41,8 @@ const DEFAULT_MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 5000; // 5 seconds
 const MAX_BACKOFF_MS = 300000; // 5 minutes
 
+const STUCK_PROCESSING_AFTER_MS = 20 * 60 * 1000;
+
 /**
  * Calculate exponential backoff delay with jitter.
  */
@@ -48,6 +50,54 @@ function calculateBackoff(attempt: number): number {
   const exponentialDelay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
   const jitter = Math.random() * 1000; // 0-1 second jitter
   return Math.min(exponentialDelay + jitter, MAX_BACKOFF_MS);
+}
+
+function getCreatorProfileIdFromJob(
+  job: typeof ingestionJobs.$inferSelect
+): string | null {
+  switch (job.jobType) {
+    case 'import_linktree': {
+      const parsed = linktreePayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    case 'import_laylo': {
+      const parsed = layloPayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    case 'import_youtube': {
+      const parsed = youtubePayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    case 'import_beacons': {
+      const parsed = beaconsPayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    default:
+      return null;
+  }
+}
+
+export async function handleIngestionJobFailure(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect,
+  errorMessage: string
+): Promise<void> {
+  const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const shouldRetry = job.attempts < maxAttempts;
+
+  const creatorProfileId = getCreatorProfileIdFromJob(job);
+  if (creatorProfileId) {
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ...(shouldRetry ? {} : { ingestionStatus: 'failed' as const }),
+        lastIngestionError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  }
+
+  await failJob(tx, job, errorMessage);
 }
 
 const linktreePayloadSchema = z.object({
@@ -484,6 +534,58 @@ export async function claimPendingJobs(
   now: Date,
   limit = 5
 ): Promise<(typeof ingestionJobs.$inferSelect)[]> {
+  const stuckBefore = new Date(now.getTime() - STUCK_PROCESSING_AFTER_MS);
+  const stuckJobs = await tx
+    .select({ jobType: ingestionJobs.jobType, payload: ingestionJobs.payload })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.status, 'processing'),
+        lte(ingestionJobs.updatedAt, stuckBefore)
+      )
+    )
+    .limit(50);
+
+  await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'pending',
+      error: 'Processing timeout; requeued',
+      runAt: now,
+      nextRunAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(ingestionJobs.status, 'processing'),
+        lte(ingestionJobs.updatedAt, stuckBefore)
+      )
+    );
+
+  for (const stuckJob of stuckJobs) {
+    const creatorProfileId = getCreatorProfileIdFromJob({
+      jobType: stuckJob.jobType,
+      payload: stuckJob.payload,
+    } as typeof ingestionJobs.$inferSelect);
+
+    if (!creatorProfileId) continue;
+
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'idle',
+        lastIngestionError: 'Processing timeout; requeued',
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(creatorProfiles.id, creatorProfileId),
+          eq(creatorProfiles.ingestionStatus, 'processing'),
+          lte(creatorProfiles.updatedAt, stuckBefore)
+        )
+      );
+  }
+
   // Only select jobs that haven't exceeded max attempts
   const candidates = await tx
     .select()

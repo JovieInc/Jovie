@@ -17,6 +17,8 @@ import {
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { checkStatsigGateForUser } from '@/lib/statsig/server';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -42,6 +44,7 @@ const getProfileAndLinks = unstable_cache(
     links: LegacySocialLink[];
     contacts: DbCreatorContact[];
     creatorIsPro: boolean;
+    creatorClerkId: string | null;
     status: 'ok' | 'not_found' | 'error';
   }> => {
     try {
@@ -53,11 +56,14 @@ const getProfileAndLinks = unstable_cache(
           links: [],
           contacts: [],
           creatorIsPro: false,
+          creatorClerkId: null,
           status: 'not_found',
         };
       }
 
       const creatorIsPro = Boolean(result.userIsPro);
+      const creatorClerkId =
+        typeof result.userClerkId === 'string' ? result.userClerkId : null;
 
       const profile: CreatorProfile = {
         id: result.id,
@@ -104,7 +110,14 @@ const getProfileAndLinks = unstable_cache(
 
       const contacts: DbCreatorContact[] = result.contacts ?? [];
 
-      return { profile, links, contacts, creatorIsPro, status: 'ok' };
+      return {
+        profile,
+        links,
+        contacts,
+        creatorIsPro,
+        creatorClerkId,
+        status: 'ok',
+      };
     } catch (error) {
       console.error('Error fetching creator profile:', error);
       return {
@@ -112,6 +125,7 @@ const getProfileAndLinks = unstable_cache(
         links: [],
         contacts: [],
         creatorIsPro: false,
+        creatorClerkId: null,
         status: 'error',
       };
     }
@@ -148,7 +162,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     cookieStore.get(AUDIENCE_SPOTIFY_PREFERRED_COOKIE)?.value === '1';
 
   const normalizedUsername = username.toLowerCase();
-  const { profile, links, contacts, status, creatorIsPro } =
+  const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
     await getProfileAndLinks(normalizedUsername);
 
   if (status === 'error') {
@@ -179,7 +193,13 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  const dynamicEnabled = creatorIsPro;
+  const dynamicOverrideEnabled = creatorClerkId
+    ? await checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+        userID: creatorClerkId,
+      })
+    : false;
+
+  const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
 
   const primaryAction = dynamicEnabled && isIdentified ? 'listen' : 'subscribe';
   const effectiveSpotifyPreferred = dynamicEnabled ? spotifyPreferred : false;

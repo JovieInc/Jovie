@@ -102,8 +102,13 @@ export default clerkMiddleware(async (auth, req) => {
     const isAuthPath =
       pathname === '/signin' ||
       pathname === '/sign-in' ||
+      pathname === '/signin/sso-callback' ||
       pathname === '/signup' ||
       pathname === '/sign-up';
+
+    const isAuthCallbackPath =
+      pathname === '/signup/sso-callback' ||
+      pathname === '/signin/sso-callback';
 
     const normalizeRedirectPath = (path: string): string => {
       if (path.startsWith('/dashboard')) {
@@ -115,10 +120,14 @@ export default clerkMiddleware(async (auth, req) => {
       return path;
     };
 
-    if (userId && isAuthPath) {
+    if (userId && (isAuthPath || isAuthCallbackPath)) {
       // If the user is already signed in and hits any auth page, check for redirect_url
       const redirectUrl = req.nextUrl.searchParams.get('redirect_url');
-      if (redirectUrl && redirectUrl.startsWith('/')) {
+      if (
+        redirectUrl &&
+        redirectUrl.startsWith('/') &&
+        !redirectUrl.startsWith('//')
+      ) {
         // Honor the redirect_url if it's a valid internal path (e.g., /claim/token)
         res = NextResponse.redirect(
           new URL(normalizeRedirectPath(redirectUrl), req.url)
