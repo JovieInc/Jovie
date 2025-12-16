@@ -7,29 +7,34 @@ import 'server-only';
 import Stripe from 'stripe';
 import { env } from '@/lib/env';
 
-const stripeSecretKey = env.STRIPE_SECRET_KEY;
+let stripeSingleton: Stripe | undefined;
 
-if (!stripeSecretKey) {
-  throw new Error('Missing STRIPE_SECRET_KEY');
+function getStripe(): Stripe {
+  if (stripeSingleton) return stripeSingleton;
+
+  const stripeSecretKey = env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    throw new Error('Missing STRIPE_SECRET_KEY');
+  }
+
+  stripeSingleton = new Stripe(stripeSecretKey, {
+    appInfo: {
+      name: 'Jovie',
+      version: '1.0.0',
+      url: 'https://jov.ie',
+    },
+    typescript: true,
+    timeout: 10000,
+    maxNetworkRetries: 3,
+  });
+
+  return stripeSingleton;
 }
 
-// Initialize Stripe client with proper configuration
-export const stripe = new Stripe(stripeSecretKey, {
-  // Add app info for better Stripe support
-  appInfo: {
-    name: 'Jovie',
-    version: '1.0.0',
-    url: 'https://jov.ie',
+export const stripe = new Proxy({} as Stripe, {
+  get(_target, prop: keyof Stripe) {
+    return getStripe()[prop];
   },
-
-  // TypeScript configuration
-  typescript: true,
-
-  // Timeout configuration
-  timeout: 10000, // 10 seconds
-
-  // Retry configuration
-  maxNetworkRetries: 3,
 });
 
 function escapeStripeSearchValue(value: string): string {
@@ -46,8 +51,9 @@ export async function getOrCreateCustomer(
   name?: string
 ): Promise<Stripe.Customer> {
   try {
+    const stripeClient = getStripe();
     // Prefer an explicit metadata match to avoid cross-account collisions.
-    const existingByUserId = await stripe.customers.search({
+    const existingByUserId = await stripeClient.customers.search({
       query: `metadata['clerk_user_id']:'${escapeStripeSearchValue(userId)}'`,
       limit: 1,
     });
@@ -58,7 +64,7 @@ export async function getOrCreateCustomer(
     // an unclaimed Jovie-created record.
     const trimmedEmail = email.trim();
     if (trimmedEmail.length > 0) {
-      const existingByEmail = await stripe.customers.search({
+      const existingByEmail = await stripeClient.customers.search({
         query: `email:'${escapeStripeSearchValue(trimmedEmail)}'`,
         limit: 5,
       });
@@ -74,7 +80,7 @@ export async function getOrCreateCustomer(
 
       if (unclaimed.length === 1) {
         const customer = unclaimed[0];
-        const updated = await stripe.customers.update(customer.id, {
+        const updated = await stripeClient.customers.update(customer.id, {
           metadata: {
             ...customer.metadata,
             clerk_user_id: userId,
@@ -86,7 +92,7 @@ export async function getOrCreateCustomer(
     }
 
     // If no customer found, create a new one
-    const customer = await stripe.customers.create({
+    const customer = await stripeClient.customers.create({
       email,
       name,
       metadata: {
@@ -121,10 +127,11 @@ export async function createCheckoutSession({
   idempotencyKey?: string;
 }): Promise<Stripe.Checkout.Session> {
   try {
+    const stripeClient = getStripe();
     const requestOptions: Stripe.RequestOptions | undefined = idempotencyKey
       ? { idempotencyKey }
       : undefined;
-    const session = await stripe.checkout.sessions.create(
+    const session = await stripeClient.checkout.sessions.create(
       {
         customer: customerId,
         line_items: [
@@ -203,7 +210,7 @@ export async function createBillingPortalSession({
   returnUrl: string;
 }): Promise<Stripe.BillingPortal.Session> {
   try {
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl,
     });
@@ -222,7 +229,7 @@ export async function getCustomerSubscription(
   customerId: string
 ): Promise<Stripe.Subscription | null> {
   try {
-    const subscriptions = await stripe.subscriptions.list({
+    const subscriptions = await getStripe().subscriptions.list({
       customer: customerId,
       status: 'active',
       limit: 1,
@@ -242,7 +249,7 @@ export async function cancelSubscription(
   subscriptionId: string
 ): Promise<Stripe.Subscription> {
   try {
-    const subscription = await stripe.subscriptions.cancel(subscriptionId);
+    const subscription = await getStripe().subscriptions.cancel(subscriptionId);
     return subscription;
   } catch (error) {
     console.error('Error canceling subscription:', error);
@@ -258,12 +265,12 @@ export async function getUpcomingInvoice(
 ): Promise<Stripe.Invoice | null> {
   try {
     // Use createPreview to fetch an upcoming invoice preview in this SDK version
-    const resp = await stripe.invoices.createPreview({
+    const resp = await getStripe().invoices.createPreview({
       customer: customerId,
     });
     return resp;
-  } catch {
-    // It's normal for there to be no upcoming invoice
+  } catch (error) {
+    console.error('Error retrieving upcoming invoice:', error);
     return null;
   }
 }

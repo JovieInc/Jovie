@@ -1,7 +1,6 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const iconUsageRule = require('./eslint-rules/icon-usage');
-const typescriptPlugin = require('@typescript-eslint/eslint-plugin');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -140,9 +139,6 @@ module.exports = [
   nextIgnores,
   {
     files: ['**/*.{ts,tsx}'],
-    plugins: {
-      '@typescript-eslint': typescriptPlugin,
-    },
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
