@@ -9,6 +9,8 @@ import {
   users,
 } from '@/lib/db/schema';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const SORTABLE_COLUMNS = {
   email: notificationSubscriptions.email,
   phone: notificationSubscriptions.phone,
@@ -40,7 +42,10 @@ export async function GET(request: Request) {
       });
 
       if (!parsed.success) {
-        return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Invalid request' },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
       }
 
       const { profileId, sort, direction, page, pageSize } = parsed.data;
@@ -92,18 +97,21 @@ export async function GET(request: Request) {
 
       return NextResponse.json(
         { subscribers: rows, total: Number(total ?? 0) },
-        { status: 200 }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
     console.error('Error fetching notification subscribers', error);
     return NextResponse.json(
       { error: 'Failed to load subscribers' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

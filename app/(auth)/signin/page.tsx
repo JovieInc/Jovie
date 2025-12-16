@@ -7,10 +7,20 @@ export default function SignInPage() {
   return (
     <>
       <ClerkLoading>
-        <AuthPageSkeleton formTitle='Log in to Jovie' />
+        <AuthPageSkeleton
+          formTitle="What's your email address?"
+          formTitleClassName='text-lg font-medium text-[rgb(227,228,230)] mb-4'
+          showFormTitle={false}
+          showFooterPrompt={false}
+        />
       </ClerkLoading>
       <ClerkLoaded>
-        <AuthLayout formTitle='Log in to Jovie'>
+        <AuthLayout
+          formTitle="What's your email address?"
+          formTitleClassName='text-lg font-medium text-[rgb(227,228,230)] mb-4'
+          showFormTitle={false}
+          showFooterPrompt={false}
+        >
           <OtpSignInForm />
         </AuthLayout>
       </ClerkLoaded>

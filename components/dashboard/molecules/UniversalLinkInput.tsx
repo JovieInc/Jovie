@@ -29,6 +29,7 @@ import {
   type SpotifyArtistResult,
   useArtistSearch,
 } from '@/lib/hooks/useArtistSearch';
+import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
 import {
   type DetectedLink,
@@ -805,7 +806,7 @@ export const UniversalLinkInput = forwardRef<
         <div className='mb-1 flex flex-wrap items-center gap-2'>
           <label
             htmlFor='link-url-input'
-            className='text-xs font-medium text-secondary-token'
+            className='text-xs font-medium text-primary-token'
           >
             Link URL
           </label>
@@ -821,7 +822,10 @@ export const UniversalLinkInput = forwardRef<
             <DropdownMenuTrigger asChild>
               <button
                 type='button'
-                className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:z-10'
+                className={cn(
+                  'relative flex h-10 w-10 items-center justify-center rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0 p-0',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:z-10'
+                )}
                 aria-label='Select platform'
               >
                 <div
@@ -836,7 +840,10 @@ export const UniversalLinkInput = forwardRef<
                     className='w-3.5 h-3.5'
                   />
                 </div>
-                <ChevronDownIcon className='w-4 h-4 text-tertiary-token' />
+                <ChevronDownIcon
+                  className='absolute right-1 top-1 h-3 w-3 text-tertiary-token'
+                  aria-hidden='true'
+                />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent

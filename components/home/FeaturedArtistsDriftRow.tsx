@@ -8,12 +8,14 @@ import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 export interface FeaturedArtistsDriftRowProps {
   creators: FeaturedCreator[];
+  showFades?: boolean;
 }
 
 const MAX_SHIFT_PX = 56;
 
 export function FeaturedArtistsDriftRow({
   creators,
+  showFades = true,
 }: FeaturedArtistsDriftRowProps) {
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -105,14 +107,18 @@ export function FeaturedArtistsDriftRow({
         </div>
       </div>
 
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-14 bg-linear-to-r from-(--color-bg-base) to-transparent'
-      />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-14 bg-linear-to-l from-(--color-bg-base) to-transparent'
-      />
+      {showFades ? (
+        <>
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-y-0 left-0 w-10 sm:w-14 bg-linear-to-r from-(--color-bg-base) to-transparent'
+          />
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-y-0 right-0 w-10 sm:w-14 bg-linear-to-l from-(--color-bg-base) to-transparent'
+          />
+        </>
+      ) : null}
     </div>
   );
 }

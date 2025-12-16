@@ -3,16 +3,12 @@
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
 import Link from 'next/link';
-
+import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
@@ -27,6 +23,12 @@ const PLATFORM_LABELS: Record<string, string> = {
   threads: 'Threads',
   snapchat: 'Snapchat',
   unknown: 'Unknown',
+};
+
+const PRIMARY_GOAL_LABELS: Record<string, string> = {
+  streams: 'Streams',
+  merch: 'Merch',
+  tickets: 'Tickets',
 };
 
 /** Map status to badge variant */
@@ -74,166 +76,17 @@ export function WaitlistTable({
   const nextHref = canNext ? buildHref(page + 1) : undefined;
 
   return (
-    <Card className='border-subtle bg-surface-1/80'>
-      <CardHeader className='space-y-1'>
-        <CardTitle className='text-lg'>Waitlist entries</CardTitle>
-        <p className='text-xs text-secondary-token'>
-          Review waitlist submissions. Read-only for now.
-        </p>
-      </CardHeader>
-      <CardContent className='space-y-4'>
-        <div className='flex items-center justify-between'>
+    <AdminTableShell
+      toolbar={
+        <div className='flex h-14 w-full items-center gap-3 px-4'>
           <div className='text-xs text-secondary-token'>
             Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
             {total.toLocaleString()} entries
           </div>
         </div>
-
-        <div className='overflow-x-auto'>
-          <table className='w-full border-collapse text-sm'>
-            <thead className='text-left text-secondary-token'>
-              <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Name
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Email
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Primary Social
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Spotify
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Heard About
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Status
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-2 py-2'>
-                  Created
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={7}
-                    className='px-2 py-6 text-center text-sm text-secondary-token'
-                  >
-                    No waitlist entries yet.
-                  </td>
-                </tr>
-              ) : (
-                entries.map(entry => {
-                  const platformLabel =
-                    PLATFORM_LABELS[entry.primarySocialPlatform] ??
-                    entry.primarySocialPlatform;
-                  const statusVariant =
-                    STATUS_VARIANTS[entry.status] ?? 'secondary';
-                  const heardAboutTruncated =
-                    entry.heardAbout && entry.heardAbout.length > 30
-                      ? entry.heardAbout.slice(0, 30) + '…'
-                      : entry.heardAbout;
-
-                  return (
-                    <tr
-                      key={entry.id}
-                      className='border-b border-subtle last:border-b-0 hover:bg-surface-2/60'
-                    >
-                      <td className='px-2 py-3 font-medium text-primary-token'>
-                        {entry.fullName}
-                      </td>
-                      <td className='px-2 py-3 text-secondary-token'>
-                        <a
-                          href={`mailto:${entry.email}`}
-                          className='hover:underline'
-                        >
-                          {entry.email}
-                        </a>
-                      </td>
-                      <td className='px-2 py-3'>
-                        <div className='flex items-center gap-2'>
-                          <Badge size='sm' variant='secondary'>
-                            {platformLabel}
-                          </Badge>
-                          <a
-                            href={entry.primarySocialUrlNormalized}
-                            target='_blank'
-                            rel='noopener noreferrer'
-                            className='text-accent hover:underline text-xs truncate max-w-[150px]'
-                          >
-                            {entry.primarySocialUrlNormalized.replace(
-                              /^https?:\/\//,
-                              ''
-                            )}
-                          </a>
-                        </div>
-                      </td>
-                      <td className='px-2 py-3 text-secondary-token'>
-                        {entry.spotifyUrlNormalized ? (
-                          <a
-                            href={entry.spotifyUrlNormalized}
-                            target='_blank'
-                            rel='noopener noreferrer'
-                            className='text-accent hover:underline text-xs truncate max-w-[150px] block'
-                          >
-                            {entry.spotifyUrlNormalized.replace(
-                              /^https?:\/\//,
-                              ''
-                            )}
-                          </a>
-                        ) : (
-                          <span className='text-tertiary-token'>—</span>
-                        )}
-                      </td>
-                      <td className='px-2 py-3 text-secondary-token'>
-                        {entry.heardAbout ? (
-                          entry.heardAbout.length > 30 ? (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className='cursor-help'>
-                                  {heardAboutTruncated}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent side='top' className='max-w-xs'>
-                                {entry.heardAbout}
-                              </TooltipContent>
-                            </Tooltip>
-                          ) : (
-                            entry.heardAbout
-                          )
-                        ) : (
-                          <span className='text-tertiary-token'>—</span>
-                        )}
-                      </td>
-                      <td className='px-2 py-3'>
-                        <Badge size='sm' variant={statusVariant}>
-                          {entry.status}
-                        </Badge>
-                      </td>
-                      <td className='px-2 py-3 text-secondary-token'>
-                        {entry.createdAt
-                          ? new Intl.DateTimeFormat('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            }).format(entry.createdAt)
-                          : '—'}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className='mt-4 flex items-center justify-between gap-2 text-xs text-secondary-token'>
+      }
+      footer={
+        <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
           <div>
             Page {page} of {totalPages}
           </div>
@@ -250,7 +103,191 @@ export function WaitlistTable({
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      }
+    >
+      {({ stickyTopPx }) => (
+        <table className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'>
+          <thead className='text-left text-secondary-token'>
+            <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Name
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Email
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Primary goal
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Primary Social
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Spotify
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Heard About
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Status
+              </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Created
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={8}
+                  className='px-3 py-10 text-center text-sm text-secondary-token'
+                >
+                  No waitlist entries yet.
+                </td>
+              </tr>
+            ) : (
+              entries.map(entry => {
+                const platformLabel =
+                  PLATFORM_LABELS[entry.primarySocialPlatform] ??
+                  entry.primarySocialPlatform;
+                const primaryGoalLabel = entry.primaryGoal
+                  ? (PRIMARY_GOAL_LABELS[entry.primaryGoal] ??
+                    entry.primaryGoal)
+                  : null;
+                const statusVariant =
+                  STATUS_VARIANTS[entry.status] ?? 'secondary';
+                const heardAboutTruncated =
+                  entry.heardAbout && entry.heardAbout.length > 30
+                    ? entry.heardAbout.slice(0, 30) + '…'
+                    : entry.heardAbout;
+
+                return (
+                  <tr
+                    key={entry.id}
+                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2'
+                  >
+                    <td className='px-3 py-3 font-medium text-primary-token'>
+                      {entry.fullName}
+                    </td>
+                    <td className='px-3 py-3 text-secondary-token'>
+                      <a
+                        href={`mailto:${entry.email}`}
+                        className='hover:underline'
+                      >
+                        {entry.email}
+                      </a>
+                    </td>
+                    <td className='px-3 py-3 text-secondary-token'>
+                      {primaryGoalLabel ? (
+                        <Badge size='sm' variant='secondary'>
+                          {primaryGoalLabel}
+                        </Badge>
+                      ) : (
+                        <span className='text-tertiary-token'>—</span>
+                      )}
+                    </td>
+                    <td className='px-3 py-3'>
+                      <div className='flex items-center gap-2'>
+                        <Badge size='sm' variant='secondary'>
+                          {platformLabel}
+                        </Badge>
+                        <a
+                          href={entry.primarySocialUrlNormalized}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-accent hover:underline text-xs truncate max-w-[220px]'
+                        >
+                          {entry.primarySocialUrlNormalized.replace(
+                            /^https?:\/\//,
+                            ''
+                          )}
+                        </a>
+                      </div>
+                    </td>
+                    <td className='px-3 py-3 text-secondary-token'>
+                      {entry.spotifyUrlNormalized ? (
+                        <a
+                          href={entry.spotifyUrlNormalized}
+                          target='_blank'
+                          rel='noopener noreferrer'
+                          className='text-accent hover:underline text-xs truncate max-w-[220px] block'
+                        >
+                          {entry.spotifyUrlNormalized.replace(
+                            /^https?:\/\//,
+                            ''
+                          )}
+                        </a>
+                      ) : (
+                        <span className='text-tertiary-token'>—</span>
+                      )}
+                    </td>
+                    <td className='px-3 py-3 text-secondary-token'>
+                      {entry.heardAbout ? (
+                        entry.heardAbout.length > 30 ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className='cursor-help'>
+                                {heardAboutTruncated}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side='top' className='max-w-xs'>
+                              {entry.heardAbout}
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          entry.heardAbout
+                        )
+                      ) : (
+                        <span className='text-tertiary-token'>—</span>
+                      )}
+                    </td>
+                    <td className='px-3 py-3'>
+                      <Badge size='sm' variant={statusVariant}>
+                        {entry.status}
+                      </Badge>
+                    </td>
+                    <td className='px-3 py-3 text-secondary-token whitespace-nowrap'>
+                      {entry.createdAt
+                        ? new Intl.DateTimeFormat('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          }).format(entry.createdAt)
+                        : '—'}
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      )}
+    </AdminTableShell>
   );
 }

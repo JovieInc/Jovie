@@ -3,8 +3,8 @@
 import { useMemo } from 'react';
 
 export interface DashboardOverviewToolbarProps {
-  range: '7d' | '30d';
-  onRangeChange: (next: '7d' | '30d') => void;
+  range: '7d' | '30d' | '90d';
+  onRangeChange: (next: '7d' | '30d' | '90d') => void;
   onRefresh: () => void;
 }
 
@@ -14,7 +14,9 @@ export function DashboardOverviewToolbar({
   onRefresh,
 }: DashboardOverviewToolbarProps): JSX.Element {
   const rangeLabel = useMemo(() => {
-    return range === '7d' ? 'Last 7 days' : 'Last 30 days';
+    if (range === '7d') return 'Last 7 days';
+    if (range === '30d') return 'Last 30 days';
+    return 'Last 90 days';
   }, [range]);
 
   return (
@@ -24,7 +26,7 @@ export function DashboardOverviewToolbar({
         aria-label='Dashboard window'
         className='inline-flex rounded-full border border-subtle bg-surface-1/40 p-0.5 ring-1 ring-inset ring-white/5 dark:ring-white/10 backdrop-blur-sm'
       >
-        {(['7d', '30d'] as const).map(value => {
+        {(['7d', '30d', '90d'] as const).map(value => {
           const active = range === value;
           return (
             <button
@@ -67,7 +69,7 @@ export function DashboardOverviewToolbar({
       </button>
 
       {rangeLabel ? (
-        <p className='hidden min-w-[6.5rem] whitespace-nowrap text-right text-xs text-tertiary-token sm:block'>
+        <p className='hidden min-w-26 whitespace-nowrap text-right text-xs text-tertiary-token sm:block'>
           {rangeLabel}
         </p>
       ) : null}

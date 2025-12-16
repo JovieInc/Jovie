@@ -1,4 +1,4 @@
-import { unstable_cache } from 'next/cache';
+import { unstable_cache, unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
@@ -14,6 +14,7 @@ import { toPublicContacts } from '@/lib/contacts/mapper';
 import {
   getCreatorProfileWithLinks,
   incrementProfileViews,
+  isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
 import type { PublicContact } from '@/types/contacts';
@@ -40,14 +41,23 @@ const getProfileAndLinks = unstable_cache(
     profile: CreatorProfile | null;
     links: LegacySocialLink[];
     contacts: DbCreatorContact[];
+    creatorIsPro: boolean;
     status: 'ok' | 'not_found' | 'error';
   }> => {
     try {
       const result = await getCreatorProfileWithLinks(username);
 
       if (!result || !result.isPublic) {
-        return { profile: null, links: [], contacts: [], status: 'not_found' };
+        return {
+          profile: null,
+          links: [],
+          contacts: [],
+          creatorIsPro: false,
+          status: 'not_found',
+        };
       }
+
+      const creatorIsPro = Boolean(result.userIsPro);
 
       const profile: CreatorProfile = {
         id: result.id,
@@ -64,8 +74,8 @@ const getProfileAndLinks = unstable_cache(
         is_public: !!result.isPublic,
         is_verified: !!result.isVerified,
         is_claimed: !!result.isClaimed,
-        claim_token: result.claimToken,
-        claimed_at: result.claimedAt?.toISOString() || null,
+        claim_token: null,
+        claimed_at: null,
         settings: result.settings,
         theme: result.theme,
         is_featured: result.isFeatured || false,
@@ -94,10 +104,16 @@ const getProfileAndLinks = unstable_cache(
 
       const contacts: DbCreatorContact[] = result.contacts ?? [];
 
-      return { profile, links, contacts, status: 'ok' };
+      return { profile, links, contacts, creatorIsPro, status: 'ok' };
     } catch (error) {
       console.error('Error fetching creator profile:', error);
-      return { profile: null, links: [], contacts: [], status: 'error' };
+      return {
+        profile: null,
+        links: [],
+        contacts: [],
+        creatorIsPro: false,
+        status: 'error',
+      };
     }
   },
   // Key prefix stays stable; args are included in the cache key so each username gets its own entry.
@@ -121,6 +137,10 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const { mode = 'profile', claim_token: claimTokenParam } =
     resolvedSearchParams || {};
 
+  if (claimTokenParam) {
+    unstable_noStore();
+  }
+
   const cookieStore = await cookies();
   const isIdentified =
     cookieStore.get(AUDIENCE_IDENTIFIED_COOKIE)?.value === '1';
@@ -128,7 +148,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
     cookieStore.get(AUDIENCE_SPOTIFY_PREFERRED_COOKIE)?.value === '1';
 
   const normalizedUsername = username.toLowerCase();
-  const { profile, links, contacts, status } =
+  const { profile, links, contacts, status, creatorIsPro } =
     await getProfileAndLinks(normalizedUsername);
 
   if (status === 'error') {
@@ -159,6 +179,11 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
+  const dynamicEnabled = creatorIsPro;
+
+  const primaryAction = dynamicEnabled && isIdentified ? 'listen' : 'subscribe';
+  const effectiveSpotifyPreferred = dynamicEnabled ? spotifyPreferred : false;
+
   // Social links loaded together with profile in a single cached helper
   const socialLinks = links;
   const publicContacts: PublicContact[] = toPublicContacts(
@@ -187,17 +212,22 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   // Determine if we should show the claim banner
   // Show only when a claim token is present in the URL and matches the profile's token
-  const showClaimBanner =
-    !!claimTokenParam &&
-    claimTokenParam === profile.claim_token &&
-    !profile.is_claimed &&
-    !profile.claimed_at;
+  let showClaimBanner = false;
+  if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
+    const claimToken = claimTokenParam;
+    if (!profile.is_claimed) {
+      showClaimBanner = await isClaimTokenValidForProfile({
+        username: normalizedUsername,
+        claimToken,
+      });
+    }
+  }
 
   return (
     <>
-      {showClaimBanner && profile.claim_token && (
+      {showClaimBanner && (
         <ClaimBanner
-          claimToken={profile.claim_token}
+          claimToken={claimTokenParam!}
           profileHandle={profile.username}
           displayName={profile.display_name || undefined}
         />
@@ -210,8 +240,9 @@ export default async function ArtistPage({ params, searchParams }: Props) {
         subtitle={getSubtitle(mode)}
         showTipButton={showTipButton}
         showBackButton={showBackButton}
-        primaryAction={isIdentified ? 'listen' : 'subscribe'}
-        spotifyPreferred={spotifyPreferred}
+        primaryAction={primaryAction}
+        spotifyPreferred={effectiveSpotifyPreferred}
+        enableDynamicEngagement={dynamicEnabled}
       />
       <DesktopQrOverlayClient handle={artist.handle} />
     </>

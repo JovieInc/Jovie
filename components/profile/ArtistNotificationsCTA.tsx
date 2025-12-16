@@ -372,7 +372,7 @@ export function ArtistNotificationsCTA({
   };
 
   // Base CTA when notifications are disabled or the bell has not been used yet.
-  if (!notificationsEnabled || notificationsState === 'idle') {
+  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
     if (variant === 'button') {
       return (
         <CTAButton

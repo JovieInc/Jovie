@@ -38,7 +38,9 @@ describe('Atomic Design Structure', () => {
       render(<AuthActions />);
 
       expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: /request early access/i })
+      ).toBeInTheDocument();
 
       // Check that it's properly structured
       const container = screen.getByRole('link', {
@@ -64,7 +66,9 @@ describe('Atomic Design Structure', () => {
         '/'
       ); // Logo link
       expect(screen.getByRole('link', { name: 'Log in' })).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: 'Sign up' })).toBeInTheDocument();
+      expect(
+        screen.getByRole('link', { name: /request early access/i })
+      ).toBeInTheDocument();
     });
   });
 });

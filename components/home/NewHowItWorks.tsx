@@ -24,7 +24,16 @@ const steps = [
 
 export function NewHowItWorks() {
   return (
-    <section id='how-it-works' className='py-20 sm:py-24 bg-base'>
+    <section
+      id='how-it-works'
+      className='relative py-20 sm:py-24 bg-base overflow-hidden'
+    >
+      <div className='absolute inset-0 -z-10'>
+        <div className='absolute inset-0 grid-bg opacity-60' />
+        <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.22),transparent)]' />
+        <div className='pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-base to-transparent dark:from-base' />
+        <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
+      </div>
       <Container>
         {/* Header */}
         <div className='text-center mb-16'>

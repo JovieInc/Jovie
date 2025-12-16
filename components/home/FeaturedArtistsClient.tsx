@@ -1,5 +1,11 @@
 import { NewFeaturedArtists } from './NewFeaturedArtists';
 
-export function FeaturedArtistsClient() {
-  return <NewFeaturedArtists />;
+export interface FeaturedArtistsClientProps {
+  showFades?: boolean;
+}
+
+export function FeaturedArtistsClient({
+  showFades,
+}: FeaturedArtistsClientProps) {
+  return <NewFeaturedArtists showFades={showFades} />;
 }

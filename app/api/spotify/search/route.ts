@@ -5,6 +5,8 @@ import { buildSpotifyArtistUrl, searchSpotifyArtists } from '@/lib/spotify';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 // Query constraints
 const MIN_QUERY_LENGTH = 2;
 const MAX_QUERY_LENGTH = 60;
@@ -80,14 +82,14 @@ export async function GET(request: NextRequest) {
   if (!q || q.length < MIN_QUERY_LENGTH) {
     return NextResponse.json(
       { error: 'Query too short', code: 'QUERY_TOO_SHORT' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
   if (q.length > MAX_QUERY_LENGTH) {
     return NextResponse.json(
       { error: 'Query too long', code: 'QUERY_TOO_LONG' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -105,7 +107,7 @@ export async function GET(request: NextRequest) {
   if (isRateLimited(clientIp)) {
     return NextResponse.json(
       { error: 'Too many requests', code: 'RATE_LIMITED' },
-      { status: 429 }
+      { status: 429, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -113,7 +115,7 @@ export async function GET(request: NextRequest) {
   const cacheKey = `${q.toLowerCase()}:${limit}`;
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return NextResponse.json(cached.data);
+    return NextResponse.json(cached.data, { headers: NO_STORE_HEADERS });
   }
 
   try {
@@ -147,11 +149,11 @@ export async function GET(request: NextRequest) {
       toDelete.forEach(([key]) => searchCache.delete(key));
     }
 
-    return NextResponse.json(results);
+    return NextResponse.json(results, { headers: NO_STORE_HEADERS });
   } catch {
     return NextResponse.json(
       { error: 'Search failed', code: 'SEARCH_FAILED' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

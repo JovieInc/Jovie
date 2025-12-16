@@ -75,6 +75,42 @@ export function DashboardAnalytics() {
         {error && <p className='mt-4 text-sm text-destructive'>{error}</p>}
       </DashboardCard>
 
+      {typeof data?.listen_clicks === 'number' &&
+        typeof data?.subscribers === 'number' &&
+        typeof data?.identified_users === 'number' && (
+          <section className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+            <DashboardCard variant='analytics' className='p-6'>
+              <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+                Listen clicks
+              </p>
+              <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
+                {Intl.NumberFormat().format(data.listen_clicks)}
+              </p>
+              <p className='mt-2 text-xs text-secondary-token'>{rangeLabel}</p>
+            </DashboardCard>
+
+            <DashboardCard variant='analytics' className='p-6'>
+              <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+                Subscribers
+              </p>
+              <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
+                {Intl.NumberFormat().format(data.subscribers)}
+              </p>
+              <p className='mt-2 text-xs text-secondary-token'>{rangeLabel}</p>
+            </DashboardCard>
+
+            <DashboardCard variant='analytics' className='p-6'>
+              <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+                Identified
+              </p>
+              <p className='mt-3 text-3xl font-extrabold tracking-tight text-primary-token'>
+                {Intl.NumberFormat().format(data.identified_users)}
+              </p>
+              <p className='mt-2 text-xs text-secondary-token'>{rangeLabel}</p>
+            </DashboardCard>
+          </section>
+        )}
+
       {/* Secondary cards */}
       <section className='grid grid-cols-1 md:grid-cols-2 gap-4'>
         <DashboardCard variant='analytics' className='p-6'>

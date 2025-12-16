@@ -1,10 +1,10 @@
-import Image from 'next/image';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 
 interface LogoIconProps {
   size?: number;
   className?: string;
-  variant?: 'color' | 'white';
+  variant?: 'color' | 'black' | 'white';
 }
 
 export function LogoIcon({
@@ -13,17 +13,11 @@ export function LogoIcon({
   variant = 'color',
 }: LogoIconProps) {
   return (
-    <Image
-      src='/brand/Jovie-Logo-Icon.svg'
+    <BrandLogo
+      size={size}
+      tone={variant}
       alt='Jovie'
-      width={size}
-      height={size}
-      priority
-      className={cn(
-        'rounded-full',
-        variant === 'white' && 'brightness-0 invert',
-        className
-      )}
+      className={cn(className)}
     />
   );
 }

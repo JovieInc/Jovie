@@ -24,12 +24,12 @@ body {
 
 /* Fallback colors before token CSS finishes loading */
 body {
-  background: #0a0a0b;
-  color: #eaeaea;
+  background: #ffffff;
+  color: #0c0c0c;
 }
 
 .dark body {
-  background: #000;
+  background: #0f0f11;
   color: #fff;
 }
 
@@ -317,7 +317,7 @@ body {
   /* Dark mode overrides — ensure this block comes AFTER light tokens */
   :root.dark {
     /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0a0a0a;
+    --color-bg-base: #0f0f11;
     /* deepest app background */
     --color-bg-surface-0: #111111;
     /* elevated backgrounds (sidebars) */

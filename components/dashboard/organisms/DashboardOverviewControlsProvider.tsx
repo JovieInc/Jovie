@@ -10,7 +10,7 @@ import {
 } from 'react';
 import type { AnalyticsRange } from '@/types/analytics';
 
-type DashboardOverviewRange = Extract<AnalyticsRange, '7d' | '30d'>;
+type DashboardOverviewRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
 
 type DashboardOverviewControlsValue = {
   range: DashboardOverviewRange;

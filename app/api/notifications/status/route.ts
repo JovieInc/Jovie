@@ -9,6 +9,8 @@ import type {
   NotificationSubscriptionState,
 } from '@/types/notifications';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const statusSchema = z
   .object({
     artist_id: z.string().uuid(),
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid request data',
           details: result.error.format(),
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -86,11 +88,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      channels,
-      details,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        channels,
+        details,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('[Notifications Status] Error:', error);
     return NextResponse.json(
@@ -98,7 +103,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Server error',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

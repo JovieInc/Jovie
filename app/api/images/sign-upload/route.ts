@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 function signParams(
   params: Record<string, string | number | undefined>
 ): string {
@@ -32,12 +34,15 @@ export async function POST(req: NextRequest) {
   // Feature flag removed - Cloudinary disabled by default
   return NextResponse.json(
     { error: 'Cloudinary not enabled' },
-    { status: 404 }
+    { status: 404, headers: NO_STORE_HEADERS }
   );
 
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   if (
@@ -47,7 +52,7 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json(
       { error: 'Cloudinary not configured' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -78,12 +83,15 @@ export async function POST(req: NextRequest) {
     params as Record<string, string | number | undefined>
   );
 
-  return NextResponse.json({
-    cloudName: env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-    apiKey: env.CLOUDINARY_API_KEY,
-    timestamp: now,
-    folder,
-    upload_preset,
-    signature,
-  });
+  return NextResponse.json(
+    {
+      cloudName: env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+      apiKey: env.CLOUDINARY_API_KEY,
+      timestamp: now,
+      folder,
+      upload_preset,
+      signature,
+    },
+    { headers: NO_STORE_HEADERS }
+  );
 }

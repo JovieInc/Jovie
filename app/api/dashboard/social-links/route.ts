@@ -20,7 +20,10 @@ import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
 import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { isValidSocialPlatform } from '@/types';
+
 // flags import removed - pre-launch
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(req: Request) {
   // Feature flag check removed - social links enabled by default
@@ -31,7 +34,7 @@ export async function GET(req: Request) {
       if (!profileId) {
         return NextResponse.json(
           { error: 'Missing profileId' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -50,7 +53,7 @@ export async function GET(req: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -84,7 +87,7 @@ export async function GET(req: Request) {
       if (rows.length === 0) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -121,17 +124,20 @@ export async function GET(req: Request) {
 
       return NextResponse.json(
         { links },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Error fetching social links:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -180,7 +186,7 @@ export async function PUT(req: Request) {
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -193,7 +199,10 @@ export async function PUT(req: Request) {
         const message = hasInvalidPlatform
           ? 'Invalid platform'
           : 'Invalid request body';
-        return NextResponse.json({ error: message }, { status: 400 });
+        return NextResponse.json(
+          { error: message },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
       }
 
       const { profileId, links: parsedLinks } = parsed.data;
@@ -201,7 +210,7 @@ export async function PUT(req: Request) {
       if (!profileId) {
         return NextResponse.json(
           { error: 'Missing profileId' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -221,7 +230,7 @@ export async function PUT(req: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -237,7 +246,7 @@ export async function PUT(req: Request) {
               {
                 error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
               },
-              { status: 400 }
+              { status: 400, headers: NO_STORE_HEADERS }
             );
           }
 
@@ -246,13 +255,13 @@ export async function PUT(req: Request) {
               {
                 error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
               },
-              { status: 400 }
+              { status: 400, headers: NO_STORE_HEADERS }
             );
           }
         } catch {
           return NextResponse.json(
             { error: `Invalid URL format: ${link.url}` },
-            { status: 400 }
+            { status: 400, headers: NO_STORE_HEADERS }
           );
         }
       }
@@ -411,17 +420,20 @@ export async function PUT(req: Request) {
 
       return NextResponse.json(
         { ok: true },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Error updating social links:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -433,7 +445,7 @@ export async function PATCH(req: Request) {
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -441,7 +453,7 @@ export async function PATCH(req: Request) {
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -462,7 +474,7 @@ export async function PATCH(req: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -492,7 +504,10 @@ export async function PATCH(req: Request) {
         .limit(1);
 
       if (!link) {
-        return NextResponse.json({ error: 'Link not found' }, { status: 404 });
+        return NextResponse.json(
+          { error: 'Link not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
       }
 
       const evidenceRaw =
@@ -557,17 +572,20 @@ export async function PATCH(req: Request) {
 
       return NextResponse.json(
         { ok: true, link: updated },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Error updating social link state:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

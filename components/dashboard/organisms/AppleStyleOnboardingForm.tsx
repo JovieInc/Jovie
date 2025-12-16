@@ -17,6 +17,7 @@ interface AppleStyleOnboardingFormProps {
   initialHandle?: string;
   userEmail?: string | null;
   userId: string;
+  skipNameStep?: boolean;
 }
 
 interface OnboardingState {
@@ -59,11 +60,14 @@ export function AppleStyleOnboardingForm({
   initialHandle = '',
   userEmail = null,
   userId,
+  skipNameStep = false,
 }: AppleStyleOnboardingFormProps) {
   const router = useRouter();
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(
+    skipNameStep ? 1 : 0
+  );
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [handle, setHandle] = useState(normalizedInitialHandle);
   const [handleInput, setHandleInput] = useState(normalizedInitialHandle);
@@ -131,22 +135,24 @@ export function AppleStyleOnboardingForm({
   }, [currentStepIndex]);
 
   const goToNextStep = useCallback(() => {
+    if (isTransitioning) return;
     if (currentStepIndex >= ONBOARDING_STEPS.length - 1) return;
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentStepIndex(prev => prev + 1);
       setIsTransitioning(false);
     }, 250);
-  }, [currentStepIndex]);
+  }, [currentStepIndex, isTransitioning]);
 
   const goToPreviousStep = useCallback(() => {
+    if (isTransitioning) return;
     if (currentStepIndex === 0) return;
     setIsTransitioning(true);
     setTimeout(() => {
       setCurrentStepIndex(prev => prev - 1);
       setIsTransitioning(false);
     }, 250);
-  }, [currentStepIndex]);
+  }, [currentStepIndex, isTransitioning]);
 
   const validateHandle = useCallback(
     async (input: string) => {
@@ -457,7 +463,11 @@ export function AppleStyleOnboardingForm({
                   maxLength={50}
                   autoComplete='name'
                   onKeyDown={e => {
-                    if (e.key === 'Enter' && fullName.trim()) {
+                    if (
+                      e.key === 'Enter' &&
+                      fullName.trim() &&
+                      !isTransitioning
+                    ) {
                       goToNextStep();
                     }
                   }}
@@ -465,7 +475,9 @@ export function AppleStyleOnboardingForm({
 
                 <Button
                   onClick={goToNextStep}
-                  disabled={!fullName.trim()}
+                  disabled={
+                    !fullName.trim() || isTransitioning || state.isSubmitting
+                  }
                   variant='primary'
                   className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
                 >
@@ -563,7 +575,9 @@ export function AppleStyleOnboardingForm({
                   disabled={
                     !handleValidation.available ||
                     !handleValidation.clientValid ||
-                    state.isSubmitting
+                    handleValidation.checking ||
+                    state.isSubmitting ||
+                    isTransitioning
                   }
                   variant='primary'
                   className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'

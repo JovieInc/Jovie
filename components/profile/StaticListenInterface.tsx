@@ -15,12 +15,14 @@ interface StaticListenInterfaceProps {
   artist: Artist;
   handle: string;
   dspsOverride?: AvailableDSP[];
+  enableDynamicEngagement?: boolean;
 }
 
 export const StaticListenInterface = React.memo(function StaticListenInterface({
   artist,
   handle,
   dspsOverride,
+  enableDynamicEngagement = false,
 }: StaticListenInterfaceProps) {
   const [dsps] = useState<AvailableDSP[]>(
     () => dspsOverride ?? getAvailableDSPs(artist)
@@ -64,7 +66,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       // Save preference
       document.cookie = `${LISTEN_COOKIE}=${dsp.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
-      if (dsp.key === 'spotify') {
+      if (enableDynamicEngagement && dsp.key === 'spotify') {
         document.cookie = `${AUDIENCE_SPOTIFY_PREFERRED_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
       }
       try {

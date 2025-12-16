@@ -34,6 +34,7 @@ interface AnimatedArtistPageProps {
   subtitle: string;
   showTipButton: boolean;
   showBackButton: boolean;
+  enableDynamicEngagement?: boolean;
 }
 
 function renderContent(
@@ -44,13 +45,18 @@ function renderContent(
   isNavigating: boolean,
   prefersReducedMotion: boolean,
   setIsNavigating: (value: boolean) => void,
-  tippingEnabled: boolean
+  tippingEnabled: boolean,
+  enableDynamicEngagement: boolean
 ) {
   switch (mode) {
     case 'listen':
       return (
         <div className='flex justify-center'>
-          <AnimatedListenInterface artist={artist} handle={artist.handle} />
+          <AnimatedListenInterface
+            artist={artist}
+            handle={artist.handle}
+            enableDynamicEngagement={enableDynamicEngagement}
+          />
         </div>
       );
 
@@ -169,6 +175,7 @@ export function AnimatedArtistPage({
   subtitle,
   showTipButton,
   showBackButton,
+  enableDynamicEngagement = false,
 }: AnimatedArtistPageProps) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
@@ -244,7 +251,8 @@ export function AnimatedArtistPage({
                 isNavigating,
                 prefersReducedMotion,
                 setIsNavigating,
-                tippingEnabled
+                tippingEnabled,
+                enableDynamicEngagement
               )}
             </motion.div>
           </AnimatePresence>

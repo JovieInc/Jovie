@@ -1,5 +1,5 @@
-import Image from 'next/image';
 import Link from 'next/link';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
@@ -51,22 +51,15 @@ export function ProfileNavButton({
       >
         <div className='relative'>
           {/* Static logo */}
-          <Image
-            src='/brand/Jovie-Logo-Icon.svg'
-            alt='Jovie'
-            width={40}
-            height={40}
-            className='w-10 h-10 object-cover rounded-full'
-            priority
-          />
+          <BrandLogo size={40} tone='auto' className='w-10 h-10' priority />
           {/* Loading spinner overlay */}
-          <Image
-            src='/brand/Jovie-Logo-Icon.svg'
-            alt='Jovie loading'
-            width={40}
-            height={40}
+          <BrandLogo
+            size={40}
+            tone='auto'
+            alt=''
+            aria-hidden
             className={cn(
-              'absolute inset-0 w-10 h-10 object-cover rounded-full',
+              'absolute inset-0 w-10 h-10',
               'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
               loading
                 ? 'opacity-100 scale-100 animate-spin-slow'

@@ -6,6 +6,8 @@ import { db, profilePhotos } from '@/lib/db';
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for cleanup
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -27,7 +29,10 @@ export async function GET(request: Request) {
   if (process.env.NODE_ENV === 'production') {
     const authHeader = request.headers.get('authorization');
     if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
   }
 
@@ -74,12 +79,15 @@ export async function GET(request: Request) {
       .limit(100); // Process in batches to avoid timeout
 
     if (orphanedRecords.length === 0) {
-      return NextResponse.json({
-        success: true,
-        message: 'No orphaned records found',
-        deleted: 0,
-        blobsDeleted: 0,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'No orphaned records found',
+          deleted: 0,
+          blobsDeleted: 0,
+        },
+        { headers: NO_STORE_HEADERS }
+      );
     }
 
     // Collect blob URLs to delete
@@ -115,19 +123,23 @@ export async function GET(request: Request) {
       `[cleanup-photos] Deleted ${recordIds.length} orphaned records, ${blobsDeleted} blobs`
     );
 
-    return NextResponse.json({
-      success: true,
-      message: `Cleaned up ${recordIds.length} orphaned photo records`,
-      deleted: recordIds.length,
-      blobsDeleted,
-      details: {
-        failed: orphanedRecords.filter(r => r.status === 'failed').length,
-        stuckUploading: orphanedRecords.filter(r => r.status === 'uploading')
-          .length,
-        stuckProcessing: orphanedRecords.filter(r => r.status === 'processing')
-          .length,
+    return NextResponse.json(
+      {
+        success: true,
+        message: `Cleaned up ${recordIds.length} orphaned photo records`,
+        deleted: recordIds.length,
+        blobsDeleted,
+        details: {
+          failed: orphanedRecords.filter(r => r.status === 'failed').length,
+          stuckUploading: orphanedRecords.filter(r => r.status === 'uploading')
+            .length,
+          stuckProcessing: orphanedRecords.filter(
+            r => r.status === 'processing'
+          ).length,
+        },
       },
-    });
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('[cleanup-photos] Cleanup failed:', error);
     return NextResponse.json(
@@ -135,7 +147,7 @@ export async function GET(request: Request) {
         success: false,
         error: error instanceof Error ? error.message : 'Cleanup failed',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

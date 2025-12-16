@@ -7,6 +7,7 @@ interface OnboardingFormWrapperProps {
   initialHandle?: string;
   userEmail?: string | null;
   userId: string;
+  skipNameStep?: boolean;
 }
 
 export function OnboardingFormWrapper({
@@ -14,6 +15,7 @@ export function OnboardingFormWrapper({
   initialHandle = '',
   userEmail = null,
   userId,
+  skipNameStep = false,
 }: OnboardingFormWrapperProps) {
   return (
     <AppleStyleOnboardingForm
@@ -21,6 +23,7 @@ export function OnboardingFormWrapper({
       initialHandle={initialHandle}
       userEmail={userEmail}
       userId={userId}
+      skipNameStep={skipNameStep}
     />
   );
 }

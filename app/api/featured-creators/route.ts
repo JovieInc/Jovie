@@ -6,6 +6,8 @@ import { creatorProfiles } from '@/lib/db/schema';
 export const runtime = 'edge';
 export const revalidate = 3600; // Cache results for 1 hour
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 async function getFeaturedCreators() {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => reject(new Error('Database timeout')), 3000);
@@ -54,7 +56,7 @@ export async function GET() {
     console.error('Error fetching featured creators:', error);
     return NextResponse.json(
       { error: 'Failed to load featured creators' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

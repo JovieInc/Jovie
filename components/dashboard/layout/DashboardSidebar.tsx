@@ -1,9 +1,9 @@
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
 import {
@@ -78,13 +78,7 @@ export function DashboardSidebar({
               )}
             >
               <div className='flex items-center justify-center'>
-                <Image
-                  src='/brand/Jovie-Logo-Icon.svg'
-                  alt='Jovie'
-                  width={20}
-                  height={20}
-                  className='h-7 w-7 rounded-full'
-                />
+                <BrandLogo size={20} tone='auto' className='h-7 w-7' />
               </div>
               <span className='sr-only group-data-[collapsible=icon]:hidden'>
                 Dashboard

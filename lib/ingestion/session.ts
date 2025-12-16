@@ -13,10 +13,10 @@ export async function withSystemIngestionSession<T>(
 
   return await db.transaction(async tx => {
     await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.user_id = '${SYSTEM_INGESTION_USER}'`)
+      drizzleSql`SELECT set_config('app.user_id', ${SYSTEM_INGESTION_USER}, true)`
     );
     await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${SYSTEM_INGESTION_USER}'`)
+      drizzleSql`SELECT set_config('app.clerk_user_id', ${SYSTEM_INGESTION_USER}, true)`
     );
 
     return operation(tx);

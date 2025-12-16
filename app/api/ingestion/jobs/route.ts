@@ -8,6 +8,8 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET;
 
@@ -21,7 +23,10 @@ function isAuthorized(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const now = new Date();
@@ -70,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { ok: true, attempted, processed },
-      { status: 200, headers: { 'Cache-Control': 'no-store' } }
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     logger.error('Ingestion job runner error', {
@@ -81,7 +86,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { error: 'Failed to process ingestion jobs' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

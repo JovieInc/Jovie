@@ -10,5 +10,5 @@ export function MarketingFooter() {
     return <Footer version='minimal' />;
   }
 
-  return <Footer />;
+  return <Footer brandingMark='icon' />;
 }

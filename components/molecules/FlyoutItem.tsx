@@ -15,7 +15,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
       <Link
         ref={ref}
         href={feature.href}
-        className={`group relative flex items-start gap-3 p-3 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-2 ${className}`}
+        className={`group relative flex items-start gap-3 p-3 transition-colors duration-150 focus-ring-themed ${className}`}
         style={style}
         role='menuitem'
       >
@@ -24,7 +24,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
         </div>
         <div className='min-w-0 flex-1'>
           <div className='flex items-center gap-2'>
-            <h3 className='text-sm font-semibold text-gray-900 dark:text-white'>
+            <h3 className='text-sm font-semibold text-primary-token'>
               {feature.title}
             </h3>
             {feature.aiPowered && (
@@ -33,9 +33,7 @@ export const FlyoutItem = React.forwardRef<HTMLAnchorElement, FlyoutItemProps>(
               </span>
             )}
           </div>
-          <p className='mt-0.5 text-xs text-gray-500 dark:text-gray-400'>
-            {feature.blurb}
-          </p>
+          <p className='mt-0.5 text-xs text-tertiary-token'>{feature.blurb}</p>
         </div>
       </Link>
     );

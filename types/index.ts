@@ -333,6 +333,7 @@ export interface UserEntitlements {
   userId: string | null;
   email: string | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isPro: boolean;
   hasAdvancedFeatures: boolean;
   canRemoveBranding: boolean;

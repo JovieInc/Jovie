@@ -9,11 +9,11 @@ import { ButtonSpinner } from './ButtonSpinner';
 const FIELD_ERROR_CLASSES =
   'mt-2 text-sm text-red-400 text-center animate-in fade-in-0 duration-200';
 const SUBMIT_BUTTON_CLASSES =
-  'w-full rounded-lg bg-[#e8e8e8] hover:bg-white disabled:opacity-70 disabled:cursor-not-allowed text-[#101012] font-medium py-3 px-4 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#101012]';
+  'w-full rounded-md bg-[#e8e8e8] hover:bg-white disabled:opacity-70 disabled:cursor-not-allowed text-[#101012] font-medium py-3 px-4 transition-colors flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10]';
 const STEP_TRANSITION_CLASSES =
   'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
 const LINK_CLASSES =
-  'w-full text-center text-sm text-secondary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#101012] rounded';
+  'w-full text-center text-sm text-secondary hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded';
 
 export function OtpSignUpForm() {
   return (

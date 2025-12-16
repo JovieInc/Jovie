@@ -6,6 +6,8 @@
 import { NextResponse } from 'next/server';
 import { getAvailablePricing } from '@/lib/stripe/config';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function GET() {
   try {
     const options = getAvailablePricing();
@@ -18,15 +20,18 @@ export async function GET() {
       description: option.description,
     }));
 
-    return NextResponse.json({
-      pricingOptions,
-      options: pricingOptions,
-    });
+    return NextResponse.json(
+      {
+        pricingOptions,
+        options: pricingOptions,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('Error getting pricing options:', error);
     return NextResponse.json(
       { error: 'Failed to get pricing options' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

@@ -5,6 +5,8 @@ import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 // Schema for unsubscription request validation
 const unsubscribeSchema = z
   .object({
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
           error: 'Invalid request data',
           details: result.error.format(),
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -87,7 +89,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: 'Either email, phone, or token must be provided',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: 'Contact required to unsubscribe',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -139,14 +141,17 @@ export async function POST(request: NextRequest) {
       channel: targetChannel,
     });
 
-    return NextResponse.json({
-      success: true,
-      removed: deleted.length,
-      message:
-        deleted.length > 0
-          ? 'Unsubscription successful'
-          : 'No matching subscription found',
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        removed: deleted.length,
+        message:
+          deleted.length > 0
+            ? 'Unsubscription successful'
+            : 'No matching subscription found',
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     // Track unexpected error
     await trackServerEvent('notifications_unsubscribe_error', {
@@ -160,7 +165,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Server error',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

@@ -1,15 +1,17 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { ActivityTable } from '@/components/admin/activity-table';
 import { KpiCards } from '@/components/admin/kpi-cards';
 import { MetricsChart } from '@/components/admin/metrics-chart';
 import { ReliabilityCard } from '@/components/admin/reliability-card';
-import { APP_URL } from '@/constants/app';
 import {
   getAdminActivityFeed,
   getAdminReliabilitySummary,
   getAdminUsageSeries,
 } from '@/lib/admin/overview';
+import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
+import { db, waitlistEntries } from '@/lib/db';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 interface AdminOverviewMetrics {
   mrrUsd: number;
@@ -20,41 +22,28 @@ export const metadata: Metadata = {
   title: 'Admin dashboard',
 };
 
-function resolveInternalApiUrl(origin: string, path: string): string {
-  try {
-    return new URL(path, origin).toString();
-  } catch {
-    return new URL(path, APP_URL).toString();
-  }
-}
+export const runtime = 'nodejs';
 
 async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
   try {
-    const h = await headers();
-    const host = h.get('x-forwarded-host') ?? h.get('host');
-    const proto = h.get('x-forwarded-proto') ?? 'https';
-    const cookie = h.get('cookie');
-
-    const origin = host ? `${proto}://${host}` : APP_URL;
-    const url = resolveInternalApiUrl(origin, '/api/admin/overview');
-
-    const response = await fetch(url, {
-      cache: 'no-store',
-      headers: cookie ? { cookie } : undefined,
-    });
-
-    if (!response.ok) {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated || !entitlements.isAdmin) {
       return { mrrUsd: 0, waitlistCount: 0 };
     }
 
-    const json = (await response.json()) as Partial<AdminOverviewMetrics>;
+    const [stripeMetrics, waitlistCount] = await Promise.all([
+      getAdminStripeOverviewMetrics(),
+      (async () => {
+        const [row] = await db
+          .select({ count: drizzleSql<number>`count(*)::int` })
+          .from(waitlistEntries);
+        return Number(row?.count ?? 0);
+      })(),
+    ]);
 
-    return {
-      mrrUsd: typeof json.mrrUsd === 'number' ? json.mrrUsd : 0,
-      waitlistCount:
-        typeof json.waitlistCount === 'number' ? json.waitlistCount : 0,
-    };
-  } catch {
+    return { mrrUsd: stripeMetrics.mrrUsd, waitlistCount };
+  } catch (error) {
+    console.error('Error computing admin overview metrics:', error);
     return { mrrUsd: 0, waitlistCount: 0 };
   }
 }

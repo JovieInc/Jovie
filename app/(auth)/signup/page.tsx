@@ -5,23 +5,27 @@ import { AuthLayout, AuthPageSkeleton, OtpSignUpForm } from '@/components/auth';
 
 export default function SignUpPage() {
   return (
-    <AuthLayout
-      formTitle='Create your account'
-      footerPrompt='Already have an account?'
-      footerLinkText='Log in'
-      footerLinkHref='/signin'
-    >
+    <>
       <ClerkLoading>
         <AuthPageSkeleton
           formTitle='Create your account'
           footerPrompt='Already have an account?'
           footerLinkText='Log in'
           footerLinkHref='/signin'
+          showLegalLinks
         />
       </ClerkLoading>
       <ClerkLoaded>
-        <OtpSignUpForm />
+        <AuthLayout
+          formTitle='Create your account'
+          footerPrompt='Already have an account?'
+          footerLinkText='Log in'
+          footerLinkHref='/signin'
+          showLegalLinks
+        >
+          <OtpSignUpForm />
+        </AuthLayout>
       </ClerkLoaded>
-    </AuthLayout>
+    </>
   );
 }

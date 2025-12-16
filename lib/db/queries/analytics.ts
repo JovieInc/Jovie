@@ -1,6 +1,11 @@
 import { and, count, sql as drizzleSql, eq, gte, isNotNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { audienceMembers, clickEvents, users } from '@/lib/db/schema';
+import {
+  audienceMembers,
+  clickEvents,
+  notificationSubscriptions,
+  users,
+} from '@/lib/db/schema';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -276,12 +281,13 @@ export async function getUserDashboardAnalytics(
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
   const found = await db
-    .select({ id: users.id })
+    .select({ id: users.id, isPro: users.isPro })
     .from(users)
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
   const appUserId = found?.[0]?.id;
+  const userIsPro = Boolean(found?.[0]?.isPro);
   if (!appUserId) {
     throw new Error('User not found for Clerk ID');
   }
@@ -380,6 +386,10 @@ export async function getUserDashboardAnalytics(
     return base;
   }
 
+  if (!userIsPro) {
+    return base;
+  }
+
   const [counts] = await db
     .select({
       total: count(),
@@ -395,12 +405,50 @@ export async function getUserDashboardAnalytics(
       )
     );
 
+  const [listenClicks, subscribers, identifiedUsers] = await Promise.all([
+    db
+      .select({ count: count() })
+      .from(clickEvents)
+      .where(
+        and(
+          eq(clickEvents.creatorProfileId, creatorProfile.id),
+          gte(clickEvents.createdAt, startDate),
+          eq(clickEvents.linkType, 'listen')
+        )
+      )
+      .limit(1),
+    db
+      .select({ count: count() })
+      .from(notificationSubscriptions)
+      .where(
+        and(
+          eq(notificationSubscriptions.creatorProfileId, creatorProfile.id),
+          gte(notificationSubscriptions.createdAt, startDate)
+        )
+      )
+      .limit(1),
+    db
+      .select({ count: count() })
+      .from(audienceMembers)
+      .where(
+        and(
+          eq(audienceMembers.creatorProfileId, creatorProfile.id),
+          gte(audienceMembers.updatedAt, startDate),
+          isNotNull(audienceMembers.email)
+        )
+      )
+      .limit(1),
+  ]);
+
   return {
     ...base,
     total_clicks: Number(counts?.total ?? 0),
     spotify_clicks: Number(counts?.spotify ?? 0),
     social_clicks: Number(counts?.social ?? 0),
     recent_clicks: Number(counts?.recent ?? 0),
+    listen_clicks: Number(listenClicks?.[0]?.count ?? 0),
+    subscribers: Number(subscribers?.[0]?.count ?? 0),
+    identified_users: Number(identifiedUsers?.[0]?.count ?? 0),
   };
 }
 

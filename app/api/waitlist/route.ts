@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 /**
  * Platform detection for waitlist primary social URL
  * Maps common social media domains to platform identifiers
@@ -61,6 +63,7 @@ function normalizeSpotifyUrl(url: string): string {
 const waitlistRequestSchema = z.object({
   fullName: z.string().min(1, 'Full name is required').max(200),
   email: z.string().email('Invalid email address'),
+  primaryGoal: z.enum(['streams', 'merch', 'tickets']).optional().nullable(),
   primarySocialUrl: z.string().url('Invalid URL format'),
   spotifyUrl: z.string().url('Invalid Spotify URL').optional().nullable(),
   heardAbout: z.string().max(1000).optional().nullable(),
@@ -75,12 +78,16 @@ export async function POST(request: Request) {
     const parseResult = waitlistRequestSchema.safeParse(body);
     if (!parseResult.success) {
       const errors = parseResult.error.flatten().fieldErrors;
-      return NextResponse.json({ success: false, errors }, { status: 400 });
+      return NextResponse.json(
+        { success: false, errors },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const {
       fullName,
       email,
+      primaryGoal,
       primarySocialUrl,
       spotifyUrl,
       heardAbout,
@@ -99,6 +106,7 @@ export async function POST(request: Request) {
     await db.insert(waitlistEntries).values({
       fullName,
       email,
+      primaryGoal: primaryGoal ?? null,
       primarySocialUrl,
       primarySocialPlatform: platform,
       primarySocialUrlNormalized: normalizedUrl,
@@ -109,12 +117,12 @@ export async function POST(request: Request) {
       status: 'new',
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

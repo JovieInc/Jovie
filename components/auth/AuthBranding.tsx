@@ -1,4 +1,4 @@
-import { Logo } from '@/components/atoms/Logo';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 
 interface AuthBrandingProps {
   title: string;
@@ -40,10 +40,10 @@ export function AuthBranding({
     <div
       className={`hidden lg:flex lg:flex-1 lg:flex-col lg:justify-center lg:px-12 xl:px-16 ${gradientClass}`}
     >
-      <div className='relative mx-auto w-full max-w-sm'>
+      <div className='relative mx-auto w-full max-w-[18rem]'>
         <div className='text-center'>
           <div className='mb-8'>
-            <Logo size='xl' className='text-white mx-auto' />
+            <BrandLogo size={64} tone='white' className='mx-auto' />
           </div>
           {showText && (
             <>

@@ -54,13 +54,18 @@ const EnvSchema = z.object({
   STRIPE_PRICE_STANDARD_MONTHLY: z.string().optional(),
   STRIPE_PRICE_STANDARD_YEARLY: z.string().optional(),
   INGESTION_CRON_SECRET: z.string().optional(),
+
+  // Statsig server-side
+  STATSIG_SERVER_API_KEY: z.string().optional(),
 });
+
 // Safe-parse to avoid hard crashes in production; surface clear errors in dev.
 const rawEnv = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie',
   NEXT_PUBLIC_STATSIG_CLIENT_KEY: process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY,
+  STATSIG_SERVER_API_KEY: process.env.STATSIG_SERVER_API_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,
   NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME:
@@ -104,6 +109,9 @@ export const env = {
   NEXT_PUBLIC_STATSIG_CLIENT_KEY: parsed.success
     ? parsed.data.NEXT_PUBLIC_STATSIG_CLIENT_KEY
     : process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY,
+  STATSIG_SERVER_API_KEY: parsed.success
+    ? parsed.data.STATSIG_SERVER_API_KEY
+    : process.env.STATSIG_SERVER_API_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: parsed.success
     ? parsed.data.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     : process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY,

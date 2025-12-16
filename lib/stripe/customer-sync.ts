@@ -89,6 +89,7 @@ export async function getUserBillingInfo(): Promise<{
   data?: {
     userId: string;
     email: string;
+    isAdmin: boolean;
     isPro: boolean;
     stripeCustomerId: string | null;
     stripeSubscriptionId: string | null;
@@ -102,17 +103,66 @@ export async function getUserBillingInfo(): Promise<{
     }
 
     return await withDbSession(async clerkUserId => {
-      const [userData] = await db
-        .select({
-          id: users.id,
-          email: users.email,
-          isPro: users.isPro,
-          stripeCustomerId: users.stripeCustomerId,
-          stripeSubscriptionId: users.stripeSubscriptionId,
-        })
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1);
+      let userData:
+        | {
+            id: string;
+            email: string | null;
+            isAdmin: boolean;
+            isPro: boolean | null;
+            stripeCustomerId: string | null;
+            stripeSubscriptionId: string | null;
+          }
+        | undefined;
+
+      try {
+        [userData] = await db
+          .select({
+            id: users.id,
+            email: users.email,
+            isAdmin: users.isAdmin,
+            isPro: users.isPro,
+            stripeCustomerId: users.stripeCustomerId,
+            stripeSubscriptionId: users.stripeSubscriptionId,
+          })
+          .from(users)
+          .where(eq(users.clerkId, clerkUserId))
+          .limit(1);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const code =
+          typeof (error as { code?: string })?.code === 'string'
+            ? (error as { code?: string }).code
+            : undefined;
+
+        const isMissingIsAdminColumn =
+          (code === '42703' && message.includes('is_admin')) ||
+          message.includes('users.is_admin') ||
+          message.includes('is_admin');
+
+        if (!isMissingIsAdminColumn) {
+          throw error;
+        }
+
+        // Backwards-compatible fallback while the is_admin migration rolls out.
+        const [legacyUserData] = await db
+          .select({
+            id: users.id,
+            email: users.email,
+            isPro: users.isPro,
+            stripeCustomerId: users.stripeCustomerId,
+            stripeSubscriptionId: users.stripeSubscriptionId,
+          })
+          .from(users)
+          .where(eq(users.clerkId, clerkUserId))
+          .limit(1);
+
+        if (legacyUserData) {
+          userData = {
+            ...legacyUserData,
+            isAdmin: false,
+          };
+        }
+      }
 
       if (!userData) {
         return { success: false, error: 'User not found' };
@@ -123,6 +173,7 @@ export async function getUserBillingInfo(): Promise<{
         data: {
           userId: userData.id,
           email: userData.email || '',
+          isAdmin: userData.isAdmin ?? false,
           isPro: userData.isPro || false,
           stripeCustomerId: userData.stripeCustomerId,
           stripeSubscriptionId: userData.stripeSubscriptionId,

@@ -217,6 +217,7 @@ export async function fetchLinktreeDocument(
       // Linktree may serve different content based on Accept header
       Accept: 'text/html,application/xhtml+xml',
     },
+    allowedHosts: LINKTREE_CONFIG.validHosts,
   };
 
   const result = await fetchDocument(validatedUrl, options);

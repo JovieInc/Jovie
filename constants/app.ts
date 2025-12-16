@@ -1,6 +1,7 @@
 import { publicEnv } from '@/lib/env-public';
 
 export const APP_NAME = 'Jovie';
+export const LEGAL_ENTITY_NAME = 'Jovie Technology Inc.';
 export const APP_URL = publicEnv.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie';
 export const MAX_SOCIAL_LINKS = 6;
 export const LISTEN_COOKIE = 'jovie_dsp';
@@ -37,7 +38,7 @@ export const LEGAL = {
 
 export const COPYRIGHT_YEAR = new Date().getFullYear();
 export const getCopyrightText = (year?: number) =>
-  `© ${year ?? COPYRIGHT_YEAR} ${APP_NAME}`;
+  `© ${year ?? COPYRIGHT_YEAR} ${LEGAL_ENTITY_NAME}`;
 
 export const SOCIAL_PLATFORMS = [
   'instagram',

@@ -6,6 +6,8 @@ import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { env } from '@/lib/env';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function GET() {
   const summary: Record<string, unknown> = {
     time: new Date().toISOString(),
@@ -20,7 +22,10 @@ export async function GET() {
     if (!databaseUrl) {
       summary.status = 'degraded';
       summary.database = { ok: false, error: 'missing_database_url' };
-      return NextResponse.json(summary, { status: 200 });
+      return NextResponse.json(summary, {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
     }
 
     // Count public creator profiles (seed invariant: should be >= 3)
@@ -35,7 +40,7 @@ export async function GET() {
     summary.database = { ok: true, publicProfiles: profileCount };
     return NextResponse.json(summary, {
       status: 200,
-      headers: { 'Cache-Control': 'no-store' },
+      headers: NO_STORE_HEADERS,
     });
   } catch (e) {
     summary.status = 'degraded';
@@ -43,6 +48,9 @@ export async function GET() {
       ok: false,
       error: e instanceof Error ? e.message : 'unknown',
     };
-    return NextResponse.json(summary, { status: 200 });
+    return NextResponse.json(summary, {
+      status: 200,
+      headers: NO_STORE_HEADERS,
+    });
   }
 }

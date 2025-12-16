@@ -59,17 +59,19 @@ export function MarketingHeader({
 
   const showSolid = pathname !== '/' || isScrolled;
   const resolvedHideNav = hideNav ?? pathname === '/investors';
+  const hidePricingLink = pathname === '/';
 
   return (
     <Header
       sticky={false}
       logoSize={logoSize}
       hideNav={resolvedHideNav}
+      hidePricingLink={hidePricingLink}
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid
-          ? 'bg-white/90 dark:bg-black/90 border-subtle backdrop-blur'
-          : 'bg-transparent! dark:bg-transparent! border-transparent!'
+          ? 'bg-white dark:bg-black border-subtle backdrop-blur'
+          : 'bg-transparent! border-transparent! dark:bg-transparent! dark:border-transparent!'
       )}
     />
   );

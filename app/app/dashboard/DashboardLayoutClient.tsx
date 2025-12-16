@@ -76,6 +76,7 @@ export default function DashboardLayoutClient({
   const isFullWidthRoute =
     pathname?.startsWith('/app/admin/creators') ||
     pathname?.startsWith('/app/admin/users') ||
+    pathname?.startsWith('/app/admin/waitlist') ||
     pathname?.startsWith('/app/dashboard/audience');
   const isContactTableRoute =
     pathname?.startsWith('/app/admin/creators') ||

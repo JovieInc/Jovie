@@ -17,6 +17,8 @@ import { validateUsername } from '@/lib/validation/username';
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const allowedUrlProtocols = new Set(['http:', 'https:']);
 
 const hasSafeHttpProtocol = (value: string) => {
@@ -136,23 +138,26 @@ export async function GET() {
       if (!profile) {
         return NextResponse.json(
           { error: "We couldn't find your profile." },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
       return NextResponse.json(
         { profile },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     return NextResponse.json(
       { error: 'Unable to load your profile right now.' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -168,7 +173,7 @@ export async function PUT(req: Request) {
       if (Object.keys(updates).length === 0) {
         return NextResponse.json(
           { error: 'No changes detected' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -179,7 +184,7 @@ export async function PUT(req: Request) {
       ) {
         return NextResponse.json(
           { error: 'Invalid updates payload' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -209,7 +214,7 @@ export async function PUT(req: Request) {
       if (Object.keys(validUpdates).length === 0) {
         return NextResponse.json(
           { error: 'No supported changes detected' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -219,7 +224,7 @@ export async function PUT(req: Request) {
         const firstError = parsedUpdatesResult.error.issues[0]?.message;
         return NextResponse.json(
           { error: firstError || 'Invalid profile updates' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -316,7 +321,7 @@ export async function PUT(req: Request) {
         };
         return NextResponse.json(
           { profile: responseProfile },
-          { status: 200, headers: { 'Cache-Control': 'no-store' } }
+          { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -325,7 +330,10 @@ export async function PUT(req: Request) {
           await syncCanonicalUsernameFromApp(clerkUserId, usernameUpdate);
         } catch (error) {
           if (error instanceof UsernameValidationError) {
-            return NextResponse.json({ error: error.message }, { status: 400 });
+            return NextResponse.json(
+              { error: error.message },
+              { status: 400, headers: NO_STORE_HEADERS }
+            );
           }
           throw error;
         }
@@ -413,7 +421,7 @@ export async function PUT(req: Request) {
       if (!updatedProfile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -442,17 +450,20 @@ export async function PUT(req: Request) {
             ? 'Profile updated, but your photo might take a little longer to refresh. Please try again in a moment if it still looks out of date.'
             : undefined,
         },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Error updating profile:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     return NextResponse.json(
       { error: 'Failed to update profile' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

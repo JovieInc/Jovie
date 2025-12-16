@@ -1,13 +1,18 @@
 import { auth } from '@clerk/nextjs/server';
-import { and, gte } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { clickEvents } from '@/lib/db/schema';
+import { clickEvents, creatorProfiles, users } from '@/lib/db/schema';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const url = new URL(request.url);
@@ -42,11 +47,37 @@ export async function GET(request: Request) {
     sevenDaysAgo.setDate(now.getDate() - 7);
 
     // Get all click events for the user in the specified date range
+    const [creatorProfile] = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(eq(users.clerkId, userId))
+      .limit(1);
+
+    if (!creatorProfile) {
+      return NextResponse.json(
+        {
+          total_clicks: 0,
+          spotify_clicks: 0,
+          social_clicks: 0,
+          recent_clicks: 0,
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const events = await db
-      .select()
+      .select({
+        linkType: clickEvents.linkType,
+        createdAt: clickEvents.createdAt,
+      })
       .from(clickEvents)
-      .where(and(gte(clickEvents.createdAt, startDate)))
-      .execute();
+      .where(
+        and(
+          gte(clickEvents.createdAt, startDate),
+          eq(clickEvents.creatorProfileId, creatorProfile.id)
+        )
+      );
 
     // Calculate metrics
     const totalClicks = events.length;
@@ -63,13 +94,13 @@ export async function GET(request: Request) {
         social_clicks: socialClicks,
         recent_clicks: recentClicks,
       },
-      { status: 200 }
+      { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
     console.error('Error fetching analytics:', error);
     return NextResponse.json(
       { error: 'Failed to fetch analytics' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

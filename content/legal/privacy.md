@@ -2,6 +2,8 @@
 
 _Last updated: January 2025_
 
+This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
+
 ## Our Commitment to Privacy
 
 Jovie exists so musicians can share their story with confidence. That means keeping your information safe, using it transparently, and never selling it. We aim for clarity, control, and fast responses whenever you need help.

@@ -3,7 +3,13 @@ import { Container } from '@/components/site/Container';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 import { FeaturedArtistsDriftRow } from './FeaturedArtistsDriftRow';
 
-export async function NewFeaturedArtists() {
+export interface NewFeaturedArtistsProps {
+  showFades?: boolean;
+}
+
+export async function NewFeaturedArtists({
+  showFades = true,
+}: NewFeaturedArtistsProps) {
   let artists: FeaturedCreator[] = [];
   let error: string | null = null;
 
@@ -29,18 +35,11 @@ export async function NewFeaturedArtists() {
           </div>
         ) : (
           /* Artist grid - centered, clean layout */
-          <div className='flex flex-col items-center'>
-            <FeaturedArtistsDriftRow creators={artists.slice(0, 12)} />
-            <div className='mt-6 max-w-3xl text-center'>
-              <p className='text-sm sm:text-base text-primary-token'>
-                Used by artists turning clicks into streams, follows, tickets,
-                and merch sales.
-              </p>
-              <p className='mt-2 text-xs sm:text-sm text-secondary-token'>
-                Built by a team with experience driving large scale music
-                growth.
-              </p>
-            </div>
+          <div className='relative'>
+            <FeaturedArtistsDriftRow
+              creators={artists.slice(0, 12)}
+              showFades={showFades}
+            />
           </div>
         )}
       </Container>
