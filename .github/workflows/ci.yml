@@ -59,6 +59,21 @@ jobs:
 
           echo "✅ .env.example looks safe (no obvious secrets)."
 
+  ci-guardrails:
+    name: Guardrails (proxy + format)
+    # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 1 }
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Next.js proxy guard
+        run: pnpm run next:proxy-guard
+      - name: Format check (Biome)
+        run: pnpm run format:check
+
   ci-fast-checks:
     name: Fast checks (typecheck + lint)
     # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
@@ -261,13 +276,80 @@ jobs:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
     if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group' }}
-    needs: [ci-fast-checks]
+    needs: [ci-fast-checks, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
           echo "ci-fast passed: Typecheck and Lint succeeded"
+
+  ci-pr-neon-migrate:
+    name: DB Migrate (PR main)
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for relevant changes
+        id: check_changes
+        uses: ./.github/actions/check-path-changes
+        with:
+          job-type: 'drizzle'
+          full-ci-label: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing') }}
+          base-ref: ${{ github.base_ref }}
+          event-name: ${{ github.event_name }}
+          is-fork: ${{ github.event.pull_request.head.repo.fork }}
+
+      - name: Skip notification
+        if: steps.check_changes.outputs.run_full_ci != 'true'
+        run: |
+          echo "Skipping DB migrate check: no DB/schema/migration paths were changed."
+          exit 0
+
+      - name: Determine sanitized Neon branch name
+        id: sanitize-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          RAW="${{ github.head_ref }}"
+          SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
+          echo "Using sanitized branch name: $SANITIZED"
+          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+
+      - name: Create or reuse Neon branch
+        id: create-branch
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_name: ${{ steps.sanitize-branch.outputs.name }}
+          role: neondb_owner
+          api_key: ${{ secrets.NEON_API_KEY }}
+
+      - name: Resolve DATABASE_URL (Neon ephemeral)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: |
+          CANDIDATE="${{ steps.create-branch.outputs.db_url }}"
+          if [ -z "$CANDIDATE" ]; then
+            echo "No Neon ephemeral DATABASE_URL available."
+            exit 1
+          fi
+          echo "DATABASE_URL=$CANDIDATE" >> $GITHUB_ENV
+
+      - uses: ./.github/actions/setup-node-pnpm
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+
+      - name: Run migrations (ephemeral Neon)
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        run: pnpm run drizzle:migrate
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          NODE_ENV: test
+          GIT_BRANCH: pr-${{ github.event.pull_request.number }}
+          ALLOW_PROD_MIGRATIONS: 'true'
 
   # Public Profile Smoke Test - runs against main.jov.ie (staging) to verify public profiles work
   # This test runs on pushes to main after deploy completes
@@ -619,7 +701,7 @@ jobs:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
       name: Main Staging
-      url: https://preview.jov.ie
+      url: https://main.jov.ie
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
@@ -665,7 +747,7 @@ jobs:
           echo "Running canary health check on main deployment..."
           deployment_url="${{ steps.deploy.outputs.deployment_url }}"
           health_url_primary="${deployment_url%/}/api/health"
-          health_url_fallback="https://preview.jov.ie/api/health"
+          health_url_fallback="https://main.jov.ie/api/health"
           health_url="$health_url_primary"
 
           # Wait a moment for deployment to be ready
@@ -715,7 +797,7 @@ jobs:
 
           if [ "$response_code" != "200" ]; then
             if [ "$response_code" = "429" ]; then
-              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to preview.jov.ie..."
+              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to main.jov.ie..."
               health_url="$health_url_fallback"
 
               attempt=1
@@ -786,6 +868,53 @@ jobs:
         continue-on-error: false
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
+      - name: Slack notify (staging deploy)
+        if: ${{ success() && secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#monitoring'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "✅ Staging deployed: main.jov.ie",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Workflow", "value": "CI", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (staging deploy failed)
+        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "🚨 Staging deploy failed: main.jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   promote:
     name: Auto Promote to Production (Primary)
@@ -985,6 +1114,53 @@ jobs:
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Slack notify (production deploy)
+        if: ${{ success() && secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "✅ Production deployed: jov.ie",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Workflow", "value": "CI", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (production deploy failed)
+        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "🔥 Production deploy failed: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   lighthouse-ci-production:
     name: Lighthouse CI (Production)
