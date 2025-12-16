@@ -942,14 +942,9 @@ export function getBaseUrl(): string {
       return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
     }
 
-    // For non-production deployments (e.g., Vercel preview URLs)
-    if (hostname.includes('vercel.app')) {
-      return `${protocol}//${hostname}`;
-    }
-
-    // For staging
-    if (hostname === 'main.jov.ie') {
-      return 'https://main.jov.ie';
+    // For staging or non-production deployments (e.g., Vercel preview URLs)
+    if (hostname === 'main.jov.ie' || hostname.includes('vercel.app')) {
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
     }
   }
 
