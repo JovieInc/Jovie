@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
-import { ThemeToggle } from '@/components/site/ThemeToggle';
 
 interface OnboardingPageProps {
   searchParams?: Promise<{ handle?: string }>;
@@ -63,11 +62,6 @@ export default async function OnboardingPage({
       logoSpinDelayMs={10000}
     >
       <div className='relative min-h-[500px]'>
-        {/* Theme Toggle pinned to viewport */}
-        <div className='fixed top-4 right-4 z-40'>
-          <ThemeToggle />
-        </div>
-
         {/* Unified onboarding form */}
         <OnboardingFormWrapper
           initialDisplayName={initialDisplayName}

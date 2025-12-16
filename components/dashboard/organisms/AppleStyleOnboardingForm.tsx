@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
@@ -115,6 +116,11 @@ export function AppleStyleOnboardingForm({
     ];
     return options[Math.floor(Math.random() * options.length)];
   }, []);
+
+  const isDisplayNameValid = useMemo(() => {
+    const trimmed = fullName.trim();
+    return trimmed.length > 0 && trimmed.length <= 50;
+  }, [fullName]);
 
   useEffect(() => {
     if (userId) {
@@ -476,7 +482,7 @@ export function AppleStyleOnboardingForm({
                 <Button
                   onClick={goToNextStep}
                   disabled={
-                    !fullName.trim() || isTransitioning || state.isSubmitting
+                    !isDisplayNameValid || isTransitioning || state.isSubmitting
                   }
                   variant='primary'
                   className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
@@ -695,12 +701,12 @@ export function AppleStyleOnboardingForm({
 
       <ProgressIndicator />
 
-      <a
+      <Link
         href='#main-content'
         className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
       >
         Skip to main content
-      </a>
+      </Link>
 
       <div className='sr-only' aria-live='polite' aria-atomic='true'>
         Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}

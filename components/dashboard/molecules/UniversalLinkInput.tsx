@@ -586,22 +586,24 @@ export const UniversalLinkInput = forwardRef<
 
       return (
         <div className='relative w-full' ref={inputRef}>
-          <div className='relative flex'>
-            {/* Search mode indicator */}
-            <div
-              className='flex items-center gap-1 px-3 rounded-l-lg border border-r-0 border-subtle bg-surface-2 shrink-0'
-              style={{ borderColor: `${brandHex}40` }}
-            >
+          <div
+            className={cn(
+              'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
+              'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+              disabled && 'opacity-50'
+            )}
+          >
+            <div className='flex h-10 w-10 items-center justify-center rounded-full shrink-0'>
               <div
                 className='flex items-center justify-center w-6 h-6 rounded-full'
                 style={{ backgroundColor: iconBg, color: iconColor }}
+                aria-hidden='true'
               >
                 <SocialIcon
                   platform={searchPlatform?.icon || 'spotify'}
                   className='w-3.5 h-3.5'
                 />
               </div>
-              <MagnifyingGlassIcon className='w-4 h-4 text-tertiary-token' />
             </div>
 
             <label htmlFor='artist-search-input' className='sr-only'>
@@ -611,6 +613,7 @@ export const UniversalLinkInput = forwardRef<
               ref={urlInputRef}
               id='artist-search-input'
               type='text'
+              inputSize='lg'
               placeholder='Search Spotify artists...'
               value={searchQuery}
               onChange={handleSearchInputChange}
@@ -624,7 +627,7 @@ export const UniversalLinkInput = forwardRef<
               autoCapitalize='none'
               autoCorrect='off'
               autoComplete='off'
-              className='pr-12 rounded-l-none'
+              className='border-0 bg-transparent px-0 pr-14 focus-visible:ring-0 focus-visible:ring-offset-0'
               role='combobox'
               aria-expanded={showResults && artistResults.length > 0}
               aria-controls='artist-search-results'
@@ -791,40 +794,27 @@ export const UniversalLinkInput = forwardRef<
             {searchState === 'success' &&
               `${artistResults.length} artists found. Use arrow keys to navigate.`}
           </div>
-
-          {/* Helper text */}
-          <div className='mt-2 text-xs text-secondary-token'>
-            💡 Select the official artist profile to ensure your link works
-            correctly
-          </div>
         </div>
       );
     }
 
     return (
       <div className='relative w-full' ref={inputRef}>
-        <div className='mb-1 flex flex-wrap items-center gap-2'>
-          <label
-            htmlFor='link-url-input'
-            className='text-xs font-medium text-primary-token'
-          >
-            Link URL
-          </label>
-          <div className='text-xs text-secondary-token'>
-            💡 Paste links from Spotify, Instagram, TikTok, YouTube, and more
-            for automatic detection
-          </div>
-        </div>
-        {/* URL Input with platform selector */}
-        <div className='relative flex'>
+        <div
+          className={cn(
+            'relative flex w-full items-center gap-2 rounded-full border border-default bg-surface-1 px-2 py-1 shadow-xs transition-colors',
+            'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+            disabled && 'opacity-50'
+          )}
+        >
           {/* Platform selector dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 type='button'
                 className={cn(
-                  'relative flex h-10 w-10 items-center justify-center rounded-l-lg border border-r-0 border-subtle bg-surface-2 hover:bg-surface-3 transition-colors shrink-0 p-0',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 focus-visible:z-10'
+                  'relative flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface-2 transition-colors shrink-0 p-0',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:z-10'
                 )}
                 aria-label='Select platform'
               >
@@ -929,6 +919,7 @@ export const UniversalLinkInput = forwardRef<
             ref={urlInputRef}
             id='link-url-input'
             type='url'
+            inputSize='lg'
             placeholder={placeholder}
             value={url}
             onChange={handleUrlChange}
@@ -938,7 +929,7 @@ export const UniversalLinkInput = forwardRef<
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            className='pr-24 rounded-l-none'
+            className='border-0 bg-transparent px-0 pr-24 focus-visible:ring-0 focus-visible:ring-offset-0'
             aria-describedby={
               detectedLink ? 'link-detection-status' : undefined
             }

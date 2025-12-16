@@ -87,6 +87,27 @@ const COUNTRY_OPTIONS: CountryOption[] = [
   { code: 'EG', dialCode: '+20', flag: '🇪🇬', label: 'Egypt' },
 ];
 
+function formatPhoneDigitsForDisplay(digits: string, dialCode: string): string {
+  const normalized = digits.replace(/\D/g, '');
+  if (!normalized) return '';
+
+  if (dialCode === '+1') {
+    const part1 = normalized.slice(0, 3);
+    const part2 = normalized.slice(3, 6);
+    const part3 = normalized.slice(6, 10);
+    const rest = normalized.slice(10);
+
+    if (normalized.length <= 3) return `(${part1}`;
+    if (normalized.length <= 6) return `(${part1}) ${part2}`;
+    if (normalized.length <= 10) return `(${part1}) ${part2}-${part3}`;
+
+    return `(${part1}) ${part2}-${part3} ${rest}`.trim();
+  }
+
+  const grouped = normalized.match(/.{1,3}/g);
+  return grouped ? grouped.join(' ') : normalized;
+}
+
 function detectDefaultCountry(): CountryOption {
   if (typeof navigator === 'undefined') {
     return COUNTRY_OPTIONS[0];
@@ -148,6 +169,12 @@ export function ArtistNotificationsCTA({
     setCountry(detectDefaultCountry());
   }, []);
 
+  useEffect(() => {
+    const dialDigits = country.dialCode.replace(/[^\d]/g, '');
+    const maxNationalDigits = Math.max(0, 15 - dialDigits.length);
+    setPhoneInput(prev => prev.slice(0, maxNationalDigits));
+  }, [country.dialCode]);
+
   // Auto-focus input when entering editing state
   React.useEffect(() => {
     if (notificationsState === 'editing' && inputRef.current) {
@@ -180,17 +207,13 @@ export function ArtistNotificationsCTA({
     setError(null);
   };
 
-  // Strip non-digits from phone input
   const handlePhoneChange = (value: string) => {
-    // Only allow digits, spaces, dashes, and parentheses for formatting
-    const cleaned = value.replace(/[^\d\s\-()]/g, '');
-    // Store only digits internally
-    const digitsOnly = cleaned.replace(/[^\d]/g, '');
-    // Limit to 15 digits (E.164 max)
-    if (digitsOnly.length <= 15) {
-      setPhoneInput(digitsOnly);
-    }
-    // Clear error when user starts typing
+    const digitsOnly = value.replace(/[^\d]/g, '');
+    const dialDigits = country.dialCode.replace(/[^\d]/g, '');
+    const maxNationalDigits = Math.max(0, 15 - dialDigits.length);
+
+    setPhoneInput(digitsOnly.slice(0, maxNationalDigits));
+
     if (error) setError(null);
   };
 
@@ -209,13 +232,17 @@ export function ArtistNotificationsCTA({
         return false;
       }
 
-      if (digitsOnly.length < 10) {
-        setError('Phone number is too short');
+      const dialDigits = country.dialCode.replace(/[^\d]/g, '');
+      const maxNationalDigits = Math.max(0, 15 - dialDigits.length);
+
+      if (digitsOnly.length > maxNationalDigits) {
+        setError('Phone number is too long');
         return false;
       }
 
-      if (digitsOnly.length > 15) {
-        setError('Phone number is too long');
+      const candidate = buildPhoneE164();
+      if (!/^\+[1-9]\d{6,14}$/.test(candidate)) {
+        setError('Please enter a valid phone number');
         return false;
       }
 
@@ -292,6 +319,7 @@ export function ArtistNotificationsCTA({
     if (isSubmitting) return;
 
     if (!validateCurrent()) {
+      setIsConfirmOpen(false);
       return;
     }
 
@@ -358,6 +386,7 @@ export function ArtistNotificationsCTA({
           ? error.message
           : 'Unable to subscribe right now.';
       setError(message);
+      setIsConfirmOpen(false);
       showError('Unable to turn on notifications right now.');
 
       track('notifications_subscribe_error', {
@@ -495,12 +524,15 @@ export function ArtistNotificationsCTA({
                 id={inputId}
                 type={channel === 'phone' ? 'tel' : 'email'}
                 inputMode={channel === 'phone' ? 'numeric' : 'email'}
-                pattern={channel === 'phone' ? '[0-9]*' : undefined}
                 className='w-full h-11 px-4 bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 border-none focus:outline-none focus:ring-0'
                 placeholder={
                   channel === 'phone' ? '(555) 123-4567' : 'your@email.com'
                 }
-                value={channel === 'phone' ? phoneInput : emailInput}
+                value={
+                  channel === 'phone'
+                    ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
+                    : emailInput
+                }
                 onChange={event => {
                   if (channel === 'phone') {
                     handlePhoneChange(event.target.value);
@@ -512,7 +544,7 @@ export function ArtistNotificationsCTA({
                 onKeyDown={handleKeyDown}
                 disabled={isSubmitting}
                 autoComplete={channel === 'phone' ? 'tel-national' : 'email'}
-                maxLength={channel === 'phone' ? 15 : 254}
+                maxLength={channel === 'phone' ? 32 : 254}
                 style={{ fontSynthesisWeight: 'none' }}
               />
             </div>

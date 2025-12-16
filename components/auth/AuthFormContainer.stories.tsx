@@ -19,7 +19,7 @@ const SampleForm = () => (
       <input
         type='email'
         placeholder='you@example.com'
-        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800'
+        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800'
       />
     </div>
     <div className='space-y-2'>
@@ -27,10 +27,10 @@ const SampleForm = () => (
       <input
         type='password'
         placeholder='••••••••'
-        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800'
+        className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800'
       />
     </div>
-    <button className='w-full py-2 bg-black text-white dark:bg-white dark:text-black rounded-lg font-medium'>
+    <button className='w-full py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'>
       Sign In
     </button>
   </div>

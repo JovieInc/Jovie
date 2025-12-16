@@ -30,6 +30,7 @@ export const STATSIG_FLAGS = {
   AVATAR_UPLOAD: 'feature_avatar_upload',
   AVATAR_UPLOADER: 'feature_avatar_uploader',
   CONTACTS: 'feature_contacts',
+  DYNAMIC_ENGAGEMENT: 'feature_dynamic_engagement',
 
   // Backend Features
   UNIVERSAL_NOTIFICATIONS: 'feature_universal_notifications',

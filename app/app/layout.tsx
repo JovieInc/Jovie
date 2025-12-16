@@ -1,12 +1,18 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { db, waitlistEntries } from '@/lib/db';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
   setSidebarCollapsed,
 } from './dashboard/actions';
 import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 export default async function AppShellLayout({
   children,
@@ -17,6 +23,35 @@ export default async function AppShellLayout({
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/dashboard');
+  }
+
+  // Waitlist gate: authenticated users must be invited/claimed (per-email) to access /app.
+  // Users can still sign in, but they are redirected to /waitlist until approved.
+  try {
+    const user = await currentUser();
+    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+    if (!emailRaw) {
+      redirect('/waitlist');
+    }
+
+    const email = normalizeEmail(emailRaw);
+    const [entry] = await db
+      .select({ status: waitlistEntries.status })
+      .from(waitlistEntries)
+      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+      .limit(1);
+
+    const status = entry?.status ?? null;
+    const isApproved = status === 'invited' || status === 'claimed';
+    if (!isApproved) {
+      redirect('/waitlist');
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error;
+    }
+    // If the waitlist query fails (e.g., during migrations), do not hard-block access.
   }
 
   try {

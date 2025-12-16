@@ -47,73 +47,123 @@ const config: StorybookConfig = {
     };
 
     // Ensure TypeScript files are properly handled
+    const existingAlias = config.resolve?.alias;
+    const normalizedAlias = Array.isArray(existingAlias)
+      ? existingAlias
+      : existingAlias && typeof existingAlias === 'object'
+        ? Object.entries(existingAlias).map(([find, replacement]) => ({
+            find,
+            replacement,
+          }))
+        : [];
+
     config.resolve = {
       ...config.resolve,
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
-      alias: {
-        ...config.resolve?.alias,
-        '@': path.resolve(__dirname, '..'),
-        '@jovie/ui': path.resolve(__dirname, '../packages/ui'),
-        // Mock Node.js modules that can't run in browser
-        'node:async_hooks': require.resolve('./empty-module.js'),
-        'server-only': require.resolve('./empty-module.js'),
-        'next/cache': require.resolve('./empty-module.js'),
-        'next/headers': require.resolve('./empty-module.js'),
-        // Mock server actions that shouldn't run in Storybook
-        '@/app/dashboard/actions': require.resolve(
-          './dashboard-actions-mock.ts'
-        ),
-        '@/app/onboarding/actions': require.resolve(
-          './onboarding-actions-mock.ts'
-        ),
+      alias: [
+        // Must come before the generic '@' alias to avoid resolving to the real file.
+        {
+          find: '@/app/app/dashboard/DashboardLayoutClient',
+          replacement: require.resolve('./dashboard-layout-client-mock.tsx'),
+        },
+        {
+          find: '@/app/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '@/app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
         // Also handle absolute imports without alias
-        '../../../app/dashboard/actions': require.resolve(
-          './dashboard-actions-mock.ts'
-        ),
-        '../../app/dashboard/actions': require.resolve(
-          './dashboard-actions-mock.ts'
-        ),
-        '../app/dashboard/actions': require.resolve(
-          './dashboard-actions-mock.ts'
-        ),
-        '../../../app/onboarding/actions': require.resolve(
-          './onboarding-actions-mock.ts'
-        ),
-        '../../app/onboarding/actions': require.resolve(
-          './onboarding-actions-mock.ts'
-        ),
-        '../app/onboarding/actions': require.resolve(
-          './onboarding-actions-mock.ts'
-        ),
+        {
+          find: '../../../app/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../../app/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../app/dashboard/actions',
+          replacement: require.resolve('./dashboard-actions-mock.ts'),
+        },
+        {
+          find: '../../../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '../../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        {
+          find: '../app/onboarding/actions',
+          replacement: require.resolve('./onboarding-actions-mock.ts'),
+        },
+        // Mock Node.js modules that can't run in browser
+        {
+          find: 'node:async_hooks',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          find: 'server-only',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          find: 'next/cache',
+          replacement: require.resolve('./empty-module.js'),
+        },
+        {
+          find: 'next/headers',
+          replacement: require.resolve('./empty-module.js'),
+        },
         // Mock Next.js navigation for Storybook
-        'next/navigation': require.resolve('./next-navigation-mock.js'),
+        {
+          find: 'next/navigation',
+          replacement: require.resolve('./next-navigation-mock.js'),
+        },
         // Mock Clerk authentication for Storybook
-        '@clerk/nextjs': path.resolve(__dirname, 'clerk-mock.jsx'),
-        '@clerk/nextjs/server': path.resolve(__dirname, 'clerk-server-mock.js'),
+        {
+          find: '@clerk/nextjs',
+          replacement: path.resolve(__dirname, 'clerk-mock.jsx'),
+        },
+        {
+          find: '@clerk/nextjs/server',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
         // Also handle any nested imports from server path
-        '@clerk/nextjs/server/auth': path.resolve(
-          __dirname,
-          'clerk-server-mock.js'
-        ),
-        '@clerk/nextjs/server/currentUser': path.resolve(
-          __dirname,
-          'clerk-server-mock.js'
-        ),
+        {
+          find: '@clerk/nextjs/server/auth',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
+        {
+          find: '@clerk/nextjs/server/currentUser',
+          replacement: path.resolve(__dirname, 'clerk-server-mock.js'),
+        },
         // Mock @clerk/elements to prevent package.json lookup warning
-        '@clerk/elements': path.resolve(__dirname, 'clerk-elements-mock.jsx'),
-        '@clerk/elements/common': path.resolve(
-          __dirname,
-          'clerk-elements-mock.jsx'
-        ),
-        '@clerk/elements/sign-in': path.resolve(
-          __dirname,
-          'clerk-elements-mock.jsx'
-        ),
-        '@clerk/elements/sign-up': path.resolve(
-          __dirname,
-          'clerk-elements-mock.jsx'
-        ),
-      },
+        {
+          find: '@clerk/elements',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements/common',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements/sign-in',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        {
+          find: '@clerk/elements/sign-up',
+          replacement: path.resolve(__dirname, 'clerk-elements-mock.jsx'),
+        },
+        // Project aliases
+        { find: '@', replacement: path.resolve(__dirname, '..') },
+        {
+          find: '@jovie/ui',
+          replacement: path.resolve(__dirname, '../packages/ui'),
+        },
+        ...normalizedAlias,
+      ],
     };
 
     // Configure Vite to handle TypeScript and JSX properly

@@ -2,7 +2,6 @@
 
 import { useClerk, useUser } from '@clerk/nextjs';
 import {
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +14,7 @@ import { Avatar } from '@/components/atoms/Avatar';
 import { Icon } from '@/components/atoms/Icon';
 import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { useToast } from '@/components/molecules/ToastContainer';
+import { Badge } from '@/components/ui/Badge';
 import { useBillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -343,7 +343,7 @@ export function UserButton({
           <button
             type='button'
             className={cn(
-              'flex w-full items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-surface px-3 py-2 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+              'flex w-full items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-surface px-3 py-2 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
             )}
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
@@ -357,15 +357,6 @@ export function UserButton({
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2 truncate'>
                 <p className='text-sm font-medium truncate'>{displayName}</p>
-                {billingStatus.isPro && (
-                  <Badge
-                    variant='secondary'
-                    size='sm'
-                    className='shrink-0 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide'
-                  >
-                    Standard
-                  </Badge>
-                )}
               </div>
             </div>
             <Icon
@@ -378,7 +369,7 @@ export function UserButton({
           <Button
             variant='ghost'
             size='icon'
-            className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+            className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
             onClick={() => setIsMenuOpen(prev => !prev)}
           >
             <Avatar
@@ -398,7 +389,7 @@ export function UserButton({
       >
         <DropdownMenuItem
           onClick={handleProfile}
-          className='cursor-pointer rounded-lg px-2 py-2 focus:bg-sidebar-surface-hover hover:bg-sidebar-surface-hover'
+          className='cursor-pointer rounded-lg px-2 py-2 hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <div className='flex w-full items-center gap-3'>
             <Avatar
@@ -417,7 +408,8 @@ export function UserButton({
                   <Badge
                     variant='secondary'
                     size='sm'
-                    className='shrink-0 px-1.5 py-0 text-[9px] font-bold uppercase tracking-wider'
+                    emphasis='subtle'
+                    className='shrink-0 rounded-full px-1.5 py-0 text-[10px] font-medium'
                   >
                     Pro
                   </Badge>
@@ -442,7 +434,7 @@ export function UserButton({
         {/* Primary actions group */}
         <DropdownMenuItem
           onClick={handleSettings}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <Icon
             name='Settings'
@@ -455,7 +447,7 @@ export function UserButton({
         {billingStatus.loading ? (
           <DropdownMenuItem
             disabled
-            className='cursor-default focus:bg-transparent px-2.5 py-2 text-[13px] h-9'
+            className='cursor-default focus-visible:bg-transparent px-2.5 py-2 text-[13px] h-9'
           >
             <div className='flex w-full items-center gap-2.5'>
               <div className='h-4 w-4 animate-pulse rounded bg-white/10' />
@@ -466,7 +458,7 @@ export function UserButton({
           <DropdownMenuItem
             onClick={handleManageBilling}
             disabled={isManageBillingLoading}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover disabled:cursor-not-allowed disabled:opacity-70'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
               name='CreditCard'
@@ -480,7 +472,7 @@ export function UserButton({
           <DropdownMenuItem
             onClick={handleUpgradeToPro}
             disabled={isUpgradeLoading}
-            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover disabled:cursor-not-allowed disabled:opacity-70'
+            className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
               name='Sparkles'
@@ -498,7 +490,7 @@ export function UserButton({
             setIsMenuOpen(false);
             setIsFeedbackOpen(true);
           }}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus:bg-sidebar-surface-hover'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <Icon
             name='MessageSquare'
@@ -513,7 +505,7 @@ export function UserButton({
         <DropdownMenuItem
           onClick={handleSignOut}
           disabled={isLoading}
-          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 focus:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60'
+          className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>

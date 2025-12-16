@@ -1,8 +1,11 @@
-import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
-import { ingestionJobs } from '@/lib/db';
 import { env } from '@/lib/env';
-import { claimPendingJobs, processJob } from '@/lib/ingestion/processor';
+import {
+  claimPendingJobs,
+  handleIngestionJobFailure,
+  processJob,
+  succeedJob,
+} from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
 
@@ -41,36 +44,30 @@ export async function POST(request: NextRequest) {
     attempted = claimed.length;
 
     for (const job of claimed) {
-      try {
-        await withSystemIngestionSession(async tx => {
+      const result = await withSystemIngestionSession(async tx => {
+        try {
           await processJob(tx, job);
-          await tx
-            .update(ingestionJobs)
-            .set({
-              status: 'succeeded',
-              error: null,
-              updatedAt: new Date(),
-            })
-            .where(eq(ingestionJobs.id, job.id));
-        });
-        processed += 1;
-      } catch (error) {
-        await withSystemIngestionSession(async tx => {
-          await tx
-            .update(ingestionJobs)
-            .set({
-              status: 'failed',
-              error: error instanceof Error ? error.message : 'Unknown error',
-              updatedAt: new Date(),
-            })
-            .where(eq(ingestionJobs.id, job.id));
-        });
-        logger.error('Ingestion job failed', {
-          jobId: job.id,
-          error:
-            error instanceof Error ? { message: error.message } : String(error),
-        });
-      }
+          await succeedJob(tx, job);
+
+          return { ok: true as const };
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Unknown error';
+          await handleIngestionJobFailure(tx, job, message);
+
+          logger.error('Ingestion job failed', {
+            jobId: job.id,
+            error:
+              error instanceof Error
+                ? { message: error.message, stack: error.stack }
+                : String(error),
+          });
+
+          return { ok: false as const };
+        }
+      });
+
+      if (result.ok) processed += 1;
     }
 
     return NextResponse.json(

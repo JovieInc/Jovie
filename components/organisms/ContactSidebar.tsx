@@ -6,7 +6,7 @@ import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
@@ -78,6 +78,66 @@ function sanitizeUsernameInput(raw: string): string {
   const trimmed = raw.trim();
   const withoutAt = trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
   return withoutAt;
+}
+
+function extractUsernameFromUrl(value: string): string | null {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    const host = url.hostname.replace(/^www\./, '').toLowerCase();
+    const segments = url.pathname.split('/').filter(Boolean);
+
+    if (segments.length === 0) return null;
+
+    const first = segments[0] ?? '';
+    const second = segments[1] ?? '';
+
+    if (host.endsWith('tiktok.com')) {
+      const candidate = first.startsWith('@') ? first.slice(1) : first;
+      return candidate || null;
+    }
+
+    if (host.endsWith('snapchat.com')) {
+      const candidate = first === 'add' || first === 'u' ? second : first;
+      const cleaned = candidate.startsWith('@')
+        ? candidate.slice(1)
+        : candidate;
+      return cleaned || null;
+    }
+
+    if (host.endsWith('youtube.com')) {
+      if (first.startsWith('@')) return first.slice(1) || null;
+      return null;
+    }
+
+    const candidate = first.startsWith('@') ? first.slice(1) : first;
+    return candidate || null;
+  } catch {
+    return null;
+  }
+}
+
+function extractUsernameFromLabel(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const lastSegment = trimmed
+    .replace(/^https?:\/\//, '')
+    .split('/')
+    .filter(Boolean)
+    .pop();
+
+  if (!lastSegment) return null;
+
+  const candidate = lastSegment.startsWith('@')
+    ? lastSegment.slice(1)
+    : lastSegment;
+  if (!candidate) return null;
+
+  if (!/^[a-zA-Z0-9._-]{2,}$/.test(candidate)) return null;
+  return candidate;
 }
 
 function isValidUrl(value: string): boolean {
@@ -411,44 +471,59 @@ export function ContactSidebar({
               {contact.socialLinks.length > 0 && (
                 <div className='flex flex-wrap gap-2'>
                   {contact.socialLinks.map((link, index) => {
-                    const label =
-                      link.label || link.url.replace(/^https?:\/\//, '');
+                    const username =
+                      extractUsernameFromUrl(link.url) ??
+                      extractUsernameFromLabel(link.label) ??
+                      '';
+                    const displayUsername = formatUsername(username);
                     const platformId =
                       (link.platformType as string | undefined) ||
-                      link.label ||
-                      'website';
+                      detectPlatform(link.url, fullName || contact.username)
+                        .platform.icon;
+
+                    const ariaLabel = displayUsername
+                      ? `Open ${platformId} profile ${displayUsername}`
+                      : `Open ${platformId} link`;
+
                     return (
-                      <a
+                      <PlatformPill
                         key={link.id ?? `${link.url}-${index}`}
-                        href={link.url}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='inline-flex items-center gap-1 rounded-full border border-sidebar-border bg-sidebar-surface px-2.5 py-1 text-xs text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-                      >
-                        <SocialIcon
-                          platform={platformId}
-                          className='h-3.5 w-3.5'
-                          aria-hidden
-                        />
-                        <span className='max-w-[140px] truncate'>{label}</span>
-                        <ExternalLink
-                          className='h-3 w-3 text-sidebar-muted'
-                          aria-hidden
-                        />
-                        {isEditable && (
-                          <button
-                            type='button'
-                            className='ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full text-sidebar-muted hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
-                            aria-label={`Remove ${label} link`}
-                            onClick={event => {
-                              event.preventDefault();
-                              handleRemoveLink(index);
-                            }}
-                          >
-                            <X className='h-3 w-3' />
-                          </button>
-                        )}
-                      </a>
+                        platformIcon={platformId}
+                        platformName={platformId}
+                        primaryText={displayUsername || platformId}
+                        tone='faded'
+                        testId={`contact-social-pill-${platformId}-${index}`}
+                        onClick={() => {
+                          window.open(
+                            link.url,
+                            '_blank',
+                            'noopener,noreferrer'
+                          );
+                        }}
+                        trailing={
+                          <div className='flex items-center gap-1'>
+                            <ExternalLink
+                              className='h-3.5 w-3.5 text-tertiary-token'
+                              aria-hidden
+                            />
+                            {isEditable ? (
+                              <button
+                                type='button'
+                                className='inline-flex h-4 w-4 items-center justify-center rounded-full text-tertiary-token hover:text-destructive focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                                aria-label={`Remove ${ariaLabel}`}
+                                onClick={event => {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  handleRemoveLink(index);
+                                }}
+                              >
+                                <X className='h-3 w-3' aria-hidden />
+                              </button>
+                            ) : null}
+                          </div>
+                        }
+                        className='border-sidebar-border bg-sidebar-surface text-sidebar-foreground hover:bg-sidebar-surface-hover'
+                      />
                     );
                   })}
                 </div>

@@ -9,9 +9,9 @@ import {
 } from './audience-data';
 
 export default async function AudiencePage({
-  searchParams,
+  searchParams = {},
 }: {
-  searchParams: Record<string, string | string[] | undefined>;
+  searchParams?: Record<string, string | string[] | undefined>;
 }) {
   const { userId } = await auth();
 
@@ -33,10 +33,30 @@ export default async function AudiencePage({
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null;
 
+    const getOne = (key: string): string | undefined => {
+      const value = searchParams[key];
+      if (Array.isArray(value)) return value[0];
+      return value;
+    };
+
+    const rlsBypassEnabled =
+      process.env.NODE_ENV !== 'production' &&
+      process.env.ALLOW_AUDIENCE_RLS_BYPASS === '1' &&
+      getOne('rlsBypass') === '1';
+
+    const modeOverride = (() => {
+      if (process.env.NODE_ENV === 'production') return undefined;
+      const raw = getOne('audienceMode');
+      if (raw === 'members' || raw === 'subscribers') return raw;
+      return undefined;
+    })();
+
     const audienceData = await getAudienceServerData({
       userId,
       selectedProfileId: artist?.id ?? null,
       searchParams: getAudienceUrlSearchParams(searchParams),
+      rlsBypass: rlsBypassEnabled,
+      modeOverride,
     });
 
     return (

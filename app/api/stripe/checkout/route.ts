@@ -6,8 +6,16 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { createCheckoutSession } from '@/lib/stripe/client';
-import { getActivePriceIds, getPriceMappingDetails } from '@/lib/stripe/config';
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  stripe,
+} from '@/lib/stripe/client';
+import {
+  getActivePriceIds,
+  getPriceMappingDetails,
+  PRICE_MAPPINGS,
+} from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 
 export const runtime = 'nodejs';
@@ -64,10 +72,62 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (priceDetails?.plan) {
+      const planPriceIds = Object.values(PRICE_MAPPINGS)
+        .filter(mapping => mapping.plan === priceDetails.plan)
+        .map(mapping => mapping.priceId);
+
+      const activeSubscriptionStatuses = new Set([
+        'active',
+        'trialing',
+        'past_due',
+        'unpaid',
+      ]);
+
+      const existingSubscriptions = await stripe.subscriptions.list({
+        customer: customerResult.customerId,
+        status: 'all',
+        limit: 25,
+      });
+
+      const alreadySubscribedToPlan = existingSubscriptions.data.some(
+        subscription =>
+          activeSubscriptionStatuses.has(subscription.status) &&
+          subscription.items.data.some(item => {
+            const itemPriceId = item.price?.id;
+            return (
+              typeof itemPriceId === 'string' &&
+              planPriceIds.includes(itemPriceId)
+            );
+          })
+      );
+
+      if (alreadySubscribedToPlan) {
+        const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const returnUrl = `${baseUrl}/app/dashboard`;
+        const portalSession = await createBillingPortalSession({
+          customerId: customerResult.customerId,
+          returnUrl,
+        });
+
+        return NextResponse.json(
+          {
+            sessionId: portalSession.id,
+            url: portalSession.url,
+            alreadySubscribed: true,
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     // Create URLs for success and cancel
     const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const successUrl = `${baseUrl}/billing/success`;
     const cancelUrl = `${baseUrl}/billing/cancel`;
+
+    const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
+    const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
 
     // Create checkout session
     const session = await createCheckoutSession({
@@ -76,6 +136,7 @@ export async function POST(request: NextRequest) {
       userId,
       successUrl,
       cancelUrl,
+      idempotencyKey,
     });
 
     // Log successful checkout creation

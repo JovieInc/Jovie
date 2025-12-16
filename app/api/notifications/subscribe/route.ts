@@ -13,11 +13,36 @@ import {
 } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { sendNotification } from '@/lib/notifications/service';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { checkStatsigGateForUser } from '@/lib/statsig/server';
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function normalizePhoneToE164(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
+
+  if (normalized.startsWith('00')) {
+    normalized = `+${normalized.slice(2)}`;
+  }
+
+  if (!normalized.startsWith('+')) {
+    normalized = `+${normalized}`;
+  }
+
+  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
+
+  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
 
 // Schema for subscription request validation
 const subscribeSchema = z
@@ -25,13 +50,10 @@ const subscribeSchema = z
     artist_id: z.string().uuid(),
     channel: z.enum(['email', 'phone']).default('email'),
     email: z.string().email().optional(),
-    phone: z
-      .string()
-      .regex(/^\+?[0-9]{7,20}$/, 'Please provide a valid phone number')
-      .optional(),
+    phone: z.string().min(1).max(64).optional(),
     country_code: z.string().min(2).max(2).optional(),
     city: z.string().min(1).max(120).optional(),
-    source: z.string().default('profile_bell'),
+    source: z.string().min(1).max(80).default('profile_bell'),
   })
   .refine(
     data =>
@@ -51,33 +73,57 @@ export async function POST(request: NextRequest) {
   try {
     const runtimeStart = Date.now();
     // Parse and validate request body
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid request data',
+        },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    const bodyObject: Record<string, unknown> =
+      typeof body === 'object' && body !== null
+        ? (body as Record<string, unknown>)
+        : {};
+
     const result = subscribeSchema.safeParse(body);
 
     // Track subscription attempt with analytics
     await trackServerEvent('notifications_subscribe_attempt', {
-      artist_id: body.artist_id,
-      channel: body.channel || 'email',
-      email_length: body.email?.length || 0,
-      phone_length: body.phone?.length || 0,
-      source: body.source || 'unknown',
+      artist_id:
+        typeof bodyObject.artist_id === 'string' ? bodyObject.artist_id : null,
+      channel:
+        typeof bodyObject.channel === 'string' ? bodyObject.channel : 'email',
+      email_length:
+        typeof bodyObject.email === 'string' ? bodyObject.email.length : 0,
+      phone_length:
+        typeof bodyObject.phone === 'string' ? bodyObject.phone.length : 0,
+      source:
+        typeof bodyObject.source === 'string' ? bodyObject.source : 'unknown',
     });
 
     // If validation fails, return error
     if (!result.success) {
       // Track validation error
       await trackServerEvent('notifications_subscribe_error', {
-        artist_id: body.artist_id,
+        artist_id:
+          typeof bodyObject.artist_id === 'string'
+            ? bodyObject.artist_id
+            : null,
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
-        source: body.source || 'unknown',
+        source:
+          typeof bodyObject.source === 'string' ? bodyObject.source : 'unknown',
       });
 
       return NextResponse.json(
         {
           success: false,
           error: 'Invalid request data',
-          details: result.error.format(),
         },
         { status: 400, headers: NO_STORE_HEADERS }
       );
@@ -92,6 +138,7 @@ export async function POST(request: NextRequest) {
         displayName: creatorProfiles.displayName,
         username: creatorProfiles.username,
         creatorIsPro: users.isPro,
+        creatorClerkId: users.clerkId,
       })
       .from(creatorProfiles)
       .leftJoin(users, eq(users.id, creatorProfiles.userId))
@@ -106,6 +153,19 @@ export async function POST(request: NextRequest) {
     }
 
     const creatorIsPro = Boolean(artistProfile.creatorIsPro);
+
+    const creatorClerkId =
+      typeof artistProfile.creatorClerkId === 'string'
+        ? artistProfile.creatorClerkId
+        : null;
+
+    const dynamicOverrideEnabled = creatorClerkId
+      ? await checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+          userID: creatorClerkId,
+        })
+      : false;
+
+    const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
 
     const ipAddress =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
@@ -126,7 +186,21 @@ export async function POST(request: NextRequest) {
       channel === 'email' && email ? email.trim().toLowerCase() : null;
 
     const normalizedPhone =
-      channel === 'phone' && phone ? phone.replace(/[\s-]/g, '') : null;
+      channel === 'phone' && phone ? normalizePhoneToE164(phone) : null;
+
+    if (channel === 'phone' && !normalizedPhone) {
+      await trackServerEvent('notifications_subscribe_error', {
+        artist_id,
+        error_type: 'validation_error',
+        validation_errors: ['Invalid phone number'],
+        source,
+      });
+
+      return NextResponse.json(
+        { success: false, error: 'Please provide a valid phone number' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const conflictTarget =
       channel === 'email'
@@ -165,9 +239,10 @@ export async function POST(request: NextRequest) {
       country_code: countryCode ?? undefined,
       source,
       creator_is_pro: creatorIsPro,
+      dynamic_enabled: dynamicEnabled,
     });
 
-    if (creatorIsPro && normalizedEmail) {
+    if (dynamicEnabled && normalizedEmail) {
       const ip =
         request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
       const ua = request.headers.get('user-agent') || null;
@@ -269,7 +344,7 @@ export async function POST(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
 
-    if (creatorIsPro) {
+    if (dynamicEnabled) {
       response.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',

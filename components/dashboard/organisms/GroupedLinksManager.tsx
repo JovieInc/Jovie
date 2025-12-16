@@ -17,7 +17,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
@@ -650,17 +649,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [existingPlatforms, isMusicProfile]);
 
   const hasAnyLinks = links.length > 0;
-  const filteredCount = links.length;
-
-  const COMPLETION_TARGET = 6;
-  const completionPercent = hasAnyLinks
-    ? Math.min(
-        100,
-        Math.round(
-          (Math.min(links.length, COMPLETION_TARGET) / COMPLETION_TARGET) * 100
-        )
-      )
-    : 0;
 
   const buildSecondaryText = useCallback(
     (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
@@ -672,314 +660,289 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   return (
     <section
-      className={cn('space-y-4', className)}
+      className={cn('space-y-2', className)}
       aria-label='Links Manager'
       ref={containerRef}
     >
-      <div className='mb-6 rounded-xl border border-subtle bg-surface-1 p-4 space-y-4'>
-        {/* Hint message with animation */}
-        <AnimatePresence>
-          {hint && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
-              role='status'
-              aria-live='polite'
-            >
-              {hint}
-            </motion.div>
-          )}
-        </AnimatePresence>
-        {ytPrompt && (
-          <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
-            <div className='text-primary-token'>
-              You already added{' '}
-              {ytPrompt.candidate.platform.name ||
-                ytPrompt.candidate.platform.id}{' '}
-              in this section. Do you also want to add it as{' '}
-              {ytPrompt.target === 'dsp'
-                ? 'a music service'
-                : labelFor(ytPrompt.target)}
-              ?
-            </div>
-            <div className='shrink-0 flex items-center gap-2'>
-              <Button
-                size='sm'
-                variant='primary'
-                onClick={() => {
-                  if (!ytPrompt) return;
-                  const adjusted = {
-                    ...ytPrompt.candidate,
-                    platform: {
-                      ...ytPrompt.candidate.platform,
-                      category: ytPrompt.target,
-                    },
-                  } as unknown as T;
-                  const next = [...links, adjusted];
-                  setLinks(next);
-                  setYtPrompt(null);
-                  onLinkAdded?.([adjusted]);
-                }}
+      <div>
+        <div className='mx-auto w-full max-w-3xl space-y-3'>
+          {/* Hint message with animation */}
+          <AnimatePresence>
+            {hint && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+                className='rounded-lg border border-amber-300/40 bg-amber-50 text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 px-3 py-2 text-sm'
+                role='status'
+                aria-live='polite'
               >
-                Add as {labelFor(ytPrompt.target)}
-              </Button>
-              <Button
-                size='sm'
-                variant='outline'
-                onClick={() => setYtPrompt(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
-        {/* Combined search + add input */}
-        <UniversalLinkInput
-          onAdd={handleAdd}
-          existingPlatforms={links
-            .filter(l => l.platform.id !== 'youtube')
-            .map(l => l.platform.id)}
-          creatorName={creatorName}
-          prefillUrl={prefillUrl}
-          onPrefillConsumed={() => setPrefillUrl(undefined)}
-          onQueryChange={() => {}}
-          onPreviewChange={(link, isDuplicate) => {
-            if (!link || isDuplicate) {
-              setPendingPreview(null);
-              return;
-            }
-            setPendingPreview({ link, isDuplicate });
-          }}
-          clearSignal={clearSignal}
-        />
-
-        {/* Links summary + completion indicator */}
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div className='min-w-0'>
-            {suggestionPills.length > 0 ? (
-              <div className='relative' aria-label='Quick link suggestions'>
-                <div
-                  className='flex gap-2 overflow-x-auto overflow-y-hidden pr-4 pb-1 [&::-webkit-scrollbar]:hidden'
-                  style={{
-                    WebkitOverflowScrolling: 'touch',
-                    scrollbarWidth: 'none',
-                    msOverflowStyle: 'none',
-                    WebkitMaskImage:
-                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
-                    maskImage:
-                      'linear-gradient(to right, #000 0%, #000 80%, transparent 100%)',
+                {hint}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {ytPrompt && (
+            <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
+              <div className='text-primary-token'>
+                You already added{' '}
+                {ytPrompt.candidate.platform.name ||
+                  ytPrompt.candidate.platform.id}{' '}
+                in this section. Do you also want to add it as{' '}
+                {ytPrompt.target === 'dsp'
+                  ? 'a music service'
+                  : labelFor(ytPrompt.target)}
+                ?
+              </div>
+              <div className='shrink-0 flex items-center gap-2'>
+                <Button
+                  size='sm'
+                  variant='primary'
+                  onClick={() => {
+                    if (!ytPrompt) return;
+                    const adjusted = {
+                      ...ytPrompt.candidate,
+                      platform: {
+                        ...ytPrompt.candidate.platform,
+                        category: ytPrompt.target,
+                      },
+                    } as unknown as T;
+                    const next = [...links, adjusted];
+                    setLinks(next);
+                    setYtPrompt(null);
+                    onLinkAdded?.([adjusted]);
                   }}
                 >
-                  {suggestionPills.map(pill => (
-                    <PlatformPill
-                      key={pill.id}
-                      platformIcon={pill.simpleIconId}
-                      platformName={pill.label}
-                      primaryText={pill.label}
-                      suffix='+'
-                      tone='faded'
-                      onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                      className='whitespace-nowrap shrink-0'
-                    />
-                  ))}
-                </div>
+                  Add as {labelFor(ytPrompt.target)}
+                </Button>
+                <Button
+                  size='sm'
+                  variant='outline'
+                  onClick={() => setYtPrompt(null)}
+                >
+                  Cancel
+                </Button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          )}
+          {/* Combined search + add input */}
+          <UniversalLinkInput
+            onAdd={handleAdd}
+            existingPlatforms={links
+              .filter(l => l.platform.id !== 'youtube')
+              .map(l => l.platform.id)}
+            creatorName={creatorName}
+            prefillUrl={prefillUrl}
+            onPrefillConsumed={() => setPrefillUrl(undefined)}
+            onQueryChange={() => {}}
+            onPreviewChange={(link, isDuplicate) => {
+              if (!link || isDuplicate) {
+                setPendingPreview(null);
+                return;
+              }
+              setPendingPreview({ link, isDuplicate });
+            }}
+            clearSignal={clearSignal}
+          />
 
-          <div className='text-xs text-secondary-token sm:text-right'>
-            {completionPercent >= 100 ? (
-              <span className='inline-flex items-center gap-2'>
-                <Icon name='CheckCircle' className='h-4 w-4 text-accent' />
-                <span className='whitespace-nowrap'>
-                  You’re set with {links.length} links
-                </span>
-              </span>
-            ) : (
-              <span className='inline-flex items-center gap-2'>
-                <span className='whitespace-nowrap'>
-                  {filteredCount} {filteredCount === 1 ? 'link' : 'links'} •{' '}
-                  {completionPercent}% to target
-                </span>
-                <span className='text-tertiary-token'>(most add 4–6)</span>
-              </span>
-            )}
-          </div>
-        </div>
-
-        {suggestionsEnabled && pendingSuggestions.length > 0 && (
-          <CategorySection title='SUGGESTED' className='space-y-0'>
-            {pendingSuggestions.map(suggestion => {
-              const id = `suggestion::${suggestionKey(suggestion)}`;
-              const rawConfidence = (suggestion as { confidence?: number })
-                .confidence;
-              const confidence: number | null =
-                typeof rawConfidence === 'number' ? rawConfidence : null;
-              const badgeText =
-                typeof confidence === 'number'
-                  ? `Suggested • ${Math.round(confidence * 100)}%`
-                  : 'Suggested';
-
-              return (
-                <LinkPill
-                  key={suggestionKey(suggestion)}
-                  platformIcon={suggestion.platform.icon}
-                  platformName={suggestion.platform.name}
-                  primaryText={suggestion.platform.name}
-                  secondaryText={buildSecondaryText(suggestion)}
-                  state='connected'
-                  badgeText={badgeText}
-                  menuId={id}
-                  isMenuOpen={openMenuId === id}
-                  onMenuOpenChange={next => handleAnyMenuOpen(next ? id : null)}
-                  menuItems={[
-                    {
-                      id: 'add',
-                      label: 'Add',
-                      iconName: 'Plus',
-                      onSelect: () => {
-                        void handleAcceptSuggestionClick(suggestion);
-                      },
-                    },
-                    {
-                      id: 'dismiss',
-                      label: 'Dismiss',
-                      iconName: 'X',
-                      onSelect: () => {
-                        void handleDismissSuggestionClick(suggestion);
-                      },
-                    },
-                  ]}
+          {suggestionPills.length > 0 ? (
+            <div
+              className='flex flex-wrap items-center justify-center gap-2'
+              aria-label='Quick link suggestions'
+            >
+              {suggestionPills.map(pill => (
+                <PlatformPill
+                  key={pill.id}
+                  platformIcon={pill.simpleIconId}
+                  platformName={pill.label}
+                  primaryText={pill.label}
+                  suffix='+'
+                  tone='faded'
+                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
+                  className='whitespace-nowrap'
                 />
-              );
-            })}
-          </CategorySection>
-        )}
+              ))}
+            </div>
+          ) : null}
+
+          {suggestionsEnabled && pendingSuggestions.length > 0 && (
+            <CategorySection title='SUGGESTED' className='space-y-0'>
+              {pendingSuggestions.map(suggestion => {
+                const id = `suggestion::${suggestionKey(suggestion)}`;
+                const rawConfidence = (suggestion as { confidence?: number })
+                  .confidence;
+                const confidence: number | null =
+                  typeof rawConfidence === 'number' ? rawConfidence : null;
+                const badgeText =
+                  typeof confidence === 'number'
+                    ? `Suggested • ${Math.round(confidence * 100)}%`
+                    : 'Suggested';
+
+                return (
+                  <LinkPill
+                    key={suggestionKey(suggestion)}
+                    platformIcon={suggestion.platform.icon}
+                    platformName={suggestion.platform.name}
+                    primaryText={suggestion.platform.name}
+                    secondaryText={buildSecondaryText(suggestion)}
+                    state='connected'
+                    badgeText={badgeText}
+                    menuId={id}
+                    isMenuOpen={openMenuId === id}
+                    onMenuOpenChange={next =>
+                      handleAnyMenuOpen(next ? id : null)
+                    }
+                    menuItems={[
+                      {
+                        id: 'add',
+                        label: 'Add',
+                        iconName: 'Plus',
+                        onSelect: () => {
+                          void handleAcceptSuggestionClick(suggestion);
+                        },
+                      },
+                      {
+                        id: 'dismiss',
+                        label: 'Dismiss',
+                        iconName: 'X',
+                        onSelect: () => {
+                          void handleDismissSuggestionClick(suggestion);
+                        },
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </CategorySection>
+          )}
+        </div>
       </div>
 
-      {!hasAnyLinks && (
-        <div className='mt-4 rounded-lg border border-dashed border-subtle bg-surface-1/40 px-4 py-6 text-center animate-pulse'>
-          <p className='text-sm font-medium text-primary-token'>
-            Add links to build your profile.
-          </p>
-          <p className='mt-1 text-xs text-secondary-token'>
-            Start with your most important link — music, socials, or a landing
-            page.
-          </p>
-        </div>
-      )}
-
-      {hasAnyLinks && (
-        <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
-          <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1/40 divide-y divide-(--color-border-subtle)'>
-            {(['social', 'dsp', 'earnings', 'custom'] as const).map(section => {
-              const groupItems = groups[section];
-
-              const items = groupItems
-                .slice()
-                .sort(
-                  (a, b) =>
-                    popularityIndex(a.platform.id) -
-                    popularityIndex(b.platform.id)
-                );
-
-              const isAddingToThis =
-                addingLink && sectionOf(addingLink) === section;
-              if (items.length === 0 && !isAddingToThis) {
-                return null;
-              }
-
-              return (
-                <CategorySection
-                  key={section}
-                  title={labelFor(section)}
-                  variant='flat'
-                  className='px-3'
-                >
-                  <SortableContext items={items.map(idFor)}>
-                    {items.map(link => {
-                      const linkId = idFor(link as T);
-                      return (
-                        <SortableRow
-                          key={linkId}
-                          id={linkId}
-                          link={link as T}
-                          index={links.findIndex(
-                            l => l.normalizedUrl === link.normalizedUrl
-                          )}
-                          draggable={items.length > 1}
-                          onToggle={handleToggle}
-                          onRemove={handleRemove}
-                          onEdit={handleEdit}
-                          visible={linkIsVisible(link as T)}
-                          openMenuId={openMenuId}
-                          onAnyMenuOpen={handleAnyMenuOpen}
-                          isLastAdded={lastAddedId === linkId}
-                          buildPillLabel={buildPillLabel}
-                        />
-                      );
-                    })}
-
-                    {pendingPreview &&
-                    sectionOf(pendingPreview.link as T) === section ? (
-                      <LinkPill
-                        platformIcon={pendingPreview.link.platform.icon}
-                        platformName={pendingPreview.link.platform.name}
-                        primaryText={buildPillLabel(pendingPreview.link)}
-                        secondaryText={buildSecondaryText(pendingPreview.link)}
-                        state='ready'
-                        badgeText='Ready to add'
-                        menuId='pending-preview'
-                        isMenuOpen={openMenuId === 'pending-preview'}
-                        onMenuOpenChange={next =>
-                          handleAnyMenuOpen(next ? 'pending-preview' : null)
-                        }
-                        menuItems={[
-                          {
-                            id: 'add',
-                            label: 'Add',
-                            iconName: 'Plus',
-                            onSelect: () => {
-                              void handleAdd(pendingPreview.link);
-                              setPendingPreview(null);
-                              setClearSignal(c => c + 1);
-                            },
-                          },
-                          {
-                            id: 'cancel',
-                            label: 'Cancel',
-                            iconName: 'X',
-                            onSelect: () => {
-                              setPendingPreview(null);
-                              setClearSignal(c => c + 1);
-                            },
-                          },
-                        ]}
-                      />
-                    ) : null}
-
-                    {isAddingToThis && (
-                      <LinkPill
-                        platformIcon='website'
-                        platformName='Loading'
-                        primaryText='Adding…'
-                        state='loading'
-                        menuId={`loading-${section}`}
-                        isMenuOpen={false}
-                        onMenuOpenChange={() => {}}
-                        menuItems={[]}
-                      />
-                    )}
-                  </SortableContext>
-                </CategorySection>
-              );
-            })}
+      <div className='mx-auto w-full max-w-3xl'>
+        {!hasAnyLinks && (
+          <div className='mt-3 rounded-lg border border-dashed border-subtle bg-surface-1/40 px-4 py-5 text-center animate-pulse'>
+            <p className='text-sm font-medium text-primary-token'>
+              Add links to build your profile.
+            </p>
+            <p className='mt-1 text-xs text-secondary-token'>
+              Start with your most important link — music, socials, or a landing
+              page.
+            </p>
           </div>
-        </DndContext>
-      )}
+        )}
+
+        {hasAnyLinks && (
+          <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
+            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
+              {(['social', 'dsp', 'earnings', 'custom'] as const).map(
+                section => {
+                  const groupItems = groups[section];
+
+                  const items = groupItems
+                    .slice()
+                    .sort(
+                      (a, b) =>
+                        popularityIndex(a.platform.id) -
+                        popularityIndex(b.platform.id)
+                    );
+
+                  const isAddingToThis =
+                    addingLink && sectionOf(addingLink) === section;
+                  if (items.length === 0 && !isAddingToThis) {
+                    return null;
+                  }
+
+                  return (
+                    <CategorySection
+                      key={section}
+                      title={labelFor(section)}
+                      variant='card'
+                    >
+                      <SortableContext items={items.map(idFor)}>
+                        {items.map(link => {
+                          const linkId = idFor(link as T);
+                          return (
+                            <SortableRow
+                              key={linkId}
+                              id={linkId}
+                              link={link as T}
+                              index={links.findIndex(
+                                l => l.normalizedUrl === link.normalizedUrl
+                              )}
+                              draggable={items.length > 1}
+                              onToggle={handleToggle}
+                              onRemove={handleRemove}
+                              onEdit={handleEdit}
+                              visible={linkIsVisible(link as T)}
+                              openMenuId={openMenuId}
+                              onAnyMenuOpen={handleAnyMenuOpen}
+                              isLastAdded={lastAddedId === linkId}
+                              buildPillLabel={buildPillLabel}
+                            />
+                          );
+                        })}
+
+                        {pendingPreview &&
+                        sectionOf(pendingPreview.link as T) === section ? (
+                          <LinkPill
+                            platformIcon={pendingPreview.link.platform.icon}
+                            platformName={pendingPreview.link.platform.name}
+                            primaryText={buildPillLabel(pendingPreview.link)}
+                            secondaryText={buildSecondaryText(
+                              pendingPreview.link
+                            )}
+                            state='ready'
+                            badgeText='Ready to add'
+                            menuId='pending-preview'
+                            isMenuOpen={openMenuId === 'pending-preview'}
+                            onMenuOpenChange={next =>
+                              handleAnyMenuOpen(next ? 'pending-preview' : null)
+                            }
+                            menuItems={[
+                              {
+                                id: 'add',
+                                label: 'Add',
+                                iconName: 'Plus',
+                                onSelect: () => {
+                                  void handleAdd(pendingPreview.link);
+                                  setPendingPreview(null);
+                                  setClearSignal(c => c + 1);
+                                },
+                              },
+                              {
+                                id: 'cancel',
+                                label: 'Cancel',
+                                iconName: 'X',
+                                onSelect: () => {
+                                  setPendingPreview(null);
+                                  setClearSignal(c => c + 1);
+                                },
+                              },
+                            ]}
+                          />
+                        ) : null}
+
+                        {isAddingToThis && (
+                          <LinkPill
+                            platformIcon='website'
+                            platformName='Loading'
+                            primaryText='Adding…'
+                            state='loading'
+                            menuId={`loading-${section}`}
+                            isMenuOpen={false}
+                            onMenuOpenChange={() => {}}
+                            menuItems={[]}
+                          />
+                        )}
+                      </SortableContext>
+                    </CategorySection>
+                  );
+                }
+              )}
+            </div>
+          </DndContext>
+        )}
+      </div>
     </section>
   );
 }

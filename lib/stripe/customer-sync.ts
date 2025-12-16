@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
-import { getOrCreateCustomer } from './client';
+import { getOrCreateCustomer, stripe } from './client';
 
 /**
  * Ensure a Stripe customer exists for the current user
@@ -45,7 +45,52 @@ export async function ensureStripeCustomer(): Promise<{
 
       // If we already have a Stripe customer ID, return it
       if (userData.stripeCustomerId) {
-        return { success: true, customerId: userData.stripeCustomerId };
+        try {
+          const existing = await stripe.customers.retrieve(
+            userData.stripeCustomerId
+          );
+
+          if (
+            existing &&
+            typeof existing === 'object' &&
+            'deleted' in existing &&
+            existing.deleted
+          ) {
+            throw new Error('Stripe customer is deleted');
+          }
+
+          const customer = existing as unknown as {
+            id: string;
+            metadata?: Record<string, string> | null;
+          };
+
+          const existingClerkUserId = customer.metadata?.clerk_user_id;
+          if (
+            typeof existingClerkUserId === 'string' &&
+            existingClerkUserId.length > 0 &&
+            existingClerkUserId !== clerkUserId
+          ) {
+            throw new Error('Stripe customer belongs to a different user');
+          }
+
+          if (existingClerkUserId !== clerkUserId) {
+            await stripe.customers.update(customer.id, {
+              metadata: {
+                ...(customer.metadata ?? {}),
+                clerk_user_id: clerkUserId,
+                created_via: 'jovie_app',
+              },
+            });
+          }
+
+          return { success: true, customerId: userData.stripeCustomerId };
+        } catch (error) {
+          console.warn('Stored Stripe customer ID is invalid; repairing', {
+            clerkUserId,
+            stripeCustomerId: userData.stripeCustomerId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       // Create a new Stripe customer

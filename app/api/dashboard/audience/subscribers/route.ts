@@ -1,13 +1,14 @@
 import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withDbSession } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { withDbSessionTx } from '@/lib/auth/session';
 import {
   creatorProfiles,
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+
+export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -31,7 +32,7 @@ const querySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
       const { searchParams } = new URL(request.url);
       const parsed = querySchema.safeParse({
         profileId: searchParams.get('profileId'),
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       const orderFn = direction === 'asc' ? asc : desc;
       const offset = (page - 1) * pageSize;
 
-      const baseQuery = db
+      const baseQuery = tx
         .select({
           id: notificationSubscriptions.id,
           email: notificationSubscriptions.email,
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
 
       const [rows, [{ total }]] = await Promise.all([
         baseQuery.orderBy(orderFn(sortColumn)).limit(pageSize).offset(offset),
-        db
+        tx
           .select({
             total: drizzleSql`COALESCE(COUNT(${notificationSubscriptions.id}), 0)`,
           })

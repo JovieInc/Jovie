@@ -19,7 +19,7 @@ export function WaitlistLink() {
               asChild
               variant='primary'
               size='lg'
-              className='rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200'
+              className='rounded-md bg-linear-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700 transition-all duration-200'
             >
               <Link href='/waitlist'>Join Waitlist</Link>
             </Button>

@@ -68,12 +68,14 @@ vi.mock('@clerk/elements/common', () => ({
     className,
     disabled,
     'aria-busy': ariaBusy,
+    onClickCapture,
   }: {
     name: string;
     children: React.ReactNode;
     className?: string;
     disabled?: boolean;
     'aria-busy'?: boolean;
+    onClickCapture?: React.MouseEventHandler<HTMLButtonElement>;
   }) => (
     <button
       data-testid='clerk-connection'
@@ -81,6 +83,7 @@ vi.mock('@clerk/elements/common', () => ({
       className={className}
       disabled={disabled}
       aria-busy={ariaBusy}
+      onClickCapture={onClickCapture}
     >
       {children}
     </button>

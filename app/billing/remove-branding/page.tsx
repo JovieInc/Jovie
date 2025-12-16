@@ -1,7 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { env } from '@/lib/env';
-import { createCheckoutSession } from '@/lib/stripe/client';
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  stripe,
+} from '@/lib/stripe/client';
 import { getAvailablePricing } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 
@@ -38,12 +42,49 @@ export default async function RemoveBrandingPage() {
   const successUrl = `${baseUrl}/billing/success`;
   const cancelUrl = `${baseUrl}/billing/cancel`;
 
+  const activeSubscriptionStatuses = new Set([
+    'active',
+    'trialing',
+    'past_due',
+    'unpaid',
+  ]);
+
+  const existingSubscriptions = await stripe.subscriptions.list({
+    customer: customerResult.customerId,
+    status: 'all',
+    limit: 25,
+  });
+
+  const alreadySubscribedToPrice = existingSubscriptions.data.some(
+    subscription =>
+      activeSubscriptionStatuses.has(subscription.status) &&
+      subscription.items.data.some(
+        item => item.price?.id === defaultPlan.priceId
+      )
+  );
+
+  if (alreadySubscribedToPrice) {
+    const returnUrl = `${baseUrl}/app/dashboard`;
+    const portalSession = await createBillingPortalSession({
+      customerId: customerResult.customerId,
+      returnUrl,
+    });
+    if (portalSession.url) {
+      redirect(portalSession.url);
+    }
+    redirect('/app/dashboard');
+  }
+
+  const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
+  const idempotencyKey = `checkout:${userId}:${defaultPlan.priceId}:${idempotencyBucket}`;
+
   const session = await createCheckoutSession({
     customerId: customerResult.customerId,
     priceId: defaultPlan.priceId,
     userId,
     successUrl,
     cancelUrl,
+    idempotencyKey,
   });
 
   if (!session.url) {

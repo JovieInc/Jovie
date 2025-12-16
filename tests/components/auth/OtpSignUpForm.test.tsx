@@ -1,6 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OtpSignUpForm } from '@/components/auth/OtpSignUpForm';
+
+vi.mock('@clerk/nextjs', () => ({
+  useClerk: () => ({
+    client: {},
+  }),
+}));
 
 // Mock Clerk Elements
 vi.mock('@clerk/elements/common', () => ({
@@ -55,6 +61,30 @@ vi.mock('@clerk/elements/common', () => ({
   }: {
     children: (isLoading: boolean) => React.ReactNode;
   }) => children(false),
+
+  Connection: ({
+    name,
+    children,
+    className,
+    disabled,
+    'aria-busy': ariaBusy,
+  }: {
+    name: string;
+    children: React.ReactNode;
+    className?: string;
+    disabled?: boolean;
+    'aria-busy'?: boolean;
+  }) => (
+    <button
+      data-testid='clerk-connection'
+      data-name={name}
+      className={className}
+      disabled={disabled}
+      aria-busy={ariaBusy}
+    >
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@clerk/elements/sign-up', () => ({
@@ -145,18 +175,21 @@ describe('OtpSignUpForm', () => {
     );
   });
 
-  it('displays "Continue with Email" button in start step', () => {
+  it('renders the multi-method start screen buttons', () => {
     render(<OtpSignUpForm />);
 
-    const buttons = screen.getAllByTestId('signup-action');
-    expect(buttons[0]).toHaveTextContent('Continue with Email');
+    expect(screen.getByText('Continue with email')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
   it('displays "Verify Code" button in verifications step', () => {
     render(<OtpSignUpForm />);
 
     const buttons = screen.getAllByTestId('signup-action');
-    expect(buttons[1]).toHaveTextContent('Verify Code');
+    expect(
+      buttons.some(button => button.textContent?.includes('Verify Code'))
+    ).toBe(true);
   });
 
   it('uses semantic design tokens for global error', () => {
@@ -173,8 +206,10 @@ describe('OtpSignUpForm', () => {
     expect(fieldErrors.length).toBeGreaterThan(0);
   });
 
-  it('renders email input field', () => {
+  it('renders email input field after choosing email flow', () => {
     render(<OtpSignUpForm />);
+
+    fireEvent.click(screen.getByText('Continue with email'));
 
     const inputs = screen.getAllByTestId('clerk-input');
     expect(inputs[0]).toHaveAttribute('data-type', 'email');
@@ -184,7 +219,7 @@ describe('OtpSignUpForm', () => {
     render(<OtpSignUpForm />);
 
     const inputs = screen.getAllByTestId('clerk-input');
-    const otpInput = inputs[1];
+    const otpInput = inputs[0];
     expect(otpInput).toHaveAttribute('data-type', 'otp');
     expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });

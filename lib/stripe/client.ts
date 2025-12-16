@@ -32,6 +32,10 @@ export const stripe = new Stripe(stripeSecretKey, {
   maxNetworkRetries: 3,
 });
 
+function escapeStripeSearchValue(value: string): string {
+  return value.replace(/'/g, "\\'");
+}
+
 /**
  * Get or create a Stripe customer for a user
  * Idempotent operation - safe to call multiple times
@@ -42,14 +46,43 @@ export async function getOrCreateCustomer(
   name?: string
 ): Promise<Stripe.Customer> {
   try {
-    // First, try to find existing customer by searching via email or metadata
-    const existingCustomers = await stripe.customers.search({
-      query: `email:'${email}' OR metadata['clerk_user_id']:'${userId}'`,
+    // Prefer an explicit metadata match to avoid cross-account collisions.
+    const existingByUserId = await stripe.customers.search({
+      query: `metadata['clerk_user_id']:'${escapeStripeSearchValue(userId)}'`,
       limit: 1,
     });
 
-    if (existingCustomers.data.length > 0) {
-      return existingCustomers.data[0];
+    if (existingByUserId.data.length > 0) return existingByUserId.data[0];
+
+    // Fallback: attempt to claim a legacy customer by email only if it looks like
+    // an unclaimed Jovie-created record.
+    const trimmedEmail = email.trim();
+    if (trimmedEmail.length > 0) {
+      const existingByEmail = await stripe.customers.search({
+        query: `email:'${escapeStripeSearchValue(trimmedEmail)}'`,
+        limit: 5,
+      });
+
+      const unclaimed = existingByEmail.data.filter(customer => {
+        const clerkUserId = customer.metadata?.clerk_user_id;
+        if (typeof clerkUserId === 'string' && clerkUserId.length > 0) {
+          return false;
+        }
+        const createdVia = customer.metadata?.created_via;
+        return createdVia === 'jovie_app';
+      });
+
+      if (unclaimed.length === 1) {
+        const customer = unclaimed[0];
+        const updated = await stripe.customers.update(customer.id, {
+          metadata: {
+            ...customer.metadata,
+            clerk_user_id: userId,
+            created_via: 'jovie_app',
+          },
+        });
+        return updated;
+      }
     }
 
     // If no customer found, create a new one
@@ -78,50 +111,58 @@ export async function createCheckoutSession({
   userId,
   successUrl,
   cancelUrl,
+  idempotencyKey,
 }: {
   customerId: string;
   priceId: string;
   userId: string;
   successUrl: string;
   cancelUrl: string;
+  idempotencyKey?: string;
 }): Promise<Stripe.Checkout.Session> {
   try {
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: 'subscription',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
+    const requestOptions: Stripe.RequestOptions | undefined = idempotencyKey
+      ? { idempotencyKey }
+      : undefined;
+    const session = await stripe.checkout.sessions.create(
+      {
+        customer: customerId,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
 
-      // Add metadata for tracking
-      metadata: {
-        clerk_user_id: userId,
-      },
-
-      // Subscription settings
-      subscription_data: {
+        // Add metadata for tracking
         metadata: {
           clerk_user_id: userId,
         },
-      },
 
-      // Billing settings
-      allow_promotion_codes: true,
-      automatic_tax: {
-        enabled: false,
-      },
+        // Subscription settings
+        subscription_data: {
+          metadata: {
+            clerk_user_id: userId,
+          },
+        },
 
-      // Customer settings
-      customer_update: {
-        name: 'auto',
-        address: 'auto',
+        // Billing settings
+        allow_promotion_codes: true,
+        automatic_tax: {
+          enabled: false,
+        },
+
+        // Customer settings
+        customer_update: {
+          name: 'auto',
+          address: 'auto',
+        },
       },
-    });
+      requestOptions
+    );
 
     return session;
   } catch (error) {

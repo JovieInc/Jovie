@@ -6,6 +6,8 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { checkStatsigGateForUser } from '@/lib/statsig/server';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -292,6 +294,13 @@ export async function getUserDashboardAnalytics(
     throw new Error('User not found for Clerk ID');
   }
 
+  const dynamicOverrideEnabled = await checkStatsigGateForUser(
+    STATSIG_FLAGS.DYNAMIC_ENGAGEMENT,
+    { userID: clerkUserId }
+  );
+
+  const dynamicEnabled = userIsPro || dynamicOverrideEnabled;
+
   const creatorProfile = await db.query.creatorProfiles.findFirst({
     columns: {
       id: true,
@@ -386,7 +395,7 @@ export async function getUserDashboardAnalytics(
     return base;
   }
 
-  if (!userIsPro) {
+  if (!dynamicEnabled) {
     return base;
   }
 
