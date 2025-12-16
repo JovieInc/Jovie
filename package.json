@@ -225,7 +225,7 @@
     "postcss": "^8",
     "shadcn": "^3.2.1",
     "storybook": "^10.1.4",
-    "tailwindcss": "^4.1.13",
+    "tailwindcss": "^4.1.18",
     "tsx": "^4.20.5",
     "typescript": "^5",
     "uuid": "^13.0.0",
