@@ -182,7 +182,7 @@
     "@commitlint/config-conventional": "^20.2.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.35.0",
-    "@next/bundle-analyzer": "^16.0.7",
+    "@next/bundle-analyzer": "^16.0.10",
     "@playwright/test": "^1.55.0",
     "@storybook/addon-a11y": "^10.1.4",
     "@storybook/addon-docs": "^10.1.4",
