@@ -140,9 +140,6 @@ module.exports = [
   nextIgnores,
   {
     files: ['**/*.{ts,tsx}'],
-    plugins: {
-      '@typescript-eslint': typescriptPlugin,
-    },
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
       '@typescript-eslint/no-explicit-any': 'warn',
