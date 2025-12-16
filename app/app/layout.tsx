@@ -8,6 +8,7 @@ import {
   getDashboardDataCached,
   setSidebarCollapsed,
 } from './dashboard/actions';
+import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 
 function normalizeEmail(email: string): string {
@@ -63,12 +64,14 @@ export default async function AppShellLayout({
 
     return (
       <MyStatsig userId={userId}>
-        <DashboardLayoutClient
-          dashboardData={dashboardData}
-          persistSidebarCollapsed={setSidebarCollapsed}
-        >
-          {children}
-        </DashboardLayoutClient>
+        <DashboardDataProvider value={dashboardData}>
+          <DashboardLayoutClient
+            dashboardData={dashboardData}
+            persistSidebarCollapsed={setSidebarCollapsed}
+          >
+            {children}
+          </DashboardLayoutClient>
+        </DashboardDataProvider>
       </MyStatsig>
     );
   } catch (error) {

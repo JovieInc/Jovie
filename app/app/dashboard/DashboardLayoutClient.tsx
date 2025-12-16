@@ -24,8 +24,7 @@ import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 import type { DashboardBreadcrumbItem } from '@/types';
 
 import type { DashboardData } from './actions';
-import { DashboardDataProvider } from './DashboardDataContext';
-import { PreviewPanelProvider, usePreviewPanel } from './PreviewPanelContext';
+import { PreviewPanelProvider, usePreviewPanelContext } from './PreviewPanelContext';
 
 type TableMeta = {
   rowCount: number | null;
@@ -86,7 +85,8 @@ export default function DashboardLayoutClient({
   const isAudienceRoute =
     pathname?.startsWith('/app/dashboard/audience') ?? false;
   const useFullWidth = fullWidth || isFullWidthRoute;
-  const resolvedPreviewEnabled = previewEnabled && isAppDashboardRoute;
+  const resolvedPreviewEnabled =
+    previewEnabled && isAppDashboardRoute && isProfileRoute;
 
   // Build a simple breadcrumb from the current path
   const crumbs = (() => {
@@ -178,28 +178,36 @@ export default function DashboardLayoutClient({
     }
   }, [dashboardData.sidebarCollapsed]);
 
-  return (
-    <DashboardDataProvider value={dashboardData}>
-      <PreviewPanelProvider enabled={resolvedPreviewEnabled}>
-        <PendingClaimRunner />
-        <PendingClaimHandler />
+  const layout = (
+    <>
+      <PendingClaimRunner />
+      <PendingClaimHandler />
 
-        <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
-          <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
-            <DashboardLayoutInner
-              crumbs={crumbs}
-              useFullWidth={useFullWidth}
-              isContactTableRoute={isContactTableRoute}
-              isProfileRoute={isProfileRoute}
-              isAudienceRoute={isAudienceRoute}
-              previewEnabled={resolvedPreviewEnabled}
-            >
-              {children}
-            </DashboardLayoutInner>
-          </TableMetaContext.Provider>
-        </SidebarProvider>
-      </PreviewPanelProvider>
-    </DashboardDataProvider>
+      <SidebarProvider open={sidebarOpen} onOpenChange={handleOpenChange}>
+        <TableMetaContext.Provider value={{ tableMeta, setTableMeta }}>
+          <DashboardLayoutInner
+            crumbs={crumbs}
+            useFullWidth={useFullWidth}
+            isContactTableRoute={isContactTableRoute}
+            isProfileRoute={isProfileRoute}
+            isAudienceRoute={isAudienceRoute}
+            previewEnabled={resolvedPreviewEnabled}
+          >
+            {children}
+          </DashboardLayoutInner>
+        </TableMetaContext.Provider>
+      </SidebarProvider>
+    </>
+  );
+
+  if (!resolvedPreviewEnabled) {
+    return layout;
+  }
+
+  return (
+    <PreviewPanelProvider enabled={resolvedPreviewEnabled}>
+      {layout}
+    </PreviewPanelProvider>
   );
 }
 
@@ -221,15 +229,18 @@ function DashboardLayoutInner({
   previewEnabled: boolean;
   children: React.ReactNode;
 }) {
-  const { isOpen: previewOpen, close: closePreview } = usePreviewPanel();
+  const previewContext = usePreviewPanelContext();
+  const previewOpen = previewContext?.isOpen ?? false;
+  const closePreview = previewContext?.close;
   const { tableMeta } = useTableMeta();
 
-  const showPreview = previewEnabled && isProfileRoute && !isContactTableRoute;
+  const showPreview =
+    previewEnabled && !!previewContext && isProfileRoute && !isContactTableRoute;
 
   // Ensure preview is closed/hidden on contact-table routes
   useEffect(() => {
     if (isContactTableRoute && previewOpen) {
-      closePreview();
+      closePreview?.();
     }
   }, [isContactTableRoute, previewOpen, closePreview]);
 
