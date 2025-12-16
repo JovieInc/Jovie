@@ -7,30 +7,36 @@ import 'server-only';
 import Stripe from 'stripe';
 import { env } from '@/lib/env';
 
-const stripeSecretKey = env.STRIPE_SECRET_KEY;
+let stripeClient: Stripe | null = null;
 
-if (!stripeSecretKey) {
-  throw new Error('Missing STRIPE_SECRET_KEY');
+function getStripeClient(): Stripe {
+  if (stripeClient) return stripeClient;
+
+  const stripeSecretKey = env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    throw new Error('Missing STRIPE_SECRET_KEY');
+  }
+
+  stripeClient = new Stripe(stripeSecretKey, {
+    // Add app info for better Stripe support
+    appInfo: {
+      name: 'Jovie',
+      version: '1.0.0',
+      url: 'https://jov.ie',
+    },
+
+    // TypeScript configuration
+    typescript: true,
+
+    // Timeout configuration
+    timeout: 10000, // 10 seconds
+
+    // Retry configuration
+    maxNetworkRetries: 3,
+  });
+
+  return stripeClient;
 }
-
-// Initialize Stripe client with proper configuration
-export const stripe = new Stripe(stripeSecretKey, {
-  // Add app info for better Stripe support
-  appInfo: {
-    name: 'Jovie',
-    version: '1.0.0',
-    url: 'https://jov.ie',
-  },
-
-  // TypeScript configuration
-  typescript: true,
-
-  // Timeout configuration
-  timeout: 10000, // 10 seconds
-
-  // Retry configuration
-  maxNetworkRetries: 3,
-});
 
 /**
  * Get or create a Stripe customer for a user
@@ -42,6 +48,7 @@ export async function getOrCreateCustomer(
   name?: string
 ): Promise<Stripe.Customer> {
   try {
+    const stripe = getStripeClient();
     // First, try to find existing customer by searching via email or metadata
     const existingCustomers = await stripe.customers.search({
       query: `email:'${email}' OR metadata['clerk_user_id']:'${userId}'`,
@@ -86,6 +93,7 @@ export async function createCheckoutSession({
   cancelUrl: string;
 }): Promise<Stripe.Checkout.Session> {
   try {
+    const stripe = getStripeClient();
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
@@ -162,6 +170,7 @@ export async function createBillingPortalSession({
   returnUrl: string;
 }): Promise<Stripe.BillingPortal.Session> {
   try {
+    const stripe = getStripeClient();
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: returnUrl,
@@ -181,6 +190,7 @@ export async function getCustomerSubscription(
   customerId: string
 ): Promise<Stripe.Subscription | null> {
   try {
+    const stripe = getStripeClient();
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
       status: 'active',
@@ -201,6 +211,7 @@ export async function cancelSubscription(
   subscriptionId: string
 ): Promise<Stripe.Subscription> {
   try {
+    const stripe = getStripeClient();
     const subscription = await stripe.subscriptions.cancel(subscriptionId);
     return subscription;
   } catch (error) {
@@ -216,6 +227,7 @@ export async function getUpcomingInvoice(
   customerId: string
 ): Promise<Stripe.Invoice | null> {
   try {
+    const stripe = getStripeClient();
     // Use createPreview to fetch an upcoming invoice preview in this SDK version
     const resp = await stripe.invoices.createPreview({
       customer: customerId,
