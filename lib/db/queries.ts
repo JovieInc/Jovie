@@ -32,6 +32,7 @@ export async function getCreatorProfileWithLinks(username: string) {
     .select({
       id: creatorProfiles.id,
       userId: creatorProfiles.userId,
+      userIsPro: users.isPro,
       creatorType: creatorProfiles.creatorType,
       username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
@@ -44,20 +45,17 @@ export async function getCreatorProfileWithLinks(username: string) {
       isPublic: creatorProfiles.isPublic,
       isVerified: creatorProfiles.isVerified,
       isClaimed: creatorProfiles.isClaimed,
-      claimToken: creatorProfiles.claimToken,
-      claimedAt: creatorProfiles.claimedAt,
-      lastLoginAt: creatorProfiles.lastLoginAt,
       isFeatured: creatorProfiles.isFeatured,
       marketingOptOut: creatorProfiles.marketingOptOut,
       settings: creatorProfiles.settings,
       theme: creatorProfiles.theme,
       profileViews: creatorProfiles.profileViews,
       usernameNormalized: creatorProfiles.usernameNormalized,
-      onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
       createdAt: creatorProfiles.createdAt,
       updatedAt: creatorProfiles.updatedAt,
     })
     .from(creatorProfiles)
+    .leftJoin(users, eq(users.id, creatorProfiles.userId))
     .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
     .limit(1);
 
@@ -139,6 +137,29 @@ export async function getCreatorProfileWithLinks(username: string) {
     socialLinks: profileSocialLinks,
     contacts: profileContacts,
   };
+}
+
+export async function isClaimTokenValidForProfile(params: {
+  username: string;
+  claimToken: string;
+}): Promise<boolean> {
+  const normalizedUsername = params.username.toLowerCase();
+  const token = params.claimToken;
+
+  const [row] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.usernameNormalized, normalizedUsername),
+        eq(creatorProfiles.claimToken, token),
+        eq(creatorProfiles.isPublic, true),
+        eq(creatorProfiles.isClaimed, false)
+      )
+    )
+    .limit(1);
+
+  return Boolean(row);
 }
 
 export async function updateCreatorProfile(

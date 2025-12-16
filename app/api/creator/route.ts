@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function GET(
   request: NextRequest,
   _context: { params: Promise<{}> }
@@ -12,22 +14,57 @@ export async function GET(
     if (!username) {
       return NextResponse.json(
         { error: 'Username is required' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     const profile = await getCreatorProfileWithLinks(username);
 
-    if (!profile) {
-      return NextResponse.json({ error: 'Creator not found' }, { status: 404 });
+    if (!profile || !profile.isPublic) {
+      return NextResponse.json(
+        { error: 'Creator not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
     }
 
-    return NextResponse.json(profile);
+    return NextResponse.json(
+      {
+        id: profile.id,
+        username: profile.username,
+        usernameNormalized: profile.usernameNormalized,
+        displayName: profile.displayName,
+        bio: profile.bio,
+        avatarUrl: profile.avatarUrl,
+        creatorType: profile.creatorType,
+        spotifyUrl: profile.spotifyUrl,
+        appleMusicUrl: profile.appleMusicUrl,
+        youtubeUrl: profile.youtubeUrl,
+        spotifyId: profile.spotifyId,
+        isPublic: Boolean(profile.isPublic),
+        isVerified: Boolean(profile.isVerified),
+        isClaimed: Boolean(profile.isClaimed),
+        isFeatured: Boolean(profile.isFeatured),
+        marketingOptOut: Boolean(profile.marketingOptOut),
+        settings: profile.settings,
+        theme: profile.theme,
+        socialLinks: (profile.socialLinks ?? []).map(link => ({
+          id: link.id,
+          platform: link.platform,
+          platformType: link.platformType,
+          url: link.url,
+          displayText: link.displayText,
+          clicks: link.clicks,
+          isActive: link.isActive,
+          sortOrder: link.sortOrder,
+        })),
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('Error fetching creator profile:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

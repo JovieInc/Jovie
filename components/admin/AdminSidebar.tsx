@@ -10,11 +10,11 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import {
   Sidebar,
   SidebarContent,
@@ -67,13 +67,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
             <SidebarMenuButton asChild size='lg' className='gap-3'>
               <Link href='/app/admin' className='flex items-center gap-3'>
                 <div className='flex aspect-square size-9 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground'>
-                  <Image
-                    src='/brand/Jovie-Logo-Icon.svg'
-                    alt='Jovie'
-                    width={18}
-                    height={18}
-                    className='size-4'
-                  />
+                  <BrandLogo size={18} tone='auto' className='size-4' />
                 </div>
                 <div className='grid flex-1 text-left leading-tight'>
                   <span className='truncate text-sm font-semibold'>Jovie</span>

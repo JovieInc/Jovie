@@ -10,7 +10,7 @@ import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
-type CityRange = Extract<AnalyticsRange, '7d' | '30d'>;
+type CityRange = Extract<AnalyticsRange, '7d' | '30d' | '90d'>;
 
 interface AnalyticsCardsProps {
   profileUrl?: string;
@@ -44,7 +44,9 @@ export function AnalyticsCards({
   }, [refresh, refreshSignal]);
 
   const rangeLabel = useMemo(() => {
-    return range === '7d' ? 'Last 7 days' : 'Last 30 days';
+    if (range === '7d') return 'Last 7 days';
+    if (range === '30d') return 'Last 30 days';
+    return 'Last 90 days';
   }, [range]);
 
   // Run count-up animation when data changes

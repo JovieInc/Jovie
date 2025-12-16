@@ -20,13 +20,19 @@ function computeMonthlyCentsFromPriceItem(
   const amountCents = price.unit_amount * quantity;
 
   const interval = price.recurring?.interval;
+  const intervalCount =
+    typeof price.recurring?.interval_count === 'number'
+      ? price.recurring.interval_count
+      : 1;
 
   if (interval === 'month') {
-    return amountCents;
+    const months = Math.max(1, intervalCount);
+    return Math.round(amountCents / months);
   }
 
   if (interval === 'year') {
-    return Math.round(amountCents / 12);
+    const months = Math.max(1, intervalCount) * 12;
+    return Math.round(amountCents / months);
   }
 
   return 0;
@@ -39,13 +45,14 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
 
   for (;;) {
     const page = await stripe.subscriptions.list({
-      status: 'active',
-      expand: ['data.items.price'],
+      status: 'all',
+      expand: ['data.items.data.price'],
       limit: 100,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     });
 
     for (const sub of page.data) {
+      if (sub.status !== 'active' && sub.status !== 'trialing') continue;
       if (!Array.isArray(sub.items.data) || sub.items.data.length === 0)
         continue;
 

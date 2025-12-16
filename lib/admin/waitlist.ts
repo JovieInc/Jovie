@@ -1,11 +1,119 @@
 import { desc, sql as drizzleSql } from 'drizzle-orm';
-import { db, waitlistEntries } from '@/lib/db';
+import { db, doesTableExist, waitlistEntries } from '@/lib/db';
 import type { WaitlistEntry } from '@/lib/db/schema';
+
+function isMissingWaitlistSchemaError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const msg = error.message.toLowerCase();
+  const mentionsWaitlist = msg.includes('waitlist_entries');
+  const missingTable =
+    msg.includes('does not exist') ||
+    msg.includes('undefined_table') ||
+    msg.includes('relation');
+  const missingColumn =
+    msg.includes('column') && msg.includes('does not exist');
+  const mentionsKnownNewColumns =
+    msg.includes('primary_goal') || msg.includes('selected_plan');
+
+  return (
+    (mentionsWaitlist && (missingTable || missingColumn)) ||
+    (mentionsWaitlist && mentionsKnownNewColumns)
+  );
+}
+
+async function getAdminWaitlistEntriesFallback(params: {
+  page: number;
+  pageSize: number;
+  offset: number;
+}): Promise<GetAdminWaitlistResult> {
+  try {
+    const countResult = await db.execute(
+      drizzleSql<{
+        count: number;
+      }>`SELECT count(*)::int AS count FROM waitlist_entries`
+    );
+    const total = Number(countResult.rows?.[0]?.count ?? 0);
+
+    const result = await db.execute(
+      drizzleSql`
+        SELECT
+          id,
+          full_name,
+          email,
+          primary_social_url,
+          primary_social_platform,
+          primary_social_url_normalized,
+          spotify_url,
+          spotify_url_normalized,
+          heard_about,
+          status,
+          primary_social_follower_count,
+          created_at,
+          updated_at
+        FROM waitlist_entries
+        ORDER BY created_at DESC
+        LIMIT ${params.pageSize}
+        OFFSET ${params.offset}
+      `
+    );
+
+    const rawRows = result.rows ?? [];
+    const entries: WaitlistEntryRow[] = rawRows.map(row => {
+      const createdAtRaw = row.created_at;
+      const updatedAtRaw = row.updated_at;
+
+      return {
+        id: String(row.id),
+        fullName: String(row.full_name),
+        email: String(row.email),
+        primaryGoal: null,
+        primarySocialUrl: String(row.primary_social_url),
+        primarySocialPlatform: String(row.primary_social_platform),
+        primarySocialUrlNormalized: String(row.primary_social_url_normalized),
+        spotifyUrl: row.spotify_url != null ? String(row.spotify_url) : null,
+        spotifyUrlNormalized:
+          row.spotify_url_normalized != null
+            ? String(row.spotify_url_normalized)
+            : null,
+        heardAbout: row.heard_about != null ? String(row.heard_about) : null,
+        status: String(row.status) as WaitlistEntry['status'],
+        primarySocialFollowerCount:
+          row.primary_social_follower_count != null
+            ? Number(row.primary_social_follower_count)
+            : null,
+        createdAt:
+          createdAtRaw instanceof Date
+            ? createdAtRaw
+            : new Date(String(createdAtRaw)),
+        updatedAt:
+          updatedAtRaw instanceof Date
+            ? updatedAtRaw
+            : new Date(String(updatedAtRaw)),
+      };
+    });
+
+    return {
+      entries,
+      page: params.page,
+      pageSize: params.pageSize,
+      total,
+    };
+  } catch {
+    return {
+      entries: [],
+      page: params.page,
+      pageSize: params.pageSize,
+      total: 0,
+    };
+  }
+}
 
 export interface WaitlistEntryRow {
   id: string;
   fullName: string;
   email: string;
+  primaryGoal: string | null;
   primarySocialUrl: string;
   primarySocialPlatform: string;
   primarySocialUrlNormalized: string;
@@ -41,39 +149,57 @@ export async function getAdminWaitlistEntries(
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
   const offset = (page - 1) * pageSize;
 
-  // Get total count
-  const [countResult] = await db
-    .select({ count: drizzleSql<number>`count(*)::int` })
-    .from(waitlistEntries);
+  const hasWaitlistTable = await doesTableExist('waitlist_entries');
+  if (!hasWaitlistTable) {
+    return {
+      entries: [],
+      page,
+      pageSize,
+      total: 0,
+    };
+  }
 
-  const total = countResult?.count ?? 0;
+  try {
+    // Get total count
+    const [countResult] = await db
+      .select({ count: drizzleSql<number>`count(*)::int` })
+      .from(waitlistEntries);
 
-  // Get entries
-  const entries = await db
-    .select()
-    .from(waitlistEntries)
-    .orderBy(desc(waitlistEntries.createdAt))
-    .limit(pageSize)
-    .offset(offset);
+    const total = countResult?.count ?? 0;
 
-  return {
-    entries: entries.map(entry => ({
-      id: entry.id,
-      fullName: entry.fullName,
-      email: entry.email,
-      primarySocialUrl: entry.primarySocialUrl,
-      primarySocialPlatform: entry.primarySocialPlatform,
-      primarySocialUrlNormalized: entry.primarySocialUrlNormalized,
-      spotifyUrl: entry.spotifyUrl,
-      spotifyUrlNormalized: entry.spotifyUrlNormalized,
-      heardAbout: entry.heardAbout,
-      status: entry.status,
-      primarySocialFollowerCount: entry.primarySocialFollowerCount,
-      createdAt: entry.createdAt,
-      updatedAt: entry.updatedAt,
-    })),
-    page,
-    pageSize,
-    total,
-  };
+    // Get entries
+    const entries = await db
+      .select()
+      .from(waitlistEntries)
+      .orderBy(desc(waitlistEntries.createdAt))
+      .limit(pageSize)
+      .offset(offset);
+
+    return {
+      entries: entries.map(entry => ({
+        id: entry.id,
+        fullName: entry.fullName,
+        email: entry.email,
+        primaryGoal: entry.primaryGoal,
+        primarySocialUrl: entry.primarySocialUrl,
+        primarySocialPlatform: entry.primarySocialPlatform,
+        primarySocialUrlNormalized: entry.primarySocialUrlNormalized,
+        spotifyUrl: entry.spotifyUrl,
+        spotifyUrlNormalized: entry.spotifyUrlNormalized,
+        heardAbout: entry.heardAbout,
+        status: entry.status,
+        primarySocialFollowerCount: entry.primarySocialFollowerCount,
+        createdAt: entry.createdAt,
+        updatedAt: entry.updatedAt,
+      })),
+      page,
+      pageSize,
+      total,
+    };
+  } catch (error) {
+    if (isMissingWaitlistSchemaError(error)) {
+      return getAdminWaitlistEntriesFallback({ page, pageSize, offset });
+    }
+    throw error;
+  }
 }

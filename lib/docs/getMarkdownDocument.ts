@@ -5,6 +5,7 @@ import { cache } from 'react';
 import { remark } from 'remark';
 import remarkHtml from 'remark-html';
 import { visit } from 'unist-util-visit';
+import { LEGAL_ENTITY_NAME } from '@/constants/app';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
 
 const slugifyHeading = (value: string): string => {
@@ -26,6 +27,10 @@ type HeadingNode = {
   };
 };
 
+const applyMarkdownTemplate = (raw: string): string => {
+  return raw.replace(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
+};
+
 export async function getMarkdownDocument(
   relativePath: string
 ): Promise<MarkdownDocument> {
@@ -39,7 +44,7 @@ async function getMarkdownDocumentUncached(
   relativePath: string
 ): Promise<MarkdownDocument> {
   const absolutePath = path.join(process.cwd(), relativePath);
-  const raw = await fs.readFile(absolutePath, 'utf-8');
+  const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
   const processor = remark().use(remarkHtml);
   const ast = processor.parse(raw);
@@ -77,7 +82,7 @@ async function getMarkdownDocumentUncached(
 const getMarkdownDocumentCached = cache(
   async (relativePath: string): Promise<MarkdownDocument> => {
     const absolutePath = path.join(process.cwd(), relativePath);
-    const raw = await fs.readFile(absolutePath, 'utf-8');
+    const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
     const processor = remark().use(remarkHtml);
     const ast = processor.parse(raw);

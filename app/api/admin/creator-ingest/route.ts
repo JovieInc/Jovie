@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -73,6 +74,29 @@ async function findAvailableHandle(
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+function isSafeExternalHttpsUrl(input: string): boolean {
+  try {
+    const parsed = new URL(input);
+    if (parsed.protocol !== 'https:') return false;
+
+    const hostname = parsed.hostname.toLowerCase();
+    if (hostname === 'localhost') return false;
+    if (hostname.endsWith('.local')) return false;
+    if (hostname.endsWith('.internal')) return false;
+
+    // Block raw IP addresses (IPv4/IPv6) to reduce SSRF risk.
+    // We intentionally do not DNS-resolve here.
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) return false;
+    if (hostname.includes(':')) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function copyAvatarToBlob(
   sourceUrl: string,
   handle: string
@@ -80,6 +104,14 @@ async function copyAvatarToBlob(
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+    return null;
+  }
+
+  if (!isSafeExternalHttpsUrl(sourceUrl)) {
+    logger.warn('Skipping avatar copy: unsafe avatar URL', {
+      sourceUrl,
+      handle,
+    });
     return null;
   }
 
@@ -177,12 +209,27 @@ async function copyAvatarToBlob(
  */
 export async function POST(request: Request) {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json().catch(() => null);
     const parsed = ingestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.flatten() },
-        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -200,7 +247,7 @@ export async function POST(request: Request) {
             ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
             : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -212,7 +259,7 @@ export async function POST(request: Request) {
     if (!rawHandle) {
       return NextResponse.json(
         { error: 'Unable to parse profile handle from URL.' },
-        { status: 422 }
+        { status: 422, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -228,7 +275,7 @@ export async function POST(request: Request) {
           details:
             'Handle must be 1-30 characters, alphanumeric and underscores only',
         },
-        { status: 422 }
+        { status: 422, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -266,7 +313,7 @@ export async function POST(request: Request) {
             error: 'Unable to allocate unique username',
             details: 'All fallback username attempts exhausted.',
           },
-          { status: 409 }
+          { status: 409, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -276,7 +323,7 @@ export async function POST(request: Request) {
             error: 'Profile already claimed',
             details: 'Cannot overwrite a claimed profile.',
           },
-          { status: 409 }
+          { status: 409, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -307,7 +354,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json(
           { error: 'Failed to fetch profile', details: errorMessage },
-          { status: 502 }
+          { status: 502, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -434,7 +481,7 @@ export async function POST(request: Request) {
       if (!created) {
         return NextResponse.json(
           { error: 'Failed to create creator profile' },
-          { status: 500 }
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -520,13 +567,13 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         { error: 'A creator profile with that handle already exists' },
-        { status: 409 }
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
     return NextResponse.json(
       { error: 'Failed to ingest Linktree profile', details: errorMessage },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

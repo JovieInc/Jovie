@@ -83,7 +83,7 @@ export function PlatformPill({
       return { base: color, hover: hexToRgba('#ef4444', 0.65) };
     }
 
-    const baseAlpha = tone === 'faded' ? 0.24 : 0.55;
+    const baseAlpha = tone === 'faded' ? 0.35 : 0.55;
     const hoverAlpha = tone === 'faded' ? 0.55 : 0.75;
     return {
       base: hexToRgba(brandHex, baseAlpha),
@@ -104,7 +104,7 @@ export function PlatformPill({
       return cssVars;
     }
 
-    const surface = 'var(--surface-1, rgba(17, 17, 17, 0.92))';
+    const surface = 'var(--color-bg-surface-1, rgba(246, 247, 248, 0.92))';
     return {
       ...cssVars,
       borderColor: 'transparent',
@@ -156,13 +156,13 @@ export function PlatformPill({
         'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-3 py-1 text-xs font-medium',
         'border-(--pill-border) hover:border-(--pill-border-hover)',
         'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
-        'text-tertiary-token hover:text-secondary-token',
+        'text-secondary-token hover:text-primary-token',
         'transform-gpu transition-all hover:bg-surface-2 dark:hover:bg-surface-2/60 hover:-translate-y-px hover:shadow-sm hover:shadow-black/10 dark:hover:shadow-black/40',
         isInteractive
           ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.98]'
           : 'cursor-default',
         tone === 'faded' &&
-          'bg-surface-1/40 hover:bg-surface-1 text-tertiary-token/70 hover:text-secondary-token',
+          'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
         state === 'hidden' && 'opacity-60',
         state === 'loading' && 'animate-pulse',
         className

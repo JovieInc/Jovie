@@ -19,6 +19,8 @@ import {
   trimHistory,
 } from '../audience/lib/audience-utils';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
@@ -110,7 +112,7 @@ export async function POST(request: NextRequest) {
           error:
             'Missing required fields: handle, linkType, and target are required',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -121,7 +123,7 @@ export async function POST(request: NextRequest) {
           error:
             'Invalid handle format. Must be 3-30 alphanumeric characters, underscores, or hyphens',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -133,7 +135,7 @@ export async function POST(request: NextRequest) {
         {
           error: `Invalid linkType. Must be one of: ${VALID_LINK_TYPES.join(', ')}`,
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -143,11 +145,14 @@ export async function POST(request: NextRequest) {
     if (looksLikeUrl && !isValidURL(target)) {
       return NextResponse.json(
         { error: 'Invalid target URL format' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
     if (typeof target !== 'string' || target.trim().length === 0) {
-      return NextResponse.json({ error: 'Invalid target' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid target' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const userAgent = request.headers.get('user-agent');
@@ -170,7 +175,10 @@ export async function POST(request: NextRequest) {
       .limit(1);
 
     if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Profile not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
     }
 
     const [clickEvent] = await withSystemIngestionSession(async tx => {
@@ -340,7 +348,7 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         { error: 'Failed to log click event' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -359,7 +367,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, id: clickEvent.id });
+    return NextResponse.json(
+      { success: true, id: clickEvent.id },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     await captureError('Track API error', error, {
       route: '/api/track',
@@ -367,7 +378,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

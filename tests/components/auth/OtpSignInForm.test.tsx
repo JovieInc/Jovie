@@ -1,6 +1,12 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OtpSignInForm } from '@/components/auth/OtpSignInForm';
+
+vi.mock('@clerk/nextjs', () => ({
+  useClerk: () => ({
+    client: {},
+  }),
+}));
 
 // Mock Clerk Elements
 vi.mock('@clerk/elements/common', () => ({
@@ -55,6 +61,30 @@ vi.mock('@clerk/elements/common', () => ({
   }: {
     children: (isLoading: boolean) => React.ReactNode;
   }) => children(false),
+
+  Connection: ({
+    name,
+    children,
+    className,
+    disabled,
+    'aria-busy': ariaBusy,
+  }: {
+    name: string;
+    children: React.ReactNode;
+    className?: string;
+    disabled?: boolean;
+    'aria-busy'?: boolean;
+  }) => (
+    <button
+      data-testid='clerk-connection'
+      data-name={name}
+      className={className}
+      disabled={disabled}
+      aria-busy={ariaBusy}
+    >
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@clerk/elements/sign-in', () => ({
@@ -138,25 +168,29 @@ describe('OtpSignInForm', () => {
     const startStep = screen.getByTestId('signin-step-start');
     const verificationsStep = screen.getByTestId('signin-step-verifications');
 
-    expect(startStep).toHaveAttribute('aria-label', 'Enter your email address');
+    expect(startStep).toHaveAttribute('aria-label', 'Choose a sign-in method');
     expect(verificationsStep).toHaveAttribute(
       'aria-label',
       'Verify your email with code'
     );
   });
 
-  it('displays "Continue with Email" button in start step', () => {
+  it('renders the multi-method start screen buttons', () => {
     render(<OtpSignInForm />);
 
-    const buttons = screen.getAllByTestId('signin-action');
-    expect(buttons[0]).toHaveTextContent('Continue with Email');
+    // Method chooser renders buttons directly and via Clerk.Connection
+    expect(screen.getByText('Continue with email')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Spotify')).toBeInTheDocument();
+    expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Verify Code" button in verifications step', () => {
+  it('displays "Continue code" button in verifications step', () => {
     render(<OtpSignInForm />);
 
     const buttons = screen.getAllByTestId('signin-action');
-    expect(buttons[1]).toHaveTextContent('Verify Code');
+    expect(
+      buttons.some(button => button.textContent?.includes('Continue code'))
+    ).toBe(true);
   });
 
   it('uses semantic design tokens for global error', () => {
@@ -173,18 +207,26 @@ describe('OtpSignInForm', () => {
     expect(fieldErrors.length).toBeGreaterThan(0);
   });
 
-  it('renders email input field', () => {
+  it('renders email input field after choosing email flow', () => {
     render(<OtpSignInForm />);
 
+    fireEvent.click(screen.getByText('Continue with email'));
+
+    expect(screen.queryByText('Continue with Spotify')).not.toBeInTheDocument();
+    expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument();
+
     const inputs = screen.getAllByTestId('clerk-input');
-    expect(inputs[0]).toHaveAttribute('data-type', 'email');
+    const hasEmailInput = inputs.some(input =>
+      input.getAttribute('data-type')?.includes('email')
+    );
+    expect(hasEmailInput).toBe(true);
   });
 
   it('renders OTP input with type="otp" and autoSubmit', () => {
     render(<OtpSignInForm />);
 
-    const inputs = screen.getAllByTestId('clerk-input');
-    const otpInput = inputs[1];
+    const verificationsStep = screen.getByTestId('signin-step-verifications');
+    const otpInput = within(verificationsStep).getByTestId('clerk-input');
     expect(otpInput).toHaveAttribute('data-type', 'otp');
     expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });

@@ -88,7 +88,7 @@ export default function LinkInBioPage() {
               url: APP_URL,
               logo: {
                 '@type': 'ImageObject',
-                url: `${APP_URL}/brand/jovie-logo.svg`,
+                url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
               },
             },
             mainEntity: {

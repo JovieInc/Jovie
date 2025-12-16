@@ -33,6 +33,13 @@ import {
 } from '@/lib/utils/bot-detection';
 import { generateSignedToken } from '@/lib/utils/url-encryption';
 
+const SECURITY_HEADERS = {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+  'X-Robots-Tag': 'noindex, nofollow, nosnippet, noarchive',
+} as const;
+
 interface RequestBody {
   verified?: boolean;
   timestamp?: number;
@@ -50,7 +57,10 @@ export async function POST(
     'unknown';
 
   if (!shortId || shortId.length > 20) {
-    return NextResponse.json({ error: 'Invalid link ID' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Invalid link ID' },
+      { status: 400, headers: SECURITY_HEADERS }
+    );
   }
 
   try {
@@ -76,7 +86,7 @@ export async function POST(
     if (isRateLimited) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
-        { status: 429 }
+        { status: 429, headers: SECURITY_HEADERS }
       );
     }
 
@@ -87,7 +97,7 @@ export async function POST(
     } catch {
       return NextResponse.json(
         { error: 'Invalid request body' },
-        { status: 400 }
+        { status: 400, headers: SECURITY_HEADERS }
       );
     }
 
@@ -95,21 +105,27 @@ export async function POST(
     if (!body.verified || !body.timestamp) {
       return NextResponse.json(
         { error: 'Verification required' },
-        { status: 400 }
+        { status: 400, headers: SECURITY_HEADERS }
       );
     }
 
     // Check timestamp is recent (within 5 minutes)
     const timeDiff = Date.now() - (body.timestamp || 0);
     if (timeDiff > 5 * 60 * 1000 || timeDiff < 0) {
-      return NextResponse.json({ error: 'Request expired' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Request expired' },
+        { status: 400, headers: SECURITY_HEADERS }
+      );
     }
 
     // Get wrapped link
     const wrappedLink = await getWrappedLink(shortId);
 
     if (!wrappedLink) {
-      return NextResponse.json({ error: 'Link not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Link not found' },
+        { status: 404, headers: SECURITY_HEADERS }
+      );
     }
 
     // Generate signed token
@@ -151,24 +167,13 @@ export async function POST(
     });
 
     // Return the original URL directly (single-use)
-    const response = NextResponse.json({
-      url: wrappedLink.originalUrl,
-      expiresAt: expiresAt.toISOString(),
-    });
-
-    // Add security headers
-    response.headers.set(
-      'Cache-Control',
-      'no-cache, no-store, must-revalidate'
+    return NextResponse.json(
+      {
+        url: wrappedLink.originalUrl,
+        expiresAt: expiresAt.toISOString(),
+      },
+      { headers: SECURITY_HEADERS }
     );
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-    response.headers.set(
-      'X-Robots-Tag',
-      'noindex, nofollow, nosnippet, noarchive'
-    );
-
-    return response;
   } catch (error) {
     await captureError('Signed URL API error', error, {
       route: '/api/link/[id]',
@@ -176,20 +181,29 @@ export async function POST(
     });
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: SECURITY_HEADERS }
     );
   }
 }
 
 // Handle other HTTP methods
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: SECURITY_HEADERS }
+  );
 }
 
 export async function PUT() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: SECURITY_HEADERS }
+  );
 }
 
 export async function DELETE() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: SECURITY_HEADERS }
+  );
 }

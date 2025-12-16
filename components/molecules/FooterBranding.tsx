@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { JovieLogo } from '@/components/atoms/JovieLogo';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +9,7 @@ interface FooterBrandingProps {
   className?: string;
   showCTA?: boolean;
   size?: 'sm' | 'md';
+  mark?: 'wordmark' | 'icon';
 }
 
 export function FooterBranding({
@@ -16,10 +18,15 @@ export function FooterBranding({
   className = '',
   showCTA = true,
   size = 'md',
+  mark = 'wordmark',
 }: FooterBrandingProps) {
   const signUpLink = artistHandle
     ? `/waitlist?utm_source=profile&utm_artist=${artistHandle}`
     : '/waitlist';
+
+  const logoHref = artistHandle
+    ? `/?utm_source=profile&utm_artist=${artistHandle}`
+    : '/';
 
   return (
     <div
@@ -28,7 +35,17 @@ export function FooterBranding({
         className
       )}
     >
-      <JovieLogo artistHandle={artistHandle} variant={variant} size={size} />
+      {mark === 'icon' ? (
+        <Link
+          href={logoHref}
+          aria-label='Jovie home'
+          className='rounded-sm focus-ring-themed'
+        >
+          <BrandLogo size={size === 'sm' ? 20 : 24} tone='auto' />
+        </Link>
+      ) : (
+        <JovieLogo artistHandle={artistHandle} variant={variant} size={size} />
+      )}
 
       {showCTA && (
         <Link

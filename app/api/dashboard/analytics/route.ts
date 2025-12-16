@@ -14,6 +14,8 @@ const TTL_MS = 5_000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<unknown>>();
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 function isRange(value: string): value is TimeRange {
   return (
     value === '1d' ||
@@ -56,9 +58,10 @@ export async function GET(request: Request) {
       const cached = cache.get(key);
 
       if (!forceRefresh && cached && cached.expiresAt > now) {
-        const response = NextResponse.json(cached.payload, { status: 200 });
-        response.headers.set('Cache-Control', 'private, max-age=0');
-        return response;
+        return NextResponse.json(cached.payload, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
       }
 
       const existing = inflight.get(key);
@@ -87,9 +90,10 @@ export async function GET(request: Request) {
       try {
         const payload = await promise;
         cache.set(key, { payload, expiresAt: Date.now() + TTL_MS });
-        const response = NextResponse.json(payload, { status: 200 });
-        response.headers.set('Cache-Control', 'private, max-age=0');
-        return response;
+        return NextResponse.json(payload, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
       } finally {
         if (inflight.get(key) === promise) {
           inflight.delete(key);
@@ -99,7 +103,10 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Error in analytics API:', error);
     if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
     // Gracefully handle missing user/profile by returning zeroed stats
     if (
@@ -115,12 +122,12 @@ export async function GET(request: Request) {
           top_countries: [],
           top_referrers: [],
         },
-        { status: 200 }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     }
     return NextResponse.json(
       { error: 'Failed to fetch analytics data' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

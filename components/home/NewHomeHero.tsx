@@ -24,30 +24,29 @@ export function NewHomeHero() {
 
           {/* Headline */}
           <h1 className='text-4xl font-bold tracking-tight text-primary-token sm:text-6xl lg:text-7xl leading-[1.05]'>
-            <span className='md:whitespace-nowrap'>You make music.</span>
-            <br />
-            <span className='md:whitespace-nowrap'>
-              Jovie handles{' '}
-              <span className='bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent'>
-                growth.
-              </span>
-            </span>
+            <span className='sm:block'>Convert social traffic </span>
+            <span className='sm:block'>into superfans.</span>
           </h1>
 
           {/* Subheadline */}
           <p className='mt-5 text-lg leading-relaxed text-secondary-token sm:text-xl max-w-2xl mx-auto md:mx-0'>
-            Jovie is your AI music manager,
+            Personalized profiles that capture identity
             <br />
-            turning attention into fans—automatically.
+            and follow up automatically.
+          </p>
+
+          <p className='mt-4 text-sm text-tertiary-token max-w-2xl mx-auto md:mx-0'>
+            Built for independent and emerging artists who drive traffic from
+            social platforms.
           </p>
 
           {/* CTA */}
           <div className='mt-8 flex flex-col items-center gap-3 md:items-start'>
             <Link
               href='/waitlist'
-              className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-full bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg focus-ring-themed'
+              className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg focus-ring-themed'
             >
-              Request Early Access
+              Request early access
               <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
             </Link>
             <Link

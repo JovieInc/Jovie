@@ -153,6 +153,7 @@ export const users = pgTable('users', {
   clerkId: text('clerk_id').unique().notNull(),
   name: text('name'),
   email: text('email').unique(),
+  isAdmin: boolean('is_admin').default(false).notNull(),
   isPro: boolean('is_pro').default(false),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
@@ -489,6 +490,7 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   spotifyUrl: text('spotify_url'),
   spotifyUrlNormalized: text('spotify_url_normalized'),
   heardAbout: text('heard_about'),
+  primaryGoal: text('primary_goal'),
   selectedPlan: text('selected_plan'), // free|pro|growth|branding - quietly tracks pricing tier interest
   status: waitlistStatusEnum('status').default('new').notNull(),
   primarySocialFollowerCount: integer('primary_social_follower_count'),

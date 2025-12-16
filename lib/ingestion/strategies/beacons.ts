@@ -221,6 +221,7 @@ export async function fetchBeaconsDocument(
       // Beacons may serve different content based on Accept header
       Accept: 'text/html,application/xhtml+xml',
     },
+    allowedHosts: BEACONS_CONFIG.validHosts,
   };
 
   const result = await fetchDocument(validatedUrl, options);

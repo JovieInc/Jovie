@@ -13,7 +13,7 @@ import {
 import { Check, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
@@ -26,6 +26,7 @@ import {
 } from '@/components/admin/creator-sort-config';
 import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
 import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
+import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
@@ -137,13 +138,11 @@ export function AdminCreatorProfilesWithSidebar({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
   const tableMetaCtx = useOptionalTableMeta();
-  const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
     () => tableMetaCtx?.setTableMeta ?? (() => {}),
     [tableMetaCtx]
   );
-  const [headerElevated, setHeaderElevated] = useState(false);
 
   // New states for dialogs and responsive
   const [isMobile, setIsMobile] = useState(false);
@@ -387,19 +386,6 @@ export function AdminCreatorProfilesWithSidebar({
     }
   }, [sidebarOpen, selectedId, profilesWithActions]);
 
-  React.useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      setHeaderElevated(container.scrollTop > 0);
-    };
-
-    handleScroll();
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
   // Expose row count and toggle handler for dashboard action button
   React.useEffect(() => {
     const toggle = () => {
@@ -433,19 +419,13 @@ export function AdminCreatorProfilesWithSidebar({
 
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
-      <div className='flex-1 min-h-0 overflow-hidden rounded-lg border border-subtle bg-surface-1'>
-        <div
-          className='min-h-0 flex-1 overflow-auto flex flex-col'
-          ref={tableContainerRef}
-          tabIndex={0}
-          onKeyDown={handleKeyDown}
-        >
-          <div
-            className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-              headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
-            )}
-          >
+      <div className='flex-1 min-h-0 overflow-hidden'>
+        <AdminTableShell
+          scrollContainerProps={{
+            tabIndex: 0,
+            onKeyDown: handleKeyDown,
+          }}
+          toolbar={
             <div className='flex h-14 w-full items-center gap-3 px-4'>
               <div className='hidden sm:block text-xs text-secondary-token'>
                 Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -483,354 +463,374 @@ export function AdminCreatorProfilesWithSidebar({
                 <IngestProfileDropdown />
               </div>
             </div>
-          </div>
-          <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
-            <colgroup>
-              <col className='w-14' />
-              <col className='w-[320px]' />
-              <col className='w-[160px]' />
-              <col className='w-[160px]' />
-              <col className='w-[160px]' />
-              <col className='w-[140px]' />
-            </colgroup>
-            <thead className='text-left text-secondary-token'>
-              <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                >
-                  <Checkbox
-                    aria-label='Select all creators'
-                    checked={headerCheckboxState}
-                    onCheckedChange={toggleSelectAll}
-                  />
-                </th>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                >
-                  <span className='sr-only'>Creator</span>
-                  <div
+          }
+          footer={
+            <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
+              <div className='flex items-center gap-2'>
+                <span>
+                  Page {page} of {totalPages}
+                </span>
+                <span className='text-tertiary-token'>
+                  {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                  {total.toLocaleString()}
+                </span>
+              </div>
+              <div className='flex items-center gap-3'>
+                <div className='flex items-center gap-2'>
+                  <span>Rows per page</span>
+                  <AdminCreatorFilters initialPageSize={pageSize} />
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
+                    <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+                      Previous
+                    </Link>
+                  </Button>
+                  <Button asChild size='sm' variant='ghost' disabled={!canNext}>
+                    <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+                      Next
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          }
+        >
+          {({ headerElevated, stickyTopPx }) => (
+            <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
+              <colgroup>
+                <col className='w-14' />
+                <col className='w-[320px]' />
+                <col className='w-[160px]' />
+                <col className='w-[160px]' />
+                <col className='w-[160px]' />
+                <col className='w-[140px]' />
+              </colgroup>
+              <thead className='text-left text-secondary-token'>
+                <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+                  <th
                     className={cn(
-                      'inline-flex items-center transition-all duration-150',
-                      selectedCount > 0
-                        ? 'opacity-100 translate-y-0'
-                        : 'pointer-events-none opacity-0 -translate-y-0.5'
+                      'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
+                    style={{ top: stickyTopPx }}
                   >
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant='secondary'
-                          size='sm'
-                          className='normal-case'
-                        >
-                          Bulk actions
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align='start'>
-                        <DropdownMenuItem disabled>
-                          Feature selected (coming soon)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled>
-                          Unverify selected (coming soon)
-                        </DropdownMenuItem>
-                        <DropdownMenuItem disabled className='text-destructive'>
-                          Delete selected (coming soon)
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </th>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                  onClick={() => router.push(createSortHref('created'))}
-                >
-                  {renderSortHeader('created')}
-                </th>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                  onClick={() => router.push(createSortHref('claimed'))}
-                >
-                  {renderSortHeader('claimed')}
-                </th>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                  onClick={() => router.push(createSortHref('verified'))}
-                >
-                  {renderSortHeader('verified')}
-                </th>
-                <th
-                  className={cn(
-                    'sticky top-14 z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                >
-                  <span className='sr-only'>Action</span>
-                  <div className='flex items-center justify-end' />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {profilesWithActions.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className='px-4 py-10 text-center text-sm text-secondary-token'
+                    <Checkbox
+                      aria-label='Select all creators'
+                      checked={headerCheckboxState}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </th>
+                  <th
+                    className={cn(
+                      'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    )}
+                    style={{ top: stickyTopPx }}
                   >
-                    No creator profiles found.
-                  </td>
-                </tr>
-              ) : (
-                profilesWithActions.map((profile, index) => {
-                  const isSelected = profile.id === selectedId;
-                  const isChecked = selectedIds.has(profile.id);
-                  const rowNumber = (page - 1) * pageSize + index + 1;
-                  const displayName =
-                    'displayName' in profile
-                      ? (profile.displayName ?? null)
-                      : null;
-                  return (
-                    <tr
-                      key={profile.id}
+                    <span className='sr-only'>Creator</span>
+                    <div
                       className={cn(
-                        'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-                        isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
+                        'inline-flex items-center transition-all duration-150',
+                        selectedCount > 0
+                          ? 'opacity-100 translate-y-0'
+                          : 'pointer-events-none opacity-0 -translate-y-0.5'
                       )}
-                      onClick={() => handleRowClick(profile.id)}
-                      onContextMenu={event => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setOpenMenuProfileId(profile.id);
-                      }}
-                      aria-selected={isSelected}
                     >
-                      <td className='w-14 px-4 py-3 align-middle'>
-                        <div
-                          className='relative flex h-7 w-7 items-center justify-center'
-                          onClick={event => event.stopPropagation()}
-                        >
-                          <span
-                            className={cn(
-                              'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
-                              isChecked
-                                ? 'opacity-0'
-                                : 'opacity-100 group-hover:opacity-0'
-                            )}
-                            aria-hidden='true'
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant='secondary'
+                            size='sm'
+                            className='normal-case'
                           >
-                            {rowNumber}
-                          </span>
+                            Bulk actions
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align='start'>
+                          <DropdownMenuItem disabled>
+                            Feature selected (coming soon)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled>
+                            Unverify selected (coming soon)
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled
+                            className='text-destructive'
+                          >
+                            Delete selected (coming soon)
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </th>
+                  <th
+                    className={cn(
+                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    )}
+                    style={{ top: stickyTopPx }}
+                    onClick={() => router.push(createSortHref('created'))}
+                  >
+                    {renderSortHeader('created')}
+                  </th>
+                  <th
+                    className={cn(
+                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    )}
+                    style={{ top: stickyTopPx }}
+                    onClick={() => router.push(createSortHref('claimed'))}
+                  >
+                    {renderSortHeader('claimed')}
+                  </th>
+                  <th
+                    className={cn(
+                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    )}
+                    style={{ top: stickyTopPx }}
+                    onClick={() => router.push(createSortHref('verified'))}
+                  >
+                    {renderSortHeader('verified')}
+                  </th>
+                  <th
+                    className={cn(
+                      'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                      headerElevated &&
+                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    )}
+                    style={{ top: stickyTopPx }}
+                  >
+                    <span className='sr-only'>Action</span>
+                    <div className='flex items-center justify-end' />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {profilesWithActions.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={6}
+                      className='px-4 py-10 text-center text-sm text-secondary-token'
+                    >
+                      No creator profiles found.
+                    </td>
+                  </tr>
+                ) : (
+                  profilesWithActions.map((profile, index) => {
+                    const isSelected = profile.id === selectedId;
+                    const isChecked = selectedIds.has(profile.id);
+                    const rowNumber = (page - 1) * pageSize + index + 1;
+                    const displayName =
+                      'displayName' in profile
+                        ? (profile.displayName ?? null)
+                        : null;
+                    return (
+                      <tr
+                        key={profile.id}
+                        className={cn(
+                          'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
+                          isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
+                        )}
+                        onClick={() => handleRowClick(profile.id)}
+                        onContextMenu={event => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setOpenMenuProfileId(profile.id);
+                        }}
+                        aria-selected={isSelected}
+                      >
+                        <td className='w-14 px-4 py-3 align-middle'>
+                          <div
+                            className='relative flex h-7 w-7 items-center justify-center'
+                            onClick={event => event.stopPropagation()}
+                          >
+                            <span
+                              className={cn(
+                                'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+                                isChecked
+                                  ? 'opacity-0'
+                                  : 'opacity-100 group-hover:opacity-0'
+                              )}
+                              aria-hidden='true'
+                            >
+                              {rowNumber}
+                            </span>
+                            <div
+                              className={cn(
+                                'absolute inset-0 transition-opacity',
+                                isChecked
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              )}
+                            >
+                              <Checkbox
+                                aria-label={`Select ${profile.username}`}
+                                checked={isChecked}
+                                onCheckedChange={() => toggleSelect(profile.id)}
+                              />
+                            </div>
+                          </div>
+                        </td>
+                        <td
+                          className={cn(
+                            'px-4 py-3 align-middle',
+                            isSelected && 'bg-surface-2'
+                          )}
+                        >
+                          <div className='flex items-center gap-3'>
+                            <CreatorAvatarCell
+                              profileId={profile.id}
+                              username={profile.username}
+                              avatarUrl={profile.avatarUrl}
+                              verified={profile.isVerified}
+                              isFeatured={profile.isFeatured}
+                            />
+                            <div className='min-w-0'>
+                              {displayName ? (
+                                <div className='truncate font-medium text-primary-token'>
+                                  {displayName}
+                                </div>
+                              ) : null}
+                              <Link
+                                href={`/${profile.username}`}
+                                className={cn(
+                                  'truncate text-secondary-token transition-colors hover:text-primary-token',
+                                  displayName
+                                    ? 'text-xs'
+                                    : 'font-medium text-primary-token'
+                                )}
+                                onClick={event => event.stopPropagation()}
+                              >
+                                @{profile.username}
+                              </Link>
+                            </div>
+                          </div>
+                        </td>
+                        <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
+                          {profile.createdAt
+                            ? new Intl.DateTimeFormat('en-US', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              }).format(profile.createdAt)
+                            : '—'}
+                        </td>
+                        <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
+                          <Badge
+                            size='sm'
+                            variant={
+                              profile.isClaimed ? 'success' : 'secondary'
+                            }
+                          >
+                            {profile.isClaimed ? (
+                              <>
+                                <Star
+                                  className='h-3 w-3 fill-current'
+                                  aria-hidden='true'
+                                />
+                                <span>Claimed</span>
+                              </>
+                            ) : (
+                              <span>Unclaimed</span>
+                            )}
+                          </Badge>
+                        </td>
+                        <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
+                          <Badge
+                            size='sm'
+                            variant={
+                              profile.isVerified ? 'primary' : 'secondary'
+                            }
+                          >
+                            {profile.isVerified ? (
+                              <>
+                                <Check className='h-3 w-3' aria-hidden='true' />
+                                <span>Verified</span>
+                              </>
+                            ) : (
+                              <span>Not verified</span>
+                            )}
+                          </Badge>
+                        </td>
+                        <td
+                          className='px-4 py-3 align-middle text-right'
+                          onClick={e => e.stopPropagation()}
+                        >
                           <div
                             className={cn(
-                              'absolute inset-0 transition-opacity',
-                              isChecked
-                                ? 'opacity-100'
-                                : 'opacity-0 group-hover:opacity-100'
+                              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                              openMenuProfileId === profile.id &&
+                                'opacity-100 pointer-events-auto'
                             )}
                           >
-                            <Checkbox
-                              aria-label={`Select ${profile.username}`}
-                              checked={isChecked}
-                              onCheckedChange={() => toggleSelect(profile.id)}
+                            <CreatorActionsMenu
+                              profile={profile}
+                              isMobile={isMobile}
+                              status={
+                                verificationStatuses[profile.id] ?? 'idle'
+                              }
+                              open={openMenuProfileId === profile.id}
+                              onOpenChange={open =>
+                                setOpenMenuProfileId(open ? profile.id : null)
+                              }
+                              onToggleVerification={async () => {
+                                const result = await toggleVerification(
+                                  profile.id,
+                                  !profile.isVerified
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle verification',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onToggleFeatured={async () => {
+                                const result = await toggleFeatured(
+                                  profile.id,
+                                  !profile.isFeatured
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle featured',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onToggleMarketing={async () => {
+                                const result = await toggleMarketing(
+                                  profile.id,
+                                  !profile.marketingOptOut
+                                );
+                                if (!result.success) {
+                                  console.error(
+                                    'Failed to toggle marketing',
+                                    result.error
+                                  );
+                                }
+                              }}
+                              onDelete={() => {
+                                setProfileToDelete(profile);
+                                setDeleteDialogOpen(true);
+                              }}
                             />
                           </div>
-                        </div>
-                      </td>
-                      <td
-                        className={cn(
-                          'px-4 py-3 align-middle',
-                          isSelected && 'bg-surface-2'
-                        )}
-                      >
-                        <div className='flex items-center gap-3'>
-                          <CreatorAvatarCell
-                            profileId={profile.id}
-                            username={profile.username}
-                            avatarUrl={profile.avatarUrl}
-                            verified={profile.isVerified}
-                            isFeatured={profile.isFeatured}
-                          />
-                          <div className='min-w-0'>
-                            {displayName ? (
-                              <div className='truncate font-medium text-primary-token'>
-                                {displayName}
-                              </div>
-                            ) : null}
-                            <Link
-                              href={`/${profile.username}`}
-                              className={cn(
-                                'truncate text-secondary-token/80 transition-colors hover:text-primary-token',
-                                displayName
-                                  ? 'text-xs'
-                                  : 'font-medium text-primary-token'
-                              )}
-                              onClick={event => event.stopPropagation()}
-                            >
-                              @{profile.username}
-                            </Link>
-                          </div>
-                        </div>
-                      </td>
-                      <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
-                        {profile.createdAt
-                          ? new Intl.DateTimeFormat('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            }).format(profile.createdAt)
-                          : '—'}
-                      </td>
-                      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
-                        <Badge
-                          size='sm'
-                          variant={profile.isClaimed ? 'success' : 'secondary'}
-                        >
-                          {profile.isClaimed ? (
-                            <>
-                              <Star
-                                className='h-3 w-3 fill-current'
-                                aria-hidden='true'
-                              />
-                              <span>Claimed</span>
-                            </>
-                          ) : (
-                            <span>Unclaimed</span>
-                          )}
-                        </Badge>
-                      </td>
-                      <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
-                        <Badge
-                          size='sm'
-                          variant={profile.isVerified ? 'primary' : 'secondary'}
-                        >
-                          {profile.isVerified ? (
-                            <>
-                              <Check className='h-3 w-3' aria-hidden='true' />
-                              <span>Verified</span>
-                            </>
-                          ) : (
-                            <span>Not verified</span>
-                          )}
-                        </Badge>
-                      </td>
-                      <td
-                        className='px-4 py-3 align-middle text-right'
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <div
-                          className={cn(
-                            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-                            openMenuProfileId === profile.id &&
-                              'opacity-100 pointer-events-auto'
-                          )}
-                        >
-                          <CreatorActionsMenu
-                            profile={profile}
-                            isMobile={isMobile}
-                            status={verificationStatuses[profile.id] ?? 'idle'}
-                            open={openMenuProfileId === profile.id}
-                            onOpenChange={open =>
-                              setOpenMenuProfileId(open ? profile.id : null)
-                            }
-                            onToggleVerification={async () => {
-                              const result = await toggleVerification(
-                                profile.id,
-                                !profile.isVerified
-                              );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle verification',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onToggleFeatured={async () => {
-                              const result = await toggleFeatured(
-                                profile.id,
-                                !profile.isFeatured
-                              );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle featured',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onToggleMarketing={async () => {
-                              const result = await toggleMarketing(
-                                profile.id,
-                                !profile.marketingOptOut
-                              );
-                              if (!result.success) {
-                                console.error(
-                                  'Failed to toggle marketing',
-                                  result.error
-                                );
-                              }
-                            }}
-                            onDelete={() => {
-                              setProfileToDelete(profile);
-                              setDeleteDialogOpen(true);
-                            }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-          <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/80 px-3 py-2 text-xs text-secondary-token backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
-            <div className='flex items-center gap-2'>
-              <span>
-                Page {page} of {totalPages}
-              </span>
-              <span className='text-tertiary-token'>
-                {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()}
-              </span>
-            </div>
-            <div className='flex items-center gap-3'>
-              <div className='flex items-center gap-2'>
-                <span>Rows per page</span>
-                <AdminCreatorFilters initialPageSize={pageSize} />
-              </div>
-              <div className='flex items-center gap-2'>
-                <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                  <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                    Previous
-                  </Link>
-                </Button>
-                <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                  <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                    Next
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          )}
+        </AdminTableShell>
       </div>
       <RightDrawer
         isOpen={sidebarOpen && Boolean(effectiveContact)}

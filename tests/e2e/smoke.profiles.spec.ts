@@ -20,18 +20,10 @@ for (const handle of publicHandles) {
       // Title should include the display name or handle in most cases
       await expect(page).toHaveTitle(/.+/);
 
-      // Primary CTA "Listen" should exist somewhere on the page
-      const hasListen = await page
-        .getByRole('button', { name: /listen/i })
-        .first()
-        .isVisible()
-        .catch(() => false);
-      const hasListenLink = await page
-        .getByRole('link', { name: /listen/i })
-        .first()
-        .isVisible()
-        .catch(() => false);
-      expect(hasListen || hasListenLink).toBeTruthy();
+      // Exactly one primary CTA container should be present
+      const primaryCtas = page.locator('[data-testid="primary-cta"]');
+      await expect(primaryCtas).toHaveCount(1);
+      await expect(primaryCtas.first()).toBeVisible();
 
       // No console errors
       expect(

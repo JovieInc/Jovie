@@ -96,7 +96,6 @@ export const metadata: Metadata = {
   other: {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': APP_NAME,
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
     'theme-color': '#ffffff',
@@ -133,8 +132,20 @@ export default async function RootLayout({
         }}
       />
       {/* Favicon and Icons */}
-      <link rel='icon' href='/favicon.ico' type='image/x-icon' />
-      <link rel='apple-touch-icon' href='/apple-touch-icon.png' />
+      <link
+        rel='icon'
+        type='image/png'
+        href='/favicon-96x96.png'
+        sizes='96x96'
+      />
+      <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
+      <link rel='shortcut icon' href='/favicon.ico' />
+      <link
+        rel='apple-touch-icon'
+        sizes='180x180'
+        href='/apple-touch-icon.png'
+      />
+      <meta name='apple-mobile-web-app-title' content='Jovie' />
       <link rel='manifest' href='/site.webmanifest' />
 
       {/* DNS Prefetch for critical external resources */}
@@ -157,7 +168,7 @@ export default async function RootLayout({
             '@type': 'Organization',
             name: APP_NAME,
             url: APP_URL,
-            logo: `${APP_URL}/brand/jovie-logo.svg`,
+            logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
             description:
               'Artist profiles for music artists. Connect your music, social media, and merch in one place.',
             sameAs: [

@@ -12,8 +12,9 @@ import {
 } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
+import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
@@ -58,8 +59,6 @@ export function AdminUsersTable({
 }: AdminUsersTableProps) {
   const router = useRouter();
   const notifications = useNotifications();
-  const tableContainerRef = useRef<HTMLDivElement | null>(null);
-  const [headerElevated, setHeaderElevated] = useState(false);
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
 
   const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
@@ -98,19 +97,6 @@ export function AdminUsersTable({
     toggleSelect,
     toggleSelectAll,
   } = useRowSelection(rowIds);
-
-  useEffect(() => {
-    const container = tableContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      setHeaderElevated(container.scrollTop > 0);
-    };
-
-    handleScroll();
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
 
   const createSortHref = (column: UserSortableColumnKey) =>
     buildHref(1, { sort: getNextUserSort(sort, column) });
@@ -162,50 +148,75 @@ export function AdminUsersTable({
   };
 
   return (
-    <div className='flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-subtle bg-surface-1'>
-      <div
-        className='min-h-0 flex-1 overflow-auto flex flex-col'
-        ref={tableContainerRef}
-      >
-        <div
-          className={cn(
-            'sticky top-0 z-30 border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-            headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
-          )}
-        >
-          <div className='flex h-14 w-full items-center gap-3 px-4'>
-            <div className='hidden sm:block text-xs text-secondary-token'>
-              Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()} users
-            </div>
-            <div className='ml-auto flex items-center gap-3'>
-              <form
-                action='/app/admin/users'
-                method='get'
-                className='relative isolate flex items-center gap-2'
-              >
-                <input type='hidden' name='sort' value={sort} />
-                <input type='hidden' name='pageSize' value={String(pageSize)} />
-                <Input
-                  name='q'
-                  defaultValue={search}
-                  placeholder='Search by email or name'
-                  className='w-[240px]'
-                />
-                <input type='hidden' name='page' value='1' />
-                <Button type='submit' size='sm' variant='secondary'>
-                  Search
+    <AdminTableShell
+      toolbar={
+        <div className='flex h-14 w-full items-center gap-3 px-4'>
+          <div className='hidden sm:block text-xs text-secondary-token'>
+            Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+            {total.toLocaleString()} users
+          </div>
+          <div className='ml-auto flex items-center gap-3'>
+            <form
+              action='/app/admin/users'
+              method='get'
+              className='relative isolate flex items-center gap-2'
+            >
+              <input type='hidden' name='sort' value={sort} />
+              <input type='hidden' name='pageSize' value={String(pageSize)} />
+              <Input
+                name='q'
+                defaultValue={search}
+                placeholder='Search by email or name'
+                className='w-[240px]'
+              />
+              <input type='hidden' name='page' value='1' />
+              <Button type='submit' size='sm' variant='secondary'>
+                Search
+              </Button>
+              {search ? (
+                <Button asChild size='sm' variant='ghost'>
+                  <Link href={clearHref}>Clear</Link>
                 </Button>
-                {search ? (
-                  <Button asChild size='sm' variant='ghost'>
-                    <Link href={clearHref}>Clear</Link>
-                  </Button>
-                ) : null}
-              </form>
+              ) : null}
+            </form>
+          </div>
+        </div>
+      }
+      footer={
+        <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
+          <div className='flex items-center gap-2'>
+            <span>
+              Page {page} of {totalPages}
+            </span>
+            <span className='text-tertiary-token'>
+              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()}
+            </span>
+          </div>
+          <div className='flex items-center gap-3'>
+            <AdminPageSizeSelect
+              initialPageSize={pageSize}
+              onPageSizeChange={nextPageSize => {
+                router.push(buildHref(1, { pageSize: nextPageSize }));
+              }}
+            />
+            <div className='flex items-center gap-2'>
+              <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
+                <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+                  Previous
+                </Link>
+              </Button>
+              <Button asChild size='sm' variant='ghost' disabled={!canNext}>
+                <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+                  Next
+                </Link>
+              </Button>
             </div>
           </div>
         </div>
-
+      }
+    >
+      {({ headerElevated, stickyTopPx }) => (
         <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
           <colgroup>
             <col className='w-14' />
@@ -220,10 +231,11 @@ export function AdminUsersTable({
             <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
               <th
                 className={cn(
-                  'sticky top-14 z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <Checkbox
                   aria-label='Select all users'
@@ -234,10 +246,11 @@ export function AdminUsersTable({
 
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <span className='sr-only'>Bulk actions</span>
                 <div
@@ -282,10 +295,11 @@ export function AdminUsersTable({
 
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <SortableHeaderButton
                   label='Name'
@@ -295,10 +309,11 @@ export function AdminUsersTable({
               </th>
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <SortableHeaderButton
                   label='Email'
@@ -308,10 +323,11 @@ export function AdminUsersTable({
               </th>
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <SortableHeaderButton
                   label='Sign up'
@@ -321,10 +337,11 @@ export function AdminUsersTable({
               </th>
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <span className='inline-flex items-center font-semibold'>
                   Plan
@@ -332,10 +349,11 @@ export function AdminUsersTable({
               </th>
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <span className='inline-flex items-center font-semibold'>
                   Status
@@ -343,10 +361,11 @@ export function AdminUsersTable({
               </th>
               <th
                 className={cn(
-                  'sticky top-14 z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                  'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                   headerElevated &&
                     'shadow-sm shadow-black/10 dark:shadow-black/40'
                 )}
+                style={{ top: stickyTopPx }}
               >
                 <span className='sr-only'>Actions</span>
               </th>
@@ -460,39 +479,7 @@ export function AdminUsersTable({
             )}
           </tbody>
         </table>
-
-        <div className='sticky bottom-0 z-20 flex flex-wrap items-center justify-between gap-3 border-t border-subtle bg-surface-1/80 px-3 py-2 text-xs text-secondary-token backdrop-blur supports-backdrop-filter:bg-surface-1/70'>
-          <div className='flex items-center gap-2'>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <span className='text-tertiary-token'>
-              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()}
-            </span>
-          </div>
-          <div className='flex items-center gap-3'>
-            <AdminPageSizeSelect
-              initialPageSize={pageSize}
-              onPageSizeChange={nextPageSize => {
-                router.push(buildHref(1, { pageSize: nextPageSize }));
-              }}
-            />
-            <div className='flex items-center gap-2'>
-              <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                  Previous
-                </Link>
-              </Button>
-              <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                  Next
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    </AdminTableShell>
   );
 }

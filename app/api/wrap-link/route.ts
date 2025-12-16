@@ -32,6 +32,12 @@ import { createWrappedLink } from '@/lib/services/link-wrapping';
 import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
 import { isValidUrl } from '@/lib/utils/url-encryption';
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+} as const;
+
 interface RequestBody {
   url: string;
   platform?: string;
@@ -53,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (isRateLimited) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
-        { status: 429 }
+        { status: 429, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -62,7 +68,10 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid JSON' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const { url, customAlias, expiresInHours } = body;
@@ -70,7 +79,10 @@ export async function POST(request: NextRequest) {
 
     // Validate URL
     if (!url || !isValidUrl(url)) {
-      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid URL' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Get user ID if authenticated
@@ -93,32 +105,25 @@ export async function POST(request: NextRequest) {
     if (!wrappedLink) {
       return NextResponse.json(
         { error: 'Failed to create wrapped link' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
     // Return wrapped link data
-    const response = NextResponse.json({
-      shortId: wrappedLink.shortId,
-      kind: wrappedLink.kind,
-      domain: wrappedLink.domain,
-      category: wrappedLink.category,
-      titleAlias: wrappedLink.titleAlias,
-      normalUrl: `/go/${wrappedLink.shortId}`,
-      sensitiveUrl: `/out/${wrappedLink.shortId}`,
-      createdAt: wrappedLink.createdAt,
-      expiresAt: wrappedLink.expiresAt,
-    });
-
-    // Add security headers
-    response.headers.set(
-      'Cache-Control',
-      'no-cache, no-store, must-revalidate'
+    return NextResponse.json(
+      {
+        shortId: wrappedLink.shortId,
+        kind: wrappedLink.kind,
+        domain: wrappedLink.domain,
+        category: wrappedLink.category,
+        titleAlias: wrappedLink.titleAlias,
+        normalUrl: `/go/${wrappedLink.shortId}`,
+        sensitiveUrl: `/out/${wrappedLink.shortId}`,
+        createdAt: wrappedLink.createdAt,
+        expiresAt: wrappedLink.expiresAt,
+      },
+      { headers: NO_STORE_HEADERS }
     );
-    response.headers.set('Pragma', 'no-cache');
-    response.headers.set('Expires', '0');
-
-    return response;
   } catch (error) {
     await captureError('Link wrapping API error', error, {
       route: '/api/wrap-link',
@@ -126,20 +131,29 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
 
 // Handle other HTTP methods
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }
 
 export async function PUT() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }
 
 export async function DELETE() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }

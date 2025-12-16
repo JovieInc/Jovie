@@ -13,6 +13,7 @@ import {
   ShieldCheckIcon,
   SparklesIcon,
   UserCircleIcon,
+  UserPlusIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
@@ -137,6 +138,13 @@ const adminNavigation: typeof primaryNavigation = [
     id: 'admin_overview',
     icon: ShieldCheckIcon,
     description: 'Internal metrics and operations',
+  },
+  {
+    name: 'Waitlist',
+    href: '/app/admin/waitlist',
+    id: 'admin_waitlist',
+    icon: UserPlusIcon,
+    description: 'Review and manage waitlist signups',
   },
   {
     name: 'Creators',

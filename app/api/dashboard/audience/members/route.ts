@@ -5,6 +5,8 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles, users } from '@/lib/db/schema';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const MEMBER_SORT_COLUMNS = {
   lastSeen: audienceMembers.lastSeenAt,
   visits: audienceMembers.visits,
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid audience request' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -132,14 +134,20 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(
         { members, total: Number(total ?? 0) },
-        { status: 200 }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('[Dashboard Audience] Failed to load members', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(
       { error: 'Unable to load audience members' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

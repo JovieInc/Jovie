@@ -120,6 +120,20 @@
       "when": 1765753779420,
       "tag": "0016_small_hex",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1765815054572,
+      "tag": "0017_medical_anita_blake",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1765836187978,
+      "tag": "0018_fearless_cerise",
+      "breakpoints": true
     }
   ]
 }

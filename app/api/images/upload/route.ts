@@ -15,6 +15,8 @@ import {
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const UPLOAD_ERROR_CODES = {
   MISSING_BLOB_TOKEN: 'MISSING_BLOB_TOKEN',
   RATE_LIMITED: 'RATE_LIMITED',
@@ -49,7 +51,9 @@ function errorResponse(
   const body: UploadErrorResponse = { error, code };
   if (options?.retryable !== undefined) body.retryable = options.retryable;
   if (options?.retryAfter !== undefined) body.retryAfter = options.retryAfter;
-  return NextResponse.json(body, { status, headers: options?.headers });
+  const headers = new Headers(options?.headers);
+  headers.set('Cache-Control', NO_STORE_HEADERS['Cache-Control']);
+  return NextResponse.json(body, { status, headers });
 }
 
 type BlobPut = typeof import('@vercel/blob').put;
@@ -485,7 +489,7 @@ export async function POST(request: NextRequest) {
             mediumUrl: avatarUrl,
             smallUrl: avatarUrl,
           },
-          { status: 202 }
+          { status: 202, headers: NO_STORE_HEADERS }
         );
       } catch (error) {
         const message =

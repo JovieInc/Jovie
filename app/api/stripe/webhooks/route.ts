@@ -24,6 +24,8 @@ import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 // Force Node.js runtime for Stripe SDK compatibility
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 
 /**
@@ -82,7 +84,10 @@ export async function POST(request: NextRequest) {
 
     if (!signature) {
       console.error('Missing Stripe signature');
-      return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing signature' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Verify webhook signature
@@ -91,7 +96,10 @@ export async function POST(request: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
       console.error('Invalid webhook signature:', error);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     console.log('Received webhook event:', {
@@ -118,7 +126,10 @@ export async function POST(request: NextRequest) {
         eventId: event.id,
         type: event.type,
       });
-      return NextResponse.json({ received: true });
+      return NextResponse.json(
+        { received: true },
+        { headers: NO_STORE_HEADERS }
+      );
     }
 
     // Handle the event
@@ -160,12 +171,12 @@ export async function POST(request: NextRequest) {
         break;
     }
 
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error processing webhook:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
@@ -498,5 +509,8 @@ async function processSubscription(
 
 // Only allow POST requests (webhooks)
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }

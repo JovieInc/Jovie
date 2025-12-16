@@ -1,7 +1,31 @@
 import { revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
-export async function POST() {
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+export async function POST(request: Request) {
+  const secret = process.env.REVALIDATE_SECRET;
+
+  if (process.env.NODE_ENV === 'production' && !secret) {
+    return NextResponse.json(
+      { error: 'Revalidation secret not configured' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (secret) {
+    const authHeader = request.headers.get('authorization');
+    if (authHeader !== `Bearer ${secret}`) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+  }
+
   revalidateTag('featured-creators', 'default');
-  return NextResponse.json({ revalidated: true });
+  return NextResponse.json(
+    { revalidated: true },
+    { headers: NO_STORE_HEADERS }
+  );
 }

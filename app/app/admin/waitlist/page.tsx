@@ -38,7 +38,7 @@ export default async function AdminWaitlistPage({
   } = await getAdminWaitlistEntries({ page, pageSize });
 
   return (
-    <div className='space-y-8'>
+    <div className='flex h-full min-h-0 flex-col gap-8'>
       <header className='space-y-2'>
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Internal
@@ -49,7 +49,7 @@ export default async function AdminWaitlistPage({
         </p>
       </header>
 
-      <section>
+      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8'>
         <WaitlistTable
           entries={entries}
           page={currentPage}

@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 type WebhookEvent = {
   data: {
     id: string;
@@ -65,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (!svix_id || !svix_timestamp || !svix_signature) {
       return NextResponse.json(
         { error: 'Missing svix headers' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -76,7 +78,7 @@ export async function POST(request: NextRequest) {
       console.error('Missing CLERK_WEBHOOK_SECRET environment variable');
       return NextResponse.json(
         { error: 'Webhook secret not configured' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -93,7 +95,10 @@ export async function POST(request: NextRequest) {
       }) as WebhookEvent;
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Handle user.created event
@@ -132,12 +137,15 @@ export async function POST(request: NextRequest) {
 
         console.log(`Post-signup processing completed for user ${user.id}`);
 
-        return NextResponse.json({
-          success: true,
-          message: 'User post-signup processing completed',
-          fullName,
-          suggestedUsername,
-        });
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'User post-signup processing completed',
+            fullName,
+            suggestedUsername,
+          },
+          { headers: NO_STORE_HEADERS }
+        );
       } catch (error) {
         console.error(
           `Failed to process user.created event for ${user.id}:`,
@@ -151,7 +159,7 @@ export async function POST(request: NextRequest) {
             error: 'Failed to process user data',
             message: error instanceof Error ? error.message : 'Unknown error',
           },
-          { status: 200 } // Return 200 to prevent retries for non-critical errors
+          { status: 200, headers: NO_STORE_HEADERS } // Return 200 to prevent retries for non-critical errors
         );
       }
     }
@@ -177,15 +185,21 @@ export async function POST(request: NextRequest) {
             success: false,
             error: 'Failed to sync username from Clerk',
           },
-          { status: 200 }
+          { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
-      return NextResponse.json({ success: true, type: evt.type });
+      return NextResponse.json(
+        { success: true, type: evt.type },
+        { headers: NO_STORE_HEADERS }
+      );
     }
 
     // For other event types, just acknowledge
-    return NextResponse.json({ success: true, type: evt.type });
+    return NextResponse.json(
+      { success: true, type: evt.type },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('Webhook processing error:', error);
     return NextResponse.json(
@@ -193,7 +207,7 @@ export async function POST(request: NextRequest) {
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

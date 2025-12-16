@@ -2,6 +2,8 @@
 
 _Last updated: January 2025_
 
+These Terms are between you and {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
+
 ## Acceptance of Terms
 
 By using Jovie, you agree to these Terms of Service. If you disagree with any part of this document, do not continue to use the service until you have contacted legal@jov.ie and resolved the concern.

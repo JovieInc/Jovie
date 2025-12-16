@@ -13,6 +13,8 @@ import {
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const visitSchema = z.object({
   profileId: z.string().uuid(),
   ipAddress: z.string().optional(),
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid visit payload' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -80,7 +82,7 @@ export async function POST(request: NextRequest) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -169,12 +171,15 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({ success: true, fingerprint });
+    return NextResponse.json(
+      { success: true, fingerprint },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('[Audience Visit] Error', error);
     return NextResponse.json(
       { error: 'Unable to record visit' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

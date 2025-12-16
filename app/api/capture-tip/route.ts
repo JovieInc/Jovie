@@ -7,6 +7,8 @@ import { creatorProfiles, tips } from '@/lib/db/schema';
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function POST(req: NextRequest) {
   try {
     if (
@@ -15,7 +17,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: 'Stripe not configured' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -25,7 +27,10 @@ export async function POST(req: NextRequest) {
     const signature = headersList.get('stripe-signature');
 
     if (!signature) {
-      return NextResponse.json({ error: 'No signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'No signature' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     let event: Stripe.Event;
@@ -38,7 +43,10 @@ export async function POST(req: NextRequest) {
       );
     } catch (err) {
       console.error('Invalid signature', err);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     if (event.type === 'payment_intent.succeeded') {
@@ -75,7 +83,7 @@ export async function POST(req: NextRequest) {
         );
         return NextResponse.json(
           { error: 'Creator profile not found', payment_intent: pi.id },
-          { status: 500 }
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -110,12 +118,12 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.json({ received: true });
+    return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Tip webhook error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

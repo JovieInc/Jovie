@@ -31,6 +31,12 @@ export default async function OnboardingPage({
   const existingProfile = dashboardData.selectedProfile;
   const user = await currentUser();
 
+  const displayNameSource = existingProfile?.displayName
+    ? 'profile'
+    : user?.fullName
+      ? 'clerk_full_name'
+      : null;
+
   const initialDisplayName =
     existingProfile?.displayName ||
     user?.fullName ||
@@ -45,6 +51,9 @@ export default async function OnboardingPage({
     '';
 
   const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+  const skipNameStep =
+    displayNameSource === 'profile' || displayNameSource === 'clerk_full_name';
 
   return (
     <AuthLayout
@@ -65,6 +74,7 @@ export default async function OnboardingPage({
           initialHandle={initialHandle}
           userEmail={userEmail}
           userId={userId}
+          skipNameStep={skipNameStep}
         />
       </div>
     </AuthLayout>

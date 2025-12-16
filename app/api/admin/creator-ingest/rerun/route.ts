@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { creatorProfiles } from '@/lib/db/schema';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
@@ -12,15 +13,32 @@ const rerunSchema = z.object({
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function POST(request: Request) {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+    if (!entitlements.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json().catch(() => null);
     const parsed = rerunSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body' },
-        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -38,7 +56,7 @@ export async function POST(request: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Creator profile not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -54,7 +72,7 @@ export async function POST(request: Request) {
       if (!jobId) {
         return NextResponse.json(
           { error: 'Unable to queue ingestion job' },
-          { status: 500 }
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -72,14 +90,14 @@ export async function POST(request: Request) {
             username: profile.username,
           },
         },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Failed to rerun ingestion job', error);
     return NextResponse.json(
       { error: 'Failed to queue ingestion job' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

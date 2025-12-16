@@ -1,13 +1,23 @@
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
 import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
-import { notificationSubscriptions } from '@/lib/db/schema';
+import {
+  audienceMembers,
+  creatorProfiles,
+  notificationSubscriptions,
+  users,
+} from '@/lib/db/schema';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { sendNotification } from '@/lib/notifications/service';
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Schema for subscription request validation
 const subscribeSchema = z
@@ -69,28 +79,33 @@ export async function POST(request: NextRequest) {
           error: 'Invalid request data',
           details: result.error.format(),
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
     const { artist_id, email, phone, channel, source, country_code, city } =
       result.data;
 
-    const artistProfile = await db.query.creatorProfiles.findFirst({
-      columns: {
-        id: true,
-        displayName: true,
-        username: true,
-      },
-      where: (fields, { eq }) => eq(fields.id, artist_id),
-    });
+    const [artistProfile] = await db
+      .select({
+        id: creatorProfiles.id,
+        displayName: creatorProfiles.displayName,
+        username: creatorProfiles.username,
+        creatorIsPro: users.isPro,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(eq(creatorProfiles.id, artist_id))
+      .limit(1);
 
     if (!artistProfile) {
       return NextResponse.json(
         { success: false, error: 'Artist not found' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    const creatorIsPro = Boolean(artistProfile.creatorIsPro);
 
     const ipAddress =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
@@ -149,7 +164,65 @@ export async function POST(request: NextRequest) {
       phone_present: Boolean(normalizedPhone),
       country_code: countryCode ?? undefined,
       source,
+      creator_is_pro: creatorIsPro,
     });
+
+    if (creatorIsPro && normalizedEmail) {
+      const ip =
+        request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null;
+      const ua = request.headers.get('user-agent') || null;
+      const fingerprint = createFingerprint(ip, ua);
+      const now = new Date();
+
+      await withSystemIngestionSession(async tx => {
+        const [existingMember] = await tx
+          .select({
+            id: audienceMembers.id,
+            type: audienceMembers.type,
+            email: audienceMembers.email,
+          })
+          .from(audienceMembers)
+          .where(
+            and(
+              eq(audienceMembers.creatorProfileId, artist_id),
+              eq(audienceMembers.fingerprint, fingerprint)
+            )
+          )
+          .limit(1);
+
+        if (existingMember) {
+          await tx
+            .update(audienceMembers)
+            .set({
+              type: 'email',
+              email: normalizedEmail,
+              lastSeenAt: now,
+              updatedAt: now,
+            })
+            .where(eq(audienceMembers.id, existingMember.id));
+          return;
+        }
+
+        await tx.insert(audienceMembers).values({
+          creatorProfileId: artist_id,
+          fingerprint,
+          type: 'email',
+          displayName: 'Subscriber',
+          email: normalizedEmail,
+          firstSeenAt: now,
+          lastSeenAt: now,
+          visits: 0,
+          engagementScore: 0,
+          intentLevel: 'low',
+          deviceType: 'unknown',
+          referrerHistory: [],
+          latestActions: [],
+          tags: [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      });
+    }
 
     let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
       null;
@@ -186,20 +259,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = NextResponse.json({
-      success: true,
-      message: 'Subscription successful',
-      email_dispatched: dispatchResult?.delivered.includes('email') ?? false,
-      duration_ms: Math.round(Date.now() - runtimeStart),
-    });
+    const response = NextResponse.json(
+      {
+        success: true,
+        message: 'Subscription successful',
+        email_dispatched: dispatchResult?.delivered.includes('email') ?? false,
+        duration_ms: Math.round(Date.now() - runtimeStart),
+      },
+      { headers: NO_STORE_HEADERS }
+    );
 
-    response.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365,
-      path: '/',
-    });
+    if (creatorIsPro) {
+      response.cookies.set(AUDIENCE_IDENTIFIED_COOKIE, '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
 
     return response;
   } catch (error) {
@@ -215,7 +293,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: 'Server error',
       },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

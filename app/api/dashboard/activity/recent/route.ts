@@ -11,10 +11,12 @@ import {
   users,
 } from '@/lib/db/schema';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const querySchema = z.object({
   profileId: z.string().uuid(),
   limit: z.preprocess(val => Number(val ?? 5), z.number().int().min(1).max(20)),
-  range: z.enum(['7d', '30d']).optional().default('7d'),
+  range: z.enum(['7d', '30d', '90d']).optional().default('7d'),
 });
 
 const ACTION_ICONS: Record<string, string> = {
@@ -113,14 +115,18 @@ export async function GET(request: NextRequest) {
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid activity request' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
       const { profileId, limit, range } = parsed.data;
 
       const rangeMs =
-        range === '30d' ? 30 * 24 * 60 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+        range === '90d'
+          ? 90 * 24 * 60 * 60 * 1000
+          : range === '30d'
+            ? 30 * 24 * 60 * 60 * 1000
+            : 7 * 24 * 60 * 60 * 1000;
       const since = new Date(Date.now() - rangeMs);
 
       const [profile] = await db
@@ -133,7 +139,10 @@ export async function GET(request: NextRequest) {
         .limit(1);
 
       if (!profile) {
-        return NextResponse.json({ activities: [] }, { status: 200 });
+        return NextResponse.json(
+          { activities: [] },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
       }
 
       const perSourceLimit = Math.min(20, Math.max(5, limit * 2));
@@ -258,13 +267,22 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
         .slice(0, limit);
 
-      return NextResponse.json({ activities: merged }, { status: 200 });
+      return NextResponse.json(
+        { activities: merged },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
     });
   } catch (error) {
     console.error('[Dashboard Activity] Error loading recent actions', error);
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to load activity' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

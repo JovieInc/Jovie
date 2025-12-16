@@ -12,6 +12,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       userId: null,
       email: null,
       isAuthenticated: false,
+      isAdmin: false,
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
@@ -25,19 +26,22 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
       userId,
       email: null,
       isAuthenticated: true,
+      isAdmin: false,
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
     };
   }
 
-  const { email, isPro } = billing.data;
+  const { email, isPro, isAdmin } = billing.data;
   const pro = isPro ?? false;
+  const admin = isAdmin ?? false;
 
   return {
     userId,
     email,
     isAuthenticated: true,
+    isAdmin: admin,
     isPro: pro,
     hasAdvancedFeatures: pro,
     canRemoveBranding: pro,

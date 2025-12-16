@@ -1,9 +1,18 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { DashboardAudience } from '@/components/dashboard/DashboardAudience';
+import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
+import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
+import {
+  getAudienceServerData,
+  getAudienceUrlSearchParams,
+} from './audience-data';
 
-export default async function AudiencePage() {
+export default async function AudiencePage({
+  searchParams,
+}: {
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   const { userId } = await auth();
 
   // Handle unauthenticated users
@@ -20,8 +29,27 @@ export default async function AudiencePage() {
       redirect('/onboarding');
     }
 
-    // Pass server-fetched data to client component
-    return <DashboardAudience />;
+    const artist = dashboardData.selectedProfile
+      ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
+      : null;
+
+    const audienceData = await getAudienceServerData({
+      userId,
+      selectedProfileId: artist?.id ?? null,
+      searchParams: getAudienceUrlSearchParams(searchParams),
+    });
+
+    return (
+      <DashboardAudienceClient
+        mode={audienceData.mode}
+        initialRows={audienceData.rows}
+        total={audienceData.total}
+        page={audienceData.page}
+        pageSize={audienceData.pageSize}
+        sort={audienceData.sort}
+        direction={audienceData.direction}
+      />
+    );
   } catch (error) {
     // Check if this is a Next.js redirect error (which is expected)
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

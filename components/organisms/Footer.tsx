@@ -14,6 +14,7 @@ export interface FooterProps {
   };
   showThemeToggle?: boolean;
   className?: string;
+  brandingMark?: 'wordmark' | 'icon';
   links?: Array<{
     href: string;
     label: string;
@@ -27,6 +28,7 @@ export function Footer({
   artistSettings,
   showThemeToggle = false,
   className = '',
+  brandingMark = 'wordmark',
   links,
 }: FooterProps) {
   // Use user's setting if available, otherwise fall back to hideBranding prop
@@ -131,7 +133,7 @@ export function Footer({
 
     const legalLinks = [
       { href: '/legal/privacy', label: 'Privacy Policy' },
-      { href: '/legal/terms', label: 'Terms' },
+      { href: '/legal/terms', label: 'Terms of Service' },
     ];
 
     return (
@@ -140,7 +142,12 @@ export function Footer({
           <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
             {/* Brand */}
             <div>
-              <FooterBranding variant='light' showCTA={false} />
+              <FooterBranding
+                variant='light'
+                showCTA={false}
+                mark={brandingMark}
+                className={brandingMark === 'icon' ? 'items-start' : ''}
+              />
             </div>
 
             {/* Product */}
@@ -203,7 +210,10 @@ export function Footer({
 
           <div className='mt-8 border-t border-subtle pt-5 flex items-center justify-between'>
             <div className='flex flex-col'>
-              <Copyright variant='light' className='text-secondary-token' />
+              <Copyright
+                variant='light'
+                className='text-[11px] tracking-tight text-tertiary-token'
+              />
             </div>
             {showThemeToggle && (
               <div className='flex items-center'>

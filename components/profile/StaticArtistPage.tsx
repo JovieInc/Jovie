@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import React from 'react';
 import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
+import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
@@ -19,8 +19,10 @@ interface StaticArtistPageProps {
   showTipButton: boolean;
   showBackButton: boolean;
   showFooter?: boolean;
+  autoOpenCapture?: boolean;
   primaryAction?: PrimaryAction;
   spotifyPreferred?: boolean;
+  enableDynamicEngagement?: boolean;
 }
 
 function renderContent(
@@ -28,7 +30,8 @@ function renderContent(
   artist: Artist,
   socialLinks: LegacySocialLink[],
   primaryAction: PrimaryAction,
-  spotifyPreferred: boolean
+  spotifyPreferred: boolean,
+  enableDynamicEngagement: boolean
 ) {
   const mapSocialPlatformToDSPKey = (platform: string): string | null => {
     const normalized = platform.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -92,6 +95,7 @@ function renderContent(
             artist={artist}
             handle={artist.handle}
             dspsOverride={mergedDSPs}
+            enableDynamicEngagement={enableDynamicEngagement}
           />
         </div>
       );
@@ -152,71 +156,13 @@ function renderContent(
       );
 
     default: // 'profile' mode
-      // Only show the Listen Now / notifications CTA if the artist has streaming platforms configured
-      const hasStreamingPlatforms = mergedDSPs.length > 0;
-
-      if (!hasStreamingPlatforms) {
-        return (
-          <div className='space-y-4'>
-            {/* Subtle placeholder matching the Listen Now button dimensions to avoid layout shift */}
-            <div
-              aria-hidden='true'
-              className='inline-flex items-center justify-center w-full px-8 py-4 text-lg font-semibold rounded-xl border border-default bg-white text-gray-400 dark:text-gray-500 shadow-md select-none'
-            >
-              Listen
-            </div>
-          </div>
-        );
-      }
-
-      if (primaryAction === 'subscribe') {
-        return (
-          <div className='space-y-4'>
-            <div className='flex justify-center'>
-              <Link
-                href={`/${artist.handle}/subscribe`}
-                prefetch={false}
-                className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
-                aria-label='Subscribe to updates'
-              >
-                Subscribe
-              </Link>
-            </div>
-          </div>
-        );
-      }
-
-      const spotifyDsp = mergedDSPs.find(dsp => dsp.key === 'spotify');
-      if (spotifyPreferred && spotifyDsp) {
-        return (
-          <div className='space-y-4'>
-            <div className='flex justify-center'>
-              <a
-                href={spotifyDsp.url}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
-                aria-label='Open in Spotify'
-              >
-                Open in Spotify
-              </a>
-            </div>
-          </div>
-        );
-      }
-
       return (
         <div className='space-y-4'>
-          <div className='flex justify-center'>
-            <Link
-              href={`/${artist.handle}/listen`}
-              prefetch={false}
-              className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
-              aria-label='Open Listen page with music links'
-            >
-              Listen now
-            </Link>
-          </div>
+          <ProfilePrimaryCTA
+            artist={artist}
+            socialLinks={socialLinks}
+            spotifyPreferred={spotifyPreferred}
+          />
         </div>
       );
   }
@@ -232,9 +178,14 @@ export function StaticArtistPage({
   showTipButton,
   showBackButton,
   showFooter = true,
-  primaryAction = 'listen',
+  autoOpenCapture,
+  primaryAction = 'subscribe',
   spotifyPreferred = false,
+  enableDynamicEngagement = false,
 }: StaticArtistPageProps) {
+  const isPublicProfileMode = mode === 'profile';
+  const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
+
   return (
     <div className='w-full'>
       <ArtistPageShell
@@ -242,18 +193,32 @@ export function StaticArtistPage({
         socialLinks={socialLinks}
         contacts={contacts}
         subtitle={subtitle}
-        showSocialBar={mode !== 'listen'}
-        showTipButton={showTipButton}
+        showSocialBar={isPublicProfileMode ? false : mode !== 'listen'}
+        showTipButton={isPublicProfileMode ? false : showTipButton}
         showBackButton={showBackButton}
         showFooter={showFooter}
+        showNotificationButton={isPublicProfileMode ? false : true}
       >
         <div>
-          {renderContent(
-            mode,
-            artist,
-            socialLinks,
-            primaryAction,
-            spotifyPreferred
+          {mode === 'profile' ? (
+            <div data-testid='primary-cta'>
+              <ProfilePrimaryCTA
+                artist={artist}
+                socialLinks={socialLinks}
+                spotifyPreferred={spotifyPreferred}
+                autoOpenCapture={resolvedAutoOpenCapture}
+                showCapture
+              />
+            </div>
+          ) : (
+            renderContent(
+              mode,
+              artist,
+              socialLinks,
+              primaryAction,
+              spotifyPreferred,
+              enableDynamicEngagement
+            )
           )}
         </div>
       </ArtistPageShell>

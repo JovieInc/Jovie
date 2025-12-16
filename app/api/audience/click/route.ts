@@ -13,6 +13,8 @@ import {
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const clickSchema = z.object({
   profileId: z.string().uuid(),
   linkId: z.string().uuid().optional(),
@@ -114,7 +116,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid click payload' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -145,7 +147,7 @@ export async function POST(request: NextRequest) {
     if (!profile) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
-        { status: 404 }
+        { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -258,12 +260,15 @@ export async function POST(request: NextRequest) {
         .where(eq(audienceMembers.id, member.id));
     });
 
-    return NextResponse.json({ success: true, fingerprint });
+    return NextResponse.json(
+      { success: true, fingerprint },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('[Audience Click] Error', error);
     return NextResponse.json(
       { error: 'Unable to record click' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

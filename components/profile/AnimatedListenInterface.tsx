@@ -15,11 +15,13 @@ import { Artist } from '@/types/db';
 interface AnimatedListenInterfaceProps {
   artist: Artist;
   handle: string;
+  enableDynamicEngagement?: boolean;
 }
 
 export function AnimatedListenInterface({
   artist,
   handle,
+  enableDynamicEngagement = false,
 }: AnimatedListenInterfaceProps) {
   const [dsps] = useState<AvailableDSP[]>(() => getAvailableDSPs(artist));
   const [selectedDSP, setSelectedDSP] = useState<string | null>(null);
@@ -58,7 +60,7 @@ export function AnimatedListenInterface({
       // Save preference
       document.cookie = `${LISTEN_COOKIE}=${dsp.key}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 
-      if (dsp.key === 'spotify') {
+      if (enableDynamicEngagement && dsp.key === 'spotify') {
         document.cookie = `${AUDIENCE_SPOTIFY_PREFERRED_COOKIE}=1; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
       }
       try {

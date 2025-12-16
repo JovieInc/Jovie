@@ -82,6 +82,7 @@ type ProfileShellProps = {
   showBackButton?: boolean;
   showFooter?: boolean;
   showNotificationButton?: boolean;
+  forceNotificationsEnabled?: boolean;
   maxWidthClass?: string;
   backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   showGradientBlurs?: boolean;
@@ -98,6 +99,7 @@ export function ProfileShell({
   showBackButton = false,
   showFooter = true,
   showNotificationButton = false,
+  forceNotificationsEnabled = false,
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
@@ -108,7 +110,8 @@ export function ProfileShell({
   const pathname = usePathname();
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const forceNotifications = searchParams?.get('preview') === '1';
-  const notificationsEnabled = notificationsGate.value || forceNotifications;
+  const notificationsEnabled =
+    forceNotificationsEnabled || notificationsGate.value || forceNotifications;
   const mode = searchParams?.get('mode') ?? 'profile';
 
   useEffect(() => {

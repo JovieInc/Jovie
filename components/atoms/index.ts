@@ -5,6 +5,7 @@ export * from './AmountSelector';
 export * from './ArtistAvatar';
 export * from './ArtistName';
 export * from './BackgroundPattern';
+export * from './BrandLogo';
 export * from './Copyright';
 export * from './Divider';
 export * from './DropdownMenu';

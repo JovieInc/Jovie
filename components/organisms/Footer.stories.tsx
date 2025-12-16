@@ -27,7 +27,7 @@ export const Minimal: Story = {
     showThemeToggle: true,
     links: [
       { href: '/legal/privacy', label: 'Privacy' },
-      { href: '/legal/terms', label: 'Terms' },
+      { href: '/legal/terms', label: 'Terms of Service' },
     ],
   },
 };
@@ -39,7 +39,7 @@ export const Regular: Story = {
     showThemeToggle: true,
     links: [
       { href: '/legal/privacy', label: 'Privacy' },
-      { href: '/legal/terms', label: 'Terms' },
+      { href: '/legal/terms', label: 'Terms of Service' },
     ],
   },
 };

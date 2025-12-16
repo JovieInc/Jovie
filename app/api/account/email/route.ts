@@ -8,6 +8,8 @@ import { users } from '@/lib/db/schema';
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 const syncSchema = z.object({
   email: z.string().email(),
 });
@@ -20,7 +22,7 @@ export async function POST(request: Request) {
     if (!result.success) {
       return NextResponse.json(
         { error: 'Invalid email address' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
             error:
               'Email must match one of your verified Clerk email addresses.',
           },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
           {
             error: 'Email address must be verified before syncing.',
           },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -61,14 +63,14 @@ export async function POST(request: Request) {
 
       return NextResponse.json(
         { success: true },
-        { status: 200, headers: { 'Cache-Control': 'no-store' } }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     });
   } catch (error) {
     console.error('Failed to sync email address:', error);
     return NextResponse.json(
       { error: 'Unable to sync email address' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

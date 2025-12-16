@@ -7,6 +7,12 @@ import { captureError, captureWarning } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+} as const;
+
 /**
  * Handle Availability Check API
  *
@@ -99,7 +105,7 @@ export async function GET(request: Request) {
   if (!handle) {
     return NextResponse.json(
       { available: false, error: 'Handle is required' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -107,14 +113,14 @@ export async function GET(request: Request) {
   if (handle.length < 3) {
     return NextResponse.json(
       { available: false, error: 'Handle must be at least 3 characters' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
   if (handle.length > 30) {
     return NextResponse.json(
       { available: false, error: 'Handle must be less than 30 characters' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -124,7 +130,7 @@ export async function GET(request: Request) {
         available: false,
         error: 'Handle can only contain letters, numbers, and hyphens',
       },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -158,12 +164,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       { available: !data || data.length === 0 },
       {
-        headers: {
-          'Cache-Control':
-            'no-store, no-cache, must-revalidate, proxy-revalidate',
-          Pragma: 'no-cache',
-          Expires: '0',
-        },
+        headers: NO_STORE_HEADERS,
       }
     );
   } catch (error: unknown) {
@@ -188,7 +189,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(
       { available: false, error: 'Database connection failed' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

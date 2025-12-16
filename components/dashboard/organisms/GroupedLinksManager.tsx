@@ -790,7 +790,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             ) : null}
           </div>
 
-          <div className='text-xs text-secondary-token/75 sm:text-right'>
+          <div className='text-xs text-secondary-token sm:text-right'>
             {completionPercent >= 100 ? (
               <span className='inline-flex items-center gap-2'>
                 <Icon name='CheckCircle' className='h-4 w-4 text-accent' />
@@ -804,7 +804,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                   {filteredCount} {filteredCount === 1 ? 'link' : 'links'} •{' '}
                   {completionPercent}% to target
                 </span>
-                <span className='text-tertiary-token/80'>(most add 4–6)</span>
+                <span className='text-tertiary-token'>(most add 4–6)</span>
               </span>
             )}
           </div>

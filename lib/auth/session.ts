@@ -35,8 +35,12 @@ export async function setupDbSession() {
 
   // Set the session variable for RLS
   // Using sql.raw with validated input to prevent SQL injection
-  await db.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
-  await db.execute(drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`));
+  await db.execute(
+    drizzleSql`SELECT set_config('app.user_id', ${userId}, true)`
+  );
+  await db.execute(
+    drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`
+  );
 
   return { userId };
 }
@@ -75,12 +79,12 @@ export async function withDbSessionTx<T>(
   return await db.transaction(async tx => {
     // Important: SET LOCAL must be inside the transaction to take effect.
     // In unit tests, drizzleSql may be mocked without .raw; guard accordingly.
-    if (typeof drizzleSql?.raw === 'function') {
-      await tx.execute(drizzleSql.raw(`SET LOCAL app.user_id = '${userId}'`));
-      await tx.execute(
-        drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userId}'`)
-      );
-    }
+    await tx.execute(
+      drizzleSql`SELECT set_config('app.user_id', ${userId}, true)`
+    );
+    await tx.execute(
+      drizzleSql`SELECT set_config('app.clerk_user_id', ${userId}, true)`
+    );
     // Transaction client now properly typed with neon-serverless driver
     return await operation(tx, userId);
   });

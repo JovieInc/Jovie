@@ -46,8 +46,7 @@ export function ProgressiveArtistPage(props: ProgressiveArtistPageProps) {
   }, [router, props.artist.handle, props.mode]);
 
   useEffect(() => {
-    // For listen mode, stay with static version for better performance
-    if (props.mode === 'listen') {
+    if (props.mode === 'profile' || props.mode === 'listen') {
       return; // Don't upgrade to animated for listen mode
     }
 

@@ -1,11 +1,12 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
-import { isAdminEmail } from '@/lib/admin/roles';
 import { db, waitlistEntries } from '@/lib/db';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export const runtime = 'nodejs';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 interface AdminOverviewResponse {
   mrrUsd: number;
@@ -17,11 +18,17 @@ export async function GET() {
     const entitlements = await getCurrentUserEntitlements();
 
     if (!entitlements.isAuthenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
-    if (!isAdminEmail(entitlements.email)) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
     }
 
     const mrrData = await getStripeMrr();
@@ -32,12 +39,12 @@ export async function GET() {
       waitlistCount,
     };
 
-    return NextResponse.json(body);
+    return NextResponse.json(body, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error in admin overview API:', error);
     return NextResponse.json(
       { error: 'Failed to load admin overview' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

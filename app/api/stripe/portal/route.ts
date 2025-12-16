@@ -11,12 +11,17 @@ import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function POST() {
   try {
     // Check authentication
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Get user's billing information
@@ -25,7 +30,7 @@ export async function POST() {
       console.error('Failed to get user billing info:', billingResult.error);
       return NextResponse.json(
         { error: 'Failed to retrieve billing information' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -35,7 +40,7 @@ export async function POST() {
     if (!stripeCustomerId) {
       return NextResponse.json(
         { error: 'No billing account found' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -65,10 +70,13 @@ export async function POST() {
       url: session.url,
     });
 
-    return NextResponse.json({
-      sessionId: session.id,
-      url: session.url,
-    });
+    return NextResponse.json(
+      {
+        sessionId: session.id,
+        url: session.url,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('Error creating billing portal session:', error);
 
@@ -77,19 +85,22 @@ export async function POST() {
       if (error.message.includes('customer')) {
         return NextResponse.json(
           { error: 'Customer not found' },
-          { status: 404 }
+          { status: 404, headers: NO_STORE_HEADERS }
         );
       }
     }
 
     return NextResponse.json(
       { error: 'Failed to create billing portal session' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
 
 // Only allow POST requests
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }

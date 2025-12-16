@@ -33,7 +33,7 @@ export function DashboardActivityFeed({
   refreshSignal,
 }: {
   profileId: string;
-  range?: '7d' | '30d';
+  range?: '7d' | '30d' | '90d';
   refreshSignal?: number;
 }) {
   const gate = useFeatureGate(STATSIG_FLAGS.AUDIENCE_V2);

@@ -12,7 +12,6 @@ import {
   or,
 } from 'drizzle-orm';
 import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
-import { isAdminEmail } from '@/lib/admin/roles';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
@@ -372,7 +371,7 @@ export async function getDashboardData(): Promise<DashboardData> {
   noStore();
 
   const entitlements = await getCurrentUserEntitlements();
-  const isAdmin = isAdminEmail(entitlements.email);
+  const isAdmin = entitlements.isAdmin;
 
   const { userId } = await auth();
 
