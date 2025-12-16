@@ -146,24 +146,30 @@ interface Props {
 }
 
 export default async function ArtistPage({ params, searchParams }: Props) {
-  const { username } = await params;
-  const resolvedSearchParams = await searchParams;
+  const { username } = params;
   const { mode = 'profile', claim_token: claimTokenParam } =
-    resolvedSearchParams || {};
+    searchParams || {};
 
   if (claimTokenParam) {
     unstable_noStore();
   }
 
-  const cookieStore = await cookies();
+  const normalizedUsername = username.toLowerCase();
+
+  const cookieStorePromise = cookies();
+  const profileResultPromise = getProfileAndLinks(normalizedUsername);
+
+  const [cookieStore, profileResult] = await Promise.all([
+    cookieStorePromise,
+    profileResultPromise,
+  ]);
+
+  const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
+    profileResult;
   const isIdentified =
     cookieStore.get(AUDIENCE_IDENTIFIED_COOKIE)?.value === '1';
   const spotifyPreferred =
     cookieStore.get(AUDIENCE_SPOTIFY_PREFERRED_COOKIE)?.value === '1';
-
-  const normalizedUsername = username.toLowerCase();
-  const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
-    await getProfileAndLinks(normalizedUsername);
 
   if (status === 'error') {
     return (
@@ -193,11 +199,27 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   // Convert our profile data to the Artist type expected by components
   const artist = convertCreatorProfileToArtist(profile);
 
-  const dynamicOverrideEnabled = creatorClerkId
-    ? await checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+  const shouldCheckClaimToken =
+    typeof claimTokenParam === 'string' && claimTokenParam.length > 0;
+
+  const dynamicOverridePromise = creatorClerkId
+    ? checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
         userID: creatorClerkId,
       })
-    : false;
+    : Promise.resolve(false);
+
+  const claimTokenValidityPromise =
+    shouldCheckClaimToken && !profile.is_claimed
+      ? isClaimTokenValidForProfile({
+          username: normalizedUsername,
+          claimToken: claimTokenParam,
+        })
+      : Promise.resolve(false);
+
+  const [dynamicOverrideEnabled, isClaimTokenValid] = await Promise.all([
+    dynamicOverridePromise,
+    claimTokenValidityPromise,
+  ]);
 
   const dynamicEnabled = creatorIsPro || dynamicOverrideEnabled;
 
@@ -232,16 +254,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   // Determine if we should show the claim banner
   // Show only when a claim token is present in the URL and matches the profile's token
-  let showClaimBanner = false;
-  if (typeof claimTokenParam === 'string' && claimTokenParam.length > 0) {
-    const claimToken = claimTokenParam;
-    if (!profile.is_claimed) {
-      showClaimBanner = await isClaimTokenValidForProfile({
-        username: normalizedUsername,
-        claimToken,
-      });
-    }
-  }
+  const showClaimBanner = Boolean(isClaimTokenValid);
 
   return (
     <>
