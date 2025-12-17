@@ -1,5 +1,7 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
@@ -173,44 +175,63 @@ export const userSettings = pgTable('user_settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const creatorProfiles = pgTable('creator_profiles', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-  creatorType: creatorTypeEnum('creator_type').notNull(),
-  username: text('username').notNull(),
-  usernameNormalized: text('username_normalized').notNull(),
-  displayName: text('display_name'),
-  bio: text('bio'),
-  venmoHandle: text('venmo_handle'),
-  avatarUrl: text('avatar_url'),
-  spotifyUrl: text('spotify_url'),
-  appleMusicUrl: text('apple_music_url'),
-  youtubeUrl: text('youtube_url'),
-  spotifyId: text('spotify_id'),
-  isPublic: boolean('is_public').default(true),
-  isVerified: boolean('is_verified').default(false),
-  isFeatured: boolean('is_featured').default(false),
-  marketingOptOut: boolean('marketing_opt_out').default(false),
-  isClaimed: boolean('is_claimed').default(false),
-  claimToken: text('claim_token'),
-  claimedAt: timestamp('claimed_at'),
-  claimTokenExpiresAt: timestamp('claim_token_expires_at'),
-  claimedFromIp: text('claimed_from_ip'),
-  claimedUserAgent: text('claimed_user_agent'),
-  avatarLockedByUser: boolean('avatar_locked_by_user').default(false).notNull(),
-  displayNameLocked: boolean('display_name_locked').default(false).notNull(),
-  ingestionStatus: ingestionStatusEnum('ingestion_status')
-    .default('idle')
-    .notNull(),
-  lastIngestionError: text('last_ingestion_error'),
-  lastLoginAt: timestamp('last_login_at'),
-  profileViews: integer('profile_views').default(0),
-  onboardingCompletedAt: timestamp('onboarding_completed_at'),
-  settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
-  theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const creatorProfiles = pgTable(
+  'creator_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    creatorType: creatorTypeEnum('creator_type').notNull(),
+    username: text('username').notNull(),
+    usernameNormalized: text('username_normalized').notNull(),
+    displayName: text('display_name'),
+    bio: text('bio'),
+    venmoHandle: text('venmo_handle'),
+    avatarUrl: text('avatar_url'),
+    spotifyUrl: text('spotify_url'),
+    appleMusicUrl: text('apple_music_url'),
+    youtubeUrl: text('youtube_url'),
+    spotifyId: text('spotify_id'),
+    isPublic: boolean('is_public').default(true),
+    isVerified: boolean('is_verified').default(false),
+    isFeatured: boolean('is_featured').default(false),
+    marketingOptOut: boolean('marketing_opt_out').default(false),
+    isClaimed: boolean('is_claimed').default(false),
+    claimToken: text('claim_token'),
+    claimedAt: timestamp('claimed_at'),
+    claimTokenExpiresAt: timestamp('claim_token_expires_at'),
+    claimedFromIp: text('claimed_from_ip'),
+    claimedUserAgent: text('claimed_user_agent'),
+    avatarLockedByUser: boolean('avatar_locked_by_user')
+      .default(false)
+      .notNull(),
+    displayNameLocked: boolean('display_name_locked').default(false).notNull(),
+    ingestionStatus: ingestionStatusEnum('ingestion_status')
+      .default('idle')
+      .notNull(),
+    lastIngestionError: text('last_ingestion_error'),
+    lastLoginAt: timestamp('last_login_at'),
+    profileViews: integer('profile_views').default(0),
+    onboardingCompletedAt: timestamp('onboarding_completed_at'),
+    settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
+    theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_with_name')
+      .on(
+        table.isPublic,
+        table.isFeatured,
+        table.marketingOptOut,
+        table.displayName
+      )
+      .where(
+        drizzleSql`is_public = true AND is_featured = true AND marketing_opt_out = false`
+      ),
+  })
+);
 
 export const socialLinks = pgTable('social_links', {
   id: uuid('id').primaryKey().defaultRandom(),
