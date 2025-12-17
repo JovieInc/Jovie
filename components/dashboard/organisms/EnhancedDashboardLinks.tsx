@@ -93,6 +93,7 @@ function getPlatformCategory(platform: string): PlatformType {
   const socialPlatforms = new Set([
     'instagram',
     'twitter',
+    'snapchat',
     'tiktok',
     'youtube',
     'facebook',
@@ -165,6 +166,26 @@ function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
     if (left.platform.id !== right.platform.id) return false;
   }
   return true;
+}
+
+function areSuggestionListsEqual(
+  a: SuggestedLink[],
+  b: SuggestedLink[]
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+
+  const serialize = (list: SuggestedLink[]) =>
+    list
+      .map(
+        item =>
+          `${item.suggestionId ?? item.normalizedUrl}:${item.platform.id}:${item.normalizedUrl}`
+      )
+      .sort();
+
+  const aSig = serialize(a);
+  const bSig = serialize(b);
+  return aSig.every((value, index) => value === bSig[index]);
 }
 
 export function EnhancedDashboardLinks({
@@ -572,6 +593,8 @@ export function EnhancedDashboardLinks({
     linksRef.current = links;
   }, [links]);
 
+  const suggestionSyncAbortRef = useRef<AbortController | null>(null);
+
   const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
     convertDbLinksToSuggestions(suggestionInitialLinks || [])
   );
@@ -587,27 +610,79 @@ export function EnhancedDashboardLinks({
     );
   }, [convertDbLinksToSuggestions, suggestionInitialLinks]);
 
-  useEffect(() => {
-    if (!autoRefreshUntilMs) return;
+  const syncSuggestionsFromServer = useCallback(async () => {
+    if (!profileId || !suggestionsEnabled) return;
 
-    const intervalMs = 2000;
-    const intervalId = window.setInterval(() => {
-      if (!autoRefreshUntilMs) {
-        window.clearInterval(intervalId);
+    suggestionSyncAbortRef.current?.abort();
+    const controller = new AbortController();
+    suggestionSyncAbortRef.current = controller;
+
+    try {
+      const response = await fetch(
+        `/api/dashboard/social-links?profileId=${profileId}`,
+        { cache: 'no-store', signal: controller.signal }
+      );
+      if (!response.ok) return;
+
+      const data = (await response.json().catch(() => null)) as {
+        links?: ProfileSocialLink[];
+      } | null;
+
+      if (!data?.links) return;
+      const nextSuggestions = convertDbLinksToSuggestions(
+        data.links.filter(link => link.state === 'suggested')
+      );
+      setSuggestedLinks(prev =>
+        areSuggestionListsEqual(prev, nextSuggestions) ? prev : nextSuggestions
+      );
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      console.error('Failed to refresh suggestions', error);
+    } finally {
+      suggestionSyncAbortRef.current = null;
+    }
+  }, [convertDbLinksToSuggestions, profileId, suggestionsEnabled]);
+
+  const pollIntervalMs = useMemo(
+    () => (autoRefreshUntilMs ? 2000 : 4500),
+    [autoRefreshUntilMs]
+  );
+
+  useEffect(() => {
+    if (!profileId || !suggestionsEnabled) return;
+
+    let mounted = true;
+
+    const tick = async () => {
+      if (!mounted) return;
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      )
         return;
-      }
-      if (Date.now() >= autoRefreshUntilMs) {
+      await syncSuggestionsFromServer();
+      if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
         setAutoRefreshUntilMs(null);
-        window.clearInterval(intervalId);
-        return;
       }
-      router.refresh();
-    }, intervalMs);
+    };
+
+    void tick();
+    const intervalId = window.setInterval(() => {
+      void tick();
+    }, pollIntervalMs);
 
     return () => {
+      mounted = false;
       window.clearInterval(intervalId);
+      suggestionSyncAbortRef.current?.abort();
     };
-  }, [autoRefreshUntilMs, router]);
+  }, [
+    autoRefreshUntilMs,
+    pollIntervalMs,
+    profileId,
+    suggestionsEnabled,
+    syncSuggestionsFromServer,
+  ]);
 
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);
@@ -691,7 +766,7 @@ export function EnhancedDashboardLinks({
 
           if (hasIngestableLink) {
             setAutoRefreshUntilMs(Date.now() + 20000);
-            router.refresh();
+            void syncSuggestionsFromServer();
           }
         }
 
@@ -706,7 +781,7 @@ export function EnhancedDashboardLinks({
         toast.error(message || 'Failed to save links. Please try again.');
       }
     },
-    [profileId, router, suggestionsEnabled]
+    [profileId, suggestionsEnabled, syncSuggestionsFromServer]
   );
 
   const enqueueSave = useCallback(

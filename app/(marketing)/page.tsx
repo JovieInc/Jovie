@@ -1,3 +1,4 @@
+import { BadgeCheck, LayoutGrid, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -188,7 +189,7 @@ export default function HomePage() {
                       streams
                     </div>
                   </div>
-                  <p className='mt-2 text-xs sm:text-sm text-secondary-token leading-relaxed'>
+                  <p className='mt-2 ml-auto max-w-[26ch] text-xs sm:text-sm text-secondary-token leading-snug'>
                     Driven to emerging acts by the team behind Jovie.
                   </p>
                 </div>
@@ -196,6 +197,10 @@ export default function HomePage() {
             </div>
           </Container>
         </section>
+        <ActionDrivenProfileSection />
+
+        {/* 2. Social proof (team credibility) */}
+        <NewSocialProofSection />
 
         <section className='relative pb-14 sm:pb-16 bg-base overflow-hidden'>
           <div className='absolute inset-0 -z-10'>
@@ -215,9 +220,13 @@ export default function HomePage() {
                         <div className='absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.06),transparent_40%)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_40%)]' />
                       </div>
 
+                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
+                        <Zap className='h-4 w-4' aria-hidden='true' />
+                      </div>
+
                       <div className='relative flex items-end justify-between gap-6'>
                         <h3 className='text-lg font-semibold leading-tight text-primary-token'>
-                          Purpose-built for conversion routing
+                          Blazing fast profiles
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
                           +
@@ -227,8 +236,8 @@ export default function HomePage() {
                   </summary>
                   <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
                     <p className='text-sm leading-relaxed text-secondary-token'>
-                      Smart routing and app deep links reduce friction so fans
-                      get to the right destination—fast.
+                      Pages load instantly so fans tap, buy, and subscribe
+                      without friction.
                     </p>
                   </div>
                 </details>
@@ -241,9 +250,13 @@ export default function HomePage() {
                         <div className='absolute inset-0 bg-[linear-gradient(135deg,transparent_10%,rgba(0,0,0,0.06))] dark:bg-[linear-gradient(135deg,transparent_10%,rgba(255,255,255,0.06))]' />
                       </div>
 
+                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
+                        <LayoutGrid className='h-4 w-4' aria-hidden='true' />
+                      </div>
+
                       <div className='relative flex items-end justify-between gap-6'>
                         <h3 className='text-lg font-semibold leading-tight text-primary-token'>
-                          Capture fan identity
+                          Opinionated design
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
                           +
@@ -253,8 +266,8 @@ export default function HomePage() {
                   </summary>
                   <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
                     <p className='text-sm leading-relaxed text-secondary-token'>
-                      Collect contact details and build an owned audience you
-                      can reach beyond the algorithm.
+                      A clean, high-converting layout that looks premium out of
+                      the box.
                     </p>
                   </div>
                 </details>
@@ -267,9 +280,13 @@ export default function HomePage() {
                         <div className='absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.06),transparent_45%)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_45%)]' />
                       </div>
 
+                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
+                        <BadgeCheck className='h-4 w-4' aria-hidden='true' />
+                      </div>
+
                       <div className='relative flex items-end justify-between gap-6'>
                         <h3 className='text-lg font-semibold leading-tight text-primary-token'>
-                          Crafted to optimize over time
+                          Zero setup
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
                           +
@@ -279,8 +296,8 @@ export default function HomePage() {
                   </summary>
                   <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
                     <p className='text-sm leading-relaxed text-secondary-token'>
-                      Automatic A/B testing by persona helps your profile keep
-                      getting better without constant tweaks.
+                      Claim your Jovie profile and start selling in minutes—no
+                      code, no templates.
                     </p>
                   </div>
                 </details>
@@ -288,11 +305,6 @@ export default function HomePage() {
             </div>
           </Container>
         </section>
-
-        <ActionDrivenProfileSection />
-
-        {/* 2. Social proof (team credibility) */}
-        <NewSocialProofSection />
 
         {/* 4. How it works (3 steps) */}
         <NewHowItWorks />
