@@ -51,9 +51,7 @@ export async function POST(request: NextRequest) {
 
           return { ok: true as const };
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : 'Unknown error';
-          await handleIngestionJobFailure(tx, job, message);
+          await handleIngestionJobFailure(tx, job, error);
 
           logger.error('Ingestion job failed', {
             jobId: job.id,

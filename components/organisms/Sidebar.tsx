@@ -17,15 +17,15 @@ import { Input } from '@/components/atoms/Input';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
-
-const SIDEBAR_COOKIE_NAME = 'sidebar:state';
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+import {
+  useSidebarCookieState,
+  useSidebarKeyboardShortcut,
+} from './sidebar-hooks';
 
 type SidebarContext = {
   state: 'open' | 'closed';
   open: boolean;
-  setOpen: (open: boolean) => void;
+  setOpen: (open: boolean | ((value: boolean) => boolean)) => void;
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
@@ -65,46 +65,18 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
-
-    // This is the internal state of the sidebar.
-    // We use openProp and setOpenProp for controlled component.
-    const [_open, _setOpen] = React.useState(defaultOpen);
-    const open = openProp ?? _open;
-    const setOpen = React.useCallback(
-      (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === 'function' ? value(open) : value;
-        if (setOpenProp) {
-          setOpenProp(openState);
-        } else {
-          _setOpen(openState);
-        }
-
-        // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
-      },
-      [setOpenProp, open]
-    );
+    const { open, setOpen } = useSidebarCookieState({
+      defaultOpen,
+      openProp,
+      onOpenChange: setOpenProp,
+    });
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
       return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
     }, [isMobile, setOpen, setOpenMobile]);
 
-    // Adds a keyboard shortcut to toggle the sidebar.
-    React.useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (
-          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-          (event.metaKey || event.ctrlKey)
-        ) {
-          event.preventDefault();
-          toggleSidebar();
-        }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [toggleSidebar]);
+    useSidebarKeyboardShortcut(toggleSidebar);
 
     const state = open ? 'open' : 'closed';
 
@@ -249,6 +221,13 @@ const SidebarTrigger = React.forwardRef<
   }
 >(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar();
+  const handleClick = React.useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(event);
+      toggleSidebar();
+    },
+    [onClick, toggleSidebar]
+  );
 
   return (
     <Button
@@ -256,11 +235,11 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar='trigger'
       variant='ghost'
       size='icon'
-      className={cn('h-7 w-7', className)}
-      onClick={event => {
-        onClick?.(event);
-        toggleSidebar();
-      }}
+      className={cn(
+        'h-7 w-7 outline-none ring-sidebar-ring focus-visible:ring-2',
+        className
+      )}
+      onClick={handleClick}
       {...props}
     >
       <PanelLeft className='h-4 w-4' />
@@ -282,9 +261,9 @@ const SidebarRail = React.forwardRef<
       data-sidebar='rail'
       aria-label='Toggle Sidebar'
       aria-pressed={state === 'open'}
-      tabIndex={-1}
       onClick={toggleSidebar}
       title='Toggle Sidebar'
+      type='button'
       className={cn(
         'absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
@@ -292,6 +271,7 @@ const SidebarRail = React.forwardRef<
         'group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar',
         'in-data-[side=left][data-collapsible=offcanvas]:-right-2',
         'in-data-[side=right][data-collapsible=offcanvas]:-left-2',
+        'outline-none ring-sidebar-ring focus-visible:ring-2 focus-visible:ring-offset-0',
         className
       )}
       {...props}
@@ -504,7 +484,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
-  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-2.5 py-1.5 text-left text-[13px] tracking-[0.03em] font-normal leading-5 outline-none transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
+  'peer/menu-button flex w-full items-center gap-1.5 overflow-hidden rounded-md px-2.5 py-1.5 text-left text-[13px] tracking-[0.03em] font-normal leading-5 outline-none ring-sidebar-ring transition-all duration-150 ease-out text-sidebar-muted hover:text-sidebar-foreground focus-visible:ring-2 data-[active=true]:text-sidebar-accent-foreground hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[state=open]:hover:bg-sidebar-accent active:duration-50 active:ease-linear group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-150 group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-muted [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-accent-foreground',
   {
     variants: {
       variant: {

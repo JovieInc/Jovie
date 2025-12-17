@@ -16,6 +16,7 @@ import {
 const LAYLO_CONFIG = {
   platformId: 'laylo',
   platformName: 'Laylo',
+  canonicalHost: 'laylo.com',
   validHosts: new Set(['laylo.com', 'www.laylo.com']),
   defaultTimeoutMs: 10000,
 } as const;
