@@ -17,6 +17,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
@@ -658,6 +659,84 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     []
   );
 
+  const formatSuggestionIdentity = useCallback(
+    (
+      link: Pick<DetectedLink, 'platform' | 'normalizedUrl' | 'originalUrl'>
+    ) => {
+      const normalizedUrl = link.normalizedUrl || link.originalUrl || '';
+      if (!normalizedUrl) return '';
+
+      const canonical = canonicalIdentity({
+        platform: link.platform,
+        normalizedUrl,
+      });
+      const [platformId, ...identityParts] = canonical.split(':');
+      const primaryIdentity = identityParts[0];
+      const secondaryIdentity = identityParts[1];
+
+      const identityFromCanonical = (() => {
+        const handlePlatforms = [
+          'instagram',
+          'twitter',
+          'tiktok',
+          'facebook',
+          'twitch',
+          'linkedin',
+          'soundcloud',
+          'bandcamp',
+          'linktree',
+        ];
+
+        if (handlePlatforms.includes(platformId) && primaryIdentity) {
+          return `@${primaryIdentity}`;
+        }
+
+        if (platformId === 'youtube') {
+          if (primaryIdentity === 'channel' && secondaryIdentity) {
+            return `channel/${secondaryIdentity}`;
+          }
+          if (primaryIdentity === 'user' && secondaryIdentity) {
+            return `user/${secondaryIdentity}`;
+          }
+          if (primaryIdentity === 'legacy' && secondaryIdentity) {
+            return secondaryIdentity;
+          }
+          if (primaryIdentity) {
+            return `@${primaryIdentity}`;
+          }
+        }
+
+        if (primaryIdentity) {
+          return primaryIdentity.replace(/^@/, '');
+        }
+
+        return null;
+      })();
+
+      if (identityFromCanonical) {
+        return identityFromCanonical;
+      }
+
+      try {
+        const url = new URL(normalizedUrl);
+        const host = url.hostname.replace(/^www\./, '');
+        const pathSegments = url.pathname.split('/').filter(Boolean);
+        const firstSegment = pathSegments[0];
+        if (firstSegment) {
+          const cleaned = firstSegment.replace(/^@/, '');
+          if (/^[A-Za-z0-9._-]+$/.test(cleaned) && !cleaned.includes('.')) {
+            return `@${cleaned}`;
+          }
+          return cleaned;
+        }
+        return host;
+      } catch {
+        return '';
+      }
+    },
+    []
+  );
+
   return (
     <section
       className={cn('space-y-2', className)}
@@ -766,54 +845,58 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           ) : null}
 
           {suggestionsEnabled && pendingSuggestions.length > 0 && (
-            <CategorySection title='SUGGESTED' className='space-y-0'>
-              {pendingSuggestions.map(suggestion => {
-                const id = `suggestion::${suggestionKey(suggestion)}`;
-                const rawConfidence = (suggestion as { confidence?: number })
-                  .confidence;
-                const confidence: number | null =
-                  typeof rawConfidence === 'number' ? rawConfidence : null;
-                const badgeText =
-                  typeof confidence === 'number'
-                    ? `Suggested • ${Math.round(confidence * 100)}%`
-                    : 'Suggested';
-
-                return (
-                  <LinkPill
-                    key={suggestionKey(suggestion)}
-                    platformIcon={suggestion.platform.icon}
-                    platformName={suggestion.platform.name}
-                    primaryText={suggestion.platform.name}
-                    secondaryText={buildSecondaryText(suggestion)}
-                    state='connected'
-                    badgeText={badgeText}
-                    menuId={id}
-                    isMenuOpen={openMenuId === id}
-                    onMenuOpenChange={next =>
-                      handleAnyMenuOpen(next ? id : null)
-                    }
-                    menuItems={[
-                      {
-                        id: 'add',
-                        label: 'Add',
-                        iconName: 'Plus',
-                        onSelect: () => {
-                          void handleAcceptSuggestionClick(suggestion);
-                        },
-                      },
-                      {
-                        id: 'dismiss',
-                        label: 'Dismiss',
-                        iconName: 'X',
-                        onSelect: () => {
-                          void handleDismissSuggestionClick(suggestion);
-                        },
-                      },
-                    ]}
-                  />
-                );
-              })}
-            </CategorySection>
+            <div className='rounded-xl border border-subtle bg-surface-1/70 p-3 shadow-sm'>
+              <div className='flex items-center justify-between gap-2'>
+                <span className='text-[11px] font-semibold uppercase tracking-[0.08em] text-secondary-token/80'>
+                  Ingested suggestions
+                </span>
+                <span className='text-[11px] font-medium text-tertiary-token'>
+                  Tap + to add, or dismiss to hide.
+                </span>
+              </div>
+              <div className='mt-2 flex flex-wrap gap-2'>
+                {pendingSuggestions.map(suggestion => {
+                  const identity = formatSuggestionIdentity(suggestion);
+                  return (
+                    <PlatformPill
+                      key={suggestionKey(suggestion)}
+                      platformIcon={suggestion.platform.icon}
+                      platformName={suggestion.platform.name}
+                      primaryText={suggestion.platform.name}
+                      secondaryText={identity || undefined}
+                      state='ready'
+                      badgeText='Suggested'
+                      trailing={
+                        <div className='flex items-center gap-1'>
+                          <Button
+                            size='icon'
+                            variant='ghost'
+                            className='h-7 w-7 rounded-full border border-subtle bg-surface-2 text-primary-token hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                            onClick={() => {
+                              void handleAcceptSuggestionClick(suggestion);
+                            }}
+                            aria-label={`Add ${suggestion.platform.name} link`}
+                          >
+                            <Icon name='Plus' className='h-4 w-4' />
+                          </Button>
+                          <Button
+                            size='icon'
+                            variant='ghost'
+                            className='h-7 w-7 rounded-full border border-subtle bg-surface-2 text-secondary-token hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
+                            onClick={() => {
+                              void handleDismissSuggestionClick(suggestion);
+                            }}
+                            aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
+                          >
+                            <Icon name='X' className='h-4 w-4' />
+                          </Button>
+                        </div>
+                      }
+                    />
+                  );
+                })}
+              </div>
+            </div>
           )}
         </div>
       </div>
