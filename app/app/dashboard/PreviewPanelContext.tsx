@@ -121,3 +121,7 @@ export function usePreviewPanel(): PreviewPanelContextValue {
   }
   return context;
 }
+
+export function usePreviewPanelContext(): PreviewPanelContextValue | null {
+  return useContext(PreviewPanelContext);
+}
