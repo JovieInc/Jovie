@@ -1,7 +1,7 @@
 'use client';
 
 import { useFeatureGate } from '@statsig/react-bindings';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
@@ -185,7 +185,7 @@ export function AnimatedArtistPage({
   const tippingEnabled = tippingGate.value;
 
   // Page-level animation variants with Apple-style easing
-  const pageVariants = {
+  const pageVariants: Variants = {
     initial: {
       opacity: 0,
       scale: 0.98,
@@ -237,7 +237,7 @@ export function AnimatedArtistPage({
           <AnimatePresence mode='wait'>
             <motion.div
               key={mode} // Keep key only on the content that should change
-              variants={prefersReducedMotion ? {} : pageVariants}
+              variants={prefersReducedMotion ? undefined : pageVariants}
               initial={prefersReducedMotion ? { opacity: 1 } : 'initial'}
               animate={prefersReducedMotion ? { opacity: 1 } : 'animate'}
               exit={prefersReducedMotion ? { opacity: 0 } : 'exit'}

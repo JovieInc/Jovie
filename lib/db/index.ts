@@ -2,8 +2,10 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
-import ws from 'ws';
 import { env } from '@/lib/env';
+
+type WebSocketConstructor = typeof WebSocket;
+
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
 
@@ -14,12 +16,15 @@ declare const EdgeRuntime: string | undefined;
 const isEdgeRuntime = typeof EdgeRuntime !== 'undefined';
 const isWebSocketAvailable = typeof WebSocket !== 'undefined';
 
+let nodeWebSocketConstructor: WebSocketConstructor | undefined;
+
 // Configure WebSocket for Node runtimes only, preferring the built-in WebSocket
 // to avoid bundling issues with `ws` in serverless/preview environments.
 const webSocketConstructor = !isEdgeRuntime
   ? isWebSocketAvailable
-    ? (WebSocket as unknown as typeof ws)
-    : ws
+    ? (WebSocket as unknown as WebSocketConstructor)
+    : (nodeWebSocketConstructor =
+        nodeWebSocketConstructor || (require('ws') as WebSocketConstructor))
   : undefined;
 
 if (webSocketConstructor) {

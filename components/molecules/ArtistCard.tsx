@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 import Link from 'next/link';
 import { Avatar } from '@/components/atoms/Avatar';
 
@@ -28,39 +28,33 @@ export function ArtistCard({
   // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
 
-  // Adjust animation settings based on motion preference
-  const containerAnimationProps = prefersReducedMotion
-    ? {
-        // Minimal animations for reduced motion preference
-        whileHover: { y: -1 },
-        whileFocus: { y: -1 },
-        transition: { duration: 0.1 },
-      }
+  const containerWhileHover: MotionProps['whileHover'] = prefersReducedMotion
+    ? { y: -1 }
+    : { y: -3 };
+
+  const containerWhileFocus: MotionProps['whileFocus'] = prefersReducedMotion
+    ? { y: -1 }
+    : { y: -3 };
+
+  const containerTransition: MotionProps['transition'] = prefersReducedMotion
+    ? { duration: 0.1 }
     : {
-        // Full animations for normal motion preference - more subtle lift
-        whileHover: { y: -3 },
-        whileFocus: { y: -3 },
-        transition: {
-          type: 'spring',
-          stiffness: 300,
-          damping: 20,
-          mass: 0.7,
-        },
+        type: 'spring',
+        stiffness: 300,
+        damping: 20,
+        mass: 0.7,
       };
 
-  // Avatar animation props
-  const avatarAnimationProps = prefersReducedMotion
-    ? {
-        whileHover: { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-        transition: { duration: 0.1 },
-      }
+  const avatarWhileHover: MotionProps['whileHover'] = prefersReducedMotion
+    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
     : {
-        whileHover: {
-          boxShadow:
-            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        },
-        transition: { type: 'spring', stiffness: 400, damping: 17 },
+        boxShadow:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
       };
+
+  const avatarTransition: MotionProps['transition'] = prefersReducedMotion
+    ? { duration: 0.1 }
+    : { type: 'spring', stiffness: 400, damping: 17 };
 
   const avatarSize = (
     {
@@ -73,8 +67,10 @@ export function ArtistCard({
 
   return (
     <motion.div
-      {...containerAnimationProps}
       initial={{ scale: 1, y: 0 }}
+      whileHover={containerWhileHover}
+      whileFocus={containerWhileFocus}
+      transition={containerTransition}
       className={className}
     >
       <Link
@@ -84,7 +80,10 @@ export function ArtistCard({
         className='group block cursor-pointer'
       >
         <div className='text-center'>
-          <motion.div {...avatarAnimationProps}>
+          <motion.div
+            whileHover={avatarWhileHover}
+            transition={avatarTransition}
+          >
             <Avatar
               src={src}
               alt={alt ?? name}
