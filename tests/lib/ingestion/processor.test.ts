@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  calculateBackoff,
+  determineJobFailure,
+} from '@/lib/ingestion/processor';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 
 // Mock the strategies
@@ -13,6 +17,10 @@ vi.mock('@/lib/ingestion/strategies/beacons', () => ({
 }));
 
 describe('Ingestion Processor', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('ExtractionError handling', () => {
     it('creates error with correct properties', () => {
       const error = new ExtractionError('Test error', 'NOT_FOUND', 404);
@@ -75,6 +83,38 @@ describe('Ingestion Processor', () => {
         );
         expect(error.statusCode).toBe(expectedStatus);
       }
+    });
+  });
+
+  describe('Retry scheduling', () => {
+    it('uses rate-limit aware backoff with broader jitter window', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      const transientDelay = calculateBackoff(1);
+      const rateLimitedDelay = calculateBackoff(1, 'rate_limited');
+
+      expect(transientDelay).toBeGreaterThanOrEqual(5000);
+      expect(transientDelay).toBeLessThan(6000);
+
+      expect(rateLimitedDelay).toBeGreaterThanOrEqual(30000);
+      expect(rateLimitedDelay).toBeLessThan(33000);
+    });
+
+    it('marks rate-limited errors as retryable with dedicated reason', () => {
+      const rateLimitedError = new ExtractionError(
+        'Rate limited by platform',
+        'RATE_LIMITED',
+        429
+      );
+
+      const failure = determineJobFailure(rateLimitedError);
+
+      expect(failure.reason).toBe('rate_limited');
+      expect(failure.message).toContain('Rate limited');
+
+      const generic = determineJobFailure(new Error('Network flake'));
+      expect(generic.reason).toBe('transient');
+      expect(generic.message).toBe('Network flake');
     });
   });
 });
