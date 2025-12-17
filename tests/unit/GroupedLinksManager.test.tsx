@@ -313,7 +313,7 @@ describeFn('GroupedLinksManager', () => {
 
     renderWithProviders(
       <GroupedLinksManager
-        initialLinks={[]}
+        initialLinks={[] as DetectedLink[]}
         suggestedLinks={[
           {
             ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
@@ -341,7 +341,7 @@ describeFn('GroupedLinksManager', () => {
 
     renderWithProviders(
       <GroupedLinksManager
-        initialLinks={[]}
+        initialLinks={[] as DetectedLink[]}
         suggestedLinks={[
           {
             ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
