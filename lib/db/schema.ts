@@ -1,16 +1,15 @@
 import {
   boolean,
+  index,
   integer,
   jsonb,
   numeric,
-  index,
   pgEnum,
   pgTable,
   text,
   timestamp,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { sql } from 'drizzle-orm';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 
 // Enums
@@ -179,7 +178,9 @@ export const creatorProfiles = pgTable(
   'creator_profiles',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     creatorType: creatorTypeEnum('creator_type').notNull(),
     username: text('username').notNull(),
     usernameNormalized: text('username_normalized').notNull(),
@@ -201,7 +202,9 @@ export const creatorProfiles = pgTable(
     claimTokenExpiresAt: timestamp('claim_token_expires_at'),
     claimedFromIp: text('claimed_from_ip'),
     claimedUserAgent: text('claimed_user_agent'),
-    avatarLockedByUser: boolean('avatar_locked_by_user').default(false).notNull(),
+    avatarLockedByUser: boolean('avatar_locked_by_user')
+      .default(false)
+      .notNull(),
     displayNameLocked: boolean('display_name_locked').default(false).notNull(),
     ingestionStatus: ingestionStatusEnum('ingestion_status')
       .default('idle')
@@ -217,7 +220,12 @@ export const creatorProfiles = pgTable(
   },
   table => ({
     featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_with_name')
-      .on(table.isPublic, table.isFeatured, table.marketingOptOut, table.displayName)
+      .on(
+        table.isPublic,
+        table.isFeatured,
+        table.marketingOptOut,
+        table.displayName
+      )
       .where(
         sql`is_public = true AND is_featured = true AND marketing_opt_out = false`
       ),

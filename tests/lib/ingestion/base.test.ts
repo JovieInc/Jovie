@@ -257,6 +257,14 @@ describe('Base Extraction Utilities', () => {
       const result = validatePlatformUrl('https://test.com/@username', config);
       expect(result.handle).toBe('username');
     });
+
+    it('preserves the matched host instead of relying on set iteration order', () => {
+      const result = validatePlatformUrl(
+        'https://www.test.com/username',
+        config
+      );
+      expect(result.normalized).toBe('https://test.com/username');
+    });
   });
 
   describe('stripTrackingParams', () => {

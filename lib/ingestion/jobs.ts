@@ -9,6 +9,7 @@ import {
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
 import { isLayloUrl } from './strategies/laylo';
 import { isLinktreeUrl } from './strategies/linktree';
+import { isStanUrl, validateStanUrl } from './strategies/stan';
 import {
   isYouTubeChannelUrl,
   validateYouTubeChannelUrl,
@@ -281,6 +282,75 @@ export async function enqueueLayloIngestionJob(params: {
     .insert(ingestionJobs)
     .values({
       jobType: 'import_laylo',
+      payload,
+      dedupKey: payload.dedupKey,
+      status: 'pending',
+      runAt: new Date(),
+      priority: 0,
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
+
+const stanJobPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string(),
+  depth: z.number().int().min(0).max(3).default(0),
+});
+
+export async function enqueueStanIngestionJob(params: {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth?: number;
+}): Promise<string | null> {
+  const validated = validateStanUrl(params.sourceUrl);
+  if (!validated || !isStanUrl(validated)) {
+    return null;
+  }
+
+  const normalizedSource = normalizeUrl(validated);
+  const detected = detectPlatform(normalizedSource);
+  const dedupKey = canonicalIdentity({
+    platform: detected.platform,
+    normalizedUrl: detected.normalizedUrl,
+  });
+
+  const payload = stanJobPayloadSchema.parse({
+    creatorProfileId: params.creatorProfileId,
+    sourceUrl: detected.normalizedUrl,
+    dedupKey,
+    depth: params.depth ?? 0,
+  });
+
+  const existing = await db
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'import_stan'),
+        drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`,
+        or(
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          and(
+            isNull(ingestionJobs.dedupKey),
+            drizzleSql`${ingestionJobs.payload} ->> 'dedupKey' = ${payload.dedupKey}`
+          )
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await db
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'import_stan',
       payload,
       dedupKey: payload.dedupKey,
       status: 'pending',

@@ -21,6 +21,7 @@ import {
 } from './strategies/beacons';
 import {
   extractLaylo,
+  extractLayloHandle,
   fetchLayloProfile,
   validateLayloUrl,
 } from './strategies/laylo';
@@ -29,6 +30,11 @@ import {
   fetchLinktreeDocument,
   validateLinktreeUrl,
 } from './strategies/linktree';
+import {
+  extractStan,
+  fetchStanDocument,
+  validateStanUrl,
+} from './strategies/stan';
 import {
   extractYouTube,
   fetchYouTubeAboutDocument,
@@ -62,6 +68,10 @@ function getCreatorProfileIdFromJob(
     }
     case 'import_laylo': {
       const parsed = layloPayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
+    case 'import_stan': {
+      const parsed = stanPayloadSchema.safeParse(job.payload);
       return parsed.success ? parsed.data.creatorProfileId : null;
     }
     case 'import_youtube': {
@@ -114,6 +124,13 @@ const layloPayloadSchema = z.object({
   depth: z.number().int().min(0).max(3).default(0),
 });
 
+const stanPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  sourceUrl: z.string().url(),
+  dedupKey: z.string().optional(),
+  depth: z.number().int().min(0).max(3).default(0),
+});
+
 const youtubePayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   sourceUrl: z.string().url(),
@@ -133,13 +150,15 @@ type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons';
+  | 'import_beacons'
+  | 'import_stan';
 
 const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_linktree: 3,
   import_laylo: 3,
   import_youtube: 1,
   import_beacons: 3,
+  import_stan: 3,
 };
 
 async function enqueueIngestionJobTx(params: {
@@ -266,6 +285,18 @@ export async function enqueueFollowupIngestionJobs(params: {
         jobType: 'import_laylo',
         creatorProfileId,
         sourceUrl: validatedLaylo,
+        depth: nextDepth,
+      });
+      continue;
+    }
+
+    const validatedStan = validateStanUrl(url);
+    if (validatedStan) {
+      await enqueueIngestionJobTx({
+        tx,
+        jobType: 'import_stan',
+        creatorProfileId,
+        sourceUrl: validatedStan,
         depth: nextDepth,
       });
     }
@@ -426,7 +457,7 @@ export async function normalizeAndMergeExtraction(
         id: '',
         creatorProfileId: profile.id,
         platform: detected.platform.id,
-        platformType: detected.platform.id,
+        platformType: detected.platform.category,
         url: detected.normalizedUrl,
         displayText: link.title,
         sortOrder: sortStart + inserted,
@@ -740,6 +771,8 @@ export async function processJob(
       return processLinktreeJob(tx, job.payload);
     case 'import_laylo':
       return processLayloJob(tx, job.payload);
+    case 'import_stan':
+      return processStanJob(tx, job.payload);
     case 'import_youtube':
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
@@ -897,9 +930,13 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
     .where(eq(creatorProfiles.id, profile.id));
 
   try {
-    const { profile: layloProfile, user } = await fetchLayloProfile(
-      profile.usernameNormalized ?? ''
-    );
+    const layloHandle = extractLayloHandle(parsed.sourceUrl);
+    if (!layloHandle) {
+      throw new Error('Invalid Laylo URL in job payload');
+    }
+
+    const { profile: layloProfile, user } =
+      await fetchLayloProfile(layloHandle);
     const extraction = extractLaylo(layloProfile, user);
     const result = await normalizeAndMergeExtraction(tx, profile, extraction);
 
@@ -922,6 +959,68 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Laylo ingestion failed';
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+async function processStanJob(tx: DbType, jobPayload: unknown) {
+  const parsed = stanPayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const html = await fetchStanDocument(parsed.sourceUrl);
+    const extraction = extractStan(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Stan ingestion failed';
     await tx
       .update(creatorProfiles)
       .set({

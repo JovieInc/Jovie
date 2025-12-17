@@ -175,6 +175,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: '6B7280',
     placeholder: 'https://laylo.com/username',
   },
+  stan: {
+    id: 'stan',
+    name: 'Stan',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://stan.me/username',
+  },
   beacons: {
     id: 'beacons',
     name: 'Beacons',
@@ -301,6 +309,8 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
+  { pattern: /(?:www\.)?stan\.(?:me|store)/i, platformId: 'stan' },
+  { pattern: /(?:www\.)?stanwith\.me/i, platformId: 'stan' },
   { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
   { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },

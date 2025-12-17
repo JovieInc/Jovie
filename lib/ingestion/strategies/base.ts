@@ -606,9 +606,12 @@ export function validatePlatformUrl(
       return { valid: false, normalized: null, handle: null };
     }
 
+    const canonicalHost = Array.from(config.validHosts).sort()[0];
+    const normalizedHost = canonicalHost ?? parsed.hostname.toLowerCase();
+
     return {
       valid: true,
-      normalized: `https://${Array.from(config.validHosts)[0]}/${rawHandle}`,
+      normalized: `https://${normalizedHost}/${rawHandle}`,
       handle: rawHandle,
     };
   } catch {
