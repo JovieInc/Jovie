@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -227,7 +228,7 @@ export const creatorProfiles = pgTable(
         table.displayName
       )
       .where(
-        sql`is_public = true AND is_featured = true AND marketing_opt_out = false`
+        drizzleSql`is_public = true AND is_featured = true AND marketing_opt_out = false`
       ),
   })
 );
