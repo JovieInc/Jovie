@@ -10,6 +10,7 @@ import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Plus, X } from 'lucide-react';
 import React, {
   useCallback,
   useEffect,
@@ -20,6 +21,7 @@ import React, {
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
+import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 // getBrandIconStyles reserved for future brand-colored icons
 import '@/lib/utils/color';
@@ -430,6 +432,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     suggestion: (typeof pendingSuggestions)[number]
   ) {
     if (!onAcceptSuggestion) return;
+    track('dashboard_link_suggestion_accept', {
+      platform: suggestion.platform.id,
+      sourcePlatform: suggestion.sourcePlatform ?? undefined,
+      sourceType: suggestion.sourceType ?? undefined,
+      confidence: suggestion.confidence ?? undefined,
+      hasIdentity: Boolean(suggestionIdentity(suggestion)),
+    });
     const accepted = await onAcceptSuggestion(suggestion);
     setPendingSuggestions(prev =>
       prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
@@ -463,6 +472,13 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   async function handleDismissSuggestionClick(
     suggestion: (typeof pendingSuggestions)[number]
   ) {
+    track('dashboard_link_suggestion_dismiss', {
+      platform: suggestion.platform.id,
+      sourcePlatform: suggestion.sourcePlatform ?? undefined,
+      sourceType: suggestion.sourceType ?? undefined,
+      confidence: suggestion.confidence ?? undefined,
+      hasIdentity: Boolean(suggestionIdentity(suggestion)),
+    });
     if (onDismissSuggestion) {
       await onDismissSuggestion(suggestion);
     }
@@ -652,8 +668,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   const buildSecondaryText = useCallback(
     (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
-      const identity = canonicalIdentity(link);
-      return identity.startsWith('@') ? identity : undefined;
+      return suggestionIdentity(link);
     },
     []
   );
@@ -745,6 +760,56 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             clearSignal={clearSignal}
           />
 
+          {suggestionsEnabled && pendingSuggestions.length > 0 ? (
+            <div
+              className='rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5'
+              aria-label='Ingested link suggestions'
+            >
+              <div className='flex flex-wrap items-center justify-center gap-2'>
+                {pendingSuggestions.map(suggestion => {
+                  const identity =
+                    buildSecondaryText(suggestion) ||
+                    compactUrlDisplay(
+                      suggestion.platform.id,
+                      suggestion.normalizedUrl
+                    );
+                  const pillText = identity
+                    ? `${suggestion.platform.name} • ${identity}`
+                    : suggestion.platform.name;
+                  return (
+                    <PlatformPill
+                      key={suggestionKey(suggestion)}
+                      platformIcon={suggestion.platform.icon}
+                      platformName={suggestion.platform.name}
+                      primaryText={pillText}
+                      badgeText='Suggested'
+                      state='ready'
+                      suffix={<Plus className='h-3.5 w-3.5' aria-hidden />}
+                      trailing={
+                        <button
+                          type='button'
+                          aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
+                          className='grid h-6 w-6 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
+                          onClick={event => {
+                            event.stopPropagation();
+                            void handleDismissSuggestionClick(suggestion);
+                          }}
+                        >
+                          <X className='h-3.5 w-3.5' aria-hidden />
+                        </button>
+                      }
+                      onClick={() => {
+                        void handleAcceptSuggestionClick(suggestion);
+                      }}
+                      className='pr-1.5'
+                      testId='ingested-suggestion-pill'
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {suggestionPills.length > 0 ? (
             <div
               className='flex flex-wrap items-center justify-center gap-2'
@@ -764,57 +829,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               ))}
             </div>
           ) : null}
-
-          {suggestionsEnabled && pendingSuggestions.length > 0 && (
-            <CategorySection title='SUGGESTED' className='space-y-0'>
-              {pendingSuggestions.map(suggestion => {
-                const id = `suggestion::${suggestionKey(suggestion)}`;
-                const rawConfidence = (suggestion as { confidence?: number })
-                  .confidence;
-                const confidence: number | null =
-                  typeof rawConfidence === 'number' ? rawConfidence : null;
-                const badgeText =
-                  typeof confidence === 'number'
-                    ? `Suggested • ${Math.round(confidence * 100)}%`
-                    : 'Suggested';
-
-                return (
-                  <LinkPill
-                    key={suggestionKey(suggestion)}
-                    platformIcon={suggestion.platform.icon}
-                    platformName={suggestion.platform.name}
-                    primaryText={suggestion.platform.name}
-                    secondaryText={buildSecondaryText(suggestion)}
-                    state='connected'
-                    badgeText={badgeText}
-                    menuId={id}
-                    isMenuOpen={openMenuId === id}
-                    onMenuOpenChange={next =>
-                      handleAnyMenuOpen(next ? id : null)
-                    }
-                    menuItems={[
-                      {
-                        id: 'add',
-                        label: 'Add',
-                        iconName: 'Plus',
-                        onSelect: () => {
-                          void handleAcceptSuggestionClick(suggestion);
-                        },
-                      },
-                      {
-                        id: 'dismiss',
-                        label: 'Dismiss',
-                        iconName: 'X',
-                        onSelect: () => {
-                          void handleDismissSuggestionClick(suggestion);
-                        },
-                      },
-                    ]}
-                  />
-                );
-              })}
-            </CategorySection>
-          )}
         </div>
       </div>
 
@@ -1204,4 +1218,11 @@ function compactUrlDisplay(platformId: string, url: string): string {
     const beforePath = withoutScheme.split('/')[0];
     return beforePath || trimmed;
   }
+}
+
+function suggestionIdentity(
+  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
+): string | undefined {
+  const identity = canonicalIdentity(link);
+  return identity.startsWith('@') ? identity : undefined;
 }
