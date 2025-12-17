@@ -1,6 +1,7 @@
 import { unstable_cache, unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
+import { cache } from 'react';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { ClaimBanner } from '@/components/profile/ClaimBanner';
 import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
@@ -26,7 +27,7 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 // Use a client wrapper to avoid ssr:false in a Server Component
 
@@ -34,105 +35,121 @@ export const runtime = 'nodejs';
 
 // Using CreatorProfile type and convertCreatorProfileToArtist utility from types/db.ts
 
-// Cache the database query across requests with a short TTL to keep hot profiles sub-100ms.
 // This helper returns both the legacy CreatorProfile and LegacySocialLink[] in one DB call.
-const getProfileAndLinks = unstable_cache(
-  async (
-    username: string
-  ): Promise<{
-    profile: CreatorProfile | null;
-    links: LegacySocialLink[];
-    contacts: DbCreatorContact[];
-    creatorIsPro: boolean;
-    creatorClerkId: string | null;
-    status: 'ok' | 'not_found' | 'error';
-  }> => {
-    try {
-      const result = await getCreatorProfileWithLinks(username);
+const fetchProfileAndLinks = async (
+  username: string
+): Promise<{
+  profile: CreatorProfile | null;
+  links: LegacySocialLink[];
+  contacts: DbCreatorContact[];
+  creatorIsPro: boolean;
+  creatorClerkId: string | null;
+  status: 'ok' | 'not_found' | 'error';
+}> => {
+  try {
+    const result = await getCreatorProfileWithLinks(username);
 
-      if (!result || !result.isPublic) {
-        return {
-          profile: null,
-          links: [],
-          contacts: [],
-          creatorIsPro: false,
-          creatorClerkId: null,
-          status: 'not_found',
-        };
-      }
-
-      const creatorIsPro = Boolean(result.userIsPro);
-      const creatorClerkId =
-        typeof result.userClerkId === 'string' ? result.userClerkId : null;
-
-      const profile: CreatorProfile = {
-        id: result.id,
-        user_id: result.userId,
-        creator_type: result.creatorType,
-        username: result.username,
-        display_name: result.displayName,
-        bio: result.bio,
-        avatar_url: result.avatarUrl,
-        spotify_url: result.spotifyUrl,
-        apple_music_url: result.appleMusicUrl,
-        youtube_url: result.youtubeUrl,
-        spotify_id: result.spotifyId,
-        is_public: !!result.isPublic,
-        is_verified: !!result.isVerified,
-        is_claimed: !!result.isClaimed,
-        claim_token: null,
-        claimed_at: null,
-        settings: result.settings,
-        theme: result.theme,
-        is_featured: result.isFeatured || false,
-        marketing_opt_out: result.marketingOptOut || false,
-        profile_views: result.profileViews || 0,
-        username_normalized: result.usernameNormalized,
-        search_text:
-          `${result.displayName || ''} ${result.username} ${result.bio || ''}`
-            .toLowerCase()
-            .trim(),
-        display_title: result.displayName || result.username,
-        profile_completion_pct: 80, // Calculate based on filled fields
-        created_at: result.createdAt.toISOString(),
-        updated_at: result.updatedAt.toISOString(),
-      };
-
-      const links: LegacySocialLink[] =
-        result.socialLinks?.map(link => ({
-          id: link.id,
-          artist_id: result.id,
-          platform: link.platform.toLowerCase(),
-          url: link.url,
-          clicks: link.clicks || 0,
-          created_at: link.createdAt.toISOString(),
-        })) ?? [];
-
-      const contacts: DbCreatorContact[] = result.contacts ?? [];
-
-      return {
-        profile,
-        links,
-        contacts,
-        creatorIsPro,
-        creatorClerkId,
-        status: 'ok',
-      };
-    } catch (error) {
-      console.error('Error fetching creator profile:', error);
+    if (!result || !result.isPublic) {
       return {
         profile: null,
         links: [],
         contacts: [],
         creatorIsPro: false,
         creatorClerkId: null,
-        status: 'error',
+        status: 'not_found',
       };
     }
-  },
+
+    const creatorIsPro = Boolean(result.userIsPro);
+    const creatorClerkId =
+      typeof result.userClerkId === 'string' ? result.userClerkId : null;
+
+    const profile: CreatorProfile = {
+      id: result.id,
+      user_id: result.userId,
+      creator_type: result.creatorType,
+      username: result.username,
+      display_name: result.displayName,
+      bio: result.bio,
+      avatar_url: result.avatarUrl,
+      spotify_url: result.spotifyUrl,
+      apple_music_url: result.appleMusicUrl,
+      youtube_url: result.youtubeUrl,
+      spotify_id: result.spotifyId,
+      is_public: !!result.isPublic,
+      is_verified: !!result.isVerified,
+      is_claimed: !!result.isClaimed,
+      claim_token: null,
+      claimed_at: null,
+      settings: result.settings,
+      theme: result.theme,
+      is_featured: result.isFeatured || false,
+      marketing_opt_out: result.marketingOptOut || false,
+      profile_views: result.profileViews || 0,
+      username_normalized: result.usernameNormalized,
+      search_text:
+        `${result.displayName || ''} ${result.username} ${result.bio || ''}`
+          .toLowerCase()
+          .trim(),
+      display_title: result.displayName || result.username,
+      profile_completion_pct: 80, // Calculate based on filled fields
+      created_at: result.createdAt.toISOString(),
+      updated_at: result.updatedAt.toISOString(),
+    };
+
+    const links: LegacySocialLink[] =
+      result.socialLinks?.map(link => ({
+        id: link.id,
+        artist_id: result.id,
+        platform: link.platform.toLowerCase(),
+        url: link.url,
+        clicks: link.clicks || 0,
+        created_at: link.createdAt.toISOString(),
+      })) ?? [];
+
+    const contacts: DbCreatorContact[] = result.contacts ?? [];
+
+    return {
+      profile,
+      links,
+      contacts,
+      creatorIsPro,
+      creatorClerkId,
+      status: 'ok',
+    };
+  } catch (error) {
+    console.error('Error fetching creator profile:', error);
+    return {
+      profile: null,
+      links: [],
+      contacts: [],
+      creatorIsPro: false,
+      creatorClerkId: null,
+      status: 'error',
+    };
+  }
+};
+
+// Cache the database query across requests with a short TTL to keep hot profiles sub-100ms.
+const getCachedProfileAndLinks = unstable_cache(
+  fetchProfileAndLinks,
   // Key prefix stays stable; args are included in the cache key so each username gets its own entry.
   ['public-profile-v1'],
   { revalidate: 60 }
+);
+
+// Memoize per-request to avoid duplicate DB work between generateMetadata and page render.
+const getProfileAndLinks = cache(
+  async (username: string, options?: { forceNoStore?: boolean }) => {
+    const normalizedUsername = username.toLowerCase();
+
+    if (options?.forceNoStore) {
+      unstable_noStore();
+      return fetchProfileAndLinks(normalizedUsername);
+    }
+
+    return getCachedProfileAndLinks(normalizedUsername);
+  }
 );
 
 interface Props {
@@ -163,7 +180,9 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 
   const normalizedUsername = username.toLowerCase();
   const { profile, links, contacts, status, creatorIsPro, creatorClerkId } =
-    await getProfileAndLinks(normalizedUsername);
+    await getProfileAndLinks(normalizedUsername, {
+      forceNoStore: Boolean(claimTokenParam),
+    });
 
   if (status === 'error') {
     return (
@@ -272,7 +291,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
 // Generate metadata for the page
 export async function generateMetadata({ params }: Props) {
   const { username } = await params;
-  const { profile, status } = await getProfileAndLinks(username.toLowerCase());
+  const { profile, status } = await getProfileAndLinks(username);
 
   if (status === 'error') {
     return {

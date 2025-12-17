@@ -942,9 +942,9 @@ export function getBaseUrl(): string {
       return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
     }
 
-    // For preview environments (typically preview.jov.ie or similar)
-    if (hostname.includes('preview') || hostname.includes('vercel.app')) {
-      return `${protocol}//${hostname}`;
+    // For staging or non-production deployments (e.g., Vercel preview URLs)
+    if (hostname === 'main.jov.ie' || hostname.includes('vercel.app')) {
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
     }
   }
 
@@ -965,8 +965,8 @@ export function isDevelopment(): boolean {
 export function isPreview(): boolean {
   if (typeof window !== 'undefined') {
     return (
-      window.location.hostname.includes('preview') ||
-      window.location.hostname.includes('vercel.app')
+      window.location.hostname.includes('vercel.app') ||
+      window.location.hostname === 'main.jov.ie'
     );
   }
   return process.env.VERCEL_ENV === 'preview';

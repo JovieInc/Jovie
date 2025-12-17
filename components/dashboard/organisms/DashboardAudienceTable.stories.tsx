@@ -1,8 +1,29 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
+import type { DashboardData } from '@/app/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
 import DashboardLayoutClient from '@/app/app/dashboard/DashboardLayoutClient';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTable } from './DashboardAudienceTable';
+
+const mockDashboardData: DashboardData = {
+  user: { id: 'story-user' },
+  creatorProfiles: [],
+  selectedProfile: null,
+  needsOnboarding: false,
+  sidebarCollapsed: false,
+  hasSocialLinks: true,
+  hasMusicLinks: false,
+  isAdmin: false,
+  tippingStats: {
+    tipClicks: 0,
+    qrTipClicks: 0,
+    linkTipClicks: 0,
+    tipsSubmitted: 0,
+    totalReceivedCents: 0,
+    monthReceivedCents: 0,
+  },
+};
 
 const mockMembers: AudienceMember[] = [
   {
@@ -107,11 +128,13 @@ const meta: Meta<typeof DashboardAudienceTable> = {
   tags: ['autodocs', 'audience-a11y'],
   decorators: [
     Story => (
-      <DashboardLayoutClient>
-        <div className='h-[720px] bg-surface-1 text-primary-token'>
-          <Story />
-        </div>
-      </DashboardLayoutClient>
+      <DashboardDataProvider value={mockDashboardData}>
+        <DashboardLayoutClient dashboardData={mockDashboardData}>
+          <div className='h-[720px] bg-surface-1 text-primary-token'>
+            <Story />
+          </div>
+        </DashboardLayoutClient>
+      </DashboardDataProvider>
     ),
   ],
 };
