@@ -134,6 +134,13 @@
       "when": 1765836187978,
       "tag": "0018_fearless_cerise",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1765918634662,
+      "tag": "0019_colorful_master_mold",
+      "breakpoints": true
     }
   ]
 }

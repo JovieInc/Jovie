@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 import Image from 'next/image';
 import React from 'react';
 
@@ -51,34 +51,31 @@ export function ArtistCard({
   // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
 
-  // Adjust animation settings based on motion preference
-  const animationProps = prefersReducedMotion
-    ? {
-        // Minimal animations for reduced motion preference
-        whileHover: { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-        whileFocus: { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-        transition: { duration: 0.1 },
-      }
+  const whileHover: MotionProps['whileHover'] = prefersReducedMotion
+    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
     : {
-        // Full animations for normal motion preference
-        whileHover: {
-          scale: 1.02,
-          boxShadow:
-            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
-        },
-        whileFocus: {
-          scale: 1.02,
-          boxShadow:
-            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
-        },
-        transition: {
-          type: 'spring',
-          stiffness: 400,
-          damping: 17,
-          mass: 0.8,
-        },
+        scale: 1.02,
+        boxShadow:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
+      };
+
+  const whileFocus: MotionProps['whileFocus'] = prefersReducedMotion
+    ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+    : {
+        scale: 1.02,
+        boxShadow:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
+      };
+
+  const transition: MotionProps['transition'] = prefersReducedMotion
+    ? { duration: 0.1 }
+    : {
+        type: 'spring',
+        stiffness: 400,
+        damping: 17,
+        mass: 0.8,
       };
 
   return (
@@ -103,7 +100,9 @@ export function ArtistCard({
       }}
       aria-label={`Select ${name} as your artist profile`}
       aria-pressed={isSelected}
-      {...animationProps}
+      whileHover={whileHover}
+      whileFocus={whileFocus}
+      transition={transition}
       initial={{ scale: 1, boxShadow: '0 0 0 rgba(0, 0, 0, 0)' }}
     >
       {/* Selection indicator */}
