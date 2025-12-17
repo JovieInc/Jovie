@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,7 +60,7 @@ const igSocial = (overrides: Partial<DetectedLink> = {}): DetectedLink => ({
 // Dynamic mocked payload for UniversalLinkInput per test
 let nextAddPayload: DetectedLink | null = null;
 
-vi.mock('@/components/dashboard/atoms/UniversalLinkInput', async () => {
+vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
   return {
     UniversalLinkInput: ({ onAdd }: { onAdd: (l: DetectedLink) => void }) => (
       <button onClick={() => nextAddPayload && onAdd(nextAddPayload)}>
@@ -244,8 +244,13 @@ describeFn('GroupedLinksManager', () => {
     // Initial call on mount
     expect(onLinksChange).toHaveBeenCalledTimes(1);
 
-    // Click "Hide" on the first row
-    const hideBtn = screen.getByRole('button', { name: /Hide link/i });
+    // Open menu and click "Hide" on the first row
+    const menuButton = screen.getByRole('button', {
+      name: /Open actions for Instagram/i,
+    });
+    fireEvent.click(menuButton);
+
+    const hideBtn = screen.getByRole('button', { name: /^Hide$/i });
     fireEvent.click(hideBtn);
 
     expect(onLinksChange).toHaveBeenCalledTimes(2);
@@ -255,8 +260,9 @@ describeFn('GroupedLinksManager', () => {
     expect(vis).toBe(false);
   });
 
-  it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', () => {
+  it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', async () => {
     const onLinksChange = vi.fn();
+    vi.useFakeTimers();
 
     const initial = Array.from({ length: MAX_SOCIAL_LINKS }, (_, i) =>
       makeSocial(`social-${i}`)
@@ -274,6 +280,8 @@ describeFn('GroupedLinksManager', () => {
 
     nextAddPayload = makeSocial('social-extra');
     fireEvent.click(screen.getByText('mock-add'));
+
+    await vi.advanceTimersByTimeAsync(650);
 
     expect(onLinksChange).toHaveBeenCalled();
     const latest = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
@@ -293,5 +301,67 @@ describeFn('GroupedLinksManager', () => {
     const extraVisible =
       (extra as unknown as { isVisible?: boolean }).isVisible ?? true;
     expect(extraVisible).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('shows ingested suggestion pills and accepts on click', async () => {
+    const onAcceptSuggestion = vi
+      .fn()
+      .mockResolvedValue(
+        igSocial({ normalizedUrl: 'https://instagram.com/artist' })
+      );
+
+    renderWithProviders(
+      <GroupedLinksManager
+        initialLinks={[]}
+        suggestedLinks={[
+          {
+            ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
+            suggestionId: 'suggest-1',
+          } as DetectedLink & { suggestionId: string },
+        ]}
+        onAcceptSuggestion={onAcceptSuggestion}
+        suggestionsEnabled
+      />
+    );
+
+    const pill = screen.getByTestId('ingested-suggestion-pill');
+    expect(pill).toHaveTextContent('Instagram');
+    expect(pill).toHaveTextContent('@artist');
+
+    fireEvent.click(pill);
+    await waitFor(() => {
+      expect(onAcceptSuggestion).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('dismisses ingested suggestion pills without triggering accept', async () => {
+    const onAcceptSuggestion = vi.fn();
+    const onDismissSuggestion = vi.fn().mockResolvedValue(undefined);
+
+    renderWithProviders(
+      <GroupedLinksManager
+        initialLinks={[]}
+        suggestedLinks={[
+          {
+            ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
+            suggestionId: 'suggest-2',
+          } as DetectedLink & { suggestionId: string },
+        ]}
+        onAcceptSuggestion={onAcceptSuggestion}
+        onDismissSuggestion={onDismissSuggestion}
+        suggestionsEnabled
+      />
+    );
+
+    const dismissButton = screen.getByLabelText(
+      /Dismiss Instagram suggestion/i
+    );
+    fireEvent.click(dismissButton);
+
+    await waitFor(() => {
+      expect(onDismissSuggestion).toHaveBeenCalledTimes(1);
+    });
+    expect(onAcceptSuggestion).not.toHaveBeenCalled();
   });
 });
