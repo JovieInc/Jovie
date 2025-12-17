@@ -93,12 +93,17 @@ function extractUsernameFromUrl(value: string): string | null {
     const first = segments[0] ?? '';
     const second = segments[1] ?? '';
 
-    if (host.endsWith('tiktok.com')) {
+    // Define allowed hostnames for each platform (no partials)
+    const tiktokHosts = ['tiktok.com'];
+    const snapchatHosts = ['snapchat.com'];
+    const youtubeHosts = ['youtube.com'];
+
+    if (tiktokHosts.includes(host)) {
       const candidate = first.startsWith('@') ? first.slice(1) : first;
       return candidate || null;
     }
 
-    if (host.endsWith('snapchat.com')) {
+    if (snapchatHosts.includes(host)) {
       const candidate = first === 'add' || first === 'u' ? second : first;
       const cleaned = candidate.startsWith('@')
         ? candidate.slice(1)
@@ -106,7 +111,7 @@ function extractUsernameFromUrl(value: string): string | null {
       return cleaned || null;
     }
 
-    if (host.endsWith('youtube.com')) {
+    if (youtubeHosts.includes(host)) {
       if (first.startsWith('@')) return first.slice(1) || null;
       return null;
     }
