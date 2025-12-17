@@ -29,6 +29,7 @@ import {
 const LINKTREE_CONFIG: StrategyConfig = {
   platformId: 'linktree',
   platformName: 'Linktree',
+  canonicalHost: 'linktr.ee',
   validHosts: new Set([
     'linktr.ee',
     'www.linktr.ee',
@@ -139,7 +140,7 @@ export function validateLinktreeUrl(url: string): string | null {
     }
 
     // Return canonical URL format
-    return `https://linktr.ee/${handle}`;
+    return `https://${LINKTREE_CONFIG.canonicalHost}/${handle}`;
   } catch {
     return null;
   }

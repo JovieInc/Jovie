@@ -75,6 +75,8 @@ export interface StrategyConfig {
   platformId: string;
   /** Display name for logging */
   platformName: string;
+  /** Preferred canonical host for normalized URLs */
+  canonicalHost: string;
   /** Valid hostnames for this platform */
   validHosts: Set<string>;
   /** Default fetch timeout */
@@ -563,6 +565,7 @@ export function validatePlatformUrl(
 ): { valid: boolean; normalized: string | null; handle: string | null } {
   try {
     const candidate = url.trim();
+    const canonicalHost = config.canonicalHost.toLowerCase();
 
     // Reject dangerous or unsupported schemes early
     if (/^(javascript|data|vbscript|file|ftp):/i.test(candidate)) {
@@ -590,6 +593,11 @@ export function validatePlatformUrl(
       return { valid: false, normalized: null, handle: null };
     }
 
+    // Ensure canonical host is an allowed host to avoid misconfiguration
+    if (!config.validHosts.has(canonicalHost)) {
+      return { valid: false, normalized: null, handle: null };
+    }
+
     // Must be a valid host
     if (!config.validHosts.has(parsed.hostname.toLowerCase())) {
       return { valid: false, normalized: null, handle: null };
@@ -608,7 +616,7 @@ export function validatePlatformUrl(
 
     return {
       valid: true,
-      normalized: `https://${Array.from(config.validHosts)[0]}/${rawHandle}`,
+      normalized: `https://${canonicalHost}/${rawHandle}`,
       handle: rawHandle,
     };
   } catch {
