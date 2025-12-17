@@ -136,8 +136,11 @@ jobs:
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch
         id: create-branch
         uses: neondatabase/create-branch-action@v6
@@ -313,8 +316,11 @@ jobs:
         run: |
           RAW="${{ github.head_ref }}"
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
 
       - name: Create or reuse Neon branch
         id: create-branch

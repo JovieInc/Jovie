@@ -1,7 +1,6 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { useId, useMemo, useState } from 'react';
 import { Container } from '@/components/site/Container';
 
@@ -45,17 +44,14 @@ const BASE_MODULES: readonly ProfileModule[] = [
   {
     id: 'listen',
     label: 'Listen',
-    sublabel: 'Smart link',
   },
   {
     id: 'merch',
     label: 'Merch',
-    sublabel: 'Featured drop',
   },
   {
     id: 'tickets',
     label: 'Tickets',
-    sublabel: 'Next show',
   },
   {
     id: 'video',
@@ -82,7 +78,7 @@ const PILLARS: readonly PillarConfig[] = [
     title: 'One profile. Optimized for every fan.',
     description: 'Same artist profile. Ordered automatically per fan.',
     fanChip: 'Fan: Spotify-heavy',
-    metricChip: '+18% stream link CTR',
+    metricChip: 'More stream clicks',
     actions: [
       'Pinned the best-performing streaming link for this fan',
       'Testing listen CTA copy (A/B)',
@@ -99,7 +95,7 @@ const PILLARS: readonly PillarConfig[] = [
     title: 'One profile. Optimized for every fan.',
     description: 'Same artist profile. Ordered automatically per fan.',
     fanChip: 'Fan: High merch intent',
-    metricChip: '+12% merch clicks',
+    metricChip: 'More merch clicks',
     actions: [
       'Featured your highest-converting item for this fan',
       'Pinned merch during peak buying sessions',
@@ -116,7 +112,7 @@ const PILLARS: readonly PillarConfig[] = [
     title: 'One profile. Optimized for every fan.',
     description: 'Same artist profile. Ordered automatically per fan.',
     fanChip: 'Fan: Nearby (Austin)',
-    metricChip: '+20% ticket link CTR',
+    metricChip: 'More ticket clicks',
     actions: [
       'Prioritized the closest upcoming show',
       'Pinned tickets when the fan is near a tour city',
@@ -156,6 +152,19 @@ export function ActionDrivenProfileSection() {
 
   const activeTabId = `${tabsBaseId}-tab-${active.id}`;
   const activePanelId = `${tabsBaseId}-panel-${active.id}`;
+
+  const promotedCtaLabel = useMemo<string>(() => {
+    switch (active.promotedModuleId) {
+      case 'listen':
+        return 'Listen';
+      case 'merch':
+        return 'Shop';
+      case 'tickets':
+        return 'Jul 14';
+      default:
+        return 'Open';
+    }
+  }, [active.promotedModuleId]);
 
   return (
     <section className='relative py-16 sm:py-20 bg-base overflow-hidden'>
@@ -228,13 +237,32 @@ export function ActionDrivenProfileSection() {
                   Same artist profile. Ordered per fan.
                 </p>
 
-                <div className='mt-6'>
-                  <Link
-                    href='#how-it-works'
-                    className='inline-flex items-center justify-center h-10 px-4 rounded-md bg-surface-1 text-sm font-medium text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-colors duration-150 border border-subtle focus-ring-themed'
-                  >
-                    Learn more
-                  </Link>
+                <div className='mt-6 rounded-2xl border border-subtle bg-surface-1 p-4'>
+                  <div className='text-xs font-medium tracking-wide uppercase text-tertiary-token'>
+                    What changes for this fan
+                  </div>
+                  <div className='mt-3 grid gap-2'>
+                    {active.actions.map(action => (
+                      <div
+                        key={action}
+                        className='flex items-start gap-2 rounded-xl border border-subtle/70 bg-surface-0/35 px-3 py-2'
+                      >
+                        <span className='mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-0 text-[10px] font-semibold text-secondary-token'>
+                          ✓
+                        </span>
+                        <span className='text-sm text-secondary-token leading-snug'>
+                          {action}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className='mt-4 flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0/30 px-3 py-2'>
+                    <span className='text-xs text-tertiary-token'>Outcome</span>
+                    <span className='text-xs font-medium text-secondary-token'>
+                      {active.metricChip}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -262,125 +290,91 @@ export function ActionDrivenProfileSection() {
                   </div>
                 </div>
 
-                <div className='grid gap-6 p-5 sm:p-6 lg:grid-cols-12'>
-                  <div className='lg:col-span-7'>
-                    <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
-                      <div className='flex items-center gap-3'>
-                        <div className='h-12 w-12 overflow-hidden rounded-full border border-subtle bg-surface-0'>
-                          <Image
-                            alt='Sample artist avatar'
-                            src='/avatars/default-user.png'
-                            width={96}
-                            height={96}
-                            className='h-full w-full object-cover'
-                            priority={false}
-                          />
-                        </div>
-                        <div className='min-w-0'>
-                          <div className='truncate text-sm font-semibold text-primary-token'>
-                            {PROFILE_ARTIST.name}
-                          </div>
-                          <div className='truncate text-xs text-tertiary-token'>
-                            {PROFILE_ARTIST.handle}
-                          </div>
-                        </div>
+                <div className='p-5 sm:p-6'>
+                  <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
+                    <div className='flex items-center gap-3'>
+                      <div className='h-12 w-12 overflow-hidden rounded-full border border-subtle bg-surface-0'>
+                        <Image
+                          alt='Sample artist avatar'
+                          src='/avatars/default-user.png'
+                          width={96}
+                          height={96}
+                          className='h-full w-full object-cover'
+                          priority={false}
+                        />
                       </div>
-
-                      <p className='mt-3 text-xs text-secondary-token'>
-                        {PROFILE_ARTIST.tagline}
-                      </p>
-
-                      <div className='mt-4 grid gap-2'>
-                        {orderedModules.map((module, index) => {
-                          const isPromoted =
-                            module.id === active.promotedModuleId;
-                          const isFirst = index === 0;
-
-                          return (
-                            <div
-                              key={module.id}
-                              className={`relative overflow-hidden rounded-xl border px-4 py-3 transition-colors duration-150 ${
-                                isPromoted
-                                  ? 'border-subtle bg-surface-0'
-                                  : 'border-subtle/70 bg-surface-0/30'
-                              }`}
-                            >
-                              {isPromoted && (
-                                <div className='pointer-events-none absolute inset-0 opacity-70'>
-                                  <div className='absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.14),transparent_55%)] dark:bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.18),transparent_55%)]' />
-                                </div>
-                              )}
-
-                              <div className='relative flex items-start justify-between gap-3'>
-                                <div className='min-w-0'>
-                                  <div className='flex items-center gap-2'>
-                                    <div className='truncate text-sm font-medium text-primary-token'>
-                                      {module.label}
-                                    </div>
-                                    {isPromoted && (
-                                      <span className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase text-secondary-token'>
-                                        Auto-pin
-                                      </span>
-                                    )}
-                                    {isFirst && !isPromoted && (
-                                      <span className='inline-flex items-center rounded-full border border-subtle/60 bg-surface-1/40 px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase text-tertiary-token'>
-                                        Top
-                                      </span>
-                                    )}
-                                  </div>
-                                  {module.sublabel && (
-                                    <div className='mt-1 text-xs text-tertiary-token'>
-                                      {module.sublabel}
-                                    </div>
-                                  )}
-                                </div>
-
-                                {isPromoted ? (
-                                  <span className='inline-flex h-8 items-center justify-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-secondary-token'>
-                                    Open
-                                  </span>
-                                ) : (
-                                  <span className='inline-flex h-8 items-center justify-center rounded-md border border-subtle/60 bg-surface-1/30 px-3 text-xs font-medium text-tertiary-token'>
-                                    —
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
+                      <div className='min-w-0'>
+                        <div className='truncate text-sm font-semibold text-primary-token'>
+                          {PROFILE_ARTIST.name}
+                        </div>
+                        <div className='truncate text-xs text-tertiary-token'>
+                          {PROFILE_ARTIST.handle}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className='lg:col-span-5'>
-                    <div className='rounded-2xl border border-subtle bg-surface-1 p-4'>
-                      <div className='text-xs font-medium tracking-wide uppercase text-tertiary-token'>
-                        Adaptive fan routing
-                      </div>
-                      <div className='mt-3 grid gap-2'>
-                        {active.actions.map(action => (
+                    <p className='mt-3 text-xs text-secondary-token'>
+                      {PROFILE_ARTIST.tagline}
+                    </p>
+
+                    <div className='mt-4 grid gap-2'>
+                      {orderedModules.map((module, index) => {
+                        const isPromoted =
+                          module.id === active.promotedModuleId;
+                        const isFirst = index === 0;
+
+                        return (
                           <div
-                            key={action}
-                            className='flex items-start gap-2 rounded-xl border border-subtle/70 bg-surface-0/35 px-3 py-2'
+                            key={module.id}
+                            className={`relative overflow-hidden rounded-xl border px-4 py-3 transition-colors duration-150 ${
+                              isPromoted
+                                ? 'border-subtle bg-surface-0'
+                                : 'border-subtle/70 bg-surface-0/30'
+                            }`}
                           >
-                            <span className='mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-0 text-[10px] font-semibold text-secondary-token'>
-                              ✓
-                            </span>
-                            <span className='text-sm text-secondary-token leading-snug'>
-                              {action}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                            {isPromoted && (
+                              <div className='pointer-events-none absolute inset-0 opacity-70'>
+                                <div className='absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.14),transparent_55%)] dark:bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.18),transparent_55%)]' />
+                              </div>
+                            )}
 
-                      <div className='mt-4 flex items-center justify-between gap-3 rounded-xl border border-subtle bg-surface-0/30 px-3 py-2'>
-                        <span className='text-xs text-tertiary-token'>
-                          Updated 12m ago
-                        </span>
-                        <span className='text-xs font-medium text-secondary-token'>
-                          Always on
-                        </span>
-                      </div>
+                            <div className='relative flex items-start justify-between gap-3'>
+                              <div className='min-w-0'>
+                                <div className='flex items-center gap-2'>
+                                  <div className='truncate text-sm font-medium text-primary-token'>
+                                    {module.label}
+                                  </div>
+                                  {isPromoted && (
+                                    <span className='inline-flex items-center rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase text-secondary-token'>
+                                      Auto-pin
+                                    </span>
+                                  )}
+                                  {isFirst && !isPromoted && (
+                                    <span className='inline-flex items-center rounded-full border border-subtle/60 bg-surface-1/40 px-2 py-0.5 text-[10px] font-medium tracking-wide uppercase text-tertiary-token'>
+                                      Top
+                                    </span>
+                                  )}
+                                </div>
+                                {module.sublabel ? (
+                                  <div className='mt-1 text-xs text-tertiary-token'>
+                                    {module.sublabel}
+                                  </div>
+                                ) : null}
+                              </div>
+
+                              {isPromoted ? (
+                                <span className='inline-flex h-8 items-center justify-center rounded-md border border-subtle bg-surface-1 px-3 text-xs font-medium text-secondary-token'>
+                                  {promotedCtaLabel}
+                                </span>
+                              ) : (
+                                <span className='inline-flex h-8 items-center justify-center rounded-md border border-subtle/60 bg-surface-1/30 px-3 text-xs font-medium text-tertiary-token'>
+                                  —
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>

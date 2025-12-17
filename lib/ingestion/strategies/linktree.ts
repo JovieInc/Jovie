@@ -239,6 +239,8 @@ type LinktreePageProps = {
   props?: {
     pageProps?: {
       seo?: { title?: string | null; image?: string | null };
+      links?: unknown;
+      allLinks?: unknown;
       user?: {
         fullName?: string | null;
         profilePicture?: { url?: string | null } | null;
