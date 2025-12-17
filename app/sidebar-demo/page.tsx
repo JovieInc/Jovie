@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import type { DashboardData } from '@/app/dashboard/actions';
+import { DashboardDataProvider } from '@/app/dashboard/DashboardDataContext';
 import DashboardLayoutClient from '@/app/dashboard/DashboardLayoutClient';
 import { MyStatsig } from '@/app/my-statsig';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
@@ -54,12 +55,14 @@ export default function SidebarDemoPage() {
 
   return (
     <MyStatsig userId={mockDashboardData.user?.id ?? null}>
-      <DashboardLayoutClient dashboardData={mockDashboardData}>
-        <DashboardOverview
-          artist={mockArtist}
-          hasSocialLinks={mockDashboardData.hasSocialLinks}
-        />
-      </DashboardLayoutClient>
+      <DashboardDataProvider value={mockDashboardData}>
+        <DashboardLayoutClient dashboardData={mockDashboardData}>
+          <DashboardOverview
+            artist={mockArtist}
+            hasSocialLinks={mockDashboardData.hasSocialLinks}
+          />
+        </DashboardLayoutClient>
+      </DashboardDataProvider>
     </MyStatsig>
   );
 }
