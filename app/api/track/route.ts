@@ -224,25 +224,27 @@ export async function POST(request: NextRequest) {
 
       const resolvedMember =
         insertedMember ??
-        (await tx
-          .select({
-            id: audienceMembers.id,
-            visits: audienceMembers.visits,
-            engagementScore: audienceMembers.engagementScore,
-            latestActions: audienceMembers.latestActions,
-            geoCity: audienceMembers.geoCity,
-            geoCountry: audienceMembers.geoCountry,
-            deviceType: audienceMembers.deviceType,
-            spotifyConnected: audienceMembers.spotifyConnected,
-          })
-          .from(audienceMembers)
-          .where(
-            and(
-              eq(audienceMembers.creatorProfileId, profile.id),
-              eq(audienceMembers.fingerprint, fingerprint)
+        (
+          await tx
+            .select({
+              id: audienceMembers.id,
+              visits: audienceMembers.visits,
+              engagementScore: audienceMembers.engagementScore,
+              latestActions: audienceMembers.latestActions,
+              geoCity: audienceMembers.geoCity,
+              geoCountry: audienceMembers.geoCountry,
+              deviceType: audienceMembers.deviceType,
+              spotifyConnected: audienceMembers.spotifyConnected,
+            })
+            .from(audienceMembers)
+            .where(
+              and(
+                eq(audienceMembers.creatorProfileId, profile.id),
+                eq(audienceMembers.fingerprint, fingerprint)
+              )
             )
-          )
-          .limit(1))?.[0];
+            .limit(1)
+        )?.[0];
 
       if (!resolvedMember) {
         throw new Error('Unable to resolve audience member');
