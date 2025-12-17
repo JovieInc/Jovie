@@ -27,6 +27,7 @@ import {
 const BEACONS_CONFIG: StrategyConfig = {
   platformId: 'beacons',
   platformName: 'Beacons',
+  canonicalHost: 'beacons.ai',
   validHosts: new Set([
     'beacons.ai',
     'www.beacons.ai',
@@ -116,7 +117,7 @@ export function validateBeaconsUrl(url: string): string | null {
   }
 
   // Return canonical URL format
-  return `https://beacons.ai/${result.handle}`;
+  return `https://${BEACONS_CONFIG.canonicalHost}/${result.handle}`;
 }
 
 /**
