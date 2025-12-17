@@ -165,12 +165,8 @@
           "name": "audience_members_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "audience_members",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -293,12 +289,8 @@
           "name": "click_events_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "click_events",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -306,12 +298,8 @@
           "name": "click_events_link_id_social_links_id_fk",
           "tableFrom": "click_events",
           "tableTo": "social_links",
-          "columnsFrom": [
-            "link_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["link_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -319,12 +307,8 @@
           "name": "click_events_audience_member_id_audience_members_id_fk",
           "tableFrom": "click_events",
           "tableTo": "audience_members",
-          "columnsFrom": [
-            "audience_member_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["audience_member_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -438,12 +422,8 @@
           "name": "creator_contacts_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "creator_contacts",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -720,12 +700,8 @@
           "name": "creator_profiles_user_id_users_id_fk",
           "tableFrom": "creator_profiles",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -910,12 +886,8 @@
           "name": "notification_subscriptions_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "notification_subscriptions",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1078,12 +1050,8 @@
           "name": "profile_photos_user_id_users_id_fk",
           "tableFrom": "profile_photos",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1091,12 +1059,8 @@
           "name": "profile_photos_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "profile_photos",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1104,12 +1068,8 @@
           "name": "profile_photos_ingestion_owner_user_id_users_id_fk",
           "tableFrom": "profile_photos",
           "tableTo": "users",
-          "columnsFrom": [
-            "ingestion_owner_user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ingestion_owner_user_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1258,9 +1218,7 @@
         "signed_link_access_signed_token_unique": {
           "name": "signed_link_access_signed_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "signed_token"
-          ]
+          "columns": ["signed_token"]
         }
       },
       "policies": {},
@@ -1373,12 +1331,8 @@
           "name": "social_accounts_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "social_accounts",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1508,12 +1462,8 @@
           "name": "social_links_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "social_links",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1581,9 +1531,7 @@
         "stripe_webhook_events_stripe_event_id_unique": {
           "name": "stripe_webhook_events_stripe_event_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_event_id"
-          ]
+          "columns": ["stripe_event_id"]
         }
       },
       "policies": {},
@@ -1673,12 +1621,8 @@
           "name": "tips_creator_profile_id_creator_profiles_id_fk",
           "tableFrom": "tips",
           "tableTo": "creator_profiles",
-          "columnsFrom": [
-            "creator_profile_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["creator_profile_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1688,9 +1632,7 @@
         "tips_payment_intent_id_unique": {
           "name": "tips_payment_intent_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "payment_intent_id"
-          ]
+          "columns": ["payment_intent_id"]
         }
       },
       "policies": {},
@@ -1736,12 +1678,8 @@
           "name": "user_settings_user_id_users_id_fk",
           "tableFrom": "user_settings",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1841,30 +1779,22 @@
         "users_clerk_id_unique": {
           "name": "users_clerk_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "clerk_id"
-          ]
+          "columns": ["clerk_id"]
         },
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         },
         "users_stripe_customer_id_unique": {
           "name": "users_stripe_customer_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_customer_id"
-          ]
+          "columns": ["stripe_customer_id"]
         },
         "users_stripe_subscription_id_unique": {
           "name": "users_stripe_subscription_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "stripe_subscription_id"
-          ]
+          "columns": ["stripe_subscription_id"]
         }
       },
       "policies": {},
@@ -2060,9 +1990,7 @@
         "wrapped_links_short_id_unique": {
           "name": "wrapped_links_short_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "short_id"
-          ]
+          "columns": ["short_id"]
         }
       },
       "policies": {},
@@ -2074,40 +2002,22 @@
     "public.audience_device_type": {
       "name": "audience_device_type",
       "schema": "public",
-      "values": [
-        "mobile",
-        "desktop",
-        "tablet",
-        "unknown"
-      ]
+      "values": ["mobile", "desktop", "tablet", "unknown"]
     },
     "public.audience_intent_level": {
       "name": "audience_intent_level",
       "schema": "public",
-      "values": [
-        "high",
-        "medium",
-        "low"
-      ]
+      "values": ["high", "medium", "low"]
     },
     "public.audience_member_type": {
       "name": "audience_member_type",
       "schema": "public",
-      "values": [
-        "anonymous",
-        "email",
-        "sms",
-        "spotify",
-        "customer"
-      ]
+      "values": ["anonymous", "email", "sms", "spotify", "customer"]
     },
     "public.contact_channel": {
       "name": "contact_channel",
       "schema": "public",
-      "values": [
-        "email",
-        "phone"
-      ]
+      "values": ["email", "phone"]
     },
     "public.contact_role": {
       "name": "contact_role",
@@ -2124,12 +2034,7 @@
     "public.creator_type": {
       "name": "creator_type",
       "schema": "public",
-      "values": [
-        "artist",
-        "podcaster",
-        "influencer",
-        "creator"
-      ]
+      "values": ["artist", "podcaster", "influencer", "creator"]
     },
     "public.currency_code": {
       "name": "currency_code",
@@ -2150,96 +2055,52 @@
     "public.ingestion_job_status": {
       "name": "ingestion_job_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "processing",
-        "succeeded",
-        "failed"
-      ]
+      "values": ["pending", "processing", "succeeded", "failed"]
     },
     "public.ingestion_source_type": {
       "name": "ingestion_source_type",
       "schema": "public",
-      "values": [
-        "manual",
-        "admin",
-        "ingested"
-      ]
+      "values": ["manual", "admin", "ingested"]
     },
     "public.ingestion_status": {
       "name": "ingestion_status",
       "schema": "public",
-      "values": [
-        "idle",
-        "pending",
-        "processing",
-        "failed"
-      ]
+      "values": ["idle", "pending", "processing", "failed"]
     },
     "public.link_type": {
       "name": "link_type",
       "schema": "public",
-      "values": [
-        "listen",
-        "social",
-        "tip",
-        "other"
-      ]
+      "values": ["listen", "social", "tip", "other"]
     },
     "public.notification_channel": {
       "name": "notification_channel",
       "schema": "public",
-      "values": [
-        "email",
-        "phone"
-      ]
+      "values": ["email", "phone"]
     },
     "public.photo_status": {
       "name": "photo_status",
       "schema": "public",
-      "values": [
-        "uploading",
-        "processing",
-        "ready",
-        "failed"
-      ]
+      "values": ["uploading", "processing", "ready", "failed"]
     },
     "public.scraper_strategy": {
       "name": "scraper_strategy",
       "schema": "public",
-      "values": [
-        "http",
-        "browser",
-        "api"
-      ]
+      "values": ["http", "browser", "api"]
     },
     "public.social_account_status": {
       "name": "social_account_status",
       "schema": "public",
-      "values": [
-        "suspected",
-        "confirmed",
-        "rejected"
-      ]
+      "values": ["suspected", "confirmed", "rejected"]
     },
     "public.social_link_state": {
       "name": "social_link_state",
       "schema": "public",
-      "values": [
-        "active",
-        "suggested",
-        "rejected"
-      ]
+      "values": ["active", "suggested", "rejected"]
     },
     "public.subscription_plan": {
       "name": "subscription_plan",
       "schema": "public",
-      "values": [
-        "free",
-        "basic",
-        "premium",
-        "pro"
-      ]
+      "values": ["free", "basic", "premium", "pro"]
     },
     "public.subscription_status": {
       "name": "subscription_status",
@@ -2258,21 +2119,12 @@
     "public.theme_mode": {
       "name": "theme_mode",
       "schema": "public",
-      "values": [
-        "system",
-        "light",
-        "dark"
-      ]
+      "values": ["system", "light", "dark"]
     },
     "public.waitlist_status": {
       "name": "waitlist_status",
       "schema": "public",
-      "values": [
-        "new",
-        "invited",
-        "claimed",
-        "rejected"
-      ]
+      "values": ["new", "invited", "claimed", "rejected"]
     }
   },
   "schemas": {},
