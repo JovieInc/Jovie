@@ -7,6 +7,7 @@ import React, {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useTransition,
 } from 'react';
@@ -22,10 +23,13 @@ import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeade
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
 import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 import type { DashboardBreadcrumbItem } from '@/types';
-
 import type { DashboardData } from './actions';
 import { DashboardDataProvider } from './DashboardDataContext';
 import { PreviewPanelProvider, usePreviewPanel } from './PreviewPanelContext';
+import {
+  persistSidebarPreference,
+  readSidebarPreference,
+} from './sidebarPreference';
 
 type TableMeta = {
   rowCount: number | null;
@@ -67,10 +71,16 @@ export default function DashboardLayoutClient({
   const [, startTransition] = useTransition();
   const pathname = usePathname();
   const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
+  const renderCountRef = useRef(0);
   const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
   });
+  const serverSidebarOpen = !(dashboardData.sidebarCollapsed ?? false);
+  const [sidebarPreference, setSidebarPreference] = useState(() =>
+    readSidebarPreference(serverSidebarOpen)
+  );
+  const sidebarOpen = sidebarPreference.open;
 
   // Routes that should use full width layout
   const isFullWidthRoute =
@@ -135,14 +145,17 @@ export default function DashboardLayoutClient({
     return items;
   })();
 
-  // For sidebar-08 pattern, we'll use the built-in state management
-  const [sidebarOpen, setSidebarOpen] = useState(
-    !(dashboardData.sidebarCollapsed ?? false)
-  );
-
   // Handle persistence of sidebar state
   const handleOpenChange = (open: boolean) => {
-    setSidebarOpen(open);
+    if (open === sidebarPreference.open) {
+      return;
+    }
+
+    setSidebarPreference({
+      open,
+      hasStoredPreference: true,
+    });
+    persistSidebarPreference(open);
     if (persistSidebarCollapsed) {
       startTransition(() => {
         void persistSidebarCollapsed(!open);
@@ -150,33 +163,33 @@ export default function DashboardLayoutClient({
     }
   };
 
-  // Sync with localStorage
+  // Sync with server-provided value when there's no stored preference
   useEffect(() => {
-    const serverValue = !(dashboardData.sidebarCollapsed ?? false);
-    try {
-      const stored = localStorage.getItem('dashboard.sidebarCollapsed');
-      if (stored === null) {
-        localStorage.setItem(
-          'dashboard.sidebarCollapsed',
-          serverValue ? '0' : '1'
-        );
-        setSidebarOpen(serverValue);
-      } else {
-        const storedBool = stored === '0';
-        if (storedBool !== serverValue) {
-          localStorage.setItem(
-            'dashboard.sidebarCollapsed',
-            serverValue ? '0' : '1'
-          );
-          setSidebarOpen(serverValue);
-        } else {
-          setSidebarOpen(storedBool);
-        }
-      }
-    } catch {
-      // ignore storage errors
+    if (sidebarPreference.hasStoredPreference) {
+      return;
     }
-  }, [dashboardData.sidebarCollapsed]);
+
+    setSidebarPreference(prev =>
+      prev.open === serverSidebarOpen
+        ? prev
+        : { ...prev, open: serverSidebarOpen }
+    );
+  }, [serverSidebarOpen, sidebarPreference.hasStoredPreference]);
+
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV !== 'development' ||
+      typeof window === 'undefined'
+    ) {
+      return;
+    }
+
+    renderCountRef.current += 1;
+    const debugWindow = window as typeof window & {
+      __dashboardLayoutRenderCount?: number;
+    };
+    debugWindow.__dashboardLayoutRenderCount = renderCountRef.current;
+  });
 
   return (
     <DashboardDataProvider value={dashboardData}>
