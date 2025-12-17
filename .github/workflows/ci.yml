@@ -167,7 +167,7 @@ jobs:
   drizzle-migration-guard:
     name: Migration Guard
     # Skip if 'skip-migration-guard' label is present (for schema consolidation)
-    if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -275,7 +275,7 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     needs: [ci-fast-checks, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
