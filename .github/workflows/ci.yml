@@ -867,7 +867,7 @@ jobs:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
       - name: Slack notify (staging deploy)
-        if: ${{ success() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -891,7 +891,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (staging deploy failed)
-        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -1113,7 +1113,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Slack notify (production deploy)
-        if: ${{ success() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -1137,7 +1137,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (production deploy failed)
-        if: ${{ failure() && secrets.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
