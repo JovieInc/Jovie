@@ -31,6 +31,7 @@ import {
 } from './strategies/beacons';
 import {
   extractLaylo,
+  extractLayloHandle,
   fetchLayloProfile,
   validateLayloUrl,
 } from './strategies/laylo';
@@ -381,6 +382,62 @@ function mergeEvidence(
   };
 }
 
+export function deriveLayloHandle(
+  sourceUrl: string,
+  usernameNormalized: string | null
+): string {
+  const handleFromUrl = extractLayloHandle(sourceUrl);
+  if (handleFromUrl) return handleFromUrl;
+  if (usernameNormalized) return usernameNormalized;
+
+  throw new Error('Unable to determine Laylo handle from sourceUrl or profile');
+}
+
+export function createInMemorySocialLinkRow({
+  profileId,
+  platformId,
+  platformCategory,
+  url,
+  displayText,
+  sortOrder,
+  isActive,
+  state,
+  confidence,
+  sourcePlatform,
+  evidence,
+}: {
+  profileId: string;
+  platformId: string;
+  platformCategory: string;
+  url: string;
+  displayText?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  state: SocialLinkRow['state'];
+  confidence: number;
+  sourcePlatform?: string | null;
+  evidence?: SocialLinkRow['evidence'];
+}): SocialLinkRow {
+  return {
+    id: '',
+    creatorProfileId: profileId,
+    platform: platformId,
+    platformType: platformCategory,
+    url,
+    displayText: displayText ?? null,
+    sortOrder,
+    isActive,
+    state,
+    confidence,
+    sourcePlatform: sourcePlatform ?? 'linktree',
+    sourceType: 'ingested',
+    evidence: evidence ?? {},
+    clicks: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as unknown as SocialLinkRow;
+}
+
 export async function normalizeAndMergeExtraction(
   tx: DbType,
   profile: {
@@ -503,24 +560,22 @@ export async function normalizeAndMergeExtraction(
       };
 
       await tx.insert(socialLinks).values(insertPayload);
-      existingByCanonical.set(canonical, {
-        id: '',
-        creatorProfileId: profile.id,
-        platform: detected.platform.id,
-        platformType: detected.platform.id,
-        url: detected.normalizedUrl,
-        displayText: link.title,
-        sortOrder: sortStart + inserted,
-        isActive: state === 'active',
-        state,
-        confidence,
-        sourcePlatform: link.sourcePlatform ?? 'linktree',
-        sourceType: 'ingested',
-        evidence,
-        clicks: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as unknown as SocialLinkRow);
+      existingByCanonical.set(
+        canonical,
+        createInMemorySocialLinkRow({
+          profileId: profile.id,
+          platformId: detected.platform.id,
+          platformCategory: detected.platform.category,
+          url: detected.normalizedUrl,
+          displayText: link.title,
+          sortOrder: sortStart + inserted,
+          isActive: state === 'active',
+          state,
+          confidence,
+          sourcePlatform: link.sourcePlatform,
+          evidence,
+        })
+      );
       inserted += 1;
     } catch (error) {
       logger.warn('normalizeAndMergeExtraction failed for link', {
@@ -1007,9 +1062,12 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
     .where(eq(creatorProfiles.id, profile.id));
 
   try {
-    const { profile: layloProfile, user } = await fetchLayloProfile(
-      profile.usernameNormalized ?? ''
+    const layloHandle = deriveLayloHandle(
+      parsed.sourceUrl,
+      profile.usernameNormalized
     );
+    const { profile: layloProfile, user } =
+      await fetchLayloProfile(layloHandle);
     const extraction = extractLaylo(layloProfile, user);
     const result = await normalizeAndMergeExtraction(tx, profile, extraction);
 
