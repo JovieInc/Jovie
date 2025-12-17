@@ -428,6 +428,43 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const suggestionKey = (s: T & { suggestionId?: string }) =>
     s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`;
 
+  const insertLinkWithSectionOrdering = useCallback(
+    (existing: T[], nextLink: T): T[] => {
+      if (existing.length === 0) return [nextLink];
+
+      const targetSection = sectionOf(nextLink);
+      const targetPopularity = popularityIndex(nextLink.platform.id);
+      const next = [...existing];
+      const sectionIndexes: number[] = [];
+
+      next.forEach((link, index) => {
+        if (sectionOf(link as T) === targetSection) {
+          sectionIndexes.push(index);
+        }
+      });
+
+      if (sectionIndexes.length === 0) {
+        next.push(nextLink);
+        return next;
+      }
+
+      const insertionIdx = sectionIndexes.find(index => {
+        const existingLink = next[index];
+        if (!existingLink) return false;
+        return (
+          popularityIndex((existingLink as DetectedLink).platform.id) >
+          targetPopularity
+        );
+      });
+
+      const insertAt = insertionIdx ?? Math.max(...sectionIndexes) + 1;
+
+      next.splice(insertAt, 0, nextLink);
+      return next;
+    },
+    [sectionOf]
+  );
+
   async function handleAcceptSuggestionClick(
     suggestion: (typeof pendingSuggestions)[number]
   ) {
@@ -444,11 +481,16 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
     );
     if (accepted) {
+      const normalizedCategory = sectionOf(accepted as T);
       const nextLink = {
         ...(accepted as T),
         isVisible:
           (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
         state: (accepted as unknown as { state?: string }).state ?? 'active',
+        platform: {
+          ...(accepted as T).platform,
+          category: normalizedCategory,
+        },
       } as T;
       const acceptedIdentity = canonicalIdentity({
         platform: (nextLink as DetectedLink).platform,
@@ -462,7 +504,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           }) === acceptedIdentity
       );
       if (!hasDuplicate) {
-        setLinks(prev => [...prev, nextLink]);
+        setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
         setLastAddedId(idFor(nextLink));
       }
       onLinkAdded?.([nextLink]);

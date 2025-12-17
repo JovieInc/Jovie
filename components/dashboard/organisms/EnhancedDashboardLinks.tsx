@@ -93,6 +93,7 @@ function getPlatformCategory(platform: string): PlatformType {
   const socialPlatforms = new Set([
     'instagram',
     'twitter',
+    'snapchat',
     'tiktok',
     'youtube',
     'facebook',
