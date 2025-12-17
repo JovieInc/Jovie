@@ -1,5 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { db, waitlistEntries } from '@/lib/db';
@@ -38,7 +38,7 @@ export default async function AppShellLayout({
 
     const email = normalizeEmail(emailRaw);
     const [entry] = await db
-      .select({ status: waitlistEntries.status })
+      .select({ id: waitlistEntries.id, status: waitlistEntries.status })
       .from(waitlistEntries)
       .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
       .limit(1);
@@ -47,6 +47,17 @@ export default async function AppShellLayout({
     const isApproved = status === 'invited' || status === 'claimed';
     if (!isApproved) {
       redirect('/waitlist');
+    }
+
+    if (status === 'invited' && entry?.id) {
+      try {
+        await db
+          .update(waitlistEntries)
+          .set({ status: 'claimed', updatedAt: new Date() })
+          .where(eq(waitlistEntries.id, entry.id));
+      } catch {
+        // Non-blocking: user already has access via invited status.
+      }
     }
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
