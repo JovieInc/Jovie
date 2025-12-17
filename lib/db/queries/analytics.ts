@@ -86,7 +86,11 @@ export async function getAnalyticsData(
       recent_clicks: string | number | null;
       profile_views_in_range: string | number | null;
       clicks_by_day: JsonArray<{ date: string; count: number }>;
-      top_links: JsonArray<{ id: string | null; url: string | null; clicks: number }>;
+      top_links: JsonArray<{
+        id: string | null;
+        url: string | null;
+        clicks: number;
+      }>;
       top_cities: JsonArray<{ city: string | null; count: number }>;
       top_countries: JsonArray<{ country: string | null; count: number }>;
       top_referrers: JsonArray<{ referrer: string | null; count: number }>;
@@ -171,14 +175,18 @@ export async function getAnalyticsData(
       date: row.date,
       count: Number(row.count),
     })),
-    topLinks: parseJsonArray<{ id: string | null; url: string | null; clicks: number }>(
-      analyticsAggregates?.top_links ?? []
-    ).map(row => ({
+    topLinks: parseJsonArray<{
+      id: string | null;
+      url: string | null;
+      clicks: number;
+    }>(analyticsAggregates?.top_links ?? []).map(row => ({
       id: row.id ?? 'unknown',
       url: row.url ?? '',
       clicks: Number(row.clicks),
     })),
-    profileViewsInRange: Number(analyticsAggregates?.profile_views_in_range ?? 0),
+    profileViewsInRange: Number(
+      analyticsAggregates?.profile_views_in_range ?? 0
+    ),
     topCities: parseJsonArray<{ city: string | null; count: number }>(
       analyticsAggregates?.top_cities ?? []
     )
