@@ -3,10 +3,12 @@
 import React, {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { Input } from '@/components/atoms/Input';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import {
@@ -49,6 +51,10 @@ export function SmartHandleInput({
   artistName,
   className = '',
 }: SmartHandleInputProps) {
+  const inputId = useId();
+  const statusId = useId();
+  const previewId = useId();
+
   // Handle validation state
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
@@ -68,9 +74,8 @@ export function SmartHandleInput({
 
   // Instant client-side validation (optimized for <50ms response time)
   const validateClientSide = useCallback(
-    (handleValue: string): ClientValidationResult => {
-      return validateUsernameFormat(handleValue);
-    },
+    (handleValue: string): ClientValidationResult =>
+      validateUsernameFormat(handleValue),
     []
   );
 
@@ -87,241 +92,199 @@ export function SmartHandleInput({
   }, [value, artistName, clientValidation.valid]);
 
   // Debounced API validation with reduced delay for better UX
+  const requestIdRef = useRef(0);
+
   const debouncedApiValidation = useMemo(
     () =>
-      debounce(async (handleValue: string) => {
-        if (!clientValidation.valid) return;
+      debounce(
+        async (
+          handleValue: string,
+          requestId: number,
+          abortController: AbortController
+        ) => {
+          if (!clientValidation.valid) return;
 
-        // Check cache first
-        if (lastValidatedRef.current?.handle === handleValue) {
-          const { available } = lastValidatedRef.current;
-          let cachedValidation: HandleValidationState;
+          // Check cache first
+          if (lastValidatedRef.current?.handle === handleValue) {
+            const { available } = lastValidatedRef.current;
 
-          setHandleValidation(prev => {
-            cachedValidation = {
+            setHandleValidation(prev => ({
               ...prev,
               available,
               checking: false,
               error: available ? null : 'Handle already taken',
-            };
-            return cachedValidation;
-          });
+            }));
 
-          // Notify parent after state update
-          setTimeout(() => {
-            onValidationChange?.(cachedValidation);
-          }, 0);
-          return;
-        }
+            return;
+          }
 
-        // Cancel previous request
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-        }
-
-        const abortController = new AbortController();
-        abortControllerRef.current = abortController;
-
-        // Add small delay to prevent flickering for very fast responses
-        const checkingTimeout = setTimeout(() => {
-          let checkingValidation: HandleValidationState;
-
-          setHandleValidation(prev => {
-            checkingValidation = {
-              ...prev,
-              checking: true,
-              error: null,
-            };
-            return checkingValidation;
-          });
-
-          // Notify parent after state update
-          setTimeout(() => {
-            onValidationChange?.(checkingValidation);
-          }, 0);
-        }, 200); // 200ms delay
-
-        try {
-          // Add timeout to prevent infinite loading
           const timeoutId = setTimeout(() => {
             abortController.abort();
           }, 5000); // 5 second timeout
 
-          const response = await fetch(
-            `/api/handle/check?handle=${encodeURIComponent(handleValue.toLowerCase())}`,
-            {
-              signal: abortController.signal,
-              headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-              },
+          try {
+            const response = await fetch(
+              `/api/handle/check?handle=${encodeURIComponent(handleValue.toLowerCase())}`,
+              {
+                signal: abortController.signal,
+                headers: {
+                  Accept: 'application/json',
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+
+            if (
+              abortController.signal.aborted ||
+              requestId !== requestIdRef.current
+            )
+              return;
+
+            if (!response.ok) {
+              throw new Error(
+                `HTTP ${response.status}: ${response.statusText}`
+              );
             }
-          );
 
-          clearTimeout(timeoutId);
-          clearTimeout(checkingTimeout);
+            const result = await response.json();
+            const available = !!result.available;
 
-          if (abortController.signal.aborted) return;
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-
-          const result = await response.json();
-          const available = !!result.available;
-          let finalValidation: HandleValidationState;
-
-          setHandleValidation(prev => {
-            finalValidation = {
+            setHandleValidation(prev => ({
               ...prev,
               available,
               checking: false,
               error: available ? null : result.error || 'Handle already taken',
-            };
-            return finalValidation;
-          });
+            }));
 
-          // Notify parent after state update
-          setTimeout(() => {
-            onValidationChange?.(finalValidation);
-          }, 0);
+            lastValidatedRef.current = { handle: handleValue, available };
+          } catch (error) {
+            if (requestId !== requestIdRef.current) return;
 
-          lastValidatedRef.current = { handle: handleValue, available };
-        } catch (error) {
-          clearTimeout(checkingTimeout);
+            if (error instanceof Error && error.name === 'AbortError') {
+              if (abortController.signal.aborted) {
+                setHandleValidation(prev => ({
+                  ...prev,
+                  available: false,
+                  checking: false,
+                  error: 'Check timed out - please try again',
+                }));
+              }
+              return;
+            }
 
-          if (error instanceof Error && error.name === 'AbortError') {
-            // Handle timeout specifically
-            let timeoutValidation: HandleValidationState;
+            console.error('Handle validation error:', error);
 
-            setHandleValidation(prev => {
-              timeoutValidation = {
-                ...prev,
-                available: false,
-                checking: false,
-                error: 'Check timed out - please try again',
-              };
-              return timeoutValidation;
-            });
+            let errorMessage = 'Network error';
+            if (error instanceof TypeError && error.message.includes('fetch')) {
+              errorMessage = 'Connection failed - check your internet';
+            } else if (error instanceof Error) {
+              errorMessage = error.message.includes('HTTP')
+                ? 'Server error - please try again'
+                : 'Network error';
+            }
 
-            // Notify parent after state update
-            setTimeout(() => {
-              onValidationChange?.(timeoutValidation);
-            }, 0);
-            return;
-          }
-
-          console.error('Handle validation error:', error);
-
-          // Provide more specific error messages
-          let errorMessage = 'Network error';
-          if (error instanceof TypeError && error.message.includes('fetch')) {
-            errorMessage = 'Connection failed - check your internet';
-          } else if (error instanceof Error) {
-            errorMessage = error.message.includes('HTTP')
-              ? 'Server error - please try again'
-              : 'Network error';
-          }
-
-          let errorValidation: HandleValidationState;
-
-          setHandleValidation(prev => {
-            errorValidation = {
+            setHandleValidation(prev => ({
               ...prev,
               available: false,
               checking: false,
               error: errorMessage,
+            }));
+
+            lastValidatedRef.current = {
+              handle: handleValue,
+              available: false,
             };
-            return errorValidation;
-          });
-
-          // Notify parent after state update
-          setTimeout(() => {
-            onValidationChange?.(errorValidation);
-          }, 0);
-
-          lastValidatedRef.current = { handle: handleValue, available: false };
-        }
-      }, 500), // Reduced debounce from 1000ms to 500ms for better UX
-    [clientValidation.valid, onValidationChange]
+          } finally {
+            clearTimeout(timeoutId);
+          }
+        },
+        500
+      ),
+    [clientValidation.valid]
   );
 
   // Update validation state when handle or client validation changes
   useEffect(() => {
-    let newValidation: HandleValidationState;
+    setHandleValidation(prevValidation => ({
+      ...prevValidation,
+      clientValid: clientValidation.valid,
+      error: clientValidation.error,
+      suggestions: usernameSuggestions,
+      available: clientValidation.valid ? prevValidation.available : false,
+      checking: clientValidation.valid ? prevValidation.checking : false,
+    }));
 
-    // Update client validation state immediately using functional update to avoid dependency on handleValidation
-    setHandleValidation(prevValidation => {
-      newValidation = {
-        ...prevValidation,
-        clientValid: clientValidation.valid,
-        error: clientValidation.error,
-        suggestions: usernameSuggestions,
-        available: clientValidation.valid ? prevValidation.available : false,
-      };
-
-      return newValidation;
-    });
-
-    // Notify parent of changes after state update
-    setTimeout(() => {
-      if (newValidation) {
-        onValidationChange?.(newValidation);
+    if (!clientValidation.valid || value.length < 3 || !showAvailability) {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-    }, 0);
-
-    // Only trigger API validation for format-valid handles
-    if (clientValidation.valid && value.length >= 3) {
-      debouncedApiValidation(value);
+      requestIdRef.current += 1;
+      setHandleValidation(prev => ({
+        ...prev,
+        checking: false,
+        available: false,
+      }));
+      return;
     }
+
+    const nextRequestId = requestIdRef.current + 1;
+    requestIdRef.current = nextRequestId;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    setHandleValidation(prev => ({
+      ...prev,
+      checking: true,
+      error: null,
+    }));
+
+    debouncedApiValidation(value, nextRequestId, abortController);
   }, [
     value,
     clientValidation,
     usernameSuggestions,
     debouncedApiValidation,
-    onValidationChange,
+    showAvailability,
   ]);
 
-  const getValidationIcon = () => {
+  useEffect(() => {
+    onValidationChange?.(handleValidation);
+  }, [handleValidation, onValidationChange]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const ValidationStatusIcon = () => {
+    if (!showAvailability) return null;
     if (handleValidation.checking) {
       return <LoadingSpinner size='sm' tone='muted' />;
     }
-    if (
-      handleValidation.available &&
-      !handleValidation.checking &&
-      clientValidation.valid
-    ) {
+    if (handleValidation.available && clientValidation.valid) {
       return (
-        <div className='w-4 h-4 bg-green-500 rounded-full flex items-center justify-center'>
-          <svg
-            className='w-2.5 h-2.5 text-white'
-            fill='currentColor'
-            viewBox='0 0 20 20'
-          >
-            <path
-              fillRule='evenodd'
-              d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-              clipRule='evenodd'
-            />
-          </svg>
-        </div>
+        <span
+          aria-hidden
+          className='flex size-4 items-center justify-center rounded-full bg-surface-2 text-[color:var(--accent-speed)]'
+        >
+          <Icon name='Check' className='size-3' strokeWidth={2.5} />
+        </span>
       );
     }
     if (handleValidation.error || !clientValidation.valid) {
       return (
-        <div className='w-4 h-4 bg-red-500 rounded-full flex items-center justify-center'>
-          <svg
-            className='w-2.5 h-2.5 text-white'
-            fill='currentColor'
-            viewBox='0 0 20 20'
-          >
-            <path
-              fillRule='evenodd'
-              d='M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z'
-              clipRule='evenodd'
-            />
-          </svg>
-        </div>
+        <span
+          aria-hidden
+          className='flex size-4 items-center justify-center rounded-full bg-surface-2 text-destructive'
+        >
+          <Icon name='X' className='size-3' strokeWidth={2.5} />
+        </span>
       );
     }
     return null;
@@ -349,7 +312,7 @@ export function SmartHandleInput({
     <div className={`space-y-2 ${className}`}>
       {/* Input with prefix and validation icon */}
       <div className='relative'>
-        <div className='absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400 text-sm font-mono z-10'>
+        <div className='absolute left-3 top-1/2 -translate-y-1/2 z-10 text-sm font-mono text-secondary-token'>
           {prefix}
         </div>
         <Input
@@ -360,6 +323,7 @@ export function SmartHandleInput({
           disabled={disabled}
           className='font-mono pl-20'
           inputClassName='font-mono'
+          id={inputId}
           validationState={
             !value
               ? null
@@ -371,24 +335,20 @@ export function SmartHandleInput({
                     ? 'pending'
                     : null
           }
-          statusIcon={showAvailability ? getValidationIcon() : undefined}
-          aria-describedby='handle-status handle-preview'
+          statusIcon={<ValidationStatusIcon />}
+          aria-describedby={`${statusId} ${previewId}`}
           aria-label='Enter your desired handle'
           autoCapitalize='none'
           autoCorrect='off'
           autoComplete='off'
           inputMode='text'
-          id='handle-input'
         />
       </div>
 
       {/* Live preview */}
-      <div
-        className='text-xs text-gray-500 dark:text-gray-400'
-        id='handle-preview'
-      >
+      <div className='text-xs text-secondary-token' id={previewId}>
         Your profile will be live at{' '}
-        <span className='font-mono text-gray-700 dark:text-gray-300'>
+        <span className='font-mono text-primary-token'>
           {prefix}
           {value || placeholder}
         </span>
@@ -399,11 +359,11 @@ export function SmartHandleInput({
         className={`text-xs min-h-[1.25rem] transition-all duration-300 ${
           statusMessage
             ? handleValidation.available && clientValidation.valid
-              ? 'text-green-600 dark:text-green-400 opacity-100'
-              : 'text-red-600 dark:text-red-400 opacity-100'
+              ? 'text-[color:var(--accent-speed)] opacity-100'
+              : 'text-destructive opacity-100'
             : 'opacity-0'
         }`}
-        id='handle-status'
+        id={statusId}
         role='status'
         aria-live='polite'
       >
@@ -414,16 +374,14 @@ export function SmartHandleInput({
       {/* Username suggestions */}
       {formatHints && handleValidation.suggestions.length > 0 && (
         <div className='space-y-2'>
-          <p className='text-xs text-gray-600 dark:text-gray-400'>
-            Try these instead:
-          </p>
+          <p className='text-xs text-secondary-token'>Try these instead:</p>
           <div className='flex flex-wrap gap-2'>
             {handleValidation.suggestions.slice(0, 3).map(suggestion => (
               <button
                 key={suggestion}
                 type='button'
                 onClick={() => onChange(suggestion)}
-                className='text-xs px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md transition-colors duration-150 font-mono'
+                className='text-xs px-3 py-1.5 rounded-md transition-colors duration-150 font-mono bg-surface-2 hover:bg-surface-3 text-primary-token'
                 disabled={disabled}
               >
                 @{suggestion}
@@ -435,7 +393,7 @@ export function SmartHandleInput({
 
       {/* Format hints */}
       {formatHints && !value && (
-        <div className='text-xs text-gray-500 dark:text-gray-400 space-y-1'>
+        <div className='text-xs text-secondary-token space-y-1'>
           <p>Great handles are:</p>
           <ul className='list-disc list-inside space-y-0.5 ml-2'>
             <li>Short and memorable (3-15 characters)</li>

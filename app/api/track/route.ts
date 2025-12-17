@@ -182,8 +182,36 @@ export async function POST(request: NextRequest) {
     }
 
     const [clickEvent] = await withSystemIngestionSession(async tx => {
-      const [existingMember] = await tx
-        .select({
+      const [insertedMember] = await tx
+        .insert(audienceMembers)
+        .values({
+          creatorProfileId: profile.id,
+          fingerprint,
+          type: 'anonymous',
+          displayName: 'Visitor',
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date(),
+          visits: 0,
+          engagementScore: 0,
+          intentLevel: 'low',
+          deviceType: audienceDeviceType,
+          referrerHistory: referrer
+            ? [{ url: referrer.trim(), timestamp: new Date().toISOString() }]
+            : [],
+          latestActions: [],
+          geoCity: geoCity ?? null,
+          geoCountry: geoCountry ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoNothing({
+          target: [
+            audienceMembers.creatorProfileId,
+            audienceMembers.fingerprint,
+          ],
+          where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
+        })
+        .returning({
           id: audienceMembers.id,
           visits: audienceMembers.visits,
           engagementScore: audienceMembers.engagementScore,
@@ -192,66 +220,11 @@ export async function POST(request: NextRequest) {
           geoCountry: audienceMembers.geoCountry,
           deviceType: audienceMembers.deviceType,
           spotifyConnected: audienceMembers.spotifyConnected,
-        })
-        .from(audienceMembers)
-        .where(
-          and(
-            eq(audienceMembers.creatorProfileId, profile.id),
-            eq(audienceMembers.fingerprint, fingerprint)
-          )
-        )
-        .limit(1);
+        });
 
-      const resolvedMember = await (async () => {
-        if (existingMember) {
-          return existingMember;
-        }
-
-        const [inserted] = await tx
-          .insert(audienceMembers)
-          .values({
-            creatorProfileId: profile.id,
-            fingerprint,
-            type: 'anonymous',
-            displayName: 'Visitor',
-            firstSeenAt: new Date(),
-            lastSeenAt: new Date(),
-            visits: 0,
-            engagementScore: 0,
-            intentLevel: 'low',
-            deviceType: audienceDeviceType,
-            referrerHistory: referrer
-              ? [{ url: referrer.trim(), timestamp: new Date().toISOString() }]
-              : [],
-            latestActions: [],
-            geoCity: geoCity ?? null,
-            geoCountry: geoCountry ?? null,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .onConflictDoNothing({
-            target: [
-              audienceMembers.creatorProfileId,
-              audienceMembers.fingerprint,
-            ],
-            where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
-          })
-          .returning({
-            id: audienceMembers.id,
-            visits: audienceMembers.visits,
-            engagementScore: audienceMembers.engagementScore,
-            latestActions: audienceMembers.latestActions,
-            geoCity: audienceMembers.geoCity,
-            geoCountry: audienceMembers.geoCountry,
-            deviceType: audienceMembers.deviceType,
-            spotifyConnected: audienceMembers.spotifyConnected,
-          });
-
-        if (inserted) {
-          return inserted;
-        }
-
-        const [loaded] = await tx
+      const resolvedMember =
+        insertedMember ??
+        (await tx
           .select({
             id: audienceMembers.id,
             visits: audienceMembers.visits,
@@ -269,14 +242,11 @@ export async function POST(request: NextRequest) {
               eq(audienceMembers.fingerprint, fingerprint)
             )
           )
-          .limit(1);
+          .limit(1))?.[0];
 
-        if (!loaded) {
-          throw new Error('Unable to resolve audience member');
-        }
-
-        return loaded;
-      })();
+      if (!resolvedMember) {
+        throw new Error('Unable to resolve audience member');
+      }
 
       const now = new Date();
       const existingActions = Array.isArray(resolvedMember.latestActions)
@@ -352,19 +322,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Increment social link click count if applicable
-    if (linkType === 'social' && linkId) {
-      try {
-        await db
-          .update(socialLinks)
-          .set({
-            clicks: drizzleSql`${socialLinks.clicks} + 1`,
-            updatedAt: new Date(),
-          })
-          .where(eq(socialLinks.id, linkId));
-      } catch {
-        // Ignore failures (often blocked by RLS for public requests)
-      }
+    const socialLinkUpdate =
+      linkType === 'social' && linkId
+        ? db
+            .update(socialLinks)
+            .set({
+              clicks: drizzleSql`${socialLinks.clicks} + 1`,
+              updatedAt: new Date(),
+            })
+            .where(eq(socialLinks.id, linkId))
+            .catch(() => {})
+        : null;
+
+    if (socialLinkUpdate) {
+      void socialLinkUpdate;
     }
 
     return NextResponse.json(
