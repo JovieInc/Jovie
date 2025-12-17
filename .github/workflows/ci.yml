@@ -62,7 +62,6 @@ jobs:
   ci-guardrails:
     name: Guardrails (proxy + format)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -77,7 +76,6 @@ jobs:
   ci-fast-checks:
     name: Fast checks (typecheck + lint)
     # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -275,7 +273,6 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     needs: [ci-fast-checks, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
