@@ -223,6 +223,7 @@ describe('Base Extraction Utilities', () => {
     const config: StrategyConfig = {
       platformId: 'test',
       platformName: 'Test',
+      canonicalHost: 'test.com',
       validHosts: new Set(['test.com', 'www.test.com']),
       defaultTimeoutMs: 10000,
     };
@@ -256,6 +257,22 @@ describe('Base Extraction Utilities', () => {
     it('strips @ prefix from handle', () => {
       const result = validatePlatformUrl('https://test.com/@username', config);
       expect(result.handle).toBe('username');
+    });
+
+    it('uses the configured canonical host when normalizing URLs', () => {
+      const customConfig: StrategyConfig = {
+        ...config,
+        canonicalHost: 'canonical.test.com',
+        validHosts: new Set(['canonical.test.com', 'www.test.com']),
+      };
+
+      const result = validatePlatformUrl(
+        'https://www.test.com/UserName',
+        customConfig
+      );
+
+      expect(result.valid).toBe(true);
+      expect(result.normalized).toBe('https://canonical.test.com/username');
     });
   });
 

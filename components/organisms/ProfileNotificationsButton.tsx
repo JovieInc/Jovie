@@ -1,0 +1,60 @@
+'use client';
+
+import { Button } from '@jovie/ui';
+import React from 'react';
+import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
+
+type ProfileNotificationsButtonProps = {
+  hasActiveSubscriptions: boolean;
+  notificationsState: ProfileNotificationsState;
+  onClick: () => void;
+  ariaExpanded?: boolean;
+  buttonRef?: React.RefObject<HTMLButtonElement>;
+};
+
+export function ProfileNotificationsButton({
+  ariaExpanded,
+  buttonRef,
+  hasActiveSubscriptions,
+  notificationsState,
+  onClick,
+}: ProfileNotificationsButtonProps) {
+  const isEditing = notificationsState === 'editing';
+
+  return (
+    <Button
+      ref={buttonRef}
+      className='relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/80 p-0 text-foreground shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+      variant='ghost'
+      aria-expanded={ariaExpanded}
+      aria-label={
+        hasActiveSubscriptions
+          ? 'Manage notification preferences'
+          : 'Subscribe to notifications'
+      }
+      aria-pressed={isEditing}
+      onClick={onClick}
+    >
+      <svg
+        className='h-5 w-5 text-foreground'
+        fill='none'
+        stroke='currentColor'
+        viewBox='0 0 24 24'
+        aria-hidden
+      >
+        <path
+          strokeLinecap='round'
+          strokeLinejoin='round'
+          strokeWidth={2}
+          d='M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+        />
+      </svg>
+      {hasActiveSubscriptions ? (
+        <span
+          aria-hidden
+          className='absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary'
+        />
+      ) : null}
+    </Button>
+  );
+}
