@@ -1,6 +1,6 @@
 import { performance } from 'node:perf_hooks';
-import { describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
+import { describe, expect, it, vi } from 'vitest';
 import { LinkType } from '@/types/db';
 
 const DEFAULT_MEMBER = {
@@ -71,7 +71,9 @@ function buildTx(state: BenchmarkState) {
     const isClickEvent = !isConflictPath;
     const isAudience = isConflictPath;
 
-    await sleep(isClickEvent ? state.delays.clickInsert : state.delays.audienceInsert);
+    await sleep(
+      isClickEvent ? state.delays.clickInsert : state.delays.audienceInsert
+    );
 
     if (isClickEvent) {
       const eventId = `click-${state.clickEvents.length + 1}`;
@@ -139,7 +141,9 @@ async function runBenchmark(sampleSize: number) {
   vi.resetModules();
 
   vi.doMock('@/lib/ingestion/session', () => ({
-    withSystemIngestionSession: async (cb: (tx: ReturnType<typeof buildTx>) => Promise<unknown>) => cb(buildTx(state)),
+    withSystemIngestionSession: async (
+      cb: (tx: ReturnType<typeof buildTx>) => Promise<unknown>
+    ) => cb(buildTx(state)),
   }));
 
   vi.doMock('@/lib/db', () => ({
