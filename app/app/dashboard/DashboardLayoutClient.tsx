@@ -24,7 +24,10 @@ import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
 import type { DashboardBreadcrumbItem } from '@/types';
 
 import type { DashboardData } from './actions';
-import { PreviewPanelProvider, usePreviewPanelContext } from './PreviewPanelContext';
+import {
+  PreviewPanelProvider,
+  usePreviewPanelContext,
+} from './PreviewPanelContext';
 
 type TableMeta = {
   rowCount: number | null;
@@ -235,7 +238,10 @@ function DashboardLayoutInner({
   const { tableMeta } = useTableMeta();
 
   const showPreview =
-    previewEnabled && !!previewContext && isProfileRoute && !isContactTableRoute;
+    previewEnabled &&
+    !!previewContext &&
+    isProfileRoute &&
+    !isContactTableRoute;
 
   // Ensure preview is closed/hidden on contact-table routes
   useEffect(() => {

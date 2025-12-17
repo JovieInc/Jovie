@@ -1,6 +1,6 @@
 'use client';
 
-import { motion, useReducedMotion } from 'framer-motion';
+import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 
 export interface FeatureCardProps {
   /** Feature title */
@@ -40,72 +40,76 @@ export function FeatureCard({
   // Check if user prefers reduced motion
   const prefersReducedMotion = useReducedMotion();
 
-  // Adjust animation settings based on motion preference
-  const containerAnimationProps =
-    interactive && !prefersReducedMotion
-      ? {
-          whileHover: { scale: 1.02, y: -5 },
-          whileFocus: { scale: 1.02, y: -5 },
-          transition: {
-            type: 'spring',
-            stiffness: 400,
-            damping: 17,
-            mass: 0.8,
-          },
-        }
-      : interactive && prefersReducedMotion
-        ? {
-            whileHover: { y: -2 },
-            whileFocus: { y: -2 },
-            transition: { duration: 0.1 },
-          }
-        : {};
+  const containerWhileHover: MotionProps['whileHover'] = interactive
+    ? prefersReducedMotion
+      ? { y: -2 }
+      : { scale: 1.02, y: -5 }
+    : undefined;
 
-  // Card animation props
-  const cardAnimationProps =
-    interactive && !prefersReducedMotion
-      ? {
-          whileHover: {
-            boxShadow:
-              '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-            borderColor: 'rgb(209, 213, 219)',
-          },
-          transition: { type: 'spring', stiffness: 400, damping: 17 },
-        }
-      : interactive && prefersReducedMotion
-        ? {
-            whileHover: { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' },
-            transition: { duration: 0.1 },
-          }
-        : {};
+  const containerWhileFocus: MotionProps['whileFocus'] = interactive
+    ? prefersReducedMotion
+      ? { y: -2 }
+      : { scale: 1.02, y: -5 }
+    : undefined;
 
-  // Glow effect animation props
-  const glowAnimationProps =
-    interactive && !prefersReducedMotion
-      ? {
-          initial: { opacity: 0 },
-          whileHover: { opacity: 1 },
-          transition: { duration: 0.3 },
+  const containerTransition: MotionProps['transition'] = interactive
+    ? prefersReducedMotion
+      ? { duration: 0.1 }
+      : {
+          type: 'spring',
+          stiffness: 400,
+          damping: 17,
+          mass: 0.8,
         }
-      : interactive && prefersReducedMotion
-        ? {
-            initial: { opacity: 0 },
-            whileHover: { opacity: 0.5 },
-            transition: { duration: 0.1 },
-          }
-        : {};
+    : undefined;
+
+  const cardWhileHover: MotionProps['whileHover'] = interactive
+    ? prefersReducedMotion
+      ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+      : {
+          boxShadow:
+            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          borderColor: 'rgb(209, 213, 219)',
+        }
+    : undefined;
+
+  const cardTransition: MotionProps['transition'] = interactive
+    ? prefersReducedMotion
+      ? { duration: 0.1 }
+      : { type: 'spring', stiffness: 400, damping: 17 }
+    : undefined;
+
+  const glowInitial: MotionProps['initial'] = interactive
+    ? { opacity: 0 }
+    : undefined;
+
+  const glowWhileHover: MotionProps['whileHover'] = interactive
+    ? prefersReducedMotion
+      ? { opacity: 0.5 }
+      : { opacity: 1 }
+    : undefined;
+
+  const glowTransition: MotionProps['transition'] = interactive
+    ? prefersReducedMotion
+      ? { duration: 0.1 }
+      : { duration: 0.3 }
+    : undefined;
 
   return (
     <motion.div
       className={`relative ${className}`}
       initial={{ scale: 1, y: 0 }}
-      {...containerAnimationProps}
+      whileHover={containerWhileHover}
+      whileFocus={containerWhileFocus}
+      transition={containerTransition}
     >
       {/* Hover glow effect */}
       {interactive && (
         <motion.div
           className='absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur'
-          {...glowAnimationProps}
+          initial={glowInitial}
+          whileHover={glowWhileHover}
+          transition={glowTransition}
         />
       )}
 
@@ -114,7 +118,8 @@ export function FeatureCard({
           relative bg-gray-50/80 dark:bg-white/5 backdrop-blur-sm 
           border border-gray-200 dark:border-white/10 rounded-2xl p-8
         `}
-        {...cardAnimationProps}
+        whileHover={cardWhileHover}
+        transition={cardTransition}
       >
         {/* Icon */}
         <div
