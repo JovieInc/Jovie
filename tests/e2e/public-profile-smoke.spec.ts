@@ -24,7 +24,9 @@ test.describe('Public Profile Smoke @smoke', () => {
     await expect(page).toHaveTitle(/Dua Lipa/i, { timeout: 10000 });
 
     // Verify h1 displays creator name
-    await expect(page.locator('h1')).toContainText('Dua Lipa', { timeout: 10000 });
+    await expect(page.locator('h1')).toContainText('Dua Lipa', {
+      timeout: 10000,
+    });
 
     // Verify profile image is visible (any profile image)
     const profileImage = page.locator('img').first();
