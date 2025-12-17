@@ -58,6 +58,8 @@ const LINKTREE_HANDLE_REGEX =
 // Regex to extract href attributes
 const HREF_REGEX = /href\s*=\s*["']([^"'#]+)["']/gi;
 
+type StructuredLink = { url?: string | null; title?: string | null };
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -280,14 +282,56 @@ export function extractLinktree(html: string): ExtractionResult {
       null
   );
 
-  // Extract links using custom logic for Linktree
   const links: ExtractionResult['links'] = [];
   const seen = new Set<string>();
-  let match: RegExpExecArray | null;
 
-  // Reset regex state
+  const addLink = (
+    rawUrl: string | undefined | null,
+    title?: string | null
+  ) => {
+    if (!rawUrl) return;
+
+    try {
+      const normalizedHref = normalizeUrl(rawUrl);
+      const parsed = new URL(normalizedHref);
+
+      // Require https and skip internal Linktree or asset hosts
+      if (parsed.protocol !== 'https:') return;
+      if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) return;
+
+      const detected = detectPlatform(normalizedHref);
+      if (!detected.isValid) return;
+
+      const key = canonicalIdentity({
+        platform: detected.platform,
+        normalizedUrl: detected.normalizedUrl,
+      });
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      links.push({
+        url: detected.normalizedUrl,
+        platformId: detected.platform.id,
+        title: detected.suggestedTitle ?? title ?? undefined,
+        sourcePlatform: 'linktree',
+        evidence: {
+          sources: ['linktree'],
+          signals: ['linktree_profile_link'],
+        },
+      });
+    } catch {
+      // Skip unparseable URLs
+      return;
+    }
+  };
+
+  for (const structuredLink of extractStructuredLinks(nextData)) {
+    addLink(structuredLink.url, structuredLink.title);
+  }
+
+  // Fallback: extract href attributes to maintain recall
   HREF_REGEX.lastIndex = 0;
-
+  let match: RegExpExecArray | null;
   while ((match = HREF_REGEX.exec(html)) !== null) {
     const rawHref = match[1];
     if (!rawHref || rawHref.startsWith('#')) continue;
@@ -305,40 +349,7 @@ export function extractLinktree(html: string): ExtractionResult {
     // Require explicit https scheme (reject http or protocol-relative)
     if (!normalized.startsWith('https://')) continue;
 
-    try {
-      const normalizedHref = normalizeUrl(rawHref);
-      const parsed = new URL(normalizedHref);
-
-      // Skip internal Linktree links
-      if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) {
-        continue;
-      }
-
-      const detected = detectPlatform(normalizedHref);
-      if (!detected.isValid) continue;
-
-      // Dedupe by canonical identity
-      const key = canonicalIdentity({
-        platform: detected.platform,
-        normalizedUrl: detected.normalizedUrl,
-      });
-      if (seen.has(key)) continue;
-      seen.add(key);
-
-      links.push({
-        url: detected.normalizedUrl,
-        platformId: detected.platform.id,
-        title: detected.suggestedTitle,
-        sourcePlatform: 'linktree',
-        evidence: {
-          sources: ['linktree'],
-          signals: ['linktree_profile_link'],
-        },
-      });
-    } catch {
-      // Skip unparseable URLs
-      continue;
-    }
+    addLink(rawHref);
   }
 
   // Extract display name from meta tags
@@ -369,4 +380,84 @@ export function extractLinktree(html: string): ExtractionResult {
     null;
 
   return createExtractionResult(links, displayName, avatarUrl);
+}
+
+function extractStructuredLinks(
+  nextData: LinktreePageProps | null
+): StructuredLink[] {
+  if (!nextData?.props?.pageProps) {
+    return [];
+  }
+
+  const structured: StructuredLink[] = [];
+  const pageProps = nextData.props.pageProps;
+
+  const candidateCollections: unknown[] = [
+    pageProps.links,
+    pageProps.allLinks,
+    (pageProps as { page?: { links?: unknown } }).page?.links,
+    (pageProps as { data?: { links?: unknown } }).data?.links,
+    (pageProps as { profile?: { links?: unknown } }).profile?.links,
+    (pageProps as { linkData?: unknown }).linkData,
+  ];
+
+  const dehydratedQueries = (
+    pageProps as { dehydratedState?: { queries?: unknown } }
+  ).dehydratedState?.queries;
+  if (Array.isArray(dehydratedQueries)) {
+    for (const query of dehydratedQueries) {
+      if (!query || typeof query !== 'object') continue;
+      const data = (query as { state?: { data?: unknown } }).state?.data;
+      if (data && typeof data === 'object') {
+        candidateCollections.push((data as { links?: unknown }).links);
+        candidateCollections.push(
+          (data as { page?: { links?: unknown } }).page?.links
+        );
+      }
+    }
+  }
+
+  const seen = new Set<string>();
+
+  const collect = (value: unknown) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collect(entry);
+      }
+      return;
+    }
+
+    if (typeof value !== 'object') return;
+    const candidate = value as Record<string, unknown>;
+    const urlCandidate = (candidate.url ??
+      candidate.linkUrl ??
+      candidate.href) as string | null | undefined;
+
+    if (typeof urlCandidate === 'string') {
+      const key = urlCandidate.trim();
+      if (!seen.has(key)) {
+        seen.add(key);
+        structured.push({
+          url: urlCandidate,
+          title:
+            (candidate.title as string | undefined) ??
+            (candidate.name as string | undefined) ??
+            (candidate.label as string | undefined) ??
+            (candidate.text as string | undefined),
+        });
+      }
+    }
+
+    if (candidate.links) collect(candidate.links);
+    if (candidate.items) collect(candidate.items);
+    if (candidate.children) collect(candidate.children);
+    if (candidate.buttons) collect(candidate.buttons);
+  };
+
+  for (const collection of candidateCollections) {
+    collect(collection);
+  }
+
+  return structured;
 }

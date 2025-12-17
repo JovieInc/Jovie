@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import {
@@ -9,6 +11,9 @@ import {
   normalizeHandle,
   validateBeaconsUrl,
 } from '@/lib/ingestion/strategies/beacons';
+
+const readFixture = (name: string) =>
+  readFileSync(path.join(__dirname, 'fixtures', 'beacons', name), 'utf-8');
 
 describe('Beacons Strategy', () => {
   describe('isBeaconsUrl', () => {
@@ -307,6 +312,29 @@ describe('Beacons Strategy', () => {
         'beacons_profile_link'
       );
       expect(result.links[0]?.evidence?.sources).toContain('beacons');
+    });
+
+    it('prefers structured data sources before href scanning', () => {
+      const html = readFixture('structured.html');
+      const result = extractBeacons(html);
+
+      const platforms = result.links.map(link => link.platformId).sort();
+      expect(platforms).toEqual(['instagram', 'spotify', 'youtube-music']);
+      expect(
+        result.links.some(link => link.url.includes('open.spotify.com'))
+      ).toBe(true);
+      // Should skip internal beacons navigation links
+      expect(
+        result.links.some(link => link.url.includes('beacons.ai/internal'))
+      ).toBe(false);
+    });
+
+    it('falls back when structured data is absent', () => {
+      const html = readFixture('edge-case.html');
+      const result = extractBeacons(html);
+
+      const platforms = result.links.map(link => link.platformId).sort();
+      expect(platforms).toEqual(['instagram', 'soundcloud', 'tiktok']);
     });
   });
 

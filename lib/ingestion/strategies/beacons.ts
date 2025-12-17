@@ -5,7 +5,11 @@
  * Hardened for server-side use with proper error handling, timeouts, and retries.
  */
 
-import { normalizeUrl } from '@/lib/utils/platform-detection';
+import {
+  canonicalIdentity,
+  detectPlatform,
+  normalizeUrl,
+} from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
   normalizeHandle as baseNormalizeHandle,
@@ -14,6 +18,7 @@ import {
   ExtractionError,
   extractLinks,
   extractMetaContent,
+  extractScriptJson,
   type FetchOptions,
   fetchDocument,
   type StrategyConfig,
@@ -56,6 +61,8 @@ const SKIP_HOSTS = new Set([
 // Beacons allows slightly more flexible handles than Linktree
 const BEACONS_HANDLE_REGEX =
   /^[a-z0-9][a-z0-9_.]{0,28}[a-z0-9]$|^[a-z0-9]{1,2}$/;
+
+type StructuredLink = { url?: string | null; title?: string | null };
 
 // ============================================================================
 // Public API
@@ -238,12 +245,60 @@ export async function fetchBeaconsDocument(
  * 4. Beacons-specific data attributes
  */
 export function extractBeacons(html: string): ExtractionResult {
-  // Extract links
-  const links = extractLinks(html, {
+  const links: ExtractionResult['links'] = [];
+  const seen = new Set<string>();
+
+  const addLink = (
+    rawUrl: string | undefined | null,
+    title?: string | null
+  ) => {
+    if (!rawUrl) return;
+
+    try {
+      const normalizedUrl = normalizeUrl(rawUrl);
+      const parsed = new URL(normalizedUrl);
+      if (parsed.protocol !== 'https:') return;
+      if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) return;
+
+      const detected = detectPlatform(normalizedUrl);
+      if (!detected.isValid) return;
+
+      const key = canonicalIdentity({
+        platform: detected.platform,
+        normalizedUrl: detected.normalizedUrl,
+      });
+      if (seen.has(key)) return;
+      seen.add(key);
+
+      links.push({
+        url: detected.normalizedUrl,
+        platformId: detected.platform.id,
+        title: detected.suggestedTitle ?? title ?? undefined,
+        sourcePlatform: 'beacons',
+        evidence: {
+          sources: ['beacons'],
+          signals: ['beacons_profile_link'],
+        },
+      });
+    } catch {
+      return;
+    }
+  };
+
+  const structuredLinks = extractBeaconsStructuredLinks(html);
+  for (const link of structuredLinks) {
+    addLink(link.url, link.title);
+  }
+
+  const fallbackLinks = extractLinks(html, {
     skipHosts: SKIP_HOSTS,
     sourcePlatform: 'beacons',
     sourceSignal: 'beacons_profile_link',
   });
+
+  for (const link of fallbackLinks) {
+    addLink(link.url, link.title);
+  }
 
   // Extract display name from meta tags
   let displayName =
@@ -446,3 +501,95 @@ function extractBeaconsSpecificData(html: string): {
 // ============================================================================
 
 export { ExtractionError } from './base';
+
+interface BeaconsPageProps {
+  props?: {
+    pageProps?: {
+      links?: unknown;
+      profile?: { links?: unknown };
+      data?: { links?: unknown };
+      dehydratedState?: { queries?: unknown };
+    };
+  };
+}
+
+function extractBeaconsStructuredLinks(html: string): StructuredLink[] {
+  const nextData = extractScriptJson<BeaconsPageProps>(html, '__NEXT_DATA__');
+  const structured: StructuredLink[] = [];
+  const seen = new Set<string>();
+
+  const candidateCollections: unknown[] = [];
+
+  const pageProps = nextData?.props?.pageProps;
+  if (pageProps) {
+    candidateCollections.push(pageProps.links);
+    candidateCollections.push(pageProps.profile?.links);
+    candidateCollections.push(pageProps.data?.links);
+
+    const dehydrated = pageProps.dehydratedState?.queries;
+    if (Array.isArray(dehydrated)) {
+      for (const query of dehydrated) {
+        if (!query || typeof query !== 'object') continue;
+        const data = (query as { state?: { data?: unknown } }).state?.data;
+        if (data && typeof data === 'object') {
+          candidateCollections.push((data as { links?: unknown }).links);
+          candidateCollections.push(
+            (data as { page?: { links?: unknown } }).page?.links
+          );
+        }
+      }
+    }
+  }
+
+  const collect = (value: unknown) => {
+    if (!value) return;
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        collect(entry);
+      }
+      return;
+    }
+
+    if (typeof value !== 'object') return;
+    const candidate = value as Record<string, unknown>;
+    const urlCandidate = (candidate.url ??
+      candidate.linkUrl ??
+      candidate.href) as string | null | undefined;
+
+    if (typeof urlCandidate === 'string') {
+      const key = urlCandidate.trim();
+      if (!seen.has(key)) {
+        seen.add(key);
+        structured.push({
+          url: urlCandidate,
+          title:
+            (candidate.title as string | undefined) ??
+            (candidate.name as string | undefined) ??
+            (candidate.label as string | undefined) ??
+            (candidate.text as string | undefined),
+        });
+      }
+    }
+
+    if (candidate.links) collect(candidate.links);
+    if (candidate.items) collect(candidate.items);
+    if (candidate.children) collect(candidate.children);
+    if (candidate.buttons) collect(candidate.buttons);
+  };
+
+  for (const collection of candidateCollections) {
+    collect(collection);
+  }
+
+  const dataHrefRegex = /data-(?:href|url)=["'](https?:[^"'#\s]+)["']/gi;
+  let match: RegExpExecArray | null;
+  while ((match = dataHrefRegex.exec(html)) !== null) {
+    const rawUrl = match[1];
+    if (!seen.has(rawUrl)) {
+      seen.add(rawUrl);
+      structured.push({ url: rawUrl, title: undefined });
+    }
+  }
+
+  return structured;
+}
