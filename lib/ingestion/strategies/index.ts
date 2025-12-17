@@ -77,6 +77,10 @@ export type IngestionPlatform =
 
 /**
  * Detects which ingestion platform a URL belongs to.
+ *
+ * Policy note: Twitch and OnlyFans are intentionally excluded here. We
+ * support detection/normalization for those platforms, but ingestion/scraping
+ * remains disallowed by default (see docs/network-support-matrix.md).
  */
 export function detectIngestionPlatform(url: string): IngestionPlatform {
   if (isLinktreeUrl(url)) {

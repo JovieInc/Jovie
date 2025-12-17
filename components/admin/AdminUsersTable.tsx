@@ -16,6 +16,7 @@ import { useMemo, useState } from 'react';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
+import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
 import {
@@ -61,33 +62,24 @@ export function AdminUsersTable({
   const notifications = useNotifications();
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
 
-  const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
-  const canPrev = page > 1;
-  const canNext = page < totalPages;
-
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = total === 0 ? 0 : Math.min(page * pageSize, total);
-
-  const buildHref = (
-    targetPage: number,
-    overrides?: {
-      sort?: AdminUsersSort;
-      pageSize?: number;
-    },
-    includeSearch = true
-  ): string => {
-    const params = new URLSearchParams();
-    params.set('page', String(targetPage));
-    params.set('pageSize', String(overrides?.pageSize ?? pageSize));
-    params.set('sort', overrides?.sort ?? sort);
-    if (includeSearch && search) params.set('q', search);
-    const query = params.toString();
-    return query.length > 0 ? `/app/admin/users?${query}` : '/app/admin/users';
-  };
-
-  const prevHref = canPrev ? buildHref(page - 1) : undefined;
-  const nextHref = canNext ? buildHref(page + 1) : undefined;
-  const clearHref = buildHref(1, undefined, false);
+  const {
+    totalPages,
+    canPrev,
+    canNext,
+    from,
+    to,
+    prevHref,
+    nextHref,
+    clearHref,
+    buildHref,
+  } = useAdminTablePaginationLinks<AdminUsersSort>({
+    basePath: '/app/admin/users',
+    page,
+    pageSize,
+    search,
+    sort,
+    total,
+  });
 
   const rowIds = useMemo(() => users.map(user => user.id), [users]);
   const {
@@ -99,7 +91,7 @@ export function AdminUsersTable({
   } = useRowSelection(rowIds);
 
   const createSortHref = (column: UserSortableColumnKey) =>
-    buildHref(1, { sort: getNextUserSort(sort, column) });
+    buildHref({ page: 1, sort: getNextUserSort(sort, column) });
 
   const selectedUsers = useMemo(
     () => users.filter(user => selectedIds.has(user.id)),
@@ -197,7 +189,7 @@ export function AdminUsersTable({
             <AdminPageSizeSelect
               initialPageSize={pageSize}
               onPageSizeChange={nextPageSize => {
-                router.push(buildHref(1, { pageSize: nextPageSize }));
+                router.push(buildHref({ page: 1, pageSize: nextPageSize }));
               }}
             />
             <div className='flex items-center gap-2'>

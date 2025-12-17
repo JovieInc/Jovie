@@ -1,4 +1,13 @@
-import { and, asc, sql as drizzleSql, eq, isNull, lte, or } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  or,
+} from 'drizzle-orm';
 import { z } from 'zod';
 import {
   creatorProfiles,
@@ -13,6 +22,7 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { ExtractionError } from './strategies/base';
 import {
   extractBeacons,
   fetchBeaconsDocument,
@@ -40,16 +50,86 @@ import { type ExtractionResult } from './types';
 const DEFAULT_MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 5000; // 5 seconds
 const MAX_BACKOFF_MS = 300000; // 5 minutes
+const RATE_LIMIT_BASE_BACKOFF_MS = 30000; // 30 seconds
+const RATE_LIMIT_MAX_BACKOFF_MS = 900000; // 15 minutes
+
+const MAX_CONCURRENT_JOBS_PER_HOST = 2;
+const CLAIM_CANDIDATE_MULTIPLIER = 3;
 
 const STUCK_PROCESSING_AFTER_MS = 20 * 60 * 1000;
+
+type JobFailureReason = 'rate_limited' | 'transient';
 
 /**
  * Calculate exponential backoff delay with jitter.
  */
-function calculateBackoff(attempt: number): number {
-  const exponentialDelay = BASE_BACKOFF_MS * Math.pow(2, attempt - 1);
-  const jitter = Math.random() * 1000; // 0-1 second jitter
-  return Math.min(exponentialDelay + jitter, MAX_BACKOFF_MS);
+export function calculateBackoff(
+  attempt: number,
+  reason: JobFailureReason = 'transient'
+): number {
+  const base =
+    reason === 'rate_limited' ? RATE_LIMIT_BASE_BACKOFF_MS : BASE_BACKOFF_MS;
+  const cap =
+    reason === 'rate_limited' ? RATE_LIMIT_MAX_BACKOFF_MS : MAX_BACKOFF_MS;
+  const exponentialDelay = base * Math.pow(2, attempt - 1);
+  const jitterRange = reason === 'rate_limited' ? 5000 : 1000; // broader jitter for rate limits
+  const jitter = Math.random() * jitterRange; // small random jitter to avoid thundering herd
+  return Math.min(exponentialDelay + jitter, cap);
+}
+
+export function determineJobFailure(error: unknown): {
+  message: string;
+  reason: JobFailureReason;
+} {
+  if (error instanceof ExtractionError && error.code === 'RATE_LIMITED') {
+    return { message: error.message, reason: 'rate_limited' };
+  }
+
+  const message =
+    error instanceof Error ? error.message : 'Unknown ingestion error';
+  return { message, reason: 'transient' };
+}
+
+function getJobHost(job: typeof ingestionJobs.$inferSelect): string | null {
+  const payloadUrl =
+    typeof job.payload === 'object' && job.payload !== null
+      ? (job.payload as Record<string, unknown>).sourceUrl
+      : null;
+
+  if (typeof payloadUrl !== 'string') return null;
+
+  try {
+    return new URL(payloadUrl).hostname.toLowerCase();
+  } catch (error) {
+    logger.debug('Failed to parse job host', {
+      error:
+        error instanceof Error
+          ? { message: error.message, stack: error.stack }
+          : String(error),
+      payloadUrl,
+    });
+    return null;
+  }
+}
+
+async function getProcessingHostCounts(
+  tx: DbType
+): Promise<Map<string, number>> {
+  const processingJobs = await tx
+    .select({ payload: ingestionJobs.payload })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.status, 'processing'));
+
+  return processingJobs.reduce((map, job) => {
+    const host =
+      typeof job.payload === 'object' && job.payload !== null
+        ? getJobHost(job as typeof ingestionJobs.$inferSelect)
+        : null;
+
+    if (!host) return map;
+    map.set(host, (map.get(host) ?? 0) + 1);
+    return map;
+  }, new Map<string, number>());
 }
 
 function getCreatorProfileIdFromJob(
@@ -80,8 +160,9 @@ function getCreatorProfileIdFromJob(
 export async function handleIngestionJobFailure(
   tx: DbType,
   job: typeof ingestionJobs.$inferSelect,
-  errorMessage: string
+  error: unknown
 ): Promise<void> {
+  const { message, reason } = determineJobFailure(error);
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const shouldRetry = job.attempts < maxAttempts;
 
@@ -91,13 +172,13 @@ export async function handleIngestionJobFailure(
       .update(creatorProfiles)
       .set({
         ...(shouldRetry ? {} : { ingestionStatus: 'failed' as const }),
-        lastIngestionError: errorMessage,
+        lastIngestionError: message,
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, creatorProfileId));
   }
 
-  await failJob(tx, job, errorMessage);
+  await failJob(tx, job, message, { reason });
 }
 
 const linktreePayloadSchema = z.object({
@@ -586,55 +667,81 @@ export async function claimPendingJobs(
       );
   }
 
-  // Only select jobs that haven't exceeded max attempts
-  const candidates = await tx
-    .select()
+  const exhaustedJobs = await tx
+    .select({
+      id: ingestionJobs.id,
+      maxAttempts: ingestionJobs.maxAttempts,
+    })
     .from(ingestionJobs)
     .where(
-      and(eq(ingestionJobs.status, 'pending'), lte(ingestionJobs.runAt, now))
+      and(
+        eq(ingestionJobs.status, 'pending'),
+        lte(ingestionJobs.runAt, now),
+        gte(ingestionJobs.attempts, ingestionJobs.maxAttempts)
+      )
     )
-    .orderBy(asc(ingestionJobs.priority), asc(ingestionJobs.runAt))
-    .limit(limit);
+    .limit(50);
 
-  const claimed: (typeof ingestionJobs.$inferSelect)[] = [];
-
-  for (const candidate of candidates) {
-    // Skip if already at max attempts
-    const maxAttempts = candidate.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-    if (candidate.attempts >= maxAttempts) {
-      // Mark as failed if at max attempts
-      await tx
-        .update(ingestionJobs)
-        .set({
-          status: 'failed',
-          error: `Exceeded max attempts (${maxAttempts})`,
-          updatedAt: new Date(),
-        })
-        .where(eq(ingestionJobs.id, candidate.id));
-      continue;
-    }
-
-    const [updated] = await tx
+  for (const job of exhaustedJobs) {
+    await tx
       .update(ingestionJobs)
       .set({
-        status: 'processing',
-        attempts: candidate.attempts + 1,
+        status: 'failed',
+        error: `Exceeded max attempts (${job.maxAttempts})`,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(ingestionJobs.id, candidate.id),
-          eq(ingestionJobs.status, 'pending')
-        )
-      )
-      .returning();
-
-    if (updated) {
-      claimed.push(updated);
-    }
+      .where(eq(ingestionJobs.id, job.id));
   }
 
-  return claimed;
+  const processingHostCounts = await getProcessingHostCounts(tx);
+
+  const candidateLimit = Math.max(limit * CLAIM_CANDIDATE_MULTIPLIER, limit);
+  const candidateResult = await tx.execute(
+    drizzleSql`
+      select *
+      from ingestion_jobs
+      where status = 'pending'
+        and run_at <= ${now}
+        and attempts < max_attempts
+      order by priority asc, run_at asc
+      limit ${candidateLimit}
+      for update skip locked
+    `
+  );
+
+  const candidates =
+    candidateResult.rows as (typeof ingestionJobs.$inferSelect)[];
+
+  const hostCounts = new Map(processingHostCounts);
+  const selectedIds: string[] = [];
+
+  for (const candidate of candidates) {
+    const host = getJobHost(candidate);
+
+    if (host) {
+      const current = hostCounts.get(host) ?? 0;
+      if (current >= MAX_CONCURRENT_JOBS_PER_HOST) {
+        continue;
+      }
+      hostCounts.set(host, current + 1);
+    }
+
+    selectedIds.push(candidate.id);
+
+    if (selectedIds.length >= limit) break;
+  }
+
+  if (selectedIds.length === 0) return [];
+
+  return tx
+    .update(ingestionJobs)
+    .set({
+      status: 'processing',
+      attempts: drizzleSql`${ingestionJobs.attempts} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(inArray(ingestionJobs.id, selectedIds))
+    .returning();
 }
 
 /**
@@ -644,19 +751,22 @@ export async function claimPendingJobs(
 export async function failJob(
   tx: DbType,
   job: typeof ingestionJobs.$inferSelect,
-  error: string
+  error: string,
+  options: { reason?: JobFailureReason } = {}
 ): Promise<void> {
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
   const shouldRetry = job.attempts < maxAttempts;
+  const reason = options.reason ?? 'transient';
 
   if (shouldRetry) {
-    const backoffMs = calculateBackoff(job.attempts);
+    const backoffMs = calculateBackoff(job.attempts, reason);
     const nextRunAt = new Date(Date.now() + backoffMs);
 
     logger.info('Scheduling job retry', {
       jobId: job.id,
       attempt: job.attempts,
       maxAttempts,
+      reason,
       nextRunAt,
       backoffMs,
     });

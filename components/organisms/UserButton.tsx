@@ -16,9 +16,9 @@ import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { Badge } from '@/components/ui/Badge';
 import { useBillingStatus } from '@/hooks/use-billing-status';
-import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
+import { useUserMenuActions } from './useUserMenuActions';
 
 interface UserButtonProps {
   artist?: Artist | null;
@@ -26,23 +26,6 @@ interface UserButtonProps {
   settingsHref?: string;
   showUserInfo?: boolean;
 }
-
-interface StripeRedirectResponse {
-  url?: string;
-}
-
-interface PricingOption {
-  interval: 'month' | 'year';
-  priceId: string;
-}
-
-interface PricingOptionsResponse {
-  pricingOptions: PricingOption[];
-}
-
-const ANALYTICS_CONTEXT = {
-  surface: 'sidebar_user_menu',
-} as const;
 
 export function UserButton({
   artist,
@@ -54,9 +37,6 @@ export function UserButton({
   const { signOut } = useClerk();
   const router = useRouter();
   const { showToast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isManageBillingLoading, setIsManageBillingLoading] = useState(false);
-  const [isUpgradeLoading, setIsUpgradeLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const billingStatus = useBillingStatus();
@@ -116,6 +96,30 @@ export function UserButton({
         .slice(0, 2)
     : 'A';
 
+  const profileUrl =
+    profileHref ??
+    (user?.username
+      ? `/${user.username}`
+      : artist?.handle
+        ? `/${artist.handle}`
+        : '/app/settings');
+  const settingsUrl = settingsHref ?? '/app/settings';
+
+  const {
+    handleManageBilling,
+    handleProfile,
+    handleSettings,
+    handleSignOut,
+    handleUpgrade,
+    loading,
+  } = useUserMenuActions({
+    billingStatus,
+    profileUrl,
+    redirectToUrl,
+    settingsUrl,
+    signOut,
+  });
+
   // shadcn dropdown-menu handles focus/aria for us
 
   // Handle loading state
@@ -162,176 +166,6 @@ export function UserButton({
     );
   }
 
-  // Handle sign out
-  const handleSignOut = async () => {
-    setIsLoading(true);
-    try {
-      await signOut(() => router.push('/'));
-    } catch (error) {
-      console.error('Sign out error:', error);
-      showToast({
-        type: 'error',
-        message: "We couldn't sign you out. Please try again in a few seconds.",
-      });
-      setIsLoading(false);
-    }
-  };
-
-  const handleUpgradeToPro = async () => {
-    if (isUpgradeLoading) return;
-    setIsUpgradeLoading(true);
-
-    try {
-      track('billing_upgrade_clicked', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
-
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      if (!pricingResponse.ok) {
-        throw new Error('Failed to load pricing options');
-      }
-
-      const pricingData =
-        (await pricingResponse.json()) as PricingOptionsResponse;
-      const monthPrice = pricingData.pricingOptions.find(
-        option => option.interval === 'month'
-      );
-
-      if (!monthPrice) {
-        throw new Error('Monthly pricing option missing');
-      }
-
-      const checkoutResponse = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: monthPrice.priceId }),
-      });
-
-      if (!checkoutResponse.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
-      const checkout =
-        (await checkoutResponse.json()) as StripeRedirectResponse;
-      if (!checkout.url) {
-        throw new Error('Checkout URL missing from response');
-      }
-
-      track('billing_upgrade_checkout_redirected', {
-        ...ANALYTICS_CONTEXT,
-        interval: monthPrice.interval,
-      });
-
-      redirectToUrl(checkout.url);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to start upgrade';
-
-      track('billing_upgrade_failed', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-        reason: message,
-      });
-
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't start your upgrade just now. Please try again in a moment.",
-        duration: 6000,
-      });
-    } finally {
-      setIsUpgradeLoading(false);
-    }
-  };
-
-  const profileUrl =
-    profileHref ??
-    (user?.username
-      ? `/${user.username}`
-      : artist?.handle
-        ? `/${artist.handle}`
-        : '/app/settings');
-  const settingsUrl = settingsHref ?? '/app/settings';
-  const navigateTo = (href: string | undefined) => {
-    if (!href) return;
-    setIsMenuOpen(false);
-    router.push(href);
-  };
-  const handleProfile = () => navigateTo(profileUrl);
-  const handleSettings = () => navigateTo(settingsUrl);
-
-  const handleManageBilling = async () => {
-    if (isManageBillingLoading) return;
-    setIsManageBillingLoading(true);
-
-    try {
-      if (!billingStatus.hasStripeCustomer) {
-        track('billing_manage_billing_missing_customer', {
-          ...ANALYTICS_CONTEXT,
-          plan: billingStatus.plan ?? 'unknown',
-        });
-
-        showToast({
-          type: 'warning',
-          message:
-            'We are still setting up your billing profile. Try again in a moment or start an upgrade to create it instantly.',
-          duration: 6000,
-        });
-        return;
-      }
-
-      track('billing_manage_billing_clicked', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
-
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create billing portal session');
-      }
-
-      const portal = (await response.json()) as StripeRedirectResponse;
-
-      if (!portal.url) {
-        throw new Error('Billing portal URL missing from response');
-      }
-
-      track('billing_manage_billing_redirected', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
-
-      redirectToUrl(portal.url);
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to open the billing portal';
-
-      track('billing_manage_billing_failed', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-        reason: message,
-      });
-
-      showToast({
-        type: 'error',
-        message:
-          "We couldn't open your billing portal just now. We're taking you to pricing so you can manage your plan there.",
-        duration: 6000,
-      });
-
-      router.push('/pricing');
-    } finally {
-      setIsManageBillingLoading(false);
-    }
-  };
-
   const jovieUsername =
     user?.username || artist?.handle || contactEmail?.split('@')[0] || null;
   const formattedUsername = jovieUsername ? `@${jovieUsername}` : null;
@@ -345,7 +179,7 @@ export function UserButton({
             className={cn(
               'flex w-full items-center gap-3 rounded-md border border-sidebar-border bg-sidebar-surface px-3 py-2 text-left transition-colors hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
             )}
-            onClick={() => setIsMenuOpen(prev => !prev)}
+            onClick={() => setIsMenuOpen(true)}
           >
             <Avatar
               src={userImageUrl}
@@ -370,7 +204,7 @@ export function UserButton({
             variant='ghost'
             size='icon'
             className='h-10 w-10 rounded-full border border-sidebar-border bg-sidebar-surface hover:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
-            onClick={() => setIsMenuOpen(prev => !prev)}
+            onClick={() => setIsMenuOpen(true)}
           >
             <Avatar
               src={userImageUrl}
@@ -388,7 +222,7 @@ export function UserButton({
         className='w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] min-w-[calc(var(--radix-dropdown-menu-trigger-width)+16px)] rounded-xl border border-sidebar-border bg-sidebar-surface p-2 font-sans text-[13px] leading-[18px] text-sidebar-foreground shadow-md backdrop-blur-none'
       >
         <DropdownMenuItem
-          onClick={handleProfile}
+          onSelect={handleProfile}
           className='cursor-pointer rounded-lg px-2 py-2 hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <div className='flex w-full items-center gap-3'>
@@ -433,7 +267,7 @@ export function UserButton({
 
         {/* Primary actions group */}
         <DropdownMenuItem
-          onClick={handleSettings}
+          onSelect={handleSettings}
           className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
         >
           <Icon
@@ -456,8 +290,8 @@ export function UserButton({
           </DropdownMenuItem>
         ) : billingStatus.isPro ? (
           <DropdownMenuItem
-            onClick={handleManageBilling}
-            disabled={isManageBillingLoading}
+            onSelect={handleManageBilling}
+            disabled={loading.manageBilling}
             className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
@@ -465,13 +299,13 @@ export function UserButton({
               className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
             />
             <span className='flex-1'>
-              {isManageBillingLoading ? 'Opening…' : 'Manage billing'}
+              {loading.manageBilling ? 'Opening…' : 'Manage billing'}
             </span>
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem
-            onClick={handleUpgradeToPro}
-            disabled={isUpgradeLoading}
+            onSelect={handleUpgrade}
+            disabled={loading.upgrade}
             className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-70'
           >
             <Icon
@@ -479,15 +313,14 @@ export function UserButton({
               className='h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors'
             />
             <span className='flex-1'>
-              {isUpgradeLoading ? 'Opening…' : 'Upgrade to Pro'}
+              {loading.upgrade ? 'Opening…' : 'Upgrade to Pro'}
             </span>
           </DropdownMenuItem>
         )}
 
         {/* Feedback */}
         <DropdownMenuItem
-          onClick={() => {
-            setIsMenuOpen(false);
+          onSelect={() => {
             setIsFeedbackOpen(true);
           }}
           className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-surface-hover focus-visible:bg-sidebar-surface-hover focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40'
@@ -503,13 +336,13 @@ export function UserButton({
 
         {/* Sign out - pinned at bottom */}
         <DropdownMenuItem
-          onClick={handleSignOut}
-          disabled={isLoading}
+          onSelect={handleSignOut}
+          disabled={loading.signOut}
           className='group flex h-9 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-red-500 transition-colors hover:bg-red-500/10 focus-visible:bg-red-500/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-sidebar-ring/40 disabled:cursor-not-allowed disabled:opacity-60'
         >
           <Icon name='LogOut' className='h-4 w-4 text-red-400' />
           <span className='flex-1'>
-            {isLoading ? 'Signing out…' : 'Sign out'}
+            {loading.signOut ? 'Signing out…' : 'Sign out'}
           </span>
         </DropdownMenuItem>
       </DropdownMenuContent>
