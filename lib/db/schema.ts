@@ -282,66 +282,88 @@ export const socialAccounts = pgTable('social_accounts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const audienceMembers = pgTable('audience_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  type: audienceMemberTypeEnum('type').default('anonymous').notNull(),
-  displayName: text('display_name'),
-  firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
-  lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
-  visits: integer('visits').default(0).notNull(),
-  engagementScore: integer('engagement_score').default(0).notNull(),
-  intentLevel: audienceIntentLevelEnum('intent_level').default('low').notNull(),
-  geoCity: text('geo_city'),
-  geoCountry: text('geo_country'),
-  deviceType: audienceDeviceTypeEnum('device_type')
-    .default('unknown')
-    .notNull(),
-  referrerHistory: jsonb('referrer_history')
-    .$type<Record<string, unknown>[]>()
-    .default([]),
-  latestActions: jsonb('latest_actions')
-    .$type<Record<string, unknown>[]>()
-    .default([]),
-  email: text('email'),
-  phone: text('phone'),
-  spotifyConnected: boolean('spotify_connected').default(false).notNull(),
-  purchaseCount: integer('purchase_count').default(0).notNull(),
-  tags: jsonb('tags').$type<string[]>().default([]),
-  fingerprint: text('fingerprint'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const audienceMembers = pgTable(
+  'audience_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    type: audienceMemberTypeEnum('type').default('anonymous').notNull(),
+    displayName: text('display_name'),
+    firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    visits: integer('visits').default(0).notNull(),
+    engagementScore: integer('engagement_score').default(0).notNull(),
+    intentLevel: audienceIntentLevelEnum('intent_level')
+      .default('low')
+      .notNull(),
+    geoCity: text('geo_city'),
+    geoCountry: text('geo_country'),
+    deviceType: audienceDeviceTypeEnum('device_type')
+      .default('unknown')
+      .notNull(),
+    referrerHistory: jsonb('referrer_history')
+      .$type<Record<string, unknown>[]>()
+      .default([]),
+    latestActions: jsonb('latest_actions')
+      .$type<Record<string, unknown>[]>()
+      .default([]),
+    email: text('email'),
+    phone: text('phone'),
+    spotifyConnected: boolean('spotify_connected').default(false).notNull(),
+    purchaseCount: integer('purchase_count').default(0).notNull(),
+    tags: jsonb('tags').$type<string[]>().default([]),
+    fingerprint: text('fingerprint'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Composite index for visitor lookup on every profile visit
+    // Query pattern: WHERE creator_profile_id = ? AND fingerprint = ?
+    creatorProfileFingerprintIdx: index(
+      'audience_members_creator_profile_id_fingerprint_idx'
+    ).on(table.creatorProfileId, table.fingerprint),
+  })
+);
 
-export const clickEvents = pgTable('click_events', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  linkId: uuid('link_id').references(() => socialLinks.id, {
-    onDelete: 'set null',
-  }),
-  linkType: linkTypeEnum('link_type').notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  referrer: text('referrer'),
-  country: text('country'),
-  city: text('city'),
-  deviceType: text('device_type'),
-  os: text('os'),
-  browser: text('browser'),
-  isBot: boolean('is_bot').default(false),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-  audienceMemberId: uuid('audience_member_id').references(
-    () => audienceMembers.id,
-    {
+export const clickEvents = pgTable(
+  'click_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    linkId: uuid('link_id').references(() => socialLinks.id, {
       onDelete: 'set null',
-    }
-  ),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+    }),
+    linkType: linkTypeEnum('link_type').notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    referrer: text('referrer'),
+    country: text('country'),
+    city: text('city'),
+    deviceType: text('device_type'),
+    os: text('os'),
+    browser: text('browser'),
+    isBot: boolean('is_bot').default(false),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    audienceMemberId: uuid('audience_member_id').references(
+      () => audienceMembers.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Composite index for analytics queries filtered by creator and sorted by time
+    // Query pattern: WHERE creator_profile_id = ? ORDER BY created_at DESC
+    creatorProfileCreatedAtIdx: index(
+      'click_events_creator_profile_id_created_at_idx'
+    ).on(table.creatorProfileId, table.createdAt),
+  })
+);
 
 export const notificationSubscriptions = pgTable('notification_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -377,21 +399,31 @@ export const creatorContacts = pgTable('creator_contacts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const tips = pgTable('tips', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  amountCents: integer('amount_cents').notNull(),
-  currency: currencyCodeEnum('currency').notNull().default('USD'),
-  paymentIntentId: text('payment_intent_id').notNull().unique(),
-  contactEmail: text('contact_email'),
-  contactPhone: text('contact_phone'),
-  message: text('message'),
-  isAnonymous: boolean('is_anonymous').default(false),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const tips = pgTable(
+  'tips',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    amountCents: integer('amount_cents').notNull(),
+    currency: currencyCodeEnum('currency').notNull().default('USD'),
+    paymentIntentId: text('payment_intent_id').notNull().unique(),
+    contactEmail: text('contact_email'),
+    contactPhone: text('contact_phone'),
+    message: text('message'),
+    isAnonymous: boolean('is_anonymous').default(false),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Index for payment tracking queries filtered by creator
+    // Query pattern: WHERE creator_profile_id = ?
+    creatorProfileIdx: index('tips_creator_profile_id_idx').on(
+      table.creatorProfileId
+    ),
+  })
+);
 
 export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   id: uuid('id').primaryKey().defaultRandom(),
