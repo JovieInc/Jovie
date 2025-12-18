@@ -2,12 +2,16 @@
 
 import { Button } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ThemeToggleProps {
   appearance?: 'icon' | 'segmented';
   className?: string;
 }
+
+let themeShortcutUsers = 0;
+let themeShortcutListener: ((event: KeyboardEvent) => void) | null = null;
+let themeShortcutCallback: (() => void) | null = null;
 
 export function ThemeToggle({
   appearance = 'icon',
@@ -15,9 +19,67 @@ export function ThemeToggle({
 }: ThemeToggleProps) {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
+  const cycleThemeRef = useRef<() => void>(() => {});
+
+  const cycleTheme = () => {
+    if (theme === 'light') {
+      setTheme('dark');
+    } else if (theme === 'dark') {
+      setTheme('system');
+    } else {
+      setTheme('light');
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    cycleThemeRef.current = cycleTheme;
+  });
+
+  useEffect(() => {
+    themeShortcutUsers += 1;
+
+    if (!themeShortcutListener) {
+      themeShortcutListener = (event: KeyboardEvent) => {
+        if (event.defaultPrevented) return;
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+        if (event.key.toLowerCase() !== 't') return;
+
+        const target = event.target;
+        if (target instanceof HTMLElement) {
+          const tagName = target.tagName.toLowerCase();
+          const isTextInput =
+            tagName === 'input' ||
+            tagName === 'textarea' ||
+            tagName === 'select';
+
+          if (isTextInput || target.isContentEditable) {
+            return;
+          }
+        }
+
+        event.preventDefault();
+        themeShortcutCallback?.();
+      };
+
+      window.addEventListener('keydown', themeShortcutListener);
+    }
+
+    themeShortcutCallback = () => cycleThemeRef.current();
+
+    return () => {
+      themeShortcutUsers -= 1;
+      if (themeShortcutUsers <= 0 && themeShortcutListener) {
+        window.removeEventListener('keydown', themeShortcutListener);
+        themeShortcutListener = null;
+        themeShortcutCallback = null;
+        themeShortcutUsers = 0;
+      }
+    };
   }, []);
 
   // Don't render anything until mounted to prevent hydration mismatch
@@ -39,16 +101,6 @@ export function ThemeToggle({
       </Button>
     );
   }
-
-  const cycleTheme = () => {
-    if (theme === 'light') {
-      setTheme('dark');
-    } else if (theme === 'dark') {
-      setTheme('system');
-    } else {
-      setTheme('light');
-    }
-  };
 
   const getThemeIcon = () => {
     if (theme === 'system') {
@@ -235,7 +287,7 @@ export function ThemeToggle({
           ? 'bg-white/10 text-white ring-white/30 hover:bg-white/20'
           : 'bg-white text-black ring-black/10 hover:bg-gray-50'
       } ${className}`}
-      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}`}
+      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()} (T)`}
     >
       <span className='sr-only'>
         Toggle theme (current:{' '}

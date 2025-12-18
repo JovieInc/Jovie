@@ -7,7 +7,7 @@ export function PricingPreview() {
       <Container size='md'>
         <div className='text-center mb-12'>
           <h2
-            className='text-3xl sm:text-4xl font-semibold tracking-tight text-neutral-900 dark:text-white'
+            className='text-3xl sm:text-4xl font-medium tracking-tight text-neutral-900 dark:text-white'
             style={{ fontSynthesisWeight: 'none' }}
           >
             Simple, transparent pricing

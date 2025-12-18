@@ -65,13 +65,13 @@ export function MarketingHeader({
     <Header
       sticky={false}
       logoSize={logoSize}
-      logoVariant='fullAlt'
+      logoVariant='wordAlt'
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid
-          ? 'bg-white dark:bg-black border-subtle backdrop-blur'
+          ? 'bg-white dark:bg-[#08090a] border-subtle backdrop-blur'
           : 'bg-transparent! border-transparent! dark:bg-transparent! dark:border-transparent!'
       )}
     />

@@ -42,10 +42,10 @@ export function Footer({
   // Variant-specific configurations
   const variantConfigs = {
     marketing: {
-      containerClass: 'bg-black text-white',
+      containerClass: 'border-t border-subtle bg-base',
       contentClass:
         'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
-      colorVariant: 'dark' as const,
+      colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
       showLinks: true,

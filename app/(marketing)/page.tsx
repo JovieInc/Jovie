@@ -1,4 +1,3 @@
-import { BadgeCheck, LayoutGrid, Zap } from 'lucide-react';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -7,6 +6,7 @@ import { ActionDrivenProfileSection } from '@/components/home/ActionDrivenProfil
 import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { NewSocialProofSection } from '@/components/home/NewSocialProofSection';
+import { ProfileFeatureCardsModal } from '@/components/home/ProfileFeatureCardsModal';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
@@ -211,97 +211,7 @@ export default function HomePage() {
 
           <Container>
             <div className='mx-auto max-w-5xl'>
-              <div className='grid gap-4 sm:gap-6 md:grid-cols-3'>
-                <details className='group rounded-3xl border border-subtle bg-surface-1 overflow-hidden'>
-                  <summary className='list-none [&::-webkit-details-marker]:hidden'>
-                    <div className='relative flex min-h-[240px] flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
-                      <div className='absolute inset-0 opacity-70'>
-                        <div className='absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.18),transparent_55%)] dark:bg-[radial-gradient(circle_at_20%_20%,rgba(120,119,198,0.22),transparent_55%)]' />
-                        <div className='absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.06),transparent_40%)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_40%)]' />
-                      </div>
-
-                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
-                        <Zap className='h-4 w-4' aria-hidden='true' />
-                      </div>
-
-                      <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
-                          Blazing fast profiles
-                        </h3>
-                        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
-                          +
-                        </span>
-                      </div>
-                    </div>
-                  </summary>
-                  <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
-                    <p className='text-sm leading-relaxed text-secondary-token'>
-                      Pages load instantly so fans tap, buy, and subscribe
-                      without friction.
-                    </p>
-                  </div>
-                </details>
-
-                <details className='group rounded-3xl border border-subtle bg-surface-1 overflow-hidden'>
-                  <summary className='list-none [&::-webkit-details-marker]:hidden'>
-                    <div className='relative flex min-h-[240px] flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
-                      <div className='absolute inset-0 opacity-70'>
-                        <div className='absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(120,119,198,0.16),transparent_60%)] dark:bg-[radial-gradient(circle_at_70%_25%,rgba(120,119,198,0.22),transparent_60%)]' />
-                        <div className='absolute inset-0 bg-[linear-gradient(135deg,transparent_10%,rgba(0,0,0,0.06))] dark:bg-[linear-gradient(135deg,transparent_10%,rgba(255,255,255,0.06))]' />
-                      </div>
-
-                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
-                        <LayoutGrid className='h-4 w-4' aria-hidden='true' />
-                      </div>
-
-                      <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
-                          Opinionated design
-                        </h3>
-                        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
-                          +
-                        </span>
-                      </div>
-                    </div>
-                  </summary>
-                  <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
-                    <p className='text-sm leading-relaxed text-secondary-token'>
-                      A clean, high-converting layout that looks premium out of
-                      the box.
-                    </p>
-                  </div>
-                </details>
-
-                <details className='group rounded-3xl border border-subtle bg-surface-1 overflow-hidden'>
-                  <summary className='list-none [&::-webkit-details-marker]:hidden'>
-                    <div className='relative flex min-h-[240px] flex-col justify-end gap-4 p-6 sm:p-7 cursor-pointer select-none'>
-                      <div className='absolute inset-0 opacity-70'>
-                        <div className='absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(120,119,198,0.14),transparent_60%)] dark:bg-[radial-gradient(circle_at_50%_20%,rgba(120,119,198,0.20),transparent_60%)]' />
-                        <div className='absolute inset-0 bg-[linear-gradient(135deg,rgba(0,0,0,0.06),transparent_45%)] dark:bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_45%)]' />
-                      </div>
-
-                      <div className='absolute left-6 top-6 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-0 text-secondary-token'>
-                        <BadgeCheck className='h-4 w-4' aria-hidden='true' />
-                      </div>
-
-                      <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
-                          Zero setup
-                        </h3>
-                        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
-                          +
-                        </span>
-                      </div>
-                    </div>
-                  </summary>
-                  <div className='px-6 pb-6 sm:px-7 sm:pb-7'>
-                    <p className='text-sm leading-relaxed text-secondary-token'>
-                      Claim your Jovie profile and start selling in minutes—no
-                      code, no templates.
-                    </p>
-                  </div>
-                </details>
-              </div>
+              <ProfileFeatureCardsModal />
             </div>
           </Container>
         </section>
@@ -327,7 +237,7 @@ export default function HomePage() {
                 <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
                   <Link
                     href='/waitlist'
-                    className='inline-flex h-11 w-full items-center justify-center rounded-md bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed md:w-auto'
+                    className='inline-flex h-11 items-center justify-center rounded-lg bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'
                   >
                     Request early access
                   </Link>
