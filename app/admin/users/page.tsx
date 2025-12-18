@@ -7,12 +7,12 @@ import {
 } from '@/lib/admin/creator-profiles';
 
 interface AdminUsersPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     page?: string;
     q?: string;
     sort?: string;
     pageSize?: string;
-  };
+  }>;
 }
 
 export const metadata: Metadata = {
@@ -22,27 +22,29 @@ export const metadata: Metadata = {
 export default async function AdminUsersPage({
   searchParams,
 }: AdminUsersPageProps) {
-  const pageParam = searchParams?.page
-    ? Number.parseInt(searchParams.page, 10)
+  const resolvedSearchParams = (await searchParams) ?? {};
+
+  const pageParam = resolvedSearchParams.page
+    ? Number.parseInt(resolvedSearchParams.page, 10)
     : 1;
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
-  const search = searchParams?.q ?? '';
+  const search = resolvedSearchParams.q ?? '';
 
-  const pageSizeParam = searchParams?.pageSize
-    ? Number.parseInt(searchParams.pageSize, 10)
+  const pageSizeParam = resolvedSearchParams.pageSize
+    ? Number.parseInt(resolvedSearchParams.pageSize, 10)
     : 20;
   const pageSize =
     Number.isFinite(pageSizeParam) && pageSizeParam > 0 && pageSizeParam <= 100
       ? pageSizeParam
       : 20;
 
-  const sortParam = searchParams?.sort;
+  const sortParam = resolvedSearchParams.sort;
   const sort: AdminCreatorProfilesSort =
     sortParam === 'created_asc' ||
-    sortParam === 'verified_desc' ||
-    sortParam === 'verified_asc' ||
-    sortParam === 'claimed_desc' ||
-    sortParam === 'claimed_asc'
+      sortParam === 'verified_desc' ||
+      sortParam === 'verified_asc' ||
+      sortParam === 'claimed_desc' ||
+      sortParam === 'claimed_asc'
       ? sortParam
       : 'created_desc';
 

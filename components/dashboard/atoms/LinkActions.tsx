@@ -53,19 +53,21 @@ export const LinkActions = memo(function LinkActions({
         </button>
       ) : null}
 
-      <div className='relative'>
+      <div className='relative z-20'>
         <button
           type='button'
           aria-label='Link actions'
           onClick={() => setOpen(!open)}
-          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97]'
+          className='inline-flex h-8 w-8 items-center justify-center rounded-md bg-white text-neutral-900 ring-1 ring-black/10 shadow-sm hover:bg-white/90 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] dark:bg-neutral-900 dark:text-white dark:ring-white/10 dark:hover:bg-neutral-800'
         >
-          <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
+          <Icon name='MoreVertical' className='h-5 w-5 text-neutral-700 dark:text-white' />
         </button>
         <div className='sr-only'>Actions: edit, hide/show, delete</div>
 
         {open ? (
-          <div className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-sm shadow-lg'>
+          <div
+            className='absolute right-0 top-9 z-50 min-w-[140px] isolate rounded-lg border border-subtle bg-white p-1 text-sm shadow-2xl ring-1 ring-black/5 dark:bg-neutral-950 dark:ring-white/10'
+          >
             {onEdit ? (
               <button
                 type='button'

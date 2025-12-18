@@ -250,10 +250,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     );
     const otherSectionHas = otherSection
       ? links.some(
-          l =>
-            l.platform.id === enriched.platform.id &&
-            sectionOf(l) === otherSection
-        )
+        l =>
+          l.platform.id === enriched.platform.id &&
+          sectionOf(l) === otherSection
+      )
       : false;
 
     const canonicalId = canonicalIdentity({
@@ -491,11 +491,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const COMPLETION_TARGET = 6;
   const completionPercent = hasAnyLinks
     ? Math.min(
-        100,
-        Math.round(
-          (Math.min(links.length, COMPLETION_TARGET) / COMPLETION_TARGET) * 100
-        )
+      100,
+      Math.round(
+        (Math.min(links.length, COMPLETION_TARGET) / COMPLETION_TARGET) * 100
       )
+    )
     : 0;
 
   return (
@@ -571,7 +571,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         creatorName={creatorName}
         prefillUrl={prefillUrl}
         onPrefillConsumed={() => setPrefillUrl(undefined)}
-        onQueryChange={() => {}}
+        onQueryChange={() => { }}
       />
 
       {/* Links summary + completion indicator */}
@@ -1035,7 +1035,7 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
       className={cn(
         'group relative rounded-xl border border-black/10 dark:border-white/10 bg-surface-1/95 p-4 text-sm shadow-[0_14px_42px_-18px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-all',
         'hover:shadow-[0_18px_56px_-16px_rgba(0,0,0,0.5)] hover:scale-[1.01] focus-within:shadow-[0_18px_56px_-16px_rgba(0,0,0,0.5)]',
-        !visible && 'opacity-50 grayscale'
+        !visible && 'grayscale'
       )}
       style={cardStyle}
     >
@@ -1078,13 +1078,13 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
             visible
               ? isTikTok
                 ? {
-                    backgroundImage: tikTokGradient,
-                    color: '#ffffff', // solid white over gradient for readability
-                  }
+                  backgroundImage: tikTokGradient,
+                  color: '#ffffff', // solid white over gradient for readability
+                }
                 : {
-                    backgroundColor: brandHex,
-                    color: '#ffffff',
-                  }
+                  backgroundColor: brandHex,
+                  color: '#ffffff',
+                }
               : undefined
           }
           aria-hidden='true'
