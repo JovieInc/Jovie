@@ -33,12 +33,14 @@ export function AuthLayout({
       <div className='w-full max-w-sm'>{children}</div>
 
       {/* Footer */}
-      <p className='mt-10 text-sm text-[#6b6f76]'>
-        {footerPrompt}{' '}
-        <Link href={footerLinkHref} className='text-white hover:underline'>
-          {footerLinkText}
-        </Link>
-      </p>
+      {footerPrompt && footerLinkText && (
+        <p className='mt-10 text-sm text-[#6b6f76]'>
+          {footerPrompt}{' '}
+          <Link href={footerLinkHref} className='text-white hover:underline'>
+            {footerLinkText}
+          </Link>
+        </p>
+      )}
 
       {/* Legal links */}
       <div className='absolute bottom-4 flex gap-4 text-xs text-[#666]'>

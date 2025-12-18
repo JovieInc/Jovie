@@ -14,7 +14,9 @@ export function OtpSignInForm() {
     <SignIn.Root routing='path' path='/signin'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
         <CardContent className='space-y-6 p-0'>
-          <Clerk.GlobalError className='text-sm text-destructive' />
+          <div className='min-h-5'>
+            <Clerk.GlobalError className='text-sm text-destructive' />
+          </div>
 
           <SignIn.Step name='start' aria-label='Enter your email address'>
             <div className='space-y-4'>

@@ -64,7 +64,7 @@ export function NewPreFooterCTA() {
               variant='primary'
               className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
             >
-              <Link href='/onboarding'>Request Early Access →</Link>
+              <Link href='/waitlist'>Request Early Access →</Link>
             </Button>
 
             {/* Secondary info with better visual hierarchy */}

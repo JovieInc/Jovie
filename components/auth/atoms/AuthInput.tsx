@@ -18,7 +18,7 @@ const authInputClasses =
 
 const variantClasses = {
   default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-mono',
+  otp: 'text-2xl tracking-[0.5em] text-center font-medium placeholder:tracking-normal placeholder:text-base placeholder:font-normal',
 } as const;
 
 export function AuthInput({

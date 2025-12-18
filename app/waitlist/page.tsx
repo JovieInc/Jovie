@@ -51,6 +51,57 @@ export default function WaitlistPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  const validateField = (field: string, value: string) => {
+    const newErrors = { ...fieldErrors };
+
+    switch (field) {
+      case 'fullName':
+        if (!value.trim()) {
+          newErrors.fullName = ['Full name is required'];
+        } else {
+          delete newErrors.fullName;
+        }
+        break;
+      case 'email':
+        if (!value.trim()) {
+          newErrors.email = ['Email is required'];
+        } else if (!isValidEmail(value)) {
+          newErrors.email = ['Please enter a valid email address'];
+        } else {
+          delete newErrors.email;
+        }
+        break;
+      case 'primarySocialUrl':
+        if (!value.trim()) {
+          newErrors.primarySocialUrl = ['Social profile link is required'];
+        } else if (!isValidUrl(value)) {
+          newErrors.primarySocialUrl = [
+            'Please enter a valid URL (e.g., instagram.com/yourhandle)',
+          ];
+        } else {
+          delete newErrors.primarySocialUrl;
+        }
+        break;
+      case 'spotifyUrl':
+        if (value.trim() && !isValidUrl(value)) {
+          newErrors.spotifyUrl = [
+            'Please enter a valid Spotify URL (e.g., open.spotify.com/artist/...)',
+          ];
+        } else {
+          delete newErrors.spotifyUrl;
+        }
+        break;
+    }
+
+    setFieldErrors(newErrors);
+  };
+
+  const handleBlur = (field: string, value: string) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+    validateField(field, value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,12 +274,13 @@ export default function WaitlistPage() {
             id='fullName'
             value={fullName}
             onChange={e => setFullName(e.target.value)}
+            onBlur={e => handleBlur('fullName', e.target.value)}
             required
-            className={INPUT_CLASSES}
+            className={`${INPUT_CLASSES} ${touched.fullName && fieldErrors.fullName ? 'ring-1 ring-red-500' : ''}`}
             placeholder='Full Name'
             disabled={isSubmitting}
           />
-          {fieldErrors.fullName && (
+          {touched.fullName && fieldErrors.fullName && (
             <p className='text-sm text-red-400'>{fieldErrors.fullName[0]}</p>
           )}
 
@@ -237,12 +289,13 @@ export default function WaitlistPage() {
             id='email'
             value={email}
             onChange={e => setEmail(e.target.value)}
+            onBlur={e => handleBlur('email', e.target.value)}
             required
-            className={INPUT_CLASSES}
+            className={`${INPUT_CLASSES} ${touched.email && fieldErrors.email ? 'ring-1 ring-red-500' : ''}`}
             placeholder='Email Address'
             disabled={isSubmitting}
           />
-          {fieldErrors.email && (
+          {touched.email && fieldErrors.email && (
             <p className='text-sm text-red-400'>{fieldErrors.email[0]}</p>
           )}
 
@@ -251,12 +304,13 @@ export default function WaitlistPage() {
             id='primarySocialUrl'
             value={primarySocialUrl}
             onChange={e => setPrimarySocialUrl(e.target.value)}
+            onBlur={e => handleBlur('primarySocialUrl', e.target.value)}
             required
-            className={INPUT_CLASSES}
+            className={`${INPUT_CLASSES} ${touched.primarySocialUrl && fieldErrors.primarySocialUrl ? 'ring-1 ring-red-500' : ''}`}
             placeholder='instagram.com/yourhandle'
             disabled={isSubmitting}
           />
-          {fieldErrors.primarySocialUrl && (
+          {touched.primarySocialUrl && fieldErrors.primarySocialUrl && (
             <p className='text-sm text-red-400'>
               {fieldErrors.primarySocialUrl[0]}
             </p>
@@ -267,10 +321,14 @@ export default function WaitlistPage() {
             id='spotifyUrl'
             value={spotifyUrl}
             onChange={e => setSpotifyUrl(e.target.value)}
-            className={INPUT_CLASSES}
+            onBlur={e => handleBlur('spotifyUrl', e.target.value)}
+            className={`${INPUT_CLASSES} ${touched.spotifyUrl && fieldErrors.spotifyUrl ? 'ring-1 ring-red-500' : ''}`}
             placeholder='open.spotify.com/artist/... (optional)'
             disabled={isSubmitting}
           />
+          {touched.spotifyUrl && fieldErrors.spotifyUrl && (
+            <p className='text-sm text-red-400'>{fieldErrors.spotifyUrl[0]}</p>
+          )}
 
           <input
             type='text'

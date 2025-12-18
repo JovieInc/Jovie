@@ -6,7 +6,7 @@ import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export default function SignInPage() {
   return (
-    <AuthLayout formTitle='Log in to Jovie'>
+    <AuthLayout formTitle='Log in to Jovie' footerPrompt='' footerLinkText=''>
       <ClerkLoading>
         <AuthFormSkeleton />
       </ClerkLoading>
