@@ -636,23 +636,26 @@ jobs:
           health_url="${deployment_url%/}/api/health"
 
           # Wait a moment for deployment to be ready
-          sleep 10
+          sleep 30
 
           USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
 
           attempt=1
-          max_attempts=6
+          max_attempts=8
           response_code="000"
           while [ $attempt -le $max_attempts ]; do
-            response_code=$(curl -s -o /dev/null -A "$USER_AGENT" -H "Accept: application/json" -w "%{http_code}" "$health_url" || echo "000")
+            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" -w "\n%{http_code}" "$health_url" || echo "\n000")
+            response_code=$(echo "$response" | tail -n 1)
 
             if [ "$response_code" = "200" ]; then
               break
             fi
 
             if [ "$response_code" = "429" ]; then
-              sleep_seconds=$((attempt * 5))
+              body_preview=$(echo "$response" | sed '$d' | head -c 300)
+              sleep_seconds=$((attempt * 15))
               echo "⚠ Canary got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+              echo "429 response preview: ${body_preview}"
               sleep "$sleep_seconds"
               attempt=$((attempt + 1))
               continue
@@ -667,7 +670,7 @@ jobs:
             exit 1
           fi
 
-          health_content=$(curl -s -A "$USER_AGENT" -H "Accept: application/json" "$health_url" || echo "")
+          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "$health_url" || echo "")
           if [[ ! "$health_content" =~ '"status":"ok"' ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
