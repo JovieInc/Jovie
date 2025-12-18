@@ -164,6 +164,25 @@ export async function completeOnboarding({
           profileId: string | null;
         };
 
+        const ensureEmailAvailable = async () => {
+          if (!userEmail) return;
+
+          const [emailOwner] = await tx
+            .select({ clerkId: users.clerkId })
+            .from(users)
+            .where(eq(users.email, userEmail))
+            .limit(1);
+
+          if (emailOwner && emailOwner.clerkId !== clerkUserId) {
+            throw onboardingErrorToError(
+              createOnboardingError(
+                OnboardingErrorCode.EMAIL_IN_USE,
+                'Email is already in use'
+              )
+            );
+          }
+        };
+
         const ensureHandleAvailable = async (profileId?: string | null) => {
           const [conflict] = await tx
             .select({ id: creatorProfiles.id })
@@ -188,6 +207,7 @@ export async function completeOnboarding({
 
         // If the user record does not exist, the stored function will create both user + profile
         if (!existingUser) {
+          await ensureEmailAvailable();
           await ensureHandleAvailable(null);
           const result = await tx.execute(
             drizzleSql<{ profile_id: string }>`
@@ -267,6 +287,7 @@ export async function completeOnboarding({
         }
 
         // Fallback: user exists but no profile yet
+        await ensureEmailAvailable();
         await ensureHandleAvailable(null);
         const result = await tx.execute(
           drizzleSql<{ profile_id: string }>`

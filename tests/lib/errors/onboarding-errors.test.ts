@@ -31,4 +31,20 @@ describe('onboardingErrorToError', () => {
 
     expect(error.message.startsWith('[USERNAME_TAKEN]')).toBe(true);
   });
+
+  it('maps users email unique violations to EMAIL_IN_USE', () => {
+    const dbError = {
+      message: 'Failed query: SELECT create_profile_with_user(...)',
+      cause: {
+        code: '23505',
+        constraint: 'users_email_unique',
+        message:
+          'duplicate key value violates unique constraint "users_email_unique"',
+      },
+    };
+
+    const mapped = mapDatabaseError(dbError);
+
+    expect(mapped.code).toBe(OnboardingErrorCode.EMAIL_IN_USE);
+  });
 });
