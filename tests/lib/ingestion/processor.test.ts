@@ -4,8 +4,6 @@ import {
   createInMemorySocialLinkRow,
   deriveLayloHandle,
   determineJobFailure,
-  createInMemorySocialLinkRow,
-  deriveLayloHandle,
 } from '@/lib/ingestion/processor';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 

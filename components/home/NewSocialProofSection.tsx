@@ -11,7 +11,7 @@ export function NewSocialProofSection() {
                 Built for conversion
               </p>
 
-              <h2 className='mt-3 text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
+              <h2 className='mt-3 text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
                 A Jovie profile turns attention into real fan actions.
               </h2>
 

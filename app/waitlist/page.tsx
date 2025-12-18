@@ -18,9 +18,9 @@ type PrimaryGoal = 'streams' | 'merch' | 'tickets';
 type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
 const INPUT_CLASSES =
-  'w-full px-4 py-3 border-0 rounded-md bg-[#23252a] text-white placeholder:text-[#6b6f76] focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-colors';
+  'w-full px-4 py-3 border border-white/10 rounded-lg bg-[#15161a] text-white placeholder:text-[#6b6f76] focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-colors';
 const BUTTON_CLASSES =
-  'w-full rounded-md bg-[#e8e8e8] hover:bg-white text-[#101012] font-medium py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full rounded-lg border border-white/10 bg-[#15161a] px-4 py-3 text-[15px] leading-5 font-medium text-[rgb(227,228,230)] hover:bg-[#1b1d23] transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
 
 const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
   [
@@ -485,8 +485,7 @@ export default function WaitlistPage() {
 
                   return (
                     <button
-                      // biome-ignore lint/suspicious/noArrayIndexKey: Static options list
-                      key={index}
+                      key={option.value}
                       ref={el => {
                         primaryGoalButtonRefs.current[index] = el;
                       }}
@@ -495,10 +494,10 @@ export default function WaitlistPage() {
                       aria-checked={isSelected}
                       tabIndex={isTabStop ? 0 : -1}
                       onClick={() => handlePrimaryGoalSelect(option.value)}
-                      className={`w-full rounded-md px-4 py-3 text-sm font-medium transition-colors border ${
+                      className={`w-full rounded-lg px-4 py-3 text-[15px] leading-5 font-medium transition-colors border ${
                         isSelected
                           ? 'bg-[#e8e8e8] text-[#101012] border-transparent'
-                          : 'bg-[#23252a] text-white border-[#2a2d33] hover:bg-[#2a2d33]'
+                          : 'bg-[#15161a] text-white border-white/10 hover:bg-[#1b1d23]'
                       }`}
                       disabled={isSubmitting}
                     >
@@ -514,7 +513,7 @@ export default function WaitlistPage() {
                   role='alert'
                   className='text-sm text-red-400'
                 >
-                  {fieldErrors.primaryGoal[0]}
+                  {fieldErrors.primaryGoal?.[0]}
                 </p>
               )}
             </>
@@ -554,8 +553,8 @@ export default function WaitlistPage() {
                     }}
                     className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border ${
                       socialPlatform === option.value
-                        ? 'bg-[#23252a] text-white border-transparent'
-                        : 'bg-transparent text-[#c9cbd1] border-[#2a2d33] hover:bg-[#23252a]'
+                        ? 'bg-[#1b1d23] text-white border-white/20'
+                        : 'bg-transparent text-[#c9cbd1] border-white/10 hover:bg-[#15161a]'
                     }`}
                     disabled={isSubmitting}
                   >
@@ -593,7 +592,7 @@ export default function WaitlistPage() {
                   />
                 </>
               ) : (
-                <div className='w-full flex items-center gap-2 rounded-md bg-[#23252a] px-4 py-3'>
+                <div className='w-full flex items-center gap-2 rounded-lg border border-white/10 bg-[#15161a] px-4 py-3 focus-within:ring-1 focus-within:ring-zinc-600'>
                   <span className='text-sm text-[#c9cbd1] whitespace-nowrap'>
                     {getSocialPlatformPrefix(socialPlatform).display}
                   </span>

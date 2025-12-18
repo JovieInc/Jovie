@@ -23,7 +23,7 @@ export function NewHomeHero() {
           </div>
 
           {/* Headline */}
-          <h1 className='text-4xl font-bold tracking-tight text-primary-token sm:text-6xl lg:text-7xl leading-[1.05]'>
+          <h1 className='text-4xl font-medium tracking-tight text-primary-token sm:text-6xl lg:text-7xl leading-[1.05]'>
             <span className='sm:block'>Convert social traffic </span>
             <span className='sm:block'>into superfans.</span>
           </h1>
