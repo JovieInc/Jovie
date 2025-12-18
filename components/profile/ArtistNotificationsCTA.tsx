@@ -197,7 +197,7 @@ export function ArtistNotificationsCTA({
   }, [autoOpen, notificationsEnabled, notificationsState, openSubscription]);
 
   const hasSubscriptions = Boolean(
-    subscribedChannels.email || subscribedChannels.phone
+    subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
 
@@ -224,7 +224,7 @@ export function ArtistNotificationsCTA({
   };
 
   const validateCurrent = (): boolean => {
-    if (channel === 'phone') {
+    if (channel === 'sms') {
       const digitsOnly = phoneInput.replace(/[^\d]/g, '');
 
       if (!digitsOnly) {
@@ -269,7 +269,7 @@ export function ArtistNotificationsCTA({
   };
 
   const handleFieldBlur = () => {
-    if (channel === 'phone' && !phoneInput.trim()) {
+    if (channel === 'sms' && !phoneInput.trim()) {
       setError(null);
       return;
     }
@@ -328,7 +328,7 @@ export function ArtistNotificationsCTA({
 
     try {
       const trimmedEmail = channel === 'email' ? emailInput.trim() : undefined;
-      const phoneE164 = channel === 'phone' ? buildPhoneE164() : undefined;
+      const phoneE164 = channel === 'sms' ? buildPhoneE164() : undefined;
 
       const body: Record<string, unknown> = {
         artist_id: artist.id,
@@ -338,7 +338,7 @@ export function ArtistNotificationsCTA({
         source: 'profile_inline',
       };
 
-      if (channel === 'phone') {
+      if (channel === 'sms') {
         body.phone = phoneE164;
         body.country_code = country.code;
       } else {
@@ -369,13 +369,12 @@ export function ArtistNotificationsCTA({
 
       setSubscriptionDetails(prev => ({
         ...prev,
-        [channel]:
-          channel === 'phone' ? (phoneE164 ?? '') : (trimmedEmail ?? ''),
+        [channel]: channel === 'sms' ? (phoneE164 ?? '') : (trimmedEmail ?? ''),
       }));
 
       setNotificationsState('success');
       showSuccess(
-        channel === 'phone'
+        channel === 'sms'
           ? "You'll receive SMS updates from this artist."
           : "You'll receive email updates from this artist."
       );
@@ -464,7 +463,7 @@ export function ArtistNotificationsCTA({
         <div className='rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden'>
           <div className='flex items-center'>
             {/* Country selector for phone */}
-            {channel === 'phone' && (
+            {channel === 'sms' && (
               <Popover open={isCountryOpen} onOpenChange={setIsCountryOpen}>
                 <PopoverTrigger asChild>
                   <button
@@ -517,24 +516,24 @@ export function ArtistNotificationsCTA({
             {/* Input field */}
             <div className='flex-1 min-w-0'>
               <label htmlFor={inputId} className='sr-only'>
-                {channel === 'phone' ? 'Phone number' : 'Email address'}
+                {channel === 'sms' ? 'Phone number' : 'Email address'}
               </label>
               <input
                 ref={inputRef}
                 id={inputId}
-                type={channel === 'phone' ? 'tel' : 'email'}
-                inputMode={channel === 'phone' ? 'numeric' : 'email'}
+                type={channel === 'sms' ? 'tel' : 'email'}
+                inputMode={channel === 'sms' ? 'numeric' : 'email'}
                 className='w-full h-11 px-4 bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 border-none focus:outline-none focus:ring-0'
                 placeholder={
-                  channel === 'phone' ? '(555) 123-4567' : 'your@email.com'
+                  channel === 'sms' ? '(555) 123-4567' : 'your@email.com'
                 }
                 value={
-                  channel === 'phone'
+                  channel === 'sms'
                     ? formatPhoneDigitsForDisplay(phoneInput, country.dialCode)
                     : emailInput
                 }
                 onChange={event => {
-                  if (channel === 'phone') {
+                  if (channel === 'sms') {
                     handlePhoneChange(event.target.value);
                   } else {
                     handleEmailChange(event.target.value);
@@ -543,8 +542,8 @@ export function ArtistNotificationsCTA({
                 onBlur={handleFieldBlur}
                 onKeyDown={handleKeyDown}
                 disabled={isSubmitting}
-                autoComplete={channel === 'phone' ? 'tel-national' : 'email'}
-                maxLength={channel === 'phone' ? 32 : 254}
+                autoComplete={channel === 'sms' ? 'tel-national' : 'email'}
+                maxLength={channel === 'sms' ? 32 : 254}
                 style={{ fontSynthesisWeight: 'none' }}
               />
             </div>
@@ -638,11 +637,11 @@ function ContactMethodToggle({
     <div className='inline-flex items-center rounded-md bg-neutral-100 dark:bg-neutral-800 p-0.5 mr-2'>
       <button
         type='button'
-        onClick={() => onChange('phone')}
+        onClick={() => onChange('sms')}
         disabled={disabled}
         aria-label='Phone'
         className={`p-2 rounded transition-all duration-150 ${
-          channel === 'phone'
+          channel === 'sms'
             ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm'
             : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
         }`}

@@ -73,7 +73,7 @@ export function ProfileNotificationsMenu({
             </p>
             {contactValue ? (
               <p className='break-all text-xs text-muted-foreground'>
-                {targetChannel === 'phone'
+                {targetChannel === 'sms'
                   ? formatE164PhoneForDisplay(contactValue)
                   : contactValue}
               </p>
@@ -131,7 +131,7 @@ export function ProfileNotificationsMenu({
           Manage notifications
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {renderChannelMenuItem('phone', 'SMS')}
+        {renderChannelMenuItem('sms', 'SMS')}
         {renderChannelMenuItem('email', 'Email')}
         <DropdownMenuSeparator />
         <DropdownMenuItem

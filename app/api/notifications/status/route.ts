@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       value: string | null;
     }> = [
       { channel: 'email', value: normalizedEmail },
-      { channel: 'phone', value: normalizedPhone },
+      { channel: 'sms', value: normalizedPhone },
     ];
 
     for (const lookup of lookups) {

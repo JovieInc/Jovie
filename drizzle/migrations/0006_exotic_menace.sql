@@ -54,7 +54,7 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint
 DO $$ BEGIN
-  CREATE TYPE "public"."notification_channel" AS ENUM('email', 'phone');
+  CREATE TYPE "public"."notification_channel" AS ENUM('email', 'sms', 'push');
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;--> statement-breakpoint

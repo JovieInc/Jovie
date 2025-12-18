@@ -48,7 +48,7 @@ function normalizePhoneToE164(raw: string): string | null {
 const subscribeSchema = z
   .object({
     artist_id: z.string().uuid(),
-    channel: z.enum(['email', 'phone']).default('email'),
+    channel: z.enum(['email', 'sms']).default('email'),
     email: z.string().email().optional(),
     phone: z.string().min(1).max(64).optional(),
     country_code: z.string().min(2).max(2).optional(),
@@ -58,7 +58,7 @@ const subscribeSchema = z
   .refine(
     data =>
       (data.channel === 'email' && Boolean(data.email)) ||
-      (data.channel === 'phone' && Boolean(data.phone)),
+      (data.channel === 'sms' && Boolean(data.phone)),
     {
       message: 'Email or phone is required for the selected channel',
       path: ['channel'],
@@ -186,9 +186,9 @@ export async function POST(request: NextRequest) {
       channel === 'email' && email ? email.trim().toLowerCase() : null;
 
     const normalizedPhone =
-      channel === 'phone' && phone ? normalizePhoneToE164(phone) : null;
+      channel === 'sms' && phone ? normalizePhoneToE164(phone) : null;
 
-    if (channel === 'phone' && !normalizedPhone) {
+    if (channel === 'sms' && !normalizedPhone) {
       await trackServerEvent('notifications_subscribe_error', {
         artist_id,
         error_type: 'validation_error',
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: artist_id,
         channel,
         email: normalizedEmail,
-        phone: channel === 'phone' ? normalizedPhone : null,
+        phone: channel === 'sms' ? normalizedPhone : null,
         countryCode,
         city: cityValue,
         ipAddress,
