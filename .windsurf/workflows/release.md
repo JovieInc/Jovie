@@ -32,14 +32,15 @@ When CI passes on `main`:
 3. PR requires manual approval before merge
 
 ### 4. Merge production PR
-**IMPORTANT: Always use squash merge to prevent branch divergence!**
+**IMPORTANT: Prefer a merge commit (not squash) to keep `production` aligned with `main`.**
 // turbo
 ```bash
-# After manual review, merge the promotion PR with SQUASH
-gh pr merge --squash --auto
+# After manual review, merge the promotion PR
+gh pr merge --merge
 ```
 
-> ⚠️ The production branch ruleset only allows squash merges. Using `--merge` or `--rebase` will be rejected.
+> ⚠️ If the production branch ruleset only allows squash merges, `production` will diverge from `main`.
+> In that case, immediately follow up with a PR to merge `production` back into `main` after the release.
 
 ### 5. Production deploy runs automatically
 When PR merges to `production`:
@@ -63,7 +64,7 @@ When PR merges to `production`:
 2. Check `GIT_BRANCH=production` is passed to migration script
 
 ### Production branch diverged from main
-This happens if someone merged a PR to production with `--merge` instead of `--squash`.
+This happens when `production` receives commits that are not in `main` (for example, squash-merged release PRs).
 
 **To fix:**
 
@@ -71,4 +72,4 @@ Do not bypass branch protections or force-push.
 
 If `production` diverges, stop and resolve via a normal PR-based workflow (or manual maintainer intervention), ensuring history and migrations remain consistent.
 
-**Prevention:** The production ruleset now only allows squash merges (`allowed_merge_methods: ["squash"]`).
+**Prevention:** Keep `production` as a fast-forward of `main` by using merge commits for release PRs.
