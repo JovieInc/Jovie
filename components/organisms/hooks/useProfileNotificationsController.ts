@@ -46,7 +46,7 @@ export function useProfileNotificationsController({
   onSuccess,
 }: ControllerParams) {
   const [state, setState] = useState<ProfileNotificationsState>('idle');
-  const [channel, setChannel] = useState<NotificationChannel>('phone');
+  const [channel, setChannel] = useState<NotificationChannel>('sms');
   const [subscribedChannels, setSubscribedChannels] =
     useState<NotificationSubscriptionState>({});
   const [subscriptionDetails, setSubscriptionDetails] =
@@ -60,8 +60,8 @@ export function useProfileNotificationsController({
   const wasMenuOpenRef = useRef(false);
 
   const hasActiveSubscriptions = useMemo(
-    () => Boolean(subscribedChannels.email || subscribedChannels.phone),
-    [subscribedChannels.email, subscribedChannels.phone]
+    () => Boolean(subscribedChannels.email || subscribedChannels.sms),
+    [subscribedChannels.email, subscribedChannels.sms]
   );
 
   const isSubscribed = state === 'success' && hasActiveSubscriptions;
@@ -87,7 +87,7 @@ export function useProfileNotificationsController({
   const persistContacts = useCallback((next: NotificationContactValues) => {
     if (typeof window === 'undefined') return;
     try {
-      const hasAny = Boolean(next.email || next.phone);
+      const hasAny = Boolean(next.email || next.sms);
 
       if (!hasAny) {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -113,7 +113,7 @@ export function useProfileNotificationsController({
 
     try {
       const parsed = JSON.parse(storedRaw) as NotificationContactValues;
-      const hasStoredContact = Boolean(parsed.email || parsed.phone);
+      const hasStoredContact = Boolean(parsed.email || parsed.sms);
       if (!hasStoredContact) return;
 
       void (async () => {
@@ -124,7 +124,7 @@ export function useProfileNotificationsController({
             body: JSON.stringify({
               artist_id: artistId,
               email: parsed.email,
-              phone: parsed.phone,
+              phone: parsed.sms,
             }),
           });
 
@@ -215,7 +215,7 @@ export function useProfileNotificationsController({
             artist_id: artistId,
             channel: targetChannel,
             email: targetChannel === 'email' ? contactValue : undefined,
-            phone: targetChannel === 'phone' ? contactValue : undefined,
+            phone: targetChannel === 'sms' ? contactValue : undefined,
             method: 'dropdown',
           }),
         });
@@ -252,7 +252,7 @@ export function useProfileNotificationsController({
         setIsNotificationMenuOpen(false);
 
         onSuccess(
-          targetChannel === 'phone'
+          targetChannel === 'sms'
             ? 'Unsubscribed from SMS updates.'
             : 'Unsubscribed from email updates.'
         );

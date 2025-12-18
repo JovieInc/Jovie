@@ -254,7 +254,7 @@ export async function GET(request: NextRequest) {
         return {
           id: `subscribe:${row.id}`,
           description: `Someone${locationLabel} just subscribed.`,
-          icon: row.channel === 'phone' ? '📱' : '📩',
+          icon: row.channel === 'sms' ? '📱' : '📩',
           timestamp: row.createdAt.toISOString(),
         };
       });
