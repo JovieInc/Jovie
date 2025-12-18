@@ -247,6 +247,7 @@ export function OtpSignInForm() {
                     <AuthInput
                       type='email'
                       placeholder='Enter your email address'
+                      autoComplete='email'
                     />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
