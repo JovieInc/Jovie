@@ -40,7 +40,7 @@ export function NewHowItWorks() {
           <p className='text-sm font-medium tracking-wide uppercase text-secondary-token mb-3'>
             Get started
           </p>
-          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
+          <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
             How it works
           </h2>
         </div>
@@ -62,7 +62,7 @@ export function NewHowItWorks() {
 
                   {/* Step number */}
                   <div className='relative z-10 inline-flex items-center justify-center w-12 h-12 rounded-full border border-subtle bg-surface-0 mb-4'>
-                    <span className='text-sm font-semibold text-primary-token'>
+                    <span className='text-sm font-medium text-primary-token'>
                       {step.number}
                     </span>
                   </div>

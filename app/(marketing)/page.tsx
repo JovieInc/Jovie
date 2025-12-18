@@ -143,7 +143,7 @@ export default function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-base text-primary-token'>
+      <div className='relative min-h-screen bg-base text-primary-token dark:[--color-bg-base:#08090a]'>
         {/* 1. Hero Section (above the fold) */}
         <NewHomeHero />
 
@@ -175,14 +175,14 @@ export default function HomePage() {
             <div className='mx-auto max-w-5xl'>
               <div className='flex flex-col gap-6 md:flex-row md:items-start md:justify-between'>
                 <div className='md:max-w-xl'>
-                  <h2 className='text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token'>
+                  <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
                     <span className='block'>Purpose-built for</span>
                     <span className='block'>music creators</span>
                   </h2>
                 </div>
                 <div className='md:text-right'>
                   <div className='flex items-baseline gap-2 md:justify-end'>
-                    <div className='text-4xl sm:text-5xl font-semibold tracking-tight text-primary-token'>
+                    <div className='text-4xl sm:text-5xl font-medium tracking-tight text-primary-token'>
                       90M+
                     </div>
                     <div className='text-sm sm:text-base font-medium text-secondary-token'>
@@ -225,7 +225,7 @@ export default function HomePage() {
                       </div>
 
                       <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-semibold leading-tight text-primary-token'>
+                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
                           Blazing fast profiles
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
@@ -255,7 +255,7 @@ export default function HomePage() {
                       </div>
 
                       <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-semibold leading-tight text-primary-token'>
+                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
                           Opinionated design
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
@@ -285,7 +285,7 @@ export default function HomePage() {
                       </div>
 
                       <div className='relative flex items-end justify-between gap-6'>
-                        <h3 className='text-lg font-semibold leading-tight text-primary-token'>
+                        <h3 className='text-lg font-medium leading-tight text-primary-token'>
                           Zero setup
                         </h3>
                         <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-transform group-[open]:rotate-45'>
@@ -319,15 +319,15 @@ export default function HomePage() {
             <div className='mx-auto max-w-5xl'>
               <div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
                 <div className='min-w-0'>
-                  <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
+                  <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
                     Claim your @handle. Build your audience.
                   </h2>
                 </div>
 
-                <div className='flex flex-wrap items-center gap-2 md:justify-end'>
+                <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
                   <Link
                     href='/waitlist'
-                    className='inline-flex h-11 items-center justify-center rounded-md bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'
+                    className='inline-flex h-11 w-full items-center justify-center rounded-md bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed md:w-auto'
                   >
                     Request early access
                   </Link>
