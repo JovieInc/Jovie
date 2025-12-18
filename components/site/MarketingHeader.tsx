@@ -70,7 +70,7 @@ export function MarketingHeader({
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid
-          ? 'bg-white/90 dark:bg-black/90 border-subtle backdrop-blur'
+          ? 'bg-base border-subtle backdrop-blur'
           : 'bg-transparent! dark:bg-transparent! border-transparent!'
       )}
     />

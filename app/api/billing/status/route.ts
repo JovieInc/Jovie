@@ -12,33 +12,42 @@ export async function GET() {
     // Check authentication
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Get user's billing information
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
       // User not found in database - they might need onboarding
-      return NextResponse.json({
-        isPro: false,
-        stripeCustomerId: null,
-        stripeSubscriptionId: null,
-      });
+      return NextResponse.json(
+        {
+          isPro: false,
+          stripeCustomerId: null,
+          stripeSubscriptionId: null,
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     const { isPro, stripeCustomerId, stripeSubscriptionId } =
       billingResult.data;
 
-    return NextResponse.json({
-      isPro,
-      stripeCustomerId,
-      stripeSubscriptionId,
-    });
+    return NextResponse.json(
+      {
+        isPro,
+        stripeCustomerId,
+        stripeSubscriptionId,
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Error getting billing status:', error);
     return NextResponse.json(
       { error: 'Failed to get billing status' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

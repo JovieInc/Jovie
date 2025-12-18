@@ -7,16 +7,25 @@ import { creatorProfiles, stripeWebhookEvents } from '@/lib/db/schema';
 
 const DISABLED_TABLES = new Set<string>();
 
+function getPostgresErrorCode(error: unknown): string | undefined {
+  const maybe = error as { code?: string; cause?: { code?: string } } | null;
+  return maybe?.code ?? maybe?.cause?.code;
+}
+
 function shouldDisableStripeEventsTable(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const msg = error.message.toLowerCase();
-  const mentionsTable = msg.includes('stripe_webhook_events');
-  const isMissingRelation =
-    msg.includes('does not exist') ||
-    msg.includes('undefined_table') ||
-    msg.includes('relation') ||
-    msg.includes('missing relation');
-  return mentionsTable && isMissingRelation;
+  const code = getPostgresErrorCode(error);
+  if (!code) return false;
+
+  if (code !== '42P01' && code !== '42703') {
+    return false;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown } | null)?.message ?? '');
+
+  return message.toLowerCase().includes(TABLE_NAMES.stripeWebhookEvents);
 }
 
 export interface AdminUsagePoint {
@@ -48,15 +57,14 @@ export async function getAdminUsageSeries(
 ): Promise<AdminUsagePoint[]> {
   const now = new Date();
   const startDate = new Date(now.getTime() - (days - 1) * MS_PER_DAY);
-  const startIso = startDate.toISOString();
 
   let rows: { date: string; activeUsers: number | null }[] = [];
   try {
     const result = await db.execute(
-      `
+      drizzleSql`
         SELECT DATE(created_at) AS date, COUNT(DISTINCT ip_address) AS active_users
         FROM click_events
-        WHERE created_at >= '${startIso}'
+        WHERE created_at >= ${startDate}::timestamp
         GROUP BY DATE(created_at)
         ORDER BY DATE(created_at)
       `
@@ -125,18 +133,22 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
           drizzleSql`${stripeWebhookEvents.createdAt} >= ${dayAgo}::timestamp`
         );
       totalEvents = Number(rows[0]?.count ?? 0);
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
-        'Stripe webhook events unavailable; skipping reliability summary.'
-      );
+    } catch (error) {
+      if (shouldDisableStripeEventsTable(error)) {
+        DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+        console.warn(
+          'Stripe webhook events unavailable; skipping reliability summary.'
+        );
 
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
+        return {
+          errorRatePercent: 0,
+          p95LatencyMs: dbHealth.latency ?? null,
+          incidents24h: 0,
+          lastIncidentAt: null,
+        };
+      }
+
+      throw error;
     }
 
     try {
@@ -166,18 +178,22 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
           : rawLastAt != null
             ? new Date(String(rawLastAt))
             : null;
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
-        'Stripe webhook incidents unavailable; skipping reliability summary.'
-      );
+    } catch (error) {
+      if (shouldDisableStripeEventsTable(error)) {
+        DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+        console.warn(
+          'Stripe webhook incidents unavailable; skipping reliability summary.'
+        );
 
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
+        return {
+          errorRatePercent: 0,
+          p95LatencyMs: dbHealth.latency ?? null,
+          incidents24h: 0,
+          lastIncidentAt: null,
+        };
+      }
+
+      throw error;
     }
 
     const errorRatePercent =
@@ -318,10 +334,11 @@ export async function getAdminActivityFeed(
         } catch (error) {
           if (shouldDisableStripeEventsTable(error)) {
             DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
+            console.warn('Stripe webhook activity unavailable; skipping.');
+            return [] as StripeActivityRow[];
           }
-          DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-          console.warn('Stripe webhook activity unavailable; skipping.');
-          return [] as StripeActivityRow[];
+
+          throw error;
         }
       })(),
     ]);

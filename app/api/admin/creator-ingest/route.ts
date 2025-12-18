@@ -38,12 +38,17 @@ import {
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { logger } from '@/lib/utils/logger';
+import { isSafeExternalUrl } from '@/lib/utils/url-encryption';
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+const MAX_ADMIN_INGEST_BODY_BYTES = 4096;
+
 const ingestSchema = z.object({
-  url: z.string().url(),
+  url: z.string().trim().max(2048).url(),
   // Optional idempotency key to prevent duplicate ingestion on double-click
   idempotencyKey: z.string().uuid().optional(),
 });
@@ -85,6 +90,11 @@ async function copyAvatarToBlob(
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
     logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+    return null;
+  }
+
+  if (!isSafeExternalUrl(sourceUrl)) {
+    logger.warn('Skipping avatar copy: unsafe avatar URL', { sourceUrl, handle });
     return null;
   }
 
@@ -184,12 +194,34 @@ export async function POST(request: Request) {
   try {
     await requireAdmin();
 
-    const body = await request.json().catch(() => null);
+    const rawBody = await request.text().catch(() => null);
+    if (rawBody == null) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const size = Buffer.byteLength(rawBody, 'utf8');
+    if (size > MAX_ADMIN_INGEST_BODY_BYTES) {
+      return NextResponse.json(
+        { error: 'Request body too large' },
+        { status: 413, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const body = (() => {
+      try {
+        return JSON.parse(rawBody) as unknown;
+      } catch {
+        return null;
+      }
+    })();
     const parsed = ingestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: 'Invalid request body', details: parsed.error.flatten() },
-        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -207,7 +239,7 @@ export async function POST(request: Request) {
             ? 'URL must be a valid HTTPS Laylo profile (e.g., https://laylo.com/username)'
             : 'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
         },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -219,7 +251,7 @@ export async function POST(request: Request) {
     if (!rawHandle) {
       return NextResponse.json(
         { error: 'Unable to parse profile handle from URL.' },
-        { status: 422 }
+        { status: 422, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -235,7 +267,7 @@ export async function POST(request: Request) {
           details:
             'Handle must be 1-30 characters, alphanumeric and underscores only',
         },
-        { status: 422 }
+        { status: 422, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -273,7 +305,7 @@ export async function POST(request: Request) {
             error: 'Unable to allocate unique username',
             details: 'All fallback username attempts exhausted.',
           },
-          { status: 409 }
+          { status: 409, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -283,7 +315,7 @@ export async function POST(request: Request) {
             error: 'Profile already claimed',
             details: 'Cannot overwrite a claimed profile.',
           },
-          { status: 409 }
+          { status: 409, headers: NO_STORE_HEADERS }
         );
       }
 
@@ -314,7 +346,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json(
           { error: 'Failed to fetch profile', details: errorMessage },
-          { status: 502 }
+          { status: 502, headers: NO_STORE_HEADERS }
         );
       }
 

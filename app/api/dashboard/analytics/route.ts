@@ -57,7 +57,7 @@ export async function GET(request: Request) {
 
       if (!forceRefresh && cached && cached.expiresAt > now) {
         const response = NextResponse.json(cached.payload, { status: 200 });
-        response.headers.set('Cache-Control', 'private, max-age=0');
+        response.headers.set('Cache-Control', 'no-store');
         return response;
       }
 
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
         const payload = await promise;
         cache.set(key, { payload, expiresAt: Date.now() + TTL_MS });
         const response = NextResponse.json(payload, { status: 200 });
-        response.headers.set('Cache-Control', 'private, max-age=0');
+        response.headers.set('Cache-Control', 'no-store');
         return response;
       } finally {
         if (inflight.get(key) === promise) {

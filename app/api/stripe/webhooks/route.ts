@@ -26,6 +26,52 @@ export const runtime = 'nodejs';
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 
+let stripeWebhookEventsTableUnavailable = false;
+
+const RECENT_EVENT_TTL_MS = 10 * 60 * 1000;
+const recentWebhookEventIds = new Map<string, number>();
+
+function getPostgresErrorCode(error: unknown): string | undefined {
+  const maybe = error as { code?: string; cause?: { code?: string } } | null;
+  return maybe?.code ?? maybe?.cause?.code;
+}
+
+function isMissingStripeWebhookEventsTable(error: unknown): boolean {
+  const code = getPostgresErrorCode(error);
+  if (!code) return false;
+  if (code !== '42P01' && code !== '42703') return false;
+
+  const message =
+    error instanceof Error
+      ? error.message
+      : String((error as { message?: unknown } | null)?.message ?? '');
+
+  return message.toLowerCase().includes('stripe_webhook_events');
+}
+
+function wasProcessedRecently(eventId: string): boolean {
+  const now = Date.now();
+  const last = recentWebhookEventIds.get(eventId);
+  if (typeof last === 'number' && now - last < RECENT_EVENT_TTL_MS) {
+    return true;
+  }
+  return false;
+}
+
+function markProcessed(eventId: string): void {
+  const now = Date.now();
+  recentWebhookEventIds.set(eventId, now);
+
+  if (recentWebhookEventIds.size > 2000) {
+    for (const [key, timestamp] of recentWebhookEventIds) {
+      if (now - timestamp > RECENT_EVENT_TTL_MS) {
+        recentWebhookEventIds.delete(key);
+      }
+      if (recentWebhookEventIds.size <= 1500) break;
+    }
+  }
+}
+
 /**
  * Safely extract the Stripe object ID from a webhook event
  * @param event - Stripe webhook event
@@ -82,7 +128,10 @@ export async function POST(request: NextRequest) {
 
     if (!signature) {
       console.error('Missing Stripe signature');
-      return NextResponse.json({ error: 'Missing signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing signature' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Verify webhook signature
@@ -91,7 +140,10 @@ export async function POST(request: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
       console.error('Invalid webhook signature:', error);
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     console.log('Received webhook event:', {
@@ -99,26 +151,61 @@ export async function POST(request: NextRequest) {
       id: event.id,
     });
 
+    if (stripeWebhookEventsTableUnavailable && wasProcessedRecently(event.id)) {
+      return NextResponse.json(
+        { received: true },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
+    }
+
     // Record the event for auditing and idempotency. If an event with the same
     // Stripe event ID already exists, we skip further processing to keep
     // handlers idempotent under Stripe retries.
-    const [webhookRecord] = await db
-      .insert(stripeWebhookEvents)
-      .values({
-        stripeEventId: event.id,
-        type: event.type,
-        stripeObjectId: getStripeObjectId(event),
-        payload: event as unknown as Record<string, unknown>,
-      })
-      .onConflictDoNothing()
-      .returning({ id: stripeWebhookEvents.id });
+    const webhookRecord = await (async (): Promise<{ id: string } | null> => {
+      if (stripeWebhookEventsTableUnavailable) {
+        return { id: 'unavailable' };
+      }
+
+      try {
+        const [row] = await db
+          .insert(stripeWebhookEvents)
+          .values({
+            stripeEventId: event.id,
+            type: event.type,
+            stripeObjectId: getStripeObjectId(event),
+            payload: event as unknown as Record<string, unknown>,
+          })
+          .onConflictDoNothing()
+          .returning({ id: stripeWebhookEvents.id });
+        return row ?? null;
+      } catch (error) {
+        if (isMissingStripeWebhookEventsTable(error)) {
+          stripeWebhookEventsTableUnavailable = true;
+          await captureWarning(
+            'Stripe webhook events table unavailable; proceeding without audit log',
+            error,
+            {
+              eventId: event.id,
+              type: event.type,
+              route: '/api/stripe/webhooks',
+            }
+          );
+          return { id: 'unavailable' };
+        }
+
+        throw error;
+      }
+    })();
 
     if (!webhookRecord) {
       console.log('Duplicate Stripe webhook event, skipping processing', {
         eventId: event.id,
         type: event.type,
       });
-      return NextResponse.json({ received: true });
+      return NextResponse.json(
+        { received: true },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Handle the event
@@ -160,12 +247,19 @@ export async function POST(request: NextRequest) {
         break;
     }
 
-    return NextResponse.json({ received: true });
+    if (stripeWebhookEventsTableUnavailable) {
+      markProcessed(event.id);
+    }
+
+    return NextResponse.json(
+      { received: true },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Error processing webhook:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

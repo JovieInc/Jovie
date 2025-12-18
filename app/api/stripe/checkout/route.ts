@@ -12,12 +12,17 @@ import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
 
 export const runtime = 'nodejs';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Parse request body
@@ -25,13 +30,19 @@ export async function POST(request: NextRequest) {
     const { priceId } = body;
 
     if (!priceId || typeof priceId !== 'string') {
-      return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid price ID' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Validate that the price ID is one of our active prices
     const activePriceIds = getActivePriceIds();
     if (!activePriceIds.includes(priceId)) {
-      return NextResponse.json({ error: 'Invalid price ID' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid price ID' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Get price details for logging
@@ -49,7 +60,7 @@ export async function POST(request: NextRequest) {
       console.error('Failed to ensure Stripe customer:', customerResult.error);
       return NextResponse.json(
         { error: 'Failed to create customer' },
-        { status: 500 }
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -79,7 +90,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
-    });
+    },
+    { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Error creating checkout session:', error);
 
@@ -88,25 +100,28 @@ export async function POST(request: NextRequest) {
       if (error.message.includes('customer')) {
         return NextResponse.json(
           { error: 'Customer setup failed' },
-          { status: 500 }
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
       if (error.message.includes('price')) {
         return NextResponse.json(
           { error: 'Invalid pricing configuration' },
-          { status: 400 }
+          { status: 400, headers: NO_STORE_HEADERS }
         );
       }
     }
 
     return NextResponse.json(
       { error: 'Failed to create checkout session' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }
 
 // Only allow POST requests
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed' }, { status: 405 });
+  return NextResponse.json(
+    { error: 'Method not allowed' },
+    { status: 405, headers: NO_STORE_HEADERS }
+  );
 }

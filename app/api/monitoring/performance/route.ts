@@ -26,7 +26,10 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
 
     // Only allow authenticated users
     if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // In a real implementation, you would fetch metrics from your database or analytics service
@@ -64,12 +67,15 @@ export async function GET(): Promise<NextResponse<PerformanceResponse>> {
       },
     ];
 
-    return NextResponse.json({ metrics: mockMetrics });
+    return NextResponse.json(
+      { metrics: mockMetrics },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Error fetching performance metrics:', error);
     return NextResponse.json(
       { error: 'Failed to fetch performance metrics' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

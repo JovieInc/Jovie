@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Creator profile not found' },
-          { status: 404 }
+          { status: 404, headers: { 'Cache-Control': 'no-store' } }
         );
       }
 
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       if (!jobId) {
         return NextResponse.json(
           { error: 'Unable to queue ingestion job' },
-          { status: 500 }
+          { status: 500, headers: { 'Cache-Control': 'no-store' } }
         );
       }
 
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     console.error('Failed to rerun ingestion job', error);
     return NextResponse.json(
       { error: 'Failed to queue ingestion job' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

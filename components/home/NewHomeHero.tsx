@@ -4,9 +4,12 @@ import { Container } from '@/components/site/Container';
 
 export function NewHomeHero() {
   return (
-    <section className='relative overflow-hidden min-h-svh flex items-center py-16 sm:py-20 lg:py-24'>
+    <section className='relative overflow-hidden min-h-[72svh] flex items-center py-16 sm:py-20 lg:py-24 bg-base border-b border-subtle'>
       {/* Subtle gradient background + vignette */}
       <div className='absolute inset-0 -z-10'>
+        <div className='absolute inset-0 grid-bg dark:grid-bg-dark opacity-60' />
+        <div className='absolute inset-x-0 top-0 h-24 bg-[linear-gradient(to_bottom,var(--color-bg-base),transparent)]' />
+        <div className='absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(to_top,var(--color-bg-base),transparent)]' />
         <div className='absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.25),transparent)]' />
         <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.03)_100%)] dark:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_100%)]' />
       </div>
@@ -36,7 +39,7 @@ export function NewHomeHero() {
               href='/waitlist'
               className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-full bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg focus-ring-themed'
             >
-              Get early access
+              Request early access
               <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
             </Link>
             <Link

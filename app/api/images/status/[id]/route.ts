@@ -5,6 +5,8 @@ import { db, profilePhotos, users } from '@/lib/db';
 
 export const runtime = 'edge';
 
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
 // UUID v4 regex pattern for validation
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,19 +25,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { userId: clerkUserId } = await auth();
     if (!clerkUserId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
     }
 
     const { id: photoId } = await context.params;
     if (!photoId) {
-      return NextResponse.json({ error: 'Photo ID required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Photo ID required' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     // Validate UUID format to prevent injection attacks
     if (!isValidUUID(photoId)) {
       return NextResponse.json(
         { error: 'Invalid photo ID format' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -55,32 +63,38 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const photo = row?.photo;
 
     if (!photo) {
-      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Photo not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
     }
 
-    return NextResponse.json({
-      jobId: photo.id,
-      status: photo.status,
-      formats: {
-        webp: {
-          original: photo.blobUrl,
-          large: photo.largeUrl,
-          medium: photo.mediumUrl,
-          small: photo.smallUrl,
+    return NextResponse.json(
+      {
+        jobId: photo.id,
+        status: photo.status,
+        formats: {
+          webp: {
+            original: photo.blobUrl,
+            large: photo.largeUrl,
+            medium: photo.mediumUrl,
+            small: photo.smallUrl,
+          },
+          avif: null, // reserved for background worker output
+          jpeg: null, // reserved for background worker output
         },
-        avif: null, // reserved for background worker output
-        jpeg: null, // reserved for background worker output
+        processedAt: photo.processedAt,
+        errorMessage: photo.errorMessage,
+        createdAt: photo.createdAt,
+        updatedAt: photo.updatedAt,
       },
-      processedAt: photo.processedAt,
-      errorMessage: photo.errorMessage,
-      createdAt: photo.createdAt,
-      updatedAt: photo.updatedAt,
-    });
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     console.error('Photo status check error:', error);
     return NextResponse.json(
       { error: 'Failed to check status' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

@@ -34,10 +34,10 @@ async function withClerkRlsTx<T>(
 
   return db.transaction(async tx => {
     await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.user_id = '${clerkUserId}'`)
+      drizzleSql`SELECT set_config('app.user_id', ${clerkUserId}, true)`
     );
     await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${clerkUserId}'`)
+      drizzleSql`SELECT set_config('app.clerk_user_id', ${clerkUserId}, true)`
     );
 
     return operation(tx);

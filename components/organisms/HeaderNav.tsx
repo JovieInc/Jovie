@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 // Geist nav link styles
 const navLinkClass =
-  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:bg-white/5 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400/40 dark:focus-visible:ring-white/30';
+  'inline-flex items-center justify-center h-8 px-3 text-sm font-medium rounded-md text-secondary-token hover:text-primary-token hover:bg-surface-1 transition-colors duration-150 focus-ring-themed';
 
 export interface HeaderNavProps {
   sticky?: boolean;
@@ -29,7 +29,7 @@ export function HeaderNav({
     <header
       data-testid='header-nav'
       className={cn(
-        'sticky top-0 z-50 w-full bg-white dark:bg-black',
+        'sticky top-0 z-50 w-full bg-base',
         className
       )}
       style={{ fontSynthesisWeight: 'none' }}

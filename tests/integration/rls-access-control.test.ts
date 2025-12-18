@@ -88,7 +88,7 @@ if (!db) {
     it("prevents a user from reading another user's private profile", async () => {
       const rows = await db.transaction(async (tx: any) => {
         await tx.execute(
-          drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${userAClerkId}, true)`
         );
         return tx.execute(
           drizzleSql.raw(
@@ -106,7 +106,7 @@ if (!db) {
     it('allows the owner to read their own private profile', async () => {
       const rows = await db.transaction(async (tx: any) => {
         await tx.execute(
-          drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userBClerkId}'`)
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${userBClerkId}, true)`
         );
         return tx.execute(
           drizzleSql.raw(
@@ -122,7 +122,7 @@ if (!db) {
     it("prevents a user from updating another user's profile", async () => {
       const updated = await db.transaction(async (tx: any) => {
         await tx.execute(
-          drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
+          drizzleSql`SELECT set_config('app.clerk_user_id', ${userAClerkId}, true)`
         );
         return tx.execute(
           drizzleSql.raw(
