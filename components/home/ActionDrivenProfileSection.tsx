@@ -173,16 +173,16 @@ export function ActionDrivenProfileSection() {
                   <div className='text-xs font-medium tracking-wide uppercase text-tertiary-token'>
                     What changes for this fan
                   </div>
-                  <div className='mt-3 grid gap-2'>
+                  <div className="relative mt-3 overflow-hidden rounded-xl border border-subtle bg-surface-0/30 before:absolute before:bottom-3 before:left-[22px] before:top-3 before:w-px before:bg-subtle/70 before:content-['']">
                     {active.actions.map(action => (
                       <div
                         key={action}
-                        className='flex items-start gap-2 rounded-xl border border-subtle/70 bg-surface-0/35 px-3 py-2'
+                        className='relative border-b border-subtle/70 py-2.5 pl-10 pr-3 last:border-b-0 hover:bg-surface-0/45'
                       >
-                        <span className='mt-1 inline-flex h-4 w-4 items-center justify-center rounded-full border border-subtle bg-surface-0 text-[10px] font-semibold text-secondary-token'>
+                        <span className='absolute left-3 top-2.5 inline-flex h-5 w-5 items-center justify-center rounded-md border border-subtle bg-surface-0 text-[11px] font-semibold text-tertiary-token'>
                           ✓
                         </span>
-                        <span className='text-sm text-secondary-token leading-snug'>
+                        <span className='text-sm leading-snug text-secondary-token'>
                           {action}
                         </span>
                       </div>

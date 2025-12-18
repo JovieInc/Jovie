@@ -1,5 +1,14 @@
 'use client';
 
+import { SignOutButton } from '@clerk/nextjs';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@jovie/ui';
+import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -17,6 +26,8 @@ interface AuthLayoutProps {
   logoSpinDelayMs?: number;
   showSkipLink?: boolean;
   showLogo?: boolean;
+  showLogoutButton?: boolean;
+  logoutRedirectUrl?: string;
 }
 
 const LINK_FOCUS_CLASSES =
@@ -35,6 +46,8 @@ export function AuthLayout({
   logoSpinDelayMs,
   showSkipLink = true,
   showLogo = true,
+  showLogoutButton = false,
+  logoutRedirectUrl = '/signin',
 }: AuthLayoutProps) {
   const [shouldSpinLogo, setShouldSpinLogo] = useState(false);
 
@@ -96,6 +109,29 @@ export function AuthLayout({
           Skip to form
         </Link>
       )}
+
+      {showLogoutButton ? (
+        <div className='absolute top-4 right-4 z-50'>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type='button'
+                size='icon'
+                variant='ghost'
+                className='h-9 w-9 rounded-full border border-subtle bg-transparent text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
+              >
+                <MoreHorizontal className='h-4 w-4' />
+                <span className='sr-only'>Open menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='end' sideOffset={8}>
+              <SignOutButton redirectUrl={logoutRedirectUrl}>
+                <DropdownMenuItem>Log out</DropdownMenuItem>
+              </SignOutButton>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      ) : null}
 
       {/* Logo */}
       <div className='mb-4 h-11 w-11 flex items-center justify-center'>
