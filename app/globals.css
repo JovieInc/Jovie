@@ -29,7 +29,7 @@ body {
 }
 
 .dark body {
-  background: #0f0f11;
+  background: #0f0f12;
   color: #fff;
 }
 
@@ -333,6 +333,13 @@ body {
     --color-skeleton-base: #f3f4f6;
     --color-skeleton-shimmer: #ffffff;
 
+    --shadow-sm:
+      0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    --shadow-md:
+      0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+    --shadow-lg:
+      0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+
     /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
     --focus-ring: 124 58 237;
     /* approx. #7c3aed */
@@ -341,23 +348,26 @@ body {
   /* Dark mode overrides — ensure this block comes AFTER light tokens */
   :root.dark {
     /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0f0f11;
+    --color-bg-base: #0f0f12;
     /* deepest app background */
-    --color-bg-surface-0: #111111;
+    --color-bg-surface-0: #141419;
     /* elevated backgrounds (sidebars) */
-    --color-bg-surface-1: #171717;
+    --color-bg-surface-1: #18181f;
     /* cards/panels */
-    --color-bg-surface-2: #1f1f1f;
+    --color-bg-surface-2: #1e1e27;
     /* interactive/hover */
-    --color-bg-surface-3: #262626;
+    --color-bg-surface-3: #242430;
     /* pressed/active */
-    --color-border-subtle: #1f1f1f;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
     /* subtle borders */
-    --color-border-default: #303030;
+    --color-border-default: rgba(255, 255, 255, 0.1);
     /* default borders */
-    --color-text-primary-token: #f5f5f5;
-    --color-text-secondary-token: #a3a3a3;
-    --color-text-tertiary-token: #8b8b8b;
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+
+    --color-text-primary-token: #f4f4f5;
+    --color-text-secondary-token: #c6c6cc;
+    --color-text-tertiary-token: #9a9aa2;
+    --color-text-disabled-token: #6f6f78;
     /* Improved contrast from #737373 */
     --color-accent: #7c3aed;
     /* accent */
@@ -372,7 +382,11 @@ body {
     --color-skeleton-base: #1a1a1a;
     --color-skeleton-shimmer: #2a2a2a;
 
-    --focus-ring: 124 58 237;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+    --focus-ring: 109 119 230 / 0.55;
   }
 
   body {
@@ -429,6 +443,10 @@ body {
 
 @utility border-default {
   border-color: var(--color-border-default);
+}
+
+@utility border-strong {
+  border-color: var(--color-border-strong);
 }
 
 @utility text-accent-token {

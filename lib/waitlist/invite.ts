@@ -8,6 +8,7 @@ interface BuildWaitlistInviteEmailParams {
   email: string;
   fullName?: string | null;
   appUrl?: string;
+  claimToken?: string;
   redirectUrl?: string;
   dedupKey?: string;
 }
@@ -16,14 +17,20 @@ export function buildWaitlistInviteEmail({
   email,
   fullName,
   appUrl = NOTIFICATIONS_APP_URL,
+  claimToken,
   redirectUrl = '/app/dashboard',
   dedupKey,
 }: BuildWaitlistInviteEmailParams): {
   message: NotificationMessage;
   target: NotificationTarget;
-  signupUrl: string;
+  inviteUrl: string;
 } {
-  const signupUrl = (() => {
+  const inviteUrl = (() => {
+    if (claimToken) {
+      const url = new URL(`/claim/${claimToken}`, appUrl);
+      return url.toString();
+    }
+
     const url = new URL('/signup', appUrl);
     url.searchParams.set('redirect_url', redirectUrl);
     return url.toString();
@@ -34,12 +41,12 @@ export function buildWaitlistInviteEmail({
 
   const subject = "You're off the waitlist";
 
-  const text = `${greeting}\n\nYou're off the waitlist. Create your Jovie account here:\n${signupUrl}\n\nIf you didn’t request this, you can ignore this email.`;
+  const text = `${greeting}\n\nYou're off the waitlist. Claim your Jovie profile here:\n${inviteUrl}\n\nIf you didn’t request this, you can ignore this email.`;
 
-  const html = `<p>${greeting}</p><p>You're off the waitlist. Create your Jovie account here:</p><p><a href="${signupUrl}">Create your account</a></p><p>If you didn't request this, you can ignore this email.</p>`;
+  const html = `<p>${greeting}</p><p>You're off the waitlist. Claim your Jovie profile here:</p><p><a href="${inviteUrl}">Claim your profile</a></p><p>If you didn't request this, you can ignore this email.</p>`;
 
   return {
-    signupUrl,
+    inviteUrl,
     target: {
       email,
     },
