@@ -143,7 +143,7 @@ export default function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-base text-primary-token'>
+      <div className='relative min-h-screen bg-base text-primary-token dark:[--color-bg-base:#08090a]'>
         {/* 1. Hero Section (above the fold) */}
         <NewHomeHero />
 
@@ -182,7 +182,7 @@ export default function HomePage() {
                 </div>
                 <div className='md:text-right'>
                   <div className='flex items-baseline gap-2 md:justify-end'>
-                    <div className='text-4xl sm:text-5xl font-semibold tracking-tight text-primary-token'>
+                    <div className='text-4xl sm:text-5xl font-medium tracking-tight text-primary-token'>
                       90M+
                     </div>
                     <div className='text-sm sm:text-base font-medium text-secondary-token'>
@@ -234,7 +234,7 @@ export default function HomePage() {
                   </h2>
                 </div>
 
-                <div className='flex flex-wrap items-center gap-2 md:justify-end'>
+                <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
                   <Link
                     href='/waitlist'
                     className='inline-flex h-11 items-center justify-center rounded-lg bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'

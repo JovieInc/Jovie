@@ -62,7 +62,7 @@ export function NewHowItWorks() {
 
                   {/* Step number */}
                   <div className='relative z-10 inline-flex items-center justify-center w-12 h-12 rounded-full border border-subtle bg-surface-0 mb-4'>
-                    <span className='text-sm font-semibold text-primary-token'>
+                    <span className='text-sm font-medium text-primary-token'>
                       {step.number}
                     </span>
                   </div>
