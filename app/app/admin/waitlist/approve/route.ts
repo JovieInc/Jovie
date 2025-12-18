@@ -30,17 +30,23 @@ function extractHandleCandidateFromUrl(urlRaw: string): string | null {
     const url = new URL(urlRaw);
     const host = url.hostname.toLowerCase();
 
-    if (host.endsWith('instagram.com')) {
+    // Define allowed hosts for each platform (add subdomains as needed)
+    const INSTAGRAM_HOSTS = ['instagram.com', 'www.instagram.com'];
+    const TIKTOK_HOSTS = ['tiktok.com', 'www.tiktok.com'];
+    const YOUTUBE_HOSTS = ['youtube.com', 'www.youtube.com', 'm.youtube.com'];
+    const LINKTREE_HOSTS = ['linktr.ee', 'www.linktr.ee'];
+
+    if (INSTAGRAM_HOSTS.includes(host)) {
       const seg = url.pathname.split('/').filter(Boolean)[0];
       return seg ? seg.replace(/^@/, '') : null;
     }
 
-    if (host.endsWith('tiktok.com')) {
+    if (TIKTOK_HOSTS.includes(host)) {
       const seg = url.pathname.split('/').filter(Boolean)[0];
       return seg ? seg.replace(/^@/, '') : null;
     }
 
-    if (host.endsWith('youtube.com')) {
+    if (YOUTUBE_HOSTS.includes(host)) {
       const seg = url.pathname.split('/').filter(Boolean)[0];
       if (!seg) return null;
 
@@ -48,7 +54,7 @@ function extractHandleCandidateFromUrl(urlRaw: string): string | null {
       return null;
     }
 
-    if (host.endsWith('linktr.ee')) {
+    if (LINKTREE_HOSTS.includes(host)) {
       const seg = url.pathname.split('/').filter(Boolean)[0];
       return seg ? seg.replace(/^@/, '') : null;
     }
