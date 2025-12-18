@@ -13,6 +13,7 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { extractBeacons, fetchBeaconsDocument } from './strategies/beacons';
 import { extractLinktree, fetchLinktreeDocument } from './strategies/linktree';
 import { type ExtractionResult } from './types';
 
@@ -30,12 +31,16 @@ function calculateBackoff(attempt: number): number {
   return Math.min(exponentialDelay + jitter, MAX_BACKOFF_MS);
 }
 
-const linktreePayloadSchema = z.object({
+const ingestionPayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   sourceUrl: z.string().url(),
   dedupKey: z.string().optional(),
   depth: z.number().int().min(0).max(3).default(0),
 });
+
+// Alias for backward compatibility
+const linktreePayloadSchema = ingestionPayloadSchema;
+const beaconsPayloadSchema = ingestionPayloadSchema;
 
 type SocialLinkRow = typeof socialLinks.$inferSelect;
 
@@ -113,10 +118,13 @@ export async function normalizeAndMergeExtraction(
         normalizedUrl: detected.normalizedUrl,
       });
       const evidence = mergeEvidence(null, link.evidence);
+      // Use evidence from the link itself for confidence calculation
+      const signals = (link.evidence?.signals ?? ['linktree_profile_link']) as string[];
+      const sources = (link.evidence?.sources ?? ['linktree']) as string[];
       const { confidence, state } = computeLinkConfidence({
         sourceType: 'ingested',
-        signals: ['linktree_profile_link'],
-        sources: ['linktree'],
+        signals,
+        sources,
         usernameNormalized: profile.usernameNormalized,
         url: detected.normalizedUrl,
       });
@@ -224,9 +232,10 @@ export async function normalizeAndMergeExtraction(
   return { inserted, updated };
 }
 
-export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
-  const parsed = linktreePayloadSchema.parse(jobPayload);
-
+/**
+ * Fetches profile data for ingestion job processing.
+ */
+async function fetchProfileForJob(tx: DbType, creatorProfileId: string) {
   const [profile] = await tx
     .select({
       id: creatorProfiles.id,
@@ -237,32 +246,136 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
       displayNameLocked: creatorProfiles.displayNameLocked,
     })
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .where(eq(creatorProfiles.id, creatorProfileId))
     .limit(1);
 
   if (!profile) {
     throw new Error('Creator profile not found for ingestion job');
   }
 
+  return profile;
+}
+
+/**
+ * Sets ingestion status on a profile.
+ */
+async function setIngestionStatus(
+  tx: DbType,
+  profileId: string,
+  status: 'processing' | 'idle' | 'failed'
+) {
   await tx
     .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+    .set({ ingestionStatus: status, updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profileId));
+}
 
-  const html = await fetchLinktreeDocument(parsed.sourceUrl);
-  const extraction = extractLinktree(html);
-  const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
+  const parsed = linktreePayloadSchema.parse(jobPayload);
+  const profile = await fetchProfileForJob(tx, parsed.creatorProfileId);
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
-
-  return {
-    ...result,
+  logger.info('Processing Linktree ingestion job', {
+    profileId: profile.id,
     sourceUrl: parsed.sourceUrl,
-    extractedLinks: extraction.links.length,
-  };
+  });
+
+  await setIngestionStatus(tx, profile.id, 'processing');
+
+  try {
+    const html = await fetchLinktreeDocument(parsed.sourceUrl);
+    const extraction = extractLinktree(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await setIngestionStatus(tx, profile.id, 'idle');
+
+    logger.info('Linktree ingestion completed', {
+      profileId: profile.id,
+      sourceUrl: parsed.sourceUrl,
+      linksExtracted: extraction.links.length,
+      inserted: result.inserted,
+      updated: result.updated,
+    });
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+      platform: 'linktree' as const,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Linktree ingestion failed', {
+      profileId: profile.id,
+      sourceUrl: parsed.sourceUrl,
+      error: errorMessage,
+    });
+
+    // Store error on profile for admin visibility
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    throw error;
+  }
+}
+
+export async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
+  const parsed = beaconsPayloadSchema.parse(jobPayload);
+  const profile = await fetchProfileForJob(tx, parsed.creatorProfileId);
+
+  logger.info('Processing Beacons ingestion job', {
+    profileId: profile.id,
+    sourceUrl: parsed.sourceUrl,
+  });
+
+  await setIngestionStatus(tx, profile.id, 'processing');
+
+  try {
+    const html = await fetchBeaconsDocument(parsed.sourceUrl);
+    const extraction = extractBeacons(html);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await setIngestionStatus(tx, profile.id, 'idle');
+
+    logger.info('Beacons ingestion completed', {
+      profileId: profile.id,
+      sourceUrl: parsed.sourceUrl,
+      linksExtracted: extraction.links.length,
+      inserted: result.inserted,
+      updated: result.updated,
+    });
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+      platform: 'beacons' as const,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Beacons ingestion failed', {
+      profileId: profile.id,
+      sourceUrl: parsed.sourceUrl,
+      error: errorMessage,
+    });
+
+    // Store error on profile for admin visibility
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: errorMessage,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    throw error;
+  }
 }
 
 /**
@@ -426,6 +539,8 @@ export async function processJob(
   switch (job.jobType) {
     case 'import_linktree':
       return processLinktreeJob(tx, job.payload);
+    case 'import_beacons':
+      return processBeaconsJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }

@@ -34,7 +34,7 @@ const PLATFORM_OPTIONS: PlatformOption[] = [
     id: 'beacons',
     label: 'Beacons',
     placeholder: 'https://beacons.ai/username',
-    enabled: false,
+    enabled: true,
   },
   {
     id: 'instagram',
@@ -92,9 +92,9 @@ export function IngestProfileDropdown() {
       notifications.success(successMessage, {
         action: profileUsername
           ? {
-              label: 'View profile',
-              onClick: () => router.push(`/${profileUsername}`),
-            }
+            label: 'View profile',
+            onClick: () => router.push(`/${profileUsername}`),
+          }
           : undefined,
       });
 
@@ -149,12 +149,11 @@ export function IngestProfileDropdown() {
                 onClick={() => setSelectedPlatform(platform.id)}
                 className={`
                   px-3 py-1.5 text-xs font-medium rounded-full transition-colors
-                  ${
-                    selectedPlatform === platform.id
-                      ? 'bg-primary text-primary-foreground'
-                      : platform.enabled
-                        ? 'bg-surface-2 text-secondary-token hover:bg-surface-3'
-                        : 'bg-surface-2/50 text-tertiary-token cursor-not-allowed opacity-50'
+                  ${selectedPlatform === platform.id
+                    ? 'bg-primary text-primary-foreground'
+                    : platform.enabled
+                      ? 'bg-surface-2 text-secondary-token hover:bg-surface-3'
+                      : 'bg-surface-2/50 text-tertiary-token cursor-not-allowed opacity-50'
                   }
                 `}
               >

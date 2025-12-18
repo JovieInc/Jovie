@@ -6,13 +6,25 @@ import { creatorProfiles } from '@/lib/db/schema';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
+  extractBeacons,
+  extractBeaconsHandle,
+  fetchBeaconsDocument,
+  isBeaconsUrl,
+  isValidHandle as isValidBeaconsHandle,
+  normalizeHandle as normalizeBeaconsHandle,
+  validateBeaconsUrl,
+} from '@/lib/ingestion/strategies/beacons';
+import {
   extractLinktree,
   extractLinktreeHandle,
   fetchLinktreeDocument,
-  isValidHandle,
-  normalizeHandle,
+  isLinktreeUrl,
+  isValidHandle as isValidLinktreeHandle,
+  normalizeHandle as normalizeLinktreeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import type { ExtractionResult } from '@/lib/ingestion/types';
 import { logger } from '@/lib/utils/logger';
 
 // Default claim token expiration: 30 days
@@ -22,20 +34,65 @@ const ingestSchema = z.object({
   url: z.string().url(),
   // Optional idempotency key to prevent duplicate ingestion on double-click
   idempotencyKey: z.string().uuid().optional(),
+  // Optional platform hint (auto-detected if not provided)
+  platform: z.enum(['linktree', 'beacons']).optional(),
 });
 
 export const runtime = 'nodejs';
 
+type IngestionPlatform = 'linktree' | 'beacons';
+
+interface PlatformStrategy {
+  validateUrl: (url: string) => string | null;
+  extractHandle: (url: string) => string | null;
+  isValidHandle: (handle: string) => boolean;
+  normalizeHandle: (handle: string) => string;
+  fetchDocument: (url: string) => Promise<string>;
+  extract: (html: string) => ExtractionResult;
+  platformName: string;
+}
+
+const strategies: Record<IngestionPlatform, PlatformStrategy> = {
+  linktree: {
+    validateUrl: validateLinktreeUrl,
+    extractHandle: extractLinktreeHandle,
+    isValidHandle: isValidLinktreeHandle,
+    normalizeHandle: normalizeLinktreeHandle,
+    fetchDocument: fetchLinktreeDocument,
+    extract: extractLinktree,
+    platformName: 'Linktree',
+  },
+  beacons: {
+    validateUrl: validateBeaconsUrl,
+    extractHandle: extractBeaconsHandle,
+    isValidHandle: isValidBeaconsHandle,
+    normalizeHandle: normalizeBeaconsHandle,
+    fetchDocument: fetchBeaconsDocument,
+    extract: extractBeacons,
+    platformName: 'Beacons',
+  },
+};
+
 /**
- * Admin endpoint to ingest a Linktree profile.
+ * Detects the ingestion platform from a URL.
+ */
+function detectPlatform(url: string): IngestionPlatform | null {
+  if (isLinktreeUrl(url)) return 'linktree';
+  if (isBeaconsUrl(url)) return 'beacons';
+  return null;
+}
+
+/**
+ * Admin endpoint to ingest a profile from supported platforms (Linktree, Beacons.ai).
  *
  * Hardening:
- * - Strict URL validation (HTTPS only, valid Linktree hosts)
+ * - Strict URL validation (HTTPS only, valid hosts)
  * - Handle normalization and validation
  * - Transaction-wrapped with race-safe duplicate check
  * - Idempotency key support
  * - Claim token generated at creation time
  * - Error persistence for admin visibility
+ * - Proper error codes for different failure modes
  */
 export async function POST(request: Request) {
   try {
@@ -48,31 +105,47 @@ export async function POST(request: Request) {
       );
     }
 
+    // Detect or use provided platform
+    const detectedPlatform =
+      parsed.data.platform ?? detectPlatform(parsed.data.url);
+
+    if (!detectedPlatform) {
+      return NextResponse.json(
+        {
+          error: 'Unsupported URL',
+          details:
+            'URL must be a valid Linktree (https://linktr.ee/username) or Beacons.ai (https://beacons.ai/username) profile',
+        },
+        { status: 400 }
+      );
+    }
+
+    const strategy = strategies[detectedPlatform];
+
     // Strict URL validation
-    const validatedUrl = validateLinktreeUrl(parsed.data.url);
+    const validatedUrl = strategy.validateUrl(parsed.data.url);
     if (!validatedUrl) {
       return NextResponse.json(
         {
-          error: 'Invalid Linktree URL',
-          details:
-            'URL must be a valid HTTPS Linktree profile (e.g., https://linktr.ee/username)',
+          error: `Invalid ${strategy.platformName} URL`,
+          details: `URL must be a valid HTTPS ${strategy.platformName} profile`,
         },
         { status: 400 }
       );
     }
 
     // Extract and validate handle
-    const rawHandle = extractLinktreeHandle(validatedUrl);
+    const rawHandle = strategy.extractHandle(validatedUrl);
     if (!rawHandle) {
       return NextResponse.json(
-        { error: 'Unable to parse Linktree handle from URL.' },
+        { error: `Unable to parse ${strategy.platformName} handle from URL.` },
         { status: 422 }
       );
     }
 
     // Normalize handle for storage
-    const handle = normalizeHandle(rawHandle);
-    if (!isValidHandle(handle)) {
+    const handle = strategy.normalizeHandle(rawHandle);
+    if (!strategy.isValidHandle(handle)) {
       return NextResponse.json(
         {
           error: 'Invalid handle format',
@@ -103,25 +176,55 @@ export async function POST(request: Request) {
         );
       }
 
-      // Fetch and extract Linktree data
+      // Fetch and extract profile data
       let html: string;
-      let extraction: ReturnType<typeof extractLinktree>;
+      let extraction: ExtractionResult;
       try {
-        html = await fetchLinktreeDocument(validatedUrl);
-        extraction = extractLinktree(html);
+        html = await strategy.fetchDocument(validatedUrl);
+        extraction = strategy.extract(html);
       } catch (fetchError) {
+        // Handle specific error types
+        if (fetchError instanceof ExtractionError) {
+          const statusMap: Record<string, number> = {
+            NOT_FOUND: 404,
+            RATE_LIMITED: 429,
+            FETCH_TIMEOUT: 504,
+            INVALID_URL: 400,
+          };
+
+          const status = statusMap[fetchError.code] ?? 502;
+
+          logger.error(`${strategy.platformName} fetch failed`, {
+            url: validatedUrl,
+            error: fetchError.message,
+            code: fetchError.code,
+          });
+
+          return NextResponse.json(
+            {
+              error: `Failed to fetch ${strategy.platformName} profile`,
+              details: fetchError.message,
+              code: fetchError.code,
+            },
+            { status }
+          );
+        }
+
         const errorMessage =
           fetchError instanceof Error
             ? fetchError.message
-            : 'Failed to fetch Linktree profile';
+            : `Failed to fetch ${strategy.platformName} profile`;
 
-        logger.error('Linktree fetch failed', {
+        logger.error(`${strategy.platformName} fetch failed`, {
           url: validatedUrl,
           error: errorMessage,
         });
 
         return NextResponse.json(
-          { error: 'Failed to fetch Linktree profile', details: errorMessage },
+          {
+            error: `Failed to fetch ${strategy.platformName} profile`,
+            details: errorMessage,
+          },
           { status: 502 }
         );
       }
@@ -213,6 +316,7 @@ export async function POST(request: Request) {
       logger.info('Creator profile ingested', {
         profileId: created.id,
         handle: created.username,
+        platform: detectedPlatform,
         linksExtracted: extraction.links.length,
         hadError: !!mergeError,
       });
@@ -226,6 +330,7 @@ export async function POST(request: Request) {
             usernameNormalized: created.usernameNormalized,
             claimToken: created.claimToken,
           },
+          platform: detectedPlatform,
           links: extraction.links.length,
           warning: mergeError
             ? `Profile created but link extraction had issues: ${mergeError}`
@@ -252,7 +357,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(
-      { error: 'Failed to ingest Linktree profile', details: errorMessage },
+      { error: 'Failed to ingest profile', details: errorMessage },
       { status: 500 }
     );
   }
