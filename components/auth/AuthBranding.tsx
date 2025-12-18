@@ -43,7 +43,11 @@ export function AuthBranding({
       <div className='relative mx-auto w-full max-w-[18rem]'>
         <div className='text-center'>
           <div className='mb-8'>
-            <BrandLogo size={64} tone='white' className='mx-auto' />
+            <BrandLogo
+              size={64}
+              tone='white'
+              className='mx-auto opacity-[0.89]'
+            />
           </div>
           {showText && (
             <>
