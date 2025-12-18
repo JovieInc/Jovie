@@ -54,38 +54,37 @@ export function ArtistCard({
   const whileHover: MotionProps['whileHover'] = prefersReducedMotion
     ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
     : {
-        scale: 1.02,
-        boxShadow:
-          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
-      };
+      scale: 1.02,
+      boxShadow:
+        '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
+    };
 
   const whileFocus: MotionProps['whileFocus'] = prefersReducedMotion
     ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
     : {
-        scale: 1.02,
-        boxShadow:
-          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-        borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
-      };
+      scale: 1.02,
+      boxShadow:
+        '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      borderColor: isSelected ? undefined : 'rgb(209, 213, 219)',
+    };
 
   const transition: MotionProps['transition'] = prefersReducedMotion
     ? { duration: 0.1 }
     : {
-        type: 'spring',
-        stiffness: 400,
-        damping: 17,
-        mass: 0.8,
-      };
+      type: 'spring',
+      stiffness: 400,
+      damping: 17,
+      mass: 0.8,
+    };
 
   return (
     <motion.div
       className={`
         relative p-4 rounded-xl border-2 cursor-pointer
-        ${
-          isSelected
-            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+        ${isSelected
+          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
         }
         ${className}
       `}
@@ -124,7 +123,7 @@ export function ArtistCard({
 
       <div className='flex items-center space-x-4'>
         {/* Artist image */}
-        <div className='w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 flex-shrink-0'>
+        <div className='w-16 h-16 rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 shrink-0'>
           {imageUrl ? (
             <Image
               src={imageUrl}
@@ -161,15 +160,14 @@ export function ArtistCard({
 
             {popularity && (
               <span
-                className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  popularity >= 80
+                className={`text-xs px-2 py-1 rounded-full font-medium ${popularity >= 80
                     ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                     : popularity >= 60
                       ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                       : popularity >= 40
                         ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
-                }`}
+                  }`}
               >
                 {getPopularityLabel(popularity)}
               </span>

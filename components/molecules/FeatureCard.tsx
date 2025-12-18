@@ -56,21 +56,21 @@ export function FeatureCard({
     ? prefersReducedMotion
       ? { duration: 0.1 }
       : {
-          type: 'spring',
-          stiffness: 400,
-          damping: 17,
-          mass: 0.8,
-        }
+        type: 'spring',
+        stiffness: 400,
+        damping: 17,
+        mass: 0.8,
+      }
     : undefined;
 
   const cardWhileHover: MotionProps['whileHover'] = interactive
     ? prefersReducedMotion
       ? { boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
       : {
-          boxShadow:
-            '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          borderColor: 'rgb(209, 213, 219)',
-        }
+        boxShadow:
+          '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+        borderColor: 'rgb(209, 213, 219)',
+      }
     : undefined;
 
   const cardTransition: MotionProps['transition'] = interactive
@@ -106,7 +106,7 @@ export function FeatureCard({
       {/* Hover glow effect */}
       {interactive && (
         <motion.div
-          className='absolute -inset-4 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl blur'
+          className='absolute -inset-4 bg-linear-to-r from-white/5 to-white/10 rounded-2xl blur'
           initial={glowInitial}
           whileHover={glowWhileHover}
           transition={glowTransition}
@@ -125,7 +125,7 @@ export function FeatureCard({
         <div
           className={`
             inline-flex h-12 w-12 items-center justify-center rounded-xl 
-            text-white shadow-lg bg-gradient-to-br ${accentClasses[accent]}
+            text-white shadow-lg bg-linear-to-br ${accentClasses[accent]}
           `}
         >
           {icon}
