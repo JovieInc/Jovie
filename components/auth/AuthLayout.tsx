@@ -20,7 +20,7 @@ interface AuthLayoutProps {
 }
 
 const LINK_FOCUS_CLASSES =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded-md';
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] rounded-md';
 
 export function AuthLayout({
   children,
@@ -86,7 +86,7 @@ export function AuthLayout({
   );
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-[#0e0f10] px-4 pt-[15vh] sm:pt-[17vh] lg:pt-[19vh] pb-24 relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06)_0%,rgba(14,15,16,0)_60%)] before:pointer-events-none after:content-[''] after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_center,rgba(0,0,0,0)_0%,rgba(0,0,0,0.6)_75%)] after:pointer-events-none">
+    <div className="min-h-screen flex flex-col items-center bg-base px-4 pt-[15vh] sm:pt-[17vh] lg:pt-[19vh] pb-24 relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.12),transparent)] dark:before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.20),transparent)] before:pointer-events-none after:content-[''] after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.03)_100%)] dark:after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.45)_100%)] after:pointer-events-none">
       {/* Skip to main content link for keyboard users */}
       {showSkipLink && (
         <Link
@@ -109,7 +109,7 @@ export function AuthLayout({
               className={shouldSpinLogo ? 'logo-spin-trigger' : undefined}
               style={logoStyle}
             >
-              <BrandLogo size={44} tone='white' priority />
+              <BrandLogo size={44} tone='auto' priority />
             </span>
           </Link>
         ) : (

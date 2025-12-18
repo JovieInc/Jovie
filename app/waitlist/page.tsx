@@ -1,8 +1,10 @@
 'use client';
 
 import { useAuth, useClerk } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { AuthBackButton, AuthLayout } from '@/components/auth';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 
@@ -17,10 +19,8 @@ type PrimaryGoal = 'streams' | 'merch' | 'tickets';
 
 type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
-const INPUT_CLASSES =
-  'w-full px-4 py-3 border border-white/10 rounded-lg bg-[#15161a] text-white placeholder:text-[#6b6f76] focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-colors';
 const BUTTON_CLASSES =
-  'w-full rounded-lg border border-white/10 bg-[#15161a] px-4 py-3 text-[15px] leading-5 font-medium text-[rgb(227,228,230)] hover:bg-[#1b1d23] transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
 
 const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
   [
@@ -411,9 +411,9 @@ export default function WaitlistPage() {
         formTitle="You're on the waitlist!"
         showLogo={false}
         showFooterPrompt={false}
-        formTitleClassName='text-lg font-medium text-[rgb(227,228,230)] mb-4 text-center'
+        formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
       >
-        <p className='text-sm text-[#6b6f76] text-center'>
+        <p className='text-sm text-secondary-token text-center'>
           Early access is rolling out in stages.
         </p>
 
@@ -422,7 +422,7 @@ export default function WaitlistPage() {
             type='button'
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className='text-sm text-[#6b6f76] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+            className='text-sm text-secondary-token hover:text-primary-token transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed rounded-md px-2 py-1'
           >
             {isSigningOut ? 'Signing out…' : 'Sign out'}
           </button>
@@ -457,12 +457,12 @@ export default function WaitlistPage() {
           {step === 0 ? (
             <>
               <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-[rgb(227,228,230)] text-center'>
+                <h1 className='text-lg font-medium text-primary-token text-center'>
                   Primary goal
                 </h1>
                 <p
                   id='waitlist-primary-goal-hint'
-                  className='text-sm text-[#6b6f76] text-center'
+                  className='text-sm text-secondary-token text-center'
                 >
                   You can change this later.
                 </p>
@@ -484,7 +484,7 @@ export default function WaitlistPage() {
                   const isTabStop = primaryGoal ? isSelected : index === 0;
 
                   return (
-                    <button
+                    <Button
                       key={option.value}
                       ref={el => {
                         primaryGoalButtonRefs.current[index] = el;
@@ -494,15 +494,12 @@ export default function WaitlistPage() {
                       aria-checked={isSelected}
                       tabIndex={isTabStop ? 0 : -1}
                       onClick={() => handlePrimaryGoalSelect(option.value)}
-                      className={`w-full rounded-lg px-4 py-3 text-[15px] leading-5 font-medium transition-colors border ${
-                        isSelected
-                          ? 'bg-[#e8e8e8] text-[#101012] border-transparent'
-                          : 'bg-[#15161a] text-white border-white/10 hover:bg-[#1b1d23]'
-                      }`}
+                      variant={isSelected ? 'primary' : 'secondary'}
+                      className='w-full justify-center rounded-xl py-3 text-[15px] leading-5'
                       disabled={isSubmitting}
                     >
                       {option.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -522,7 +519,7 @@ export default function WaitlistPage() {
           {step === 1 ? (
             <>
               <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-[rgb(227,228,230)] text-center'>
+                <h1 className='text-lg font-medium text-primary-token text-center'>
                   Where do fans find you?
                 </h1>
               </div>
@@ -551,10 +548,10 @@ export default function WaitlistPage() {
                     onClick={() => {
                       handleSocialPlatformSelect(option.value);
                     }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
                       socialPlatform === option.value
-                        ? 'bg-[#1b1d23] text-white border-white/20'
-                        : 'bg-transparent text-[#c9cbd1] border-white/10 hover:bg-[#15161a]'
+                        ? 'bg-surface-2 text-primary-token border-border'
+                        : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
                     }`}
                     disabled={isSubmitting}
                   >
@@ -568,9 +565,9 @@ export default function WaitlistPage() {
                   <label htmlFor='primarySocialUrl' className='sr-only'>
                     Social profile link
                   </label>
-                  <input
+                  <Input
                     ref={primarySocialUrlInputRef}
-                    type='text'
+                    type='url'
                     id='primarySocialUrl'
                     value={primarySocialUrl}
                     onChange={e => setPrimarySocialUrl(e.target.value)}
@@ -581,7 +578,6 @@ export default function WaitlistPage() {
                         ? 'waitlist-primary-social-url-error'
                         : undefined
                     }
-                    className={INPUT_CLASSES}
                     placeholder='Paste a link'
                     disabled={isSubmitting}
                     onKeyDown={e => {
@@ -592,8 +588,8 @@ export default function WaitlistPage() {
                   />
                 </>
               ) : (
-                <div className='w-full flex items-center gap-2 rounded-lg border border-white/10 bg-[#15161a] px-4 py-3 focus-within:ring-1 focus-within:ring-zinc-600'>
-                  <span className='text-sm text-[#c9cbd1] whitespace-nowrap'>
+                <div className='w-full flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
+                  <span className='text-sm text-secondary-token whitespace-nowrap'>
                     {getSocialPlatformPrefix(socialPlatform).display}
                   </span>
                   <input
@@ -610,7 +606,7 @@ export default function WaitlistPage() {
                         ? 'waitlist-primary-social-url-error'
                         : undefined
                     }
-                    className='min-w-0 flex-1 bg-transparent text-white placeholder:text-[#6b6f76] focus:outline-none'
+                    className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
                     placeholder='yourusername'
                     disabled={isSubmitting}
                     onKeyDown={e => {
@@ -639,8 +635,8 @@ export default function WaitlistPage() {
               <label htmlFor='spotifyUrl' className='sr-only'>
                 Spotify link
               </label>
-              <input
-                type='text'
+              <Input
+                type='url'
                 id='spotifyUrl'
                 value={spotifyUrl}
                 onChange={e => setSpotifyUrl(e.target.value)}
@@ -651,7 +647,6 @@ export default function WaitlistPage() {
                     ? 'waitlist-spotify-url-error'
                     : undefined
                 }
-                className={INPUT_CLASSES}
                 placeholder='open.spotify.com/artist/... (optional)'
                 disabled={isSubmitting}
               />
@@ -668,12 +663,11 @@ export default function WaitlistPage() {
               <label htmlFor='heardAbout' className='sr-only'>
                 How did you hear about us?
               </label>
-              <input
+              <Input
                 type='text'
                 id='heardAbout'
                 value={heardAbout}
                 onChange={e => setHeardAbout(e.target.value)}
-                className={INPUT_CLASSES}
                 placeholder='How did you hear about us? (optional)'
                 disabled={isSubmitting}
               />

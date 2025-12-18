@@ -278,6 +278,11 @@ function DashboardLayoutInner({
       >
         <DashboardHeader
           breadcrumbs={crumbs}
+          className={
+            isContactTableRoute
+              ? 'border-sidebar-border bg-sidebar-surface'
+              : undefined
+          }
           action={
             <>
               <DashboardThemeToggleButton />

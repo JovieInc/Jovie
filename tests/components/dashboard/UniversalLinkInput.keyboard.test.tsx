@@ -84,6 +84,31 @@ describe('UniversalLinkInput Keyboard Accessibility', () => {
     });
   });
 
+  it('supports fuzzy platform autosuggest + Enter to prefill', async () => {
+    const user = userEvent.setup();
+    render(<UniversalLinkInput onAdd={mockOnAdd} />);
+
+    const input = screen.getByRole('textbox');
+    await user.type(input, 'insta');
+
+    // autosuggest should appear and the input should become a combobox
+    const combobox = screen.getByRole('combobox');
+    expect(combobox).toBeInTheDocument();
+
+    const listbox = screen.getByRole('listbox', {
+      name: /platform suggestions/i,
+    });
+    expect(listbox).toBeInTheDocument();
+
+    // Press Enter to select the highlighted suggestion (defaults to first)
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => {
+      // Instagram prefill
+      expect(screen.getByRole('textbox')).toHaveValue('https://instagram.com/');
+    });
+  });
+
   it('allows typing handle after platform selection', async () => {
     const user = userEvent.setup();
     render(<UniversalLinkInput onAdd={mockOnAdd} />);

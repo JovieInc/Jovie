@@ -10,14 +10,20 @@ import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
+import {
+  getSocialPlatformLabel,
+  type SaveStatus,
+  type SocialPlatform,
+} from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 type ProfileUpdatePayload = {
@@ -144,13 +150,6 @@ interface SuggestedLink extends DetectedLink {
   evidence?: { sources?: string[]; signals?: string[] } | null;
 }
 
-interface SaveStatus {
-  saving: boolean;
-  success: boolean | null;
-  error: string | null;
-  lastSaved: Date | null;
-}
-
 function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -239,6 +238,8 @@ export function EnhancedDashboardLinks({
       window.clearTimeout(timeoutId);
     };
   }, [profileSaveStatus.success]);
+
+  useProfileSaveToasts(profileSaveStatus);
 
   const [autoRefreshUntilMs, setAutoRefreshUntilMs] = useState<number | null>(
     null
@@ -969,6 +970,10 @@ export function EnhancedDashboardLinks({
         return;
       }
 
+      if (!suggestion.suggestionId) {
+        return;
+      }
+
       try {
         const response = await fetch('/api/dashboard/social-links', {
           method: 'PATCH',
@@ -1002,8 +1007,12 @@ export function EnhancedDashboardLinks({
   );
 
   // Get username/handle and avatar for preview
-  const username = artist?.handle || 'username';
-  const displayName = artist?.name || username;
+  const { username, displayName, profilePath } = getProfileIdentity({
+    profileUsername,
+    profileDisplayName,
+    artistHandle: artist?.handle,
+    artistName: artist?.name,
+  });
   const avatarUrl = artist?.image_url || null;
 
   // Convert links to the format expected by EnhancedDashboardLayout
@@ -1047,9 +1056,6 @@ export function EnhancedDashboardLinks({
     [links]
   );
 
-  // Prepare links for the phone preview component
-  const profilePath = `/${artist?.handle || 'username'}`;
-
   // Preview panel integration - sync data to context
   const { setPreviewData } = usePreviewPanel();
 
@@ -1063,12 +1069,12 @@ export function EnhancedDashboardLinks({
       profilePath,
     });
   }, [
-    username,
-    displayName,
     avatarUrl,
     dashboardLinks,
+    displayName,
     profilePath,
     setPreviewData,
+    username,
   ]);
 
   return (
@@ -1078,23 +1084,10 @@ export function EnhancedDashboardLinks({
         {profileId && artist && (
           <div className='mx-auto w-full max-w-2xl'>
             <div className='flex flex-col items-center gap-3'>
-              {profileSaveStatus.saving || profileSaveStatus.success ? (
-                <div
-                  className='rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token/80'
-                  aria-live='polite'
-                >
-                  {profileSaveStatus.saving
-                    ? 'Saving…'
-                    : profileSaveStatus.success
-                      ? 'Saved'
-                      : null}
-                </div>
-              ) : null}
-
               <AvatarUploadable
                 src={avatarUrl}
-                alt={`Avatar for @${artist.handle}`}
-                name={artist.name}
+                alt={`Avatar for @${username}`}
+                name={displayName}
                 size='display-lg'
                 uploadable
                 onUpload={handleAvatarUpload}
