@@ -18,6 +18,13 @@ export function ArtistInfo({
   nameSize = 'lg',
   className = '',
 }: ArtistInfoProps) {
+  const resolvedSubtitle =
+    subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
+  const subtitleClassName =
+    resolvedSubtitle === DEFAULT_PROFILE_TAGLINE
+      ? 'text-[11px] sm:text-xs font-normal tracking-[0.2em] uppercase leading-none text-secondary-token opacity-70'
+      : 'text-base sm:text-lg leading-snug text-secondary-token line-clamp-2';
+
   const avatarSizeMap = {
     sm: 'display-sm',
     md: 'display-lg',
@@ -49,11 +56,8 @@ export function ArtistInfo({
           size={nameSize}
         />
 
-        <p
-          className='text-base sm:text-lg leading-snug text-secondary-token line-clamp-2'
-          itemProp='description'
-        >
-          {subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE}
+        <p className={subtitleClassName} itemProp='description'>
+          {resolvedSubtitle}
         </p>
 
         {/* Hidden SEO elements */}

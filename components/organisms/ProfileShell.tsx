@@ -7,6 +7,7 @@ import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import {
+  type ProfileNotificationsHydrationStatus,
   type ProfileNotificationsState,
   useProfileNotificationsController,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
@@ -34,6 +35,8 @@ import type {
 interface ProfileNotificationsContextValue {
   state: ProfileNotificationsState;
   setState: React.Dispatch<React.SetStateAction<ProfileNotificationsState>>;
+  hydrationStatus: ProfileNotificationsHydrationStatus;
+  hasStoredContacts: boolean;
   notificationsEnabled: boolean;
   channel: NotificationChannel;
   setChannel: React.Dispatch<React.SetStateAction<NotificationChannel>>;
@@ -141,7 +144,9 @@ export function ProfileShell({
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,
+    hasStoredContacts,
     hasActiveSubscriptions,
+    hydrationStatus,
     isNotificationMenuOpen,
     menuTriggerRef,
     openSubscription,
@@ -158,6 +163,8 @@ export function ProfileShell({
     () => ({
       state: notificationsState,
       setState: setNotificationsState,
+      hydrationStatus,
+      hasStoredContacts,
       notificationsEnabled,
       channel,
       setChannel,
@@ -169,6 +176,8 @@ export function ProfileShell({
     }),
     [
       channel,
+      hasStoredContacts,
+      hydrationStatus,
       notificationsEnabled,
       notificationsState,
       openSubscription,
