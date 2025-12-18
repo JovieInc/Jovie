@@ -18,7 +18,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
@@ -712,84 +711,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const buildSecondaryText = useCallback(
     (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
       return suggestionIdentity(link);
-    },
-    []
-  );
-
-  const formatSuggestionIdentity = useCallback(
-    (
-      link: Pick<DetectedLink, 'platform' | 'normalizedUrl' | 'originalUrl'>
-    ) => {
-      const normalizedUrl = link.normalizedUrl || link.originalUrl || '';
-      if (!normalizedUrl) return '';
-
-      const canonical = canonicalIdentity({
-        platform: link.platform,
-        normalizedUrl,
-      });
-      const [platformId, ...identityParts] = canonical.split(':');
-      const primaryIdentity = identityParts[0];
-      const secondaryIdentity = identityParts[1];
-
-      const identityFromCanonical = (() => {
-        const handlePlatforms = [
-          'instagram',
-          'twitter',
-          'tiktok',
-          'facebook',
-          'twitch',
-          'linkedin',
-          'soundcloud',
-          'bandcamp',
-          'linktree',
-        ];
-
-        if (handlePlatforms.includes(platformId) && primaryIdentity) {
-          return `@${primaryIdentity}`;
-        }
-
-        if (platformId === 'youtube') {
-          if (primaryIdentity === 'channel' && secondaryIdentity) {
-            return `channel/${secondaryIdentity}`;
-          }
-          if (primaryIdentity === 'user' && secondaryIdentity) {
-            return `user/${secondaryIdentity}`;
-          }
-          if (primaryIdentity === 'legacy' && secondaryIdentity) {
-            return secondaryIdentity;
-          }
-          if (primaryIdentity) {
-            return `@${primaryIdentity}`;
-          }
-        }
-
-        if (primaryIdentity) {
-          return primaryIdentity.replace(/^@/, '');
-        }
-
-        return null;
-      })();
-
-      if (identityFromCanonical) {
-        return identityFromCanonical;
-      }
-
-      try {
-        const url = new URL(normalizedUrl);
-        const host = url.hostname.replace(/^www\./, '');
-        const pathSegments = url.pathname.split('/').filter(Boolean);
-        const firstSegment = pathSegments[0];
-        if (firstSegment) {
-          const cleaned = firstSegment.replace(/^@/, '');
-          if (/^[A-Za-z0-9._-]+$/.test(cleaned) && !cleaned.includes('.')) {
-            return `@${cleaned}`;
-          }
-          return cleaned;
-        }
-        return host;
-      } catch {
-        return '';
-      }
     },
     []
   );

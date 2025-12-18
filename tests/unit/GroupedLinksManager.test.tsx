@@ -312,7 +312,7 @@ describeFn('GroupedLinksManager', () => {
       );
 
     renderWithProviders(
-      <GroupedLinksManager
+      <GroupedLinksManager<DetectedLink>
         initialLinks={[]}
         suggestedLinks={[
           {
@@ -340,7 +340,7 @@ describeFn('GroupedLinksManager', () => {
     const onDismissSuggestion = vi.fn().mockResolvedValue(undefined);
 
     renderWithProviders(
-      <GroupedLinksManager
+      <GroupedLinksManager<DetectedLink>
         initialLinks={[]}
         suggestedLinks={[
           {
