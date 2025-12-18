@@ -1,5 +1,6 @@
+import { Button } from '@jovie/ui';
+import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { ClaimHandleForm } from './ClaimHandleForm';
 import { HeroExampleProfiles } from './HeroExampleProfiles';
 import { HeroHandlePreviewChip } from './HeroHandlePreviewChip';
 import { QRCodeCard } from './QRCodeCard';
@@ -34,9 +35,11 @@ export function NewHomeHero() {
               optimized to convert.
             </p>
 
-            {/* Handle claim form */}
+            {/* Waitlist CTA */}
             <div className='mt-6 max-w-md mx-auto lg:mx-0'>
-              <ClaimHandleForm />
+              <Button asChild size='lg' data-test='waitlist-btn'>
+                <Link href='/waitlist'>Join the waitlist</Link>
+              </Button>
               <HeroExampleProfiles />
             </div>
           </div>
