@@ -1,6 +1,6 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 
 import { isAdminEmail } from '@/lib/admin/roles';
@@ -8,6 +8,9 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { normalizeUrl } from '@/lib/utils/platform-detection';
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
@@ -89,6 +92,121 @@ export async function toggleCreatorVerifiedAction(
   revalidatePath('/app/admin/creators');
 }
 
+export async function bulkRerunCreatorIngestionAction(
+  formData: FormData
+): Promise<{ queuedCount: number }> {
+  await requireAdmin();
+
+  const profileIdsRaw = formData.get('profileIds');
+  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
+    throw new Error('profileIds is required');
+  }
+
+  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('profileIds must be an array');
+  }
+
+  const profileIds = parsed.filter((value): value is string => {
+    return typeof value === 'string' && value.length > 0;
+  });
+
+  if (profileIds.length === 0) {
+    throw new Error('profileIds must contain at least one id');
+  }
+
+  if (profileIds.length > 200) {
+    throw new Error('Too many profileIds');
+  }
+
+  const queuedCount = await withSystemIngestionSession(async tx => {
+    const profiles = await tx
+      .select({
+        id: creatorProfiles.id,
+        username: creatorProfiles.username,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      })
+      .from(creatorProfiles)
+      .where(inArray(creatorProfiles.id, profileIds));
+
+    if (profiles.length === 0) {
+      return 0;
+    }
+
+    const jobIds = await Promise.all(
+      profiles.map(async profile => {
+        const handle = profile.usernameNormalized ?? profile.username;
+        const sourceUrl = normalizeUrl(`https://linktr.ee/${handle}`);
+
+        return enqueueLinktreeIngestionJob({
+          creatorProfileId: profile.id,
+          sourceUrl,
+        });
+      })
+    );
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'pending', updatedAt: new Date() })
+      .where(inArray(creatorProfiles.id, profiles.map(p => p.id)));
+
+    return jobIds.filter(Boolean).length;
+  });
+
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
+
+  return { queuedCount };
+}
+
+export async function bulkSetCreatorsVerifiedAction(
+  formData: FormData
+): Promise<void> {
+  await requireAdmin();
+
+  const profileIdsRaw = formData.get('profileIds');
+  const nextVerifiedRaw = formData.get('nextVerified');
+
+  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
+    throw new Error('profileIds is required');
+  }
+
+  const isVerified =
+    typeof nextVerifiedRaw === 'string' ? nextVerifiedRaw === 'true' : true;
+
+  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('profileIds must be an array');
+  }
+
+  const profileIds = parsed.filter((value): value is string => {
+    return typeof value === 'string' && value.length > 0;
+  });
+
+  if (profileIds.length === 0) {
+    throw new Error('profileIds must contain at least one id');
+  }
+
+  if (profileIds.length > 200) {
+    throw new Error('Too many profileIds');
+  }
+
+  const updatedProfiles = await db
+    .update(creatorProfiles)
+    .set({
+      isVerified,
+      updatedAt: new Date(),
+    })
+    .where(inArray(creatorProfiles.id, profileIds))
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  await Promise.all(
+    updatedProfiles.map(profile => invalidateProfileCache(profile.usernameNormalized))
+  );
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
+}
+
 export async function updateCreatorAvatarAsAdmin(
   profileId: string,
   avatarUrl: string
@@ -143,6 +261,55 @@ export async function toggleCreatorFeaturedAction(
   revalidatePath('/app/admin');
   revalidatePath('/app/admin/creators');
   revalidatePath('/'); // Featured creators show on homepage
+}
+
+export async function bulkSetCreatorsFeaturedAction(
+  formData: FormData
+): Promise<void> {
+  await requireAdmin();
+
+  const profileIdsRaw = formData.get('profileIds');
+  const nextFeaturedRaw = formData.get('nextFeatured');
+
+  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
+    throw new Error('profileIds is required');
+  }
+
+  const isFeatured =
+    typeof nextFeaturedRaw === 'string' ? nextFeaturedRaw === 'true' : true;
+
+  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error('profileIds must be an array');
+  }
+
+  const profileIds = parsed.filter((value): value is string => {
+    return typeof value === 'string' && value.length > 0;
+  });
+
+  if (profileIds.length === 0) {
+    throw new Error('profileIds must contain at least one id');
+  }
+
+  if (profileIds.length > 200) {
+    throw new Error('Too many profileIds');
+  }
+
+  const updatedProfiles = await db
+    .update(creatorProfiles)
+    .set({
+      isFeatured,
+      updatedAt: new Date(),
+    })
+    .where(inArray(creatorProfiles.id, profileIds))
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  await Promise.all(
+    updatedProfiles.map(profile => invalidateProfileCache(profile.usernameNormalized))
+  );
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/creators');
+  revalidatePath('/');
 }
 
 export async function toggleCreatorMarketingAction(

@@ -276,10 +276,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     );
     const otherSectionHas = otherSection
       ? links.some(
-          l =>
-            l.platform.id === enriched.platform.id &&
-            sectionOf(l) === otherSection
-        )
+        l =>
+          l.platform.id === enriched.platform.id &&
+          sectionOf(l) === otherSection
+      )
       : false;
 
     const canonicalId = canonicalIdentity({
@@ -350,10 +350,70 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     // Show pulsing placeholder for a moment to indicate creation
     await new Promise(resolve => setTimeout(resolve, 600));
 
-    const next = [...links, enriched];
-    setLinks(next);
-    setLastAddedId(idFor(enriched as T));
-    onLinkAdded?.([enriched as T]);
+    let didAdd = false;
+    let didMerge = false;
+    let emittedLink: T | null = null;
+    setLinks(prev => {
+      const section = sectionOf(enriched as T);
+      const canonicalId = canonicalIdentity({
+        platform: (enriched as DetectedLink).platform,
+        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+      });
+
+      const dupAt = prev.findIndex(
+        existing =>
+          canonicalIdentity({
+            platform: (existing as DetectedLink).platform,
+            normalizedUrl: (existing as DetectedLink).normalizedUrl,
+          }) === canonicalId
+      );
+
+      if (dupAt !== -1) {
+        const duplicate = prev[dupAt];
+        if (!duplicate) return prev;
+
+        const duplicateSection = sectionOf(duplicate);
+
+        if (
+          enriched.platform.id === 'youtube' &&
+          duplicateSection !== section
+        ) {
+          // Allow YouTube to exist in both social + dsp.
+        } else if (duplicateSection !== section) {
+          return prev;
+        } else {
+          const merged = {
+            ...duplicate,
+            normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+            suggestedTitle: (enriched as DetectedLink).suggestedTitle,
+          } as T;
+          didMerge = true;
+          emittedLink = merged;
+          return prev.map((l, i) => (i === dupAt ? merged : l));
+        }
+      }
+
+      const socialVisibleCount = prev.filter(
+        existing =>
+          sectionOf(existing) === 'social' && linkIsVisible(existing)
+      ).length;
+
+      const adjusted = { ...enriched } as unknown as T;
+      if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
+        (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
+      }
+
+      didAdd = true;
+      emittedLink = adjusted;
+      return [...prev, adjusted];
+    });
+
+    if (emittedLink) {
+      setLastAddedId(idFor(emittedLink));
+      if (didAdd || didMerge) {
+        onLinkAdded?.([emittedLink]);
+      }
+    }
     setAddingLink(null);
 
     try {
@@ -596,11 +656,11 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   const COMPLETION_TARGET = 6;
   const completionPercent = hasAnyLinks
     ? Math.min(
-        100,
-        Math.round(
-          (Math.min(links.length, COMPLETION_TARGET) / COMPLETION_TARGET) * 100
-        )
+      100,
+      Math.round(
+        (Math.min(links.length, COMPLETION_TARGET) / COMPLETION_TARGET) * 100
       )
+    )
     : 0;
 
   const buildSecondaryText = useCallback(
@@ -686,7 +746,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           creatorName={creatorName}
           prefillUrl={prefillUrl}
           onPrefillConsumed={() => setPrefillUrl(undefined)}
-          onQueryChange={() => {}}
+          onQueryChange={() => { }}
           onPreviewChange={(link, isDuplicate) => {
             if (!link || isDuplicate) {
               setPendingPreview(null);
@@ -865,7 +925,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                     })}
 
                     {pendingPreview &&
-                    sectionOf(pendingPreview.link as T) === section ? (
+                      sectionOf(pendingPreview.link as T) === section ? (
                       <LinkPill
                         platformIcon={pendingPreview.link.platform.icon}
                         platformName={pendingPreview.link.platform.name}
@@ -910,7 +970,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                         state='loading'
                         menuId={`loading-${section}`}
                         isMenuOpen={false}
-                        onMenuOpenChange={() => {}}
+                        onMenuOpenChange={() => { }}
                         menuItems={[]}
                       />
                     )}

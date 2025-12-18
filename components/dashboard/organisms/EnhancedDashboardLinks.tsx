@@ -556,6 +556,11 @@ export function EnhancedDashboardLinks({
     return convertDbLinksToLinkItems(activeInitialLinks || []);
   });
 
+  const linksRef = useRef<LinkItem[]>(links);
+  useEffect(() => {
+    linksRef.current = links;
+  }, [links]);
+
   const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
     convertDbLinksToSuggestions(suggestionInitialLinks || [])
   );
@@ -593,128 +598,151 @@ export function EnhancedDashboardLinks({
     };
   }, [autoRefreshUntilMs, router]);
 
-  // Save links to database (debounced)
-  const debouncedSave = useMemo(
-    () =>
-      debounce(async (...args: unknown[]) => {
-        const [input] = args as [LinkItem[]];
+  const saveLoopRunningRef = useRef(false);
+  const pendingSaveRef = useRef<LinkItem[] | null>(null);
 
-        const normalized: LinkItem[] = input.map((item, index) => {
-          const rawCategory = item.platform.category as
-            | PlatformType
-            | undefined;
-          const category: PlatformType =
-            rawCategory === 'dsp' ||
+  const persistLinks = useCallback(
+    async (input: LinkItem[]): Promise<void> => {
+      const normalized: LinkItem[] = input.map((item, index) => {
+        const rawCategory = item.platform.category as PlatformType | undefined;
+        const category: PlatformType =
+          rawCategory === 'dsp' ||
             rawCategory === 'social' ||
             rawCategory === 'earnings' ||
             rawCategory === 'websites' ||
             rawCategory === 'custom'
-              ? rawCategory
-              : 'custom';
+            ? rawCategory
+            : 'custom';
 
-          return {
-            ...item,
-            platform: {
-              ...item.platform,
-              category,
-            },
+        return {
+          ...item,
+          platform: {
+            ...item.platform,
             category,
-            order: typeof item.order === 'number' ? item.order : index,
-          };
-        });
+          },
+          category,
+          order: typeof item.order === 'number' ? item.order : index,
+        };
+      });
 
-        try {
-          setSaveStatus(prev => ({ ...prev, saving: true }));
+      try {
+        setSaveStatus(prev => ({ ...prev, saving: true }));
 
-          const payload = normalized.map((l, index) => ({
-            platform: l.platform.id,
-            platformType: l.platform.category,
-            url: l.normalizedUrl,
-            sortOrder: index,
-            isActive: l.isVisible !== false,
-            displayText: l.title,
-            state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
-            confidence:
-              typeof l.confidence === 'number'
-                ? Number(l.confidence.toFixed(2))
-                : undefined,
-            sourcePlatform: l.sourcePlatform ?? undefined,
-            sourceType: l.sourceType ?? undefined,
-            evidence: l.evidence ?? undefined,
-          }));
+        const payload = normalized.map((l, index) => ({
+          platform: l.platform.id,
+          platformType: l.platform.category,
+          url: l.normalizedUrl,
+          sortOrder: index,
+          isActive: l.isVisible !== false,
+          displayText: l.title,
+          state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
+          confidence:
+            typeof l.confidence === 'number'
+              ? Number(l.confidence.toFixed(2))
+              : undefined,
+          sourcePlatform: l.sourcePlatform ?? undefined,
+          sourceType: l.sourceType ?? undefined,
+          evidence: l.evidence ?? undefined,
+        }));
 
-          if (!profileId) {
-            setSaveStatus({
-              saving: false,
-              success: false,
-              error:
-                'Missing profile id; please refresh the page and try again.',
-              lastSaved: null,
-            });
-            toast.error('Unable to save links. Please refresh and try again.');
-            return;
-          }
-
-          const response = await fetch('/api/dashboard/social-links', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId, links: payload }),
-          });
-          if (!response.ok) {
-            let message = 'Failed to save links';
-            try {
-              const data = (await response.json().catch(() => null)) as {
-                error?: string;
-              } | null;
-              if (data?.error && typeof data.error === 'string') {
-                message = data.error;
-              }
-            } catch {
-              // swallow JSON parse errors and fall back to default message
-            }
-            throw new Error(message);
-          }
-
-          // Keep normalized links locally; server IDs will be applied on next load
-          setLinks(prev =>
-            areLinkItemsEqual(prev, normalized) ? prev : normalized
-          );
-
-          if (suggestionsEnabled) {
-            const hasIngestableLink = normalized.some(item => {
-              return isIngestableUrl(item.normalizedUrl);
-            });
-
-            if (hasIngestableLink) {
-              setAutoRefreshUntilMs(Date.now() + 20000);
-              router.refresh();
-            }
-          }
-
-          const now = new Date();
-          setSaveStatus({
-            saving: false,
-            success: true,
-            error: null,
-            lastSaved: now,
-          });
-          toast.success(
-            `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
-          );
-        } catch (error) {
-          console.error('Error saving links:', error);
-          const message =
-            error instanceof Error ? error.message : 'Failed to save links';
+        if (!profileId) {
           setSaveStatus({
             saving: false,
             success: false,
-            error: message,
+            error: 'Missing profile id; please refresh the page and try again.',
             lastSaved: null,
           });
-          toast.error(message || 'Failed to save links. Please try again.');
+          toast.error('Unable to save links. Please refresh and try again.');
+          return;
         }
-      }, 500),
+
+        const response = await fetch('/api/dashboard/social-links', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profileId, links: payload }),
+        });
+        if (!response.ok) {
+          let message = 'Failed to save links';
+          try {
+            const data = (await response.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            if (data?.error && typeof data.error === 'string') {
+              message = data.error;
+            }
+          } catch {
+            // swallow JSON parse errors and fall back to default message
+          }
+          throw new Error(message);
+        }
+
+        // Keep normalized links locally; server IDs will be applied on next load
+        setLinks(prev => (areLinkItemsEqual(prev, normalized) ? prev : normalized));
+
+        if (suggestionsEnabled) {
+          const hasIngestableLink = normalized.some(item => {
+            return isIngestableUrl(item.normalizedUrl);
+          });
+
+          if (hasIngestableLink) {
+            setAutoRefreshUntilMs(Date.now() + 20000);
+            router.refresh();
+          }
+        }
+
+        const now = new Date();
+        setSaveStatus({
+          saving: false,
+          success: true,
+          error: null,
+          lastSaved: now,
+        });
+        toast.success(
+          `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
+        );
+      } catch (error) {
+        console.error('Error saving links:', error);
+        const message =
+          error instanceof Error ? error.message : 'Failed to save links';
+        setSaveStatus({
+          saving: false,
+          success: false,
+          error: message,
+          lastSaved: null,
+        });
+        toast.error(message || 'Failed to save links. Please try again.');
+      }
+    },
     [profileId, router, suggestionsEnabled]
+  );
+
+  const enqueueSave = useCallback(
+    (input: LinkItem[]): void => {
+      pendingSaveRef.current = input;
+
+      if (saveLoopRunningRef.current) return;
+      saveLoopRunningRef.current = true;
+
+      void (async () => {
+        while (pendingSaveRef.current) {
+          const next = pendingSaveRef.current;
+          pendingSaveRef.current = null;
+          await persistLinks(next);
+        }
+        saveLoopRunningRef.current = false;
+      })();
+    },
+    [persistLinks]
+  );
+
+  // Save links to database (debounced) - enqueue ensures we never write older state after newer state.
+  const debouncedSave = useMemo(
+    () =>
+      debounce((...args: unknown[]) => {
+        const [input] = args as [LinkItem[]];
+        enqueueSave(input);
+      }, 500),
+    [enqueueSave]
   );
 
   // Cancel pending saves when profileId changes to prevent saving to wrong profile
@@ -783,6 +811,7 @@ export function EnhancedDashboardLinks({
         };
       });
       let shouldSave = false;
+      const isAdd = mapped.length > linksRef.current.length;
       setLinks(prev => {
         if (areLinkItemsEqual(prev, mapped)) {
           return prev;
@@ -791,10 +820,15 @@ export function EnhancedDashboardLinks({
         return mapped;
       });
       if (shouldSave) {
-        debouncedSave(mapped);
+        if (isAdd) {
+          debouncedSave.cancel();
+          enqueueSave(mapped);
+        } else {
+          debouncedSave(mapped);
+        }
       }
     },
-    [debouncedSave]
+    [debouncedSave, enqueueSave]
   );
 
   const handleAcceptSuggestion = useCallback(
@@ -901,6 +935,7 @@ export function EnhancedDashboardLinks({
 
   // Get username/handle and avatar for preview
   const username = artist?.handle || 'username';
+  const displayName = artist?.name || username;
   const avatarUrl = artist?.image_url || null;
 
   // Convert links to the format expected by EnhancedDashboardLayout
@@ -954,11 +989,12 @@ export function EnhancedDashboardLinks({
   useEffect(() => {
     setPreviewData({
       username,
+      displayName,
       avatarUrl: avatarUrl || null,
       links: dashboardLinks,
       profilePath,
     });
-  }, [username, avatarUrl, dashboardLinks, profilePath, setPreviewData]);
+  }, [username, displayName, avatarUrl, dashboardLinks, profilePath, setPreviewData]);
 
   return (
     <div className='min-w-0 min-h-screen'>
@@ -978,7 +1014,7 @@ export function EnhancedDashboardLinks({
         </div>
 
         {profileId && artist && (
-          <div className='w-full max-w-3xl rounded-xl border border-subtle bg-surface-1 p-3 md:p-4'>
+          <div className='w-full max-w-2xl rounded-xl border border-subtle bg-surface-1 p-3 md:p-4'>
             <div className='mb-3 flex items-start justify-between gap-3'>
               <div className='min-w-0'>
                 <div className='text-sm font-medium text-primary-token'>
@@ -1019,7 +1055,7 @@ export function EnhancedDashboardLinks({
               />
 
               <div className='grid min-w-0 w-full gap-3 sm:border-l sm:border-subtle sm:pl-4'>
-                <div className='grid gap-1.5 sm:grid-cols-2 sm:gap-3'>
+                <div className='grid gap-3'>
                   <div className='grid gap-1.5'>
                     <label
                       htmlFor='profile-display-name'

@@ -22,7 +22,7 @@ export function PreviewPanel() {
     return null;
   }
 
-  const { username, avatarUrl, links, profilePath } = previewData;
+  const { username, displayName, avatarUrl, links, profilePath } = previewData;
 
   return (
     <RightDrawer
@@ -32,7 +32,7 @@ export function PreviewPanel() {
       className='bg-sidebar-surface border-sidebar-border'
     >
       {/* Header */}
-      <div className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'>
+      <div className='flex h-12 items-center justify-between border-b border-subtle bg-sidebar-surface/95 px-4 shrink-0 backdrop-blur-sm'>
         <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
@@ -44,24 +44,27 @@ export function PreviewPanel() {
       </div>
 
       {/* Preview Content */}
-      <div className='flex-1 min-h-0 overflow-hidden p-4'>
-        <div className='h-full w-full overflow-hidden rounded-2xl border border-subtle bg-bg-base'>
-          <ProfilePreview
-            username={username}
-            avatarUrl={avatarUrl}
-            links={links}
-            className='h-full w-full'
-          />
+      <div className='flex-1 min-h-0 overflow-y-auto p-4'>
+        <div className='flex flex-col items-center gap-4 pb-8'>
+          <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 dark:ring-white/10 shadow-sm shadow-black/10 dark:shadow-black/40'>
+            <ProfilePreview
+              username={username}
+              displayName={displayName}
+              avatarUrl={avatarUrl}
+              links={links}
+              className='h-full w-full'
+            />
+          </div>
         </div>
       </div>
 
       {/* Footer - URL Preview */}
-      <div className='shrink-0 border-t border-subtle p-4'>
+      <div className='shrink-0 border-t border-subtle bg-sidebar-surface/95 p-4 backdrop-blur-sm'>
         <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>
         <div className='flex flex-col gap-2'>
-          <div className='rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-[12px] text-primary-token font-mono truncate'>
+          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-mono truncate'>
             {typeof window !== 'undefined'
               ? `${window.location.origin}${profilePath}`
               : 'Loading...'}
@@ -71,12 +74,13 @@ export function PreviewPanel() {
               relativePath={profilePath}
               idleLabel='Copy'
               successLabel='Copied!'
+              className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
             />
             <Button
               asChild
               size='sm'
               variant='secondary'
-              className='flex-1 whitespace-nowrap'
+              className='flex-1 whitespace-nowrap border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/5 transition-colors hover:bg-surface-2/40 dark:ring-white/10'
             >
               <Link
                 href={profilePath}
@@ -84,7 +88,7 @@ export function PreviewPanel() {
                 rel='noopener noreferrer'
               >
                 <ArrowTopRightOnSquareIcon className='h-4 w-4 mr-1.5' />
-                Open
+                Open Jovie Profile
               </Link>
             </Button>
           </div>

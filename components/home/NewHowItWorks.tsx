@@ -16,22 +16,22 @@ const steps = [
   },
   {
     number: '03',
-    title: 'Grow your audience',
-    description: 'Track clicks and convert fans into followers.',
+    title: 'TURN CLICKS INTO FANS',
+    description: 'Jovie’s AI does the heavy lifting.',
     icon: TrendingUp,
   },
 ];
 
 export function NewHowItWorks() {
   return (
-    <section className='py-20 sm:py-24'>
+    <section id='how-it-works' className='py-20 sm:py-24 bg-base'>
       <Container>
         {/* Header */}
         <div className='text-center mb-16'>
-          <p className='text-sm font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 mb-3'>
+          <p className='text-sm font-medium tracking-wide uppercase text-secondary-token mb-3'>
             Get started
           </p>
-          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-100'>
+          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
             How it works
           </h2>
         </div>
@@ -42,28 +42,31 @@ export function NewHowItWorks() {
             {steps.map((step, index) => {
               const Icon = step.icon;
               return (
-                <div key={index} className='relative text-center md:text-left'>
+                <div
+                  key={index}
+                  className='relative flex flex-col items-center text-center'
+                >
                   {/* Connector line (desktop only) */}
                   {index < steps.length - 1 && (
-                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-neutral-200 dark:bg-neutral-800' />
+                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-surface-3' />
                   )}
 
                   {/* Step number */}
-                  <div className='inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 mb-4'>
-                    <span className='text-sm font-semibold text-neutral-900 dark:text-neutral-100'>
+                  <div className='relative z-10 inline-flex items-center justify-center w-12 h-12 rounded-full border border-subtle bg-surface-0 mb-4'>
+                    <span className='text-sm font-semibold text-primary-token'>
                       {step.number}
                     </span>
                   </div>
 
                   {/* Content */}
                   <div className='space-y-2'>
-                    <div className='flex items-center justify-center md:justify-start gap-2'>
-                      <Icon className='h-4 w-4 text-neutral-400' />
-                      <h3 className='text-base font-medium text-neutral-900 dark:text-neutral-100'>
+                    <div className='flex items-center justify-center gap-2'>
+                      <Icon className='h-4 w-4 text-tertiary-token' />
+                      <h3 className='text-base font-medium text-primary-token'>
                         {step.title}
                       </h3>
                     </div>
-                    <p className='text-sm text-neutral-500 dark:text-neutral-400 leading-relaxed'>
+                    <p className='text-sm text-secondary-token leading-relaxed'>
                       {step.description}
                     </p>
                   </div>

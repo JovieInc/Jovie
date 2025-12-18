@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 
 import { AdminUsersTable } from '@/components/admin/AdminUsersTable';
-import { getAdminUsers } from '@/lib/admin/users';
+import { type AdminUsersSort, getAdminUsers } from '@/lib/admin/users';
 
 interface AdminUsersPageProps {
   searchParams?: {
     page?: string;
     q?: string;
+    sort?: string;
     pageSize?: string;
   };
 }
@@ -24,6 +25,17 @@ export default async function AdminUsersPage({
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
   const search = searchParams?.q ?? '';
 
+  const sortParam = searchParams?.sort;
+  const sort: AdminUsersSort =
+    sortParam === 'created_asc' ||
+      sortParam === 'created_desc' ||
+      sortParam === 'name_asc' ||
+      sortParam === 'name_desc' ||
+      sortParam === 'email_asc' ||
+      sortParam === 'email_desc'
+      ? sortParam
+      : 'created_desc';
+
   const pageSizeParam = searchParams?.pageSize
     ? Number.parseInt(searchParams.pageSize, 10)
     : 20;
@@ -36,10 +48,11 @@ export default async function AdminUsersPage({
     page,
     pageSize,
     search,
+    sort,
   });
 
   return (
-    <div className='space-y-8'>
+    <div className='flex h-full min-h-0 flex-col gap-8'>
       <header className='space-y-2'>
         <p className='text-xs uppercase tracking-wide text-tertiary-token'>
           Internal
@@ -50,13 +63,14 @@ export default async function AdminUsersPage({
         </p>
       </header>
 
-      <section className='-mx-4 sm:-mx-6 lg:-mx-8'>
+      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8'>
         <AdminUsersTable
           users={users}
           page={page}
           pageSize={pageSize}
           total={total}
           search={search}
+          sort={sort}
         />
       </section>
     </div>

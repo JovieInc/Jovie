@@ -1,0 +1,105 @@
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
+import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
+import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+
+export interface FeaturedArtistsDriftRowProps {
+    creators: FeaturedCreator[];
+}
+
+const MAX_SHIFT_PX = 56;
+
+export function FeaturedArtistsDriftRow({ creators }: FeaturedArtistsDriftRowProps) {
+    const prefersReducedMotion = useReducedMotion();
+    const containerRef = useRef<HTMLDivElement | null>(null);
+    const rafRef = useRef<number | null>(null);
+    const [shiftPx, setShiftPx] = useState<number>(0);
+
+    useEffect(() => {
+        if (prefersReducedMotion) {
+            setShiftPx(0);
+            return;
+        }
+
+        const update = () => {
+            const el = containerRef.current;
+            if (!el) return;
+
+            const rect = el.getBoundingClientRect();
+            const viewportH = window.innerHeight;
+            const denom = viewportH + rect.height;
+
+            if (denom <= 0) {
+                setShiftPx(0);
+                return;
+            }
+
+            const rawProgress = (viewportH - rect.top) / denom;
+            const progress = Math.max(0, Math.min(1, rawProgress));
+            const nextShift = Math.round(progress * MAX_SHIFT_PX);
+
+            setShiftPx(prev => (prev === nextShift ? prev : nextShift));
+        };
+
+        const onScrollOrResize = () => {
+            if (rafRef.current != null) return;
+            rafRef.current = window.requestAnimationFrame(() => {
+                rafRef.current = null;
+                update();
+            });
+        };
+
+        update();
+        window.addEventListener('scroll', onScrollOrResize, { passive: true });
+        window.addEventListener('resize', onScrollOrResize);
+
+        return () => {
+            window.removeEventListener('scroll', onScrollOrResize);
+            window.removeEventListener('resize', onScrollOrResize);
+            if (rafRef.current != null) {
+                window.cancelAnimationFrame(rafRef.current);
+                rafRef.current = null;
+            }
+        };
+    }, [prefersReducedMotion]);
+
+    return (
+        <div
+            ref={containerRef}
+            className='w-full overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+        >
+            <div
+                className='flex flex-nowrap items-center justify-start gap-8 sm:gap-10 px-4 sm:px-6 lg:px-8 py-2 w-max will-change-transform'
+                style={{
+                    transform: prefersReducedMotion
+                        ? undefined
+                        : `translate3d(${-shiftPx}px, 0, 0)`,
+                }}
+            >
+                {creators.map(creator => (
+                    <Link
+                        key={creator.id}
+                        href={`/${creator.handle}`}
+                        aria-label={`View ${creator.name}'s profile (@${creator.handle})`}
+                        title={creator.name}
+                        className='group flex flex-col items-center'
+                    >
+                        <div className='relative w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-800 group-hover:border-neutral-400 dark:group-hover:border-neutral-600 transition-colors'>
+                            <Image
+                                src={creator.src}
+                                alt={creator.alt || creator.name}
+                                fill
+                                className='object-cover'
+                            />
+                        </div>
+                        <span className='sr-only'>{creator.name}</span>
+                        <span className='sr-only'>@{creator.handle}</span>
+                    </Link>
+                ))}
+            </div>
+        </div>
+    );
+}

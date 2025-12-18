@@ -4,6 +4,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SetupTaskItem } from '@/components/dashboard/molecules/SetupTaskItem';
 import { DashboardOverviewControlsProvider } from '@/components/dashboard/organisms/DashboardOverviewControlsProvider';
+import { DashboardOverviewHeaderToolbarClient } from '@/components/dashboard/organisms/DashboardOverviewHeaderToolbarClient';
 import { DashboardOverviewMetricsClient } from '@/components/dashboard/organisms/DashboardOverviewMetricsClient';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { APP_URL } from '@/constants/app';
@@ -35,12 +36,12 @@ export function DashboardOverview({
   const isHandleClaimed = Boolean(artist.owner_user_id);
   const musicLinkFromProfile = Boolean(
     artist.spotify_url ||
-      artist.apple_music_url ||
-      artist.youtube_url ||
-      // Fallback for camelCase fields in some test fixtures
-      (artist as { spotifyUrl?: string }).spotifyUrl ||
-      (artist as { appleMusicUrl?: string }).appleMusicUrl ||
-      (artist as { youtubeUrl?: string }).youtubeUrl
+    artist.apple_music_url ||
+    artist.youtube_url ||
+    // Fallback for camelCase fields in some test fixtures
+    (artist as { spotifyUrl?: string }).spotifyUrl ||
+    (artist as { appleMusicUrl?: string }).appleMusicUrl ||
+    (artist as { youtubeUrl?: string }).youtubeUrl
   );
   const hasMusicLink = hasMusicLinks || musicLinkFromProfile;
   const allTasksComplete = isHandleClaimed && hasMusicLink && hasSocialLinks;
@@ -63,46 +64,49 @@ export function DashboardOverview({
   })();
 
   const header = (
-    <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-1'>
-      <div className='flex flex-col gap-0.5'>
-        <div className='flex flex-wrap items-start justify-between gap-2'>
-          <div className='min-w-0'>
-            <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
-              <h1 className='text-xl font-semibold text-primary-token'>
-                Welcome back, {greetingName}
-              </h1>
-              <div className='flex items-center gap-1.5'>
-                <Button
-                  asChild
-                  variant='secondary'
-                  size='sm'
-                  className='h-8 w-8 rounded-full p-0'
+    <header className='flex flex-col gap-0.5 rounded-2xl bg-transparent p-3'>
+      <div className='grid grid-cols-1 gap-0.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-4'>
+        <div className='min-w-0'>
+          <div className='flex flex-wrap items-center gap-x-1.5 gap-y-0.5'>
+            <h1 className='text-xl font-semibold text-primary-token'>
+              Welcome back, {greetingName}
+            </h1>
+            <div className='flex items-center gap-1.5'>
+              <Button
+                asChild
+                variant='secondary'
+                size='sm'
+                className='h-8 w-8 rounded-full p-0'
+              >
+                <Link
+                  href={`/${artist.handle}`}
+                  aria-label='View profile'
+                  target='_blank'
+                  rel='noopener noreferrer'
                 >
-                  <Link
-                    href={`/${artist.handle}`}
-                    aria-label='View profile'
-                    target='_blank'
-                    rel='noopener noreferrer'
-                  >
-                    <Icon
-                      name='ArrowUpRight'
-                      className='h-4 w-4'
-                      aria-hidden='true'
-                    />
-                    <span className='sr-only'>View profile</span>
-                  </Link>
-                </Button>
-                <CopyToClipboardButton
-                  relativePath={`/${artist.handle}`}
-                  idleLabel='Copy URL'
-                  iconName='Copy'
-                  className='h-8 w-8 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
-                />
-              </div>
+                  <Icon
+                    name='ArrowUpRight'
+                    className='h-4 w-4'
+                    aria-hidden='true'
+                  />
+                  <span className='sr-only'>View profile</span>
+                </Link>
+              </Button>
+              <CopyToClipboardButton
+                relativePath={`/${artist.handle}`}
+                idleLabel='Copy URL'
+                iconName='Copy'
+                className='h-8 w-8 rounded-full border border-subtle p-0 bg-transparent text-primary-token hover:bg-surface-2'
+              />
             </div>
           </div>
         </div>
-        <p className='text-sm text-secondary-token'>
+
+        <div className='flex shrink-0 items-center justify-end sm:self-start'>
+          <DashboardOverviewHeaderToolbarClient />
+        </div>
+
+        <p className='text-sm text-secondary-token sm:col-span-2'>
           Keep your profile polished and ready to share.
         </p>
       </div>

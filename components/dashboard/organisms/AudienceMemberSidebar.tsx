@@ -2,6 +2,7 @@
 
 import { XMarkIcon } from '@heroicons/react/24/outline';
 import type { ReactNode } from 'react';
+import { Icon } from '@/components/atoms/Icon';
 import { AudienceDetailRow } from '@/components/dashboard/atoms/AudienceDetailRow';
 import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
 import { AudienceMemberHeader } from '@/components/dashboard/atoms/AudienceMemberHeader';
@@ -21,6 +22,41 @@ export interface AudienceMemberSidebarProps {
 
 function renderEmptyValue(fallback: string = '—'): ReactNode {
   return <span className='text-secondary-token'>{fallback}</span>;
+}
+
+function formatDeviceTypeLabel(deviceType: string): string {
+  const normalized = deviceType.trim();
+  if (normalized.length === 0) return deviceType;
+
+  const lower = normalized.toLowerCase();
+  if (lower === 'desktop') return 'Desktop';
+  if (lower === 'mobile') return 'Mobile';
+  if (lower === 'tablet') return 'Tablet';
+
+  const isSimpleLowercaseWord = /^[a-z]+$/.test(normalized);
+  if (!isSimpleLowercaseWord) return normalized;
+
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+}
+
+function formatActionLabel(label: string): string {
+  const normalized = label.trim();
+  if (normalized.length === 0) return label;
+
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
+}
+
+function resolveAudienceActionIcon(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (normalized.includes('visit')) return 'Eye';
+  if (normalized.includes('view')) return 'Eye';
+  if (normalized.includes('tip')) return 'HandCoins';
+  if (normalized.includes('purchase')) return 'CreditCard';
+  if (normalized.includes('subscribe')) return 'Bell';
+  if (normalized.includes('follow')) return 'UserPlus';
+  if (normalized.includes('click')) return 'MousePointerClick';
+  if (normalized.includes('link')) return 'Link';
+  return 'Sparkles';
 }
 
 export function AudienceMemberSidebar({
@@ -94,7 +130,7 @@ export function AudienceMemberSidebar({
               label='Device'
               value={
                 member.deviceType
-                  ? member.deviceType
+                  ? formatDeviceTypeLabel(member.deviceType)
                   : renderEmptyValue('Unknown')
               }
             />
@@ -129,12 +165,20 @@ export function AudienceMemberSidebar({
                   {member.latestActions.slice(0, 6).map(action => (
                     <li
                       key={`${member.id}-${action.label}-${action.timestamp ?? ''}`}
-                      className={cn('text-sm text-primary-token')}
+                      className={cn('flex items-start gap-2 text-sm text-primary-token')}
                     >
-                      <span className='mr-2' aria-hidden='true'>
-                        {action.emoji ?? '⭐'}
+                      <span
+                        className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
+                        aria-hidden='true'
+                      >
+                        <Icon
+                          name={resolveAudienceActionIcon(action.label)}
+                          className='h-3.5 w-3.5'
+                        />
                       </span>
-                      <span>{action.label}</span>
+                      <span className='min-w-0 flex-1'>
+                        {formatActionLabel(action.label)}
+                      </span>
                       {action.timestamp ? (
                         <span className='ml-2 text-xs text-secondary-token'>
                           {formatTimeAgo(action.timestamp)}

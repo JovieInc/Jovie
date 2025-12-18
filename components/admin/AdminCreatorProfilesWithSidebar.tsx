@@ -131,13 +131,14 @@ export function AdminCreatorProfilesWithSidebar({
   } = useCreatorActions(profiles);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [openMenuProfileId, setOpenMenuProfileId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
   const tableMetaCtx = useOptionalTableMeta();
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
+    () => tableMetaCtx?.setTableMeta ?? (() => { }),
     [tableMetaCtx]
   );
   const [headerElevated, setHeaderElevated] = useState(false);
@@ -496,7 +497,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                 >
                   <Checkbox
@@ -509,7 +510,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                 >
                   <span className='sr-only'>Creator</span>
@@ -549,7 +550,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                   onClick={() => router.push(createSortHref('created'))}
                 >
@@ -559,7 +560,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                   onClick={() => router.push(createSortHref('claimed'))}
                 >
@@ -569,7 +570,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                   onClick={() => router.push(createSortHref('verified'))}
                 >
@@ -579,7 +580,7 @@ export function AdminCreatorProfilesWithSidebar({
                   className={cn(
                     'sticky top-14 z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                    'shadow-sm shadow-black/10 dark:shadow-black/40'
                   )}
                 >
                   <span className='sr-only'>Action</span>
@@ -614,6 +615,11 @@ export function AdminCreatorProfilesWithSidebar({
                         isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
                       )}
                       onClick={() => handleRowClick(profile.id)}
+                      onContextMenu={event => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setOpenMenuProfileId(profile.id);
+                      }}
                       aria-selected={isSelected}
                     >
                       <td className='w-14 px-4 py-3 align-middle'>
@@ -686,10 +692,10 @@ export function AdminCreatorProfilesWithSidebar({
                       <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
                         {profile.createdAt
                           ? new Intl.DateTimeFormat('en-US', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            }).format(profile.createdAt)
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          }).format(profile.createdAt)
                           : '—'}
                       </td>
                       <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
@@ -729,11 +735,21 @@ export function AdminCreatorProfilesWithSidebar({
                         className='px-4 py-3 align-middle text-right'
                         onClick={e => e.stopPropagation()}
                       >
-                        <div className='opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto'>
+                        <div
+                          className={cn(
+                            'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                            openMenuProfileId === profile.id &&
+                            'opacity-100 pointer-events-auto'
+                          )}
+                        >
                           <CreatorActionsMenu
                             profile={profile}
                             isMobile={isMobile}
                             status={verificationStatuses[profile.id] ?? 'idle'}
+                            open={openMenuProfileId === profile.id}
+                            onOpenChange={open =>
+                              setOpenMenuProfileId(open ? profile.id : null)
+                            }
                             onToggleVerification={async () => {
                               const result = await toggleVerification(
                                 profile.id,

@@ -10,9 +10,6 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 const NewFeaturesSection = dynamic(() =>
   import('@/components/home/NewFeaturesSection').then(m => m.NewFeaturesSection)
 );
-const NewUpgradeTeaser = dynamic(() =>
-  import('@/components/home/NewUpgradeTeaser').then(m => m.NewUpgradeTeaser)
-);
 const NewHowItWorks = dynamic(() =>
   import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
 );
@@ -148,17 +145,17 @@ export default function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-white text-gray-900 dark:bg-[#0D0E12] dark:text-white'>
+      <div className='relative min-h-screen bg-base text-primary-token'>
         {/* 1. Hero Section (above the fold) */}
         <NewHomeHero />
 
         {/* 2. Artist carousel (visual proof, not endorsement) */}
         <Suspense
           fallback={
-            <section className='py-10 bg-white dark:bg-black'>
+            <section className='py-10 bg-base'>
               <Container>
                 <div className='text-center py-8'>
-                  <p className='text-sm font-medium text-gray-600 dark:text-gray-400'>
+                  <p className='text-sm font-medium text-secondary-token'>
                     Explore example Jovie profiles
                   </p>
                 </div>
@@ -169,14 +166,13 @@ export default function HomePage() {
           <FeaturedArtistsClient />
         </Suspense>
 
-        {/* 3. Features (what Free includes, forever) */}
+        {/* 3. How it works (3 steps) */}
+        <NewHowItWorks />
+
+        {/* 4. Features (what Free includes, forever) */}
         <NewFeaturesSection />
 
-        {/* 4. Upgrade teaser (lightweight, not a pricing page) */}
-        <NewUpgradeTeaser />
-
-        {/* 5. How it works (3 steps) */}
-        <NewHowItWorks />
+        {/* 5. Upgrade teaser (lightweight, not a pricing page) */}
       </div>
 
       {/* Pre-footer CTA */}

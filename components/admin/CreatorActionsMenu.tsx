@@ -42,6 +42,8 @@ interface CreatorActionsMenuProps {
   onToggleFeatured: () => Promise<void>;
   onToggleMarketing: () => Promise<void>;
   onDelete: () => void;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 const copyTextToClipboard = async (text: string): Promise<boolean> => {
@@ -64,6 +66,8 @@ export function CreatorActionsMenu({
   onToggleFeatured,
   onToggleMarketing,
   onDelete,
+  open,
+  onOpenChange,
 }: CreatorActionsMenuProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -87,9 +91,9 @@ export function CreatorActionsMenu({
   const stateClass = cn(
     'transition duration-200 ease-in-out transform',
     isSuccess &&
-      'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+    'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     isError &&
-      'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+    'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
   // Desktop: Show first 4 actions inline, rest in overflow menu
@@ -97,7 +101,7 @@ export function CreatorActionsMenu({
     return (
       <div className='flex w-full items-center justify-end gap-1'>
         {/* Overflow Menu: Verify/Feature + other actions */}
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={onOpenChange}>
           <DropdownMenuTrigger asChild>
             <Button
               type='button'
@@ -204,7 +208,7 @@ export function CreatorActionsMenu({
 
   // Mobile: All actions in dropdown
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           type='button'
