@@ -370,6 +370,9 @@ export function AppleStyleOnboardingForm({
         } else if (message.includes('USERNAME_TAKEN')) {
           userMessage =
             'This handle is already taken. Please choose another one.';
+        } else if (message.includes('EMAIL_IN_USE')) {
+          userMessage =
+            'This email is already associated with another account.';
         } else if (message.includes('RATE_LIMITED')) {
           userMessage = 'Too many attempts. Please try again in a few moments.';
         } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
