@@ -21,7 +21,7 @@ const authInputClasses =
 
 const variantClasses: Record<AuthInputVariant, string> = {
   default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-mono',
+  otp: 'text-2xl tracking-[0.3em] text-center font-sans',
 } as const;
 
 export function AuthInput({
@@ -35,6 +35,7 @@ export function AuthInput({
   autoCorrect,
   spellCheck,
   name,
+  ...rest
 }: AuthInputProps) {
   const resolvedAutoCapitalize =
     autoCapitalize ?? (type === 'email' ? 'none' : undefined);
@@ -53,6 +54,7 @@ export function AuthInput({
       spellCheck={resolvedSpellCheck}
       maxLength={maxLength}
       name={name}
+      {...rest}
       asChild
     >
       <Input

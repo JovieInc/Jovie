@@ -1,16 +1,6 @@
 'use client';
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from '@jovie/ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import { Check, ChevronDown, Mail, Phone } from 'lucide-react';
 import Link from 'next/link';
 import React, { useEffect, useId, useState } from 'react';
@@ -108,19 +98,6 @@ function formatPhoneDigitsForDisplay(digits: string, dialCode: string): string {
   return grouped ? grouped.join(' ') : normalized;
 }
 
-function detectDefaultCountry(): CountryOption {
-  if (typeof navigator === 'undefined') {
-    return COUNTRY_OPTIONS[0];
-  }
-
-  const language =
-    navigator.language || (navigator.languages && navigator.languages[0]) || '';
-  const upper = language.toUpperCase();
-
-  const matched = COUNTRY_OPTIONS.find(option => upper.endsWith(option.code));
-  return matched ?? COUNTRY_OPTIONS[0];
-}
-
 interface ArtistNotificationsCTAProps {
   artist: Artist;
   /**
@@ -157,17 +134,12 @@ export function ArtistNotificationsCTA({
   const [emailInput, setEmailInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [isConfirmOpen, setIsConfirmOpen] = useState<boolean>(false);
   const [isCountryOpen, setIsCountryOpen] = useState<boolean>(false);
 
   const { success: showSuccess, error: showError } = useNotifications();
 
   const inputId = useId();
   const inputRef = React.useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setCountry(detectDefaultCountry());
-  }, []);
 
   useEffect(() => {
     const dialDigits = country.dialCode.replace(/[^\d]/g, '');
@@ -200,6 +172,8 @@ export function ArtistNotificationsCTA({
     subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = notificationsState === 'success' && hasSubscriptions;
+
+  const shouldShowCountrySelector = channel === 'sms' && phoneInput.length > 0;
 
   const handleChannelChange = (next: NotificationChannel) => {
     if (isSubmitting) return;
@@ -282,7 +256,9 @@ export function ArtistNotificationsCTA({
     void validateCurrent();
   };
 
-  const openConfirmIfValid = () => {
+  const handleSubscribe = async () => {
+    if (isSubmitting) return;
+
     if (!validateCurrent()) {
       track('notifications_subscribe_error', {
         error_type: 'validation_error',
@@ -299,13 +275,13 @@ export function ArtistNotificationsCTA({
       handle: artist.handle,
     });
 
-    setIsConfirmOpen(true);
+    await handleConfirmSubscription();
   };
 
   const handleKeyDown: React.KeyboardEventHandler<HTMLInputElement> = event => {
     if (event.key === 'Enter') {
       event.preventDefault();
-      openConfirmIfValid();
+      void handleSubscribe();
     }
   };
 
@@ -317,11 +293,6 @@ export function ArtistNotificationsCTA({
 
   const handleConfirmSubscription = async () => {
     if (isSubmitting) return;
-
-    if (!validateCurrent()) {
-      setIsConfirmOpen(false);
-      return;
-    }
 
     setIsSubmitting(true);
     setError(null);
@@ -378,14 +349,12 @@ export function ArtistNotificationsCTA({
           ? "You'll receive SMS updates from this artist."
           : "You'll receive email updates from this artist."
       );
-      setIsConfirmOpen(false);
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Unable to subscribe right now.';
       setError(message);
-      setIsConfirmOpen(false);
       showError('Unable to turn on notifications right now.');
 
       track('notifications_subscribe_error', {
@@ -460,57 +429,81 @@ export function ArtistNotificationsCTA({
     <>
       <div className='space-y-3'>
         {/* Input container - Geist style */}
-        <div className='rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden'>
+        <div className='rounded-2xl bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-sm focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] transition-[box-shadow,ring] overflow-hidden'>
           <div className='flex items-center'>
             {/* Country selector for phone */}
-            {channel === 'sms' && (
-              <Popover open={isCountryOpen} onOpenChange={setIsCountryOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type='button'
-                    className='h-11 px-3 flex items-center gap-1.5 border-r border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800 text-sm text-neutral-900 dark:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors focus:outline-none'
-                    style={{ fontSynthesisWeight: 'none' }}
-                    aria-label='Select country code'
+            {channel === 'sms' ? (
+              shouldShowCountrySelector ? (
+                <Popover open={isCountryOpen} onOpenChange={setIsCountryOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type='button'
+                      className='h-12 pl-4 pr-3 flex items-center gap-1.5 bg-transparent text-[15px] text-foreground hover:bg-surface-2 transition-colors focus:outline-none'
+                      style={{ fontSynthesisWeight: 'none' }}
+                      aria-label='Select country code'
+                    >
+                      <span>{country.flag}</span>
+                      <span>{country.dialCode}</span>
+                      <ChevronDown className='w-3.5 h-3.5 text-muted-foreground' />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align='start'
+                    sideOffset={4}
+                    className='w-64 p-1 rounded-lg border border-subtle bg-surface-0 shadow-lg'
                   >
-                    <span>{country.flag}</span>
-                    <span>{country.dialCode}</span>
-                    <ChevronDown className='w-3.5 h-3.5 text-neutral-400' />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  align='start'
-                  sideOffset={4}
-                  className='w-64 p-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-lg'
+                    <div className='max-h-64 overflow-y-auto py-1'>
+                      {COUNTRY_OPTIONS.map(option => (
+                        <button
+                          key={option.code}
+                          type='button'
+                          onClick={() => {
+                            setCountry(option);
+                            setIsCountryOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                            country.code === option.code
+                              ? 'bg-surface-2 text-foreground'
+                              : 'text-foreground hover:bg-surface-1'
+                          }`}
+                          style={{ fontSynthesisWeight: 'none' }}
+                        >
+                          <span className='text-base'>{option.flag}</span>
+                          <span className='flex-1 text-left'>
+                            {option.label}
+                          </span>
+                          <span className='text-muted-foreground'>
+                            {option.dialCode}
+                          </span>
+                          {country.code === option.code && (
+                            <Check className='w-4 h-4 text-foreground' />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : (
+                <button
+                  type='button'
+                  className='h-12 pl-4 pr-3 flex items-center bg-transparent text-muted-foreground hover:bg-surface-2 transition-colors focus:outline-none'
+                  aria-label='Switch to email updates'
+                  onClick={() => handleChannelChange('email')}
+                  disabled={isSubmitting}
                 >
-                  <div className='max-h-64 overflow-y-auto py-1'>
-                    {COUNTRY_OPTIONS.map(option => (
-                      <button
-                        key={option.code}
-                        type='button'
-                        onClick={() => {
-                          setCountry(option);
-                          setIsCountryOpen(false);
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
-                          country.code === option.code
-                            ? 'bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100'
-                            : 'text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800'
-                        }`}
-                        style={{ fontSynthesisWeight: 'none' }}
-                      >
-                        <span className='text-base'>{option.flag}</span>
-                        <span className='flex-1 text-left'>{option.label}</span>
-                        <span className='text-neutral-500'>
-                          {option.dialCode}
-                        </span>
-                        {country.code === option.code && (
-                          <Check className='w-4 h-4 text-neutral-900 dark:text-neutral-100' />
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  <Phone className='w-4 h-4' aria-hidden='true' />
+                </button>
+              )
+            ) : (
+              <button
+                type='button'
+                className='h-12 pl-4 pr-3 flex items-center bg-transparent text-muted-foreground hover:bg-surface-2 transition-colors focus:outline-none'
+                aria-label='Switch to text updates'
+                onClick={() => handleChannelChange('sms')}
+                disabled={isSubmitting}
+              >
+                <Mail className='w-4 h-4' aria-hidden='true' />
+              </button>
             )}
 
             {/* Input field */}
@@ -523,7 +516,7 @@ export function ArtistNotificationsCTA({
                 id={inputId}
                 type={channel === 'sms' ? 'tel' : 'email'}
                 inputMode={channel === 'sms' ? 'numeric' : 'email'}
-                className='w-full h-11 px-4 bg-transparent text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 border-none focus:outline-none focus:ring-0'
+                className='w-full h-12 px-4 bg-transparent text-[15px] text-foreground placeholder:text-muted-foreground placeholder:opacity-80 border-none focus:outline-none focus:ring-0'
                 placeholder={
                   channel === 'sms' ? '(555) 123-4567' : 'your@email.com'
                 }
@@ -547,26 +540,23 @@ export function ArtistNotificationsCTA({
                 style={{ fontSynthesisWeight: 'none' }}
               />
             </div>
-
-            {/* Channel toggle */}
-            <ContactMethodToggle
-              channel={channel}
-              onChange={handleChannelChange}
-              disabled={isSubmitting}
-            />
           </div>
         </div>
 
         {/* Subscribe button - Geist style */}
         <button
           type='button'
-          onClick={openConfirmIfValid}
+          onClick={() => void handleSubscribe()}
           disabled={isSubmitting}
-          className='w-full h-10 inline-flex items-center justify-center rounded-md bg-neutral-900 dark:bg-white text-white dark:text-black text-sm font-medium transition-colors duration-150 hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white'
+          className='w-full h-11 inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-opacity duration-150 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
           style={{ fontSynthesisWeight: 'none' }}
         >
           {isSubmitting ? 'Subscribing…' : 'Subscribe'}
         </button>
+
+        <p className='text-center text-xs text-muted-foreground'>
+          No spam. Opt-out anytime.
+        </p>
 
         {/* Error message - below button to prevent layout shift */}
         <div className='h-5'>
@@ -577,90 +567,6 @@ export function ArtistNotificationsCTA({
           )}
         </div>
       </div>
-
-      <Sheet open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <SheetContent side='bottom'>
-          <SheetHeader>
-            <SheetTitle>Subscribe to notifications?</SheetTitle>
-            <SheetDescription>
-              You&apos;ll receive updates from this artist. By subscribing, you
-              agree to our{' '}
-              <Link href='/terms' className='underline'>
-                Terms
-              </Link>{' '}
-              and{' '}
-              <Link href='/privacy' className='underline'>
-                Privacy Policy
-              </Link>
-              .
-            </SheetDescription>
-          </SheetHeader>
-
-          <SheetFooter className='mt-6'>
-            <div className='flex w-full justify-end gap-3'>
-              <button
-                type='button'
-                onClick={() => setIsConfirmOpen(false)}
-                disabled={isSubmitting}
-                className='inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium border border-gray-300 text-gray-800 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-900'
-              >
-                Cancel
-              </button>
-              <button
-                type='button'
-                onClick={handleConfirmSubscription}
-                disabled={isSubmitting}
-                className='inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold bg-black text-white hover:bg-gray-800 disabled:opacity-60 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-100'
-              >
-                {isSubmitting ? 'Subscribing…' : 'Confirm subscription'}
-              </button>
-            </div>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </>
-  );
-}
-
-interface ContactMethodToggleProps {
-  channel: NotificationChannel;
-  onChange: (channel: NotificationChannel) => void;
-  disabled?: boolean;
-}
-
-function ContactMethodToggle({
-  channel,
-  onChange,
-  disabled,
-}: ContactMethodToggleProps) {
-  return (
-    <div className='inline-flex items-center rounded-md bg-neutral-100 dark:bg-neutral-800 p-0.5 mr-2'>
-      <button
-        type='button'
-        onClick={() => onChange('sms')}
-        disabled={disabled}
-        aria-label='Phone'
-        className={`p-2 rounded transition-all duration-150 ${
-          channel === 'sms'
-            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm'
-            : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
-        }`}
-      >
-        <Phone className='w-4 h-4' />
-      </button>
-      <button
-        type='button'
-        onClick={() => onChange('email')}
-        disabled={disabled}
-        aria-label='Email'
-        className={`p-2 rounded transition-all duration-150 ${
-          channel === 'email'
-            ? 'bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm'
-            : 'text-neutral-400 dark:text-neutral-500 hover:text-neutral-600 dark:hover:text-neutral-300'
-        }`}
-      >
-        <Mail className='w-4 h-4' />
-      </button>
-    </div>
   );
 }

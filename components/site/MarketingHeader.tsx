@@ -68,6 +68,7 @@ export function MarketingHeader({
       logoVariant='wordAlt'
       hideNav={resolvedHideNav}
       hidePricingLink={hidePricingLink}
+      containerSize='md'
       className={cn(
         'transition-colors duration-300 border-b',
         showSolid

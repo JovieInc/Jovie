@@ -4,6 +4,7 @@ import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { ThemeToggle } from '@/components/site/ThemeToggle';
 import { FEATURES } from '@/lib/features';
+import { cn } from '@/lib/utils';
 
 export interface FooterProps {
   variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
@@ -15,6 +16,7 @@ export interface FooterProps {
   showThemeToggle?: boolean;
   className?: string;
   brandingMark?: 'wordmark' | 'icon';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   links?: Array<{
     href: string;
     label: string;
@@ -29,10 +31,21 @@ export function Footer({
   showThemeToggle = false,
   className = '',
   brandingMark = 'wordmark',
+  containerSize = 'lg',
   links,
 }: FooterProps) {
   // Use user's setting if available, otherwise fall back to hideBranding prop
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
+
+  const containerSizes = {
+    sm: 'max-w-3xl',
+    md: 'max-w-5xl',
+    lg: 'max-w-6xl',
+    xl: 'max-w-7xl',
+    full: 'max-w-none',
+  } as const;
+
+  const maxWidthClass = containerSizes[containerSize];
 
   // Profile footer logic - hide if branding should be hidden
   if (variant === 'profile' && shouldHideBranding) {
@@ -43,8 +56,10 @@ export function Footer({
   const variantConfigs = {
     marketing: {
       containerClass: 'border-t border-subtle bg-base',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
+        maxWidthClass
+      ),
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -62,8 +77,10 @@ export function Footer({
     },
     minimal: {
       containerClass: 'border-t border-subtle bg-base',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 py-5 md:h-16 md:py-0',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 py-5 md:h-16 md:py-0',
+        maxWidthClass
+      ),
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -73,8 +90,10 @@ export function Footer({
     regular: {
       // Clerk-like footer: subtle border top, compact spacing, segmented theme selector
       containerClass: 'border-t border-subtle bg-base',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 pb-6 flex items-center justify-between',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-6 flex items-center justify-between',
+        maxWidthClass
+      ),
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -89,20 +108,24 @@ export function Footer({
   if (variant === 'profile') {
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5 pb-4'>
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
           <FooterBranding
             artistHandle={artistHandle}
             variant={config.colorVariant}
             size='sm'
+            showCTA={false}
+            mark='wordmark'
           />
         </div>
 
         {/* Mobile privacy link - small and corner-aligned to keep footer tight */}
-        <div className='md:hidden absolute bottom-2 right-4 text-[11px]'>
+        <div className='md:hidden absolute bottom-2 right-4'>
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[{ href: '/legal/privacy', label: 'Privacy' }]}
+            links={[]}
+            className='gap-2 text-[10px] leading-4'
+            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
         </div>
 
@@ -111,7 +134,9 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[{ href: '/legal/privacy', label: 'Privacy' }]}
+            links={[]}
+            className='gap-2 text-[10px] leading-4'
+            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
         </div>
       </footer>
@@ -141,7 +166,12 @@ export function Footer({
 
     return (
       <footer className={`border-t border-subtle bg-base ${className}`}>
-        <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-10 pb-6'>
+        <div
+          className={cn(
+            'mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6',
+            maxWidthClass
+          )}
+        >
           <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8'>
             {/* Brand */}
             <div className='sm:col-span-2 md:col-span-3 lg:col-span-1'>

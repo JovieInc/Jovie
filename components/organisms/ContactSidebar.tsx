@@ -6,40 +6,13 @@ import Link from 'next/link';
 import React, { useCallback, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
+import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { Contact, ContactSidebarMode, ContactSocialLink } from '@/types';
-
-type HeaderIconButtonProps = {
-  children: React.ReactNode;
-  ariaLabel: string;
-  onClick?: () => void;
-  asChild?: boolean;
-};
-
-function HeaderIconButton({
-  children,
-  ariaLabel,
-  onClick,
-  asChild = false,
-}: HeaderIconButtonProps) {
-  return (
-    <Button
-      type='button'
-      asChild={asChild}
-      variant='ghost'
-      size='icon'
-      className='h-8 w-8 text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-      aria-label={ariaLabel}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
-  );
-}
 
 export interface ContactSidebarProps {
   contact: Contact | null;
@@ -296,20 +269,23 @@ export function ContactSidebar({
       role='complementary'
     >
       <div className='flex items-center justify-between border-b border-sidebar-border px-3 py-2'>
-        <p className='text-xs uppercase tracking-wide text-sidebar-muted leading-none'>
-          Contact
+        <p className='text-xs text-sidebar-muted'>
+          {hasContact ? `ID: ${contact?.id}` : 'No contact selected'}
         </p>
         <div className='flex items-center gap-1'>
           {hasContact && contact?.username && (
             <HeaderIconButton
+              size='xs'
               ariaLabel='Copy profile link'
               onClick={handleCopyProfileUrl}
+              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             >
               <Copy className='h-4 w-4' aria-hidden />
             </HeaderIconButton>
           )}
           {hasContact && contact?.username && (
             <HeaderIconButton
+              size='xs'
               ariaLabel='Refresh profile'
               onClick={() => {
                 if (onRefresh) {
@@ -318,12 +294,18 @@ export function ContactSidebar({
                 }
                 window.location.reload();
               }}
+              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             >
               <RefreshCw className='h-4 w-4' aria-hidden />
             </HeaderIconButton>
           )}
           {hasContact && contact?.username && (
-            <HeaderIconButton ariaLabel='Open profile' asChild>
+            <HeaderIconButton
+              size='xs'
+              ariaLabel='Open profile'
+              asChild
+              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+            >
               <Link
                 href={`/${contact.username}`}
                 target='_blank'
@@ -335,8 +317,10 @@ export function ContactSidebar({
           )}
           {onClose && (
             <HeaderIconButton
+              size='xs'
               ariaLabel='Close contact sidebar'
               onClick={onClose}
+              className='text-secondary-token hover:text-primary-token transition-transform duration-150 ease-out hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             >
               <X className='h-4 w-4' aria-hidden='true' />
             </HeaderIconButton>

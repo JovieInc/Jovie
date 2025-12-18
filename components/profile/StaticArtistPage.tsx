@@ -137,8 +137,8 @@ function renderContent(
             />
           ) : (
             <div className='text-center'>
-              <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5'>
-                <p className='text-gray-600 dark:text-gray-400' role='alert'>
+              <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl'>
+                <p className='text-secondary-token' role='alert'>
                   Venmo tipping is not available for this artist yet.
                 </p>
               </div>
@@ -150,7 +150,7 @@ function renderContent(
     case 'subscribe':
       // Subscribe mode - show notification subscription form directly
       return (
-        <div className='space-y-4'>
+        <div className='space-y-4 py-4 sm:py-5'>
           <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
         </div>
       );

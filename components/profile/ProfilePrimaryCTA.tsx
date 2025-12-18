@@ -35,7 +35,7 @@ export function ProfilePrimaryCTA({
 
   if (showCapture && notificationsEnabled && !isSubscribed) {
     return (
-      <div className='space-y-4'>
+      <div className='space-y-4 py-4 sm:py-5'>
         <ArtistNotificationsCTA
           artist={artist}
           variant='button'
@@ -89,7 +89,7 @@ export function ProfilePrimaryCTA({
           href={nextAction.url}
           target='_blank'
           rel='noopener noreferrer'
-          className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
+          className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-4 text-lg font-semibold text-btn-primary-foreground shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
           aria-label='Open in Spotify'
         >
           Open in Spotify
@@ -104,7 +104,7 @@ export function ProfilePrimaryCTA({
         <Link
           href={`/${artist.handle}/listen`}
           prefetch={false}
-          className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-black px-8 py-4 text-lg font-semibold text-white shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/60 focus-visible:ring-offset-2 dark:bg-white dark:text-black dark:focus-visible:ring-white/70'
+          className='inline-flex w-full max-w-sm items-center justify-center gap-2 rounded-xl bg-btn-primary px-8 py-4 text-lg font-semibold text-btn-primary-foreground shadow-lg transition-[transform,opacity,filter] duration-150 ease-[cubic-bezier(0.33,.01,.27,1)] hover:opacity-90 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
           aria-label='Open Listen page with music links'
         >
           Listen now

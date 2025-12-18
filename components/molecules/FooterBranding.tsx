@@ -32,7 +32,7 @@ export function FooterBranding({
   return (
     <div
       className={cn(
-        'flex flex-col items-center justify-center space-y-1.5',
+        'group flex flex-col items-center justify-center space-y-1.5',
         className
       )}
     >
@@ -40,7 +40,7 @@ export function FooterBranding({
         <Link
           href={logoHref}
           aria-label='Jovie home'
-          className='rounded-sm focus-ring-themed'
+          className='rounded-sm focus-ring-themed opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
         >
           <BrandLogo size={size === 'sm' ? 20 : 24} tone='auto' />
         </Link>
@@ -48,16 +48,20 @@ export function FooterBranding({
         <Link
           href={logoHref}
           aria-label='Jovie home'
-          className='rounded-sm focus-ring-themed'
+          className='rounded-sm focus-ring-themed opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
         >
-          <Logo size={size === 'sm' ? 'xs' : 'sm'} variant='wordAlt' />
+          <Logo
+            size={size === 'sm' ? 'xs' : 'sm'}
+            variant='wordAlt'
+            className='opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+          />
         </Link>
       )}
 
       {showCTA && (
         <Link
           href={signUpLink}
-          className='text-[10px] leading-snug uppercase font-medium tracking-tight text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors text-center'
+          className='text-[10px] leading-snug uppercase font-medium tracking-tight text-gray-400 dark:text-gray-500 transition-[color,opacity] text-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-gray-600 dark:hover:text-gray-300'
         >
           Join the waitlist
         </Link>

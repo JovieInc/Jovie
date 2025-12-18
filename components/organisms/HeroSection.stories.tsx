@@ -146,7 +146,7 @@ export const MinimalForm: Story = {
         </CTAButton>
       </div>
     ),
-    supportingText: 'No spam, unsubscribe anytime',
+    supportingText: 'No spam. Opt-out anytime.',
   },
 };
 

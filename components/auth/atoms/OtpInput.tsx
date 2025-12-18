@@ -84,7 +84,7 @@ export function OtpInput({
         render={({ value, status }) => (
           <div
             className={cn(
-              'flex h-12 w-10 items-center justify-center rounded-lg border text-xl font-mono transition-all',
+              'flex h-12 w-10 items-center justify-center rounded-lg border text-xl font-sans transition-all',
               'bg-[#15161a] text-white',
               // Status-based styling
               status === 'cursor'

@@ -193,7 +193,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-200'
+        className='relative min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -212,10 +212,11 @@ export function ProfileShell({
             <ProfileNavButton
               showBackButton={showBackButton}
               artistHandle={artist.handle}
+              hideBranding={Boolean(artist.settings?.hide_branding)}
             />
           </div>
 
-          <div className='absolute right-4 top-4 z-10 flex items-center gap-3'>
+          <div className='absolute right-4 top-4 z-10 flex items-center gap-2'>
             {showNotificationButton && notificationsEnabled ? (
               hasActiveSubscriptions ? (
                 <ProfileNotificationsMenu
