@@ -121,7 +121,10 @@ export async function GET() {
   }
 
   const user = await currentUser();
-  const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+  const emailRaw =
+    user?.primaryEmailAddress?.emailAddress ??
+    user?.emailAddresses?.[0]?.emailAddress ??
+    null;
   if (!emailRaw) {
     return NextResponse.json(
       { hasEntry: false, status: null },
@@ -231,7 +234,10 @@ export async function POST(request: Request) {
     }
 
     const user = await currentUser();
-    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+    const emailRaw =
+      user?.primaryEmailAddress?.emailAddress ??
+      user?.emailAddresses?.[0]?.emailAddress ??
+      null;
     if (!emailRaw) {
       return NextResponse.json(
         { success: false, error: 'Email is required' },

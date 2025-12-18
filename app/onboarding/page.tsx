@@ -30,6 +30,11 @@ export default async function OnboardingPage({
   const existingProfile = dashboardData.selectedProfile;
   const user = await currentUser();
 
+  const userEmail =
+    user?.primaryEmailAddress?.emailAddress ??
+    user?.emailAddresses?.[0]?.emailAddress ??
+    null;
+
   const displayNameSource = existingProfile?.displayName
     ? 'profile'
     : user?.fullName
@@ -40,7 +45,7 @@ export default async function OnboardingPage({
     existingProfile?.displayName ||
     user?.fullName ||
     user?.username ||
-    user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] ||
+    userEmail?.split('@')[0] ||
     '';
 
   const initialHandle =
@@ -48,8 +53,6 @@ export default async function OnboardingPage({
     existingProfile?.username ||
     user?.username ||
     '';
-
-  const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   const skipNameStep =
     displayNameSource === 'profile' || displayNameSource === 'clerk_full_name';

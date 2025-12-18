@@ -29,7 +29,10 @@ export default async function AppShellLayout({
   // Users can still sign in, but they are redirected to /waitlist until approved.
   try {
     const user = await currentUser();
-    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+    const emailRaw =
+      user?.primaryEmailAddress?.emailAddress ??
+      user?.emailAddresses?.[0]?.emailAddress ??
+      null;
 
     if (!emailRaw) {
       redirect('/waitlist');

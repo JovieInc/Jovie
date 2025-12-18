@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { ActionDrivenProfileSection } from '@/components/home/ActionDrivenProfileSection';
+import { FanIdentificationBento } from '@/components/home/FanIdentificationBento';
 import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { NewSocialProofSection } from '@/components/home/NewSocialProofSection';
@@ -290,6 +291,8 @@ export default function HomePage() {
         </section>
 
         <ActionDrivenProfileSection />
+
+        <FanIdentificationBento />
 
         {/* 2. Social proof (team credibility) */}
         <NewSocialProofSection />
