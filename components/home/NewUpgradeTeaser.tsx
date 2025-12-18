@@ -7,13 +7,13 @@ import { Container } from '@/components/site/Container';
 
 export function NewUpgradeTeaser() {
   return (
-    <section className='py-16 sm:py-20 bg-white dark:bg-[#0a0a0b]'>
+    <section className='py-16 sm:py-20 bg-white dark:bg-[#0D0E12]'>
       <Container>
         <div className='max-w-lg mx-auto'>
-          <div className='relative rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/50 p-8 sm:p-10'>
+          <div className='relative rounded-2xl border border-neutral-200/60 dark:border-white/10 bg-white/60 dark:bg-white/3 p-8 sm:p-10 transition-shadow duration-200 hover:shadow-sm hover:shadow-neutral-900/5 dark:hover:shadow-black/30'>
             {/* Badge */}
             <div className='flex justify-center mb-6'>
-              <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 rounded-full'>
+              <span className='inline-flex items-center px-3 py-1 text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400 bg-neutral-100/80 dark:bg-white/5 rounded-full border border-neutral-200/60 dark:border-white/10'>
                 Standard
               </span>
             </div>

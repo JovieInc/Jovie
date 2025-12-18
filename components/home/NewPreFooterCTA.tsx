@@ -2,27 +2,28 @@
 
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
+import { Container } from '@/components/site/Container';
 
 export function NewPreFooterCTA() {
   return (
-    <section className='relative py-24 sm:py-32 bg-white dark:bg-gray-900 transition-colors duration-300'>
+    <section className='relative py-20 sm:py-28 bg-white dark:bg-[#0D0E12] transition-colors duration-300'>
       {/* Background with gradient - Light theme */}
-      <div className='absolute inset-0 bg-linear-to-br from-blue-500/5 via-purple-500/5 to-cyan-500/5 dark:from-blue-500/10 dark:via-purple-500/10 dark:to-cyan-500/10' />
+      <div className='absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.08),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.18),transparent)]' />
 
       {/* Grid pattern - Theme aware */}
-      <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-size-[50px_50px]' />
+      <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-size-[56px_56px]' />
 
       {/* Ambient light effects for glass morphism */}
-      <div className='absolute top-1/4 left-1/4 w-96 h-96 bg-linear-to-r from-blue-400/10 to-purple-400/10 dark:from-blue-400/20 dark:to-purple-400/20 rounded-full blur-3xl opacity-50' />
-      <div className='absolute bottom-1/4 right-1/4 w-96 h-96 bg-linear-to-r from-purple-400/10 to-cyan-400/10 dark:from-purple-400/20 dark:to-cyan-400/20 rounded-full blur-3xl opacity-50' />
+      <div className='absolute top-1/3 left-1/4 w-80 h-80 bg-linear-to-r from-blue-400/6 to-purple-400/6 dark:from-blue-400/12 dark:to-purple-400/12 rounded-full blur-3xl opacity-40' />
+      <div className='absolute bottom-1/3 right-1/4 w-80 h-80 bg-linear-to-r from-purple-400/6 to-cyan-400/6 dark:from-purple-400/12 dark:to-cyan-400/12 rounded-full blur-3xl opacity-40' />
 
-      <div className='relative mx-auto max-w-5xl px-6 lg:px-8'>
+      <Container className='relative'>
         <div className='mx-auto max-w-4xl text-center'>
           {/* Badge with glass morphism effect */}
           <div className='mb-8'>
-            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-100/80 dark:bg-white/10 border border-gray-200/50 dark:border-white/20 backdrop-blur-sm text-sm font-medium text-gray-700 dark:text-white transition-all duration-300 hover:bg-gray-200/80 dark:hover:bg-white/20 hover:scale-105'>
+            <div className='inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-100/80 dark:bg-white/5 border border-neutral-200/60 dark:border-white/10 backdrop-blur-sm text-sm font-medium text-neutral-700 dark:text-white/90 transition-colors duration-200'>
               <svg
-                className='w-4 h-4 text-blue-600 dark:text-blue-400'
+                className='w-4 h-4 text-neutral-700 dark:text-white/80'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
@@ -39,38 +40,39 @@ export function NewPreFooterCTA() {
           </div>
 
           {/* Main heading with improved typography hierarchy */}
-          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 dark:text-white tracking-tight leading-[1.1] transition-colors duration-300'>
+          <h2 className='text-4xl sm:text-5xl lg:text-6xl font-bold text-neutral-900 dark:text-white tracking-tight leading-[1.1] transition-colors duration-300'>
             Ready to claim
             <br />
-            <span className='text-transparent bg-linear-to-r from-blue-600 via-purple-600 to-cyan-600 dark:from-blue-400 dark:via-purple-400 dark:to-cyan-400 bg-clip-text font-extrabold'>
+            <span className='text-transparent bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text font-extrabold'>
               your @handle?
             </span>
           </h2>
 
           {/* Description with improved readability */}
-          <p className='mt-8 text-xl text-gray-600 dark:text-gray-300 font-light leading-relaxed max-w-2xl mx-auto transition-colors duration-300'>
-            Create your profile in 60 seconds.
-            <br />
-            <span className='text-gray-500 dark:text-gray-400'>
-              Start converting today.
-            </span>
+          <p className='mt-6 text-lg sm:text-xl text-neutral-600 dark:text-neutral-300 font-normal leading-relaxed max-w-2xl mx-auto transition-colors duration-300'>
+            Create your profile in 60 seconds. Start converting today.
           </p>
 
           {/* CTA buttons with enhanced spacing and interactions */}
-          <div className='mt-12 flex flex-col sm:flex-row gap-6 justify-center items-center'>
+          <div className='mt-10 flex flex-col sm:flex-row gap-6 justify-center items-center'>
             <Button
               asChild
               size='lg'
               variant='primary'
-              className='text-lg px-8 py-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/25 dark:hover:shadow-indigo-400/25'
+              className='text-lg px-8 py-4 transition-all duration-200 hover:shadow-lg hover:shadow-neutral-900/15 dark:hover:shadow-white/10'
             >
-              <Link href='/onboarding'>Request Early Access →</Link>
+              <Link
+                href='/onboarding'
+                className='focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0D0E12] rounded'
+              >
+                Request Early Access →
+              </Link>
             </Button>
 
             {/* Secondary info with better visual hierarchy */}
-            <div className='flex items-center gap-2 text-gray-600 dark:text-gray-400 transition-colors duration-300'>
+            <div className='flex items-center gap-2 text-neutral-600 dark:text-neutral-400 transition-colors duration-300'>
               <svg
-                className='w-5 h-5 text-green-600 dark:text-green-400'
+                className='w-5 h-5 text-emerald-600 dark:text-emerald-400'
                 fill='none'
                 viewBox='0 0 24 24'
                 stroke='currentColor'
@@ -86,7 +88,7 @@ export function NewPreFooterCTA() {
             </div>
           </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

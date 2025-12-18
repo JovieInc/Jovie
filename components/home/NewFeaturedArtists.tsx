@@ -20,9 +20,7 @@ export async function NewFeaturedArtists() {
   }
 
   return (
-    <section className='relative pt-0 pb-12'>
-      {/* Gradient blend from hero to this section */}
-      <div className='absolute inset-0 -z-10 bg-linear-to-b from-white via-white to-neutral-50 dark:from-[#0a0a0b] dark:via-[#0a0a0b] dark:to-[#0f0f11]' />
+    <section className='relative pt-0 pb-12 bg-white dark:bg-[#0D0E12]'>
       <Container>
         {error ? (
           <div className='flex items-center justify-center py-6'>
@@ -37,9 +35,9 @@ export async function NewFeaturedArtists() {
               <Link
                 key={creator.id}
                 href={`/${creator.handle}`}
-                className='group flex flex-col items-center gap-3'
+                className='group flex flex-col items-center gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0D0E12]'
               >
-                <div className='relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-800 group-hover:border-neutral-400 dark:group-hover:border-neutral-600 transition-colors'>
+                <div className='relative w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border border-neutral-200/60 dark:border-white/10 group-hover:border-neutral-300/70 dark:group-hover:border-white/20 transition-colors duration-200'>
                   <Image
                     src={creator.src}
                     alt={creator.alt || creator.name}
@@ -47,7 +45,7 @@ export async function NewFeaturedArtists() {
                     className='object-cover'
                   />
                 </div>
-                <span className='text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors'>
+                <span className='text-xs sm:text-sm font-medium text-neutral-600 dark:text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white transition-colors duration-200'>
                   {creator.name}
                 </span>
               </Link>

@@ -168,15 +168,18 @@ const features = [
 
 export function NewFeaturesSection() {
   return (
-    <section className='py-20 bg-white dark:bg-[#0a0a0b]'>
+    <section id='features' className='py-20 sm:py-28 bg-white dark:bg-[#0D0E12]'>
       <Container>
         {/* Section header */}
-        <div className='text-center mb-16'>
-          <h2 className='text-3xl md:text-4xl font-semibold tracking-tight text-gray-900 dark:text-white'>
-            Features <span className='text-[#0070F3]'>included forever</span>
+        <div className='text-center mb-14 sm:mb-16'>
+          <p className='text-xs font-medium tracking-wide uppercase text-neutral-500 dark:text-neutral-400'>
+            Features
+          </p>
+          <h2 className='mt-3 text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-tight text-neutral-900 dark:text-white'>
+            Included forever.
           </h2>
-          <p className='mt-4 text-base text-gray-500 dark:text-gray-400 max-w-xl mx-auto'>
-            Everything you need to convert fans, included in the free plan.
+          <p className='mt-4 text-base sm:text-lg text-neutral-600 dark:text-neutral-400 max-w-xl mx-auto'>
+            Everything you need to convert attention into fans.
           </p>
         </div>
 
@@ -187,7 +190,7 @@ export function NewFeaturesSection() {
             return (
               <div
                 key={index}
-                className='group relative p-6 rounded-xl border border-gray-200 dark:border-white/8 bg-gray-50 dark:bg-white/2 hover:border-gray-300 dark:hover:border-white/12 hover:bg-gray-100/50 dark:hover:bg-white/4 transition-all duration-200'
+                className='group relative p-6 sm:p-7 rounded-2xl border border-neutral-200/60 dark:border-white/10 bg-white/60 dark:bg-white/3 hover:border-neutral-300/70 dark:hover:border-white/15 hover:bg-neutral-50/40 dark:hover:bg-white/5 hover:shadow-sm hover:shadow-neutral-900/5 dark:hover:shadow-black/30 transition-all duration-200'
               >
                 {/* Icon with Geist color */}
                 <div
@@ -197,12 +200,12 @@ export function NewFeaturesSection() {
                 </div>
 
                 {/* Title */}
-                <h3 className='text-base font-semibold text-gray-900 dark:text-white mb-2'>
+                <h3 className='text-base font-semibold text-neutral-900 dark:text-white mb-2'>
                   {feature.title}
                 </h3>
 
                 {/* Description */}
-                <p className='text-sm text-gray-500 dark:text-gray-400 leading-relaxed'>
+                <p className='text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed'>
                   {feature.description}
                 </p>
               </div>

@@ -24,7 +24,7 @@ const steps = [
 
 export function NewHowItWorks() {
   return (
-    <section className='py-20 sm:py-24'>
+    <section className='py-20 sm:py-28 bg-white dark:bg-[#0D0E12]'>
       <Container>
         {/* Header */}
         <div className='text-center mb-16'>
@@ -45,11 +45,11 @@ export function NewHowItWorks() {
                 <div key={index} className='relative text-center md:text-left'>
                   {/* Connector line (desktop only) */}
                   {index < steps.length - 1 && (
-                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-neutral-200 dark:bg-neutral-800' />
+                    <div className='hidden md:block absolute top-6 left-[calc(50%+24px)] w-[calc(100%-48px)] h-px bg-neutral-200/60 dark:bg-white/10' />
                   )}
 
                   {/* Step number */}
-                  <div className='inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 mb-4'>
+                  <div className='inline-flex items-center justify-center w-12 h-12 rounded-full border border-neutral-200/60 dark:border-white/10 bg-white/60 dark:bg-white/3 mb-4'>
                     <span className='text-sm font-semibold text-neutral-900 dark:text-neutral-100'>
                       {step.number}
                     </span>

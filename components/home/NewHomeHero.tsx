@@ -36,14 +36,14 @@ export function NewHomeHero() {
           <div className='mt-8 flex flex-col items-center gap-3 md:items-start'>
             <Link
               href='/waitlist'
-              className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-black text-base font-medium transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-neutral-900/25 dark:hover:shadow-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-2'
+              className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-black text-base font-medium transition-all duration-200 hover:shadow-lg hover:shadow-neutral-900/20 dark:hover:shadow-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0D0E12] active:translate-y-px'
             >
               Request Early Access
               <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
             </Link>
             <Link
               href='#features'
-              className='text-xs text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors'
+              className='text-xs text-neutral-500 dark:text-neutral-500 hover:text-neutral-900 dark:hover:text-white transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900 dark:focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#0D0E12] rounded'
             >
               See how it works ↓
             </Link>
