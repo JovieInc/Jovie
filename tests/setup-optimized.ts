@@ -77,20 +77,32 @@ vi.mock('next/image', () => ({
   },
 }));
 
-// Mock Clerk components
+// Mock Clerk components (fast setup) – keep in sync with tests/setup.ts
+const mockUseUser = vi.fn(() => ({
+  isSignedIn: false,
+  user: null,
+  isLoaded: true,
+}));
+
+const mockUseClerk = vi.fn(() => ({
+  signOut: vi.fn(),
+  openUserProfile: vi.fn(),
+}));
+
+const mockUseAuth = vi.fn(() => ({
+  has: vi.fn(() => false),
+}));
+
+const mockUseSession = vi.fn(() => ({
+  session: null,
+  isLoaded: true,
+}));
+
 vi.mock('@clerk/nextjs', () => ({
-  useUser: () => ({
-    isSignedIn: false,
-    user: null,
-    isLoaded: true,
-  }),
-  useAuth: () => ({
-    has: vi.fn(() => false),
-  }),
-  useSession: () => ({
-    session: null,
-    isLoaded: true,
-  }),
+  useUser: mockUseUser,
+  useClerk: mockUseClerk,
+  useAuth: mockUseAuth,
+  useSession: mockUseSession,
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
   SignIn: ({ children }: { children: React.ReactNode }) => children,
   SignUp: ({ children }: { children: React.ReactNode }) => children,
@@ -105,13 +117,47 @@ vi.mock('server-only', () => ({
   default: vi.fn(),
 }));
 
-// Mock @jovie/ui components (including TooltipProvider)
+// Mock @jovie/ui components (including TooltipProvider/Tooltip) for fast tests
 vi.mock('@jovie/ui', async () => {
   const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+
+  const MockTooltipProvider = ({
+    children,
+  }: {
+    children: React.ReactNode;
+  }) => React.createElement(React.Fragment, {}, children);
+
+  const MockTooltip = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'tooltip-wrapper-fast' },
+      children,
+    );
+
+  const MockTooltipTrigger = React.forwardRef<
+    HTMLElement,
+    { asChild?: boolean; children: React.ReactNode }
+  >(({ children, asChild }, ref) => {
+    if (asChild && React.isValidElement(children)) {
+      return React.cloneElement(children as React.ReactElement, { ref });
+    }
+    return React.createElement('button', { ref }, children);
+  });
+  MockTooltipTrigger.displayName = 'MockTooltipTriggerFast';
+
+  const MockTooltipContent = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(
+      'div',
+      { 'data-testid': 'tooltip-content-fast', role: 'tooltip' },
+      children,
+    );
+
   return {
     ...actual,
-    // Provide a pass-through TooltipProvider for tests
-    TooltipProvider: ({ children }: { children: React.ReactNode }) => children,
+    TooltipProvider: MockTooltipProvider,
+    Tooltip: MockTooltip,
+    TooltipTrigger: MockTooltipTrigger,
+    TooltipContent: MockTooltipContent,
   };
 });
 

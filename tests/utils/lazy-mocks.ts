@@ -23,6 +23,10 @@ export function loadClerkMocks() {
       user: null,
       isLoaded: true,
     }),
+    useClerk: () => ({
+      signOut: vi.fn(),
+      openUserProfile: vi.fn(),
+    }),
     useAuth: () => ({
       has: vi.fn(() => false),
     }),

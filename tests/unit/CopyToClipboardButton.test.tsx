@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 
 // Mock the analytics module
