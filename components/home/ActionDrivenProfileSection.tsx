@@ -183,7 +183,7 @@ export function ActionDrivenProfileSection() {
                 {active.eyebrow}
               </p>
 
-              <h2 className='mt-3 text-3xl sm:text-4xl font-semibold tracking-tight text-primary-token'>
+              <h2 className='mt-3 text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
                 {active.title}
               </h2>
 

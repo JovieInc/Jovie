@@ -234,6 +234,30 @@ body {
   color: var(--color-text-tertiary-token);
 }
 
+@utility heading-linear {
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  font-variation-settings: "opsz" 28;
+  letter-spacing: -0.0325em;
+  font-weight: 538;
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+@utility text-linear {
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  font-variation-settings: "opsz" 28;
+  letter-spacing: -0.011em;
+  line-height: 1.6;
+}
+
 @utility text-destructive {
   color: #dc2626;
   /* red-600 */
