@@ -46,6 +46,7 @@ export interface ContactSidebarProps {
   mode: ContactSidebarMode;
   isOpen: boolean;
   onClose?: () => void;
+  onRefresh?: () => void;
   onContactChange?: (contact: Contact) => void;
   onSave?: (contact: Contact) => void | Promise<void>;
   isSaving?: boolean;
@@ -161,6 +162,7 @@ export function ContactSidebar({
   mode,
   isOpen,
   onClose,
+  onRefresh,
   onContactChange,
   onSave,
   isSaving,
@@ -309,7 +311,13 @@ export function ContactSidebar({
           {hasContact && contact?.username && (
             <HeaderIconButton
               ariaLabel='Refresh profile'
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                if (onRefresh) {
+                  onRefresh();
+                  return;
+                }
+                window.location.reload();
+              }}
             >
               <RefreshCw className='h-4 w-4' aria-hidden />
             </HeaderIconButton>

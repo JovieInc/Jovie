@@ -3,9 +3,24 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
+import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
+export const runtime = 'nodejs';
+
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+
+const allowedUrlProtocols = new Set(['http:', 'https:']);
+
+const hasSafeHttpProtocol = (value: string) => {
+  try {
+    const url = new URL(value);
+    return allowedUrlProtocols.has(url.protocol);
+  } catch {
+    return false;
+  }
+};
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -105,8 +120,20 @@ function isMissingWaitlistSchemaError(error: unknown): boolean {
 // Request body schema
 const waitlistRequestSchema = z.object({
   primaryGoal: z.enum(['streams', 'merch', 'tickets']).optional().nullable(),
-  primarySocialUrl: z.string().url('Invalid URL format'),
-  spotifyUrl: z.string().url('Invalid Spotify URL').optional().nullable(),
+  primarySocialUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .url('Invalid URL format')
+    .refine(hasSafeHttpProtocol, 'URL must start with http or https'),
+  spotifyUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .url('Invalid Spotify URL')
+    .refine(hasSafeHttpProtocol, 'URL must start with http or https')
+    .optional()
+    .nullable(),
   heardAbout: z.string().max(1000).optional().nullable(),
   selectedPlan: z.string().optional().nullable(), // free|pro|growth|branding
 });
@@ -155,6 +182,11 @@ export async function POST(request: Request) {
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Abuse protection: apply the same lightweight in-memory limiter used for onboarding.
+    // Always check a shared bucket for missing/unknown IPs.
+    const clientIP = extractClientIPFromRequest({ headers: request.headers });
+    await enforceOnboardingRateLimit({ userId, ip: clientIP, checkIP: true });
 
     const isDev = process.env.NODE_ENV === 'development';
     const databaseUrl = process.env.DATABASE_URL;

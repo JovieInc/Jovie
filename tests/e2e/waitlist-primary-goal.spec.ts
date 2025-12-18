@@ -6,24 +6,11 @@ test.describe('Waitlist primary goal', () => {
   }) => {
     await page.goto('/waitlist', { waitUntil: 'domcontentloaded' });
 
-    await page.getByPlaceholder('Full Name').fill('Test User');
-    await page
-      .getByPlaceholder('Enter your email address')
-      .fill(`test-${Date.now().toString(36)}@example.com`);
-
-    await page.getByRole('button', { name: 'Next' }).click();
-
     const goalButton = page.getByRole('button', { name: 'More streams' });
     await expect(goalButton).toBeVisible();
 
     await goalButton.click();
 
-    await expect(
-      page.getByPlaceholder('instagram.com/yourhandle')
-    ).toBeVisible();
-
-    await page.getByRole('button', { name: 'Back' }).click();
-
-    await expect(goalButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText('Where do fans find you?')).toBeVisible();
   });
 });
