@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   calculateBackoff,
-  determineJobFailure,
   createInMemorySocialLinkRow,
   deriveLayloHandle,
+  determineJobFailure,
 } from '@/lib/ingestion/processor';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 
