@@ -136,12 +136,15 @@ export function Footer({
       { href: '/legal/terms', label: 'Terms of Service' },
     ];
 
+    const footerLinkClassName =
+      'inline-flex rounded-md px-2 py-1 -mx-2 -my-1 text-[13px] leading-5 font-medium tracking-tight text-secondary-token hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+
     return (
       <footer className={`border-t border-subtle bg-base ${className}`}>
         <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-10 pb-6'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8'>
             {/* Brand */}
-            <div>
+            <div className='sm:col-span-2 md:col-span-3 lg:col-span-1'>
               <FooterBranding
                 variant='light'
                 showCTA={false}
@@ -152,16 +155,13 @@ export function Footer({
 
             {/* Product */}
             <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
+              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
                 Product
               </h3>
               <ul className='space-y-2'>
                 {productLinks.map(link => (
                   <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
+                    <Link href={link.href} className={footerLinkClassName}>
                       {link.label}
                     </Link>
                   </li>
@@ -171,16 +171,13 @@ export function Footer({
 
             {/* Company */}
             <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
+              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
                 Company
               </h3>
               <ul className='space-y-2'>
                 {companyLinks.map(link => (
                   <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
+                    <Link href={link.href} className={footerLinkClassName}>
                       {link.label}
                     </Link>
                   </li>
@@ -190,16 +187,13 @@ export function Footer({
 
             {/* Legal */}
             <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
+              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
                 Legal
               </h3>
               <ul className='space-y-2'>
                 {legalLinks.map(link => (
                   <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
+                    <Link href={link.href} className={footerLinkClassName}>
                       {link.label}
                     </Link>
                   </li>
@@ -208,17 +202,22 @@ export function Footer({
             </div>
           </div>
 
-          <div className='mt-8 border-t border-subtle pt-5 flex items-center justify-between'>
+          <div className='mt-8 border-t border-subtle pt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
             <div className='flex flex-col'>
               <Copyright
                 variant='light'
-                className='text-[11px] tracking-tight text-tertiary-token'
+                className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'
               />
             </div>
             {showThemeToggle && (
-              <div className='flex items-center'>
-                <ThemeToggle appearance='segmented' />
-              </div>
+              <>
+                <div className='flex items-center sm:hidden'>
+                  <ThemeToggle appearance='icon' />
+                </div>
+                <div className='hidden sm:flex items-center'>
+                  <ThemeToggle appearance='segmented' />
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -239,12 +238,12 @@ export function Footer({
                 variant={config.colorVariant}
                 className={
                   variant === 'minimal'
-                    ? 'text-[11px] tracking-tight text-secondary-token'
-                    : undefined
+                    ? 'text-[11px] leading-4 font-medium tracking-tight text-secondary-token'
+                    : 'text-[12px] leading-4 font-medium tracking-tight text-tertiary-token'
                 }
               />
               {variant === 'minimal' && (
-                <p className='text-[11px] tracking-tight text-tertiary-token'>
+                <p className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'>
                   Made for musicians, by musicians
                 </p>
               )}
@@ -258,18 +257,27 @@ export function Footer({
                   variant={config.colorVariant}
                   ariaLabel={variant === 'minimal' ? 'Legal' : undefined}
                   links={links}
-                  className={variant === 'minimal' ? 'gap-2' : ''}
+                  className={
+                    variant === 'minimal'
+                      ? 'gap-2 flex-wrap justify-center'
+                      : ''
+                  }
                   linkClassName={
                     variant === 'minimal'
-                      ? 'text-[11px] tracking-tight font-medium'
+                      ? 'text-[11px] leading-4 font-medium tracking-tight'
                       : ''
                   }
                 />
               )}
               {showThemeToggle && (
-                <div className='flex items-center'>
-                  <ThemeToggle appearance={config.themeAppearance} />
-                </div>
+                <>
+                  <div className='flex items-center md:hidden'>
+                    <ThemeToggle appearance='icon' />
+                  </div>
+                  <div className='hidden md:flex items-center'>
+                    <ThemeToggle appearance={config.themeAppearance} />
+                  </div>
+                </>
               )}
             </div>
           </>

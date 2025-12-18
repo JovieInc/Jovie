@@ -7,7 +7,7 @@ interface CopyrightProps {
   year?: number;
 }
 
-const baseStyles = 'text-sm';
+const baseStyles = 'text-sm font-medium tracking-tight';
 const variantStyles = {
   light: 'text-gray-500 dark:text-gray-400',
   dark: 'text-white/70',

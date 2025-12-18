@@ -24,7 +24,7 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
         : 'text-white/70 hover:text-white';
 
     const linkClassName = cn(
-      'inline-flex items-center rounded-md px-0 py-0 text-sm font-medium transition-colors',
+      'inline-flex items-center rounded-md px-0 py-0 text-[13px] leading-5 font-medium tracking-tight transition-colors',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
       palette,
       className

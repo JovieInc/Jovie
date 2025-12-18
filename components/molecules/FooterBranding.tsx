@@ -57,7 +57,7 @@ export function FooterBranding({
       {showCTA && (
         <Link
           href={signUpLink}
-          className='text-[10px] leading-snug uppercase tracking-[0.08em] text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 font-medium transition-colors text-center'
+          className='text-[10px] leading-snug uppercase font-medium tracking-tight text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors text-center'
         >
           Join the waitlist
         </Link>

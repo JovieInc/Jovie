@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -97,6 +98,13 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'invited',
   'claimed',
   'rejected',
+]);
+
+export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
+  'pending',
+  'sending',
+  'sent',
+  'failed',
 ]);
 
 export const notificationChannelEnum = pgEnum('notification_channel', [
@@ -520,6 +528,35 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const waitlistInvites = pgTable(
+  'waitlist_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    waitlistEntryId: uuid('waitlist_entry_id')
+      .notNull()
+      .references(() => waitlistEntries.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    fullName: text('full_name').notNull(),
+    claimToken: text('claim_token').notNull(),
+    status: waitlistInviteStatusEnum('status').default('pending').notNull(),
+    error: text('error'),
+    attempts: integer('attempts').default(0).notNull(),
+    maxAttempts: integer('max_attempts').default(3).notNull(),
+    runAt: timestamp('run_at').defaultNow().notNull(),
+    sentAt: timestamp('sent_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    waitlistEntryIdUnique: uniqueIndex('idx_waitlist_invites_entry_id').on(
+      table.waitlistEntryId
+    ),
+  })
+);
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -578,6 +615,9 @@ export const selectScraperConfigSchema = createSelectSchema(scraperConfigs);
 export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
 export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
 
+export const insertWaitlistInviteSchema = createInsertSchema(waitlistInvites);
+export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -628,3 +668,6 @@ export type NewScraperConfig = typeof scraperConfigs.$inferInsert;
 
 export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
 export type NewWaitlistEntry = typeof waitlistEntries.$inferInsert;
+
+export type WaitlistInvite = typeof waitlistInvites.$inferSelect;
+export type NewWaitlistInvite = typeof waitlistInvites.$inferInsert;
