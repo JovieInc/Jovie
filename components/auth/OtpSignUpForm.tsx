@@ -267,7 +267,11 @@ export function OtpSignUpForm() {
                 <>
                   <Clerk.Field name='emailAddress'>
                     <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
-                    <AuthInput type='email' placeholder='Email Address' />
+                    <AuthInput
+                      type='email'
+                      placeholder='Email Address'
+                      autoComplete='email'
+                    />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 

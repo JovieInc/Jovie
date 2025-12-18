@@ -76,6 +76,8 @@ export function OtpInput({
         type='otp'
         autoSubmit={autoSubmit}
         autoFocus={autoFocus}
+        autoComplete='one-time-code'
+        inputMode='numeric'
         length={OTP_LENGTH}
         className='flex justify-center gap-2'
         aria-label={ariaLabel}
