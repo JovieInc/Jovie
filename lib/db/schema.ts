@@ -373,20 +373,31 @@ export const clickEvents = pgTable(
   })
 );
 
-export const notificationSubscriptions = pgTable('notification_subscriptions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  channel: notificationChannelEnum('channel').notNull(),
-  email: text('email'),
-  phone: text('phone'),
-  countryCode: text('country_code'),
-  city: text('city'),
-  ipAddress: text('ip_address'),
-  source: text('source'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const notificationSubscriptions = pgTable(
+  'notification_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    channel: notificationChannelEnum('channel').notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    countryCode: text('country_code'),
+    city: text('city'),
+    ipAddress: text('ip_address'),
+    source: text('source'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileEmailUnique: uniqueIndex(
+      'notification_subscriptions_creator_profile_id_email_unique'
+    ).on(table.creatorProfileId, table.email),
+    creatorProfilePhoneUnique: uniqueIndex(
+      'notification_subscriptions_creator_profile_id_phone_unique'
+    ).on(table.creatorProfileId, table.phone),
+  })
+);
 
 export const creatorContacts = pgTable('creator_contacts', {
   id: uuid('id').primaryKey().defaultRandom(),

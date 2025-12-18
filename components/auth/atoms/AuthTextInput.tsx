@@ -11,7 +11,7 @@ type AuthTextInputVariant = 'default' | 'otp';
 
 const variantClasses: Record<AuthTextInputVariant, string> = {
   default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-mono',
+  otp: 'text-2xl tracking-[0.3em] text-center font-sans',
 } as const;
 
 export interface AuthTextInputProps

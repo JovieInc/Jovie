@@ -109,7 +109,7 @@ export function ActionDrivenProfileSection() {
         <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
       </div>
 
-      <Container>
+      <Container size='md'>
         <div className='mx-auto max-w-5xl'>
           <div className='grid gap-10 md:grid-cols-12 md:items-start'>
             <div className='md:col-span-8'>

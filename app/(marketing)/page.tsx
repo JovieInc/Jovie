@@ -147,10 +147,13 @@ export default function HomePage() {
         {/* 1. Hero Section (above the fold) */}
         <NewHomeHero />
 
+        {/* 2. Social proof (team credibility) */}
+        <NewSocialProofSection />
+
         <Suspense
           fallback={
             <section className='py-10 bg-base'>
-              <Container>
+              <Container size='md'>
                 <div className='text-center py-8'>
                   <p className='text-sm font-medium text-secondary-token'>
                     Explore example Jovie profiles
@@ -171,7 +174,7 @@ export default function HomePage() {
             <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
           </div>
 
-          <Container>
+          <Container size='md'>
             <div className='mx-auto max-w-5xl'>
               <div className='flex flex-col gap-6 md:flex-row md:items-start md:justify-between'>
                 <div className='md:max-w-xl'>
@@ -199,9 +202,6 @@ export default function HomePage() {
         </section>
         <ActionDrivenProfileSection />
 
-        {/* 2. Social proof (team credibility) */}
-        <NewSocialProofSection />
-
         <section className='relative pb-14 sm:pb-16 bg-base overflow-hidden'>
           <div className='absolute inset-0 -z-10'>
             <div className='absolute inset-0 grid-bg opacity-60' />
@@ -209,7 +209,7 @@ export default function HomePage() {
             <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
           </div>
 
-          <Container>
+          <Container size='md'>
             <div className='mx-auto max-w-5xl'>
               <ProfileFeatureCardsModal />
             </div>
@@ -225,7 +225,7 @@ export default function HomePage() {
             <div className='absolute inset-0 grid-bg opacity-60' />
             <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.22),transparent)]' />
           </div>
-          <Container>
+          <Container size='md'>
             <div className='mx-auto max-w-5xl'>
               <div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
                 <div className='min-w-0'>

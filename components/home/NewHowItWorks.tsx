@@ -34,7 +34,7 @@ export function NewHowItWorks() {
         <div className='pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-base to-transparent dark:from-base' />
         <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
       </div>
-      <Container>
+      <Container size='md'>
         {/* Header */}
         <div className='text-center mb-16'>
           <p className='text-sm font-medium tracking-wide uppercase text-secondary-token mb-3'>

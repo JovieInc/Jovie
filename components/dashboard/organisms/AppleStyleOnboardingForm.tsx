@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Copy } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,7 +10,6 @@ import {
   AuthLinkPreviewCard,
   AuthTextInput,
 } from '@/components/auth';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { identify, track } from '@/lib/analytics';
 import {
@@ -56,7 +55,7 @@ const ONBOARDING_STEPS = [
   {
     id: 'handle',
     title: 'Claim your handle',
-    prompt: 'This becomes your public link. You can change it later.',
+    prompt: '',
   },
   { id: 'done', title: "You're live.", prompt: '' },
 ] as const;
@@ -385,25 +384,16 @@ export function AppleStyleOnboardingForm({
           timestamp: new Date().toISOString(),
         });
 
-        let userMessage =
-          'Something went wrong saving your handle. Please try again.';
+        let userMessage = 'Could not save. Please try again.';
         const message = errorMessage.toUpperCase();
         if (message.includes('INVALID_SESSION')) {
-          userMessage = 'Your session expired. Please refresh and try again.';
+          userMessage = 'Could not save. Please refresh and try again.';
         } else if (message.includes('USERNAME_TAKEN')) {
-          userMessage =
-            'This handle is already taken. Please choose another one.';
-        } else if (message.includes('EMAIL_IN_USE')) {
-          userMessage =
-            'This email is already associated with another account.';
+          userMessage = 'Not available. Try another handle.';
         } else if (message.includes('RATE_LIMITED')) {
           userMessage = 'Too many attempts. Please try again in a few moments.';
-        } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
-          userMessage = 'Please add your name to finish setup.';
-        } else if (message.includes('DISPLAY_NAME_TOO_LONG')) {
-          userMessage = 'Name must be 50 characters or less.';
         } else if (message.includes('INVALID_USERNAME')) {
-          userMessage = 'Handle is invalid. Please update and try again.';
+          userMessage = 'That handle can’t be used. Try another one.';
         }
 
         setState(prev => ({
@@ -457,14 +447,6 @@ export function AppleStyleOnboardingForm({
     }
   }, [currentStepIndex, goToPreviousStep, router]);
 
-  const retryOperation = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      retryCount: prev.retryCount + 1,
-      error: null,
-    }));
-  }, []);
-
   const renderStepContent = () => {
     switch (currentStepIndex) {
       case 0:
@@ -482,10 +464,23 @@ export function AppleStyleOnboardingForm({
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='space-y-4'>
+              <form
+                className='space-y-4'
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (
+                    isDisplayNameValid &&
+                    !isTransitioning &&
+                    !state.isSubmitting
+                  ) {
+                    goToNextStep();
+                  }
+                }}
+              >
                 <AuthTextInput
                   id='display-name'
                   ref={nameInputRef}
+                  name='name'
                   type='text'
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
@@ -493,26 +488,17 @@ export function AppleStyleOnboardingForm({
                   aria-label='Your full name'
                   maxLength={50}
                   autoComplete='name'
-                  onKeyDown={e => {
-                    if (
-                      e.key === 'Enter' &&
-                      fullName.trim() &&
-                      !isTransitioning
-                    ) {
-                      goToNextStep();
-                    }
-                  }}
                 />
 
                 <AuthButton
-                  onClick={goToNextStep}
+                  type='submit'
                   disabled={
                     !isDisplayNameValid || isTransitioning || state.isSubmitting
                   }
                 >
                   Continue
                 </AuthButton>
-              </div>
+              </form>
             </div>
           </div>
         );
@@ -532,7 +518,7 @@ export function AppleStyleOnboardingForm({
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='space-y-4'>
+              <form className='space-y-4' onSubmit={handleSubmit}>
                 <label
                   className='text-sm font-medium text-(--muted)'
                   htmlFor='handle-input'
@@ -546,6 +532,7 @@ export function AppleStyleOnboardingForm({
                   <AuthTextInput
                     id='handle-input'
                     ref={handleInputRef}
+                    name='username'
                     aria-label='Enter your desired handle'
                     type='text'
                     value={handleInput}
@@ -559,6 +546,9 @@ export function AppleStyleOnboardingForm({
                     }
                     placeholder='yourhandle'
                     autoComplete='username'
+                    autoCapitalize='none'
+                    autoCorrect='off'
+                    spellCheck={false}
                     aria-invalid={handleValidation.error ? 'true' : undefined}
                     className={[
                       'pl-10',
@@ -570,16 +560,6 @@ export function AppleStyleOnboardingForm({
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    onKeyDown={e => {
-                      if (
-                        e.key === 'Enter' &&
-                        handleValidation.available &&
-                        handleValidation.clientValid &&
-                        !state.isSubmitting
-                      ) {
-                        handleSubmit();
-                      }
-                    }}
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
@@ -591,112 +571,31 @@ export function AppleStyleOnboardingForm({
                   )}
                 </div>
 
-                <div className='min-h-[24px] flex flex-col items-center justify-center px-1'>
-                  {handleValidation.checking ? (
-                    <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                      Checking availability…
-                    </div>
-                  ) : null}
-
-                  {!handleValidation.checking &&
-                  handleValidation.clientValid &&
-                  handleValidation.available ? (
-                    <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                      ✅ Available
-                    </div>
-                  ) : null}
-
-                  {!handleValidation.checking &&
-                  !handleValidation.clientValid &&
-                  handleValidation.error ? (
-                    <div className='text-yellow-600 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-                      ⚠️ {handleValidation.error}
-                    </div>
-                  ) : null}
-
-                  {!handleValidation.checking &&
-                  handleValidation.clientValid &&
-                  !handleValidation.available &&
-                  handleValidation.error ? (
-                    <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
-                      ❌ Taken
-                    </div>
+                <div
+                  className='min-h-[24px] flex flex-col items-center justify-center px-1'
+                  role='status'
+                  aria-live='polite'
+                >
+                  {handleInput ? (
+                    handleValidation.checking ? (
+                      <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                        Checking…
+                      </div>
+                    ) : handleValidation.clientValid &&
+                      handleValidation.available ? (
+                      <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                        Available
+                      </div>
+                    ) : handleValidation.error ? (
+                      <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+                        Not available
+                      </div>
+                    ) : null
                   ) : null}
                 </div>
-
-                <div className='text-center space-y-1'>
-                  <p className='text-[#6b6f76] text-xs'>
-                    Allowed: letters, numbers, hyphens
-                  </p>
-                  <p className='text-[#6b6f76] text-xs'>
-                    Length: 3–30 characters
-                  </p>
-                </div>
-
-                <AuthLinkPreviewCard
-                  label='Your link'
-                  hrefText={`${displayDomain}/${handleInput || 'yourhandle'}`}
-                  trailing={
-                    <button
-                      type='button'
-                      aria-label='Copy link'
-                      disabled={
-                        !handleValidation.clientValid ||
-                        !handleValidation.available ||
-                        handleValidation.checking ||
-                        !handleInput
-                      }
-                      className='mt-[2px] rounded-md p-1 text-[#6b6f76] hover:text-[rgb(227,228,230)] disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10]'
-                      onClick={() => {
-                        const link = `${PRODUCTION_PROFILE_BASE_URL}/${handleInput}`;
-                        navigator.clipboard
-                          .writeText(link)
-                          .then(() => {
-                            setCopyFeedback('Copied!');
-                            setTimeout(() => setCopyFeedback(null), 1500);
-                          })
-                          .catch(() => {
-                            setCopyFeedback('Unable to copy');
-                            setTimeout(() => setCopyFeedback(null), 1500);
-                          });
-                      }}
-                    >
-                      <Copy className='h-4 w-4' />
-                    </button>
-                  }
-                />
-
-                {copyFeedback ? (
-                  <p className='text-center text-xs text-[#6b6f76]'>
-                    {copyFeedback}
-                  </p>
-                ) : null}
-
-                {!handleValidation.checking &&
-                handleValidation.clientValid &&
-                !handleValidation.available &&
-                handleValidation.suggestions.length > 0 ? (
-                  <div className='text-center'>
-                    <p className='text-xs text-[#6b6f76]'>Try one of these:</p>
-                    <div className='mt-2 flex flex-wrap justify-center gap-2'>
-                      {handleValidation.suggestions
-                        .slice(0, 3)
-                        .map(suggestion => (
-                          <button
-                            key={suggestion}
-                            type='button'
-                            className='text-xs text-[rgb(227,228,230)] border border-white/10 bg-[#15161a] hover:bg-[#1e2025] rounded-md px-2 py-1 focus-ring'
-                            onClick={() => setHandleInput(suggestion)}
-                          >
-                            {suggestion}
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                ) : null}
 
                 <AuthButton
-                  onClick={handleSubmit}
+                  type='submit'
                   disabled={
                     Boolean(handleStepCtaDisabledReason) || isTransitioning
                   }
@@ -712,34 +611,12 @@ export function AppleStyleOnboardingForm({
                   )}
                 </AuthButton>
 
-                {handleStepCtaDisabledReason ? (
-                  <p className='text-center text-xs text-[#6b6f76]'>
-                    {handleStepCtaDisabledReason}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className='min-h-[140px] flex items-start'>
                 {state.error ? (
-                  <ErrorBanner
-                    title='We could not save your handle'
-                    description={state.error}
-                    actions={[
-                      {
-                        label: 'Try again',
-                        onClick: retryOperation,
-                      },
-                      {
-                        label: 'Contact support',
-                        href: '/support',
-                      },
-                    ]}
-                    testId='onboarding-error'
-                  />
-                ) : (
-                  <div aria-hidden='true' className='w-full' />
-                )}
-              </div>
+                  <div className='text-center text-xs text-[#6b6f76]'>
+                    {state.error}
+                  </div>
+                ) : null}
+              </form>
             </div>
           </div>
         );

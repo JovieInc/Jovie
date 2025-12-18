@@ -222,7 +222,7 @@ export function IngestProfileDropdown({
               />
               <p className='text-xs text-secondary-token'>
                 {currentPlatform?.label} URL:{' '}
-                <span className='font-mono'>{effectiveUrl || '—'}</span>
+                <span className='font-sans'>{effectiveUrl || '—'}</span>
               </p>
             </div>
 
