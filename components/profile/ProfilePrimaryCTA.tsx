@@ -25,15 +25,28 @@ export function ProfilePrimaryCTA({
   autoOpenCapture = true,
   showCapture = true,
 }: ProfilePrimaryCTAProps) {
-  const { state, notificationsEnabled, subscribedChannels } =
-    useProfileNotifications();
+  const {
+    state,
+    hasStoredContacts,
+    hydrationStatus,
+    notificationsEnabled,
+    subscribedChannels,
+  } = useProfileNotifications();
 
   const hasSubscriptions = Boolean(
     subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = state === 'success' && hasSubscriptions;
 
-  if (showCapture && notificationsEnabled && !isSubscribed) {
+  const isHydratingSubscriptionStatus =
+    hydrationStatus === 'checking' && hasStoredContacts;
+
+  if (
+    showCapture &&
+    notificationsEnabled &&
+    !isSubscribed &&
+    !isHydratingSubscriptionStatus
+  ) {
     return (
       <div className='space-y-4 py-4 sm:py-5'>
         <ArtistNotificationsCTA

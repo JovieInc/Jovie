@@ -554,7 +554,10 @@ export function ArtistNotificationsCTA({
           {isSubmitting ? 'Subscribing…' : 'Subscribe'}
         </button>
 
-        <p className='text-center text-xs text-muted-foreground'>
+        <p
+          className='text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80'
+          style={{ fontSynthesisWeight: 'none' }}
+        >
           No spam. Opt-out anytime.
         </p>
 

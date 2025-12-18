@@ -8,6 +8,8 @@ import type {
 
 export type ProfileNotificationsState = 'idle' | 'editing' | 'success';
 
+export type ProfileNotificationsHydrationStatus = 'idle' | 'checking' | 'done';
+
 type ControllerParams = {
   artistId: string;
   artistHandle: string;
@@ -17,6 +19,19 @@ type ControllerParams = {
 };
 
 const STORAGE_KEY = 'jovie:notification-contacts';
+
+function readStoredContacts(): NotificationContactValues | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const storedRaw = window.localStorage.getItem(STORAGE_KEY);
+    if (!storedRaw) return null;
+    const parsed = JSON.parse(storedRaw) as NotificationContactValues;
+    const hasStoredContact = Boolean(parsed.email || parsed.sms);
+    return hasStoredContact ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export function formatE164PhoneForDisplay(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -45,12 +60,23 @@ export function useProfileNotificationsController({
   onError,
   onSuccess,
 }: ControllerParams) {
+  const storedContacts = readStoredContacts();
+  const hasInitialStoredContacts = Boolean(storedContacts);
+
   const [state, setState] = useState<ProfileNotificationsState>('idle');
+  const [hydrationStatus, setHydrationStatus] =
+    useState<ProfileNotificationsHydrationStatus>(() => {
+      if (!notificationsEnabled) return 'idle';
+      return hasInitialStoredContacts ? 'checking' : 'done';
+    });
   const [channel, setChannel] = useState<NotificationChannel>('sms');
   const [subscribedChannels, setSubscribedChannels] =
     useState<NotificationSubscriptionState>({});
   const [subscriptionDetails, setSubscriptionDetails] =
-    useState<NotificationContactValues>({});
+    useState<NotificationContactValues>(() => storedContacts ?? {});
+  const [hasStoredContacts, setHasStoredContacts] = useState<boolean>(
+    hasInitialStoredContacts
+  );
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
   const [channelBusy, setChannelBusy] = useState<
     Partial<Record<NotificationChannel, boolean>>
@@ -109,12 +135,24 @@ export function useProfileNotificationsController({
     if (typeof window === 'undefined') return;
 
     const storedRaw = window.localStorage.getItem(STORAGE_KEY);
-    if (!storedRaw) return;
+    if (!storedRaw) {
+      setHasStoredContacts(false);
+      setHydrationStatus('done');
+      return;
+    }
 
     try {
       const parsed = JSON.parse(storedRaw) as NotificationContactValues;
       const hasStoredContact = Boolean(parsed.email || parsed.sms);
-      if (!hasStoredContact) return;
+      setHasStoredContacts(hasStoredContact);
+
+      if (!hasStoredContact) {
+        setHydrationStatus('done');
+        return;
+      }
+
+      setSubscriptionDetails(prev => ({ ...prev, ...parsed }));
+      setHydrationStatus('checking');
 
       void (async () => {
         try {
@@ -149,10 +187,14 @@ export function useProfileNotificationsController({
             'Unable to hydrate notification subscription state',
             error
           );
+        } finally {
+          setHydrationStatus('done');
         }
       })();
     } catch {
       // Ignore parse failures
+      setHasStoredContacts(false);
+      setHydrationStatus('done');
     }
   }, [artistId, notificationsEnabled]);
 
@@ -295,7 +337,9 @@ export function useProfileNotificationsController({
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,
+    hasStoredContacts,
     hasActiveSubscriptions,
+    hydrationStatus,
     isNotificationMenuOpen,
     isSubscribed,
     menuTriggerRef,
