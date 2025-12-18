@@ -101,7 +101,8 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
 
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',
-  'phone',
+  'sms',
+  'push',
 ]);
 
 export const audienceMemberTypeEnum = pgEnum('audience_member_type', [

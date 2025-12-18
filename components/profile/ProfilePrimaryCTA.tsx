@@ -29,7 +29,7 @@ export function ProfilePrimaryCTA({
     useProfileNotifications();
 
   const hasSubscriptions = Boolean(
-    subscribedChannels.email || subscribedChannels.phone
+    subscribedChannels.email || subscribedChannels.sms
   );
   const isSubscribed = state === 'success' && hasSubscriptions;
 
