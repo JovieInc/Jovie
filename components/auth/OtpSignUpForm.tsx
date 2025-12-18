@@ -78,7 +78,7 @@ function SpotifyIcon({ className }: { className?: string }) {
     <svg
       viewBox='0 0 24 24'
       aria-hidden='true'
-      className={className ?? 'h-5 w-5'}
+      className={className ?? 'h-4 w-4'}
       fill='none'
     >
       <path
@@ -165,7 +165,7 @@ export function OtpSignUpForm() {
   );
 
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] = ['spotify', 'google', 'email'];
+    const base: AuthMethod[] = ['google', 'email', 'spotify'];
     if (!lastAuthMethod) return base;
     return [lastAuthMethod, ...base.filter(m => m !== lastAuthMethod)];
   }, [lastAuthMethod]);
@@ -174,15 +174,18 @@ export function OtpSignUpForm() {
     method: AuthMethod,
     isPrimary: boolean
   ): JSX.Element => {
+    const isGooglePrimary = method === 'google' && isPrimary;
     const className = isPrimary
-      ? submitButtonClassName
+      ? isGooglePrimary
+        ? authButtonVariants({ variant: 'oauthPrimary' })
+        : authButtonVariants({ variant: 'primaryLight' })
       : secondaryButtonClassName;
 
     if (method === 'email') {
       return (
         <div>
           <AuthButton
-            variant={isPrimary ? 'primary' : 'secondary'}
+            variant={isPrimary ? 'primaryLight' : 'secondary'}
             onClick={() => {
               setLastUsedAuthMethod('email');
               setIsEmailOpen(true);
@@ -252,7 +255,7 @@ export function OtpSignUpForm() {
   return (
     <SignUp.Root routing='path' path='/signup'>
       <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-6 p-0'>
+        <CardContent className='space-y-3 p-0'>
           {/* Fixed height container to prevent layout shift when error appears */}
           <div className='min-h-[24px]' role='alert' aria-live='polite'>
             <Clerk.GlobalError className='text-sm text-destructive text-center' />
@@ -298,10 +301,10 @@ export function OtpSignUpForm() {
                   </AuthButton>
                 </>
               ) : (
-                <div className='pt-4 space-y-3'>
+                <div className='pt-6 space-y-3'>
                   {renderMethodButton(orderedMethods[0], true)}
                   {orderedMethods.length > 1 ? (
-                    <div className='mt-6 space-y-3'>
+                    <div className='mt-8 space-y-3'>
                       {orderedMethods.slice(1).map(method => (
                         <div key={method}>
                           {renderMethodButton(method, false)}

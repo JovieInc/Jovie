@@ -25,7 +25,7 @@ const LINK_FOCUS_CLASSES =
 export function AuthLayout({
   children,
   formTitle,
-  formTitleClassName = 'text-lg font-medium text-[rgb(227,228,230)] mb-4',
+  formTitleClassName = 'text-[18px] leading-6 font-medium text-[rgb(227,228,230)] mb-4 text-center',
   footerPrompt = "Don't have access?",
   footerLinkText = 'Join the waitlist',
   footerLinkHref = '/waitlist',
@@ -86,7 +86,7 @@ export function AuthLayout({
   );
 
   return (
-    <div className='min-h-screen flex flex-col items-center bg-[#0e0f10] px-4 pt-[18vh] sm:pt-[20vh] lg:pt-[22vh] pb-24'>
+    <div className="min-h-screen flex flex-col items-center bg-[#0e0f10] px-4 pt-[15vh] sm:pt-[17vh] lg:pt-[19vh] pb-24 relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06)_0%,rgba(14,15,16,0)_60%)] before:pointer-events-none after:content-[''] after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_center,rgba(0,0,0,0)_0%,rgba(0,0,0,0.6)_75%)] after:pointer-events-none">
       {/* Skip to main content link for keyboard users */}
       {showSkipLink && (
         <Link
@@ -98,7 +98,7 @@ export function AuthLayout({
       )}
 
       {/* Logo */}
-      <div className='mb-6 h-12 w-12 flex items-center justify-center'>
+      <div className='mb-4 h-11 w-11 flex items-center justify-center'>
         {showLogo ? (
           <Link
             href='/'
@@ -109,7 +109,12 @@ export function AuthLayout({
               className={shouldSpinLogo ? 'logo-spin-trigger' : undefined}
               style={logoStyle}
             >
-              <BrandLogo size={48} tone='white' priority />
+              <BrandLogo
+                size={44}
+                tone='white'
+                priority
+                className='opacity-[0.89]'
+              />
             </span>
           </Link>
         ) : (
@@ -121,13 +126,17 @@ export function AuthLayout({
       {showFormTitle && <h1 className={formTitleClassName}>{formTitle}</h1>}
 
       {/* Form content */}
-      <main id='auth-form' className='w-full max-w-[18rem]' role='main'>
+      <main
+        id='auth-form'
+        className='w-full max-w-[20rem] relative z-10'
+        role='main'
+      >
         {children}
       </main>
 
       {/* Footer */}
       {showFooterPrompt && (
-        <p className='mt-10 text-sm text-[#6b6f76]'>
+        <p className='mt-8 text-sm text-[#6b6f76] text-center relative z-10'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}

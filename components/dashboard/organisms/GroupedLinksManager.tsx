@@ -18,7 +18,6 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
@@ -278,10 +277,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     );
     const otherSectionHas = otherSection
       ? links.some(
-        l =>
-          l.platform.id === enriched.platform.id &&
-          sectionOf(l) === otherSection
-      )
+          l =>
+            l.platform.id === enriched.platform.id &&
+            sectionOf(l) === otherSection
+        )
       : false;
 
     const canonicalId = canonicalIdentity({
@@ -716,84 +715,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     []
   );
 
-  const formatSuggestionIdentity = useCallback(
-    (
-      link: Pick<DetectedLink, 'platform' | 'normalizedUrl' | 'originalUrl'>
-    ) => {
-      const normalizedUrl = link.normalizedUrl || link.originalUrl || '';
-      if (!normalizedUrl) return '';
-
-      const canonical = canonicalIdentity({
-        platform: link.platform,
-        normalizedUrl,
-      });
-      const [platformId, ...identityParts] = canonical.split(':');
-      const primaryIdentity = identityParts[0];
-      const secondaryIdentity = identityParts[1];
-
-      const identityFromCanonical = (() => {
-        const handlePlatforms = [
-          'instagram',
-          'twitter',
-          'tiktok',
-          'facebook',
-          'twitch',
-          'linkedin',
-          'soundcloud',
-          'bandcamp',
-          'linktree',
-        ];
-
-        if (handlePlatforms.includes(platformId) && primaryIdentity) {
-          return `@${primaryIdentity}`;
-        }
-
-        if (platformId === 'youtube') {
-          if (primaryIdentity === 'channel' && secondaryIdentity) {
-            return `channel/${secondaryIdentity}`;
-          }
-          if (primaryIdentity === 'user' && secondaryIdentity) {
-            return `user/${secondaryIdentity}`;
-          }
-          if (primaryIdentity === 'legacy' && secondaryIdentity) {
-            return secondaryIdentity;
-          }
-          if (primaryIdentity) {
-            return `@${primaryIdentity}`;
-          }
-        }
-
-        if (primaryIdentity) {
-          return primaryIdentity.replace(/^@/, '');
-        }
-
-        return null;
-      })();
-
-      if (identityFromCanonical) {
-        return identityFromCanonical;
-      }
-
-      try {
-        const url = new URL(normalizedUrl);
-        const host = url.hostname.replace(/^www\./, '');
-        const pathSegments = url.pathname.split('/').filter(Boolean);
-        const firstSegment = pathSegments[0];
-        if (firstSegment) {
-          const cleaned = firstSegment.replace(/^@/, '');
-          if (/^[A-Za-z0-9._-]+$/.test(cleaned) && !cleaned.includes('.')) {
-            return `@${cleaned}`;
-          }
-          return cleaned;
-        }
-        return host;
-      } catch {
-        return '';
-      }
-    },
-    []
-  );
-
   return (
     <section
       className={cn('space-y-2', className)}
@@ -870,7 +791,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             creatorName={creatorName}
             prefillUrl={prefillUrl}
             onPrefillConsumed={() => setPrefillUrl(undefined)}
-            onQueryChange={() => { }}
+            onQueryChange={() => {}}
             onPreviewChange={(link, isDuplicate) => {
               if (!link || isDuplicate) {
                 setPendingPreview(null);
@@ -1018,7 +939,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                         })}
 
                         {pendingPreview &&
-                          sectionOf(pendingPreview.link as T) === section ? (
+                        sectionOf(pendingPreview.link as T) === section ? (
                           <LinkPill
                             platformIcon={pendingPreview.link.platform.icon}
                             platformName={pendingPreview.link.platform.name}
@@ -1065,7 +986,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                             state='loading'
                             menuId={`loading-${section}`}
                             isMenuOpen={false}
-                            onMenuOpenChange={() => { }}
+                            onMenuOpenChange={() => {}}
                             menuItems={[]}
                           />
                         )}

@@ -14,7 +14,7 @@ interface AuthInputProps {
 }
 
 const authInputClasses =
-  'border-0 bg-[#23252a] text-white placeholder:text-[#6b6f76] focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 rounded-md';
+  'border border-white/10 bg-[#15161a] text-white placeholder:text-[#6b6f76] focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 rounded-lg';
 
 const variantClasses = {
   default: '',

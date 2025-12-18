@@ -2,7 +2,7 @@ import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export function WaitlistSkeleton() {
   return (
-    <div className='min-h-screen flex flex-col items-center bg-[#0f0f11] px-4 pt-[18vh] sm:pt-[20vh] pb-24'>
+    <div className='min-h-screen flex flex-col items-center bg-[#0e0f10] px-4 pt-[18vh] sm:pt-[20vh] pb-24'>
       {/* Logo */}
       <div className='mb-6 h-12 w-12' aria-hidden='true' />
 
