@@ -149,6 +149,19 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
+export const providerLinkQualityEnum = pgEnum('provider_link_quality', [
+  'canonical_api',
+  'partner_feed',
+  'manual_override',
+  'derived_search',
+]);
+
+export const smartLinkTargetKindEnum = pgEnum('smart_link_target_kind', [
+  'track',
+  'release',
+  'profile',
+]);
+
 // Tables
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -161,6 +174,15 @@ export const users = pgTable('users', {
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   billingUpdatedAt: timestamp('billing_updated_at'),
   deletedAt: timestamp('deleted_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const providers = pgTable('providers', {
+  key: text('key').primaryKey(),
+  displayName: text('display_name').notNull(),
+  category: text('category').notNull(),
+  isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -232,6 +254,87 @@ export const creatorProfiles = pgTable(
       ),
   })
 );
+
+export const discogReleases = pgTable('discog_releases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  spotifyReleaseId: text('spotify_release_id').notNull(),
+  title: text('title').notNull(),
+  releaseDate: timestamp('release_date'),
+  upc: text('upc'),
+  spotifyUrl: text('spotify_url'),
+  imageUrl: text('image_url'),
+  rawData: jsonb('raw_data').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const discogTracks = pgTable('discog_tracks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  releaseId: uuid('release_id')
+    .notNull()
+    .references(() => discogReleases.id, { onDelete: 'cascade' }),
+  spotifyTrackId: text('spotify_track_id').notNull(),
+  title: text('title').notNull(),
+  isrc: text('isrc'),
+  trackNumber: integer('track_number'),
+  discNumber: integer('disc_number'),
+  durationMs: integer('duration_ms'),
+  spotifyUrl: text('spotify_url'),
+  previewUrl: text('preview_url'),
+  rawData: jsonb('raw_data').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const providerLinks = pgTable('provider_links', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  providerKey: text('provider_key')
+    .notNull()
+    .references(() => providers.key, { onDelete: 'cascade' }),
+  releaseId: uuid('release_id').references(() => discogReleases.id, {
+    onDelete: 'cascade',
+  }),
+  trackId: uuid('track_id').references(() => discogTracks.id, {
+    onDelete: 'cascade',
+  }),
+  url: text('url').notNull(),
+  quality: providerLinkQualityEnum('quality').notNull(),
+  discoveredFrom: text('discovered_from'),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const smartLinkTargets = pgTable('smart_link_targets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorProfileId: uuid('creator_profile_id')
+    .notNull()
+    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+  code: text('code').notNull(),
+  kind: smartLinkTargetKindEnum('kind').notNull(),
+  releaseId: uuid('release_id').references(() => discogReleases.id, {
+    onDelete: 'set null',
+  }),
+  trackId: uuid('track_id').references(() => discogTracks.id, {
+    onDelete: 'set null',
+  }),
+  defaultProviderKey: text('default_provider_key').references(
+    () => providers.key,
+    { onDelete: 'set null' }
+  ),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
 
 export const socialLinks = pgTable('social_links', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -514,6 +617,9 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   primaryGoal: text('primary_goal'),
   selectedPlan: text('selected_plan'), // free|pro|growth|branding - quietly tracks pricing tier interest
   status: waitlistStatusEnum('status').default('new').notNull(),
+  inviteTokenHash: text('invite_token_hash'),
+  inviteTokenExpiresAt: timestamp('invite_token_expires_at'),
+  invitedAt: timestamp('invited_at'),
   primarySocialFollowerCount: integer('primary_social_follower_count'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
