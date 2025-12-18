@@ -4,6 +4,7 @@ import {
   createContext,
   type ReactNode,
   useCallback,
+  useContext,
   useMemo,
   useState,
 } from 'react';
@@ -20,6 +21,16 @@ type DashboardOverviewControlsValue = {
 
 const DashboardOverviewControlsContext =
   createContext<DashboardOverviewControlsValue | null>(null);
+
+export function useDashboardOverviewControls(): DashboardOverviewControlsValue {
+  const value = useContext(DashboardOverviewControlsContext);
+  if (!value) {
+    throw new Error(
+      'useDashboardOverviewControls must be used within DashboardOverviewControlsProvider'
+    );
+  }
+  return value;
+}
 
 export interface DashboardOverviewControlsProviderProps {
   children: ReactNode;

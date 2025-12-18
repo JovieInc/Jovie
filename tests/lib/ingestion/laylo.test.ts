@@ -39,7 +39,16 @@ describe('Laylo strategy', () => {
     expect(result.displayName).toBe('MOCHAKK');
     expect(result.avatarUrl).toBe(user.imageUrl);
 
-    const layloLink = result.links.find(link => link.url.includes('laylo.com'));
+    const layloLink = result.links.find(link => {
+      try {
+        const hostname = new URL(link.url).hostname
+          .replace(/\.$/, '')
+          .toLowerCase();
+        return hostname === 'laylo.com' || hostname.endsWith('.laylo.com');
+      } catch {
+        return false;
+      }
+    });
     expect(layloLink?.sourcePlatform).toBe('laylo');
 
     const socials = result.links.filter(

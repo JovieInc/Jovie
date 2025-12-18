@@ -20,6 +20,26 @@ import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
+const INGESTABLE_HOSTS = [
+  'youtube.com',
+  'youtu.be',
+  'linktr.ee',
+  'laylo.com',
+  'beacons.ai',
+] as const;
+
+function isIngestableUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/\.$/, '').toLowerCase();
+    return INGESTABLE_HOSTS.some(
+      host => hostname === host || hostname.endsWith(`.${host}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 type ProfileUpdatePayload = {
   username?: string;
   displayName?: string;
@@ -580,10 +600,10 @@ export function EnhancedDashboardLinks({
             | undefined;
           const category: PlatformType =
             rawCategory === 'dsp' ||
-            rawCategory === 'social' ||
-            rawCategory === 'earnings' ||
-            rawCategory === 'websites' ||
-            rawCategory === 'custom'
+              rawCategory === 'social' ||
+              rawCategory === 'earnings' ||
+              rawCategory === 'websites' ||
+              rawCategory === 'custom'
               ? rawCategory
               : 'custom';
 
@@ -657,14 +677,7 @@ export function EnhancedDashboardLinks({
 
           if (suggestionsEnabled) {
             const hasIngestableLink = normalized.some(item => {
-              const url = item.normalizedUrl.toLowerCase();
-              return (
-                url.includes('youtube.com') ||
-                url.includes('youtu.be') ||
-                url.includes('linktr.ee') ||
-                url.includes('laylo.com') ||
-                url.includes('beacons.ai')
-              );
+              return isIngestableUrl(item.normalizedUrl);
             });
 
             if (hasIngestableLink) {

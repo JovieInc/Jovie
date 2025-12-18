@@ -6,7 +6,14 @@ import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLi
 // Mock platform detection
 vi.mock('@/lib/utils/platform-detection', () => ({
   detectPlatform: (url: string) => {
-    if (url.includes('spotify.com')) {
+    let hostname: string | null = null;
+    try {
+      hostname = new URL(url).hostname.replace(/\.$/, '').toLowerCase();
+    } catch {
+      hostname = null;
+    }
+
+    if (hostname === 'spotify.com' || hostname?.endsWith('.spotify.com')) {
       return {
         platform: {
           id: 'spotify',
@@ -19,7 +26,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
         isValid: true,
       };
     }
-    if (url.includes('instagram.com')) {
+    if (hostname === 'instagram.com' || hostname?.endsWith('.instagram.com')) {
       return {
         platform: {
           id: 'instagram',

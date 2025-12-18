@@ -795,8 +795,24 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
     .where(eq(creatorProfiles.id, profile.id));
 
   try {
+    const validatedSourceUrl = validateLayloUrl(parsed.sourceUrl);
+    if (!validatedSourceUrl) {
+      throw new Error('Invalid Laylo source URL for ingestion job');
+    }
+
+    const layloHandle = validatedSourceUrl
+      .replace(/^https?:\/\/(?:www\.)?laylo\.com\//i, '')
+      .replace(/^@/, '')
+      .split(/[/?#]/)[0]
+      .trim()
+      .toLowerCase();
+
+    if (!layloHandle) {
+      throw new Error('Missing Laylo handle for ingestion job');
+    }
+
     const { profile: layloProfile, user } = await fetchLayloProfile(
-      profile.usernameNormalized ?? ''
+      layloHandle
     );
     const extraction = extractLaylo(layloProfile, user);
     const result = await normalizeAndMergeExtraction(tx, profile, extraction);
