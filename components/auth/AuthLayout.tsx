@@ -113,7 +113,7 @@ export function AuthLayout({
                 size={44}
                 tone='white'
                 priority
-                className='opacity-[0.89]'
+                style={{ filter: 'brightness(0.89)' }}
               />
             </span>
           </Link>

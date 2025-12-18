@@ -46,7 +46,8 @@ export function AuthBranding({
             <BrandLogo
               size={64}
               tone='white'
-              className='mx-auto opacity-[0.89]'
+              className='mx-auto'
+              style={{ filter: 'brightness(0.89)' }}
             />
           </div>
           {showText && (
