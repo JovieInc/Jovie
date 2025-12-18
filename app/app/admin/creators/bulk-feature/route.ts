@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { bulkSetCreatorsFeaturedAction } from '@/app/admin/actions';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export const runtime = 'nodejs';
 
@@ -63,6 +64,19 @@ export async function POST(request: NextRequest) {
   const wantsJson =
     (request.headers.get('accept') ?? '').includes('application/json') ||
     (request.headers.get('content-type') ?? '').includes('application/json');
+
+  // Check admin authorization
+  const entitlements = await getCurrentUserEntitlements();
+  if (!entitlements.isAdmin) {
+    if (wantsJson) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - admin access required' },
+        { status: 403 }
+      );
+    }
+    const redirectUrl = new URL('/app/dashboard/overview', request.url);
+    return NextResponse.redirect(redirectUrl);
+  }
 
   try {
     const { profileIds, nextFeatured } = await parseRequestPayload(request);
