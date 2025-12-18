@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -89,6 +89,25 @@ export async function toggleCreatorVerifiedAction(
   await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath('/app/admin');
   revalidatePath('/app/admin/creators');
+}
+
+export async function approveWaitlistEntryAction(
+  formData: FormData
+): Promise<void> {
+  await requireAdmin();
+
+  const entryId = formData.get('entryId');
+  if (typeof entryId !== 'string' || entryId.length === 0) {
+    throw new Error('entryId is required');
+  }
+
+  await db
+    .update(waitlistEntries)
+    .set({ status: 'invited', updatedAt: new Date() })
+    .where(eq(waitlistEntries.id, entryId));
+
+  revalidatePath('/app/admin');
+  revalidatePath('/app/admin/waitlist');
 }
 
 export async function bulkRerunCreatorIngestionAction(
