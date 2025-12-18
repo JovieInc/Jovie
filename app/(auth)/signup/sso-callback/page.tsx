@@ -26,7 +26,7 @@ export default function SignUpSsoCallbackPage() {
 
   return (
     <SignUp.Root routing='path' path='/signup'>
-      <SignUp.Step name='sso-callback'>
+      <SignUp.Step name='continue'>
         <SignUp.Captcha />
       </SignUp.Step>
     </SignUp.Root>

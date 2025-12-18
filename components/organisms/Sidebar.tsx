@@ -16,11 +16,12 @@ import { Divider } from '@/components/atoms/Divider';
 import { Input } from '@/components/atoms/Input';
 import { Skeleton } from '@/components/atoms/Skeleton';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
+import { useSidebarCookieState } from '@/hooks/use-sidebar-cookie-state';
 import {
-  useSidebarCookieState,
+  SIDEBAR_KEYBOARD_SHORTCUT,
   useSidebarKeyboardShortcut,
-} from './sidebar-hooks';
+} from '@/hooks/use-sidebar-keyboard-shortcut';
+import { cn } from '@/lib/utils';
 
 type SidebarContext = {
   state: 'open' | 'closed';
@@ -67,7 +68,7 @@ const SidebarProvider = React.forwardRef<
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
       defaultOpen,
-      openProp,
+      open: openProp,
       onOpenChange: setOpenProp,
     });
 
@@ -76,7 +77,7 @@ const SidebarProvider = React.forwardRef<
       return isMobile ? setOpenMobile(open => !open) : setOpen(open => !open);
     }, [isMobile, setOpen, setOpenMobile]);
 
-    useSidebarKeyboardShortcut(toggleSidebar);
+    useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
     const state = open ? 'open' : 'closed';
 
@@ -260,12 +261,14 @@ const SidebarRail = React.forwardRef<
       ref={ref}
       data-sidebar='rail'
       aria-label='Toggle Sidebar'
+      aria-expanded={state === 'open'}
       aria-pressed={state === 'open'}
+      type='button'
       onClick={toggleSidebar}
       title='Toggle Sidebar'
-      type='button'
       className={cn(
         'absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
         'in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize',
         'in-data-[side=left][data-state=closed]:cursor-e-resize in-data-[side=right][data-state=closed]:cursor-w-resize',
         'group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar',
@@ -586,7 +589,7 @@ const SidebarMenuActions = React.forwardRef<
       'peer-data-[size=lg]/menu-button:top-2.5',
       'group-data-[collapsible=icon]:hidden',
       showOnHover &&
-        'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 group-focus-within/menu-item:pointer-events-auto group-hover/menu-item:pointer-events-auto lg:pointer-events-none lg:opacity-0',
+      'group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 group-focus-within/menu-item:pointer-events-auto group-hover/menu-item:pointer-events-auto lg:pointer-events-none lg:opacity-0',
       className
     )}
     {...props}
