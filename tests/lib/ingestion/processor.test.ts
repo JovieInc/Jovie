@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   calculateBackoff,
+  createInMemorySocialLinkRow,
+  deriveLayloHandle,
   determineJobFailure,
+  createInMemorySocialLinkRow,
+  deriveLayloHandle,
 } from '@/lib/ingestion/processor';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 
@@ -115,6 +119,47 @@ describe('Ingestion Processor', () => {
       const generic = determineJobFailure(new Error('Network flake'));
       expect(generic.reason).toBe('transient');
       expect(generic.message).toBe('Network flake');
+    });
+  });
+
+  describe('deriveLayloHandle', () => {
+    it('extracts handle from source URL when available', () => {
+      expect(deriveLayloHandle('https://laylo.com/@test-artist', null)).toBe(
+        'test-artist'
+      );
+    });
+
+    it('falls back to usernameNormalized when URL lacks handle', () => {
+      expect(
+        deriveLayloHandle('https://example.com/not-laylo', 'stored-handle')
+      ).toBe('stored-handle');
+    });
+
+    it('throws when no handle can be derived', () => {
+      expect(() =>
+        deriveLayloHandle('https://example.com/not-laylo', null)
+      ).toThrow('Unable to determine Laylo handle from sourceUrl or profile');
+    });
+  });
+
+  describe('createInMemorySocialLinkRow', () => {
+    it('uses platform category when caching newly inserted links', () => {
+      const row = createInMemorySocialLinkRow({
+        profileId: 'profile-id',
+        platformId: 'instagram',
+        platformCategory: 'social',
+        url: 'https://instagram.com/test',
+        displayText: 'Instagram',
+        sortOrder: 1,
+        isActive: true,
+        state: 'active',
+        confidence: 0.9,
+        sourcePlatform: 'laylo',
+        evidence: { sources: ['laylo'], signals: ['laylo_profile_link'] },
+      });
+
+      expect(row.platformType).toBe('social');
+      expect(row.sourcePlatform).toBe('laylo');
     });
   });
 });
