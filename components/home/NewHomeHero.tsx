@@ -1,8 +1,8 @@
+import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './ClaimHandleForm';
 import { HeroExampleProfiles } from './HeroExampleProfiles';
 import { HeroHandlePreviewChip } from './HeroHandlePreviewChip';
-import { QRCodeCard } from './QRCodeCard';
 
 export function NewHomeHero() {
   return (
@@ -79,7 +79,7 @@ export function NewHomeHero() {
 
               {/* QR code card */}
               <div className='absolute -right-12 bottom-12'>
-                <QRCodeCard handle='yourhandle' />
+                <QRCodeCard data='https://jov.ie/yourhandle' title='Scan to view profile' />
               </div>
             </div>
           </div>

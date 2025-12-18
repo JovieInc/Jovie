@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-// Mock the entire FeaturedArtists module since it's a server component
-vi.mock('@/components/home/FeaturedArtists', () => ({
-  FeaturedArtists: () => {
+// Mock the entire NewFeaturedArtists module since it's a server component
+vi.mock('@/components/home/NewFeaturedArtists', () => ({
+  NewFeaturedArtists: () => {
     const MockFeaturedCreatorsSection = () => (
       <section aria-label='Featured creators' data-testid='featured-creators'>
         <div className='container mx-auto px-4'>
@@ -66,11 +66,11 @@ vi.mock('@/components/home/FeaturedArtists', () => ({
 }));
 
 // Import the component after mocking
-import { FeaturedArtists } from '@/components/home/FeaturedArtists';
+import { NewFeaturedArtists } from '@/components/home/NewFeaturedArtists';
 
 describe('FeaturedCreators Component', () => {
   it('renders featured creators section with correct test ID', () => {
-    const { container } = render(<FeaturedArtists />);
+    const { container } = render(<NewFeaturedArtists />);
 
     const section = container.querySelector(
       '[data-testid="featured-creators"]'
@@ -79,14 +79,14 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('renders with "Featured Creators" heading', () => {
-    render(<FeaturedArtists />);
+    render(<NewFeaturedArtists />);
 
     const heading = screen.getByText('Featured Creators');
     expect(heading).toBeInTheDocument();
   });
 
   it('renders creator links with correct hrefs', () => {
-    render(<FeaturedArtists />);
+    render(<NewFeaturedArtists />);
 
     // More efficient approach - check for at least one link with each expected href
     const expectedHrefs = ['/ladygaga', '/taylorswift', '/dualipa'];
@@ -99,7 +99,7 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('renders creator names', () => {
-    render(<FeaturedArtists />);
+    render(<NewFeaturedArtists />);
 
     expect(screen.getAllByText('Lady Gaga').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Taylor Swift').length).toBeGreaterThan(0);
@@ -107,7 +107,7 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('renders creator images', () => {
-    render(<FeaturedArtists />);
+    render(<NewFeaturedArtists />);
 
     const images = screen.getAllByTestId('creator-image');
     // Should have 6 images total (3 for desktop, 3 for mobile)
@@ -115,7 +115,7 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('has proper accessibility attributes', () => {
-    const { container } = render(<FeaturedArtists />);
+    const { container } = render(<NewFeaturedArtists />);
 
     const section = container.querySelector(
       'section[aria-label="Featured creators"]'
@@ -124,7 +124,7 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('renders both desktop and mobile views', () => {
-    const { container } = render(<FeaturedArtists />);
+    const { container } = render(<NewFeaturedArtists />);
 
     // Check for desktop view (hidden on mobile)
     const desktopView = container.querySelector('.hidden.md\\:block');
@@ -136,7 +136,7 @@ describe('FeaturedCreators Component', () => {
   });
 
   it('has smooth scroll on mobile carousel', () => {
-    const { container } = render(<FeaturedArtists />);
+    const { container } = render(<NewFeaturedArtists />);
 
     const mobileCarousel = container.querySelector(
       '.md\\:hidden.overflow-x-auto'
