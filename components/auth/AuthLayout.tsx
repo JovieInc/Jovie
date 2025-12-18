@@ -109,12 +109,7 @@ export function AuthLayout({
               className={shouldSpinLogo ? 'logo-spin-trigger' : undefined}
               style={logoStyle}
             >
-              <BrandLogo
-                size={44}
-                tone='white'
-                priority
-                style={{ filter: 'brightness(0.89)' }}
-              />
+              <BrandLogo size={44} tone='white' priority />
             </span>
           </Link>
         ) : (
