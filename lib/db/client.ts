@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 // Lazy-initialize the database connection to avoid build-time errors
 let _db: ReturnType<typeof drizzle> | null = null;

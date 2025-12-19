@@ -7,6 +7,7 @@ export * from './BrandingBadge';
 export * from './CookieBannerSection';
 export * from './CookieModal';
 export * from './CTASection';
+export * from './DeferredSection';
 export * from './FeaturedArtistsSection';
 export * from './HeaderNav';
 export * from './HeroSection';

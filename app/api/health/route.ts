@@ -4,7 +4,7 @@ import { count, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 

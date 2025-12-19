@@ -242,7 +242,7 @@ If issues arise:
 
 4. **Continuous improvement:**
    - Set up performance monitoring
-   - Add performance budgets to CI/CD
+   - Add performance budgets to CI/CD (includes `/` route guard)
    - Reject PRs that add slow tests
 
 ## Benefits
