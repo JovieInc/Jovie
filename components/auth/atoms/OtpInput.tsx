@@ -76,29 +76,34 @@ export function OtpInput({
         type='otp'
         autoSubmit={autoSubmit}
         autoFocus={autoFocus}
+        autoComplete='one-time-code'
+        inputMode='numeric'
         length={OTP_LENGTH}
         className='flex justify-center gap-2'
         aria-label={ariaLabel}
         render={({ value, status }) => (
           <div
             className={cn(
-              'flex h-12 w-10 items-center justify-center rounded-md border-2 text-xl font-mono transition-all',
-              'bg-[#23252a] text-white',
+              'flex h-12 w-10 items-center justify-center rounded-lg border text-xl font-sans transition-all',
+              'bg-surface-0 text-primary-token',
               // Status-based styling
               status === 'cursor'
-                ? 'border-white ring-2 ring-white/20'
+                ? 'border-default ring-2 ring-[rgb(var(--focus-ring))]/30'
                 : status === 'selected'
-                  ? 'border-zinc-500'
-                  : 'border-zinc-700',
+                  ? 'border-default'
+                  : 'border-subtle',
               // Focus-visible for keyboard navigation
-              'focus-within:border-white focus-within:ring-2 focus-within:ring-white/20'
+              'focus-within:border-default focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]/30'
             )}
             data-status={status}
             role='presentation'
           >
             {value}
             {status === 'cursor' && (
-              <span className='animate-pulse text-white/60' aria-hidden='true'>
+              <span
+                className='animate-pulse text-secondary-token'
+                aria-hidden='true'
+              >
                 |
               </span>
             )}

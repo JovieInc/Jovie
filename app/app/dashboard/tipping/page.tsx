@@ -8,7 +8,7 @@ export default async function TippingPage() {
 
   // Handle unauthenticated users
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/tipping');
+    redirect('/signin?redirect_url=/app/dashboard/tipping');
   }
 
   try {

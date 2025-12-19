@@ -26,6 +26,15 @@ interface UniversalLinkInputUrlModeProps {
   onPlatformSelect: (platform: (typeof PLATFORM_OPTIONS)[number]) => void;
   onArtistSearchSelect: (provider: ArtistSearchProvider) => void;
   onRestoreFocus: (cursor?: CursorPosition) => void;
+  onFocus?: (event: React.FocusEvent<HTMLInputElement>) => void;
+  onBlur?: (event: React.FocusEvent<HTMLInputElement>) => void;
+  comboboxAria?: {
+    role?: 'combobox';
+    ariaExpanded?: boolean;
+    ariaControls?: string;
+    ariaActivedescendant?: string;
+    ariaAutocomplete?: 'list';
+  };
 }
 
 export function UniversalLinkInputUrlMode({
@@ -40,6 +49,9 @@ export function UniversalLinkInputUrlMode({
   onPlatformSelect,
   onArtistSearchSelect,
   onRestoreFocus,
+  onFocus,
+  onBlur,
+  comboboxAria,
 }: UniversalLinkInputUrlModeProps) {
   const currentPlatformIcon = detectedLink?.platform.icon || 'globe';
   const brandColor = detectedLink?.platform.color
@@ -79,6 +91,8 @@ export function UniversalLinkInputUrlMode({
           value={url}
           onChange={event => onUrlChange(event.target.value)}
           onKeyDown={onKeyDown}
+          onFocus={onFocus}
+          onBlur={onBlur}
           disabled={disabled}
           inputMode='url'
           autoCapitalize='none'
@@ -86,6 +100,11 @@ export function UniversalLinkInputUrlMode({
           autoComplete='off'
           className='border-0 bg-transparent px-0 pr-24 focus-visible:ring-0 focus-visible:ring-offset-0'
           aria-describedby={detectedLink ? 'link-detection-status' : undefined}
+          role={comboboxAria?.role}
+          aria-expanded={comboboxAria?.ariaExpanded}
+          aria-controls={comboboxAria?.ariaControls}
+          aria-activedescendant={comboboxAria?.ariaActivedescendant}
+          aria-autocomplete={comboboxAria?.ariaAutocomplete}
         />
 
         {url && (

@@ -13,7 +13,7 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import {
@@ -68,6 +68,7 @@ export function LinkPill({
   className,
 }: LinkPillProps) {
   const [openInternal, setOpenInternal] = useState(false);
+  const firstItemRef = useRef<HTMLButtonElement | null>(null);
   const open = isMenuOpen ?? openInternal;
 
   const {
@@ -101,6 +102,8 @@ export function LinkPill({
   );
 
   const menuButtonAria = `Open actions for ${platformName}`;
+  const initialFocusTarget =
+    menuItems.length > 0 ? firstItemRef : floatingRefs.floating;
 
   const trailing = (
     <button
@@ -131,9 +134,14 @@ export function LinkPill({
 
       {open ? (
         <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false}>
+          <FloatingFocusManager
+            context={context}
+            modal
+            initialFocus={initialFocusTarget}
+          >
             <div
               ref={setFloatingRef}
+              tabIndex={-1}
               style={floatingStyles}
               className={cn(
                 'z-[100] min-w-[176px]',
@@ -141,10 +149,11 @@ export function LinkPill({
               )}
               {...getFloatingProps()}
             >
-              {menuItems.map(item => (
+              {menuItems.map((item, index) => (
                 <button
                   key={item.id}
                   type='button'
+                  ref={index === 0 ? firstItemRef : undefined}
                   onClick={() => {
                     setOpen(false);
                     item.onSelect();

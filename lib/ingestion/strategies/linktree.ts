@@ -239,16 +239,16 @@ type LinktreePageProps = {
   props?: {
     pageProps?: {
       seo?: { title?: string | null; image?: string | null };
+      links?: unknown;
+      allLinks?: unknown;
       user?: {
         fullName?: string | null;
         profilePicture?: { url?: string | null } | null;
       };
       account?: { displayName?: string | null; profilePicture?: string | null };
-      links?: unknown[];
-      allLinks?: unknown[];
-      page?: { links?: unknown[]; allLinks?: unknown[] };
-      data?: { links?: unknown[] };
-      profile?: { links?: unknown[] };
+      page?: { links?: unknown };
+      data?: { links?: unknown };
+      profile?: { links?: unknown };
       linkData?: unknown;
       dehydratedState?: { queries?: unknown };
     };

@@ -2,23 +2,26 @@
 
 import * as Clerk from '@clerk/elements/common';
 import { Input } from '@jovie/ui';
+import * as React from 'react';
 import { cn } from '@/lib/utils';
 
-interface AuthInputProps {
+type AuthInputVariant = 'default' | 'otp';
+
+interface AuthInputProps
+  extends Omit<
+    React.InputHTMLAttributes<HTMLInputElement>,
+    'type' | 'size' | 'children'
+  > {
   type: 'email' | 'text';
-  inputMode?: 'text' | 'numeric';
-  autoComplete?: string;
-  maxLength?: number;
-  variant?: 'default' | 'otp';
-  placeholder?: string;
+  variant?: AuthInputVariant;
 }
 
 const authInputClasses =
-  'border-0 bg-[#23252a] text-white placeholder:text-[#6b6f76] focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 rounded-md';
+  'border border-subtle bg-surface-0 text-primary-token placeholder:text-tertiary-token rounded-lg focus-ring-themed focus-visible:ring-offset-(--color-bg-base)';
 
-const variantClasses = {
+const variantClasses: Record<AuthInputVariant, string> = {
   default: '',
-  otp: 'text-2xl tracking-[0.3em] text-center font-mono',
+  otp: 'text-2xl tracking-[0.3em] text-center font-sans',
 } as const;
 
 export function AuthInput({
@@ -28,13 +31,30 @@ export function AuthInput({
   maxLength,
   variant = 'default',
   placeholder,
+  autoCapitalize,
+  autoCorrect,
+  spellCheck,
+  name,
+  ...rest
 }: AuthInputProps) {
+  const resolvedAutoCapitalize =
+    autoCapitalize ?? (type === 'email' ? 'none' : undefined);
+  const resolvedAutoCorrect =
+    autoCorrect ?? (type === 'email' ? 'off' : undefined);
+  const resolvedSpellCheck =
+    spellCheck ?? (type === 'email' ? false : undefined);
+
   return (
     <Clerk.Input
       type={type}
       inputMode={inputMode}
       autoComplete={autoComplete}
+      autoCapitalize={resolvedAutoCapitalize}
+      autoCorrect={resolvedAutoCorrect}
+      spellCheck={resolvedSpellCheck}
       maxLength={maxLength}
+      name={name}
+      {...rest}
       asChild
     >
       <Input

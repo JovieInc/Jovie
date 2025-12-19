@@ -166,8 +166,8 @@ export function AnimatedListenInterface({
           className='space-y-3'
         >
           {availableDSPs.length === 0 ? (
-            <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5 text-center'>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl text-center'>
+              <p className='text-sm text-secondary-token'>
                 Streaming links aren&apos;t available for this profile yet.
               </p>
             </div>
@@ -274,7 +274,7 @@ export function AnimatedListenInterface({
         {/* Footer note */}
         <motion.p
           variants={prefersReducedMotion ? undefined : itemVariants}
-          className='text-xs text-gray-500 dark:text-gray-400 text-center mt-6'
+          className='text-xs text-tertiary-token text-center mt-6'
         >
           Tap to open in the app or your browser
         </motion.p>

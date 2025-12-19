@@ -56,7 +56,7 @@ export function SocialProofSection() {
             </div>
           </div>
 
-          <h2 className='text-4xl font-semibold tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
+          <h2 className='text-4xl font-medium tracking-tight text-gray-900 dark:text-white sm:text-5xl lg:text-6xl'>
             Musicians love Jovie
           </h2>
 

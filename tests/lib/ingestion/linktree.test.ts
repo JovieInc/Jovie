@@ -282,7 +282,13 @@ describe('Linktree Strategy', () => {
         'youtube-music',
       ]);
       expect(
-        result.links.some(link => link.url.includes('open.spotify.com'))
+        result.links.some(link => {
+          try {
+            return new URL(link.url).host === 'open.spotify.com';
+          } catch {
+            return false;
+          }
+        })
       ).toBe(true);
       // Internal Linktree URLs should be ignored
       expect(

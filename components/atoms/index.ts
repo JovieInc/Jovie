@@ -11,6 +11,7 @@ export * from './Divider';
 export * from './DropdownMenu';
 export * from './DSPButton';
 export * from './GradientText';
+export * from './HeaderIconButton';
 export * from './HeaderText';
 export * from './Icon';
 export * from './IconBadge';

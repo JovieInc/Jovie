@@ -1,6 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -9,6 +10,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -56,6 +58,29 @@ export const ingestionSourceTypeEnum = pgEnum('ingestion_source_type', [
   'ingested',
 ]);
 
+export const providerKindEnum = pgEnum('provider_kind', [
+  'music_streaming',
+  'video',
+  'social',
+  'retail',
+  'other',
+]);
+
+export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
+  'single',
+  'ep',
+  'album',
+  'compilation',
+  'live',
+  'mixtape',
+  'other',
+]);
+
+export const providerLinkOwnerEnum = pgEnum('provider_link_owner_type', [
+  'release',
+  'track',
+]);
+
 export const socialLinkStateEnum = pgEnum('social_link_state', [
   'active',
   'suggested',
@@ -99,9 +124,17 @@ export const waitlistStatusEnum = pgEnum('waitlist_status', [
   'rejected',
 ]);
 
+export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
+  'pending',
+  'sending',
+  'sent',
+  'failed',
+]);
+
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',
-  'phone',
+  'sms',
+  'push',
 ]);
 
 export const audienceMemberTypeEnum = pgEnum('audience_member_type', [
@@ -175,6 +208,17 @@ export const userSettings = pgTable('user_settings', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const providers = pgTable('providers', {
+  id: text('id').primaryKey(),
+  displayName: text('display_name').notNull(),
+  kind: providerKindEnum('kind').notNull().default('music_streaming'),
+  baseUrl: text('base_url'),
+  isActive: boolean('is_active').notNull().default(true),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 export const creatorProfiles = pgTable(
   'creator_profiles',
   {
@@ -233,6 +277,190 @@ export const creatorProfiles = pgTable(
   })
 );
 
+export const discogReleases = pgTable(
+  'discog_releases',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    releaseType: discogReleaseTypeEnum('release_type')
+      .notNull()
+      .default('single'),
+    releaseDate: timestamp('release_date'),
+    label: text('label'),
+    upc: text('upc'),
+    totalTracks: integer('total_tracks').default(0).notNull(),
+    isExplicit: boolean('is_explicit').default(false).notNull(),
+    artworkUrl: text('artwork_url'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorSlugUnique: uniqueIndex('discog_releases_creator_slug_unique').on(
+      table.creatorProfileId,
+      table.slug
+    ),
+    creatorUpcUnique: uniqueIndex('discog_releases_creator_upc_unique')
+      .on(table.creatorProfileId, table.upc)
+      .where(drizzleSql`upc IS NOT NULL`),
+    releaseDateIndex: index('discog_releases_release_date_idx').on(
+      table.releaseDate
+    ),
+  })
+);
+
+export const discogTracks = pgTable(
+  'discog_tracks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    durationMs: integer('duration_ms'),
+    trackNumber: integer('track_number').notNull(),
+    discNumber: integer('disc_number').default(1).notNull(),
+    isExplicit: boolean('is_explicit').default(false).notNull(),
+    isrc: text('isrc'),
+    previewUrl: text('preview_url'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    releaseTrackPositionUnique: uniqueIndex(
+      'discog_tracks_release_track_position_unique'
+    ).on(table.releaseId, table.discNumber, table.trackNumber),
+    releaseSlugUnique: uniqueIndex('discog_tracks_release_slug_unique').on(
+      table.releaseId,
+      table.slug
+    ),
+    trackIsrcUnique: uniqueIndex('discog_tracks_isrc_unique')
+      .on(table.isrc)
+      .where(drizzleSql`isrc IS NOT NULL`),
+    releaseIndex: index('discog_tracks_release_id_idx').on(table.releaseId),
+    creatorIndex: index('discog_tracks_creator_profile_id_idx').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
+export const providerLinks = pgTable(
+  'provider_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    providerId: text('provider_id')
+      .notNull()
+      .references(() => providers.id, { onDelete: 'restrict' }),
+    ownerType: providerLinkOwnerEnum('owner_type').notNull(),
+    releaseId: uuid('release_id').references(() => discogReleases.id, {
+      onDelete: 'cascade',
+    }),
+    trackId: uuid('track_id').references(() => discogTracks.id, {
+      onDelete: 'cascade',
+    }),
+    externalId: text('external_id'),
+    url: text('url').notNull(),
+    country: text('country'),
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    releaseProviderUnique: uniqueIndex('provider_links_release_provider').on(
+      table.providerId,
+      table.releaseId
+    ),
+    trackProviderUnique: uniqueIndex('provider_links_track_provider').on(
+      table.providerId,
+      table.trackId
+    ),
+    providerExternalUnique: uniqueIndex('provider_links_provider_external')
+      .on(table.providerId, table.externalId)
+      .where(drizzleSql`external_id IS NOT NULL`),
+    releaseIndex: index('provider_links_release_id_idx').on(table.releaseId),
+    trackIndex: index('provider_links_track_id_idx').on(table.trackId),
+    ownerConstraint: check(
+      'provider_links_owner_match',
+      drizzleSql`
+        (owner_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL)
+        OR (owner_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL)
+      `
+    ),
+  })
+);
+
+export const smartLinkTargets = pgTable(
+  'smart_link_targets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    smartLinkSlug: text('smart_link_slug').notNull(),
+    providerId: text('provider_id')
+      .notNull()
+      .references(() => providers.id, { onDelete: 'restrict' }),
+    providerLinkId: uuid('provider_link_id').references(
+      () => providerLinks.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    releaseId: uuid('release_id').references(() => discogReleases.id, {
+      onDelete: 'cascade',
+    }),
+    trackId: uuid('track_id').references(() => discogTracks.id, {
+      onDelete: 'cascade',
+    }),
+    url: text('url').notNull(),
+    isFallback: boolean('is_fallback').default(false).notNull(),
+    priority: integer('priority').default(0).notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    slugProviderUnique: uniqueIndex('smart_link_targets_slug_provider').on(
+      table.creatorProfileId,
+      table.smartLinkSlug,
+      table.providerId
+    ),
+    providerLinkIndex: index('smart_link_targets_provider_link_idx').on(
+      table.providerLinkId
+    ),
+    releaseIndex: index('smart_link_targets_release_id_idx').on(
+      table.releaseId
+    ),
+    trackIndex: index('smart_link_targets_track_id_idx').on(table.trackId),
+    ownerConstraint: check(
+      'smart_link_targets_owner_match',
+      drizzleSql`
+        (release_id IS NOT NULL AND track_id IS NULL)
+        OR (track_id IS NOT NULL AND release_id IS NULL)
+      `
+    ),
+  })
+);
+
 export const socialLinks = pgTable('social_links', {
   id: uuid('id').primaryKey().defaultRandom(),
   creatorProfileId: uuid('creator_profile_id')
@@ -281,81 +509,114 @@ export const socialAccounts = pgTable('social_accounts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const audienceMembers = pgTable('audience_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  type: audienceMemberTypeEnum('type').default('anonymous').notNull(),
-  displayName: text('display_name'),
-  firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
-  lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
-  visits: integer('visits').default(0).notNull(),
-  engagementScore: integer('engagement_score').default(0).notNull(),
-  intentLevel: audienceIntentLevelEnum('intent_level').default('low').notNull(),
-  geoCity: text('geo_city'),
-  geoCountry: text('geo_country'),
-  deviceType: audienceDeviceTypeEnum('device_type')
-    .default('unknown')
-    .notNull(),
-  referrerHistory: jsonb('referrer_history')
-    .$type<Record<string, unknown>[]>()
-    .default([]),
-  latestActions: jsonb('latest_actions')
-    .$type<Record<string, unknown>[]>()
-    .default([]),
-  email: text('email'),
-  phone: text('phone'),
-  spotifyConnected: boolean('spotify_connected').default(false).notNull(),
-  purchaseCount: integer('purchase_count').default(0).notNull(),
-  tags: jsonb('tags').$type<string[]>().default([]),
-  fingerprint: text('fingerprint'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const audienceMembers = pgTable(
+  'audience_members',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    type: audienceMemberTypeEnum('type').default('anonymous').notNull(),
+    displayName: text('display_name'),
+    firstSeenAt: timestamp('first_seen_at').defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    visits: integer('visits').default(0).notNull(),
+    engagementScore: integer('engagement_score').default(0).notNull(),
+    intentLevel: audienceIntentLevelEnum('intent_level')
+      .default('low')
+      .notNull(),
+    geoCity: text('geo_city'),
+    geoCountry: text('geo_country'),
+    deviceType: audienceDeviceTypeEnum('device_type')
+      .default('unknown')
+      .notNull(),
+    referrerHistory: jsonb('referrer_history')
+      .$type<Record<string, unknown>[]>()
+      .default([]),
+    latestActions: jsonb('latest_actions')
+      .$type<Record<string, unknown>[]>()
+      .default([]),
+    email: text('email'),
+    phone: text('phone'),
+    spotifyConnected: boolean('spotify_connected').default(false).notNull(),
+    purchaseCount: integer('purchase_count').default(0).notNull(),
+    tags: jsonb('tags').$type<string[]>().default([]),
+    fingerprint: text('fingerprint'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Composite index for visitor lookup on every profile visit
+    // Query pattern: WHERE creator_profile_id = ? AND fingerprint = ?
+    creatorProfileFingerprintIdx: index(
+      'audience_members_creator_profile_id_fingerprint_idx'
+    ).on(table.creatorProfileId, table.fingerprint),
+  })
+);
 
-export const clickEvents = pgTable('click_events', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  linkId: uuid('link_id').references(() => socialLinks.id, {
-    onDelete: 'set null',
-  }),
-  linkType: linkTypeEnum('link_type').notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  referrer: text('referrer'),
-  country: text('country'),
-  city: text('city'),
-  deviceType: text('device_type'),
-  os: text('os'),
-  browser: text('browser'),
-  isBot: boolean('is_bot').default(false),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-  audienceMemberId: uuid('audience_member_id').references(
-    () => audienceMembers.id,
-    {
+export const clickEvents = pgTable(
+  'click_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    linkId: uuid('link_id').references(() => socialLinks.id, {
       onDelete: 'set null',
-    }
-  ),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+    }),
+    linkType: linkTypeEnum('link_type').notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    referrer: text('referrer'),
+    country: text('country'),
+    city: text('city'),
+    deviceType: text('device_type'),
+    os: text('os'),
+    browser: text('browser'),
+    isBot: boolean('is_bot').default(false),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    audienceMemberId: uuid('audience_member_id').references(
+      () => audienceMembers.id,
+      {
+        onDelete: 'set null',
+      }
+    ),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Composite index for analytics queries filtered by creator and sorted by time
+    // Query pattern: WHERE creator_profile_id = ? ORDER BY created_at DESC
+    creatorProfileCreatedAtIdx: index(
+      'click_events_creator_profile_id_created_at_idx'
+    ).on(table.creatorProfileId, table.createdAt),
+  })
+);
 
-export const notificationSubscriptions = pgTable('notification_subscriptions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  channel: notificationChannelEnum('channel').notNull(),
-  email: text('email'),
-  phone: text('phone'),
-  countryCode: text('country_code'),
-  city: text('city'),
-  ipAddress: text('ip_address'),
-  source: text('source'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const notificationSubscriptions = pgTable(
+  'notification_subscriptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    channel: notificationChannelEnum('channel').notNull(),
+    email: text('email'),
+    phone: text('phone'),
+    countryCode: text('country_code'),
+    city: text('city'),
+    ipAddress: text('ip_address'),
+    source: text('source'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorProfileEmailUnique: uniqueIndex(
+      'notification_subscriptions_creator_profile_id_email_unique'
+    ).on(table.creatorProfileId, table.email),
+    creatorProfilePhoneUnique: uniqueIndex(
+      'notification_subscriptions_creator_profile_id_phone_unique'
+    ).on(table.creatorProfileId, table.phone),
+  })
+);
 
 export const creatorContacts = pgTable('creator_contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -376,21 +637,31 @@ export const creatorContacts = pgTable('creator_contacts', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
-export const tips = pgTable('tips', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  amountCents: integer('amount_cents').notNull(),
-  currency: currencyCodeEnum('currency').notNull().default('USD'),
-  paymentIntentId: text('payment_intent_id').notNull().unique(),
-  contactEmail: text('contact_email'),
-  contactPhone: text('contact_phone'),
-  message: text('message'),
-  isAnonymous: boolean('is_anonymous').default(false),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+export const tips = pgTable(
+  'tips',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    amountCents: integer('amount_cents').notNull(),
+    currency: currencyCodeEnum('currency').notNull().default('USD'),
+    paymentIntentId: text('payment_intent_id').notNull().unique(),
+    contactEmail: text('contact_email'),
+    contactPhone: text('contact_phone'),
+    message: text('message'),
+    isAnonymous: boolean('is_anonymous').default(false),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Index for payment tracking queries filtered by creator
+    // Query pattern: WHERE creator_profile_id = ?
+    creatorProfileIdx: index('tips_creator_profile_id_idx').on(
+      table.creatorProfileId
+    ),
+  })
+);
 
 export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -519,13 +790,57 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export const waitlistInvites = pgTable(
+  'waitlist_invites',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    waitlistEntryId: uuid('waitlist_entry_id')
+      .notNull()
+      .references(() => waitlistEntries.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    fullName: text('full_name').notNull(),
+    claimToken: text('claim_token').notNull(),
+    status: waitlistInviteStatusEnum('status').default('pending').notNull(),
+    error: text('error'),
+    attempts: integer('attempts').default(0).notNull(),
+    maxAttempts: integer('max_attempts').default(3).notNull(),
+    runAt: timestamp('run_at').defaultNow().notNull(),
+    sentAt: timestamp('sent_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    waitlistEntryIdUnique: uniqueIndex('idx_waitlist_invites_entry_id').on(
+      table.waitlistEntryId
+    ),
+  })
+);
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 
+export const insertProviderSchema = createInsertSchema(providers);
+export const selectProviderSchema = createSelectSchema(providers);
+
 export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
 
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
+
+export const insertDiscogReleaseSchema = createInsertSchema(discogReleases);
+export const selectDiscogReleaseSchema = createSelectSchema(discogReleases);
+
+export const insertDiscogTrackSchema = createInsertSchema(discogTracks);
+export const selectDiscogTrackSchema = createSelectSchema(discogTracks);
+
+export const insertProviderLinkSchema = createInsertSchema(providerLinks);
+export const selectProviderLinkSchema = createSelectSchema(providerLinks);
+
+export const insertSmartLinkTargetSchema = createInsertSchema(smartLinkTargets);
+export const selectSmartLinkTargetSchema = createSelectSchema(smartLinkTargets);
 
 export const insertSocialLinkSchema = createInsertSchema(socialLinks);
 export const selectSocialLinkSchema = createSelectSchema(socialLinks);
@@ -577,12 +892,30 @@ export const selectScraperConfigSchema = createSelectSchema(scraperConfigs);
 export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
 export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
 
+export const insertWaitlistInviteSchema = createInsertSchema(waitlistInvites);
+export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
+export type Provider = typeof providers.$inferSelect;
+export type NewProvider = typeof providers.$inferInsert;
+
 export type CreatorProfile = typeof creatorProfiles.$inferSelect;
 export type NewCreatorProfile = typeof creatorProfiles.$inferInsert;
+
+export type DiscogRelease = typeof discogReleases.$inferSelect;
+export type NewDiscogRelease = typeof discogReleases.$inferInsert;
+
+export type DiscogTrack = typeof discogTracks.$inferSelect;
+export type NewDiscogTrack = typeof discogTracks.$inferInsert;
+
+export type ProviderLink = typeof providerLinks.$inferSelect;
+export type NewProviderLink = typeof providerLinks.$inferInsert;
+
+export type SmartLinkTarget = typeof smartLinkTargets.$inferSelect;
+export type NewSmartLinkTarget = typeof smartLinkTargets.$inferInsert;
 
 export type SocialLink = typeof socialLinks.$inferSelect;
 export type NewSocialLink = typeof socialLinks.$inferInsert;
@@ -627,3 +960,6 @@ export type NewScraperConfig = typeof scraperConfigs.$inferInsert;
 
 export type WaitlistEntry = typeof waitlistEntries.$inferSelect;
 export type NewWaitlistEntry = typeof waitlistEntries.$inferInsert;
+
+export type WaitlistInvite = typeof waitlistInvites.$inferSelect;
+export type NewWaitlistInvite = typeof waitlistInvites.$inferInsert;

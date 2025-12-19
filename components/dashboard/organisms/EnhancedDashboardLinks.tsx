@@ -10,14 +10,20 @@ import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
-import { getSocialPlatformLabel, type SocialPlatform } from '@/types';
+import {
+  getSocialPlatformLabel,
+  type SaveStatus,
+  type SocialPlatform,
+} from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 type ProfileUpdatePayload = {
@@ -93,6 +99,7 @@ function getPlatformCategory(platform: string): PlatformType {
   const socialPlatforms = new Set([
     'instagram',
     'twitter',
+    'snapchat',
     'tiktok',
     'youtube',
     'facebook',
@@ -143,13 +150,6 @@ interface SuggestedLink extends DetectedLink {
   evidence?: { sources?: string[]; signals?: string[] } | null;
 }
 
-interface SaveStatus {
-  saving: boolean;
-  success: boolean | null;
-  error: string | null;
-  lastSaved: Date | null;
-}
-
 function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
   if (a === b) return true;
   if (a.length !== b.length) return false;
@@ -165,6 +165,26 @@ function areLinkItemsEqual(a: LinkItem[], b: LinkItem[]): boolean {
     if (left.platform.id !== right.platform.id) return false;
   }
   return true;
+}
+
+function areSuggestionListsEqual(
+  a: SuggestedLink[],
+  b: SuggestedLink[]
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+
+  const serialize = (list: SuggestedLink[]) =>
+    list
+      .map(
+        item =>
+          `${item.suggestionId ?? item.normalizedUrl}:${item.platform.id}:${item.normalizedUrl}`
+      )
+      .sort();
+
+  const aSig = serialize(a);
+  const bSig = serialize(b);
+  return aSig.every((value, index) => value === bSig[index]);
 }
 
 export function EnhancedDashboardLinks({
@@ -219,10 +239,11 @@ export function EnhancedDashboardLinks({
     };
   }, [profileSaveStatus.success]);
 
+  useProfileSaveToasts(profileSaveStatus);
+
   const [autoRefreshUntilMs, setAutoRefreshUntilMs] = useState<number | null>(
     null
   );
-
   useEffect(() => {
     if (!dashboardData.selectedProfile) {
       setArtist(null);
@@ -572,6 +593,8 @@ export function EnhancedDashboardLinks({
     linksRef.current = links;
   }, [links]);
 
+  const suggestionSyncAbortRef = useRef<AbortController | null>(null);
+
   const [suggestedLinks, setSuggestedLinks] = useState<SuggestedLink[]>(() =>
     convertDbLinksToSuggestions(suggestionInitialLinks || [])
   );
@@ -587,27 +610,79 @@ export function EnhancedDashboardLinks({
     );
   }, [convertDbLinksToSuggestions, suggestionInitialLinks]);
 
-  useEffect(() => {
-    if (!autoRefreshUntilMs) return;
+  const syncSuggestionsFromServer = useCallback(async () => {
+    if (!profileId || !suggestionsEnabled) return;
 
-    const intervalMs = 2000;
-    const intervalId = window.setInterval(() => {
-      if (!autoRefreshUntilMs) {
-        window.clearInterval(intervalId);
+    suggestionSyncAbortRef.current?.abort();
+    const controller = new AbortController();
+    suggestionSyncAbortRef.current = controller;
+
+    try {
+      const response = await fetch(
+        `/api/dashboard/social-links?profileId=${profileId}`,
+        { cache: 'no-store', signal: controller.signal }
+      );
+      if (!response.ok) return;
+
+      const data = (await response.json().catch(() => null)) as {
+        links?: ProfileSocialLink[];
+      } | null;
+
+      if (!data?.links) return;
+      const nextSuggestions = convertDbLinksToSuggestions(
+        data.links.filter(link => link.state === 'suggested')
+      );
+      setSuggestedLinks(prev =>
+        areSuggestionListsEqual(prev, nextSuggestions) ? prev : nextSuggestions
+      );
+    } catch (error) {
+      if ((error as Error).name === 'AbortError') return;
+      console.error('Failed to refresh suggestions', error);
+    } finally {
+      suggestionSyncAbortRef.current = null;
+    }
+  }, [convertDbLinksToSuggestions, profileId, suggestionsEnabled]);
+
+  const pollIntervalMs = useMemo(
+    () => (autoRefreshUntilMs ? 2000 : 4500),
+    [autoRefreshUntilMs]
+  );
+
+  useEffect(() => {
+    if (!profileId || !suggestionsEnabled) return;
+
+    let mounted = true;
+
+    const tick = async () => {
+      if (!mounted) return;
+      if (
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'hidden'
+      )
         return;
-      }
-      if (Date.now() >= autoRefreshUntilMs) {
+      await syncSuggestionsFromServer();
+      if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
         setAutoRefreshUntilMs(null);
-        window.clearInterval(intervalId);
-        return;
       }
-      router.refresh();
-    }, intervalMs);
+    };
+
+    void tick();
+    const intervalId = window.setInterval(() => {
+      void tick();
+    }, pollIntervalMs);
 
     return () => {
+      mounted = false;
       window.clearInterval(intervalId);
+      suggestionSyncAbortRef.current?.abort();
     };
-  }, [autoRefreshUntilMs, router]);
+  }, [
+    autoRefreshUntilMs,
+    pollIntervalMs,
+    profileId,
+    suggestionsEnabled,
+    syncSuggestionsFromServer,
+  ]);
 
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);
@@ -691,7 +766,7 @@ export function EnhancedDashboardLinks({
 
           if (hasIngestableLink) {
             setAutoRefreshUntilMs(Date.now() + 20000);
-            router.refresh();
+            void syncSuggestionsFromServer();
           }
         }
 
@@ -706,7 +781,7 @@ export function EnhancedDashboardLinks({
         toast.error(message || 'Failed to save links. Please try again.');
       }
     },
-    [profileId, router, suggestionsEnabled]
+    [profileId, suggestionsEnabled, syncSuggestionsFromServer]
   );
 
   const enqueueSave = useCallback(
@@ -894,6 +969,10 @@ export function EnhancedDashboardLinks({
         return;
       }
 
+      if (!suggestion.suggestionId) {
+        return;
+      }
+
       try {
         const response = await fetch('/api/dashboard/social-links', {
           method: 'PATCH',
@@ -927,8 +1006,12 @@ export function EnhancedDashboardLinks({
   );
 
   // Get username/handle and avatar for preview
-  const username = artist?.handle || 'username';
-  const displayName = artist?.name || username;
+  const { username, displayName, profilePath } = getProfileIdentity({
+    profileUsername,
+    profileDisplayName,
+    artistHandle: artist?.handle,
+    artistName: artist?.name,
+  });
   const avatarUrl = artist?.image_url || null;
 
   // Convert links to the format expected by EnhancedDashboardLayout
@@ -972,9 +1055,6 @@ export function EnhancedDashboardLinks({
     [links]
   );
 
-  // Prepare links for the phone preview component
-  const profilePath = `/${artist?.handle || 'username'}`;
-
   // Preview panel integration - sync data to context
   const { setPreviewData } = usePreviewPanel();
 
@@ -988,12 +1068,12 @@ export function EnhancedDashboardLinks({
       profilePath,
     });
   }, [
-    username,
-    displayName,
     avatarUrl,
     dashboardLinks,
+    displayName,
     profilePath,
     setPreviewData,
+    username,
   ]);
 
   return (
@@ -1003,23 +1083,10 @@ export function EnhancedDashboardLinks({
         {profileId && artist && (
           <div className='mx-auto w-full max-w-2xl'>
             <div className='flex flex-col items-center gap-3'>
-              {profileSaveStatus.saving || profileSaveStatus.success ? (
-                <div
-                  className='rounded-full border border-subtle bg-surface-2 px-2.5 py-1 text-[11px] font-medium text-secondary-token/80'
-                  aria-live='polite'
-                >
-                  {profileSaveStatus.saving
-                    ? 'Saving…'
-                    : profileSaveStatus.success
-                      ? 'Saved'
-                      : null}
-                </div>
-              ) : null}
-
               <AvatarUploadable
                 src={avatarUrl}
-                alt={`Avatar for @${artist.handle}`}
-                name={artist.name}
+                alt={`Avatar for @${username}`}
+                name={displayName}
                 size='display-lg'
                 uploadable
                 onUpload={handleAvatarUpload}
@@ -1158,6 +1225,7 @@ export function EnhancedDashboardLinks({
             suggestionsEnabled ? handleDismissSuggestion : undefined
           }
           suggestionsEnabled={suggestionsEnabled}
+          profileId={profileId}
         />
       </div>
     </div>
