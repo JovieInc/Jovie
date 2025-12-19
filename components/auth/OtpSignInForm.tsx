@@ -142,7 +142,10 @@ export function OtpSignInForm() {
   const orderedMethods = useMemo((): AuthMethod[] => {
     const base: AuthMethod[] = ['google', 'email', 'spotify'];
     if (!lastAuthMethod) return base;
-    return [lastAuthMethod, ...base.filter(m => m !== lastAuthMethod)];
+    return [
+      lastAuthMethod,
+      ...base.filter(method => method !== lastAuthMethod),
+    ];
   }, [lastAuthMethod]);
 
   const renderMethodButton = (
@@ -252,6 +255,10 @@ export function OtpSignInForm() {
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 
+                  <p className='text-sm text-[#6b6f76] text-center'>
+                    We&apos;ll email a 6-digit code to keep your account secure.
+                  </p>
+
                   <Clerk.Loading>
                     {isLoading => (
                       <SignIn.Action
@@ -267,7 +274,7 @@ export function OtpSignInForm() {
                             <span>Sending code...</span>
                           </>
                         ) : (
-                          'Continue with email'
+                          'Send code'
                         )}
                       </SignIn.Action>
                     )}
@@ -278,7 +285,7 @@ export function OtpSignInForm() {
                     className='text-center'
                     onClick={() => setIsEmailOpen(false)}
                   >
-                    ← Back to login
+                    ← Back to sign-in
                   </AuthButton>
                 </div>
               ) : (
@@ -332,7 +339,9 @@ export function OtpSignInForm() {
                   className='mt-6 mb-12 text-sm text-secondary text-center'
                   id='otp-description'
                 >
-                  We sent a 6-digit code to your email
+                  We sent a 6-digit code to your email.
+                  <br />
+                  Codes expire after 10 minutes.
                 </p>
 
                 <div className='space-y-4'>
@@ -361,7 +370,7 @@ export function OtpSignInForm() {
                             <span>Verifying...</span>
                           </>
                         ) : (
-                          'Continue code'
+                          'Verify code'
                         )}
                       </SignIn.Action>
                     )}
