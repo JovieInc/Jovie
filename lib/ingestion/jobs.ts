@@ -1,6 +1,6 @@
 import { and, sql as drizzleSql, eq, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, ingestionJobs } from '@/lib/db';
+import { type DbType, db, ingestionJobs } from '@/lib/db';
 import {
   canonicalIdentity,
   detectPlatform,
@@ -93,6 +93,64 @@ const beaconsJobPayloadSchema = z.object({
   dedupKey: z.string(),
   depth: z.number().int().min(0).max(3).default(0),
 });
+
+const spotifyDiscographyPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  spotifyId: z.string(),
+  dedupKey: z.string(),
+});
+
+export async function enqueueSpotifyDiscographyIngestionJob(params: {
+  creatorProfileId: string;
+  spotifyId: string;
+  runAt?: Date;
+  priority?: number;
+  tx?: DbType;
+}): Promise<string | null> {
+  const payload = spotifyDiscographyPayloadSchema.parse({
+    creatorProfileId: params.creatorProfileId,
+    spotifyId: params.spotifyId,
+    dedupKey: `spotify_discog:${params.spotifyId}`,
+  });
+
+  const client = params.tx ?? db;
+
+  const existing = await client
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.jobType, 'import_spotify_discography'),
+        or(
+          eq(ingestionJobs.dedupKey, payload.dedupKey),
+          drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${payload.creatorProfileId}`
+        )
+      )
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    return existing[0].id;
+  }
+
+  const [inserted] = await client
+    .insert(ingestionJobs)
+    .values({
+      jobType: 'import_spotify_discography',
+      payload: {
+        creatorProfileId: payload.creatorProfileId,
+        spotifyId: payload.spotifyId,
+      },
+      dedupKey: payload.dedupKey,
+      status: 'pending',
+      runAt: params.runAt ?? new Date(),
+      priority: params.priority ?? 0,
+      attempts: 0,
+    })
+    .returning({ id: ingestionJobs.id });
+
+  return inserted?.id ?? null;
+}
 
 export async function enqueueBeaconsIngestionJob(params: {
   creatorProfileId: string;

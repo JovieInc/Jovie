@@ -9,6 +9,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
@@ -280,6 +281,80 @@ export const socialAccounts = pgTable('social_accounts', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const spotifyDiscographyReleases = pgTable(
+  'spotify_discography_releases',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    spotifyId: text('spotify_id').notNull(),
+    spotifyUrl: text('spotify_url'),
+    name: text('name').notNull(),
+    albumType: text('album_type').notNull(),
+    releaseDate: text('release_date'),
+    releaseDatePrecision: text('release_date_precision'),
+    totalTracks: integer('total_tracks'),
+    upc: text('upc'),
+    imageUrl: text('image_url'),
+    artists: jsonb('artists')
+      .$type<Array<{ id?: string; name: string }>>()
+      .default([]),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    uniqueProfileSpotifyId: uniqueIndex(
+      'uniq_spotify_discog_release_profile_spotify_id'
+    ).on(table.creatorProfileId, table.spotifyId),
+    profileIdx: index('idx_spotify_discog_releases_profile_id').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
+export const spotifyDiscographyTracks = pgTable(
+  'spotify_discography_tracks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => spotifyDiscographyReleases.id, {
+        onDelete: 'cascade',
+      }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    spotifyId: text('spotify_id').notNull(),
+    spotifyUrl: text('spotify_url'),
+    name: text('name').notNull(),
+    durationMs: integer('duration_ms'),
+    trackNumber: integer('track_number'),
+    discNumber: integer('disc_number'),
+    explicit: boolean('explicit').default(false).notNull(),
+    isrc: text('isrc'),
+    previewUrl: text('preview_url'),
+    artists: jsonb('artists')
+      .$type<Array<{ id?: string; name: string }>>()
+      .default([]),
+    lastSeenAt: timestamp('last_seen_at').defaultNow().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    uniqueProfileTrackId: uniqueIndex(
+      'uniq_spotify_discog_track_profile_spotify_id'
+    ).on(table.creatorProfileId, table.spotifyId),
+    releaseIdx: index('idx_spotify_discog_tracks_release_id').on(
+      table.releaseId
+    ),
+    profileIdx: index('idx_spotify_discog_tracks_profile_id').on(
+      table.creatorProfileId
+    ),
+  })
+);
 
 export const audienceMembers = pgTable('audience_members', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -568,6 +643,20 @@ export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
 export const insertSocialAccountSchema = createInsertSchema(socialAccounts);
 export const selectSocialAccountSchema = createSelectSchema(socialAccounts);
 
+export const insertSpotifyDiscographyReleaseSchema = createInsertSchema(
+  spotifyDiscographyReleases
+);
+export const selectSpotifyDiscographyReleaseSchema = createSelectSchema(
+  spotifyDiscographyReleases
+);
+
+export const insertSpotifyDiscographyTrackSchema = createInsertSchema(
+  spotifyDiscographyTracks
+);
+export const selectSpotifyDiscographyTrackSchema = createSelectSchema(
+  spotifyDiscographyTracks
+);
+
 export const insertIngestionJobSchema = createInsertSchema(ingestionJobs);
 export const selectIngestionJobSchema = createSelectSchema(ingestionJobs);
 
@@ -618,6 +707,16 @@ export type NewProfilePhoto = typeof profilePhotos.$inferInsert;
 
 export type SocialAccount = typeof socialAccounts.$inferSelect;
 export type NewSocialAccount = typeof socialAccounts.$inferInsert;
+
+export type SpotifyDiscographyRelease =
+  typeof spotifyDiscographyReleases.$inferSelect;
+export type NewSpotifyDiscographyRelease =
+  typeof spotifyDiscographyReleases.$inferInsert;
+
+export type SpotifyDiscographyTrack =
+  typeof spotifyDiscographyTracks.$inferSelect;
+export type NewSpotifyDiscographyTrack =
+  typeof spotifyDiscographyTracks.$inferInsert;
 
 export type IngestionJob = typeof ingestionJobs.$inferSelect;
 export type NewIngestionJob = typeof ingestionJobs.$inferInsert;

@@ -1,3 +1,4 @@
+import type { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
@@ -28,12 +29,14 @@ interface PricingOptionsResponse {
   pricingOptions: PricingOption[];
 }
 
+type SignOutHandler = ReturnType<typeof useClerk>['signOut'];
+
 interface UseUserMenuActionsParams {
   billingStatus: BillingStatus;
   profileUrl?: string;
   settingsUrl?: string;
   redirectToUrl: (url: string) => void;
-  signOut: (options?: unknown) => Promise<void>;
+  signOut: SignOutHandler;
 }
 
 export function useUserMenuActions({
