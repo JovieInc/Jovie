@@ -6,9 +6,9 @@ import {
   NOTIFICATIONS_BRAND_NAME,
   RESEND_ENABLED,
 } from '@/lib/notifications/config';
+import type { NotificationProvider } from '@/lib/notifications/providers/types';
 import type {
   EmailMessage,
-  EmailProvider,
   NotificationChannelResult,
   NotificationDeliveryChannel,
 } from '@/types/notifications';
@@ -23,8 +23,8 @@ const getClient = () => {
   return client;
 };
 
-export class ResendEmailProvider implements EmailProvider {
-  provider: EmailProvider['provider'] = 'resend';
+export class ResendEmailProvider implements NotificationProvider {
+  provider = 'resend';
 
   async sendEmail(message: EmailMessage): Promise<NotificationChannelResult> {
     if (!RESEND_ENABLED || !env.RESEND_API_KEY) {

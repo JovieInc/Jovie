@@ -137,6 +137,16 @@ export const notificationChannelEnum = pgEnum('notification_channel', [
   'push',
 ]);
 
+export const notificationOutboxChannelEnum = pgEnum(
+  'notification_outbox_channel',
+  ['email', 'sms', 'push', 'in_app']
+);
+
+export const notificationOutboxStatusEnum = pgEnum(
+  'notification_outbox_status',
+  ['pending', 'processing', 'sent', 'failed']
+);
+
 export const audienceMemberTypeEnum = pgEnum('audience_member_type', [
   'anonymous',
   'email',
@@ -621,6 +631,22 @@ export const notificationSubscriptions = pgTable(
   })
 );
 
+export const notificationOutbox = pgTable(
+  'notification_outbox',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    channel: notificationOutboxChannelEnum('channel').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    status: notificationOutboxStatusEnum('status').default('pending').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    statusChannelCreatedAtIdx: index(
+      'idx_notification_outbox_status_channel_created_at'
+    ).on(table.status, table.channel, table.createdAt),
+  })
+);
+
 export const creatorContacts = pgTable('creator_contacts', {
   id: uuid('id').primaryKey().defaultRandom(),
   creatorProfileId: uuid('creator_profile_id')
@@ -863,6 +889,12 @@ export const selectNotificationSubscriptionSchema = createSelectSchema(
   notificationSubscriptions
 );
 
+export const insertNotificationOutboxSchema =
+  createInsertSchema(notificationOutbox);
+
+export const selectNotificationOutboxSchema =
+  createSelectSchema(notificationOutbox);
+
 export const insertTipSchema = createInsertSchema(tips);
 
 export const selectTipSchema = createSelectSchema(tips);
@@ -933,6 +965,9 @@ export type NotificationSubscription =
   typeof notificationSubscriptions.$inferSelect;
 export type NewNotificationSubscription =
   typeof notificationSubscriptions.$inferInsert;
+
+export type NotificationOutbox = typeof notificationOutbox.$inferSelect;
+export type NewNotificationOutbox = typeof notificationOutbox.$inferInsert;
 
 export type Tip = typeof tips.$inferSelect;
 export type NewTip = typeof tips.$inferInsert;

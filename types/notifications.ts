@@ -2,7 +2,7 @@
 export type NotificationChannel = 'sms' | 'email';
 
 // App-wide delivery channels (allows future push/in-app support)
-export type NotificationDeliveryChannel = 'email' | 'push' | 'in_app';
+export type NotificationDeliveryChannel = 'email' | 'sms' | 'push' | 'in_app';
 
 export type NotificationCategory = 'transactional' | 'product' | 'marketing';
 
@@ -16,6 +16,7 @@ export interface NotificationPreferences {
 
 export interface NotificationTarget {
   email?: string | null;
+  phone?: string | null;
   userId?: string;
   clerkUserId?: string;
   creatorProfileId?: string;
@@ -64,6 +65,21 @@ export interface EmailMessage {
   replyTo?: string;
   headers?: Record<string, string>;
   from?: string;
+}
+
+export interface SmsMessage {
+  to: string;
+  text: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface InAppMessage {
+  userId?: string;
+  clerkUserId?: string;
+  subject: string;
+  text: string;
+  ctaUrl?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface EmailProvider {

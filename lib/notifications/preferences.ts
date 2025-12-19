@@ -21,6 +21,7 @@ type NotificationSettings = {
 
 const DEFAULT_CHANNELS: Record<NotificationDeliveryChannel, boolean> = {
   email: true,
+  sms: false,
   push: false,
   in_app: true,
 };

@@ -3,20 +3,34 @@ import {
   getNotificationPreferences,
   markNotificationDismissed,
 } from '@/lib/notifications/preferences';
+import { InAppStubProvider } from '@/lib/notifications/providers/in-app';
 import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
+import { SmsStubProvider } from '@/lib/notifications/providers/sms';
+import type { NotificationProvider } from '@/lib/notifications/providers/types';
 import type {
-  EmailProvider,
+  InAppMessage,
   NotificationChannelResult,
   NotificationDeliveryChannel,
   NotificationDispatchResult,
   NotificationMessage,
   NotificationTarget,
+  SmsMessage,
 } from '@/types/notifications';
 
-let emailProvider: EmailProvider = new ResendEmailProvider();
+let emailProvider: NotificationProvider = new ResendEmailProvider();
+let smsProvider: NotificationProvider = new SmsStubProvider();
+let inAppProvider: NotificationProvider = new InAppStubProvider();
 
-export const setEmailProvider = (provider: EmailProvider) => {
+export const setEmailProvider = (provider: NotificationProvider) => {
   emailProvider = provider;
+};
+
+export const setSmsProvider = (provider: NotificationProvider) => {
+  smsProvider = provider;
+};
+
+export const setInAppProvider = (provider: NotificationProvider) => {
+  inAppProvider = provider;
 };
 
 const DEFAULT_CHANNELS: NotificationDeliveryChannel[] = ['email'];
@@ -90,7 +104,14 @@ export const sendNotification = async (
         continue;
       }
 
-      const emailResult = await emailProvider.sendEmail({
+      const emailSender = emailProvider.sendEmail;
+
+      if (!emailSender) {
+        results.push(buildSkippedResult(channel, 'Email provider unavailable'));
+        continue;
+      }
+
+      const emailResult = await emailSender({
         to,
         subject: message.subject,
         text: message.text,
@@ -104,7 +125,54 @@ export const sendNotification = async (
       continue;
     }
 
-    // Placeholder for push or in-app transports
+    if (channel === 'sms') {
+      const to = target.phone ?? null;
+
+      if (!to) {
+        results.push(buildSkippedResult(channel, 'No phone number available'));
+        continue;
+      }
+
+      const smsSender = smsProvider.sendSms;
+
+      if (!smsSender) {
+        results.push(buildSkippedResult(channel, 'SMS provider unavailable'));
+        continue;
+      }
+
+      const smsResult = await smsSender({
+        to,
+        text: message.text,
+        metadata: message.metadata,
+      } satisfies SmsMessage);
+
+      results.push(smsResult);
+      continue;
+    }
+
+    if (channel === 'in_app') {
+      const inAppSender = inAppProvider.sendInApp;
+
+      if (!inAppSender) {
+        results.push(
+          buildSkippedResult(channel, 'In-app provider unavailable')
+        );
+        continue;
+      }
+
+      const inAppResult = await inAppSender({
+        userId: target.userId,
+        clerkUserId: target.clerkUserId,
+        subject: message.subject,
+        text: message.text,
+        ctaUrl: message.ctaUrl,
+        metadata: message.metadata,
+      } satisfies InAppMessage);
+
+      results.push(inAppResult);
+      continue;
+    }
+
     results.push(buildSkippedResult(channel, 'Channel not implemented yet'));
   }
 

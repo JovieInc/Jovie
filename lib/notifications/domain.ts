@@ -11,8 +11,8 @@ import {
   users,
 } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { enqueueNotificationOutbox } from '@/lib/notifications/outbox';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
-import { sendNotification } from '@/lib/notifications/service';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
@@ -381,8 +381,7 @@ export const subscribeToNotificationsDomain = async (
       });
     }
 
-    let dispatchResult: Awaited<ReturnType<typeof sendNotification>> | null =
-      null;
+    let emailEnqueued = false;
 
     if (channel === 'email' && normalizedEmail && insertedSubscription?.id) {
       const profileUrl = `${APP_URL.replace(/\/$/, '')}/${artistProfile.username}`;
@@ -390,8 +389,8 @@ export const subscribeToNotificationsDomain = async (
         artistProfile.displayName || artistProfile.username || 'this artist';
       const dedupKey = `notification_subscribe:${artist_id}:${normalizedEmail}`;
 
-      dispatchResult = await sendNotification(
-        {
+      await enqueueNotificationOutbox({
+        message: {
           id: dedupKey,
           dedupKey,
           category: 'transactional',
@@ -409,11 +408,13 @@ export const subscribeToNotificationsDomain = async (
           respectUserPreferences: false,
           dismissible: true,
         },
-        {
+        target: {
           email: normalizedEmail,
           creatorProfileId: artist_id,
-        }
-      );
+        },
+        source: 'notifications_subscribe',
+      });
+      emailEnqueued = true;
     }
 
     return {
@@ -422,7 +423,7 @@ export const subscribeToNotificationsDomain = async (
       body: {
         success: true,
         message: 'Subscription successful',
-        emailDispatched: dispatchResult?.delivered.includes('email') ?? false,
+        emailDispatched: emailEnqueued,
         durationMs: Math.round(Date.now() - runtimeStart),
       },
     };

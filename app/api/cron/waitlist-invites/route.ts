@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
-import { sendNotification } from '@/lib/notifications/service';
+import { enqueueNotificationOutbox } from '@/lib/notifications/outbox';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
 export const runtime = 'nodejs';
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
   });
 
   const attempted = claimedRows.length;
-  let sent = 0;
+  let enqueued = 0;
 
   for (const invite of claimedRows) {
     try {
@@ -183,62 +183,18 @@ export async function POST(request: NextRequest) {
         dedupKey: `waitlist_invite:${invite.id}`,
       });
 
-      const result = await sendNotification(message, target);
+      await enqueueNotificationOutbox({
+        message,
+        target,
+        source: 'waitlist_invite',
+        maxAttempts: invite.maxAttempts,
+        metadata: {
+          waitlistInviteId: invite.id,
+          attempts: invite.attempts,
+        },
+      });
 
-      const hadErrors = result.errors.length > 0;
-
-      if (hadErrors) {
-        const errorText = result.errors
-          .map(e => e.error ?? e.detail)
-          .join('; ');
-        const [row] = await db
-          .select({
-            attempts: waitlistInvites.attempts,
-            maxAttempts: waitlistInvites.maxAttempts,
-          })
-          .from(waitlistInvites)
-          .where(eq(waitlistInvites.id, invite.id))
-          .limit(1);
-
-        const nextAttempts = (row?.attempts ?? invite.attempts ?? 0) + 1;
-        const maxAttemptsResolved = row?.maxAttempts ?? invite.maxAttempts ?? 3;
-
-        if (nextAttempts >= maxAttemptsResolved) {
-          await db
-            .update(waitlistInvites)
-            .set({
-              status: 'failed',
-              attempts: nextAttempts,
-              error: errorText || 'Notification send failed',
-              updatedAt: new Date(),
-            })
-            .where(eq(waitlistInvites.id, invite.id));
-          continue;
-        }
-
-        await db
-          .update(waitlistInvites)
-          .set({
-            status: 'pending',
-            attempts: nextAttempts,
-            error: errorText || 'Notification send failed',
-            runAt: new Date(Date.now() + 5 * 60 * 1000),
-            updatedAt: new Date(),
-          })
-          .where(eq(waitlistInvites.id, invite.id));
-        continue;
-      }
-
-      sent += 1;
-
-      await db
-        .update(waitlistInvites)
-        .set({
-          status: 'sent',
-          sentAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .where(eq(waitlistInvites.id, invite.id));
+      enqueued += 1;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
@@ -282,7 +238,7 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { ok: true, attempted, sent },
+    { ok: true, attempted, enqueued },
     { status: 200, headers: NO_STORE_HEADERS }
   );
 }
