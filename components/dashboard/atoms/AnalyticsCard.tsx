@@ -31,7 +31,7 @@ export function AnalyticsCard({
   const IconToRender = IconComponent ?? FallbackIcon;
 
   return (
-    <div className={cn('h-full', order)}>
+    <section className={cn('h-full', order)} aria-label={`${title} metric`}>
       <div
         className={cn(
           cardTokens.variants.analytics,
@@ -39,45 +39,47 @@ export function AnalyticsCard({
           'flex h-full flex-col'
         )}
       >
-        <div className='flex items-start justify-between gap-3'>
-          <p className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
-            {title}
-          </p>
-          {headerRight ? <div className='shrink-0'>{headerRight}</div> : null}
-        </div>
-
-        <div className='mt-3 flex items-end justify-between gap-4'>
-          <p className='text-4xl font-semibold tracking-tight text-primary-token tabular-nums leading-none dark:text-primary-token/90'>
-            {value}
-          </p>
-          <div
-            className={cn(
-              'shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2.5 ring-1 ring-inset ring-white/5 dark:ring-white/10',
-              iconChipClassName
-            )}
-            aria-hidden='true'
-          >
-            <IconToRender
-              className={cn('h-5 w-5', iconClassName ?? 'text-accent-token')}
-            />
+        <dl className='flex h-full flex-col'>
+          <div className='flex items-start justify-between gap-3'>
+            <dt className='text-xs font-semibold uppercase tracking-[0.18em] text-tertiary-token'>
+              {title}
+            </dt>
+            {headerRight ? <div className='shrink-0'>{headerRight}</div> : null}
           </div>
-        </div>
 
-        <div
-          className='mt-4 h-px w-full bg-white/5 dark:bg-white/10'
-          aria-hidden='true'
-        />
+          <div className='mt-4 flex items-end justify-between gap-4'>
+            <dd className='text-[2.4rem] font-semibold tracking-tight text-primary-token tabular-nums leading-none dark:text-primary-token/90'>
+              {value}
+            </dd>
+            <div
+              className={cn(
+                'shrink-0 rounded-full border border-subtle/80 bg-surface-2/70 p-2.5 ring-1 ring-inset ring-white/10 shadow-sm shadow-black/5 dark:shadow-black/30',
+                iconChipClassName
+              )}
+              aria-hidden='true'
+            >
+              <IconToRender
+                className={cn('h-5 w-5', iconClassName ?? 'text-accent-token')}
+              />
+            </div>
+          </div>
 
-        <div className='mt-auto pt-3'>
-          {children ? (
-            children
-          ) : metadata ? (
-            <p className='text-xs text-tertiary-token'>{metadata}</p>
-          ) : (
-            <div className='h-4' aria-hidden='true' />
-          )}
-        </div>
+          <div
+            className='mt-4 h-px w-full bg-white/5 dark:bg-white/10'
+            aria-hidden='true'
+          />
+
+          <div className='mt-auto pt-3'>
+            {children ? (
+              children
+            ) : metadata ? (
+              <dd className='text-xs text-tertiary-token'>{metadata}</dd>
+            ) : (
+              <div className='h-4' aria-hidden='true' />
+            )}
+          </div>
+        </dl>
       </div>
-    </div>
+    </section>
   );
 }
