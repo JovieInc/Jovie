@@ -231,19 +231,51 @@ const nextConfig = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
-          maxSize: 244000, // Reduce chunk size to improve cache serialization
+          maxSize: 200000, // Smaller chunks reduce serialized cache payloads.
+          minSize: 20000,
           cacheGroups: {
-            vendor: {
+            framework: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
+              name: 'framework',
+              chunks: 'all',
+              priority: 40,
+              enforce: true,
+            },
+            icons: {
+              test: /[\\/]node_modules[\\/](simple-icons|lucide-react)[\\/]/,
+              name: 'icons',
+              chunks: 'all',
+              priority: 30,
+              maxSize: 180000,
+            },
+            motion: {
+              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
+              name: 'motion',
+              chunks: 'all',
+              priority: 25,
+              maxSize: 180000,
+            },
+            charts: {
+              test: /[\\/]node_modules[\\/]recharts[\\/]/,
+              name: 'charts',
+              chunks: 'all',
+              priority: 25,
+              maxSize: 180000,
+            },
+            vendors: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendors',
               chunks: 'all',
-              maxSize: 244000,
+              priority: 10,
+              reuseExistingChunk: true,
+              maxSize: 200000,
             },
             common: {
               name: 'common',
               minChunks: 2,
               chunks: 'all',
-              maxSize: 244000,
+              priority: 5,
+              maxSize: 200000,
             },
           },
         },
