@@ -2,7 +2,7 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 type WebSocketConstructor = typeof WebSocket;
 

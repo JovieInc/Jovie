@@ -1,7 +1,8 @@
 import { auth } from '@clerk/nextjs/server';
 import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (
-    !env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
+    !publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ||
     !env.CLOUDINARY_API_KEY ||
     !env.CLOUDINARY_API_SECRET
   ) {
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(
     {
-      cloudName: env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+      cloudName: publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
       apiKey: env.CLOUDINARY_API_KEY,
       timestamp: now,
       folder,

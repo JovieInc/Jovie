@@ -45,7 +45,7 @@ vi.mock('drizzle-orm/neon-serverless', () => {
 });
 
 // Mock the env module
-vi.mock('@/lib/env', () => ({
+vi.mock('@/lib/env-server', () => ({
   env: {
     DATABASE_URL: 'postgres://mock:mock@localhost:5432/mock',
   },

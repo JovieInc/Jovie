@@ -5,7 +5,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
@@ -53,7 +53,7 @@ export async function POST() {
     // }
 
     // Create return URL
-    const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const returnUrl = `${baseUrl}/app/dashboard`;
 
     // Create billing portal session

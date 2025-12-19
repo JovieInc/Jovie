@@ -1,6 +1,7 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const iconUsageRule = require('./eslint-rules/icon-usage');
+const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imports');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -11,6 +12,7 @@ const baseConfig = {
     '@jovie': {
       rules: {
         'icon-usage': iconUsageRule,
+        'edge-runtime-node-imports': edgeRuntimeNodeImportsRule,
       },
     },
   },
@@ -92,6 +94,7 @@ const baseConfig = {
       },
     ],
     '@jovie/icon-usage': 'error',
+    '@jovie/edge-runtime-node-imports': 'error',
   },
 };
 

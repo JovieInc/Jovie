@@ -214,6 +214,24 @@ describe('MyComponent Styles', () => {
 });
 ```
 
+If the test only needs class names or DOM structure (not computed styles), mock the CSS per-test instead of importing it:
+
+```typescript
+import { render } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
+vi.mock('../../app/globals.css', () => ({}));
+
+import { MyComponent } from '@/components/MyComponent';
+
+describe('MyComponent', () => {
+  it('renders with expected class names', () => {
+    const { container } = render(<MyComponent />);
+    expect(container.querySelector('.my-class')).toBeTruthy();
+  });
+});
+```
+
 ## Best Practices
 
 ### 1. Test Classification

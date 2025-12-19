@@ -1,7 +1,8 @@
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 
-const appUrl = env.NEXT_PUBLIC_APP_URL ?? APP_URL;
+const appUrl = publicEnv.NEXT_PUBLIC_APP_URL ?? APP_URL;
 const fallbackHostname = 'jov.ie';
 const hostname = (() => {
   try {
