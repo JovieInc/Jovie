@@ -6,6 +6,8 @@ import { stripe } from '@/lib/stripe/client';
 export interface AdminStripeOverviewMetrics {
   mrrUsd: number;
   activeSubscribers: number;
+  mrrUsd30dAgo: number;
+  mrrGrowthMonthlyUsd: number;
 }
 
 function computeMonthlyCentsFromPriceItem(
@@ -38,10 +40,42 @@ function computeMonthlyCentsFromPriceItem(
   return 0;
 }
 
+function isSubscriptionActiveAt(
+  subscription: Stripe.Subscription,
+  timestampSeconds: number
+): boolean {
+  if (
+    subscription.status === 'incomplete' ||
+    subscription.status === 'incomplete_expired'
+  ) {
+    return false;
+  }
+
+  if (subscription.created > timestampSeconds) {
+    return false;
+  }
+
+  const endTimestamp =
+    subscription.ended_at ??
+    subscription.canceled_at ??
+    subscription.cancel_at ??
+    null;
+
+  if (endTimestamp != null && endTimestamp <= timestampSeconds) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOverviewMetrics> {
   let mrrCents = 0;
   let activeSubscribers = 0;
+  let pastMrrCents = 0;
   let startingAfter: string | undefined;
+  const thirtyDaysAgoSeconds = Math.floor(
+    (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+  );
 
   for (;;) {
     const page = await stripe.subscriptions.list({
@@ -56,10 +90,20 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
       if (!Array.isArray(sub.items.data) || sub.items.data.length === 0)
         continue;
 
-      activeSubscribers += 1;
+      const isCurrentActive =
+        sub.status === 'active' || sub.status === 'trialing';
+      if (isCurrentActive) {
+        activeSubscribers += 1;
+      }
 
       for (const item of sub.items.data) {
-        mrrCents += computeMonthlyCentsFromPriceItem(item);
+        const itemMrrCents = computeMonthlyCentsFromPriceItem(item);
+        if (isCurrentActive) {
+          mrrCents += itemMrrCents;
+        }
+        if (isSubscriptionActiveAt(sub, thirtyDaysAgoSeconds)) {
+          pastMrrCents += itemMrrCents;
+        }
       }
     }
 
@@ -74,5 +118,7 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
   return {
     mrrUsd: mrrCents / 100,
     activeSubscribers,
+    mrrUsd30dAgo: pastMrrCents / 100,
+    mrrGrowthMonthlyUsd: (mrrCents - pastMrrCents) / 100,
   };
 }
