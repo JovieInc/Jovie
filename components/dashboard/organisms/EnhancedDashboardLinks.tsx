@@ -219,10 +219,6 @@ export function EnhancedDashboardLinks({
     };
   }, [profileSaveStatus.success]);
 
-  const [autoRefreshUntilMs, setAutoRefreshUntilMs] = useState<number | null>(
-    null
-  );
-
   useEffect(() => {
     if (!dashboardData.selectedProfile) {
       setArtist(null);
@@ -587,27 +583,92 @@ export function EnhancedDashboardLinks({
     );
   }, [convertDbLinksToSuggestions, suggestionInitialLinks]);
 
+  const suggestedLinksRef = useRef<SuggestedLink[]>(suggestedLinks);
   useEffect(() => {
-    if (!autoRefreshUntilMs) return;
+    suggestedLinksRef.current = suggestedLinks;
+  }, [suggestedLinks]);
 
-    const intervalMs = 2000;
-    const intervalId = window.setInterval(() => {
-      if (!autoRefreshUntilMs) {
-        window.clearInterval(intervalId);
+  const suggestionsSignature = useCallback((items: SuggestedLink[]): string => {
+    return items
+      .map(item => {
+        return `${item.suggestionId || item.id}::${item.normalizedUrl}::${item.state ?? ''}`;
+      })
+      .sort()
+      .join('|');
+  }, []);
+
+  const [suggestionsPollNonce, setSuggestionsPollNonce] = useState(0);
+  const restartSuggestionsPolling = useCallback(() => {
+    setSuggestionsPollNonce(prev => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    if (!suggestionsEnabled || !profileId) return;
+
+    let cancelled = false;
+    let timeoutId: number | null = null;
+    const INITIAL_INTERVAL_MS = 1500;
+    const MAX_INTERVAL_MS = 5000;
+    const MAX_STABLE_CYCLES = 6;
+    let intervalMs = INITIAL_INTERVAL_MS;
+    let stableCycles = 0;
+
+    const pollLatestSuggestions = async (): Promise<void> => {
+      if (cancelled) return;
+      try {
+        const response = await fetch(
+          `/api/dashboard/social-links?profileId=${encodeURIComponent(profileId)}`,
+          { method: 'GET', cache: 'no-store' }
+        );
+
+        if (response.ok) {
+          const body = (await response.json().catch(() => null)) as {
+            links?: ProfileSocialLink[];
+          } | null;
+          const nextSuggestions = convertDbLinksToSuggestions(
+            (body?.links ?? []).filter(link => link.state === 'suggested')
+          );
+          const prevSignature = suggestionsSignature(suggestedLinksRef.current);
+          const nextSignature = suggestionsSignature(nextSuggestions);
+
+          if (nextSignature !== prevSignature) {
+            stableCycles = 0;
+            intervalMs = INITIAL_INTERVAL_MS;
+            setSuggestedLinks(nextSuggestions);
+          } else {
+            stableCycles += 1;
+          }
+        } else {
+          stableCycles += 1;
+        }
+      } catch (error) {
+        console.error('Error polling suggested social links', error);
+        stableCycles += 1;
+      }
+
+      if (cancelled || stableCycles >= MAX_STABLE_CYCLES) {
         return;
       }
-      if (Date.now() >= autoRefreshUntilMs) {
-        setAutoRefreshUntilMs(null);
-        window.clearInterval(intervalId);
-        return;
-      }
-      router.refresh();
-    }, intervalMs);
+
+      intervalMs = Math.min(Math.round(intervalMs * 1.6), MAX_INTERVAL_MS);
+      timeoutId = window.setTimeout(pollLatestSuggestions, intervalMs);
+    };
+
+    void pollLatestSuggestions();
 
     return () => {
-      window.clearInterval(intervalId);
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
-  }, [autoRefreshUntilMs, router]);
+  }, [
+    convertDbLinksToSuggestions,
+    profileId,
+    suggestionsEnabled,
+    suggestionsPollNonce,
+    suggestionsSignature,
+  ]);
 
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);
@@ -690,8 +751,7 @@ export function EnhancedDashboardLinks({
           });
 
           if (hasIngestableLink) {
-            setAutoRefreshUntilMs(Date.now() + 20000);
-            router.refresh();
+            restartSuggestionsPolling();
           }
         }
 
@@ -706,7 +766,7 @@ export function EnhancedDashboardLinks({
         toast.error(message || 'Failed to save links. Please try again.');
       }
     },
-    [profileId, router, suggestionsEnabled]
+    [profileId, restartSuggestionsPolling, suggestionsEnabled]
   );
 
   const enqueueSave = useCallback(
