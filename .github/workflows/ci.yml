@@ -726,6 +726,8 @@ jobs:
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      deployment_url: ${{ steps.deploy.outputs.deployment_url }}
     env:
       # Main/staging must always use DATABASE_URL_MAIN; keep production secrets separate.
       DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
@@ -773,135 +775,25 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Canary health check (Main deployment)
-        run: |
-          echo "Running canary health check on main deployment..."
-          deployment_url="${{ steps.deploy.outputs.deployment_url }}"
-          health_url_primary="${deployment_url%/}/api/health"
-          health_url_fallback="https://main.jov.ie/api/health"
-          health_url="$health_url_primary"
+  canary-health-gate:
+    name: Canary Health Gate (staging)
+    needs: [deploy]
+    if: ${{ needs.deploy.result == 'success' }}
+    uses: ./.github/workflows/canary-health-gate.yml
+    with:
+      deployment_url: ${{ needs.deploy.outputs.deployment_url }}
+      fallback_health_url: https://main.jov.ie/api/health
+    secrets:
+      VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-          # Wait a moment for deployment to be ready
-          sleep 30
-
-          USER_AGENT="Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)"
-          COOKIE_JAR="$(mktemp)"
-
-          # Vercel Deployment Protection / Bot protection bypass for automation
-          # See: https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation
-          BYPASS_SECRET="${VERCEL_AUTOMATION_BYPASS_SECRET:-}"
-          BYPASS_ARGS=()
-          if [ -n "$BYPASS_SECRET" ]; then
-            BYPASS_ARGS+=(
-              -H "x-vercel-protection-bypass: $BYPASS_SECRET"
-              -H "x-vercel-set-bypass-cookie: true"
-              -c "$COOKIE_JAR"
-              -b "$COOKIE_JAR"
-            )
-          else
-            echo "⚠ VERCEL_AUTOMATION_BYPASS_SECRET not set; canary may hit Vercel Security Checkpoint (HTTP 429)."
-          fi
-
-          attempt=1
-          max_attempts=8
-          response_code="000"
-          canary_inconclusive="false"
-          while [ $attempt -le $max_attempts ]; do
-            response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
-            response_code="${response##*$'\n'}"
-
-            if [ "$response_code" = "200" ]; then
-              break
-            fi
-
-            if [ "$response_code" = "429" ]; then
-              sleep_seconds=$((attempt * 5))
-              echo "⚠ Canary got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-              sleep "$sleep_seconds"
-              attempt=$((attempt + 1))
-              continue
-            fi
-
-            echo "❌ Canary failed: HTTP $response_code"
-            exit 1
-          done
-
-          if [ "$response_code" != "200" ]; then
-            if [ "$response_code" = "429" ]; then
-              echo "⚠ Canary still rate-limited on deployment URL after retries. Falling back to main.jov.ie..."
-              health_url="$health_url_fallback"
-
-              attempt=1
-              max_attempts=5
-              response_code="000"
-              while [ $attempt -le $max_attempts ]; do
-                response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "$health_url" || echo "\n000")
-                response_code="${response##*$'\n'}"
-
-                if [ "$response_code" = "200" ]; then
-                  break
-                fi
-
-                if [ "$response_code" = "429" ]; then
-                  response_body="${response%$'\n'*}"
-                  body_preview="${response_body:0:300}"
-                  sleep_seconds=$((attempt * 15))
-                  echo "⚠ Canary fallback got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
-                  echo "429 response preview: ${body_preview}"
-                  sleep "$sleep_seconds"
-                  attempt=$((attempt + 1))
-                  continue
-                fi
-
-                echo "❌ Canary fallback failed: HTTP $response_code"
-                exit 1
-              done
-
-              if [ "$response_code" != "200" ]; then
-                if [ "$response_code" = "429" ]; then
-                  if [ -z "$BYPASS_SECRET" ]; then
-                    echo "⚠ Canary inconclusive: Vercel returned HTTP 429 Security Checkpoint even after retries."
-                    echo "⚠ Not failing deploy because bypass secret is unavailable."
-                    canary_inconclusive="true"
-                  else
-                    echo "❌ Canary failed: HTTP 429 Security Checkpoint even though bypass secret is set."
-                    exit 1
-                  fi
-                else
-                  echo "❌ Canary fallback failed after retries: HTTP $response_code"
-                  exit 1
-                fi
-              fi
-            else
-              echo "❌ Canary failed after retries: HTTP $response_code"
-              exit 1
-            fi
-          fi
-
-          if [ "$canary_inconclusive" = "true" ]; then
-            exit 0
-          fi
-
-          health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "$health_url" || echo "")
-          if [[ "$health_content" != *'"status":"ok"'* ]]; then
-            echo "❌ Canary failed: Health status not ok"
-            echo "Health response: $health_content"
-            exit 1
-          fi
-
-          if [[ "$health_content" != *'"database":{"ok":true'* ]]; then
-            echo "❌ Canary failed: Database health not ok"
-            echo "Health response: $health_content"
-            exit 1
-          fi
-
-          echo "✅ Canary passed: Main deployment healthy"
-        continue-on-error: false
-        env:
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
-
+  staging-deploy-notify:
+    name: Notify staging deploy
+    needs: [deploy, canary-health-gate]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Slack notify (staging deploy)
-        if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -925,7 +817,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (staging deploy failed)
-        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -951,7 +843,7 @@ jobs:
     name: Auto Promote to Production (Primary)
     # PRIMARY: Automatic promotion path - creates/updates main → production PR
     # Fallback: Manual promotion available via auto-promote.yml workflow
-    needs: [deploy]
+    needs: [canary-health-gate]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
