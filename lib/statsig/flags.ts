@@ -38,6 +38,7 @@ export const STATSIG_FLAGS = {
   CLICK_ANALYTICS_RPC: 'feature_click_analytics_rpc',
 
   // Integration Features
+  DISCOG_INGESTION: 'feature_discog_ingestion',
   PRICING_USE_CLERK: 'feature_pricing_use_clerk',
   LINK_INGESTION: 'feature_link_ingestion',
 } as const;

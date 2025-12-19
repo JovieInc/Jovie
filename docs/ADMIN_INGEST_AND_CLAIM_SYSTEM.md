@@ -837,5 +837,6 @@ Adds:
 ## Related Documentation
 
 - `docs/link_ingestion_and_suggestions.md` – Full design doc for ingestion system
+- `docs/discog_rollout_checklist.md` – Discog gate, backfill, and monitoring rollout steps
 - `future_features/claim-handle.md` – Handle-first claim flow design
 - `docs/STATSIG_FEATURE_GATES.md` – Feature flags for rollout

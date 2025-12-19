@@ -185,6 +185,16 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Expiry**: Can be removed after Q1 2025
 - **Used in**: Legacy pricing code
 
+#### `feature_discog_ingestion`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Gate Discog ingestion, admin-triggered backfills, and any Discog-sourced profile enrichments.
+- **Expiry**: Review after pilot rollout
+- **Used in** (planned):
+  - `app/api/admin/creator-ingest/route.ts` (Discog entry point guard)
+  - `app/api/admin/creator-ingest/rerun/route.ts` (admin rerun/backfill guard)
+  - `app/api/ingestion/jobs/route.ts` (worker polling guard)
+
 ## Flag Lifecycle Rules
 
 Per `agents.md`:
