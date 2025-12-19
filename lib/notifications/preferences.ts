@@ -240,3 +240,55 @@ export const markNotificationDismissed = async (
       .where(eq(creatorProfiles.id, creatorProfileId));
   });
 };
+
+export const updateNotificationPreferences = async (
+  target: NotificationTarget,
+  updates: Partial<NotificationPreferences>
+) => {
+  if (!updates) return;
+  if (!target.creatorProfileId && !target.userId && !target.clerkUserId) return;
+
+  const {
+    preferences: storedPreferences,
+    creatorProfileId,
+    settings,
+  } = await fetchStoredPreferences(target);
+
+  if (!creatorProfileId) return;
+
+  const basePreferences = storedPreferences ?? {
+    ...EMPTY_PREFERENCES,
+    email: target.email ?? null,
+  };
+  const mergedPreferences = mergePreferences(basePreferences, updates);
+  const baseSettings = isRecord(settings) ? settings : {};
+  const existingNotifications =
+    (baseSettings as NotificationSettings).notifications ?? {};
+
+  const nextSettings: NotificationSettings = {
+    marketing_emails: mergedPreferences.marketingEmails,
+    notifications: {
+      channels: mergedPreferences.channels,
+      dismissedIds: mergedPreferences.dismissedNotificationIds,
+      preferredChannel: mergedPreferences.preferredChannel,
+      lastDismissedAt: existingNotifications.lastDismissedAt,
+    },
+  };
+
+  await withNotificationSession(target, async () => {
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...baseSettings,
+          ...nextSettings,
+          notifications: {
+            ...existingNotifications,
+            ...nextSettings.notifications,
+          },
+        } as Record<string, unknown>,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  });
+};

@@ -9,6 +9,11 @@ import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
+  getNotificationSubscribeSuccessMessage,
+  NOTIFICATION_COPY,
+  subscribeToNotifications,
+} from '@/lib/notifications/client';
+import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
@@ -301,11 +306,11 @@ export function ArtistNotificationsCTA({
     try {
       const trimmedEmail =
         channel === 'email'
-          ? normalizeSubscriptionEmail(emailInput)
+          ? (normalizeSubscriptionEmail(emailInput) ?? undefined)
           : undefined;
       const phoneE164 =
         channel === 'sms'
-          ? normalizeSubscriptionPhone(buildPhoneE164())
+          ? (normalizeSubscriptionPhone(buildPhoneE164()) ?? undefined)
           : undefined;
 
       if (channel === 'email' && !trimmedEmail) {
@@ -316,34 +321,14 @@ export function ArtistNotificationsCTA({
         throw new Error('Please enter a valid phone number');
       }
 
-      const body: Record<string, unknown> = {
-        artist_id: artist.id,
-        artist_handle: artist.handle,
-        artist_name: artist.name,
+      await subscribeToNotifications({
+        artistId: artist.id,
         channel,
+        email: channel === 'email' ? trimmedEmail : undefined,
+        phone: channel === 'sms' ? phoneE164 : undefined,
+        countryCode: channel === 'sms' ? country.code : undefined,
         source: 'profile_inline',
-      };
-
-      if (channel === 'sms') {
-        body.phone = phoneE164;
-        body.country_code = country.code;
-      } else {
-        body.email = trimmedEmail;
-      }
-
-      const response = await fetch('/api/notifications/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
       });
-
-      const data = (await response.json()) as { error?: string };
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to subscribe');
-      }
 
       track('notifications_subscribe_success', {
         channel,
@@ -359,18 +344,14 @@ export function ArtistNotificationsCTA({
       }));
 
       setNotificationsState('success');
-      showSuccess(
-        channel === 'sms'
-          ? "You'll receive SMS updates from this artist."
-          : "You'll receive email updates from this artist."
-      );
+      showSuccess(getNotificationSubscribeSuccessMessage(channel));
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
-          : 'Unable to subscribe right now.';
+          : NOTIFICATION_COPY.errors.subscribe;
       setError(message);
-      showError('Unable to turn on notifications right now.');
+      showError(NOTIFICATION_COPY.errors.subscribe);
 
       track('notifications_subscribe_error', {
         error_type: 'submission_error',

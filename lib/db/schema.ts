@@ -551,6 +551,9 @@ export const audienceMembers = pgTable(
     creatorProfileFingerprintIdx: index(
       'audience_members_creator_profile_id_fingerprint_idx'
     ).on(table.creatorProfileId, table.fingerprint),
+    creatorProfileFingerprintUnique: uniqueIndex(
+      'audience_members_creator_profile_id_fingerprint_unique'
+    ).on(table.creatorProfileId, table.fingerprint),
   })
 );
 
