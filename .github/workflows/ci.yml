@@ -645,14 +645,20 @@ jobs:
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: pnpm run test:e2e --reporter=line
 
-      - name: Upload Playwright Artifacts on Failure
+      - name: Upload Playwright Report on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
+          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright Test Results on Failure
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
           retention-days: 7
 
   ci-pr-vercel-preview:
