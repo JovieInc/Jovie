@@ -2,7 +2,7 @@
 
 import { ClerkProvider, useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
-import { ThemeProvider } from 'next-themes';
+import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
 import { MyStatsig } from '@/app/my-statsig';
 import { logger } from '@/lib/utils/logger';
@@ -15,6 +15,36 @@ type LazyProvidersLoadingProps = LazyProvidersProps &
 function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   const { children } = props as LazyProvidersLoadingProps;
   return <>{children}</>;
+}
+
+function ThemeKeyboardShortcut() {
+  const { resolvedTheme, setTheme } = useTheme();
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.key.toLowerCase() !== 't') return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        const tagName = target.tagName.toLowerCase();
+        const isTextInput =
+          tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+        if (isTextInput || target.isContentEditable) return;
+      }
+
+      event.preventDefault();
+      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [resolvedTheme, setTheme]);
+
+  return null;
 }
 
 // Lazy load non-critical providers to reduce initial bundle size
@@ -79,6 +109,7 @@ function ClientProvidersInner({
         disableTransitionOnChange
         storageKey='jovie-theme'
       >
+        <ThemeKeyboardShortcut />
         <MyStatsig userId={user?.id}>
           <LazyProviders>{children}</LazyProviders>
         </MyStatsig>

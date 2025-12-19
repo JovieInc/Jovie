@@ -1,10 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, gte, isNull, or } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
+import { checkRateLimit } from '@/lib/utils/rate-limit';
 
 interface ClaimPageProps {
   params: {
@@ -13,6 +14,9 @@ interface ClaimPageProps {
 }
 
 export const runtime = 'nodejs';
+
+const CLAIM_TOKEN_UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Claim page for creator profiles.
@@ -31,12 +35,11 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     redirect('/');
   }
 
-  const { userId } = await auth();
-
-  if (!userId) {
-    const redirectTarget = `/claim/${encodeURIComponent(token)}`;
-    // Redirect to signup (most claim users are new) with redirect back to claim
-    redirect(`/signup?redirect_url=${encodeURIComponent(redirectTarget)}`);
+  if (!CLAIM_TOKEN_UUID_REGEX.test(token)) {
+    logger.warn('Claim attempt with malformed token', {
+      token: token.slice(0, 8),
+    });
+    redirect('/');
   }
 
   // Get request headers for audit
@@ -46,6 +49,35 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
     headersList.get('x-real-ip') ||
     null;
   const claimedUserAgent = headersList.get('user-agent') || null;
+
+  const claimIp = claimedFromIp ?? 'unknown';
+  const claimIpKey = `claim:ip:${claimIp}`;
+  const claimTokenKey = `claim:token:${token}`;
+
+  if (checkRateLimit(claimIpKey) || checkRateLimit(claimTokenKey)) {
+    logger.warn('Claim attempt rate limited', {
+      token: token.slice(0, 8),
+      ip: claimIp,
+    });
+    redirect('/');
+  }
+
+  const { userId } = await auth();
+
+  if (!userId) {
+    const redirectTarget = `/claim/${encodeURIComponent(token)}`;
+    // Redirect to signup (most claim users are new) with redirect back to claim
+    redirect(`/signup?redirect_url=${encodeURIComponent(redirectTarget)}`);
+  }
+
+  const claimUserKey = `claim:user:${userId}`;
+  if (checkRateLimit(claimUserKey)) {
+    logger.warn('Claim attempt rate limited by user', {
+      token: token.slice(0, 8),
+      clerkId: userId,
+    });
+    redirect('/');
+  }
 
   // Look up profile by claim token
   const [profile] = await db
@@ -150,7 +182,11 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
         eq(creatorProfiles.id, profile.id),
         eq(creatorProfiles.claimToken, token),
         eq(creatorProfiles.isClaimed, false),
-        isNull(creatorProfiles.userId)
+        isNull(creatorProfiles.userId),
+        or(
+          isNull(creatorProfiles.claimTokenExpiresAt),
+          gte(creatorProfiles.claimTokenExpiresAt, now)
+        )
       )
     )
     .returning({

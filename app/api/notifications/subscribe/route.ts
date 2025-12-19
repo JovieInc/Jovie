@@ -13,6 +13,10 @@ import {
 } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { sendNotification } from '@/lib/notifications/service';
+import {
+  normalizeSubscriptionEmail,
+  normalizeSubscriptionPhone,
+} from '@/lib/notifications/validation';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { checkStatsigGateForUser } from '@/lib/statsig/server';
 
@@ -21,44 +25,25 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-function normalizePhoneToE164(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-
-  let normalized = trimmed.replace(/(?!^\+)[^\d]/g, '');
-
-  if (normalized.startsWith('00')) {
-    normalized = `+${normalized.slice(2)}`;
-  }
-
-  if (!normalized.startsWith('+')) {
-    normalized = `+${normalized}`;
-  }
-
-  normalized = `+${normalized.slice(1).replace(/\D/g, '')}`;
-
-  if (!/^\+[1-9]\d{6,14}$/.test(normalized)) {
-    return null;
-  }
-
-  return normalized;
-}
-
 // Schema for subscription request validation
 const subscribeSchema = z
   .object({
     artist_id: z.string().uuid(),
-    channel: z.enum(['email', 'phone']).default('email'),
-    email: z.string().email().optional(),
-    phone: z.string().min(1).max(64).optional(),
-    country_code: z.string().min(2).max(2).optional(),
-    city: z.string().min(1).max(120).optional(),
+    channel: z.enum(['email', 'sms']).default('email'),
+    email: z.string().max(254).optional(),
+    phone: z.string().max(32).optional(),
+    country_code: z
+      .string()
+      .length(2)
+      .regex(/^[a-zA-Z]{2}$/)
+      .optional(),
+    city: z.string().max(120).optional(),
     source: z.string().min(1).max(80).default('profile_bell'),
   })
   .refine(
     data =>
       (data.channel === 'email' && Boolean(data.email)) ||
-      (data.channel === 'phone' && Boolean(data.phone)),
+      (data.channel === 'sms' && Boolean(data.phone)),
     {
       message: 'Email or phone is required for the selected channel',
       path: ['channel'],
@@ -183,12 +168,26 @@ export async function POST(request: NextRequest) {
     const cityValue = (city || geoCity)?.trim() || null;
 
     const normalizedEmail =
-      channel === 'email' && email ? email.trim().toLowerCase() : null;
+      channel === 'email' ? normalizeSubscriptionEmail(email) : null;
 
     const normalizedPhone =
-      channel === 'phone' && phone ? normalizePhoneToE164(phone) : null;
+      channel === 'sms' ? normalizeSubscriptionPhone(phone) : null;
 
-    if (channel === 'phone' && !normalizedPhone) {
+    if (channel === 'email' && !normalizedEmail) {
+      await trackServerEvent('notifications_subscribe_error', {
+        artist_id,
+        error_type: 'validation_error',
+        validation_errors: ['Invalid email address'],
+        source,
+      });
+
+      return NextResponse.json(
+        { success: false, error: 'Please provide a valid email address' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (channel === 'sms' && !normalizedPhone) {
       await trackServerEvent('notifications_subscribe_error', {
         artist_id,
         error_type: 'validation_error',
@@ -219,7 +218,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: artist_id,
         channel,
         email: normalizedEmail,
-        phone: channel === 'phone' ? normalizedPhone : null,
+        phone: channel === 'sms' ? normalizedPhone : null,
         countryCode,
         city: cityValue,
         ipAddress,

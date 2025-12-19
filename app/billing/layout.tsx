@@ -9,7 +9,7 @@ export default async function BillingLayout({
   // Ensure user is authenticated
   const { userId } = await auth();
   if (!userId) {
-    redirect('/sign-in');
+    redirect('/signin');
   }
 
   return (

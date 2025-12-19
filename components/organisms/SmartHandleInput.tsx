@@ -271,7 +271,7 @@ export function SmartHandleInput({
       return (
         <span
           aria-hidden
-          className='flex size-4 items-center justify-center rounded-full bg-surface-2 text-[color:var(--accent-speed)]'
+          className='flex size-4 items-center justify-center rounded-full bg-surface-2 text-(--accent-speed)'
         >
           <Icon name='Check' className='size-3' strokeWidth={2.5} />
         </span>
@@ -312,7 +312,7 @@ export function SmartHandleInput({
     <div className={`space-y-2 ${className}`}>
       {/* Input with prefix and validation icon */}
       <div className='relative'>
-        <div className='absolute left-3 top-1/2 -translate-y-1/2 z-10 text-sm font-mono text-secondary-token'>
+        <div className='absolute left-3 top-1/2 -translate-y-1/2 z-10 text-sm font-sans text-secondary-token'>
           {prefix}
         </div>
         <Input
@@ -321,8 +321,8 @@ export function SmartHandleInput({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           disabled={disabled}
-          className='font-mono pl-20'
-          inputClassName='font-mono'
+          className='font-sans pl-20'
+          inputClassName='font-sans'
           id={inputId}
           validationState={
             !value
@@ -348,7 +348,7 @@ export function SmartHandleInput({
       {/* Live preview */}
       <div className='text-xs text-secondary-token' id={previewId}>
         Your profile will be live at{' '}
-        <span className='font-mono text-primary-token'>
+        <span className='font-sans text-primary-token'>
           {prefix}
           {value || placeholder}
         </span>
@@ -356,10 +356,10 @@ export function SmartHandleInput({
 
       {/* Status message - always reserve space to prevent layout shift */}
       <div
-        className={`text-xs min-h-[1.25rem] transition-all duration-300 ${
+        className={`text-xs min-h-5 transition-all duration-300 ${
           statusMessage
             ? handleValidation.available && clientValidation.valid
-              ? 'text-[color:var(--accent-speed)] opacity-100'
+              ? 'text-(--accent-speed) opacity-100'
               : 'text-destructive opacity-100'
             : 'opacity-0'
         }`}
@@ -381,7 +381,7 @@ export function SmartHandleInput({
                 key={suggestion}
                 type='button'
                 onClick={() => onChange(suggestion)}
-                className='text-xs px-3 py-1.5 rounded-md transition-colors duration-150 font-mono bg-surface-2 hover:bg-surface-3 text-primary-token'
+                className='text-xs px-3 py-1.5 rounded-md transition-colors duration-150 font-sans bg-surface-2 hover:bg-surface-3 text-primary-token'
                 disabled={disabled}
               >
                 @{suggestion}

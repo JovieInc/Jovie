@@ -40,6 +40,7 @@ export const STATSIG_FLAGS = {
   // Integration Features
   PRICING_USE_CLERK: 'feature_pricing_use_clerk',
   LINK_INGESTION: 'feature_link_ingestion',
+  DISCOG_SMART_LINKS: 'feature_discog_smart_links',
 } as const;
 
 export type StatsigFlagName =

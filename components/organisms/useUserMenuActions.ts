@@ -1,15 +1,11 @@
+import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
 import type { BillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
 
-type SignOutHandler = (options?: {
-  sessionId?: string;
-  redirectUrl?: string;
-  signOutAll?: boolean;
-  redirectUrlComplete?: string;
-}) => Promise<void>;
+type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 
 const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
@@ -40,7 +36,7 @@ interface UseUserMenuActionsParams {
   profileUrl?: string;
   settingsUrl?: string;
   redirectToUrl: (url: string) => void;
-  signOut: SignOutHandler;
+  signOut: ClerkSignOut;
 }
 
 export function useUserMenuActions({

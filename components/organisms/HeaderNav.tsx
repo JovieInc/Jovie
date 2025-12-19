@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
 import { AuthActions } from '@/components/molecules/AuthActions';
 import { Container } from '@/components/site/Container';
@@ -12,16 +13,20 @@ export interface HeaderNavProps {
   sticky?: boolean;
   className?: string;
   logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  logoVariant?: LogoVariant;
   hideNav?: boolean;
   hidePricingLink?: boolean;
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 export function HeaderNav({
   sticky: _sticky = true,
   className,
   logoSize = 'sm',
+  logoVariant = 'word',
   hideNav = false,
   hidePricingLink = false,
+  containerSize = 'lg',
 }: HeaderNavProps = {}) {
   // Note: sticky prop reserved for future use
   void _sticky;
@@ -31,11 +36,11 @@ export function HeaderNav({
       className={cn('sticky top-0 z-50 w-full bg-base', className)}
       style={{ fontSynthesisWeight: 'none' }}
     >
-      <Container>
+      <Container size={containerSize}>
         <div className='flex h-16 items-center'>
           {/* Logo - Left side */}
           <div className='flex items-center'>
-            <LogoLink logoSize={logoSize} />
+            <LogoLink logoSize={logoSize} variant={logoVariant} />
           </div>
 
           {!hideNav ? (

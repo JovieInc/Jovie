@@ -16,6 +16,7 @@ import {
   MailX,
   MoreHorizontal,
   MoreVertical,
+  RefreshCw,
   Star,
   Trash2,
   X,
@@ -38,9 +39,11 @@ interface CreatorActionsMenuProps {
   profile: AdminCreatorProfileRow;
   isMobile: boolean;
   status: CreatorActionStatus;
+  refreshIngestStatus?: CreatorActionStatus;
   onToggleVerification: () => Promise<void>;
   onToggleFeatured: () => Promise<void>;
   onToggleMarketing: () => Promise<void>;
+  onRefreshIngest?: () => Promise<void>;
   onDelete: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -62,16 +65,18 @@ export function CreatorActionsMenu({
   profile,
   isMobile,
   status,
+  refreshIngestStatus,
   onToggleVerification,
   onToggleFeatured,
   onToggleMarketing,
+  onRefreshIngest,
   onDelete,
   open,
   onOpenChange,
 }: CreatorActionsMenuProps) {
   const [copySuccess, setCopySuccess] = useState(false);
 
-  const isLoading = status === 'loading';
+  const isLoading = status === 'loading' || refreshIngestStatus === 'loading';
   const isSuccess = status === 'success';
   const isError = status === 'error';
 
@@ -118,6 +123,21 @@ export function CreatorActionsMenu({
             sideOffset={8}
             className={geistTableMenuContentClass}
           >
+            {onRefreshIngest ? (
+              <>
+                <DropdownMenuItem
+                  onClick={onRefreshIngest}
+                  className={geistTableMenuItemClass}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className='h-4 w-4' />
+                  Refresh ingest
+                </DropdownMenuItem>
+                <DropdownMenuSeparator
+                  className={geistTableMenuSeparatorClass}
+                />
+              </>
+            ) : null}
             <DropdownMenuItem
               onClick={onToggleVerification}
               className={geistTableMenuItemClass}
@@ -226,6 +246,19 @@ export function CreatorActionsMenu({
         sideOffset={8}
         className={cn('w-56', geistTableMenuContentClass)}
       >
+        {onRefreshIngest ? (
+          <>
+            <DropdownMenuItem
+              onClick={onRefreshIngest}
+              className={geistTableMenuItemClass}
+              disabled={isLoading}
+            >
+              <RefreshCw className='h-4 w-4' />
+              Refresh ingest
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className={geistTableMenuSeparatorClass} />
+          </>
+        ) : null}
         <DropdownMenuItem
           onClick={onToggleVerification}
           className={geistTableMenuItemClass}
