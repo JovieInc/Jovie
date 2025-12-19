@@ -185,6 +185,13 @@ Ask Claude to create the gate using the Statsig MCP, providing:
 - **Expiry**: Can be removed after Q1 2025
 - **Used in**: Legacy pricing code
 
+#### `feature_discog_smart_links`
+- **Status**: Development
+- **Default**: `false`
+- **Description**: Gate Spotify discography ingestion, multi-DSP link mapping, and smart listen routing for artist profiles (JOV-239 epic).
+- **Expiry**: Review after initial internal testing
+- **Used in**: Upcoming discography ingestion and smart link routing flows
+
 ## Flag Lifecycle Rules
 
 Per `agents.md`:
