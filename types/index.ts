@@ -69,6 +69,8 @@ export type {
   SocialLink,
   SocialLinkState,
   SocialPlatform,
+  SpotifyDiscographyRelease,
+  SpotifyDiscographyTrack,
   // Billing interfaces
   Subscription,
   SubscriptionPlan,

@@ -327,6 +327,43 @@ export interface Release {
   updated_at: string;
 }
 
+export interface SpotifyDiscographyRelease {
+  id: string;
+  creator_profile_id: string;
+  spotify_id: string;
+  spotify_url?: string | null;
+  name: string;
+  album_type: string;
+  release_date?: string | null;
+  release_date_precision?: string | null;
+  total_tracks?: number | null;
+  upc?: string | null;
+  image_url?: string | null;
+  artists: Array<{ id?: string; name: string }> | null;
+  last_seen_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpotifyDiscographyTrack {
+  id: string;
+  release_id: string;
+  creator_profile_id: string;
+  spotify_id: string;
+  spotify_url?: string | null;
+  name: string;
+  duration_ms?: number | null;
+  track_number?: number | null;
+  disc_number?: number | null;
+  explicit: boolean;
+  isrc?: string | null;
+  preview_url?: string | null;
+  artists: Array<{ id?: string; name: string }> | null;
+  last_seen_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // =====================================
 // ANALYTICS AND TRACKING INTERFACES
 // =====================================

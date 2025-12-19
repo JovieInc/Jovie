@@ -4,6 +4,7 @@ import {
   determineJobFailure,
 } from '@/lib/ingestion/processor';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import { SpotifyRateLimitError } from '@/lib/spotify';
 
 // Mock the strategies
 vi.mock('@/lib/ingestion/strategies/linktree', () => ({
@@ -111,6 +112,13 @@ describe('Ingestion Processor', () => {
 
       expect(failure.reason).toBe('rate_limited');
       expect(failure.message).toContain('Rate limited');
+
+      const spotifyRateLimited = determineJobFailure(
+        new SpotifyRateLimitError('Spotify is throttling', 1000)
+      );
+
+      expect(spotifyRateLimited.reason).toBe('rate_limited');
+      expect(spotifyRateLimited.message).toContain('Spotify is throttling');
 
       const generic = determineJobFailure(new Error('Network flake'));
       expect(generic.reason).toBe('transient');

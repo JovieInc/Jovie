@@ -15,6 +15,7 @@ import {
   ingestionJobs,
   socialLinks,
 } from '@/lib/db';
+import { SpotifyRateLimitError } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
@@ -22,6 +23,7 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { syncSpotifyDiscography } from './spotify-discography';
 import { ExtractionError } from './strategies/base';
 import {
   extractBeacons,
@@ -82,6 +84,10 @@ export function determineJobFailure(error: unknown): {
   reason: JobFailureReason;
 } {
   if (error instanceof ExtractionError && error.code === 'RATE_LIMITED') {
+    return { message: error.message, reason: 'rate_limited' };
+  }
+
+  if (error instanceof SpotifyRateLimitError) {
     return { message: error.message, reason: 'rate_limited' };
   }
 
@@ -152,6 +158,10 @@ function getCreatorProfileIdFromJob(
       const parsed = beaconsPayloadSchema.safeParse(job.payload);
       return parsed.success ? parsed.data.creatorProfileId : null;
     }
+    case 'import_spotify_discography': {
+      const parsed = spotifyDiscographyPayloadSchema.safeParse(job.payload);
+      return parsed.success ? parsed.data.creatorProfileId : null;
+    }
     default:
       return null;
   }
@@ -207,6 +217,11 @@ const beaconsPayloadSchema = z.object({
   sourceUrl: z.string().url(),
   dedupKey: z.string().optional(),
   depth: z.number().int().min(0).max(3).default(0),
+});
+
+const spotifyDiscographyPayloadSchema = z.object({
+  creatorProfileId: z.string().uuid(),
+  spotifyId: z.string(),
 });
 type SocialLinkRow = typeof socialLinks.$inferSelect;
 
@@ -854,6 +869,8 @@ export async function processJob(
       return processYouTubeJob(tx, job.payload);
     case 'import_beacons':
       return processBeaconsJob(tx, job.payload);
+    case 'import_spotify_discography':
+      return processSpotifyDiscographyJob(tx, job.payload);
     default:
       throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
   }
@@ -917,6 +934,80 @@ async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+async function processSpotifyDiscographyJob(tx: DbType, jobPayload: unknown) {
+  const parsed = spotifyDiscographyPayloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      spotifyId: creatorProfiles.spotifyId,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  const spotifyId = profile.spotifyId ?? parsed.spotifyId;
+  if (!spotifyId) {
+    throw new Error('Creator profile missing spotify_id');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({
+      ingestionStatus: 'processing',
+      lastIngestionError: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const result = await syncSpotifyDiscography({
+      tx,
+      creatorProfileId: profile.id,
+      spotifyId,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'idle',
+        lastIngestionError: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    logger.info('Spotify discography ingestion completed', {
+      profileId: profile.id,
+      spotifyId,
+      releasesFetched: result.releasesFetched,
+      releasesUpserted: result.releasesUpserted,
+      tracksUpserted: result.tracksUpserted,
+    });
+
+    return result;
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'Spotify discography ingestion failed';
+
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+
     throw error;
   }
 }
