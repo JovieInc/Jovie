@@ -1,10 +1,9 @@
 import 'server-only';
 
 import { clerkClient } from '@clerk/nextjs/server';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { validateClerkUserId } from '@/lib/auth/session';
+import { eq } from 'drizzle-orm';
+import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
-import { type DbType, db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -26,24 +25,6 @@ interface UsernameUpdateOutcome {
   canonicalUsername: string;
 }
 
-async function withClerkRlsTx<T>(
-  clerkUserId: string,
-  operation: (tx: DbType) => Promise<T>
-): Promise<T> {
-  validateClerkUserId(clerkUserId);
-
-  return db.transaction(async tx => {
-    await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.user_id = '${clerkUserId}'`)
-    );
-    await tx.execute(
-      drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${clerkUserId}'`)
-    );
-
-    return operation(tx);
-  });
-}
-
 async function updateCanonicalUsernameInternal(
   clerkUserId: string,
   rawUsername: string
@@ -58,69 +39,77 @@ async function updateCanonicalUsernameInternal(
 
   const normalized = normalizeUsername(rawUsername);
 
-  return withClerkRlsTx(clerkUserId, async tx => {
-    const [userRow] = await tx
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
+  return withDbSessionTx(
+    async (tx, sessionClerkUserId) => {
+      const effectiveClerkUserId = sessionClerkUserId;
+      if (effectiveClerkUserId !== clerkUserId) {
+        throw new Error('Clerk user mismatch while syncing username');
+      }
 
-    if (!userRow) {
-      throw new Error('User not found');
-    }
+      const [userRow] = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, effectiveClerkUserId))
+        .limit(1);
 
-    const [profile] = await tx
-      .select()
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, userRow.id))
-      .limit(1);
+      if (!userRow) {
+        throw new Error('User not found');
+      }
 
-    if (!profile) {
-      throw new Error('Creator profile not found');
-    }
+      const [profile] = await tx
+        .select()
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.userId, userRow.id))
+        .limit(1);
 
-    const canonicalUsername = profile.usernameNormalized;
+      if (!profile) {
+        throw new Error('Creator profile not found');
+      }
 
-    if (canonicalUsername === normalized) {
+      const canonicalUsername = profile.usernameNormalized;
+
+      if (canonicalUsername === normalized) {
+        return {
+          normalized,
+          changed: false,
+          conflict: false,
+          canonicalUsername,
+        };
+      }
+
+      const [conflict] = await tx
+        .select({ id: creatorProfiles.id })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.usernameNormalized, normalized))
+        .limit(1);
+
+      if (conflict && conflict.id !== profile.id) {
+        return {
+          normalized,
+          changed: false,
+          conflict: true,
+          canonicalUsername,
+        };
+      }
+
+      await tx
+        .update(creatorProfiles)
+        .set({
+          username: rawUsername,
+          usernameNormalized: normalized,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+
       return {
         normalized,
-        changed: false,
+        changed: true,
         conflict: false,
-        canonicalUsername,
+        canonicalUsername: normalized,
       };
-    }
-
-    const [conflict] = await tx
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.usernameNormalized, normalized))
-      .limit(1);
-
-    if (conflict && conflict.id !== profile.id) {
-      return {
-        normalized,
-        changed: false,
-        conflict: true,
-        canonicalUsername,
-      };
-    }
-
-    await tx
-      .update(creatorProfiles)
-      .set({
-        username: rawUsername,
-        usernameNormalized: normalized,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    return {
-      normalized,
-      changed: true,
-      conflict: false,
-      canonicalUsername: normalized,
-    };
-  });
+    },
+    { clerkUserId }
+  );
 }
 
 export async function syncCanonicalUsernameFromApp(
