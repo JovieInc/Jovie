@@ -5,6 +5,7 @@
 
 import 'server-only';
 import { eq } from 'drizzle-orm';
+import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -75,26 +76,31 @@ export async function checkUserHasProfile(
   clerkUserId: string
 ): Promise<boolean> {
   try {
-    // First get the user's database ID from Clerk ID
-    const [user] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
+    return await withDbSession(
+      async sessionClerkUserId => {
+        // First get the user's database ID from Clerk ID
+        const [user] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.clerkId, sessionClerkUserId))
+          .limit(1);
 
-    if (!user) {
-      // User doesn't exist in our database yet
-      return false;
-    }
+        if (!user) {
+          // User doesn't exist in our database yet
+          return false;
+        }
 
-    // Check if user has any creator profiles
-    const [profile] = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, user.id))
-      .limit(1);
+        // Check if user has any creator profiles
+        const [profile] = await db
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.userId, user.id))
+          .limit(1);
 
-    return !!profile;
+        return !!profile;
+      },
+      { clerkUserId }
+    );
   } catch (error) {
     console.error('Error checking user profile:', error);
     return false; // Assume no profile on error to allow creation attempt

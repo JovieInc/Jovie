@@ -127,6 +127,18 @@ main.jov.ie  jov.ie
 - ✅ **Conditional execution:** Only runs when needed
 - ✅ **Comprehensive logging:** Clear status messages
 
+### **Test Quarantine (Flaky Test Isolation):**
+
+- ✅ **Single source of truth:** `tests/quarantine.json` lists quarantined unit + E2E specs.
+- ✅ **Fast checks stay fast:** Quarantined tests never gate typecheck/lint.
+- ✅ **Reliable signal:** Quarantined suites run separately with retries and report status without blocking merges.
+
+**Process:**
+1. Add test file paths to `tests/quarantine.json` under `unit` or `e2e`.
+2. CI runs non-quarantined tests as the default lane.
+3. Quarantined tests run in a separate step with retries, logging results for visibility.
+4. Remove entries once a fix is verified and the test is stable.
+
 ---
 
 ## 🚀 **YC-Aligned Rapid Deployment**

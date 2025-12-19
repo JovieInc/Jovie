@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OtpSignUpForm } from '@/components/auth/OtpSignUpForm';
+import { fastRender, renderWithClerk } from '@/tests/utils/fast-render';
 
 vi.mock('@clerk/nextjs', () => ({
   useClerk: () => ({
@@ -149,34 +150,37 @@ vi.mock('next/link', () => ({
 }));
 
 describe('OtpSignUpForm', () => {
+  const renderSignUp = () => fastRender(<OtpSignUpForm />);
+  const renderSignUpIntegration = () => renderWithClerk(<OtpSignUpForm />);
+
   it('renders the signup form correctly', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     expect(screen.getByTestId('signup-root')).toBeInTheDocument();
   });
 
   it('renders both form steps', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     expect(screen.getByTestId('signup-step-start')).toBeInTheDocument();
     expect(screen.getByTestId('signup-step-verifications')).toBeInTheDocument();
   });
 
   it('includes ARIA labels for accessibility', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const startStep = screen.getByTestId('signup-step-start');
     const verificationsStep = screen.getByTestId('signup-step-verifications');
 
-    expect(startStep).toHaveAttribute('aria-label', 'Enter your email address');
+    expect(startStep).toHaveAttribute('aria-label', 'Choose a sign-up method');
     expect(verificationsStep).toHaveAttribute(
       'aria-label',
       'Verify your email with code'
     );
   });
 
-  it('renders the multi-method start screen buttons', () => {
-    render(<OtpSignUpForm />);
+  it('renders the multi-method sign-up buttons', () => {
+    renderSignUp();
 
     expect(screen.getByText('Continue with email')).toBeInTheDocument();
     expect(screen.getByText('Continue with Spotify')).toBeInTheDocument();
@@ -184,7 +188,7 @@ describe('OtpSignUpForm', () => {
   });
 
   it('displays "Verify Code" button in verifications step', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const buttons = screen.getAllByTestId('signup-action');
     expect(
@@ -193,21 +197,21 @@ describe('OtpSignUpForm', () => {
   });
 
   it('uses semantic design tokens for global error', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const globalError = screen.getByTestId('global-error');
     expect(globalError).toHaveClass('text-destructive');
   });
 
   it('renders field errors with correct styling', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const fieldErrors = screen.getAllByTestId('field-error');
     expect(fieldErrors.length).toBeGreaterThan(0);
   });
 
-  it('renders email input field after choosing email flow', () => {
-    render(<OtpSignUpForm />);
+  it('supports the email sign-up flow end-to-end', () => {
+    renderSignUpIntegration();
 
     fireEvent.click(screen.getByText('Continue with email'));
 
@@ -216,16 +220,16 @@ describe('OtpSignUpForm', () => {
   });
 
   it('renders OTP input with type="otp" and autoSubmit', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
-    const inputs = screen.getAllByTestId('clerk-input');
-    const otpInput = inputs[0];
+    const verificationsStep = screen.getByTestId('signup-step-verifications');
+    const otpInput = within(verificationsStep).getByTestId('clerk-input');
     expect(otpInput).toHaveAttribute('data-type', 'otp');
     expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });
 
   it('has screen reader labels for form fields', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const labels = screen.getAllByTestId('clerk-label');
     expect(labels.length).toBeGreaterThan(0);
@@ -235,7 +239,7 @@ describe('OtpSignUpForm', () => {
   });
 
   it('has aria-live region for global errors', () => {
-    render(<OtpSignUpForm />);
+    renderSignUp();
 
     const errorContainer = screen.getByRole('alert');
     expect(errorContainer).toHaveAttribute('aria-live', 'polite');

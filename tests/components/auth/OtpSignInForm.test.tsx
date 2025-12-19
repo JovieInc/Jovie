@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OtpSignInForm } from '@/components/auth/OtpSignInForm';
+import { fastRender, renderWithClerk } from '@/tests/utils/fast-render';
 
 vi.mock('@clerk/nextjs', () => ({
   useClerk: () => ({
@@ -152,21 +153,24 @@ vi.mock('next/link', () => ({
 }));
 
 describe('OtpSignInForm', () => {
+  const renderSignIn = () => fastRender(<OtpSignInForm />);
+  const renderSignInIntegration = () => renderWithClerk(<OtpSignInForm />);
+
   it('renders the signin form correctly', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     expect(screen.getByTestId('signin-root')).toBeInTheDocument();
   });
 
   it('renders both form steps', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     expect(screen.getByTestId('signin-step-start')).toBeInTheDocument();
     expect(screen.getByTestId('signin-step-verifications')).toBeInTheDocument();
   });
 
   it('includes ARIA labels for accessibility', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const startStep = screen.getByTestId('signin-step-start');
     const verificationsStep = screen.getByTestId('signin-step-verifications');
@@ -178,40 +182,39 @@ describe('OtpSignInForm', () => {
     );
   });
 
-  it('renders the multi-method start screen buttons', () => {
-    render(<OtpSignInForm />);
+  it('renders the multi-method sign-in buttons', () => {
+    renderSignIn();
 
-    // Method chooser renders buttons directly and via Clerk.Connection
     expect(screen.getByText('Continue with email')).toBeInTheDocument();
     expect(screen.getByText('Continue with Spotify')).toBeInTheDocument();
     expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Continue code" button in verifications step', () => {
-    render(<OtpSignInForm />);
+  it('displays "Verify code" button in verifications step', () => {
+    renderSignIn();
 
     const buttons = screen.getAllByTestId('signin-action');
     expect(
-      buttons.some(button => button.textContent?.includes('Continue code'))
+      buttons.some(button => button.textContent?.includes('Verify code'))
     ).toBe(true);
   });
 
   it('uses semantic design tokens for global error', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const globalError = screen.getByTestId('global-error');
     expect(globalError).toHaveClass('text-destructive');
   });
 
   it('renders field errors with correct styling', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const fieldErrors = screen.getAllByTestId('field-error');
     expect(fieldErrors.length).toBeGreaterThan(0);
   });
 
-  it('renders email input field after choosing email flow', () => {
-    render(<OtpSignInForm />);
+  it('supports the email sign-in flow end-to-end', () => {
+    renderSignInIntegration();
 
     fireEvent.click(screen.getByText('Continue with email'));
 
@@ -226,7 +229,7 @@ describe('OtpSignInForm', () => {
   });
 
   it('renders OTP input with type="otp" and autoSubmit', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const verificationsStep = screen.getByTestId('signin-step-verifications');
     const otpInput = within(verificationsStep).getByTestId('clerk-input');
@@ -235,7 +238,7 @@ describe('OtpSignInForm', () => {
   });
 
   it('has screen reader labels for form fields', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const labels = screen.getAllByTestId('clerk-label');
     expect(labels.length).toBeGreaterThan(0);
@@ -245,7 +248,7 @@ describe('OtpSignInForm', () => {
   });
 
   it('has aria-live region for global errors', () => {
-    render(<OtpSignInForm />);
+    renderSignIn();
 
     const errorContainer = screen.getByRole('alert');
     expect(errorContainer).toHaveAttribute('aria-live', 'polite');

@@ -45,6 +45,7 @@
     "test:fast": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.fast.mts",
     "test:profile": "tsx scripts/test-performance-profiler.ts",
     "test:guard": "tsx scripts/test-performance-guard.ts",
+    "test:budgets": "tsx scripts/performance-budgets-guard.ts",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

@@ -11,7 +11,11 @@ import {
   inArray,
   or,
 } from 'drizzle-orm';
-import { unstable_noStore as noStore, revalidateTag } from 'next/cache';
+import {
+  unstable_noStore as noStore,
+  revalidateTag,
+  updateTag,
+} from 'next/cache';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
@@ -551,7 +555,8 @@ export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
         set: { sidebarCollapsed: collapsed, updatedAt: new Date() },
       });
   });
-  revalidateTag('dashboard-data', 'default');
+  updateTag('dashboard-data');
+  revalidateTag('dashboard-data', 'max');
 }
 
 export async function updateCreatorProfile(

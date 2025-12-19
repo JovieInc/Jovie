@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import type {
@@ -106,52 +107,68 @@ export const mergePreferences = (
   };
 };
 
+const withNotificationSession = async <T>(
+  target: NotificationTarget,
+  operation: () => Promise<T>
+): Promise<T> => {
+  if (target.clerkUserId) {
+    return await withDbSession(async () => operation(), {
+      clerkUserId: target.clerkUserId,
+    });
+  }
+
+  return await operation();
+};
+
 const fetchStoredPreferences = async (target: NotificationTarget) => {
   if (!target.creatorProfileId && !target.userId && !target.clerkUserId) {
     return {
       preferences: null as NotificationPreferences | null,
+      creatorProfileId: null as string | null,
       settings: null,
     };
   }
 
-  const baseQuery = db
-    .select({
-      settings: creatorProfiles.settings,
-      marketingOptOut: creatorProfiles.marketingOptOut,
-      email: users.email,
-      creatorProfileId: creatorProfiles.id,
-    })
-    .from(creatorProfiles)
-    .leftJoin(users, eq(users.id, creatorProfiles.userId));
+  return await withNotificationSession(target, async () => {
+    const baseQuery = db
+      .select({
+        settings: creatorProfiles.settings,
+        marketingOptOut: creatorProfiles.marketingOptOut,
+        email: users.email,
+        creatorProfileId: creatorProfiles.id,
+      })
+      .from(creatorProfiles)
+      .leftJoin(users, eq(users.id, creatorProfiles.userId));
 
-  const whereCondition = target.creatorProfileId
-    ? eq(creatorProfiles.id, target.creatorProfileId)
-    : target.userId
-      ? eq(creatorProfiles.userId, target.userId)
-      : target.clerkUserId
-        ? eq(users.clerkId, target.clerkUserId)
-        : undefined;
+    const whereCondition = target.creatorProfileId
+      ? eq(creatorProfiles.id, target.creatorProfileId)
+      : target.userId
+        ? eq(creatorProfiles.userId, target.userId)
+        : target.clerkUserId
+          ? eq(users.clerkId, target.clerkUserId)
+          : undefined;
 
-  const query = whereCondition ? baseQuery.where(whereCondition) : baseQuery;
+    const query = whereCondition ? baseQuery.where(whereCondition) : baseQuery;
 
-  const [row] = await query.limit(1);
+    const [row] = await query.limit(1);
 
-  if (!row) {
-    return { preferences: null, settings: null };
-  }
+    if (!row) {
+      return { preferences: null, creatorProfileId: null, settings: null };
+    }
 
-  const rawSettings = isRecord(row.settings) ? row.settings : {};
-  const typedSettings = rawSettings as NotificationSettings;
+    const rawSettings = isRecord(row.settings) ? row.settings : {};
+    const typedSettings = rawSettings as NotificationSettings;
 
-  return {
-    preferences: normalizePreferences(
-      typedSettings,
-      row.marketingOptOut ?? false,
-      target.email ?? row.email
-    ),
-    creatorProfileId: row.creatorProfileId,
-    settings: rawSettings,
-  };
+    return {
+      preferences: normalizePreferences(
+        typedSettings,
+        row.marketingOptOut ?? false,
+        target.email ?? row.email
+      ),
+      creatorProfileId: row.creatorProfileId,
+      settings: rawSettings,
+    };
+  });
 };
 
 export const getNotificationPreferences = async (
@@ -206,18 +223,20 @@ export const markNotificationDismissed = async (
     },
   };
 
-  await db
-    .update(creatorProfiles)
-    .set({
-      settings: {
-        ...baseSettings,
-        ...nextSettings,
-        notifications: {
-          ...existingNotifications,
-          ...nextSettings.notifications,
-        },
-      } as Record<string, unknown>,
-      updatedAt: new Date(),
-    })
-    .where(eq(creatorProfiles.id, creatorProfileId));
+  await withNotificationSession(target, async () => {
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: {
+          ...baseSettings,
+          ...nextSettings,
+          notifications: {
+            ...existingNotifications,
+            ...nextSettings.notifications,
+          },
+        } as Record<string, unknown>,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+  });
 };

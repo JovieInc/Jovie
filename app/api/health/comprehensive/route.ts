@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { checkDbHealth, validateDbConnection } from '@/lib/db';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
-import { getEnvironmentInfo, validateEnvironment } from '@/lib/env';
+import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { validateDatabaseEnvironment } from '@/lib/startup/environment-validator';
 import { logger } from '@/lib/utils/logger';
 import {

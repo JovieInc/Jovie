@@ -1,4 +1,4 @@
-import { unstable_cache, unstable_noStore } from 'next/cache';
+import { cacheLife, cacheTag, unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
@@ -130,13 +130,13 @@ const fetchProfileAndLinks = async (
   }
 };
 
-// Cache the database query across requests with a short TTL to keep hot profiles sub-100ms.
-const getCachedProfileAndLinks = unstable_cache(
-  fetchProfileAndLinks,
-  // Key prefix stays stable; args are included in the cache key so each username gets its own entry.
-  ['public-profile-v1'],
-  { revalidate: 60 }
-);
+// Cache public profile reads across requests; tags keep updates fast and precise.
+const getCachedProfileAndLinks = async (username: string) => {
+  'use cache';
+  cacheTag('public-profile', `public-profile:${username}`);
+  cacheLife('hours');
+  return fetchProfileAndLinks(username);
+};
 
 // Memoize per-request to avoid duplicate DB work between generateMetadata and page render.
 const getProfileAndLinks = cache(

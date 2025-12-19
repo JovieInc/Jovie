@@ -4,6 +4,7 @@
  */
 
 import { sql as drizzleSql, eq, lt } from 'drizzle-orm';
+import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { wrappedLinks } from '@/lib/db/schema';
 import {
@@ -67,7 +68,7 @@ export async function createWrappedLink(
   let shortId = customAlias || generateShortId();
   let expiresAt: Date | null = null;
 
-  try {
+  const createRecord = async () => {
     // Ensure short ID is unique
     let attempts = 0;
     while (attempts < 5) {
@@ -127,6 +128,16 @@ export async function createWrappedLink(
       createdAt: data.createdAt.toISOString(),
       expiresAt: data.expiresAt?.toISOString() || undefined,
     };
+  };
+
+  try {
+    const result = userId
+      ? await withDbSession(async () => createRecord(), {
+          clerkUserId: userId,
+        })
+      : await createRecord();
+
+    return result;
   } catch (error) {
     console.error('Link wrapping service error:', error);
 
@@ -154,7 +165,7 @@ export async function createWrappedLink(
         titleAlias: category.alias || getCrawlerSafeLabel(domain),
         clickCount: 0,
         createdAt: new Date().toISOString(),
-        expiresAt: expiresAt?.toISOString() || undefined,
+        expiresAt: (expiresAt as Date | null)?.toISOString() || undefined,
       };
     }
 
@@ -287,10 +298,18 @@ export async function incrementClickCount(shortId: string): Promise<boolean> {
  */
 export async function getLinkStats(userId?: string): Promise<LinkStats> {
   try {
-    const data = await db
-      .select()
-      .from(wrappedLinks)
-      .where(userId ? eq(wrappedLinks.createdBy, userId) : undefined);
+    const fetchLinks = async () => {
+      return await db
+        .select()
+        .from(wrappedLinks)
+        .where(userId ? eq(wrappedLinks.createdBy, userId) : undefined);
+    };
+
+    const data = userId
+      ? await withDbSession(async () => fetchLinks(), {
+          clerkUserId: userId,
+        })
+      : await fetchLinks();
 
     const totalClicks = data.reduce(
       (sum, link) => sum + (link.clickCount || 0),
