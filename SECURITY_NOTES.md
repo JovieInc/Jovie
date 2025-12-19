@@ -95,6 +95,12 @@ _Last reviewed: 2025-11-29_
   - Inline scripts are allowed (`'unsafe-inline'`) to support the inline theme bootstrapping snippet and JSON-LD metadata in `app/layout.tsx`.
   - `frame-ancestors 'none'` is included to match `X-Frame-Options: DENY`.
 
+- **HSTS (non-local only)**
+  - `next.config.js` adds `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` for non-local environments only.
+  - **Verification:** in local dev confirm `Strict-Transport-Security` is **absent**; in staging confirm the header is **present** (e.g., `curl -I https://main.jov.ie`).
+  - **Permissions-Policy** remains conservative:
+    - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
+
 - **Third-party script inventory (current)**
   - **Clerk**: Auth UI/SDK injection for sign-in and session management (`@clerk/nextjs`).
   - **Statsig**: Feature flags + session replay plugin (loaded via `@statsig/react-bindings` and `@statsig/session-replay`).
