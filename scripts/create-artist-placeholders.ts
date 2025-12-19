@@ -5,13 +5,12 @@
  * Creates simple, professional placeholder avatars for artists
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -114,8 +113,7 @@ function createSVGAvatar(initials: string, color: string): string {
 async function main() {
   console.log('🎨 Creating artist placeholder images...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   const avatarsDir = join(process.cwd(), 'public', 'images', 'avatars');
 
@@ -123,62 +121,69 @@ async function main() {
   let skipped = 0;
   let updated = 0;
 
-  for (const [username, placeholderData] of Object.entries(
-    ARTIST_PLACEHOLDERS
-  )) {
-    const filepath = join(avatarsDir, placeholderData.filename);
+  try {
+    for (const [username, placeholderData] of Object.entries(
+      ARTIST_PLACEHOLDERS
+    )) {
+      const filepath = join(avatarsDir, placeholderData.filename);
 
-    // Check if image already exists
-    if (existsSync(filepath)) {
-      console.log(`⏭️  Already exists: ${placeholderData.filename}`);
-      skipped++;
-      continue;
+      // Check if image already exists
+      if (existsSync(filepath)) {
+        console.log(`⏭️  Already exists: ${placeholderData.filename}`);
+        skipped++;
+        continue;
+      }
+
+      // Create the SVG avatar
+      const svgContent = createSVGAvatar(
+        placeholderData.initials,
+        placeholderData.color
+      );
+
+      try {
+        // Save the SVG file
+        writeFileSync(filepath, svgContent, 'utf8');
+        console.log(`✅ Created: ${placeholderData.filename}`);
+        created++;
+
+        // Update database with local path
+        await db
+          .update(schema.creatorProfiles)
+          .set({
+            avatarUrl: `/images/avatars/${placeholderData.filename}`,
+            spotifyId: placeholderData.spotifyId,
+            spotifyUrl: placeholderData.spotifyUrl,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.creatorProfiles.username, username));
+
+        console.log(`🗄️  Updated database for ${placeholderData.displayName}`);
+        updated++;
+      } catch (error) {
+        console.error(
+          `❌ Failed to create ${placeholderData.filename}:`,
+          error
+        );
+      }
+
+      console.log('');
     }
 
-    // Create the SVG avatar
-    const svgContent = createSVGAvatar(
-      placeholderData.initials,
-      placeholderData.color
-    );
+    console.log('🎉 Placeholder creation completed!');
+    console.log(`   ✅ Created: ${created}`);
+    console.log(`   ⏭️  Skipped: ${skipped}`);
+    console.log(`   📊 Total: ${Object.keys(ARTIST_PLACEHOLDERS).length}`);
+    console.log(`   🗄️  Database updated: ${updated}`);
 
-    try {
-      // Save the SVG file
-      writeFileSync(filepath, svgContent, 'utf8');
-      console.log(`✅ Created: ${placeholderData.filename}`);
-      created++;
-
-      // Update database with local path
-      await db
-        .update(schema.creatorProfiles)
-        .set({
-          avatarUrl: `/images/avatars/${placeholderData.filename}`,
-          spotifyId: placeholderData.spotifyId,
-          spotifyUrl: placeholderData.spotifyUrl,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.creatorProfiles.username, username));
-
-      console.log(`🗄️  Updated database for ${placeholderData.displayName}`);
-      updated++;
-    } catch (error) {
-      console.error(`❌ Failed to create ${placeholderData.filename}:`, error);
+    if (created > 0) {
+      console.log('\n📝 Next steps:');
+      console.log('   • SVG placeholders are now served from /images/avatars/');
+      console.log('   • They scale perfectly and are lightweight');
+      console.log('   • Database updated with local paths');
+      console.log('   • Each artist has a unique color and initials');
     }
-
-    console.log('');
-  }
-
-  console.log('🎉 Placeholder creation completed!');
-  console.log(`   ✅ Created: ${created}`);
-  console.log(`   ⏭️  Skipped: ${skipped}`);
-  console.log(`   📊 Total: ${Object.keys(ARTIST_PLACEHOLDERS).length}`);
-  console.log(`   🗄️  Database updated: ${updated}`);
-
-  if (created > 0) {
-    console.log('\n📝 Next steps:');
-    console.log('   • SVG placeholders are now served from /images/avatars/');
-    console.log('   • They scale perfectly and are lightweight');
-    console.log('   • Database updated with local paths');
-    console.log('   • Each artist has a unique color and initials');
+  } finally {
+    await pool.end();
   }
 }
 

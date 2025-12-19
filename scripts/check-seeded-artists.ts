@@ -5,10 +5,9 @@
  * Queries the database to see current seeded artists and their image status
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
-import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 console.error('❌ Seed profiles have been removed; this script is disabled.');
 process.exit(1);
@@ -26,8 +25,7 @@ if (!DATABASE_URL) {
 async function main() {
   console.log('🔍 Checking seeded artists and their image status...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   try {
     // Get all creator profiles
@@ -93,6 +91,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error checking artists:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

@@ -5,10 +5,9 @@
  * Creates the onboarding function and required enum
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -23,8 +22,7 @@ if (!DATABASE_URL) {
 async function main() {
   console.log('🔧 Creating onboarding function and enum...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql);
+  const { db, pool } = createNeonClient(DATABASE_URL!);
 
   try {
     // Create creator_type enum if it doesn't exist
@@ -135,6 +133,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error creating onboarding function:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

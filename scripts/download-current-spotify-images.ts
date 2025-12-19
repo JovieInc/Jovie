@@ -5,13 +5,12 @@
  * Downloads current working Spotify CDN images to prevent expiration
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -120,8 +119,7 @@ async function testAndDownloadImage(
 async function main() {
   console.log('📸 Downloading Spotify artist images...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   // Ensure the avatars directory exists
   const avatarsDir = join(process.cwd(), 'public', 'images', 'avatars');
@@ -133,75 +131,81 @@ async function main() {
   let downloaded = 0;
   let failed = 0;
 
-  for (const [username, imageData] of Object.entries(WORKING_ARTIST_IMAGES)) {
-    const filepath = join(avatarsDir, imageData.filename);
+  try {
+    for (const [username, imageData] of Object.entries(WORKING_ARTIST_IMAGES)) {
+      const filepath = join(avatarsDir, imageData.filename);
 
-    console.log(`\n🎨 Processing ${username}...`);
+      console.log(`\n🎨 Processing ${username}...`);
 
-    // Download the image
-    const success = await testAndDownloadImage(
-      imageData.imageUrl,
-      filepath,
-      username
-    );
+      // Download the image
+      const success = await testAndDownloadImage(
+        imageData.imageUrl,
+        filepath,
+        username
+      );
 
-    if (success) {
-      downloaded++;
+      if (success) {
+        downloaded++;
 
-      // Update database with local path
-      try {
-        const result = await db
-          .update(schema.creatorProfiles)
-          .set({
-            avatarUrl: `/images/avatars/${imageData.filename}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.creatorProfiles.username, username))
-          .returning({
-            username: schema.creatorProfiles.username,
-            displayName: schema.creatorProfiles.displayName,
-          });
+        // Update database with local path
+        try {
+          const result = await db
+            .update(schema.creatorProfiles)
+            .set({
+              avatarUrl: `/images/avatars/${imageData.filename}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.creatorProfiles.username, username))
+            .returning({
+              username: schema.creatorProfiles.username,
+              displayName: schema.creatorProfiles.displayName,
+            });
 
-        if (result && result.length > 0) {
-          console.log(
-            `🗄️  Updated ${result[0].displayName} (@${result[0].username}) in database`
-          );
-        } else {
-          console.log(`⚠️  No profile found for ${username}`);
+          if (result && result.length > 0) {
+            console.log(
+              `🗄️  Updated ${result[0].displayName} (@${result[0].username}) in database`
+            );
+          } else {
+            console.log(`⚠️  No profile found for ${username}`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to update database for ${username}:`, error);
         }
-      } catch (error) {
-        console.error(`❌ Failed to update database for ${username}:`, error);
+      } else {
+        failed++;
+        console.log(`⚠️  ${username}: Will keep existing SVG placeholder`);
       }
-    } else {
-      failed++;
-      console.log(`⚠️  ${username}: Will keep existing SVG placeholder`);
+
+      // Delay between downloads
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
 
-    // Delay between downloads
-    await new Promise(resolve => setTimeout(resolve, 800));
-  }
+    console.log('\n🎉 Spotify image download completed!');
+    console.log(`   ✅ Downloaded: ${downloaded}`);
+    console.log(`   ❌ Failed: ${failed}`);
+    console.log(`   📊 Total: ${Object.keys(WORKING_ARTIST_IMAGES).length}`);
 
-  console.log('\n🎉 Spotify image download completed!');
-  console.log(`   ✅ Downloaded: ${downloaded}`);
-  console.log(`   ❌ Failed: ${failed}`);
-  console.log(`   📊 Total: ${Object.keys(WORKING_ARTIST_IMAGES).length}`);
+    if (downloaded > 0) {
+      console.log('\n📝 Results:');
+      console.log(
+        '   • Successfully downloaded Spotify images that were accessible'
+      );
+      console.log('   • Images are now served locally (no expiration issues)');
+      console.log('   • Database updated with local paths');
+      console.log('   • Homepage carousel will show real artist photos');
+    }
 
-  if (downloaded > 0) {
-    console.log('\n📝 Results:');
-    console.log(
-      '   • Successfully downloaded Spotify images that were accessible'
-    );
-    console.log('   • Images are now served locally (no expiration issues)');
-    console.log('   • Database updated with local paths');
-    console.log('   • Homepage carousel will show real artist photos');
-  }
-
-  if (failed > 0) {
-    console.log('\n⚠️  Some Spotify URLs were not accessible');
-    console.log(
-      '   • Those artists will keep their professional SVG placeholders'
-    );
-    console.log('   • SVG placeholders provide consistent, branded appearance');
+    if (failed > 0) {
+      console.log('\n⚠️  Some Spotify URLs were not accessible');
+      console.log(
+        '   • Those artists will keep their professional SVG placeholders'
+      );
+      console.log(
+        '   • SVG placeholders provide consistent, branded appearance'
+      );
+    }
+  } finally {
+    await pool.end();
   }
 }
 

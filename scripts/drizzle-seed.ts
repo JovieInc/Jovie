@@ -1,6 +1,5 @@
 #!/usr/bin/env -S tsx
 
-import { neon } from '@neondatabase/serverless';
 /**
  * Drizzle Database Seed Script
  * Seeds the database with demo data using Drizzle ORM and Neon
@@ -8,10 +7,7 @@ import { neon } from '@neondatabase/serverless';
 
 import { config as dotenvConfig } from 'dotenv';
 import { sql as drizzleSql } from 'drizzle-orm';
-import {
-  type NeonHttpDatabase,
-  drizzle as neonDrizzle,
-} from 'drizzle-orm/neon-http';
+import { type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import {
   type PostgresJsDatabase,
   drizzle as pgDrizzle,
@@ -19,6 +15,7 @@ import {
 import postgres from 'postgres';
 import * as schema from '@/lib/db/schema';
 import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load .env.local first to override defaults, then fallback to .env
 dotenvConfig({ path: '.env.local', override: true });
@@ -38,9 +35,7 @@ if (!DATABASE_URL) {
   console.error('❌ DATABASE_URL not configured');
   process.exit(1);
 }
-type SeedDB =
-  | NeonHttpDatabase<typeof schema>
-  | PostgresJsDatabase<typeof schema>;
+type SeedDB = NeonDatabase<typeof schema> | PostgresJsDatabase<typeof schema>;
 let db: SeedDB;
 let closeDb: () => Promise<void> = async () => {};
 
@@ -76,23 +71,32 @@ function logConnInfo(url: string) {
 }
 
 async function initDb(): Promise<void> {
-  // Prefer Neon HTTP unless URL explicitly demands TCP
+  // Prefer Neon serverless unless URL explicitly demands TCP
   if (!isTcpUrl(DATABASE_URL)) {
     const neonUrl = normalizeForNeon(DATABASE_URL);
     logConnInfo(neonUrl);
+    let neonPool: { end: () => Promise<void> } | null = null;
     try {
-      const sqlClient = neon(neonUrl);
-      const neonDb = neonDrizzle(sqlClient, { schema });
+      const { db: neonDb, pool } = createNeonClient(neonUrl, { schema });
+      neonPool = pool;
       // quick ping
       await neonDb.execute(drizzleSql`SELECT 1`);
       db = neonDb;
       closeDb = async () => {
-        /* neon-http doesn't require explicit close */
+        if (neonPool) {
+          await neonPool.end();
+          neonPool = null;
+        }
       };
       return;
     } catch (err) {
+      // Ensure we clean up any pool if Neon init fails
+      if (neonPool) {
+        await neonPool.end();
+        neonPool = null;
+      }
       console.warn(
-        '⚠️  Neon HTTP init failed, falling back to TCP:',
+        '⚠️  Neon serverless init failed, falling back to TCP:',
         (err as Error).message
       );
       // fall through to TCP

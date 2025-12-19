@@ -1,5 +1,5 @@
 import { NeonQueryFunction } from '@neondatabase/serverless';
-import { NeonDatabase } from 'drizzle-orm/neon-http';
+import { NeonDatabase } from 'drizzle-orm/neon-serverless';
 
 declare global {
   // Extend the global namespace to include our test database

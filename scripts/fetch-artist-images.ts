@@ -5,11 +5,10 @@
  * Gets Spotify IDs and high-quality images for seeded artists
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq, isNull } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -129,8 +128,7 @@ class SpotifyAPI {
 async function main() {
   console.log('🎵 Fetching artist images from Spotify...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
   const spotify = new SpotifyAPI();
 
   try {
@@ -210,6 +208,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error fetching artist images:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

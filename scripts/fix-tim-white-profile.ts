@@ -5,11 +5,10 @@
  * Merges duplicate Tim White profiles and adds correct Spotify ID
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -24,8 +23,7 @@ if (!DATABASE_URL) {
 async function main() {
   console.log('🔧 Fixing Tim White profile...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   try {
     // First, let's see all Tim White profiles
@@ -140,6 +138,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error fixing Tim White profile:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

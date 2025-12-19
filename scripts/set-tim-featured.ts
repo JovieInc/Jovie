@@ -5,11 +5,10 @@
  * Makes Tim White featured so he appears in the homepage carousel
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -24,8 +23,7 @@ if (!DATABASE_URL) {
 async function main() {
   console.log('⭐ Setting Tim White as featured...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   try {
     // Set Tim White as featured
@@ -61,6 +59,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error setting Tim White as featured:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

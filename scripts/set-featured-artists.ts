@@ -5,11 +5,10 @@
  * Makes several artists featured so they appear in the homepage carousel
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { inArray } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -38,8 +37,7 @@ const FEATURED_ARTISTS = [
 async function main() {
   console.log('⭐ Setting featured artists...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   try {
     // Set selected artists as featured
@@ -72,6 +70,8 @@ async function main() {
   } catch (error) {
     console.error('❌ Error setting featured artists:', error);
     process.exit(1);
+  } finally {
+    await pool.end();
   }
 }
 

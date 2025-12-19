@@ -5,13 +5,12 @@
  * Downloads Spotify artist images and saves them locally for optimization
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -132,8 +131,7 @@ async function downloadImage(url: string, filepath: string): Promise<boolean> {
 async function main() {
   console.log('📸 Downloading artist images locally...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   // Ensure the avatars directory exists
   const avatarsDir = join(process.cwd(), 'public', 'images', 'avatars');
@@ -146,58 +144,62 @@ async function main() {
   let skipped = 0;
   let failed = 0;
 
-  for (const [username, imageData] of Object.entries(ARTIST_IMAGES)) {
-    const filepath = join(avatarsDir, imageData.filename);
+  try {
+    for (const [username, imageData] of Object.entries(ARTIST_IMAGES)) {
+      const filepath = join(avatarsDir, imageData.filename);
 
-    // Check if image already exists
-    if (existsSync(filepath)) {
-      console.log(`⏭️  Already exists: ${imageData.filename}`);
-      skipped++;
-      continue;
-    }
-
-    // Download the image
-    const success = await downloadImage(imageData.spotifyImageUrl, filepath);
-
-    if (success) {
-      downloaded++;
-
-      // Update database with local path
-      try {
-        await db
-          .update(schema.creatorProfiles)
-          .set({
-            avatarUrl: `/images/avatars/${imageData.filename}`,
-            spotifyId: imageData.spotifyId,
-            spotifyUrl: imageData.spotifyUrl,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.creatorProfiles.username, username));
-
-        console.log(`🗄️  Updated database for ${username}`);
-      } catch (error) {
-        console.error(`❌ Failed to update database for ${username}:`, error);
+      // Check if image already exists
+      if (existsSync(filepath)) {
+        console.log(`⏭️  Already exists: ${imageData.filename}`);
+        skipped++;
+        continue;
       }
-    } else {
-      failed++;
+
+      // Download the image
+      const success = await downloadImage(imageData.spotifyImageUrl, filepath);
+
+      if (success) {
+        downloaded++;
+
+        // Update database with local path
+        try {
+          await db
+            .update(schema.creatorProfiles)
+            .set({
+              avatarUrl: `/images/avatars/${imageData.filename}`,
+              spotifyId: imageData.spotifyId,
+              spotifyUrl: imageData.spotifyUrl,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.creatorProfiles.username, username));
+
+          console.log(`🗄️  Updated database for ${username}`);
+        } catch (error) {
+          console.error(`❌ Failed to update database for ${username}:`, error);
+        }
+      } else {
+        failed++;
+      }
+
+      // Small delay to avoid overwhelming servers
+      await new Promise(resolve => setTimeout(resolve, 200));
+      console.log('');
     }
 
-    // Small delay to avoid overwhelming servers
-    await new Promise(resolve => setTimeout(resolve, 200));
-    console.log('');
-  }
+    console.log('🎉 Artist image download completed!');
+    console.log(`   ✅ Downloaded: ${downloaded}`);
+    console.log(`   ⏭️  Skipped: ${skipped}`);
+    console.log(`   ❌ Failed: ${failed}`);
+    console.log(`   📊 Total: ${Object.keys(ARTIST_IMAGES).length}`);
 
-  console.log('🎉 Artist image download completed!');
-  console.log(`   ✅ Downloaded: ${downloaded}`);
-  console.log(`   ⏭️  Skipped: ${skipped}`);
-  console.log(`   ❌ Failed: ${failed}`);
-  console.log(`   📊 Total: ${Object.keys(ARTIST_IMAGES).length}`);
-
-  if (downloaded > 0) {
-    console.log('\n📝 Next steps:');
-    console.log('   • Images are now served from /images/avatars/');
-    console.log('   • They will be optimized by Next.js Image component');
-    console.log('   • Database updated with local paths');
+    if (downloaded > 0) {
+      console.log('\n📝 Next steps:');
+      console.log('   • Images are now served from /images/avatars/');
+      console.log('   • They will be optimized by Next.js Image component');
+      console.log('   • Database updated with local paths');
+    }
+  } finally {
+    await pool.end();
   }
 }
 

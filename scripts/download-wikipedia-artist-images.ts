@@ -5,13 +5,12 @@
  * Downloads artist photos from Wikimedia Commons (public domain/creative commons)
  */
 
-import { neon } from '@neondatabase/serverless';
 import { config as dotenvConfig } from 'dotenv';
 import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import * as schema from '@/lib/db/schema';
+import { createNeonClient } from './utils/neon-client';
 
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
@@ -129,8 +128,7 @@ async function downloadImage(
 async function main() {
   console.log('📸 Downloading Wikipedia artist images...\n');
 
-  const sql = neon(DATABASE_URL!);
-  const db = drizzle(sql, { schema });
+  const { db, pool } = createNeonClient(DATABASE_URL!, { schema });
 
   // Ensure the avatars directory exists
   const avatarsDir = join(process.cwd(), 'public', 'images', 'avatars');
@@ -142,73 +140,79 @@ async function main() {
   let downloaded = 0;
   let failed = 0;
 
-  for (const [username, imageData] of Object.entries(ARTIST_IMAGES)) {
-    const filepath = join(avatarsDir, imageData.filename);
+  try {
+    for (const [username, imageData] of Object.entries(ARTIST_IMAGES)) {
+      const filepath = join(avatarsDir, imageData.filename);
 
-    console.log(`\n🎨 Processing ${username}...`);
+      console.log(`\n🎨 Processing ${username}...`);
 
-    // Download the image (overwrite existing)
-    const success = await downloadImage(
-      imageData.imageUrl,
-      filepath,
-      imageData.source
-    );
+      // Download the image (overwrite existing)
+      const success = await downloadImage(
+        imageData.imageUrl,
+        filepath,
+        imageData.source
+      );
 
-    if (success) {
-      downloaded++;
+      if (success) {
+        downloaded++;
 
-      // Update database with new image path
-      try {
-        const result = await db
-          .update(schema.creatorProfiles)
-          .set({
-            avatarUrl: `/images/avatars/${imageData.filename}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.creatorProfiles.username, username))
-          .returning({
-            username: schema.creatorProfiles.username,
-            displayName: schema.creatorProfiles.displayName,
-          });
+        // Update database with new image path
+        try {
+          const result = await db
+            .update(schema.creatorProfiles)
+            .set({
+              avatarUrl: `/images/avatars/${imageData.filename}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.creatorProfiles.username, username))
+            .returning({
+              username: schema.creatorProfiles.username,
+              displayName: schema.creatorProfiles.displayName,
+            });
 
-        if (result && result.length > 0) {
-          console.log(
-            `🗄️  Updated ${result[0].displayName} (@${result[0].username}) in database`
-          );
-        } else {
-          console.log(`⚠️  No profile found for ${username}`);
+          if (result && result.length > 0) {
+            console.log(
+              `🗄️  Updated ${result[0].displayName} (@${result[0].username}) in database`
+            );
+          } else {
+            console.log(`⚠️  No profile found for ${username}`);
+          }
+        } catch (error) {
+          console.error(`❌ Failed to update database for ${username}:`, error);
         }
-      } catch (error) {
-        console.error(`❌ Failed to update database for ${username}:`, error);
+      } else {
+        failed++;
       }
-    } else {
-      failed++;
+
+      // Small delay to be respectful to servers
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    // Small delay to be respectful to servers
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
+    console.log('\n🎉 Artist image download completed!');
+    console.log(`   ✅ Downloaded: ${downloaded}`);
+    console.log(`   ❌ Failed: ${failed}`);
+    console.log(`   📊 Total: ${Object.keys(ARTIST_IMAGES).length}`);
 
-  console.log('\n🎉 Artist image download completed!');
-  console.log(`   ✅ Downloaded: ${downloaded}`);
-  console.log(`   ❌ Failed: ${failed}`);
-  console.log(`   📊 Total: ${Object.keys(ARTIST_IMAGES).length}`);
+    if (downloaded > 0) {
+      console.log('\n📝 Results:');
+      console.log(
+        '   • All artists now have real photos from reliable sources'
+      );
+      console.log(
+        '   • Images are from Wikimedia Commons (public domain/Creative Commons)'
+      );
+      console.log('   • Images are optimized by Next.js Image component');
+      console.log('   • Database updated with new image paths');
+      console.log('   • Homepage carousel will show actual artist photos');
+    }
 
-  if (downloaded > 0) {
-    console.log('\n📝 Results:');
-    console.log('   • All artists now have real photos from reliable sources');
-    console.log(
-      '   • Images are from Wikimedia Commons (public domain/Creative Commons)'
-    );
-    console.log('   • Images are optimized by Next.js Image component');
-    console.log('   • Database updated with new image paths');
-    console.log('   • Homepage carousel will show actual artist photos');
-  }
-
-  if (failed > 0) {
-    console.log(
-      '\n⚠️  Some downloads failed - those artists will keep their SVG placeholders for now'
-    );
+    if (failed > 0) {
+      console.log(
+        '\n⚠️  Some downloads failed - those artists will keep their SVG placeholders for now'
+      );
+    }
+  } finally {
+    await pool.end();
   }
 }
 
