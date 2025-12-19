@@ -245,6 +245,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -287,6 +289,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -363,6 +367,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -459,6 +465,10 @@ jobs:
         run: |
           CI=true BASE_URL=https://main.jov.ie pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
 
+      - name: Run Performance Budget Guard against staging
+        run: |
+          CI=true BASE_URL=https://main.jov.ie pnpm run test:budgets
+
       - name: Upload Playwright Artifacts on Failure
         if: failure()
         uses: actions/upload-artifact@v6
@@ -476,6 +486,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -533,6 +545,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -628,6 +642,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -772,14 +788,20 @@ jobs:
         continue-on-error: true
         run: pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
-      - name: Upload Playwright Artifacts on Failure
+      - name: Upload Playwright Report on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
+          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright Test Results on Failure
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
           retention-days: 7
 
   ci-pr-vercel-preview:
@@ -847,6 +869,193 @@ jobs:
           DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
+
+  ci-summary:
+    name: CI Summary
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs:
+      - ci-env-example-guard
+      - ci-guardrails
+      - ci-fast-checks
+      - neon-db
+      - drizzle-migration-guard
+      - ci-drizzle-check
+      - ci-fast
+      - ci-pr-neon-migrate
+      - ci-build
+      - ci-unit-tests
+      - ci-e2e-tests
+      - ci-pr-vercel-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Post CI summary to PR
+        uses: actions/github-script@v8
+        env:
+          BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
+          DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
+          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-tests.outputs.run_full_ci }}
+          MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
+          PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
+          UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const runId = context.runId;
+
+            const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+              per_page: 100
+            });
+
+            const jobByName = new Map(
+              jobsResponse.data.jobs.map(job => [job.name, job])
+            );
+
+            const formatDuration = (job) => {
+              if (!job?.started_at || !job?.completed_at) return '—';
+              const start = new Date(job.started_at);
+              const end = new Date(job.completed_at);
+              const ms = Math.max(0, end - start);
+              const minutes = Math.floor(ms / 60000);
+              const seconds = Math.floor((ms % 60000) / 1000);
+              return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            };
+
+            const resolveOutcome = (jobName, fallbackResult) => {
+              const job = jobByName.get(jobName);
+              if (!job) return { status: fallbackResult ?? 'not_run', duration: '—' };
+              return {
+                status: job.conclusion || job.status || fallbackResult || 'unknown',
+                duration: formatDuration(job)
+              };
+            };
+
+            const summarizeStatus = (status) => {
+              switch (status) {
+                case 'success':
+                  return '✅ Passed';
+                case 'failure':
+                  return '❌ Failed';
+                case 'cancelled':
+                  return '⚠️ Cancelled';
+                case 'skipped':
+                  return '⚠️ Skipped';
+                case 'timed_out':
+                  return '❌ Timed out';
+                case 'not_run':
+                  return '⚪️ Not run';
+                default:
+                  return `⚪️ ${status}`;
+              }
+            };
+
+            const deriveSkipReason = (jobKey, runFullCiFlag) => {
+              if (runFullCiFlag === 'false') {
+                return 'Skipped (path guard: no relevant changes)';
+              }
+              if (runFullCiFlag === '') {
+                return 'Skipped (job not applicable)';
+              }
+              return jobKey === 'neon-db'
+                ? 'Skipped (not required for this PR)'
+                : 'Skipped (conditional job)';
+            };
+
+            const summaryRows = [
+              { label: 'Env Example Guard', jobName: 'Env Example Guard' },
+              { label: 'Guardrails', jobName: 'Guardrails (proxy + format)' },
+              { label: 'Fast Checks', jobName: 'Fast checks (typecheck + lint)' },
+              {
+                label: 'Migration Guard',
+                jobName: 'Migration Guard',
+                runFullCi: process.env.MIGRATION_GUARD_RUN_FULL_CI
+              },
+              { label: 'Neon DB', jobName: 'Neon DB' },
+              {
+                label: 'Drizzle Check',
+                jobName: 'Drizzle Check',
+                runFullCi: process.env.DRIZZLE_RUN_FULL_CI
+              },
+              {
+                label: 'Build',
+                jobName: 'Build',
+                runFullCi: process.env.BUILD_RUN_FULL_CI
+              },
+              {
+                label: 'Unit Tests',
+                jobName: 'Unit Tests',
+                runFullCi: process.env.UNIT_RUN_FULL_CI
+              },
+              {
+                label: 'E2E Tests',
+                jobName: 'E2E Tests',
+                runFullCi: process.env.E2E_RUN_FULL_CI
+              },
+              {
+                label: 'DB Migrate (PR main)',
+                jobName: 'DB Migrate (PR main)',
+                runFullCi: process.env.PR_MIGRATE_RUN_FULL_CI
+              },
+              { label: 'Preview Deploy', jobName: 'Preview Deploy (PR)' }
+            ];
+
+            const rows = summaryRows.map((row) => {
+              const outcome = resolveOutcome(row.jobName);
+              const statusLabel = summarizeStatus(outcome.status);
+              const timing = outcome.duration;
+              let context = 'Executed';
+              if (outcome.status === 'skipped' || outcome.status === 'not_run') {
+                context = deriveSkipReason(row.label, row.runFullCi ?? '');
+              }
+              return `| ${row.label} | ${statusLabel} | ${context} | ${timing} |`;
+            });
+
+            const summaryBody = [
+              '## CI Summary',
+              '',
+              'A crisp snapshot of this PR run — executed vs. skipped, with timing for every key lane.',
+              '',
+              '| Job | Status | Context | Time |',
+              '| --- | ------ | ------- | ---- |',
+              ...rows,
+              '',
+              `**Run:** [${runId}](${context.serverUrl}/${owner}/${repo}/actions/runs/${runId})`,
+              ''
+            ].join('\n');
+
+            const existingComments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: prNumber
+            });
+
+            const botComment = existingComments.data.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.startsWith('## CI Summary')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: botComment.id,
+                body: summaryBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: summaryBody
+              });
+            }
 
   deploy:
     needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy

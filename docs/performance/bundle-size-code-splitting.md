@@ -31,7 +31,7 @@ Scope: #378 (bundle/code splitting) across app/pages/components
 4. Monitoring
 
 - Add `ANALYZE=true pnpm build` docs and CI artifact for analyzer output.
-- Optional perf budgets (Lighthouse) in CI.
+- Enforce performance budgets in CI via `pnpm test:budgets`, including `/` and `/[username]` routes from `performance-budgets.config.js`.
 
 ## Targets
 
