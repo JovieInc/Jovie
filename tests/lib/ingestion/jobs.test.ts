@@ -33,6 +33,13 @@ describe('Ingestion Jobs', () => {
       );
     });
 
+    it('detects Stan URLs', () => {
+      expect(detectIngestionPlatform('https://stan.me/creator')).toBe('stan');
+      expect(detectIngestionPlatform('https://www.stan.me/creator')).toBe(
+        'stan'
+      );
+    });
+
     it('returns unknown for unsupported URLs', () => {
       expect(detectIngestionPlatform('https://example.com/username')).toBe(
         'unknown'
@@ -79,6 +86,7 @@ describe('Ingestion Jobs', () => {
     it('returns true for supported platforms', () => {
       expect(isSupportedIngestionUrl('https://linktr.ee/username')).toBe(true);
       expect(isSupportedIngestionUrl('https://beacons.ai/username')).toBe(true);
+      expect(isSupportedIngestionUrl('https://stan.me/creator')).toBe(true);
     });
 
     it('returns false for unsupported platforms', () => {

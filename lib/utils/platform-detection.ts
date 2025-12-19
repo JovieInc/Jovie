@@ -183,6 +183,14 @@ const PLATFORMS: Record<string, PlatformInfo> = {
     color: '6B7280',
     placeholder: 'https://beacons.ai/username',
   },
+  stan: {
+    id: 'stan',
+    name: 'Stan',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://stan.me/username',
+  },
   // Additional social platforms
   telegram: {
     id: 'telegram',
@@ -302,6 +310,7 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
   { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
+  { pattern: /(?:www\.)?stan\.me/i, platformId: 'stan' },
   { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
@@ -611,6 +620,7 @@ export function detectPlatform(
     pinterest: 'Add your username. Example: https://pinterest.com/username',
     onlyfans: 'Add your username. Example: https://onlyfans.com/username',
     linktree: 'Add your username. Example: https://linktr.ee/username',
+    stan: 'Add your username. Example: https://stan.me/username',
     bandcamp: 'Add your subdomain. Example: https://username.bandcamp.com',
   };
 

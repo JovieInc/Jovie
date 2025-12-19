@@ -145,4 +145,13 @@ describe('Platform Detection', () => {
       expect(detected.isValid).toBe(true);
     });
   });
+
+  describe('Stan detection', () => {
+    it('detects stan.me hosts and preserves HTTPS', () => {
+      const detected = detectPlatform('https://stan.me/creator');
+      expect(detected.platform.id).toBe('stan');
+      expect(detected.normalizedUrl).toBe('https://stan.me/creator');
+      expect(detected.platform.category).toBe('websites');
+    });
+  });
 });

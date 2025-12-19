@@ -50,6 +50,15 @@ export {
   normalizeHandle as normalizeLinktreeHandle,
   validateLinktreeUrl,
 } from './linktree';
+// Stan strategy
+export {
+  extractStan,
+  extractStanHandle,
+  fetchStanDocument,
+  isStanUrl,
+  normalizeStanHandle,
+  validateStanUrl,
+} from './stan';
 // YouTube strategy
 export {
   extractYouTube,
@@ -66,11 +75,13 @@ export {
 import { isBeaconsUrl } from './beacons';
 import { isLayloUrl } from './laylo';
 import { isLinktreeUrl } from './linktree';
+import { isStanUrl } from './stan';
 import { isYouTubeChannelUrl } from './youtube';
 
 export type IngestionPlatform =
   | 'linktree'
   | 'beacons'
+  | 'stan'
   | 'laylo'
   | 'youtube'
   | 'unknown';
@@ -84,6 +95,9 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
   }
   if (isBeaconsUrl(url)) {
     return 'beacons';
+  }
+  if (isStanUrl(url)) {
+    return 'stan';
   }
   if (isLayloUrl(url)) {
     return 'laylo';
