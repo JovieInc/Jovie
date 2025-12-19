@@ -124,6 +124,7 @@ const fetchStoredPreferences = async (target: NotificationTarget) => {
   if (!target.creatorProfileId && !target.userId && !target.clerkUserId) {
     return {
       preferences: null as NotificationPreferences | null,
+      creatorProfileId: null as string | null,
       settings: null,
     };
   }
@@ -152,7 +153,7 @@ const fetchStoredPreferences = async (target: NotificationTarget) => {
     const [row] = await query.limit(1);
 
     if (!row) {
-      return { preferences: null, settings: null };
+      return { preferences: null, creatorProfileId: null, settings: null };
     }
 
     const rawSettings = isRecord(row.settings) ? row.settings : {};
