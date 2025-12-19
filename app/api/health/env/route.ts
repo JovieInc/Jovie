@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
-import { getEnvironmentInfo, validateEnvironment } from '@/lib/env';
+import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { isValidationCompleted } from '@/lib/startup/environment-validator';
 import { logger } from '@/lib/utils/logger';
 import {

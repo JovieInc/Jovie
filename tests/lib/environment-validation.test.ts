@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { validateAndLogEnvironment, validateEnvironment } from '@/lib/env';
+import {
+  validateAndLogEnvironment,
+  validateEnvironment,
+} from '@/lib/env-server';
 import {
   validateDatabaseEnvironment,
   validateEnvironmentForApiRoute,

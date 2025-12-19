@@ -5,7 +5,8 @@
  * Only used on the server side for security.
  */
 
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 
 // Plan types supported by the application
 export type PlanType = 'standard';
@@ -117,15 +118,15 @@ export function validateStripeConfig(): {
   isValid: boolean;
   missingVars: string[];
 } {
-  const requiredVars = [
-    'STRIPE_SECRET_KEY',
-    'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-    'STRIPE_WEBHOOK_SECRET',
-  ];
+  const requiredVars = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'];
 
   const missingVars = requiredVars.filter(
     varName => !env[varName as keyof typeof env]
   );
+
+  if (!publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    missingVars.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
+  }
 
   return {
     isValid: missingVars.length === 0,
