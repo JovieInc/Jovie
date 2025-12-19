@@ -11,6 +11,7 @@ import {
   enqueueLinktreeIngestionJob,
   enqueueYouTubeIngestionJob,
 } from '@/lib/ingestion/jobs';
+import { maybeSetProfileAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   isBeaconsUrl,
   validateBeaconsUrl,
@@ -22,6 +23,8 @@ import { detectPlatform } from '@/lib/utils/platform-detection';
 import { isValidSocialPlatform } from '@/types';
 
 // flags import removed - pre-launch
+
+export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -219,6 +222,9 @@ export async function PUT(req: Request) {
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
+          avatarUrl: creatorProfiles.avatarUrl,
+          avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+          userId: creatorProfiles.userId,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -338,6 +344,25 @@ export async function PUT(req: Request) {
         );
 
         await db.insert(socialLinks).values(insertPayload);
+      }
+
+      // Magic profile enrichment: if the user has no profile photo yet, try to
+      // pull one from any newly-added link (Linktree/Beacons/Laylo/YouTube/OG image)
+      // and store it in our blob pipeline.
+      try {
+        if (links.length > 0) {
+          await maybeSetProfileAvatarFromLinks({
+            db,
+            clerkUserId,
+            profileId,
+            userId: profile.userId ?? null,
+            currentAvatarUrl: profile.avatarUrl ?? null,
+            avatarLockedByUser: profile.avatarLockedByUser ?? null,
+            links: links.map(link => link.url),
+          });
+        }
+      } catch {
+        // Non-blocking: link saving should succeed even if enrichment fails.
       }
 
       const linktreeTargets = links.filter(

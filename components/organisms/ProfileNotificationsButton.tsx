@@ -1,7 +1,7 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import React from 'react';
+import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 
 type ProfileNotificationsButtonProps = {
@@ -22,12 +22,13 @@ export function ProfileNotificationsButton({
   const isEditing = notificationsState === 'editing';
 
   return (
-    <Button
+    <HeaderIconButton
       ref={buttonRef}
-      className='relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-card/80 p-0 text-foreground shadow-sm backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+      size='xs'
       variant='ghost'
+      className='relative border border-border bg-card/80 text-foreground shadow-sm backdrop-blur'
       aria-expanded={ariaExpanded}
-      aria-label={
+      ariaLabel={
         hasActiveSubscriptions
           ? 'Manage notification preferences'
           : 'Subscribe to notifications'
@@ -36,7 +37,7 @@ export function ProfileNotificationsButton({
       onClick={onClick}
     >
       <svg
-        className='h-5 w-5 text-foreground'
+        className='h-4 w-4 text-foreground'
         fill='none'
         stroke='currentColor'
         viewBox='0 0 24 24'
@@ -55,6 +56,6 @@ export function ProfileNotificationsButton({
           className='absolute -right-1 -top-1 inline-flex h-2.5 w-2.5 rounded-full bg-primary'
         />
       ) : null}
-    </Button>
+    </HeaderIconButton>
   );
 }

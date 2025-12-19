@@ -1,6 +1,10 @@
 'use client';
 
-import { UserGroupIcon } from '@heroicons/react/24/outline';
+import {
+  Bars3Icon,
+  UserGroupIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
 import React, {
@@ -19,8 +23,13 @@ import {
 } from '@/components/dashboard/layout/PreviewPanel';
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
+import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
 import { PendingClaimHandler } from '@/components/dashboard/PendingClaimHandler';
-import { SidebarInset, SidebarProvider } from '@/components/organisms/Sidebar';
+import {
+  SidebarInset,
+  SidebarProvider,
+  useSidebar,
+} from '@/components/organisms/Sidebar';
 import type { DashboardBreadcrumbItem } from '@/types';
 
 import type { DashboardData } from './actions';
@@ -69,6 +78,8 @@ export default function DashboardLayoutClient({
   const [, startTransition] = useTransition();
   const pathname = usePathname();
   const isAppDashboardRoute = pathname?.startsWith('/app/dashboard') ?? false;
+  const isSettingsRoute = pathname?.startsWith('/app/settings') ?? false;
+  const isAdminRoute = pathname?.startsWith('/app/admin') ?? false;
   const [tableMeta, setTableMeta] = useState<TableMeta>({
     rowCount: null,
     toggle: null,
@@ -90,6 +101,8 @@ export default function DashboardLayoutClient({
   const useFullWidth = fullWidth || isFullWidthRoute;
   const resolvedPreviewEnabled =
     previewEnabled && isAppDashboardRoute && isProfileRoute;
+  const showMobileTabs =
+    isAppDashboardRoute && !isSettingsRoute && !isAdminRoute;
 
   // Build a simple breadcrumb from the current path
   const crumbs = (() => {
@@ -195,6 +208,7 @@ export default function DashboardLayoutClient({
             isProfileRoute={isProfileRoute}
             isAudienceRoute={isAudienceRoute}
             previewEnabled={resolvedPreviewEnabled}
+            showMobileTabs={showMobileTabs}
           >
             {children}
           </DashboardLayoutInner>
@@ -222,6 +236,7 @@ function DashboardLayoutInner({
   isProfileRoute,
   isAudienceRoute,
   previewEnabled,
+  showMobileTabs,
   children,
 }: {
   crumbs: DashboardBreadcrumbItem[];
@@ -230,12 +245,14 @@ function DashboardLayoutInner({
   isProfileRoute: boolean;
   isAudienceRoute: boolean;
   previewEnabled: boolean;
+  showMobileTabs: boolean;
   children: React.ReactNode;
 }) {
   const previewContext = usePreviewPanelContext();
   const previewOpen = previewContext?.isOpen ?? false;
   const closePreview = previewContext?.close;
   const { tableMeta } = useTableMeta();
+  const { toggleSidebar, openMobile, isMobile } = useSidebar();
 
   const showPreview =
     previewEnabled &&
@@ -263,6 +280,23 @@ function DashboardLayoutInner({
     </Button>
   ) : null;
 
+  const MobileMenuButton = isMobile ? (
+    <Button
+      variant='ghost'
+      size='icon'
+      onClick={toggleSidebar}
+      aria-label={openMobile ? 'Close menu' : 'Open menu'}
+      aria-expanded={openMobile}
+      className='h-9 w-9'
+    >
+      {openMobile ? (
+        <XMarkIcon className='h-5 w-5' />
+      ) : (
+        <Bars3Icon className='h-5 w-5' />
+      )}
+    </Button>
+  ) : null;
+
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
       <DashboardSidebar />
@@ -278,6 +312,12 @@ function DashboardLayoutInner({
       >
         <DashboardHeader
           breadcrumbs={crumbs}
+          leading={MobileMenuButton}
+          className={
+            isContactTableRoute
+              ? 'border-sidebar-border bg-sidebar-surface'
+              : undefined
+          }
           action={
             <>
               <DashboardThemeToggleButton />
@@ -307,9 +347,18 @@ function DashboardLayoutInner({
                 : 'container mx-auto max-w-7xl p-6'
             }
           >
-            {children}
+            <div
+              className={
+                showMobileTabs
+                  ? 'pb-[calc(env(safe-area-inset-bottom)+5rem)] lg:pb-0'
+                  : undefined
+              }
+            >
+              {children}
+            </div>
           </div>
         </main>
+        {showMobileTabs ? <DashboardMobileTabs /> : null}
       </SidebarInset>
       {showPreview && <PreviewPanel />}
     </div>

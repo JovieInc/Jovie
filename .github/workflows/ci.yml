@@ -3,10 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [main, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
   push:
     branches: [main, production, 'codegen-bot/**']
     paths-ignore:
@@ -14,10 +10,6 @@ on:
       - 'docs/**'
   merge_group:
     branches: [main, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
   workflow_dispatch:
 
 permissions: read-all
@@ -67,6 +59,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping guardrails."
+            exit 0
+          fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping guardrails."
+            exit 0
+          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm run next:proxy-guard
@@ -84,6 +94,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping fast checks."
+            exit 0
+          fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping fast checks."
+            exit 0
+          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache TypeScript artifacts
         if: ${{ matrix.check == 'typecheck' }}
@@ -136,8 +164,11 @@ jobs:
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch
         id: create-branch
         uses: neondatabase/create-branch-action@v6
@@ -313,8 +344,11 @@ jobs:
         run: |
           RAW="${{ github.head_ref }}"
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
 
       - name: Create or reuse Neon branch
         id: create-branch
@@ -482,9 +516,39 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
+      - name: Load quarantined unit tests
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: quarantine
+        run: |
+          FILE="tests/quarantine.json"
+          UNIT_FILES=""
+          UNIT_EXCLUDES=""
+
+          if [ -f "$FILE" ]; then
+            UNIT_FILES=$(jq -r '.unit // [] | join(" ")' "$FILE")
+            UNIT_EXCLUDES=$(jq -r '.unit // [] | map("--exclude=" + .) | join(" ")' "$FILE")
+          fi
+
+          echo "unit_files=$UNIT_FILES" >> $GITHUB_OUTPUT
+          echo "unit_excludes=$UNIT_EXCLUDES" >> $GITHUB_OUTPUT
+
+          if [ -n "$UNIT_FILES" ]; then
+            echo "has_unit=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_unit=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm test
+        run: pnpm test -- ${{ steps.quarantine.outputs.unit_excludes }}
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Run quarantined unit tests (retries)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        continue-on-error: true
+        run: pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -602,14 +666,65 @@ jobs:
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: npx playwright install chromium firefox --with-deps
 
+      - name: Load quarantined E2E specs
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        id: quarantine
+        run: |
+          FILE="tests/quarantine.json"
+          QUARANTINED=()
+
+          if [ -f "$FILE" ]; then
+            mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
+          fi
+
+          mapfile -t ALL_SPECS < <(git ls-files "tests/e2e/**/*.spec.ts" "tests/smoke/**/*.spec.ts")
+
+          ALLOWED_SPECS=()
+          for spec in "${ALL_SPECS[@]}"; do
+            skip=false
+            for quarantined in "${QUARANTINED[@]}"; do
+              if [[ "$spec" == "$quarantined" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == "false" ]]; then
+              ALLOWED_SPECS+=("$spec")
+            fi
+          done
+
+          echo "allowed_specs=${ALLOWED_SPECS[*]}" >> $GITHUB_OUTPUT
+          echo "quarantined_specs=${QUARANTINED[*]}" >> $GITHUB_OUTPUT
+
+          if [ ${#QUARANTINED[@]} -gt 0 ]; then
+            echo "has_quarantine=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_quarantine=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: E2E Smoke (PR to Preview)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        run: pnpm run e2e:smoke --trace=retain-on-failure
+        run: |
+          if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
+            echo "No non-quarantined E2E specs to run."
+            exit 0
+          fi
+          pnpm playwright test -g @smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
       - name: E2E Full (Main Branch)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        run: pnpm run test:e2e --reporter=line
+        run: |
+          if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
+            echo "No non-quarantined E2E specs to run."
+            exit 0
+          fi
+          pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
+
+      - name: E2E Quarantine (retries)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
+        continue-on-error: true
+        run: pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
@@ -866,6 +981,34 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (staging deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -905,6 +1048,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }
@@ -1112,6 +1257,34 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (production deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -1151,6 +1324,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }

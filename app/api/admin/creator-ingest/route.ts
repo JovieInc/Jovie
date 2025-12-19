@@ -12,6 +12,7 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
+import { maybeCopyIngestionAvatarFromLinks } from '@/lib/ingestion/magic-profile-avatar';
 import {
   enqueueFollowupIngestionJobs,
   normalizeAndMergeExtraction,
@@ -361,9 +362,21 @@ export async function POST(request: Request) {
       const displayName = extraction.displayName?.trim() || handle;
       const externalAvatarUrl = extraction.avatarUrl?.trim() || null;
 
-      const hostedAvatarUrl = externalAvatarUrl
+      const hostedAvatarUrlFromProfile = externalAvatarUrl
         ? await copyAvatarToBlob(externalAvatarUrl, handle)
         : null;
+
+      const hostedAvatarUrlFromLinks = hostedAvatarUrlFromProfile
+        ? null
+        : await maybeCopyIngestionAvatarFromLinks({
+            handle,
+            links: extraction.links
+              .map(link => link.url)
+              .filter((url): url is string => typeof url === 'string'),
+          });
+
+      const hostedAvatarUrl =
+        hostedAvatarUrlFromProfile ?? hostedAvatarUrlFromLinks;
 
       const extractionWithHostedAvatar = {
         ...extraction,

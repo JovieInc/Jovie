@@ -24,15 +24,16 @@ export function ArtistThemeToggle() {
           variant='ghost'
           size='sm'
           onClick={handleToggle}
-          className='h-8 w-8 px-0 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors'
+          className='h-8 w-8 px-0 rounded-full bg-surface-1 hover:bg-surface-2 transition-colors'
         >
           <span className='sr-only'>Toggle theme</span>
           {resolvedTheme === 'light' ? (
             <svg
-              className='h-5 w-5 text-gray-700 dark:text-gray-300'
+              className='h-5 w-5 text-secondary-token'
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
+              xmlns='http://www.w3.org/2000/svg'
             >
               <path
                 strokeLinecap='round'
@@ -43,10 +44,11 @@ export function ArtistThemeToggle() {
             </svg>
           ) : (
             <svg
-              className='h-5 w-5 text-gray-700 dark:text-gray-300'
+              className='h-5 w-5 text-secondary-token'
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
+              xmlns='http://www.w3.org/2000/svg'
             >
               <path
                 strokeLinecap='round'

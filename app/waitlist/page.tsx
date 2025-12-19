@@ -1,8 +1,10 @@
 'use client';
 
 import { useAuth, useClerk } from '@clerk/nextjs';
+import { Button } from '@jovie/ui';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Input } from '@/components/atoms/Input';
 import { AuthBackButton, AuthLayout } from '@/components/auth';
 import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
 
@@ -17,10 +19,10 @@ type PrimaryGoal = 'streams' | 'merch' | 'tickets';
 
 type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
-const INPUT_CLASSES =
-  'w-full px-4 py-3 border-0 rounded-md bg-[#23252a] text-white placeholder:text-[#6b6f76] focus:outline-none focus:ring-1 focus:ring-zinc-600 transition-colors';
 const BUTTON_CLASSES =
-  'w-full rounded-md bg-[#e8e8e8] hover:bg-white text-[#101012] font-medium py-3 px-4 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+  'w-full rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
+
+const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
 
 const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
   [
@@ -76,6 +78,20 @@ function normalizeUrl(url: string): string {
   return trimmed;
 }
 
+function resolvePrimarySocialUrl(
+  value: string,
+  platform: SocialPlatform
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) {
+    return normalizeUrl(trimmed);
+  }
+
+  const { buildUrl } = getSocialPlatformPrefix(platform);
+  return normalizeUrl(buildUrl(trimmed));
+}
+
 function isValidUrl(url: string): boolean {
   if (!url.trim()) return false;
   const normalized = normalizeUrl(url);
@@ -92,7 +108,11 @@ export default function WaitlistPage() {
   const { signOut } = useClerk();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selectedPlan = searchParams.get('plan') || null; // free|pro|growth|branding - quietly tracked
+  const selectedPlan = useMemo(() => {
+    const plan = searchParams.get('plan');
+    if (!plan) return null;
+    return ALLOWED_PLANS.has(plan) ? plan : null;
+  }, [searchParams]);
 
   const [isHydrating, setIsHydrating] = useState(true);
   const [step, setStep] = useState<0 | 1 | 2>(0);
@@ -234,8 +254,10 @@ export default function WaitlistPage() {
     }
 
     if (targetStep === 1) {
-      const { buildUrl } = getSocialPlatformPrefix(socialPlatform);
-      const resolvedUrl = buildUrl(primarySocialUrl.trim());
+      const resolvedUrl = resolvePrimarySocialUrl(
+        primarySocialUrl,
+        socialPlatform
+      );
 
       if (!primarySocialUrl.trim()) {
         errors.primarySocialUrl = ['Social profile link is required'];
@@ -359,16 +381,21 @@ export default function WaitlistPage() {
     setIsSubmitting(true);
 
     try {
+      const resolvedPrimarySocialUrl = resolvePrimarySocialUrl(
+        primarySocialUrl,
+        socialPlatform
+      );
+      const normalizedSpotifyUrl = spotifyUrl ? normalizeUrl(spotifyUrl) : null;
+      const sanitizedHeardAbout = heardAbout.trim() || null;
+
       const response = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           primaryGoal,
-          primarySocialUrl: normalizeUrl(
-            getSocialPlatformPrefix(socialPlatform).buildUrl(primarySocialUrl)
-          ),
-          spotifyUrl: spotifyUrl ? normalizeUrl(spotifyUrl) : null,
-          heardAbout: heardAbout || null,
+          primarySocialUrl: resolvedPrimarySocialUrl,
+          spotifyUrl: normalizedSpotifyUrl,
+          heardAbout: sanitizedHeardAbout,
           selectedPlan, // Quietly track pricing tier interest
         }),
       });
@@ -411,9 +438,9 @@ export default function WaitlistPage() {
         formTitle="You're on the waitlist!"
         showLogo={false}
         showFooterPrompt={false}
-        formTitleClassName='text-lg font-medium text-[rgb(227,228,230)] mb-4 text-center'
+        formTitleClassName='text-lg font-medium text-primary-token mb-4 text-center'
       >
-        <p className='text-sm text-[#6b6f76] text-center'>
+        <p className='text-sm text-secondary-token text-center'>
           Early access is rolling out in stages.
         </p>
 
@@ -422,7 +449,7 @@ export default function WaitlistPage() {
             type='button'
             onClick={handleSignOut}
             disabled={isSigningOut}
-            className='text-sm text-[#6b6f76] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+            className='text-sm text-secondary-token hover:text-primary-token transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed rounded-md px-2 py-1'
           >
             {isSigningOut ? 'Signing out…' : 'Sign out'}
           </button>
@@ -457,12 +484,12 @@ export default function WaitlistPage() {
           {step === 0 ? (
             <>
               <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-[rgb(227,228,230)] text-center'>
+                <h1 className='text-lg font-medium text-primary-token text-center'>
                   Primary goal
                 </h1>
                 <p
                   id='waitlist-primary-goal-hint'
-                  className='text-sm text-[#6b6f76] text-center'
+                  className='text-sm text-secondary-token text-center'
                 >
                   You can change this later.
                 </p>
@@ -484,9 +511,8 @@ export default function WaitlistPage() {
                   const isTabStop = primaryGoal ? isSelected : index === 0;
 
                   return (
-                    <button
-                      // biome-ignore lint/suspicious/noArrayIndexKey: Static options list
-                      key={index}
+                    <Button
+                      key={option.value}
                       ref={el => {
                         primaryGoalButtonRefs.current[index] = el;
                       }}
@@ -495,15 +521,12 @@ export default function WaitlistPage() {
                       aria-checked={isSelected}
                       tabIndex={isTabStop ? 0 : -1}
                       onClick={() => handlePrimaryGoalSelect(option.value)}
-                      className={`w-full rounded-md px-4 py-3 text-sm font-medium transition-colors border ${
-                        isSelected
-                          ? 'bg-[#e8e8e8] text-[#101012] border-transparent'
-                          : 'bg-[#23252a] text-white border-[#2a2d33] hover:bg-[#2a2d33]'
-                      }`}
+                      variant={isSelected ? 'primary' : 'secondary'}
+                      className='w-full justify-center rounded-xl py-3 text-[15px] leading-5'
                       disabled={isSubmitting}
                     >
                       {option.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -514,7 +537,7 @@ export default function WaitlistPage() {
                   role='alert'
                   className='text-sm text-red-400'
                 >
-                  {fieldErrors.primaryGoal[0]}
+                  {fieldErrors.primaryGoal?.[0]}
                 </p>
               )}
             </>
@@ -523,7 +546,7 @@ export default function WaitlistPage() {
           {step === 1 ? (
             <>
               <div className='space-y-1'>
-                <h1 className='text-lg font-medium text-[rgb(227,228,230)] text-center'>
+                <h1 className='text-lg font-medium text-primary-token text-center'>
                   Where do fans find you?
                 </h1>
               </div>
@@ -552,10 +575,10 @@ export default function WaitlistPage() {
                     onClick={() => {
                       handleSocialPlatformSelect(option.value);
                     }}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border ${
+                    className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
                       socialPlatform === option.value
-                        ? 'bg-[#23252a] text-white border-transparent'
-                        : 'bg-transparent text-[#c9cbd1] border-[#2a2d33] hover:bg-[#23252a]'
+                        ? 'bg-surface-2 text-primary-token border-border'
+                        : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
                     }`}
                     disabled={isSubmitting}
                   >
@@ -569,12 +592,13 @@ export default function WaitlistPage() {
                   <label htmlFor='primarySocialUrl' className='sr-only'>
                     Social profile link
                   </label>
-                  <input
+                  <Input
                     ref={primarySocialUrlInputRef}
-                    type='text'
+                    type='url'
                     id='primarySocialUrl'
                     value={primarySocialUrl}
                     onChange={e => setPrimarySocialUrl(e.target.value)}
+                    maxLength={2048}
                     required
                     aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
                     aria-describedby={
@@ -582,7 +606,6 @@ export default function WaitlistPage() {
                         ? 'waitlist-primary-social-url-error'
                         : undefined
                     }
-                    className={INPUT_CLASSES}
                     placeholder='Paste a link'
                     disabled={isSubmitting}
                     onKeyDown={e => {
@@ -593,8 +616,8 @@ export default function WaitlistPage() {
                   />
                 </>
               ) : (
-                <div className='w-full flex items-center gap-2 rounded-md bg-[#23252a] px-4 py-3'>
-                  <span className='text-sm text-[#c9cbd1] whitespace-nowrap'>
+                <div className='w-full flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
+                  <span className='text-sm text-secondary-token whitespace-nowrap'>
                     {getSocialPlatformPrefix(socialPlatform).display}
                   </span>
                   <input
@@ -603,6 +626,7 @@ export default function WaitlistPage() {
                     id='primarySocialUrl'
                     value={primarySocialUrl}
                     onChange={e => setPrimarySocialUrl(e.target.value)}
+                    maxLength={2048}
                     required
                     aria-label='Social profile username'
                     aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
@@ -611,7 +635,7 @@ export default function WaitlistPage() {
                         ? 'waitlist-primary-social-url-error'
                         : undefined
                     }
-                    className='min-w-0 flex-1 bg-transparent text-white placeholder:text-[#6b6f76] focus:outline-none'
+                    className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus:outline-none'
                     placeholder='yourusername'
                     disabled={isSubmitting}
                     onKeyDown={e => {
@@ -640,19 +664,19 @@ export default function WaitlistPage() {
               <label htmlFor='spotifyUrl' className='sr-only'>
                 Spotify link
               </label>
-              <input
-                type='text'
+              <Input
+                type='url'
                 id='spotifyUrl'
                 value={spotifyUrl}
                 onChange={e => setSpotifyUrl(e.target.value)}
                 ref={spotifyUrlInputRef}
+                maxLength={2048}
                 aria-invalid={Boolean(fieldErrors.spotifyUrl)}
                 aria-describedby={
                   fieldErrors.spotifyUrl
                     ? 'waitlist-spotify-url-error'
                     : undefined
                 }
-                className={INPUT_CLASSES}
                 placeholder='open.spotify.com/artist/... (optional)'
                 disabled={isSubmitting}
               />
@@ -669,12 +693,12 @@ export default function WaitlistPage() {
               <label htmlFor='heardAbout' className='sr-only'>
                 How did you hear about us?
               </label>
-              <input
+              <Input
                 type='text'
                 id='heardAbout'
                 value={heardAbout}
                 onChange={e => setHeardAbout(e.target.value)}
-                className={INPUT_CLASSES}
+                maxLength={280}
                 placeholder='How did you hear about us? (optional)'
                 disabled={isSubmitting}
               />

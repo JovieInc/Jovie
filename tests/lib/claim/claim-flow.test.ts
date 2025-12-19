@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { RATE_LIMIT_CONFIG } from '@/lib/db/config';
+import { checkRateLimit } from '@/lib/utils/rate-limit';
 
 /**
  * Claim Flow Unit Tests
@@ -8,6 +10,19 @@ import { describe, expect, it } from 'vitest';
  */
 
 describe('Claim Flow Logic', () => {
+  describe('rate limiting', () => {
+    it('blocks repeated attempts for the same key', () => {
+      const key = `claim:test:${Date.now()}:${Math.random()}`;
+
+      // Use the configured limit (shared with the in-memory limiter).
+      for (let i = 0; i < RATE_LIMIT_CONFIG.requests; i += 1) {
+        expect(checkRateLimit(key)).toBe(false);
+      }
+
+      expect(checkRateLimit(key)).toBe(true);
+    });
+  });
+
   describe('claim token validation', () => {
     it('rejects empty claim tokens', () => {
       const token = '';

@@ -1,13 +1,20 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { setPreviewDataMock } = vi.hoisted(() => ({
+  setPreviewDataMock: vi.fn(),
+}));
+
 vi.mock('sonner', () => ({
   toast: {
+    loading: vi.fn(),
     success: vi.fn(),
     error: vi.fn(),
     message: vi.fn(),
+    dismiss: vi.fn(),
   },
 }));
 
@@ -48,17 +55,20 @@ vi.mock('@/components/dashboard/molecules/ProfilePreview', () => ({
 
 vi.mock('@/components/organisms/AvatarUploadable', () => ({
   AvatarUploadable: Object.assign(
-    React.forwardRef<HTMLDivElement, { className?: string }>(
-      function AvatarUploadableMock({ className }, ref) {
-        return (
-          <div
-            ref={ref}
-            className={className}
-            data-testid='avatar-uploadable'
-          />
-        );
-      }
-    ),
+    React.forwardRef<
+      HTMLDivElement,
+      { className?: string; alt?: string; name?: string }
+    >(function AvatarUploadableMock({ className, alt, name }, ref) {
+      return (
+        <div
+          ref={ref}
+          className={className}
+          data-testid='avatar-uploadable'
+          data-alt={alt}
+          data-name={name}
+        />
+      );
+    }),
     { displayName: 'AvatarUploadable' }
   ),
 }));
@@ -134,7 +144,12 @@ vi.mock('@/app/app/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
     user: { id: 'user_123' },
     creatorProfiles: [],
-    selectedProfile: { id: 'profile_123' },
+    selectedProfile: {
+      id: 'profile_123',
+      creatorType: 'artist',
+      displayName: 'Artist',
+      username: 'handle',
+    },
     needsOnboarding: false,
     sidebarCollapsed: false,
     hasSocialLinks: false,
@@ -149,7 +164,7 @@ vi.mock('@/app/app/dashboard/PreviewPanelContext', () => ({
     close: vi.fn(),
     toggle: vi.fn(),
     previewData: null,
-    setPreviewData: vi.fn(),
+    setPreviewData: setPreviewDataMock,
   }),
 }));
 
@@ -212,6 +227,7 @@ vi.mock('@/components/dashboard/organisms/GroupedLinksManager', () => ({
 describe.skip('EnhancedDashboardLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setPreviewDataMock.mockClear();
   });
 
   it('surfaces API error messages from social-links endpoint', async () => {
@@ -291,6 +307,156 @@ describe.skip('EnhancedDashboardLinks', () => {
     });
 
     unmount();
+    fetchMock.mockRestore();
+  });
+
+  it('uses toast-style status for profile save (no inline Saving… element)', async () => {
+    const user = userEvent.setup();
+    const EnhancedDashboardLinks = await loadEnhancedDashboardLinks();
+
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input, init) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        const method = init?.method ?? 'GET';
+
+        if (url.includes('/api/dashboard/profile') && method === 'PUT') {
+          return new Response(
+            JSON.stringify({
+              profile: {
+                username: 'newname',
+                displayName: 'Artist',
+                avatarUrl: null,
+              },
+            }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }
+          ) as unknown as Response;
+        }
+
+        if (url.includes('/api/dashboard/social-links') && method === 'PUT') {
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }) as unknown as Response;
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }) as unknown as Response;
+      });
+
+    render(<EnhancedDashboardLinks initialLinks={[]} />);
+
+    // Enter username edit mode
+    await user.click(screen.getByRole('button', { name: /edit username/i }));
+
+    const input = screen.getByRole('textbox', { name: /username/i });
+    await user.type(input, 'newname');
+
+    await waitFor(() => {
+      expect(toast.loading).toHaveBeenCalledWith('Saving…', {
+        id: 'profile-save-status',
+      });
+    });
+
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith('Saved', {
+        id: 'profile-save-status',
+      });
+    });
+
+    // No inline layout-shifting saving indicator.
+    expect(screen.queryByText('Saving…')).not.toBeInTheDocument();
+
+    fetchMock.mockRestore();
+  });
+
+  it('updates preview data username immediately while typing', async () => {
+    const user = userEvent.setup();
+    const EnhancedDashboardLinks = await loadEnhancedDashboardLinks();
+
+    vi.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          profile: {
+            username: 'newname',
+            displayName: 'Artist',
+            avatarUrl: null,
+          },
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      ) as unknown as Response
+    );
+
+    render(<EnhancedDashboardLinks initialLinks={[]} />);
+
+    await user.click(screen.getByRole('button', { name: /edit username/i }));
+    const input = screen.getByRole('textbox', { name: /username/i });
+    await user.type(input, 'newname');
+
+    await waitFor(() => {
+      expect(setPreviewDataMock).toHaveBeenCalled();
+    });
+
+    const calls = setPreviewDataMock.mock.calls as Array<
+      [{ username?: string }]
+    >;
+    const lastCall = calls.at(-1)?.[0];
+    expect(lastCall?.username).toBe('newname');
+  });
+
+  it('shows error toast when profile save fails', async () => {
+    const user = userEvent.setup();
+    const EnhancedDashboardLinks = await loadEnhancedDashboardLinks();
+
+    const fetchMock = vi
+      .spyOn(global, 'fetch')
+      .mockImplementation(async (input, init) => {
+        const url =
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.toString()
+              : input.url;
+        const method = init?.method ?? 'GET';
+
+        if (url.includes('/api/dashboard/profile') && method === 'PUT') {
+          return new Response(JSON.stringify({ error: 'Username taken' }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' },
+          }) as unknown as Response;
+        }
+
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }) as unknown as Response;
+      });
+
+    render(<EnhancedDashboardLinks initialLinks={[]} />);
+
+    await user.click(screen.getByRole('button', { name: /edit username/i }));
+    const input = screen.getByRole('textbox', { name: /username/i });
+    await user.type(input, 'newname');
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Username taken', {
+        id: 'profile-save-status',
+      });
+    });
+
     fetchMock.mockRestore();
   });
 });

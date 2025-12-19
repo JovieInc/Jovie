@@ -33,12 +33,12 @@ export default function VenmoTipSelector({
 
   return (
     <div className={className} role='region' aria-label='Venmo Tipping'>
-      <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-6 shadow-xl shadow-black/5'>
-        <h2 className='text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100'>
+      <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-6 shadow-xl'>
+        <h2 className='text-xl font-semibold mb-4 text-primary-token'>
           Send a Tip via Venmo
         </h2>
         <TipSelector amounts={amounts} onContinue={handleAmountSelected} />
-        <p className='mt-4 text-sm text-gray-600 dark:text-gray-400'>
+        <p className='mt-4 text-sm text-secondary-token'>
           You&apos;ll be redirected to Venmo to complete your tip.
         </p>
       </div>

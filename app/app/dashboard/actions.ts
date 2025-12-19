@@ -68,6 +68,23 @@ function profileIsPublishable(profile: CreatorProfile | null): boolean {
   return hasHandle && hasName && isPublic && hasCompleted;
 }
 
+function selectDashboardProfile(profiles: CreatorProfile[]): CreatorProfile {
+  const publishable = profiles.find(profileIsPublishable);
+  if (publishable) return publishable;
+
+  const byRecency = [...profiles].sort((a, b) => {
+    const aUpdated = a.updatedAt ? a.updatedAt.getTime() : 0;
+    const bUpdated = b.updatedAt ? b.updatedAt.getTime() : 0;
+    if (aUpdated !== bUpdated) return bUpdated - aUpdated;
+
+    const aCreated = a.createdAt ? a.createdAt.getTime() : 0;
+    const bCreated = b.createdAt ? b.createdAt.getTime() : 0;
+    return bCreated - aCreated;
+  });
+
+  return byRecency[0];
+}
+
 // Minimal link shape for initializing DashboardLinks client from the server
 export interface ProfileSocialLink {
   id: string;
@@ -188,7 +205,7 @@ async function fetchDashboardDataWithSession(
       };
     }
 
-    const selected = creatorData[0];
+    const selected = selectDashboardProfile(creatorData);
 
     const [settings, hasLinks, hasMusicLinks] = await Promise.all([
       dbClient
@@ -389,14 +406,32 @@ export async function getDashboardData(): Promise<DashboardData> {
     };
   }
 
-  const base = await withDbSessionTx(async (tx, clerkUserId) => {
-    return fetchDashboardDataWithSession(tx, clerkUserId);
-  });
+  try {
+    const base = await withDbSessionTx(async (tx, clerkUserId) => {
+      return fetchDashboardDataWithSession(tx, clerkUserId);
+    });
 
-  return {
-    ...base,
-    isAdmin,
-  };
+    return {
+      ...base,
+      isAdmin,
+    };
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { context: 'get_dashboard_data' },
+    });
+
+    return {
+      user: null,
+      creatorProfiles: [],
+      selectedProfile: null,
+      needsOnboarding: true,
+      sidebarCollapsed: false,
+      hasSocialLinks: false,
+      hasMusicLinks: false,
+      isAdmin,
+      tippingStats: createEmptyTippingStats(),
+    };
+  }
 }
 
 export async function getDashboardDataCached(): Promise<DashboardData> {

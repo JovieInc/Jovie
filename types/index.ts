@@ -35,7 +35,7 @@ export type {
   PublicContact,
   PublicContactChannel,
 } from './contacts';
-export type { DashboardBreadcrumbItem } from './dashboard';
+export type { DashboardBreadcrumbItem, SaveStatus } from './dashboard';
 // Re-export shared enums and types from db.ts
 export type {
   // Core interfaces

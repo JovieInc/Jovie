@@ -1,6 +1,14 @@
 'use client';
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -26,7 +34,7 @@ type ProfileNotificationsMenuProps = {
   notificationsState: ProfileNotificationsState;
   onAddChannel: (channel?: NotificationChannel) => void;
   onOpenChange: (open: boolean) => void;
-  onUnsubscribe: (channel: NotificationChannel) => void;
+  onUnsubscribe: (channel: NotificationChannel) => Promise<void> | void;
   open: boolean;
   subscribedChannels: NotificationSubscriptionState;
   subscriptionDetails: NotificationContactValues;
@@ -45,6 +53,14 @@ export function ProfileNotificationsMenu({
   subscriptionDetails,
   triggerRef,
 }: ProfileNotificationsMenuProps) {
+  const [confirmChannel, setConfirmChannel] =
+    React.useState<NotificationChannel | null>(null);
+  const [isConfirming, setIsConfirming] = React.useState(false);
+
+  const labelForChannel = (channel: NotificationChannel): string => {
+    return channel === 'sms' ? 'SMS' : 'Email';
+  };
+
   const renderChannelMenuItem = (
     targetChannel: NotificationChannel,
     label: string
@@ -61,7 +77,8 @@ export function ProfileNotificationsMenu({
           disabled={isLoading}
           onSelect={event => {
             event.preventDefault();
-            onUnsubscribe(targetChannel);
+            onOpenChange(false);
+            setConfirmChannel(targetChannel);
           }}
         >
           <div className='flex-1'>
@@ -73,7 +90,7 @@ export function ProfileNotificationsMenu({
             </p>
             {contactValue ? (
               <p className='break-all text-xs text-muted-foreground'>
-                {targetChannel === 'phone'
+                {targetChannel === 'sms'
                   ? formatE164PhoneForDisplay(contactValue)
                   : contactValue}
               </p>
@@ -93,6 +110,7 @@ export function ProfileNotificationsMenu({
         disabled={isLoading}
         onSelect={event => {
           event.preventDefault();
+          onOpenChange(false);
           onAddChannel(targetChannel);
         }}
       >
@@ -110,45 +128,96 @@ export function ProfileNotificationsMenu({
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
-      <DropdownMenuTrigger asChild>
-        <div>
-          <ProfileNotificationsButton
-            ariaExpanded={open}
-            buttonRef={triggerRef}
-            hasActiveSubscriptions={hasActiveSubscriptions}
-            notificationsState={notificationsState}
-            onClick={() => onOpenChange(!open)}
-          />
-        </div>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align='end'
-        className='w-72 rounded-xl border border-border bg-popover shadow-lg backdrop-blur'
-        sideOffset={8}
-      >
-        <DropdownMenuLabel className='text-sm font-semibold text-foreground'>
-          Manage notifications
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {renderChannelMenuItem('phone', 'SMS')}
-        {renderChannelMenuItem('email', 'Email')}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled
-          className='flex items-start gap-2 cursor-default opacity-70'
-        >
-          <div className='flex-1'>
-            <p className='text-sm font-semibold text-foreground'>
-              Instagram DMs
-            </p>
-            <p className='text-xs text-muted-foreground'>Coming soon</p>
+    <>
+      <DropdownMenu open={open} onOpenChange={onOpenChange}>
+        <DropdownMenuTrigger asChild>
+          <div>
+            <ProfileNotificationsButton
+              ariaExpanded={open}
+              buttonRef={triggerRef}
+              hasActiveSubscriptions={hasActiveSubscriptions}
+              notificationsState={notificationsState}
+              onClick={() => onOpenChange(!open)}
+            />
           </div>
-          <span aria-hidden className='text-xs text-muted-foreground'>
-            …
-          </span>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align='end'
+          className='w-72 rounded-xl border border-border bg-popover shadow-lg backdrop-blur'
+          sideOffset={8}
+        >
+          <DropdownMenuLabel className='text-sm font-semibold text-foreground'>
+            Manage notifications
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {renderChannelMenuItem('sms', 'SMS')}
+          {renderChannelMenuItem('email', 'Email')}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            disabled
+            className='flex items-start gap-2 cursor-default opacity-70'
+          >
+            <div className='flex-1'>
+              <p className='text-sm font-semibold text-foreground'>
+                Instagram DMs
+              </p>
+              <p className='text-xs text-muted-foreground'>Coming soon</p>
+            </div>
+            <span aria-hidden className='text-xs text-muted-foreground'>
+              …
+            </span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog
+        open={confirmChannel !== null}
+        onOpenChange={nextOpen => {
+          if (!nextOpen) {
+            setConfirmChannel(null);
+            setIsConfirming(false);
+          }
+        }}
+      >
+        <AlertDialogContent className='max-w-md'>
+          <AlertDialogHeader className='gap-2'>
+            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
+              {confirmChannel
+                ? `Unsubscribe from ${labelForChannel(confirmChannel)}`
+                : 'Unsubscribe'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className='text-sm text-secondary-token'>
+              {confirmChannel
+                ? `You will stop receiving ${labelForChannel(confirmChannel).toLowerCase()} updates from this artist.`
+                : 'You will stop receiving updates from this artist.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className='gap-2 sm:gap-2'>
+            <AlertDialogCancel
+              disabled={isConfirming}
+              className='flex-1 sm:flex-none'
+            >
+              Keep
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant='destructive'
+              disabled={isConfirming || confirmChannel === null}
+              className='flex-1 sm:flex-none'
+              onClick={() => {
+                if (!confirmChannel) return;
+                setIsConfirming(true);
+                void (async () => {
+                  await onUnsubscribe(confirmChannel);
+                  setIsConfirming(false);
+                  setConfirmChannel(null);
+                })();
+              }}
+            >
+              {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

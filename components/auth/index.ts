@@ -10,8 +10,12 @@ export {
   AuthBackButton,
   AuthButton,
   AuthFooterLink,
+  AuthGoogleIcon,
   AuthInput,
   AuthLink,
+  AuthLinkPreviewCard,
+  AuthSpotifyIcon,
+  AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
 export { OtpSignInForm } from './OtpSignInForm';

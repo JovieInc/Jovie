@@ -30,6 +30,11 @@ import {
 dotenvConfig({ path: '.env.local', override: true });
 dotenvConfig();
 
+if (process.env.ALLOW_DB_SEED !== '1') {
+  console.error('❌ db:seed is disabled. Seed profiles have been removed.');
+  process.exit(1);
+}
+
 // URL patterns for special cases
 const NEON_PLUS_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
 const TCP_PLUS_PATTERN = /(postgres)(|ql)(\+tcp)(.*)/;

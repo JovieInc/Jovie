@@ -1,44 +1,28 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
 
 interface ThemeToggleProps {
   appearance?: 'icon' | 'segmented';
   className?: string;
+  shortcutKey?: string;
 }
 
 export function ThemeToggle({
   appearance = 'icon',
   className = '',
+  shortcutKey,
 }: ThemeToggleProps) {
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  // Don't render anything until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return appearance === 'segmented' ? (
-      <div
-        role='toolbar'
-        aria-label='Theme'
-        className={`inline-flex items-center gap-0 rounded-full border border-black/5 bg-black/5 p-0 dark:border-white/10 dark:bg-white/10 ${className}`}
-      >
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
-      </div>
-    ) : (
-      <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
-        <span className='sr-only'>Loading theme toggle</span>
-        <div className='h-4 w-4 animate-pulse rounded-sm bg-gray-300 dark:bg-gray-600' />
-      </Button>
-    );
-  }
 
   const cycleTheme = () => {
     if (theme === 'light') {
@@ -50,6 +34,62 @@ export function ThemeToggle({
     }
   };
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const shortcutDisplay = shortcutKey?.trim().toUpperCase();
+  const shortcutDescription = shortcutDisplay
+    ? `Press ${shortcutDisplay} to toggle between light and dark themes.`
+    : undefined;
+  const shortcutDescriptionId = useId();
+
+  const renderTooltipContent = useMemo(
+    () =>
+      shortcutDisplay
+        ? () => (
+            <TooltipContent side='top' align='center'>
+              <div className='flex items-center gap-2 text-xs font-semibold leading-none'>
+                <span>Toggle theme</span>
+                <kbd className='rounded-md border border-subtle bg-surface-1 px-1.5 text-[10px] tracking-tight'>
+                  {shortcutDisplay}
+                </kbd>
+              </div>
+            </TooltipContent>
+          )
+        : null,
+    [shortcutDisplay]
+  );
+
+  // Don't render anything until mounted to prevent hydration mismatch
+  if (!mounted) {
+    return appearance === 'segmented' ? (
+      <div
+        role='toolbar'
+        aria-label='Theme'
+        className={`inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
+      >
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
+      </div>
+    ) : (
+      <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
+        <span className='sr-only'>Loading theme toggle</span>
+        <div className='h-4 w-4 animate-pulse rounded-sm bg-surface-2' />
+      </Button>
+    );
+  }
+
+  const withShortcutTooltip = (control: React.ReactElement) =>
+    renderTooltipContent ? (
+      <Tooltip>
+        <TooltipTrigger asChild>{control}</TooltipTrigger>
+        {renderTooltipContent()}
+      </Tooltip>
+    ) : (
+      control
+    );
   const getThemeIcon = () => {
     if (theme === 'system') {
       // System theme - show a computer/auto icon
@@ -129,17 +169,17 @@ export function ThemeToggle({
     const indicatorX = activeIndex * (buttonSizePx + gapPx);
 
     const baseBtn =
-      'relative z-10 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+      'relative z-10 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full leading-none outline-none transition-colors focus-ring-themed focus-visible:ring-offset-transparent';
 
-    return (
+    const segmentedGroup = (
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`relative inline-flex items-center gap-0 rounded-full border border-black/5 bg-black/5 p-0 dark:border-white/10 dark:bg-white/10 ${className}`}
+        className={`relative inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
       >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full bg-white ring-1 ring-inset ring-black/10 transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)] dark:bg-black/40 dark:ring-white/10'
+          className='pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle) transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)]'
           style={{ transform: `translateX(${indicatorX}px)` }}
         />
 
@@ -166,82 +206,116 @@ export function ThemeToggle({
           </svg>
         </button>
 
-        <button
-          type='button'
-          aria-label='Light theme'
-          className={`${baseBtn} ${currentTheme === 'light' ? 'text-primary-token' : 'text-secondary-token hover:text-primary-token'}`}
-          onClick={() => setTheme('light')}
-        >
-          <span className='absolute inset-[calc(-3/16*1rem)]' />
-          <svg
-            viewBox='0 0 20 20'
-            fill='none'
-            aria-hidden='true'
-            className='h-3.5 w-3.5'
+        {withShortcutTooltip(
+          <button
+            type='button'
+            aria-label='Light theme'
+            aria-describedby={
+              shortcutDescription ? shortcutDescriptionId : undefined
+            }
+            className={`${baseBtn} ${currentTheme === 'light' ? 'text-primary-token' : 'text-secondary-token hover:text-primary-token'}`}
+            onClick={() => setTheme('light')}
           >
-            <circle
-              cx='10'
-              cy='10'
-              r='3.25'
-              stroke='currentColor'
-              strokeWidth='1.5'
-            />
-            <g
-              stroke='currentColor'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              strokeWidth='1.5'
+            <span className='absolute inset-[calc(-3/16*1rem)]' />
+            <svg
+              viewBox='0 0 20 20'
+              fill='none'
+              aria-hidden='true'
+              className='h-3.5 w-3.5'
             >
-              <path d='M10 3.75v.5M14.42 5.58l-.354.354M16.25 10h-.5M14.42 14.42l-.354-.354M10 15.75v.5M5.934 14.065l-.354.354M4.25 10h-.5M5.934 5.935 5.58 5.58' />
-            </g>
-          </svg>
-        </button>
+              <circle
+                cx='10'
+                cy='10'
+                r='3.25'
+                stroke='currentColor'
+                strokeWidth='1.5'
+              />
+              <g
+                stroke='currentColor'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                strokeWidth='1.5'
+              >
+                <path d='M10 3.75v.5M14.42 5.58l-.354.354M16.25 10h-.5M14.42 14.42l-.354-.354M10 15.75v.5M5.934 14.065l-.354.354M4.25 10h-.5M5.934 5.935 5.58 5.58' />
+              </g>
+            </svg>
+          </button>
+        )}
 
-        <button
-          type='button'
-          aria-label='Dark theme'
-          className={`${baseBtn} ${currentTheme === 'dark' ? 'text-primary-token' : 'text-secondary-token hover:text-primary-token'}`}
-          onClick={() => setTheme('dark')}
-        >
-          <span className='absolute inset-[calc(-3/16*1rem)]' />
-          <svg
-            viewBox='0 0 20 20'
-            fill='none'
-            aria-hidden='true'
-            className='h-3.5 w-3.5'
+        {withShortcutTooltip(
+          <button
+            type='button'
+            aria-label='Dark theme'
+            aria-describedby={
+              shortcutDescription ? shortcutDescriptionId : undefined
+            }
+            className={`${baseBtn} ${currentTheme === 'dark' ? 'text-primary-token' : 'text-secondary-token hover:text-primary-token'}`}
+            onClick={() => setTheme('dark')}
           >
-            <path
-              stroke='currentColor'
-              strokeWidth='1.5'
-              strokeLinecap='round'
-              strokeLinejoin='round'
-              d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
-            />
-          </svg>
-        </button>
+            <span className='absolute inset-[calc(-3/16*1rem)]' />
+            <svg
+              viewBox='0 0 20 20'
+              fill='none'
+              aria-hidden='true'
+              className='h-3.5 w-3.5'
+            >
+              <path
+                stroke='currentColor'
+                strokeWidth='1.5'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+                d='M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z'
+              />
+            </svg>
+          </button>
+        )}
       </div>
+    );
+
+    const segmentedContent = (
+      <>
+        {segmentedGroup}
+        {shortcutDescription ? (
+          <span id={shortcutDescriptionId} className='sr-only'>
+            {shortcutDescription}
+          </span>
+        ) : null}
+      </>
+    );
+
+    return renderTooltipContent ? (
+      <TooltipProvider delayDuration={0}>{segmentedContent}</TooltipProvider>
+    ) : (
+      segmentedContent
     );
   }
 
-  const isDarkUi = resolvedTheme === 'dark';
-
-  return (
+  const toggleButton = (
     <Button
       variant='ghost'
       size='sm'
       onClick={cycleTheme}
-      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
-        isDarkUi
-          ? 'bg-white/10 text-white ring-white/30 hover:bg-white/20'
-          : 'bg-white text-black ring-black/10 hover:bg-gray-50'
-      } ${className}`}
-      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}`}
+      aria-describedby={shortcutDescription ? shortcutDescriptionId : undefined}
+      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token transition-colors hover:bg-surface-1 focus-ring-themed focus-visible:ring-offset-transparent ${className}`}
+      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}${shortcutDisplay ? ` (${shortcutDisplay})` : ''}`}
     >
-      <span className='sr-only'>
-        Toggle theme (current:{' '}
-        {theme === 'system' ? `auto, showing ${resolvedTheme}` : theme})
+      <span
+        className='sr-only'
+        id={shortcutDescription ? shortcutDescriptionId : undefined}
+      >
+        Toggle theme. Current:{' '}
+        {theme === 'system' ? `auto (${resolvedTheme})` : theme}. Next:{' '}
+        {getNextTheme()}.
       </span>
       {getThemeIcon()}
     </Button>
+  );
+
+  const buttonWithTooltip = withShortcutTooltip(toggleButton);
+
+  return shortcutDescription ? (
+    <TooltipProvider delayDuration={0}>{buttonWithTooltip}</TooltipProvider>
+  ) : (
+    buttonWithTooltip
   );
 }
