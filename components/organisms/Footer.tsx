@@ -15,6 +15,7 @@ export interface FooterProps {
   };
   showThemeToggle?: boolean;
   className?: string;
+  themeShortcutKey?: string;
   brandingMark?: 'wordmark' | 'icon';
   containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   links?: Array<{
@@ -29,6 +30,7 @@ export function Footer({
   hideBranding = false,
   artistSettings,
   showThemeToggle = false,
+  themeShortcutKey,
   className = '',
   brandingMark = 'wordmark',
   containerSize = 'lg',
@@ -246,10 +248,16 @@ export function Footer({
               {showThemeToggle && (
                 <div className='flex items-center gap-3 justify-self-start sm:justify-self-end'>
                   <div className='flex items-center sm:hidden'>
-                    <ThemeToggle appearance='icon' />
+                    <ThemeToggle
+                      appearance='icon'
+                      shortcutKey={themeShortcutKey}
+                    />
                   </div>
                   <div className='hidden sm:flex items-center'>
-                    <ThemeToggle appearance='segmented' />
+                    <ThemeToggle
+                      appearance='segmented'
+                      shortcutKey={themeShortcutKey}
+                    />
                   </div>
                 </div>
               )}
@@ -307,10 +315,16 @@ export function Footer({
               {showThemeToggle && (
                 <>
                   <div className='flex items-center md:hidden'>
-                    <ThemeToggle appearance='icon' />
+                    <ThemeToggle
+                      appearance='icon'
+                      shortcutKey={themeShortcutKey}
+                    />
                   </div>
                   <div className='hidden md:flex items-center'>
-                    <ThemeToggle appearance={config.themeAppearance} />
+                    <ThemeToggle
+                      appearance={config.themeAppearance}
+                      shortcutKey={themeShortcutKey}
+                    />
                   </div>
                 </>
               )}
