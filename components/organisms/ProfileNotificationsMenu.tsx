@@ -129,7 +129,7 @@ export function ProfileNotificationsMenu({
 
   return (
     <>
-      <DropdownMenu open={open} onOpenChange={onOpenChange} modal={false}>
+      <DropdownMenu open={open} onOpenChange={onOpenChange}>
         <DropdownMenuTrigger asChild>
           <div>
             <ProfileNotificationsButton

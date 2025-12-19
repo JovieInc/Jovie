@@ -8,6 +8,10 @@ import { useProfileNotifications } from '@/components/organisms/ProfileShell';
 import { CTAButton } from '@/components/ui/CTAButton';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  normalizeSubscriptionEmail,
+  normalizeSubscriptionPhone,
+} from '@/lib/notifications/validation';
 import type { Artist } from '@/types/db';
 import type { NotificationChannel } from '@/types/notifications';
 
@@ -214,8 +218,8 @@ export function ArtistNotificationsCTA({
         return false;
       }
 
-      const candidate = buildPhoneE164();
-      if (!/^\+[1-9]\d{6,14}$/.test(candidate)) {
+      const normalizedPhone = normalizeSubscriptionPhone(buildPhoneE164());
+      if (!normalizedPhone) {
         setError('Please enter a valid phone number');
         return false;
       }
@@ -224,16 +228,13 @@ export function ArtistNotificationsCTA({
       return true;
     }
 
-    const trimmedEmail = emailInput.trim().toLowerCase();
+    const trimmedEmail = emailInput.trim();
     if (!trimmedEmail) {
       setError('Email address is required');
       return false;
     }
 
-    // More robust email validation
-    const emailRegex =
-      /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-    if (!emailRegex.test(trimmedEmail)) {
+    if (!normalizeSubscriptionEmail(trimmedEmail)) {
       setError('Please enter a valid email address');
       return false;
     }
@@ -298,8 +299,22 @@ export function ArtistNotificationsCTA({
     setError(null);
 
     try {
-      const trimmedEmail = channel === 'email' ? emailInput.trim() : undefined;
-      const phoneE164 = channel === 'sms' ? buildPhoneE164() : undefined;
+      const trimmedEmail =
+        channel === 'email'
+          ? normalizeSubscriptionEmail(emailInput)
+          : undefined;
+      const phoneE164 =
+        channel === 'sms'
+          ? normalizeSubscriptionPhone(buildPhoneE164())
+          : undefined;
+
+      if (channel === 'email' && !trimmedEmail) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      if (channel === 'sms' && !phoneE164) {
+        throw new Error('Please enter a valid phone number');
+      }
 
       const body: Record<string, unknown> = {
         artist_id: artist.id,

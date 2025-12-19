@@ -4,16 +4,13 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { z } from 'zod';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-
-// Email validation schema
-const emailSchema = z.string().email('Please enter a valid email address');
 
 export default function NotificationsPage() {
   const params = useParams();
@@ -57,23 +54,20 @@ export default function NotificationsPage() {
     setError(null);
 
     // Client-side validation
-    try {
-      emailSchema.parse(email);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        const errorMessage = err.format()._errors[0] || 'Invalid email';
-        setError(errorMessage);
-        notifyError(errorMessage);
+    const normalizedEmail = normalizeSubscriptionEmail(email);
+    if (!normalizedEmail) {
+      const errorMessage = 'Please enter a valid email address';
+      setError(errorMessage);
+      notifyError(errorMessage);
 
-        // Track form validation error
-        track('notifications_subscribe_error', {
-          error_type: 'validation_error',
-          error_message: errorMessage,
-          source: 'notifications_page',
-        });
+      // Track form validation error
+      track('notifications_subscribe_error', {
+        error_type: 'validation_error',
+        error_message: errorMessage,
+        source: 'notifications_page',
+      });
 
-        return;
-      }
+      return;
     }
 
     setIsSubmitting(true);
@@ -82,7 +76,7 @@ export default function NotificationsPage() {
 
     // Track form submission attempt
     track('notifications_subscribe_attempt', {
-      email_length: email.length,
+      email_length: normalizedEmail.length,
       source: 'notifications_page',
     });
 
@@ -99,7 +93,7 @@ export default function NotificationsPage() {
         },
         body: JSON.stringify({
           artist_id: '00000000-0000-0000-0000-000000000000', // This would be fetched from the username
-          email,
+          email: normalizedEmail,
           source: 'notifications_page',
         }),
       });
@@ -112,7 +106,7 @@ export default function NotificationsPage() {
 
       // Track successful subscription
       track('notifications_subscribe_success', {
-        email_domain: email.split('@')[1],
+        email_domain: normalizedEmail.split('@')[1],
         source: 'notifications_page',
       });
 

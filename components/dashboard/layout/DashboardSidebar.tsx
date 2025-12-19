@@ -1,11 +1,14 @@
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ComponentPropsWithoutRef } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { DashboardNav } from '@/components/dashboard/DashboardNav';
 import { DashboardRemoveBrandingCard } from '@/components/dashboard/molecules/DashboardRemoveBrandingCard';
+import { OptimizedAvatar } from '@/components/molecules/OptimizedAvatar';
 import {
   Sidebar,
   SidebarContent,
@@ -39,6 +42,11 @@ export function DashboardSidebar({
     dashboardData.selectedProfile?.usernameNormalized ??
     dashboardData.selectedProfile?.username;
   const profileHref = username ? `/${username}` : undefined;
+  const displayName =
+    dashboardData.selectedProfile?.displayName?.trim() ||
+    dashboardData.selectedProfile?.username ||
+    'Your profile';
+  const avatarUrl = dashboardData.selectedProfile?.avatarUrl;
 
   return (
     <Sidebar
@@ -93,6 +101,53 @@ export function DashboardSidebar({
             )}
           />
         </div>
+        {!isInSettings && (
+          <div className='px-2 pb-3 pt-2 lg:hidden'>
+            <div className='flex items-center gap-3 rounded-lg border border-sidebar-border bg-sidebar/40 p-3'>
+              <OptimizedAvatar
+                src={avatarUrl}
+                alt={displayName}
+                size={64}
+                className='h-10 w-10'
+              />
+              <div className='min-w-0'>
+                <p className='truncate text-sm font-semibold text-sidebar-foreground'>
+                  {displayName}
+                </p>
+                {username ? (
+                  <p className='truncate text-xs text-sidebar-muted'>
+                    @{username}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {profileHref ? (
+              <div className='mt-3 flex items-center gap-2'>
+                <Button
+                  asChild
+                  size='sm'
+                  variant='secondary'
+                  className='flex-1'
+                >
+                  <Link
+                    href={profileHref}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                  >
+                    View profile
+                  </Link>
+                </Button>
+                <CopyToClipboardButton
+                  relativePath={profileHref}
+                  idleLabel='Copy link'
+                  successLabel='Copied'
+                  errorLabel='Copy failed'
+                  className='flex-1'
+                />
+              </div>
+            ) : null}
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent className='flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>

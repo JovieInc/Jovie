@@ -244,7 +244,6 @@ export function EnhancedDashboardLinks({
   const [autoRefreshUntilMs, setAutoRefreshUntilMs] = useState<number | null>(
     null
   );
-
   useEffect(() => {
     if (!dashboardData.selectedProfile) {
       setArtist(null);
@@ -1226,6 +1225,7 @@ export function EnhancedDashboardLinks({
             suggestionsEnabled ? handleDismissSuggestion : undefined
           }
           suggestionsEnabled={suggestionsEnabled}
+          profileId={profileId}
         />
       </div>
     </div>
