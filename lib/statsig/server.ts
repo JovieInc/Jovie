@@ -1,6 +1,6 @@
 'server only';
 
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 export interface StatsigGateCheckResult {
   name: string;

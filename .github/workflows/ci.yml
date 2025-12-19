@@ -86,6 +86,7 @@ jobs:
   ci-fast-checks:
     name: Fast checks (typecheck + lint)
     # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
+    needs: [ci-cache-warm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -137,6 +138,51 @@ jobs:
           else
             pnpm run lint
           fi
+
+  ci-cache-warm:
+    name: Cache Warm (pnpm + Next build cache)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping cache warm."
+            exit 0
+          fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping cache warm."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache Next build cache
+        uses: actions/cache@v5
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-next-
+      - name: Warm Next build cache
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
+        run: pnpm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN || 'placeholder' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN || 'placeholder' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY || 'placeholder' }}
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
 
   neon-db:
     name: Neon DB
@@ -199,6 +245,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -241,6 +289,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -317,6 +367,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -413,6 +465,10 @@ jobs:
         run: |
           CI=true BASE_URL=https://main.jov.ie pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
 
+      - name: Run Performance Budget Guard against staging
+        run: |
+          CI=true BASE_URL=https://main.jov.ie pnpm run test:budgets
+
       - name: Upload Playwright Artifacts on Failure
         if: failure()
         uses: actions/upload-artifact@v6
@@ -430,6 +486,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -487,6 +545,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -516,9 +576,39 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         uses: ./.github/actions/setup-node-pnpm
 
+      - name: Load quarantined unit tests
+        if: steps.check_changes.outputs.run_full_ci == 'true'
+        id: quarantine
+        run: |
+          FILE="tests/quarantine.json"
+          UNIT_FILES=""
+          UNIT_EXCLUDES=""
+
+          if [ -f "$FILE" ]; then
+            UNIT_FILES=$(jq -r '.unit // [] | join(" ")' "$FILE")
+            UNIT_EXCLUDES=$(jq -r '.unit // [] | map("--exclude=" + .) | join(" ")' "$FILE")
+          fi
+
+          echo "unit_files=$UNIT_FILES" >> $GITHUB_OUTPUT
+          echo "unit_excludes=$UNIT_EXCLUDES" >> $GITHUB_OUTPUT
+
+          if [ -n "$UNIT_FILES" ]; then
+            echo "has_unit=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_unit=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm test
+        run: pnpm test -- ${{ steps.quarantine.outputs.unit_excludes }}
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+
+      - name: Run quarantined unit tests (retries)
+        if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
+        continue-on-error: true
+        run: pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -552,6 +642,8 @@ jobs:
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -636,23 +728,80 @@ jobs:
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         run: npx playwright install chromium firefox --with-deps
 
+      - name: Load quarantined E2E specs
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        id: quarantine
+        run: |
+          FILE="tests/quarantine.json"
+          QUARANTINED=()
+
+          if [ -f "$FILE" ]; then
+            mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
+          fi
+
+          mapfile -t ALL_SPECS < <(git ls-files "tests/e2e/**/*.spec.ts" "tests/smoke/**/*.spec.ts")
+
+          ALLOWED_SPECS=()
+          for spec in "${ALL_SPECS[@]}"; do
+            skip=false
+            for quarantined in "${QUARANTINED[@]}"; do
+              if [[ "$spec" == "$quarantined" ]]; then
+                skip=true
+                break
+              fi
+            done
+            if [[ "$skip" == "false" ]]; then
+              ALLOWED_SPECS+=("$spec")
+            fi
+          done
+
+          echo "allowed_specs=${ALLOWED_SPECS[*]}" >> $GITHUB_OUTPUT
+          echo "quarantined_specs=${QUARANTINED[*]}" >> $GITHUB_OUTPUT
+
+          if [ ${#QUARANTINED[@]} -gt 0 ]; then
+            echo "has_quarantine=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_quarantine=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: E2E Smoke (PR to Preview)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        run: pnpm run e2e:smoke --trace=retain-on-failure
+        run: |
+          if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
+            echo "No non-quarantined E2E specs to run."
+            exit 0
+          fi
+          pnpm playwright test -g @smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
       - name: E2E Full (Main Branch)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
-        run: pnpm run test:e2e --reporter=line
+        run: |
+          if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
+            echo "No non-quarantined E2E specs to run."
+            exit 0
+          fi
+          pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
 
-      - name: Upload Playwright Artifacts on Failure
+      - name: E2E Quarantine (retries)
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
+        continue-on-error: true
+        run: pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+
+      - name: Upload Playwright Report on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
         uses: actions/upload-artifact@v6
         with:
-          name: playwright-report-${{ github.run_id }}
-          path: |
-            playwright-report/
-            test-results/
+          name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright Test Results on Failure
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
           retention-days: 7
 
   ci-pr-vercel-preview:
@@ -721,6 +870,192 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: ${{ github.head_ref || github.ref_name }}
 
+  ci-summary:
+    name: CI Summary
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs:
+      - ci-env-example-guard
+      - ci-guardrails
+      - ci-fast-checks
+      - neon-db
+      - drizzle-migration-guard
+      - ci-drizzle-check
+      - ci-fast
+      - ci-pr-neon-migrate
+      - ci-build
+      - ci-unit-tests
+      - ci-e2e-tests
+      - ci-pr-vercel-preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Post CI summary to PR
+        uses: actions/github-script@v8
+        env:
+          BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
+          DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
+          E2E_RUN_FULL_CI: ${{ needs.ci-e2e-tests.outputs.run_full_ci }}
+          MIGRATION_GUARD_RUN_FULL_CI: ${{ needs.drizzle-migration-guard.outputs.run_full_ci }}
+          PR_MIGRATE_RUN_FULL_CI: ${{ needs.ci-pr-neon-migrate.outputs.run_full_ci }}
+          UNIT_RUN_FULL_CI: ${{ needs.ci-unit-tests.outputs.run_full_ci }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const runId = context.runId;
+
+            const jobsResponse = await github.rest.actions.listJobsForWorkflowRun({
+              owner,
+              repo,
+              run_id: runId,
+              per_page: 100
+            });
+
+            const jobByName = new Map(
+              jobsResponse.data.jobs.map(job => [job.name, job])
+            );
+
+            const formatDuration = (job) => {
+              if (!job?.started_at || !job?.completed_at) return '—';
+              const start = new Date(job.started_at);
+              const end = new Date(job.completed_at);
+              const ms = Math.max(0, end - start);
+              const minutes = Math.floor(ms / 60000);
+              const seconds = Math.floor((ms % 60000) / 1000);
+              return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            };
+
+            const resolveOutcome = (jobName, fallbackResult) => {
+              const job = jobByName.get(jobName);
+              if (!job) return { status: fallbackResult ?? 'not_run', duration: '—' };
+              return {
+                status: job.conclusion || job.status || fallbackResult || 'unknown',
+                duration: formatDuration(job)
+              };
+            };
+
+            const summarizeStatus = (status) => {
+              switch (status) {
+                case 'success':
+                  return '✅ Passed';
+                case 'failure':
+                  return '❌ Failed';
+                case 'cancelled':
+                  return '⚠️ Cancelled';
+                case 'skipped':
+                  return '⚠️ Skipped';
+                case 'timed_out':
+                  return '❌ Timed out';
+                case 'not_run':
+                  return '⚪️ Not run';
+                default:
+                  return `⚪️ ${status}`;
+              }
+            };
+
+            const deriveSkipReason = (jobKey, runFullCiFlag) => {
+              if (runFullCiFlag === 'false') {
+                return 'Skipped (path guard: no relevant changes)';
+              }
+              if (runFullCiFlag === '') {
+                return 'Skipped (job not applicable)';
+              }
+              return jobKey === 'neon-db'
+                ? 'Skipped (not required for this PR)'
+                : 'Skipped (conditional job)';
+            };
+
+            const summaryRows = [
+              { label: 'Env Example Guard', jobName: 'Env Example Guard' },
+              { label: 'Guardrails', jobName: 'Guardrails (proxy + format)' },
+              { label: 'Fast Checks', jobName: 'Fast checks (typecheck + lint)' },
+              {
+                label: 'Migration Guard',
+                jobName: 'Migration Guard',
+                runFullCi: process.env.MIGRATION_GUARD_RUN_FULL_CI
+              },
+              { label: 'Neon DB', jobName: 'Neon DB' },
+              {
+                label: 'Drizzle Check',
+                jobName: 'Drizzle Check',
+                runFullCi: process.env.DRIZZLE_RUN_FULL_CI
+              },
+              {
+                label: 'Build',
+                jobName: 'Build',
+                runFullCi: process.env.BUILD_RUN_FULL_CI
+              },
+              {
+                label: 'Unit Tests',
+                jobName: 'Unit Tests',
+                runFullCi: process.env.UNIT_RUN_FULL_CI
+              },
+              {
+                label: 'E2E Tests',
+                jobName: 'E2E Tests',
+                runFullCi: process.env.E2E_RUN_FULL_CI
+              },
+              {
+                label: 'DB Migrate (PR main)',
+                jobName: 'DB Migrate (PR main)',
+                runFullCi: process.env.PR_MIGRATE_RUN_FULL_CI
+              },
+              { label: 'Preview Deploy', jobName: 'Preview Deploy (PR)' }
+            ];
+
+            const rows = summaryRows.map((row) => {
+              const outcome = resolveOutcome(row.jobName);
+              const statusLabel = summarizeStatus(outcome.status);
+              const timing = outcome.duration;
+              let context = 'Executed';
+              if (outcome.status === 'skipped' || outcome.status === 'not_run') {
+                context = deriveSkipReason(row.label, row.runFullCi ?? '');
+              }
+              return `| ${row.label} | ${statusLabel} | ${context} | ${timing} |`;
+            });
+
+            const summaryBody = [
+              '## CI Summary',
+              '',
+              'A crisp snapshot of this PR run — executed vs. skipped, with timing for every key lane.',
+              '',
+              '| Job | Status | Context | Time |',
+              '| --- | ------ | ------- | ---- |',
+              ...rows,
+              '',
+              `**Run:** [${runId}](${context.serverUrl}/${owner}/${repo}/actions/runs/${runId})`,
+              ''
+            ].join('\n');
+
+            const existingComments = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: prNumber
+            });
+
+            const botComment = existingComments.data.find(comment =>
+              comment.user?.type === 'Bot' && comment.body?.startsWith('## CI Summary')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: botComment.id,
+                body: summaryBody
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body: summaryBody
+              });
+            }
   deploy:
     needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -900,6 +1235,34 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (staging deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -939,6 +1302,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }
@@ -1146,6 +1511,34 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (production deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -1185,6 +1578,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }

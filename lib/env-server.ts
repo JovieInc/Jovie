@@ -1,14 +1,14 @@
 import 'server-only';
 import { z } from 'zod';
-import { publicEnv } from './env.public';
+import { publicEnv } from '@/lib/env-public';
 import {
   getDatabaseUrlErrorMessage,
   isDatabaseUrlValid,
 } from './utils/database-url-validator';
 
 // Server-side environment variables
-// This file should NEVER be imported in client-side code
-// The 'server-only' import at the top will cause a build error if accidentally imported client-side
+// This module must never be imported in client-side code.
+// The `server-only` import above enforces that constraint at build time.
 
 // Custom DATABASE_URL validator using shared validation logic
 const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
@@ -16,6 +16,10 @@ const databaseUrlValidator = z.string().optional().refine(isDatabaseUrlValid, {
 });
 
 const ServerEnvSchema = z.object({
+  // Clerk server-side configuration
+  CLERK_SECRET_KEY: z.string().optional(),
+  CLERK_WEBHOOK_SECRET: z.string().optional(),
+
   // Cloudinary configuration
   CLOUDINARY_API_KEY: z.string().optional(),
   CLOUDINARY_API_SECRET: z.string().optional(),
@@ -53,6 +57,8 @@ const ServerEnvSchema = z.object({
 });
 
 const rawServerEnv = {
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+  CLERK_WEBHOOK_SECRET: process.env.CLERK_WEBHOOK_SECRET,
   CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
   CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
   CLOUDINARY_UPLOAD_FOLDER: process.env.CLOUDINARY_UPLOAD_FOLDER,
@@ -78,13 +84,19 @@ const parsed = ServerEnvSchema.safeParse(rawServerEnv);
 
 if (!parsed.success && process.env.NODE_ENV === 'development') {
   console.warn(
-    '[env.server] Validation issues:',
+    '[env-server] Validation issues:',
     parsed.error.flatten().fieldErrors
   );
 }
 
-// Export server-side environment variables
-const serverEnv = {
+// Export server-side environment variables only
+export const env = {
+  CLERK_SECRET_KEY: parsed.success
+    ? parsed.data.CLERK_SECRET_KEY
+    : process.env.CLERK_SECRET_KEY,
+  CLERK_WEBHOOK_SECRET: parsed.success
+    ? parsed.data.CLERK_WEBHOOK_SECRET
+    : process.env.CLERK_WEBHOOK_SECRET,
   CLOUDINARY_API_KEY: parsed.success
     ? parsed.data.CLOUDINARY_API_KEY
     : process.env.CLOUDINARY_API_KEY,
@@ -144,12 +156,6 @@ const serverEnv = {
     : process.env.STATSIG_SERVER_API_KEY,
 } as const;
 
-// Combined env object for server-side use (includes both public and server-only)
-export const env = {
-  ...publicEnv,
-  ...serverEnv,
-} as const;
-
 // Environment validation utilities
 export interface EnvironmentValidationResult {
   valid: boolean;
@@ -178,9 +184,7 @@ export function validateEnvironment(
     Object.entries(fieldErrors).forEach(([field, fieldErrors]) => {
       if (fieldErrors) {
         fieldErrors.forEach(error => {
-          if (field === 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY') {
-            critical.push(`${field}: ${error}`);
-          } else if (field === 'DATABASE_URL' && context === 'runtime') {
+          if (field === 'DATABASE_URL' && context === 'runtime') {
             critical.push(`${field}: ${error}`);
           } else {
             warnings.push(`${field}: ${error}`);
@@ -193,7 +197,7 @@ export function validateEnvironment(
   // Additional runtime-specific validations
   if (context === 'runtime') {
     // Check for critical runtime dependencies
-    if (!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+    if (!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
       critical.push(
         'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required for authentication'
       );
@@ -205,8 +209,8 @@ export function validateEnvironment(
 
     // Validate specific formats
     if (
-      env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-      !env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_')
+      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.startsWith('pk_')
     ) {
       errors.push('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY should start with pk_');
     }
@@ -216,14 +220,14 @@ export function validateEnvironment(
     }
 
     if (
-      env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY &&
-      !env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.startsWith('pk_')
+      publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY &&
+      !publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.startsWith('pk_')
     ) {
       errors.push('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY should start with pk_');
     }
 
     // Check for missing environment pairs
-    const hasStripePublic = !!env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+    const hasStripePublic = !!publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
     const hasStripeSecret = !!env.STRIPE_SECRET_KEY;
 
     if (hasStripePublic && !hasStripeSecret) {
@@ -241,7 +245,7 @@ export function validateEnvironment(
     const cloudinaryKeys = [
       env.CLOUDINARY_API_KEY,
       env.CLOUDINARY_API_SECRET,
-      env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+      publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
     ];
     const cloudinaryKeysPresent = cloudinaryKeys.filter(Boolean).length;
 
@@ -291,14 +295,14 @@ export function getEnvironmentInfo() {
     platform,
     nodeVersion,
     hasDatabase: !!env.DATABASE_URL,
-    hasClerk: !!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+    hasClerk: !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
     hasStripe: !!(
-      env.STRIPE_SECRET_KEY && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+      env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     ),
     hasCloudinary: !!(
       env.CLOUDINARY_API_KEY &&
       env.CLOUDINARY_API_SECRET &&
-      env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+      publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
     ),
   };
 }

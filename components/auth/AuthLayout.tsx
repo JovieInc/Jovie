@@ -31,12 +31,12 @@ interface AuthLayoutProps {
 }
 
 const LINK_FOCUS_CLASSES =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] rounded-md';
+  'focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md';
 
 export function AuthLayout({
   children,
   formTitle,
-  formTitleClassName = 'text-[18px] leading-6 font-medium text-[rgb(227,228,230)] mb-4 text-center',
+  formTitleClassName = 'text-[18px] leading-6 font-medium text-primary-token mb-4 text-center',
   footerPrompt = "Don't have access?",
   footerLinkText = 'Join the waitlist',
   footerLinkHref = '/waitlist',
@@ -104,7 +104,7 @@ export function AuthLayout({
       {showSkipLink && (
         <Link
           href='#auth-form'
-          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-white focus:text-black focus:rounded-md'
+          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:rounded-md focus:bg-surface-0 focus:text-primary-token focus:border focus:border-subtle focus-ring-themed focus-visible:ring-offset-(--color-bg-base)'
         >
           Skip to form
         </Link>
@@ -167,11 +167,11 @@ export function AuthLayout({
 
       {/* Footer */}
       {showFooterPrompt && (
-        <p className='mt-8 text-sm text-[#6b6f76] text-center relative z-10'>
+        <p className='mt-8 text-sm text-secondary-token text-center relative z-10'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-white hover:underline ${LINK_FOCUS_CLASSES}`}
+            className={`text-primary-token hover:underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>
@@ -181,18 +181,18 @@ export function AuthLayout({
       {/* Legal links */}
       {showLegalLinks && (
         <nav
-          className='absolute bottom-4 flex gap-4 text-xs text-[#666]'
+          className='absolute bottom-4 flex gap-4 text-xs text-secondary-token'
           aria-label='Legal'
         >
           <Link
             href='/legal/terms'
-            className={`hover:text-white transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
+            className={`hover:text-primary-token transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
           >
             Terms
           </Link>
           <Link
             href='/legal/privacy'
-            className={`hover:text-white transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
+            className={`hover:text-primary-token transition-colors no-underline ${LINK_FOCUS_CLASSES}`}
           >
             Privacy Policy
           </Link>

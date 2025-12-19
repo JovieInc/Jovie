@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 

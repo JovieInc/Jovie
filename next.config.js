@@ -6,6 +6,58 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
 
+const isDev = process.env.NODE_ENV === 'development';
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  [
+    "script-src 'self'",
+    "'unsafe-inline'",
+    isDev ? "'unsafe-eval'" : null,
+    'https://va.vercel-scripts.com',
+    'https://vitals.vercel-insights.com',
+    'https://*.clerk.com',
+    'https://*.clerk.accounts.dev',
+    'https://cdn.statsig.com',
+    'https://*.statsigcdn.com',
+  ]
+    .filter(Boolean)
+    .join(' '),
+  "style-src 'self' 'unsafe-inline'",
+  [
+    "img-src 'self' data: blob:",
+    'https://i.scdn.co',
+    'https://res.cloudinary.com',
+    'https://images.clerk.dev',
+    'https://img.clerk.com',
+    'https://images.unsplash.com',
+    'https://linktr.ee',
+    'https://api.qrserver.com',
+    'https://*.public.blob.vercel-storage.com',
+    'https://*.blob.vercel-storage.com',
+  ].join(' '),
+  [
+    "connect-src 'self'",
+    'https://api.statsig.com',
+    'https://statsigapi.net',
+    'https://*.statsigcdn.com',
+    'https://*.statsig.com',
+    'https://va.vercel-scripts.com',
+    'https://vitals.vercel-insights.com',
+    'https://*.clerk.com',
+    'https://*.clerk.accounts.dev',
+    'https://api.stripe.com',
+    'https://*.ingest.sentry.io',
+  ].join(' '),
+  "font-src 'self' data:",
+  "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+].join('; ');
+
 const nextConfig = {
   turbopack: {},
   typescript: {
@@ -98,6 +150,10 @@ const nextConfig = {
         key: 'Referrer-Policy',
         value: 'origin-when-cross-origin',
       },
+      {
+        key: 'Content-Security-Policy',
+        value: contentSecurityPolicy,
+      },
     ];
 
     const isProdLike =
@@ -175,19 +231,51 @@ const nextConfig = {
         ...config.optimization,
         splitChunks: {
           chunks: 'all',
-          maxSize: 244000, // Reduce chunk size to improve cache serialization
+          maxSize: 200000, // Smaller chunks reduce serialized cache payloads.
+          minSize: 20000,
           cacheGroups: {
-            vendor: {
+            framework: {
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
+              name: 'framework',
+              chunks: 'all',
+              priority: 40,
+              enforce: true,
+            },
+            icons: {
+              test: /[\\/]node_modules[\\/](simple-icons|lucide-react)[\\/]/,
+              name: 'icons',
+              chunks: 'all',
+              priority: 30,
+              maxSize: 180000,
+            },
+            motion: {
+              test: /[\\/]node_modules[\\/]framer-motion[\\/]/,
+              name: 'motion',
+              chunks: 'all',
+              priority: 25,
+              maxSize: 180000,
+            },
+            charts: {
+              test: /[\\/]node_modules[\\/]recharts[\\/]/,
+              name: 'charts',
+              chunks: 'all',
+              priority: 25,
+              maxSize: 180000,
+            },
+            vendors: {
               test: /[\\/]node_modules[\\/]/,
               name: 'vendors',
               chunks: 'all',
-              maxSize: 244000,
+              priority: 10,
+              reuseExistingChunk: true,
+              maxSize: 200000,
             },
             common: {
               name: 'common',
               minChunks: 2,
               chunks: 'all',
-              maxSize: 244000,
+              priority: 5,
+              maxSize: 200000,
             },
           },
         },

@@ -17,7 +17,7 @@ interface AuthInputProps
 }
 
 const authInputClasses =
-  'border border-white/10 bg-[#15161a] text-white placeholder:text-[#6b6f76] focus-visible:ring-1 focus-visible:ring-zinc-600 focus-visible:ring-offset-0 rounded-lg';
+  'border border-subtle bg-surface-0 text-primary-token placeholder:text-tertiary-token rounded-lg focus-ring-themed focus-visible:ring-offset-(--color-bg-base)';
 
 const variantClasses: Record<AuthInputVariant, string> = {
   default: '',

@@ -22,6 +22,8 @@ type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 const BUTTON_CLASSES =
   'w-full rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
 
+const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
+
 const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
   [
     { value: 'instagram', label: 'Instagram' },
@@ -76,6 +78,20 @@ function normalizeUrl(url: string): string {
   return trimmed;
 }
 
+function resolvePrimarySocialUrl(
+  value: string,
+  platform: SocialPlatform
+): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) {
+    return normalizeUrl(trimmed);
+  }
+
+  const { buildUrl } = getSocialPlatformPrefix(platform);
+  return normalizeUrl(buildUrl(trimmed));
+}
+
 function isValidUrl(url: string): boolean {
   if (!url.trim()) return false;
   const normalized = normalizeUrl(url);
@@ -92,7 +108,11 @@ export default function WaitlistPage() {
   const { signOut } = useClerk();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const selectedPlan = searchParams.get('plan') || null; // free|pro|growth|branding - quietly tracked
+  const selectedPlan = useMemo(() => {
+    const plan = searchParams.get('plan');
+    if (!plan) return null;
+    return ALLOWED_PLANS.has(plan) ? plan : null;
+  }, [searchParams]);
 
   const [isHydrating, setIsHydrating] = useState(true);
   const [step, setStep] = useState<0 | 1 | 2>(0);
@@ -234,8 +254,10 @@ export default function WaitlistPage() {
     }
 
     if (targetStep === 1) {
-      const { buildUrl } = getSocialPlatformPrefix(socialPlatform);
-      const resolvedUrl = buildUrl(primarySocialUrl.trim());
+      const resolvedUrl = resolvePrimarySocialUrl(
+        primarySocialUrl,
+        socialPlatform
+      );
 
       if (!primarySocialUrl.trim()) {
         errors.primarySocialUrl = ['Social profile link is required'];
@@ -359,16 +381,21 @@ export default function WaitlistPage() {
     setIsSubmitting(true);
 
     try {
+      const resolvedPrimarySocialUrl = resolvePrimarySocialUrl(
+        primarySocialUrl,
+        socialPlatform
+      );
+      const normalizedSpotifyUrl = spotifyUrl ? normalizeUrl(spotifyUrl) : null;
+      const sanitizedHeardAbout = heardAbout.trim() || null;
+
       const response = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           primaryGoal,
-          primarySocialUrl: normalizeUrl(
-            getSocialPlatformPrefix(socialPlatform).buildUrl(primarySocialUrl)
-          ),
-          spotifyUrl: spotifyUrl ? normalizeUrl(spotifyUrl) : null,
-          heardAbout: heardAbout || null,
+          primarySocialUrl: resolvedPrimarySocialUrl,
+          spotifyUrl: normalizedSpotifyUrl,
+          heardAbout: sanitizedHeardAbout,
           selectedPlan, // Quietly track pricing tier interest
         }),
       });
@@ -571,6 +598,7 @@ export default function WaitlistPage() {
                     id='primarySocialUrl'
                     value={primarySocialUrl}
                     onChange={e => setPrimarySocialUrl(e.target.value)}
+                    maxLength={2048}
                     required
                     aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
                     aria-describedby={
@@ -598,6 +626,7 @@ export default function WaitlistPage() {
                     id='primarySocialUrl'
                     value={primarySocialUrl}
                     onChange={e => setPrimarySocialUrl(e.target.value)}
+                    maxLength={2048}
                     required
                     aria-label='Social profile username'
                     aria-invalid={Boolean(fieldErrors.primarySocialUrl)}
@@ -641,6 +670,7 @@ export default function WaitlistPage() {
                 value={spotifyUrl}
                 onChange={e => setSpotifyUrl(e.target.value)}
                 ref={spotifyUrlInputRef}
+                maxLength={2048}
                 aria-invalid={Boolean(fieldErrors.spotifyUrl)}
                 aria-describedby={
                   fieldErrors.spotifyUrl
@@ -668,6 +698,7 @@ export default function WaitlistPage() {
                 id='heardAbout'
                 value={heardAbout}
                 onChange={e => setHeardAbout(e.target.value)}
+                maxLength={280}
                 placeholder='How did you hear about us? (optional)'
                 disabled={isSubmitting}
               />

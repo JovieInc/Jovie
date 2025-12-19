@@ -1,5 +1,8 @@
 import { validateDbConnection } from '@/lib/db';
-import { getEnvironmentInfo, validateAndLogEnvironment } from '@/lib/env';
+import {
+  getEnvironmentInfo,
+  validateAndLogEnvironment,
+} from '@/lib/env-server';
 import { validateDatabaseUrl } from '@/lib/utils/database-url-validator';
 
 // Track if validation has already run to avoid duplicate checks
