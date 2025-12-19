@@ -321,7 +321,13 @@ describe('Beacons Strategy', () => {
       const platforms = result.links.map(link => link.platformId).sort();
       expect(platforms).toEqual(['instagram', 'spotify', 'youtube-music']);
       expect(
-        result.links.some(link => link.url.includes('open.spotify.com'))
+        result.links.some(link => {
+          try {
+            return new URL(link.url).hostname === 'open.spotify.com';
+          } catch {
+            return false;
+          }
+        })
       ).toBe(true);
       // Should skip internal beacons navigation links
       expect(

@@ -18,6 +18,13 @@ export function ArtistInfo({
   nameSize = 'lg',
   className = '',
 }: ArtistInfoProps) {
+  const resolvedSubtitle =
+    subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE;
+  const subtitleClassName =
+    resolvedSubtitle === DEFAULT_PROFILE_TAGLINE
+      ? 'text-[11px] sm:text-xs font-normal tracking-[0.2em] uppercase leading-none text-secondary-token opacity-70'
+      : 'text-base sm:text-lg leading-snug text-secondary-token line-clamp-2';
+
   const avatarSizeMap = {
     sm: 'display-sm',
     md: 'display-lg',
@@ -29,14 +36,17 @@ export function ArtistInfo({
     <div
       className={`flex flex-col items-center space-y-3 sm:space-y-4 text-center ${className}`}
     >
-      <Avatar
-        src={artist.image_url || ''}
-        alt={artist.name}
-        name={artist.name}
-        size={avatarSizeMap[avatarSize]}
-        priority
-        verified={false}
-      />
+      <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
+        <Avatar
+          src={artist.image_url || ''}
+          alt={artist.name}
+          name={artist.name}
+          size={avatarSizeMap[avatarSize]}
+          priority
+          verified={false}
+          className='ring-0 shadow-none bg-white/80 dark:bg-black/20'
+        />
+      </div>
 
       <div className='space-y-1.5 sm:space-y-2 max-w-md'>
         <ArtistName
@@ -46,11 +56,8 @@ export function ArtistInfo({
           size={nameSize}
         />
 
-        <p
-          className='text-base sm:text-lg leading-snug text-secondary-token line-clamp-2'
-          itemProp='description'
-        >
-          {subtitle ?? artist.tagline ?? DEFAULT_PROFILE_TAGLINE}
+        <p className={subtitleClassName} itemProp='description'>
+          {resolvedSubtitle}
         </p>
 
         {/* Hidden SEO elements */}

@@ -7,8 +7,8 @@ export function MarketingFooter() {
   const pathname = usePathname();
 
   if (pathname === '/investors') {
-    return <Footer version='minimal' />;
+    return <Footer version='minimal' containerSize='md' />;
   }
 
-  return <Footer brandingMark='icon' />;
+  return <Footer brandingMark='icon' containerSize='md' />;
 }

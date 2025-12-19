@@ -8,6 +8,7 @@ import {
   DocumentDuplicateIcon,
   HomeIcon,
   IdentificationIcon,
+  MusicalNoteIcon,
   PaintBrushIcon,
   RocketLaunchIcon,
   ShieldCheckIcon,
@@ -64,6 +65,13 @@ const primaryNavigation = [
     description: 'Manage your team and contact routes',
   },
   {
+    name: 'Releases',
+    href: '/app/dashboard/releases',
+    id: 'releases',
+    icon: MusicalNoteIcon,
+    description: 'Link out every provider with one smart link',
+  },
+  {
     name: 'Audience',
     href: '/app/dashboard/audience',
     id: 'audience',
@@ -78,8 +86,9 @@ const navShortcuts: Record<string, string> = {
   overview: '1',
   links: '2',
   contacts: '3',
-  audience: '4',
-  tipping: '5',
+  releases: '4',
+  audience: '5',
+  tipping: '6',
 };
 
 const secondaryNavigation = [

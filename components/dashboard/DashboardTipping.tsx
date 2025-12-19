@@ -134,7 +134,7 @@ export function DashboardTipping() {
           ) : (
             <div className='flex flex-wrap items-center gap-2 rounded-xl border border-subtle bg-surface-1/40 px-3 py-2 shadow-none'>
               <WalletIcon className='h-4 w-4 text-accent' />
-              <span className='rounded-md bg-surface-2 px-2 py-1 font-mono text-sm text-primary-token'>
+              <span className='rounded-md bg-surface-2 px-2 py-1 font-sans text-sm text-primary-token'>
                 {artist.venmo_handle}
               </span>
               <span className='text-sm text-secondary-token'>Connected</span>
@@ -271,6 +271,7 @@ export function DashboardTipping() {
               </div>
             </div>
           </div>
+
           <div className='grid gap-5 lg:col-span-12 lg:grid-cols-2'>
             <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
               <SectionHeader
@@ -280,7 +281,7 @@ export function DashboardTipping() {
               />
               <div className='px-5 py-4'>
                 <div className='space-y-3'>
-                  <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2/60 px-3 py-2 text-sm font-mono text-primary-token'>
+                  <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2/60 px-3 py-2 text-sm font-sans text-primary-token'>
                     <span className='min-w-0 flex-1 truncate'>
                       https://jov.ie{tipRelativePathLink}
                     </span>
@@ -302,6 +303,7 @@ export function DashboardTipping() {
                 </div>
               </div>
             </div>
+
             <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
               <SectionHeader
                 title='Downloadable QR'

@@ -9,8 +9,13 @@ const { mockGetUserBillingInfo } = vi.hoisted(() => ({
   mockGetUserBillingInfo: vi.fn(),
 }));
 
+const { mockCurrentUser } = vi.hoisted(() => ({
+  mockCurrentUser: vi.fn(),
+}));
+
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
+  currentUser: mockCurrentUser,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
@@ -20,6 +25,7 @@ vi.mock('@/lib/stripe/customer-sync', () => ({
 describe('getCurrentUserEntitlements', () => {
   it('returns anonymous entitlements when not authenticated', async () => {
     mockAuth.mockResolvedValue({ userId: null });
+    mockCurrentUser.mockResolvedValue(null);
 
     const entitlements = await getCurrentUserEntitlements();
 
@@ -36,6 +42,9 @@ describe('getCurrentUserEntitlements', () => {
 
   it('returns basic entitlements when authenticated but billing lookup fails', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'basic@example.com' },
+    });
     mockGetUserBillingInfo.mockResolvedValue({
       success: false,
       error: 'not found',
@@ -45,7 +54,7 @@ describe('getCurrentUserEntitlements', () => {
 
     expect(entitlements).toEqual({
       userId: 'user_123',
-      email: null,
+      email: 'basic@example.com',
       isAuthenticated: true,
       isAdmin: false,
       isPro: false,
@@ -56,6 +65,9 @@ describe('getCurrentUserEntitlements', () => {
 
   it('maps billing data for a free user', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_free' });
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'free@example.com' },
+    });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {
@@ -83,6 +95,9 @@ describe('getCurrentUserEntitlements', () => {
 
   it('maps billing data for a pro user', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_pro' });
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'pro@example.com' },
+    });
     mockGetUserBillingInfo.mockResolvedValue({
       success: true,
       data: {

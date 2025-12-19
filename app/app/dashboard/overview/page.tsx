@@ -8,7 +8,7 @@ export default async function OverviewPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/overview');
+    redirect('/signin?redirect_url=/app/dashboard/overview');
   }
 
   const dashboardData = await getDashboardData();

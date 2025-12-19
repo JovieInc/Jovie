@@ -4,6 +4,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AdminCreatorProfilesWithSidebar } from '@/components/admin/AdminCreatorProfilesWithSidebar';
+import { ToastProvider } from '@/components/providers/ToastProvider';
 import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
@@ -54,7 +55,11 @@ vi.mock('@/components/organisms/UserButton', () => ({
 }));
 
 const renderWithProviders = (ui: ReactNode) => {
-  return render(<TooltipProvider>{ui}</TooltipProvider>);
+  return render(
+    <ToastProvider>
+      <TooltipProvider>{ui}</TooltipProvider>
+    </ToastProvider>
+  );
 };
 
 describe('AdminCreatorProfilesWithSidebar', () => {

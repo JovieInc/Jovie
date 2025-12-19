@@ -33,6 +33,7 @@ import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminT
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -81,6 +82,21 @@ function mapProfileToContact(
   };
 }
 
+type AdminCreatorSocialLinksResponse =
+  | {
+      success: true;
+      links: Array<{
+        id: string;
+        label: string;
+        url: string;
+        platformType: string;
+      }>;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
   page,
@@ -92,6 +108,7 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -111,6 +128,10 @@ export function AdminCreatorProfilesWithSidebar({
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
+
+  const [ingestRefreshStatuses, setIngestRefreshStatuses] = useState<
+    Record<string, 'idle' | 'loading' | 'success' | 'error'>
+  >({});
   const tableMetaCtx = useOptionalTableMeta();
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
@@ -176,6 +197,48 @@ export function AdminCreatorProfilesWithSidebar({
     [filteredProfiles, selectedId]
   );
 
+  const hydrateContactSocialLinks = useCallback(
+    async (profileId: string): Promise<void> => {
+      const contactBase = mapProfileToContact(
+        filteredProfiles.find(p => p.id === profileId) ?? null
+      );
+      if (!contactBase) return;
+
+      try {
+        const response = await fetch(
+          `/api/admin/creator-social-links?profileId=${encodeURIComponent(profileId)}`,
+          {
+            headers: {
+              Accept: 'application/json',
+            },
+          }
+        );
+
+        const payload = (await response
+          .json()
+          .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
+
+        if (!response.ok || !payload || !payload.success) {
+          setDraftContact(contactBase);
+          return;
+        }
+
+        setDraftContact({
+          ...contactBase,
+          socialLinks: payload.links.map(link => ({
+            id: link.id,
+            label: link.label,
+            url: link.url,
+            platformType: link.platformType,
+          })),
+        });
+      } catch {
+        setDraftContact(contactBase);
+      }
+    },
+    [filteredProfiles]
+  );
+
   const effectiveContact = useMemo(() => {
     if (draftContact && draftContact.id === selectedId) return draftContact;
     return mapProfileToContact(selectedProfile);
@@ -186,6 +249,59 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(true);
     setDraftContact(null);
   }, []);
+
+  React.useEffect(() => {
+    if (!sidebarOpen || !selectedId) return;
+    void hydrateContactSocialLinks(selectedId);
+  }, [hydrateContactSocialLinks, selectedId, sidebarOpen]);
+
+  const refreshIngest = useCallback(
+    async (profileId: string): Promise<void> => {
+      setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'loading' }));
+      try {
+        const response = await fetch('/app/admin/creators/bulk-refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ profileIds: [profileId] }),
+        });
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          success?: boolean;
+          queuedCount?: number;
+          error?: string;
+        };
+
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error ?? 'Failed to queue ingestion');
+        }
+
+        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'success' }));
+        showToast({
+          type: 'success',
+          message: 'Ingestion refresh queued',
+        });
+        router.refresh();
+
+        if (selectedId === profileId) {
+          void hydrateContactSocialLinks(profileId);
+        }
+      } catch (error) {
+        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
+        showToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Refresh failed',
+        });
+      } finally {
+        window.setTimeout(() => {
+          setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'idle' }));
+        }, 2200);
+      }
+    },
+    [hydrateContactSocialLinks, router, selectedId, showToast]
+  );
 
   const { handleKeyDown } = useAdminTableKeyboardNavigation({
     items: filteredProfiles,
@@ -393,6 +509,7 @@ export function AdminCreatorProfilesWithSidebar({
                       aria-label='Select all creators'
                       checked={headerCheckboxState}
                       onCheckedChange={toggleSelectAll}
+                      className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
                     />
                   </th>
                   <th
@@ -556,6 +673,7 @@ export function AdminCreatorProfilesWithSidebar({
                                 aria-label={`Select ${profile.username}`}
                                 checked={isChecked}
                                 onCheckedChange={() => toggleSelect(profile.id)}
+                                className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
                               />
                             </div>
                           </div>
@@ -658,10 +776,14 @@ export function AdminCreatorProfilesWithSidebar({
                               status={
                                 verificationStatuses[profile.id] ?? 'idle'
                               }
+                              refreshIngestStatus={
+                                ingestRefreshStatuses[profile.id] ?? 'idle'
+                              }
                               open={openMenuProfileId === profile.id}
                               onOpenChange={open =>
                                 setOpenMenuProfileId(open ? profile.id : null)
                               }
+                              onRefreshIngest={() => refreshIngest(profile.id)}
                               onToggleVerification={async () => {
                                 const result = await toggleVerification(
                                   profile.id,
@@ -726,6 +848,12 @@ export function AdminCreatorProfilesWithSidebar({
             mode={mode}
             isOpen={sidebarOpen && Boolean(effectiveContact)}
             onClose={handleSidebarClose}
+            onRefresh={() => {
+              router.refresh();
+              if (selectedId) {
+                void hydrateContactSocialLinks(selectedId);
+              }
+            }}
             onContactChange={handleContactChange}
             onAvatarUpload={handleAvatarUpload}
           />

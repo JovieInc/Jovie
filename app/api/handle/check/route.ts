@@ -138,9 +138,9 @@ export async function GET(request: Request) {
     // Lightweight rate limit to reduce enumeration; uses same buckets as onboarding
     const headersList = await headers();
     const ip = extractClientIP(headersList);
-    // We don't have a userId here; namespace with IP only
+    // We don't have a Clerk userId here; namespace per-IP to avoid a global shared bucket
     await enforceOnboardingRateLimit({
-      userId: 'handle-check',
+      userId: `handle-check:${ip}`,
       ip,
       checkIP: true,
     });
