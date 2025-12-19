@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { AvatarUpload } from '@/components/organisms/AvatarUpload';
+import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock the toast context
 const mockShowToast = vi.fn();
@@ -38,7 +39,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for invalid file type', async () => {
-    render(
+    fastRender(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -62,7 +63,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for file too large', async () => {
-    render(
+    fastRender(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -71,8 +72,9 @@ describe('AvatarUpload - Error Handling', () => {
 
     const fileInput = screen.getByLabelText('Choose profile photo file');
 
-    const largeFile = new File(['x'.repeat(30 * 1024 * 1024)], 'large.jpg', {
-      type: 'image/jpeg',
+    const largeFile = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(largeFile, 'size', {
+      value: 30 * 1024 * 1024,
     });
 
     fireEvent.change(fileInput, { target: { files: [largeFile] } });
@@ -95,7 +97,7 @@ describe('AvatarUpload - Error Handling', () => {
 
     const onUploadSuccess = vi.fn();
 
-    render(
+    fastRender(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -126,7 +128,7 @@ describe('AvatarUpload - Error Handling', () => {
       json: () => Promise.resolve({ error: 'Upload failed' }),
     });
 
-    render(
+    fastRender(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
@@ -149,7 +151,7 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should display upload instructions', () => {
-    render(
+    fastRender(
       <AvatarUpload
         artistName='Test Artist'
         currentAvatarUrl='/test-avatar.jpg'
