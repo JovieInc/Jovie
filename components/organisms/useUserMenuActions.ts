@@ -11,6 +11,10 @@ const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
 
+type ClerkSignOut = ReturnType<
+  typeof import('@clerk/nextjs').useClerk
+>['signOut'];
+
 export interface UserMenuLoadingState {
   signOut: boolean;
   manageBilling: boolean;
