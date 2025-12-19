@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
+import {
+  getNotificationStatus,
+  getNotificationUnsubscribeSuccessMessage,
+  NOTIFICATION_COPY,
+  unsubscribeFromNotifications,
+} from '@/lib/notifications/client';
 import type {
   NotificationChannel,
   NotificationContactValues,
@@ -156,31 +162,18 @@ export function useProfileNotificationsController({
 
       void (async () => {
         try {
-          const response = await fetch('/api/notifications/status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              artist_id: artistId,
-              email: parsed.email,
-              phone: parsed.sms,
-            }),
+          const data = await getNotificationStatus({
+            artistId,
+            email: parsed.email,
+            phone: parsed.sms,
           });
 
-          if (!response.ok) return;
+          setSubscribedChannels(data.channels);
+          const hasAny = Object.values(data.channels).some(Boolean);
 
-          const data = (await response.json()) as {
-            channels?: NotificationSubscriptionState;
-            details?: NotificationContactValues;
-          };
-
-          if (data.channels) {
-            setSubscribedChannels(data.channels);
-            const hasAny = Object.values(data.channels).some(Boolean);
-
-            if (hasAny) {
-              setSubscriptionDetails(data.details ?? {});
-              setState('success');
-            }
+          if (hasAny) {
+            setSubscriptionDetails(data.details ?? {});
+            setState('success');
           }
         } catch (error) {
           console.error(
@@ -235,7 +228,7 @@ export function useProfileNotificationsController({
       const contactValue = subscriptionDetails[targetChannel];
 
       if (!contactValue) {
-        onError('Need your contact to unsubscribe. Add it again to manage.');
+        onError(NOTIFICATION_COPY.errors.missingContact);
         return;
       }
 
@@ -248,25 +241,13 @@ export function useProfileNotificationsController({
           source: 'profile_inline',
         });
 
-        const response = await fetch('/api/notifications/unsubscribe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            artist_id: artistId,
-            channel: targetChannel,
-            email: targetChannel === 'email' ? contactValue : undefined,
-            phone: targetChannel === 'sms' ? contactValue : undefined,
-            method: 'dropdown',
-          }),
+        await unsubscribeFromNotifications({
+          artistId,
+          channel: targetChannel,
+          email: targetChannel === 'email' ? contactValue : undefined,
+          phone: targetChannel === 'sms' ? contactValue : undefined,
+          method: 'dropdown',
         });
-
-        const data = (await response.json()) as { error?: string };
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to unsubscribe');
-        }
 
         track('notifications_unsubscribe_success', {
           channel: targetChannel,
@@ -293,14 +274,12 @@ export function useProfileNotificationsController({
 
         setIsNotificationMenuOpen(false);
 
-        onSuccess(
-          targetChannel === 'sms'
-            ? 'Unsubscribed from SMS updates.'
-            : 'Unsubscribed from email updates.'
-        );
+        onSuccess(getNotificationUnsubscribeSuccessMessage(targetChannel));
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Unable to unsubscribe.';
+          error instanceof Error
+            ? error.message
+            : NOTIFICATION_COPY.errors.unsubscribe;
 
         onError(message);
 

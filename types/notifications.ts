@@ -78,3 +78,39 @@ export type NotificationSubscriptionState = Partial<
 export type NotificationContactValues = Partial<
   Record<NotificationChannel, string>
 >;
+
+export type NotificationErrorCode =
+  | 'invalid_request'
+  | 'validation_error'
+  | 'not_found'
+  | 'missing_identifier'
+  | 'rate_limited'
+  | 'server_error';
+
+export interface NotificationErrorEnvelope {
+  success: false;
+  error: string;
+  code: NotificationErrorCode;
+  details?: Record<string, unknown>;
+}
+
+export interface NotificationSubscribeResponse {
+  success: true;
+  message: string;
+  emailDispatched: boolean;
+  durationMs: number;
+}
+
+export interface NotificationUnsubscribeResponse {
+  success: true;
+  removed: number;
+  message: string;
+}
+
+export interface NotificationStatusResponse {
+  success: true;
+  channels: NotificationSubscriptionState;
+  details: NotificationContactValues;
+}
+
+export type NotificationApiResponse<T> = T | NotificationErrorEnvelope;
