@@ -12,6 +12,7 @@ interface UpgradeButtonProps {
   variant?: 'primary' | 'secondary' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   priceId?: string; // Default price ID for direct checkout
+  dataTestId?: string;
 }
 
 export function UpgradeButton({
@@ -20,6 +21,7 @@ export function UpgradeButton({
   variant = 'primary',
   size = 'md',
   priceId,
+  dataTestId = 'checkout-upgrade-button',
 }: UpgradeButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -123,12 +125,18 @@ export function UpgradeButton({
         variant={variant}
         size={mappedSize}
         className='inline-flex items-center gap-2'
+        data-testid={dataTestId}
       >
         <RocketLaunchIcon className='h-4 w-4' />
         {loading ? 'Loading...' : children}
       </Button>
       {error && (
-        <p className='mt-2 text-sm text-red-600 dark:text-red-400'>{error}</p>
+        <p
+          className='mt-2 text-sm text-red-600 dark:text-red-400'
+          data-testid='checkout-upgrade-error'
+        >
+          {error}
+        </p>
       )}
     </div>
   );

@@ -112,16 +112,16 @@ test.describe('Dashboard Access Control', () => {
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
-    const handleInputA = page.getByLabel('Enter your desired handle');
+    const handleInputA = page.getByTestId('onboarding-handle-input');
     await expect(handleInputA).toBeVisible({ timeout: 5_000 });
     await handleInputA.fill(userAHandle);
 
-    // Wait for handle validation
-    await expect(
-      page.locator('.bg-green-500.rounded-full').first()
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('onboarding-handle-status-text')).toHaveText(
+      /available/i,
+      { timeout: 10_000 }
+    );
 
-    const submitButtonA = page.getByRole('button', { name: 'Create Profile' });
+    const submitButtonA = page.getByTestId('onboarding-handle-continue');
     await expect
       .poll(async () => await submitButtonA.isEnabled(), { timeout: 15_000 })
       .toBe(true);
@@ -186,14 +186,15 @@ test.describe('Dashboard Access Control', () => {
     await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
     await page.waitForURL('**/onboarding', { timeout: 10_000 });
 
-    const handleInputB = page.getByLabel('Enter your desired handle');
+    const handleInputB = page.getByTestId('onboarding-handle-input');
     await handleInputB.fill(userBHandle);
 
-    await expect(
-      page.locator('.bg-green-500.rounded-full').first()
-    ).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('onboarding-handle-status-text')).toHaveText(
+      /available/i,
+      { timeout: 10_000 }
+    );
 
-    const submitButtonB = page.getByRole('button', { name: 'Create Profile' });
+    const submitButtonB = page.getByTestId('onboarding-handle-continue');
     await expect
       .poll(async () => await submitButtonB.isEnabled(), { timeout: 15_000 })
       .toBe(true);

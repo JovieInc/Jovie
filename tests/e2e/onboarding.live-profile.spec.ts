@@ -77,23 +77,26 @@ test.describe('New user completes onboarding and sees live profile', () => {
       waitUntil: 'domcontentloaded',
     });
 
-    await page.getByLabel('Your name').fill(displayName);
-    await page.getByRole('button', { name: 'Continue' }).click();
+    await page.getByTestId('onboarding-name-input').fill(displayName);
+    await page.getByTestId('onboarding-name-continue').click();
 
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByTestId('onboarding-handle-input');
     await handleInput.fill(handle);
     await expect(handleInput).toHaveValue(handle);
 
-    await expect(page.locator('.bg-green-500')).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByTestId('onboarding-handle-status-text')).toHaveText(
+      /available/i,
+      {
+        timeout: 10_000,
+      }
+    );
 
-    await page.getByRole('button', { name: 'Create Profile' }).click();
+    await page.getByTestId('onboarding-handle-continue').click();
     await expect(
       page.getByRole('heading', { name: /you're live/i })
     ).toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Go to Dashboard' }).click();
+    await page.getByTestId('onboarding-go-dashboard').click();
     await page.waitForURL('**/app/dashboard/overview**', { timeout: 15_000 });
 
     const updatedName = `${displayName} Published`;

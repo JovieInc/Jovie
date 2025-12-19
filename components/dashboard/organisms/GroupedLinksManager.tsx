@@ -770,6 +770,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       className={cn('space-y-2', className)}
       aria-label='Links Manager'
       ref={containerRef}
+      data-testid='profile-links-manager'
     >
       <div>
         <div className='mx-auto w-full max-w-3xl space-y-3'>

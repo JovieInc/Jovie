@@ -45,7 +45,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test simulates rapid typing across different handles
     // to ensure the final availability state matches the last input
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible();
 
     // Simulate rapid typing sequence: taken1 -> available1 -> taken2 -> available2
@@ -79,18 +79,15 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // Check availability indicator matches expected state
     if (lastHandle.expectedAvailable) {
       // Submit button should be enabled
-      const submitButton = page.getByRole('button', {
-        name: `Claim @${lastHandle.handle}`,
-      });
+      const submitButton = page.getByTestId('onboarding-claim-submit');
       await expect(submitButton).toBeEnabled();
     } else {
-      // Should show error for unavailable handle
-      await expect(page.locator('text="Handle already taken"')).toBeVisible();
+      await expect(
+        page.getByTestId('onboarding-claim-handle-helper')
+      ).toHaveText(/handle already taken/i);
 
       // Submit button should be disabled
-      const submitButton = page.getByRole('button', {
-        name: 'Request Early Access',
-      });
+      const submitButton = page.getByTestId('onboarding-claim-submit');
       await expect(submitButton).toBeDisabled();
     }
   });
@@ -101,7 +98,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     // This test specifically checks that a taken handle doesn't show as available
     // even if there are race conditions with previous requests
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible();
 
     // Type sequence: available1 -> taken1 rapidly
@@ -114,12 +111,12 @@ test.describe('Onboarding Handle Race Conditions', () => {
 
     // Final state must show taken1 as unavailable
     await expect(handleInput).toHaveValue('taken1');
-    await expect(page.locator('text="Handle already taken"')).toBeVisible();
+    await expect(page.getByTestId('onboarding-claim-handle-helper')).toHaveText(
+      /handle already taken/i
+    );
 
     // Submit button must be disabled for taken handle
-    const submitButton = page.getByRole('button', {
-      name: 'Request Early Access',
-    });
+    const submitButton = page.getByTestId('onboarding-claim-submit');
     await expect(submitButton).toBeDisabled();
   });
 
@@ -128,7 +125,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test rapid sequence of different handles to stress test the race condition protection
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible();
 
     const rapidSequence = [
@@ -154,9 +151,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await expect(handleInput).toHaveValue(finalHandle);
 
     // Since final handle is available, should show as such
-    const submitButton = page.getByRole('button', {
-      name: `Claim @${finalHandle}`,
-    });
+    const submitButton = page.getByTestId('onboarding-claim-submit');
     await expect(submitButton).toBeEnabled();
   });
 
@@ -191,7 +186,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible();
 
     // Type rapidly to trigger request cancellation
@@ -219,10 +214,8 @@ test.describe('Onboarding Handle Race Conditions', () => {
   }) => {
     // Test that the UI doesn't flicker or show inconsistent states
 
-    const handleInput = page.getByLabel('Choose your handle');
-    const submitButton = page.getByRole('button', {
-      name: 'Request Early Access',
-    });
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
+    const submitButton = page.getByTestId('onboarding-claim-submit');
 
     await expect(handleInput).toBeVisible();
 
@@ -238,12 +231,12 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await page.waitForTimeout(650);
 
     // Verify final state - available handle
-    await expect(
-      page.getByRole('button', { name: 'Claim @available1' })
-    ).toBeEnabled();
+    await expect(page.getByTestId('onboarding-claim-submit')).toBeEnabled();
 
     // No error message should be visible for available handle
-    await expect(page.locator('text="Handle already taken"')).not.toBeVisible();
+    await expect(
+      page.getByTestId('onboarding-claim-handle-helper')
+    ).not.toHaveText(/handle already taken/i);
   });
 
   test('handles network errors gracefully during race conditions', async ({
@@ -273,7 +266,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
       }
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible();
 
     // Type handle that will cause network error
@@ -281,16 +274,18 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await page.waitForTimeout(650);
 
     // Should show network error
-    await expect(page.locator('text="Network error"')).toBeVisible();
+    await expect(page.getByTestId('onboarding-claim-handle-helper')).toHaveText(
+      /network error/i
+    );
 
     // Type new handle that succeeds
     await handleInput.fill('recovery');
     await page.waitForTimeout(650);
 
     // Should recover and show success state
+    await expect(page.getByTestId('onboarding-claim-submit')).toBeEnabled();
     await expect(
-      page.getByRole('button', { name: 'Claim @recovery' })
-    ).toBeEnabled();
-    await expect(page.locator('text="Network error"')).not.toBeVisible();
+      page.getByTestId('onboarding-claim-handle-helper')
+    ).not.toHaveText(/network error/i);
   });
 });

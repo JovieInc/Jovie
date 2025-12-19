@@ -17,14 +17,12 @@ test.describe('Onboarding Flow', () => {
       });
     });
 
-    const handleInput = page.getByLabel('Choose your handle');
+    const handleInput = page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible({ timeout: 5000 });
 
     await handleInput.fill(handle);
 
-    const submitButton = page
-      .locator('form:has(#handle-input) button[type="submit"]')
-      .first();
+    const submitButton = page.getByTestId('onboarding-claim-submit');
     await expect(submitButton).toBeVisible();
 
     await expect

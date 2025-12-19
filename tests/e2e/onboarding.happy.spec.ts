@@ -93,18 +93,18 @@ test.describe('Onboarding Happy Path', () => {
     });
 
     // Step 4a: Name step - fill display name and continue
-    const nameInput = page.getByLabel('Your name');
+    const nameInput = page.getByTestId('onboarding-name-input');
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
 
     const displayName = `Playwright User ${Date.now().toString(36)}`;
     await nameInput.fill(displayName);
 
-    const continueButton = page.getByRole('button', { name: 'Continue' });
+    const continueButton = page.getByTestId('onboarding-name-continue');
     await expect(continueButton).toBeVisible({ timeout: 5_000 });
     await continueButton.click();
 
     // Step 4b: Handle step - claim an available handle
-    const handleInput = page.getByLabel('Enter your desired handle');
+    const handleInput = page.getByTestId('onboarding-handle-input');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // Generate unique handle with timestamp
@@ -112,14 +112,15 @@ test.describe('Onboarding Happy Path', () => {
     await handleInput.fill(uniqueHandle);
 
     // Wait for handle availability check to complete (green checkmark indicator)
-    await expect(
-      page.locator('.bg-green-500.rounded-full').first()
-    ).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(page.getByTestId('onboarding-handle-status-text')).toHaveText(
+      /available/i,
+      {
+        timeout: 10_000,
+      }
+    );
 
     // Ensure submit button is enabled after validation
-    const submitButton = page.getByRole('button', { name: 'Create Profile' });
+    const submitButton = page.getByTestId('onboarding-handle-continue');
     await expect(submitButton).toBeVisible();
 
     // Use expect.poll for deterministic button state checking
@@ -180,12 +181,9 @@ test.describe('Onboarding Happy Path', () => {
       profileNav.click(),
     ]);
 
-    await expect(
-      page
-        .locator('h1, h2')
-        .filter({ hasText: /profile/i })
-        .first()
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId('profile-editor')).toBeVisible({
+      timeout: 5_000,
+    });
 
     // Optional: Verify we can access the public profile page with the new handle
     await page.goto(`/${uniqueHandle}`, { waitUntil: 'domcontentloaded' });

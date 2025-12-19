@@ -352,6 +352,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
             autoCapitalize='none'
             autoCorrect='off'
             aria-describedby={helperState.text ? helperId : undefined}
+            data-testid='onboarding-claim-handle-input'
             validationState={
               !handle
                 ? null
@@ -377,6 +378,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
               id={helperId}
               className={`text-sm leading-5 transition-colors duration-200 ${helperToneClass}`}
               aria-live={helperAriaLive}
+              data-testid='onboarding-claim-handle-helper'
             >
               {helperState.text}
             </p>
@@ -391,6 +393,7 @@ export function ClaimHandleForm({ onHandleChange }: ClaimHandleFormProps) {
         size='lg'
         className='w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 group h-[54px]! px-6! text-base font-semibold tracking-wide bg-linear-to-br! from-blue-600/95! via-indigo-600/85! to-cyan-500/90! text-white! shadow-[0_18px_35px_rgba(15,23,42,0.25)]'
         disabled={btnDisabled || !handle}
+        data-testid='onboarding-claim-submit'
       >
         <span className='inline-flex items-center justify-center gap-2 transition-opacity duration-200'>
           {showChecking ? (

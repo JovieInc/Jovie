@@ -12,5 +12,9 @@ export default function BillingPage() {
     });
   }, []);
 
-  return <BillingDashboard />;
+  return (
+    <div data-testid='checkout-billing-page'>
+      <BillingDashboard />
+    </div>
+  );
 }

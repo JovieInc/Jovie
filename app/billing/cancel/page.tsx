@@ -22,24 +22,38 @@ export default function CheckoutCancelPage() {
     });
   }, []);
   return (
-    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center'>
+    <div
+      className='flex min-h-[calc(100vh-4rem)] items-center justify-center'
+      data-testid='checkout-cancel-page'
+    >
       <div className='w-full text-center'>
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/15'>
           <XCircleIcon className='h-8 w-8 text-amber-500' />
         </div>
 
-        <h1 className='mt-6 text-3xl font-bold text-foreground'>
+        <h1
+          className='mt-6 text-3xl font-bold text-foreground'
+          data-testid='checkout-cancel-title'
+        >
           Checkout cancelled
         </h1>
 
-        <p className='mt-4 text-lg text-muted-foreground'>
+        <p
+          className='mt-4 text-lg text-muted-foreground'
+          data-testid='checkout-cancel-description'
+        >
           No worries. Your subscription wasn&apos;t charged.
         </p>
 
-        <div className='mt-8 flex flex-col sm:flex-row gap-4 justify-center'>
-          <UpgradeButton>Try again</UpgradeButton>
+        <div
+          className='mt-8 flex flex-col sm:flex-row gap-4 justify-center'
+          data-testid='checkout-cancel-actions'
+        >
+          <UpgradeButton dataTestId='checkout-cancel-retry'>
+            Try again
+          </UpgradeButton>
 
-          <Button variant='outline' asChild>
+          <Button variant='outline' asChild data-testid='checkout-cancel-back'>
             <Link href='/app/dashboard'>Back to dashboard</Link>
           </Button>
         </div>

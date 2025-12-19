@@ -110,7 +110,7 @@ test.describe('Onboarding smoke', () => {
       });
 
       // 4) Fill the onboarding form (handle)
-      const handleInput = page.getByLabel('Enter your desired handle');
+      const handleInput = page.getByTestId('onboarding-handle-input');
       await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
       const uniqueHandle = `e2e-${Date.now().toString(36)}`;
@@ -118,12 +118,14 @@ test.describe('Onboarding smoke', () => {
 
       // Wait for the availability check indicator (green checkmark)
       // Based on the OnboardingForm component, it shows a green circle with checkmark
-      await expect(page.locator('.bg-green-500.rounded-full')).toBeVisible({
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).toHaveText(/available/i, {
         timeout: 10_000,
       });
 
       // Wait for submit button to be enabled
-      const submit = page.getByRole('button', { name: 'Create Profile' });
+      const submit = page.getByTestId('onboarding-handle-continue');
       await expect(submit).toBeVisible();
 
       // Use expect.poll for deterministic waiting on button state

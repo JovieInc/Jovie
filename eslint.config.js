@@ -1,6 +1,7 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
 const iconUsageRule = require('./eslint-rules/icon-usage');
+const requireCriticalTestIdsRule = require('./eslint-rules/require-critical-testids');
 
 const [nextBase, nextTypescript, nextIgnores] = nextConfig;
 
@@ -11,6 +12,7 @@ const baseConfig = {
     '@jovie': {
       rules: {
         'icon-usage': iconUsageRule,
+        'require-critical-testids': requireCriticalTestIdsRule,
       },
     },
   },
@@ -156,6 +158,19 @@ module.exports = [
     files: ['**/components/dashboard/**/*'],
     rules: {
       'import/no-cycle': 'off',
+    },
+  },
+  {
+    files: [
+      'components/dashboard/organisms/AppleStyleOnboardingForm.tsx',
+      'components/dashboard/organisms/EnhancedDashboardLinks.tsx',
+      'components/dashboard/organisms/GroupedLinksManager.tsx',
+      'components/molecules/UpgradeButton.tsx',
+      'components/organisms/BillingDashboard.tsx',
+      'app/billing/**/page.tsx',
+    ],
+    rules: {
+      '@jovie/require-critical-testids': 'warn',
     },
   },
   {

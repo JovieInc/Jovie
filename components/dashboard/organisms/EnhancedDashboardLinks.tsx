@@ -1077,28 +1077,30 @@ export function EnhancedDashboardLinks({
   ]);
 
   return (
-    <div className='min-w-0 min-h-screen'>
+    <div className='min-w-0 min-h-screen' data-testid='profile-editor'>
       {/* Main content / links manager */}
       <div className='w-full min-w-0 space-y-4'>
         {profileId && artist && (
           <div className='mx-auto w-full max-w-2xl'>
             <div className='flex flex-col items-center gap-3'>
-              <AvatarUploadable
-                src={avatarUrl}
-                alt={`Avatar for @${username}`}
-                name={displayName}
-                size='display-lg'
-                uploadable
-                onUpload={handleAvatarUpload}
-                onError={message => {
-                  toast.error(
-                    message || 'Failed to upload avatar. Please try again.'
-                  );
-                }}
-                maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
-                acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
-                showHoverOverlay
-              />
+              <div data-testid='profile-avatar-upload'>
+                <AvatarUploadable
+                  src={avatarUrl}
+                  alt={`Avatar for @${username}`}
+                  name={displayName}
+                  size='display-lg'
+                  uploadable
+                  onUpload={handleAvatarUpload}
+                  onError={message => {
+                    toast.error(
+                      message || 'Failed to upload avatar. Please try again.'
+                    );
+                  }}
+                  maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+                  acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
+                  showHoverOverlay
+                />
+              </div>
 
               <div className='w-full max-w-md space-y-1.5'>
                 <div className='grid gap-1'>
@@ -1108,6 +1110,7 @@ export function EnhancedDashboardLinks({
                       id='profile-display-name'
                       type='text'
                       aria-label='Display name'
+                      data-testid='profile-display-name-input'
                       value={profileDisplayName}
                       onChange={e => {
                         const nextValue = e.target.value;
@@ -1146,6 +1149,7 @@ export function EnhancedDashboardLinks({
                       className='w-full rounded-md py-1.5 text-center text-base font-medium text-primary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
                       onClick={() => setEditingField('displayName')}
                       aria-label='Edit display name'
+                      data-testid='profile-display-name-trigger'
                     >
                       {profileDisplayName || 'Add display name'}
                     </button>
@@ -1159,6 +1163,7 @@ export function EnhancedDashboardLinks({
                       id='profile-username'
                       type='text'
                       aria-label='Username'
+                      data-testid='profile-username-input'
                       value={profileUsername}
                       onChange={e => {
                         const rawValue = e.target.value;
@@ -1200,6 +1205,7 @@ export function EnhancedDashboardLinks({
                       className='w-full rounded-md py-1 text-center text-sm font-medium text-secondary-token hover:bg-surface-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent'
                       onClick={() => setEditingField('username')}
                       aria-label='Edit username'
+                      data-testid='profile-username-trigger'
                     >
                       {profileUsername || 'Add username'}
                     </button>

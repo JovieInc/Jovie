@@ -451,7 +451,10 @@ export function AppleStyleOnboardingForm({
     switch (currentStepIndex) {
       case 0:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+          <div
+            className='flex flex-col items-center justify-center h-full space-y-8'
+            data-testid='onboarding-step-name'
+          >
             <div className='text-center space-y-3 max-w-2xl px-4'>
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[0].title}
@@ -486,6 +489,7 @@ export function AppleStyleOnboardingForm({
                   onChange={e => setFullName(e.target.value)}
                   placeholder={namePlaceholder}
                   aria-label='Your full name'
+                  data-testid='onboarding-name-input'
                   maxLength={50}
                   autoComplete='name'
                 />
@@ -495,6 +499,7 @@ export function AppleStyleOnboardingForm({
                   disabled={
                     !isDisplayNameValid || isTransitioning || state.isSubmitting
                   }
+                  data-testid='onboarding-name-continue'
                 >
                   Continue
                 </AuthButton>
@@ -505,7 +510,10 @@ export function AppleStyleOnboardingForm({
 
       case 1:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+          <div
+            className='flex flex-col items-center justify-center h-full space-y-8'
+            data-testid='onboarding-step-handle'
+          >
             <div className='text-center space-y-3 max-w-xl px-4'>
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[1].title}
@@ -534,6 +542,7 @@ export function AppleStyleOnboardingForm({
                     ref={handleInputRef}
                     name='username'
                     aria-label='Enter your desired handle'
+                    data-testid='onboarding-handle-input'
                     type='text'
                     value={handleInput}
                     onChange={e =>
@@ -575,19 +584,29 @@ export function AppleStyleOnboardingForm({
                   className='min-h-[24px] flex flex-col items-center justify-center px-1'
                   role='status'
                   aria-live='polite'
+                  data-testid='onboarding-handle-status'
                 >
                   {handleInput ? (
                     handleValidation.checking ? (
-                      <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                      <div
+                        className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'
+                        data-testid='onboarding-handle-status-text'
+                      >
                         Checking…
                       </div>
                     ) : handleValidation.clientValid &&
                       handleValidation.available ? (
-                      <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                      <div
+                        className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'
+                        data-testid='onboarding-handle-status-text'
+                      >
                         Available
                       </div>
                     ) : handleValidation.error ? (
-                      <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+                      <div
+                        className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'
+                        data-testid='onboarding-handle-status-text'
+                      >
                         Not available
                       </div>
                     ) : null
@@ -600,6 +619,7 @@ export function AppleStyleOnboardingForm({
                     Boolean(handleStepCtaDisabledReason) || isTransitioning
                   }
                   variant='primary'
+                  data-testid='onboarding-handle-continue'
                 >
                   {state.isSubmitting ? (
                     <div className='flex items-center justify-center space-x-2'>
@@ -612,7 +632,10 @@ export function AppleStyleOnboardingForm({
                 </AuthButton>
 
                 {state.error ? (
-                  <div className='text-center text-xs text-[#6b6f76]'>
+                  <div
+                    className='text-center text-xs text-[#6b6f76]'
+                    data-testid='onboarding-handle-error'
+                  >
                     {state.error}
                   </div>
                 ) : null}
@@ -623,7 +646,10 @@ export function AppleStyleOnboardingForm({
 
       case 2:
         return (
-          <div className='flex flex-col items-center justify-center h-full space-y-8'>
+          <div
+            className='flex flex-col items-center justify-center h-full space-y-8'
+            data-testid='onboarding-step-done'
+          >
             <div className='text-center space-y-3 max-w-xl px-4'>
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[2].title}
@@ -636,21 +662,35 @@ export function AppleStyleOnboardingForm({
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <AuthLinkPreviewCard
-                label='Your link'
-                hrefText={`${displayDomain}/${profileReadyHandle || handle}`}
-              />
+              <div data-testid='onboarding-link-preview'>
+                <AuthLinkPreviewCard
+                  label='Your link'
+                  hrefText={`${displayDomain}/${profileReadyHandle || handle}`}
+                />
+              </div>
 
               <div className='space-y-4'>
-                <AuthButton onClick={goToDashboard}>Go to Dashboard</AuthButton>
+                <AuthButton
+                  onClick={goToDashboard}
+                  data-testid='onboarding-go-dashboard'
+                >
+                  Go to Dashboard
+                </AuthButton>
 
-                <AuthButton onClick={copyProfileLink} variant='secondary'>
+                <AuthButton
+                  onClick={copyProfileLink}
+                  variant='secondary'
+                  data-testid='onboarding-copy-link'
+                >
                   Copy Link
                 </AuthButton>
               </div>
 
               {copyFeedback && (
-                <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
+                <div
+                  className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'
+                  data-testid='onboarding-copy-feedback'
+                >
                   {copyFeedback}
                 </div>
               )}
@@ -663,7 +703,10 @@ export function AppleStyleOnboardingForm({
   };
 
   const ProgressIndicator = () => (
-    <div className='w-full h-1 bg-[#1f1f22] rounded-full overflow-hidden'>
+    <div
+      className='w-full h-1 bg-[#1f1f22] rounded-full overflow-hidden'
+      data-testid='onboarding-progress'
+    >
       <div
         className='h-full bg-white transition-all duration-500 ease-in-out'
         style={{
@@ -674,12 +717,16 @@ export function AppleStyleOnboardingForm({
   );
 
   return (
-    <div className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'>
+    <div
+      className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'
+      data-testid='onboarding-form'
+    >
       <button
         type='button'
         onClick={goBack}
         aria-label='Go back'
         className='fixed top-4 left-4 md:top-6 md:left-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-(--fg) hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)'
+        data-testid='onboarding-back'
       >
         <ArrowLeft className='h-5 w-5' />
       </button>

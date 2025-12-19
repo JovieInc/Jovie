@@ -79,7 +79,7 @@ export function BillingDashboard() {
   const defaultPriceId = activePriceIds[0]; // Use first active price as default
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-6' data-testid='checkout-billing-dashboard'>
       {/* Header */}
       <div>
         <h1 className='text-3xl font-bold text-foreground'>
@@ -91,7 +91,10 @@ export function BillingDashboard() {
       </div>
 
       {/* Subscription Status Card */}
-      <div className='rounded-lg border border-border bg-muted/30 p-6'>
+      <div
+        className='rounded-lg border border-border bg-muted/30 p-6'
+        data-testid='checkout-status-card'
+      >
         <div className='flex items-center'>
           <div className='shrink-0'>
             {billingInfo?.isPro ? (
@@ -121,7 +124,10 @@ export function BillingDashboard() {
       </div>
 
       {/* Actions */}
-      <div className='rounded-lg border border-border bg-muted/30 p-6'>
+      <div
+        className='rounded-lg border border-border bg-muted/30 p-6'
+        data-testid='checkout-actions'
+      >
         <h3 className='mb-4 text-lg font-medium text-foreground'>
           Billing Actions
         </h3>

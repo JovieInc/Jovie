@@ -94,9 +94,9 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
     }
 
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
-    );
+    const handleInput = runWithRealAPI
+      ? page.getByTestId('onboarding-handle-input')
+      : page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // Enter a known taken handle from seed data
@@ -106,18 +106,25 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     // Verify error message is displayed
-    await expect(page.locator('text="Handle already taken"')).toBeVisible({
-      timeout: 5_000,
-    });
+    if (runWithRealAPI) {
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).toHaveText(/not available/i, { timeout: 5_000 });
+    } else {
+      await expect(
+        page.getByTestId('onboarding-claim-handle-helper')
+      ).toHaveText(/handle already taken/i, { timeout: 5_000 });
+    }
 
     const submitButton = runWithRealAPI
-      ? page.getByRole('button', { name: 'Create Profile' })
-      : page.getByRole('button', { name: 'Request Early Access' });
+      ? page.getByTestId('onboarding-handle-continue')
+      : page.getByTestId('onboarding-claim-submit');
     await expect(submitButton).toBeDisabled({ timeout: 5_000 });
 
     if (runWithRealAPI) {
-      // Verify no green checkmark is visible (onboarding UI)
-      await expect(page.locator('.bg-green-500')).not.toBeVisible();
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).not.toHaveText(/available/i);
     }
 
     // Now try with a different taken handle to ensure consistency
@@ -125,9 +132,15 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     // Verify error message is still displayed
-    await expect(page.locator('text="Handle already taken"')).toBeVisible({
-      timeout: 5_000,
-    });
+    if (runWithRealAPI) {
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).toHaveText(/not available/i, { timeout: 5_000 });
+    } else {
+      await expect(
+        page.getByTestId('onboarding-claim-handle-helper')
+      ).toHaveText(/handle already taken/i, { timeout: 5_000 });
+    }
 
     // Verify submit button is still disabled
     await expect(submitButton).toBeDisabled({ timeout: 5_000 });
@@ -140,9 +153,9 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     test.setTimeout(30_000);
 
     // Get the handle input field
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
-    );
+    const handleInput = runWithRealAPI
+      ? page.getByTestId('onboarding-handle-input')
+      : page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // First enter a taken handle
@@ -151,8 +164,8 @@ test.describe('Onboarding Handle Taken Prevention', () => {
 
     // Verify submit button is disabled
     const submitButton = runWithRealAPI
-      ? page.getByRole('button', { name: 'Create Profile' })
-      : page.getByRole('button', { name: 'Request Early Access' });
+      ? page.getByTestId('onboarding-handle-continue')
+      : page.getByTestId('onboarding-claim-submit');
     await expect(submitButton).toBeDisabled({ timeout: 5_000 });
 
     // Now switch to an available handle
@@ -163,23 +176,30 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await page.waitForTimeout(runWithRealAPI ? 800 : 650);
 
     if (runWithRealAPI) {
-      // Verify green checkmark is visible
-      await expect(page.locator('.bg-green-500')).toBeVisible({
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).toHaveText(/available/i, {
         timeout: 5_000,
       });
 
-      // Verify submit button is now enabled
       await expect(submitButton).toBeEnabled({ timeout: 5_000 });
     } else {
-      // Homepage claim flow updates button label when available.
-      const claimButton = page.getByRole('button', {
-        name: `Claim @${uniqueHandle.toLowerCase()}`,
-      });
-      await expect(claimButton).toBeEnabled({ timeout: 5_000 });
+      await expect(
+        page.getByTestId('onboarding-claim-handle-helper')
+      ).toHaveText(/available/i, { timeout: 5_000 });
+      await expect(submitButton).toBeEnabled({ timeout: 5_000 });
     }
 
     // Verify no error message is visible
-    await expect(page.locator('text="Handle already taken"')).not.toBeVisible();
+    if (runWithRealAPI) {
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).not.toHaveText(/not available/i);
+    } else {
+      await expect(
+        page.getByTestId('onboarding-claim-handle-helper')
+      ).not.toHaveText(/handle already taken/i);
+    }
   });
 
   test('handles race conditions correctly when switching between taken and available', async ({
@@ -189,9 +209,9 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     test.setTimeout(30_000);
 
     // Get the handle input field
-    const handleInput = page.getByLabel(
-      runWithRealAPI ? 'Enter your desired handle' : 'Choose your handle'
-    );
+    const handleInput = runWithRealAPI
+      ? page.getByTestId('onboarding-handle-input')
+      : page.getByTestId('onboarding-claim-handle-input');
     await expect(handleInput).toBeVisible({ timeout: 5_000 });
 
     // Simulate rapid typing sequence: available -> taken -> available
@@ -222,16 +242,15 @@ test.describe('Onboarding Handle Taken Prevention', () => {
     await expect(handleInput).toHaveValue(lastHandle.handle);
 
     if (runWithRealAPI) {
-      // Check availability indicator matches expected state (should be available)
-      await expect(page.locator('.bg-green-500')).toBeVisible();
+      await expect(
+        page.getByTestId('onboarding-handle-status-text')
+      ).toHaveText(/available/i);
 
       // Submit button should be enabled
-      const submitButton = page.getByRole('button', { name: 'Create Profile' });
+      const submitButton = page.getByTestId('onboarding-handle-continue');
       await expect(submitButton).toBeEnabled();
     } else {
-      const submitButton = page.getByRole('button', {
-        name: `Claim @${lastHandle.handle}`,
-      });
+      const submitButton = page.getByTestId('onboarding-claim-submit');
       await expect(submitButton).toBeEnabled();
     }
   });

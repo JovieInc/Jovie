@@ -20,18 +20,27 @@ export default function CheckoutSuccessPage() {
     });
   }, []);
   return (
-    <div className='flex min-h-[calc(100vh-4rem)] items-center justify-center'>
+    <div
+      className='flex min-h-[calc(100vh-4rem)] items-center justify-center'
+      data-testid='checkout-success-page'
+    >
       <div className='w-full text-center'>
-        <h1 className='mt-6 text-3xl font-bold text-foreground'>
+        <h1
+          className='mt-6 text-3xl font-bold text-foreground'
+          data-testid='checkout-success-title'
+        >
           You&apos;ve been upgraded.
         </h1>
 
-        <p className='mt-4 text-lg text-muted-foreground'>
+        <p
+          className='mt-4 text-lg text-muted-foreground'
+          data-testid='checkout-success-description'
+        >
           Your subscription is active and your profile is now branding-free.
         </p>
 
         <div className='mt-8 flex justify-center'>
-          <Button asChild>
+          <Button asChild data-testid='checkout-success-dashboard'>
             <Link href='/app/dashboard'>Go to Dashboard</Link>
           </Button>
         </div>
