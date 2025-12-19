@@ -9,7 +9,7 @@ import { AuthButton, AuthInput, authButtonVariants, OtpInput } from './atoms';
 import { ButtonSpinner } from './ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
-  'mt-2 text-sm text-red-400 text-center animate-in fade-in-0 duration-200';
+  'mt-2 text-sm text-destructive text-center animate-in fade-in-0 duration-200';
 const STEP_TRANSITION_CLASSES =
   'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
 
