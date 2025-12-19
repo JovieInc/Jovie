@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag, updateTag } from 'next/cache';
 
 /**
  * Centralized cache invalidation for creator profiles.
@@ -14,15 +14,25 @@ export async function invalidateProfileCache(
   oldUsernameNormalized?: string | null
 ): Promise<void> {
   // Invalidate dashboard data cache
-  revalidateTag('dashboard-data', 'default');
+  updateTag('dashboard-data');
+  revalidateTag('dashboard-data', 'max');
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
     revalidatePath(`/${usernameNormalized}`);
   }
 
+  if (usernameNormalized) {
+    updateTag('public-profile');
+    updateTag(`public-profile:${usernameNormalized}`);
+    revalidateTag('public-profile', 'max');
+    revalidateTag(`public-profile:${usernameNormalized}`, 'max');
+  }
+
   // If username changed, also invalidate the old path
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
+    updateTag(`public-profile:${oldUsernameNormalized}`);
+    revalidateTag(`public-profile:${oldUsernameNormalized}`, 'max');
     revalidatePath(`/${oldUsernameNormalized}`);
   }
 
