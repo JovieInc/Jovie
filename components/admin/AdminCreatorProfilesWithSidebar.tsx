@@ -44,7 +44,7 @@ import type {
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
 
-const CONTACT_PANEL_WIDTH = 360;
+const CONTACT_PANEL_WIDTH = 320;
 
 function useOptionalTableMeta() {
   try {
@@ -840,7 +840,7 @@ export function AdminCreatorProfilesWithSidebar({
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={CONTACT_PANEL_WIDTH}
         ariaLabel='Contact details'
-        className='hidden md:flex bg-sidebar-surface border-sidebar-border'
+        className='hidden md:flex bg-surface-0 border-subtle'
       >
         <div className='flex-1 min-h-0 overflow-auto'>
           <ContactSidebar
