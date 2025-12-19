@@ -1,4 +1,4 @@
-import { revalidateTag } from 'next/cache';
+import { revalidateTag, updateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
     }
   }
 
-  revalidateTag('featured-creators', 'default');
+  updateTag('featured-creators');
+  revalidateTag('featured-creators', 'max');
   return NextResponse.json(
     { revalidated: true },
     { headers: NO_STORE_HEADERS }
