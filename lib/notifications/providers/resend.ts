@@ -1,5 +1,5 @@
 import { Resend } from 'resend';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import {
   EMAIL_FROM_ADDRESS,
   EMAIL_REPLY_TO,
