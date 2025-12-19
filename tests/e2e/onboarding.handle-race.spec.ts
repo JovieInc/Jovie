@@ -6,11 +6,23 @@ test.describe('Onboarding Handle Race Conditions', () => {
     await page.route('/api/handle/check*', async (route, request) => {
       const url = new URL(request.url());
       const handle = url.searchParams.get('handle');
+      const normalizedHandle = handle?.toLowerCase() || '';
+      const latencyByHandle: Record<string, number> = {
+        taken1: 120,
+        taken2: 80,
+        available1: 100,
+        available2: 60,
+        available3: 140,
+        testhandle1: 90,
+        testhandle2: 110,
+        testhandle3: 70,
+        musicmaker: 130,
+        existinguser: 95,
+      };
+      const simulatedLatencyMs = latencyByHandle[normalizedHandle] ?? 75;
 
-      // Add artificial delay to simulate network latency
-      await new Promise(resolve =>
-        setTimeout(resolve, 100 + Math.random() * 200)
-      );
+      // Add deterministic delay to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, simulatedLatencyMs));
 
       // Define known test handles and their availability
       const handleAvailability: Record<string, boolean> = {
@@ -26,7 +38,7 @@ test.describe('Onboarding Handle Race Conditions', () => {
         existinguser: false,
       };
 
-      const available = handleAvailability[handle?.toLowerCase() || ''] ?? true;
+      const available = handleAvailability[normalizedHandle] ?? true;
 
       await route.fulfill({
         status: 200,

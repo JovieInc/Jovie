@@ -27,6 +27,7 @@ describe('Database Performance Monitoring', () => {
 
   afterEach(() => {
     vi.runOnlyPendingTimers();
+    vi.restoreAllMocks();
   });
 
   describe('Query Tracking', () => {
@@ -59,35 +60,34 @@ describe('Database Performance Monitoring', () => {
     });
 
     it('should track query duration', async () => {
-      const slowQuery = vi.fn().mockImplementation(async () => {
-        // Simulate delay with fake timers
-        await new Promise(resolve => setTimeout(resolve, 100));
-        return 'result';
-      });
+      const nowSpy = vi
+        .spyOn(performance, 'now')
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(100);
+      const slowQuery = vi.fn().mockResolvedValue('result');
 
-      const queryPromise = trackDatabaseQuery('slow-query', slowQuery);
-      await vi.advanceTimersByTimeAsync(100);
-      await queryPromise;
+      await trackDatabaseQuery('slow-query', slowQuery);
 
       const stats = databaseMonitor.getQueryStats();
-      // With fake timers, duration tracking may not reflect real time
       expect(stats.totalQueries).toBe(1);
+      expect(stats.averageResponseTime).toBe(100);
+      nowSpy.mockRestore();
     });
 
     it('should identify slow queries', async () => {
-      // Mock a slow query (> 500ms) - use immediate resolution for speed
-      const slowQuery = vi.fn().mockImplementation(async () => {
-        await new Promise(resolve => setTimeout(resolve, 600));
-        return 'slow result';
-      });
+      const nowSpy = vi
+        .spyOn(performance, 'now')
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce(600);
+      const slowQuery = vi.fn().mockResolvedValue('slow result');
 
-      const queryPromise = trackDatabaseQuery('very-slow-query', slowQuery);
-      await vi.advanceTimersByTimeAsync(600);
-      await queryPromise;
+      await trackDatabaseQuery('very-slow-query', slowQuery);
 
       const stats = databaseMonitor.getQueryStats();
-      // Query should be tracked
       expect(stats.totalQueries).toBe(1);
+      expect(stats.slowQueries).toHaveLength(1);
+      expect(stats.slowQueries[0]?.query).toBe('very-slow-query');
+      nowSpy.mockRestore();
     });
   });
 
