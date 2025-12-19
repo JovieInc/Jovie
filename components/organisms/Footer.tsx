@@ -172,83 +172,88 @@ export function Footer({
             maxWidthClass
           )}
         >
-          <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8'>
+          <div className='grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
             {/* Brand */}
-            <div className='sm:col-span-2 md:col-span-3 lg:col-span-1'>
+            <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
               <FooterBranding
                 variant='light'
                 showCTA={false}
                 mark={brandingMark}
-                className={brandingMark === 'icon' ? 'items-start' : ''}
+                className={cn(
+                  'items-center sm:items-start',
+                  brandingMark === 'icon' ? 'sm:justify-start' : ''
+                )}
               />
             </div>
 
-            {/* Product */}
-            <div>
-              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
-                Product
-              </h3>
-              <ul className='space-y-2'>
-                {productLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link href={link.href} className={footerLinkClassName}>
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
+              {/* Product */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Product
+                </h3>
+                <ul className='space-y-2'>
+                  {productLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Company */}
-            <div>
-              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
-                Company
-              </h3>
-              <ul className='space-y-2'>
-                {companyLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link href={link.href} className={footerLinkClassName}>
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {/* Company */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Company
+                </h3>
+                <ul className='space-y-2'>
+                  {companyLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Legal */}
-            <div>
-              <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
-                Legal
-              </h3>
-              <ul className='space-y-2'>
-                {legalLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link href={link.href} className={footerLinkClassName}>
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {/* Legal */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Legal
+                </h3>
+                <ul className='space-y-2'>
+                  {legalLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div className='mt-8 border-t border-subtle pt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-            <div className='flex flex-col'>
+          <div className='mt-8 border-t border-subtle pt-5'>
+            <div className='grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'>
               <Copyright
                 variant='light'
                 className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'
               />
+              {showThemeToggle && (
+                <div className='flex items-center gap-3 justify-self-start sm:justify-self-end'>
+                  <div className='flex items-center sm:hidden'>
+                    <ThemeToggle appearance='icon' />
+                  </div>
+                  <div className='hidden sm:flex items-center'>
+                    <ThemeToggle appearance='segmented' />
+                  </div>
+                </div>
+              )}
             </div>
-            {showThemeToggle && (
-              <>
-                <div className='flex items-center sm:hidden'>
-                  <ThemeToggle appearance='icon' />
-                </div>
-                <div className='hidden sm:flex items-center'>
-                  <ThemeToggle appearance='segmented' />
-                </div>
-              </>
-            )}
           </div>
         </div>
       </footer>
