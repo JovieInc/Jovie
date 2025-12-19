@@ -1,17 +1,21 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
-import { Input } from '@/components/atoms/Input';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import {
+  AuthButton,
+  AuthLinkPreviewCard,
+  AuthTextInput,
+} from '@/components/auth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { identify, track } from '@/lib/analytics';
-import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { validateUsernameFormat } from '@/lib/validation/client-username';
+import {
+  generateUsernameSuggestions,
+  validateUsernameFormat,
+} from '@/lib/validation/client-username';
 
 interface AppleStyleOnboardingFormProps {
   initialDisplayName?: string;
@@ -50,10 +54,10 @@ const ONBOARDING_STEPS = [
   },
   {
     id: 'handle',
-    title: 'Pick your @handle',
+    title: 'Claim your handle',
     prompt: '',
   },
-  { id: 'done', title: "You're live.", prompt: 'Your Jovie link' },
+  { id: 'done', title: "You're live.", prompt: '' },
 ] as const;
 
 export function AppleStyleOnboardingForm({
@@ -64,6 +68,9 @@ export function AppleStyleOnboardingForm({
   skipNameStep = false,
 }: AppleStyleOnboardingFormProps) {
   const router = useRouter();
+
+  const PRODUCTION_PROFILE_DOMAIN = 'jov.ie';
+  const PRODUCTION_PROFILE_BASE_URL = 'https://jov.ie';
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [currentStepIndex, setCurrentStepIndex] = useState(
@@ -76,6 +83,7 @@ export function AppleStyleOnboardingForm({
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [state, setState] = useState<OnboardingState>({
     step: 'validating',
     progress: 0,
@@ -98,10 +106,7 @@ export function AppleStyleOnboardingForm({
   const nameInputRef = useRef<HTMLInputElement | null>(null);
   const handleInputRef = useRef<HTMLInputElement | null>(null);
 
-  const profileBaseUrl = getBaseUrl();
-  const displayDomain = profileBaseUrl
-    .replace(/^https?:\/\//, '')
-    .replace(/\/$/, '');
+  const displayDomain = PRODUCTION_PROFILE_DOMAIN;
 
   const namePlaceholder = useMemo(() => {
     const options = [
@@ -238,12 +243,16 @@ export function AppleStyleOnboardingForm({
             suggestions: [],
           });
         } else {
+          const suggestions = generateUsernameSuggestions(
+            normalizedInput,
+            fullName
+          ).slice(0, 3);
           setHandleValidation({
             available: false,
             checking: false,
             error: data.error || 'Handle already taken',
             clientValid: true,
-            suggestions: [],
+            suggestions,
           });
         }
       } catch (error) {
@@ -260,8 +269,21 @@ export function AppleStyleOnboardingForm({
         });
       }
     },
-    [normalizedInitialHandle]
+    [fullName, normalizedInitialHandle]
   );
+
+  const handleStepCtaDisabledReason = useMemo(() => {
+    if (state.isSubmitting) return 'Saving…';
+    if (!handleInput) return 'Enter a handle to continue';
+    if (!handleValidation.clientValid) {
+      return handleValidation.error || 'Handle is invalid';
+    }
+    if (handleValidation.checking) return 'Checking availability…';
+    if (!handleValidation.available) {
+      return handleValidation.error || 'Handle is taken';
+    }
+    return null;
+  }, [handleInput, handleValidation, state.isSubmitting]);
 
   useEffect(() => {
     if (!handleInput) {
@@ -362,22 +384,16 @@ export function AppleStyleOnboardingForm({
           timestamp: new Date().toISOString(),
         });
 
-        let userMessage =
-          'Something went wrong saving your handle. Please try again.';
+        let userMessage = 'Could not save. Please try again.';
         const message = errorMessage.toUpperCase();
         if (message.includes('INVALID_SESSION')) {
-          userMessage = 'Your session expired. Please refresh and try again.';
+          userMessage = 'Could not save. Please refresh and try again.';
         } else if (message.includes('USERNAME_TAKEN')) {
-          userMessage =
-            'This handle is already taken. Please choose another one.';
+          userMessage = 'Not available. Try another handle.';
         } else if (message.includes('RATE_LIMITED')) {
           userMessage = 'Too many attempts. Please try again in a few moments.';
-        } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
-          userMessage = 'Please add your name to finish setup.';
-        } else if (message.includes('DISPLAY_NAME_TOO_LONG')) {
-          userMessage = 'Name must be 50 characters or less.';
         } else if (message.includes('INVALID_USERNAME')) {
-          userMessage = 'Handle is invalid. Please update and try again.';
+          userMessage = 'That handle can’t be used. Try another one.';
         }
 
         setState(prev => ({
@@ -404,19 +420,19 @@ export function AppleStyleOnboardingForm({
 
   const copyProfileLink = useCallback(() => {
     const targetHandle = profileReadyHandle || handle || handleInput;
-    const link = `${getBaseUrl().replace(/\/$/, '')}/${targetHandle}`;
+    const link = `${PRODUCTION_PROFILE_BASE_URL}/${targetHandle}`;
     navigator.clipboard
       .writeText(link)
       .then(() => {
-        setState(prev => ({ ...prev, error: 'Link copied to clipboard!' }));
+        setCopyFeedback('Link copied to clipboard!');
         setTimeout(() => {
-          setState(prev => ({ ...prev, error: null }));
+          setCopyFeedback(null);
         }, 2000);
       })
       .catch(err => {
         console.error('Failed to copy link:', err);
       });
-  }, [handle, handleInput, profileReadyHandle]);
+  }, [PRODUCTION_PROFILE_BASE_URL, handle, handleInput, profileReadyHandle]);
 
   const goToDashboard = useCallback(() => {
     router.push('/app/dashboard/overview');
@@ -430,14 +446,6 @@ export function AppleStyleOnboardingForm({
       router.back();
     }
   }, [currentStepIndex, goToPreviousStep, router]);
-
-  const retryOperation = useCallback(() => {
-    setState(prev => ({
-      ...prev,
-      retryCount: prev.retryCount + 1,
-      error: null,
-    }));
-  }, []);
 
   const renderStepContent = () => {
     switch (currentStepIndex) {
@@ -456,40 +464,41 @@ export function AppleStyleOnboardingForm({
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='space-y-4'>
-                <Input
+              <form
+                className='space-y-4'
+                onSubmit={e => {
+                  e.preventDefault();
+                  if (
+                    isDisplayNameValid &&
+                    !isTransitioning &&
+                    !state.isSubmitting
+                  ) {
+                    goToNextStep();
+                  }
+                }}
+              >
+                <AuthTextInput
                   id='display-name'
                   ref={nameInputRef}
+                  name='name'
                   type='text'
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   placeholder={namePlaceholder}
                   aria-label='Your full name'
-                  inputClassName='w-full px-4 py-4 text-lg bg-(--panel) border-2 border-(--border) rounded-xl focus-ring text-(--fg) transition-all'
                   maxLength={50}
                   autoComplete='name'
-                  onKeyDown={e => {
-                    if (
-                      e.key === 'Enter' &&
-                      fullName.trim() &&
-                      !isTransitioning
-                    ) {
-                      goToNextStep();
-                    }
-                  }}
                 />
 
-                <Button
-                  onClick={goToNextStep}
+                <AuthButton
+                  type='submit'
                   disabled={
                     !isDisplayNameValid || isTransitioning || state.isSubmitting
                   }
-                  variant='primary'
-                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
                 >
                   Continue
-                </Button>
-              </div>
+                </AuthButton>
+              </form>
             </div>
           </div>
         );
@@ -501,13 +510,15 @@ export function AppleStyleOnboardingForm({
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[1].title}
               </h1>
-              <p className='text-(--muted) text-sm sm:text-base'>
-                {ONBOARDING_STEPS[1].prompt}
-              </p>
+              {ONBOARDING_STEPS[1].prompt ? (
+                <p className='text-(--muted) text-sm sm:text-base'>
+                  {ONBOARDING_STEPS[1].prompt}
+                </p>
+              ) : null}
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='space-y-4'>
+              <form className='space-y-4' onSubmit={handleSubmit}>
                 <label
                   className='text-sm font-medium text-(--muted)'
                   htmlFor='handle-input'
@@ -515,32 +526,40 @@ export function AppleStyleOnboardingForm({
                   @handle
                 </label>
                 <div className='relative'>
-                  <Input
+                  <div className='pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#6b6f76]'>
+                    @
+                  </div>
+                  <AuthTextInput
                     id='handle-input'
                     ref={handleInputRef}
+                    name='username'
                     aria-label='Enter your desired handle'
                     type='text'
                     value={handleInput}
-                    onChange={e => setHandleInput(e.target.value.toLowerCase())}
+                    onChange={e =>
+                      setHandleInput(
+                        e.target.value
+                          .toLowerCase()
+                          .replace(/\s+/g, '')
+                          .replace(/^@+/, '')
+                      )
+                    }
                     placeholder='yourhandle'
                     autoComplete='username'
-                    inputClassName={`w-full px-4 py-4 text-lg bg-(--panel) border-2 rounded-xl transition-all ${
+                    autoCapitalize='none'
+                    autoCorrect='off'
+                    spellCheck={false}
+                    aria-invalid={handleValidation.error ? 'true' : undefined}
+                    className={[
+                      'pl-10',
                       handleValidation.error
                         ? 'border-red-500'
                         : handleValidation.available
                           ? 'border-green-500'
-                          : 'border-(--border)'
-                    } focus-ring text-(--fg)`}
-                    onKeyDown={e => {
-                      if (
-                        e.key === 'Enter' &&
-                        handleValidation.available &&
-                        handleValidation.clientValid &&
-                        !state.isSubmitting
-                      ) {
-                        handleSubmit();
-                      }
-                    }}
+                          : undefined,
+                    ]
+                      .filter(Boolean)
+                      .join(' ')}
                   />
                   {handleValidation.checking && (
                     <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
@@ -552,41 +571,35 @@ export function AppleStyleOnboardingForm({
                   )}
                 </div>
 
-                <div className='text-center space-y-1'>
-                  <p className='text-(--muted) text-xs sm:text-sm font-medium'>
-                    Your Jovie link
-                  </p>
-                  <p className='font-mono text-(--muted) text-base sm:text-lg break-all max-w-full font-semibold'>
-                    {displayDomain}/{handleInput || 'yourhandle'}
-                  </p>
-                </div>
-
-                <div className='min-h-[24px] flex items-center px-1'>
-                  {handleValidation.error && (
-                    <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300'>
-                      {handleValidation.error}
-                    </div>
-                  )}
-                  {handleValidation.available &&
-                    handleValidation.clientValid && (
-                      <div className='flex items-center gap-2 text-green-600 text-sm animate-in fade-in slide-in-from-bottom-1 duration-300'>
-                        <span className='inline-flex h-3 w-3 rounded-full bg-green-500' />
-                        <span className='font-medium'>Handle is available</span>
+                <div
+                  className='min-h-[24px] flex flex-col items-center justify-center px-1'
+                  role='status'
+                  aria-live='polite'
+                >
+                  {handleInput ? (
+                    handleValidation.checking ? (
+                      <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                        Checking…
                       </div>
-                    )}
+                    ) : handleValidation.clientValid &&
+                      handleValidation.available ? (
+                      <div className='text-green-600 text-sm font-medium animate-in fade-in slide-in-from-bottom-1 duration-300'>
+                        Available
+                      </div>
+                    ) : handleValidation.error ? (
+                      <div className='text-red-500 text-sm animate-in fade-in slide-in-from-top-1 duration-300 text-center'>
+                        Not available
+                      </div>
+                    ) : null
+                  ) : null}
                 </div>
 
-                <Button
-                  onClick={handleSubmit}
+                <AuthButton
+                  type='submit'
                   disabled={
-                    !handleValidation.available ||
-                    !handleValidation.clientValid ||
-                    handleValidation.checking ||
-                    state.isSubmitting ||
-                    isTransitioning
+                    Boolean(handleStepCtaDisabledReason) || isTransitioning
                   }
                   variant='primary'
-                  className='w-full py-4 text-lg rounded-xl transition-all duration-300 ease-in-out hover:scale-[1.02] active:scale-[0.98]'
                 >
                   {state.isSubmitting ? (
                     <div className='flex items-center justify-center space-x-2'>
@@ -594,32 +607,16 @@ export function AppleStyleOnboardingForm({
                       <span>Saving…</span>
                     </div>
                   ) : (
-                    'Create Profile'
+                    'Continue'
                   )}
-                </Button>
-              </div>
+                </AuthButton>
 
-              <div className='min-h-[140px] flex items-start'>
                 {state.error ? (
-                  <ErrorBanner
-                    title='We could not save your handle'
-                    description={state.error}
-                    actions={[
-                      {
-                        label: 'Try again',
-                        onClick: retryOperation,
-                      },
-                      {
-                        label: 'Contact support',
-                        href: '/support',
-                      },
-                    ]}
-                    testId='onboarding-error'
-                  />
-                ) : (
-                  <div aria-hidden='true' className='w-full' />
-                )}
-              </div>
+                  <div className='text-center text-xs text-[#6b6f76]'>
+                    {state.error}
+                  </div>
+                ) : null}
+              </form>
             </div>
           </div>
         );
@@ -631,42 +628,30 @@ export function AppleStyleOnboardingForm({
               <h1 className='text-2xl sm:text-3xl font-semibold text-(--fg) transition-colors sm:whitespace-nowrap'>
                 {ONBOARDING_STEPS[2].title}
               </h1>
-              <p className='text-(--muted) text-sm sm:text-base'>
-                {ONBOARDING_STEPS[2].prompt}
-              </p>
+              {ONBOARDING_STEPS[2].prompt ? (
+                <p className='text-(--muted) text-sm sm:text-base'>
+                  {ONBOARDING_STEPS[2].prompt}
+                </p>
+              ) : null}
             </div>
 
             <div className='w-full max-w-md space-y-6'>
-              <div className='text-center space-y-1'>
-                <p className='text-(--muted) text-xs sm:text-sm font-medium'>
-                  Your Jovie link
-                </p>
-                <p className='font-mono text-(--muted) text-base sm:text-lg break-all max-w-full font-semibold'>
-                  {displayDomain}/{profileReadyHandle || handle}
-                </p>
-              </div>
+              <AuthLinkPreviewCard
+                label='Your link'
+                hrefText={`${displayDomain}/${profileReadyHandle || handle}`}
+              />
 
               <div className='space-y-4'>
-                <Button
-                  onClick={goToDashboard}
-                  variant='primary'
-                  className='w-full py-4 text-lg rounded-xl'
-                >
-                  Go to Dashboard
-                </Button>
+                <AuthButton onClick={goToDashboard}>Go to Dashboard</AuthButton>
 
-                <Button
-                  onClick={copyProfileLink}
-                  variant='secondary'
-                  className='w-full py-4 text-lg rounded-xl bg-transparent border border-(--border) text-(--muted) hover:bg-(--border)'
-                >
+                <AuthButton onClick={copyProfileLink} variant='secondary'>
                   Copy Link
-                </Button>
+                </AuthButton>
               </div>
 
-              {state.error && (
+              {copyFeedback && (
                 <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
-                  {state.error}
+                  {copyFeedback}
                 </div>
               )}
             </div>

@@ -1,21 +1,70 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
+import { publicEnv } from '@/lib/env-public';
 import {
   createOnboardingError,
   mapDatabaseError,
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
+import { applyProfileEnrichment } from '@/lib/ingestion/profile';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+
+function getRequestBaseUrl(headersList: Headers): string {
+  const host = headersList.get('x-forwarded-host') ?? headersList.get('host');
+  const proto = headersList.get('x-forwarded-proto') ?? 'https';
+  if (host) return `${proto}://${host}`;
+  return publicEnv.NEXT_PUBLIC_APP_URL;
+}
+
+async function uploadRemoteAvatar(params: {
+  imageUrl: string;
+  baseUrl: string;
+  cookieHeader: string | null;
+}): Promise<{ blobUrl: string; photoId: string } | null> {
+  const source = await fetch(params.imageUrl);
+  if (!source.ok) return null;
+
+  const contentType =
+    source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
+  if (!contentType || !contentType.startsWith('image/')) return null;
+
+  const buffer = await source.arrayBuffer();
+  const file = new File([buffer], 'oauth-avatar', { type: contentType });
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
+    method: 'POST',
+    body: formData,
+    headers: params.cookieHeader ? { cookie: params.cookieHeader } : undefined,
+  });
+
+  if (!upload.ok) return null;
+
+  const data = (await upload.json()) as {
+    blobUrl?: string;
+    photoId?: string;
+    jobId?: string;
+  };
+
+  const blobUrl = data.blobUrl ?? null;
+  const photoId = data.photoId ?? data.jobId ?? null;
+
+  if (!blobUrl || !photoId) return null;
+  return { blobUrl, photoId };
+}
 
 function profileIsPublishable(
   profile: typeof creatorProfiles.$inferSelect | null
@@ -84,6 +133,12 @@ export async function completeOnboarding({
     // Step 3: Rate limiting check
     const headersList = await headers();
     const clientIP = extractClientIP(headersList);
+    const cookieHeader = headersList.get('cookie');
+    const baseUrl = getRequestBaseUrl(headersList);
+
+    const clerkUser = await currentUser();
+    const clerkIdentity = resolveClerkIdentity(clerkUser);
+    const oauthAvatarUrl = clerkIdentity.avatarUrl;
 
     // IMPORTANT: Always check IP-based rate limiting, even for 'unknown' IPs
     // The 'unknown' bucket acts as a shared rate limit to prevent abuse
@@ -103,6 +158,31 @@ export async function completeOnboarding({
 
     const completion = await withDbSessionTx(
       async (tx, clerkUserId: string) => {
+        type CompletionResult = {
+          username: string;
+          status: 'created' | 'updated' | 'complete';
+          profileId: string | null;
+        };
+
+        const ensureEmailAvailable = async () => {
+          if (!userEmail) return;
+
+          const [emailOwner] = await tx
+            .select({ clerkId: users.clerkId })
+            .from(users)
+            .where(eq(users.email, userEmail))
+            .limit(1);
+
+          if (emailOwner && emailOwner.clerkId !== clerkUserId) {
+            throw onboardingErrorToError(
+              createOnboardingError(
+                OnboardingErrorCode.EMAIL_IN_USE,
+                'Email is already in use'
+              )
+            );
+          }
+        };
+
         const ensureHandleAvailable = async (profileId?: string | null) => {
           const [conflict] = await tx
             .select({ id: creatorProfiles.id })
@@ -127,9 +207,10 @@ export async function completeOnboarding({
 
         // If the user record does not exist, the stored function will create both user + profile
         if (!existingUser) {
+          await ensureEmailAvailable();
           await ensureHandleAvailable(null);
-          await tx.execute(
-            drizzleSql`
+          const result = await tx.execute(
+            drizzleSql<{ profile_id: string }>`
               SELECT create_profile_with_user(
                 ${clerkUserId},
                 ${userEmail ?? null},
@@ -139,7 +220,17 @@ export async function completeOnboarding({
             `
           );
 
-          return { username: normalizedUsername, status: 'created' as const };
+          const profileId = result.rows?.[0]?.profile_id
+            ? String(result.rows[0].profile_id)
+            : null;
+
+          const created: CompletionResult = {
+            username: normalizedUsername,
+            status: 'created',
+            profileId,
+          };
+
+          return created;
         }
 
         const [existingProfile] = await tx
@@ -176,23 +267,30 @@ export async function completeOnboarding({
             .where(eq(creatorProfiles.id, existingProfile.id))
             .returning();
 
-          return {
+          const updatedResult: CompletionResult = {
             username: updated?.usernameNormalized || normalizedUsername,
-            status: 'updated' as const,
+            status: 'updated',
+            profileId: existingProfile.id,
           };
+
+          return updatedResult;
         }
 
         if (existingProfile) {
-          return {
+          const completed: CompletionResult = {
             username: existingProfile.usernameNormalized,
-            status: 'complete' as const,
+            status: 'complete',
+            profileId: existingProfile.id,
           };
+
+          return completed;
         }
 
         // Fallback: user exists but no profile yet
+        await ensureEmailAvailable();
         await ensureHandleAvailable(null);
-        await tx.execute(
-          drizzleSql`
+        const result = await tx.execute(
+          drizzleSql<{ profile_id: string }>`
             SELECT create_profile_with_user(
               ${clerkUserId},
               ${userEmail ?? null},
@@ -201,9 +299,62 @@ export async function completeOnboarding({
             ) AS profile_id
           `
         );
-        return { username: normalizedUsername, status: 'created' as const };
+
+        const profileId = result.rows?.[0]?.profile_id
+          ? String(result.rows[0].profile_id)
+          : null;
+
+        const created: CompletionResult = {
+          username: normalizedUsername,
+          status: 'created',
+          profileId,
+        };
+
+        return created;
       }
     );
+
+    const profileId = completion.profileId;
+    if (profileId && oauthAvatarUrl) {
+      try {
+        const uploaded = await uploadRemoteAvatar({
+          imageUrl: oauthAvatarUrl,
+          baseUrl,
+          cookieHeader,
+        });
+
+        if (uploaded) {
+          await withDbSessionTx(async tx => {
+            const [profile] = await tx
+              .select({
+                avatarUrl: creatorProfiles.avatarUrl,
+                avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+              })
+              .from(creatorProfiles)
+              .where(eq(creatorProfiles.id, profileId))
+              .limit(1);
+
+            await applyProfileEnrichment(tx, {
+              profileId,
+              avatarLockedByUser: profile?.avatarLockedByUser ?? null,
+              currentAvatarUrl: profile?.avatarUrl ?? null,
+              extractedAvatarUrl: uploaded.blobUrl,
+            });
+
+            await tx
+              .update(profilePhotos)
+              .set({
+                creatorProfileId: profileId,
+                sourcePlatform: 'clerk',
+                updatedAt: new Date(),
+              })
+              .where(eq(profilePhotos.id, uploaded.photoId));
+          });
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     await syncCanonicalUsernameFromApp(userId, completion.username);
 

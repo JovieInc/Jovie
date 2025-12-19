@@ -26,7 +26,7 @@ export function ProblemSolutionSection() {
         {/* Unified heading */}
         <h2
           id='problem-solution-heading'
-          className='mt-6 text-4xl md:text-6xl font-bold tracking-tight text-balance text-gray-900 dark:text-white'
+          className='mt-6 text-4xl md:text-6xl font-medium tracking-tight text-balance text-gray-900 dark:text-white'
         >
           Your bio link is a speed bump.
           <br />

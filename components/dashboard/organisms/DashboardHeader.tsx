@@ -5,15 +5,20 @@ import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 
 export interface DashboardHeaderProps {
   breadcrumbs: DashboardBreadcrumbItem[];
+  leading?: ReactNode;
   action?: ReactNode;
   className?: string;
 }
 
 export function DashboardHeader({
   breadcrumbs,
+  leading,
   action,
   className,
 }: DashboardHeaderProps) {
+  const currentLabel =
+    breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].label : '';
+
   return (
     <header
       className={cn(
@@ -21,10 +26,11 @@ export function DashboardHeader({
         className
       )}
     >
-      <div className='flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
+      <div className='relative flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
+        {leading ? <div className='flex items-center'>{leading}</div> : null}
         <nav
           aria-label='Breadcrumb'
-          className='flex min-w-0 items-center gap-1 text-[13px] text-secondary-token'
+          className='hidden min-w-0 items-center gap-1 text-[13px] text-secondary-token sm:flex'
         >
           {breadcrumbs.map((crumb, index) => {
             const isLast = index === breadcrumbs.length - 1;
@@ -54,6 +60,9 @@ export function DashboardHeader({
             );
           })}
         </nav>
+        <div className='absolute left-1/2 hidden min-w-0 -translate-x-1/2 text-[13px] font-medium text-primary-token sm:hidden'>
+          <span className='block max-w-[180px] truncate'>{currentLabel}</span>
+        </div>
         {action ? (
           <div className='ml-auto flex items-center gap-2'>{action}</div>
         ) : null}

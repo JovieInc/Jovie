@@ -26,7 +26,9 @@ export default function SignUpSsoCallbackPage() {
 
   return (
     <SignUp.Root routing='path' path='/signup'>
-      {null}
+      <SignUp.Step name='continue'>
+        <SignUp.Captcha />
+      </SignUp.Step>
     </SignUp.Root>
   );
 }

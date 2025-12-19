@@ -11,44 +11,78 @@ interface DesktopQrOverlayProps {
 }
 
 export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
-  const [show, setShow] = useState(false);
+  const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [dismissed, setDismissed] = useState(false);
   const [url, setUrl] = useState('');
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    const onOpen = () => {
+      const isMdUp = window.matchMedia('(min-width: 768px)').matches;
+      if (!isMdUp) return;
+      setDismissed(false);
+      setMode('open');
+      setUrl(`${window.location.origin}/${handle}`);
+    };
+
+    window.addEventListener('jovie:open-profile-qr', onOpen);
+    return () => {
+      window.removeEventListener('jovie:open-profile-qr', onOpen);
+    };
+  }, [handle]);
+
+  useEffect(() => {
+    const isMdUp = window.matchMedia('(min-width: 768px)').matches;
+    const isLgUp = window.matchMedia('(min-width: 1024px)').matches;
     const hasDismissed =
       localStorage.getItem('viewOnMobileDismissed') === 'true';
 
-    if (isDesktop && !hasDismissed) {
-      setShow(true);
-      setUrl(`${window.location.origin}/${handle}`);
-    } else if (hasDismissed) {
-      setDismissed(true);
+    setDismissed(hasDismissed);
+
+    if (!isMdUp) {
+      setMode('hidden');
+      setUrl('');
+      return;
     }
+
+    if (isLgUp && !hasDismissed) {
+      setMode('open');
+      setUrl(`${window.location.origin}/${handle}`);
+      return;
+    }
+
+    setMode('icon');
+    setUrl('');
   }, [handle]);
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
   useEffect(() => {
-    const mql = window.matchMedia('(min-width: 768px)');
+    const mqlMd = window.matchMedia('(min-width: 768px)');
+    const mqlLg = window.matchMedia('(min-width: 1024px)');
 
     const onChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      const isDesktop =
-        'matches' in e ? e.matches : (e as MediaQueryList).matches;
-      if (isDesktop) {
-        if (!dismissed) {
-          setShow(true);
-          setUrl(`${window.location.origin}/${handle}`);
-        }
-      } else {
-        // Always hide on mobile viewport
-        setShow(false);
+      void e;
+      const isMdUp = mqlMd.matches;
+      const isLgUp = mqlLg.matches;
+
+      if (!isMdUp) {
+        setMode('hidden');
+        setUrl('');
+        return;
       }
+
+      if (isLgUp && !dismissed) {
+        setMode('open');
+        setUrl(`${window.location.origin}/${handle}`);
+        return;
+      }
+
+      setMode('icon');
+      setUrl('');
     };
 
     // Initial sync in case state drifted
-    onChange(mql);
+    onChange(mqlMd);
 
     // Add listener with both modern and legacy APIs (feature detection)
     type LegacyMQL = MediaQueryList & {
@@ -59,21 +93,30 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
         listener: (this: MediaQueryList, ev: MediaQueryListEvent) => void
       ) => void;
     };
-    const legacyMql = mql as LegacyMQL;
+    const legacyMqlMd = mqlMd as LegacyMQL;
+    const legacyMqlLg = mqlLg as LegacyMQL;
 
-    if (typeof mql.addEventListener === 'function') {
-      mql.addEventListener('change', onChange as EventListener);
-    } else if (typeof legacyMql.addListener === 'function') {
-      legacyMql.addListener(
+    if (typeof mqlMd.addEventListener === 'function') {
+      mqlMd.addEventListener('change', onChange as EventListener);
+      mqlLg.addEventListener('change', onChange as EventListener);
+    } else if (typeof legacyMqlMd.addListener === 'function') {
+      legacyMqlMd.addListener(
+        onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
+      );
+      legacyMqlLg.addListener(
         onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
       );
     }
 
     return () => {
-      if (typeof mql.removeEventListener === 'function') {
-        mql.removeEventListener('change', onChange as EventListener);
-      } else if (typeof legacyMql.removeListener === 'function') {
-        legacyMql.removeListener(
+      if (typeof mqlMd.removeEventListener === 'function') {
+        mqlMd.removeEventListener('change', onChange as EventListener);
+        mqlLg.removeEventListener('change', onChange as EventListener);
+      } else if (typeof legacyMqlMd.removeListener === 'function') {
+        legacyMqlMd.removeListener(
+          onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
+        );
+        legacyMqlLg.removeListener(
           onChange as (this: MediaQueryList, ev: MediaQueryListEvent) => void
         );
       }
@@ -83,24 +126,23 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
   const close = () => {
     // Clear URL first so the <img> disappears immediately, even during exit animation
     setUrl('');
-    setShow(false);
+    setMode('icon');
     setDismissed(true);
     localStorage.setItem('viewOnMobileDismissed', 'true');
   };
 
   const reopen = () => {
-    setShow(true);
-    setDismissed(false);
+    setMode('open');
     try {
       setUrl(`${window.location.origin}/${handle}`);
     } catch {}
   };
 
-  if (!show && !dismissed) return null;
+  if (mode === 'hidden') return null;
 
   return (
     <>
-      {show && (
+      {mode === 'open' && (
         <motion.div
           key='qr'
           initial={
@@ -118,7 +160,7 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
               ? { duration: 0 }
               : { duration: 0.2, ease: 'easeOut' }
           }
-          className='group fixed bottom-4 right-4 z-50 flex flex-col items-center rounded-xl p-4 ring-1 ring-black/10 dark:ring-white/10 shadow-xl bg-white/85 dark:bg-gray-900/80 backdrop-blur-md overflow-hidden'
+          className='group fixed bottom-4 right-4 z-50 flex flex-col items-center rounded-xl p-4 ring-1 ring-(--color-border-subtle) shadow-xl bg-surface-0 backdrop-blur-md overflow-hidden'
         >
           <div className='pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100'>
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
@@ -126,20 +168,18 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
           <button
             onClick={close}
             aria-label='Close'
-            className='absolute top-1 right-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+            className='absolute top-1 right-1 text-tertiary-token hover:text-secondary-token'
           >
             <XMarkIcon className='h-4 w-4' />
           </button>
           {url && (
             <QRCode data={url} size={120} label='Scan to view on mobile' />
           )}
-          <p className='mt-2 text-xs text-gray-600 dark:text-gray-400'>
-            View on mobile
-          </p>
+          <p className='mt-2 text-xs text-secondary-token'>View on mobile</p>
         </motion.div>
       )}
 
-      {!show && dismissed && (
+      {mode === 'icon' && (
         <motion.button
           key='reopen'
           initial={
@@ -153,10 +193,10 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
           }
           onClick={reopen}
           aria-label='View on mobile'
-          className='group fixed bottom-4 right-4 z-50 p-2 rounded-full bg-white/90 dark:bg-gray-900/80 backdrop-blur-md ring-1 ring-black/10 dark:ring-white/10 shadow-md hover:shadow-lg transition'
+          className='group fixed bottom-4 right-4 z-50 p-2 rounded-full bg-surface-0 backdrop-blur-md ring-1 ring-(--color-border-subtle) shadow-md hover:shadow-lg transition'
         >
           <span className='pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
-          <DevicePhoneMobileIcon className='relative h-5 w-5 text-gray-700 dark:text-gray-300' />
+          <DevicePhoneMobileIcon className='relative h-5 w-5 text-primary-token' />
         </motion.button>
       )}
     </>

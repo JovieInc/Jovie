@@ -294,12 +294,13 @@ describeFn('GroupedLinksManager', () => {
     // Initial call on mount
     expect(onLinksChange).toHaveBeenCalledTimes(1);
 
-    // Click "Hide" on the first row
-    const menuTrigger = screen.getByRole('button', {
+    // Open menu and click "Hide" on the first row
+    const menuButton = screen.getByRole('button', {
       name: /Open actions for Instagram/i,
     });
-    fireEvent.click(menuTrigger);
-    const hideBtn = screen.getByRole('button', { name: /Hide/i });
+    fireEvent.click(menuButton);
+
+    const hideBtn = screen.getByRole('button', { name: /^Hide$/i });
     fireEvent.click(hideBtn);
 
     await waitFor(() => {
@@ -313,6 +314,7 @@ describeFn('GroupedLinksManager', () => {
 
   it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', async () => {
     const onLinksChange = vi.fn();
+    vi.useFakeTimers();
 
     const initial = Array.from({ length: MAX_SOCIAL_LINKS }, (_, i) =>
       makeSocial(`social-${i}`)
@@ -333,9 +335,9 @@ describeFn('GroupedLinksManager', () => {
     nextAddPayload = makeSocial('social-extra');
     fireEvent.click(screen.getByText('mock-add'));
 
-    await waitFor(() => {
-      expect(onLinksChange).toHaveBeenCalled();
-    });
+    await vi.advanceTimersByTimeAsync(650);
+
+    expect(onLinksChange).toHaveBeenCalled();
     const latest = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
 
     // Should have MAX_SOCIAL_LINKS + 1 total links
@@ -353,6 +355,68 @@ describeFn('GroupedLinksManager', () => {
     const extraVisible =
       (extra as unknown as { isVisible?: boolean }).isVisible ?? true;
     expect(extraVisible).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('shows ingested suggestion pills and accepts on click', async () => {
+    const onAcceptSuggestion = vi
+      .fn()
+      .mockResolvedValue(
+        igSocial({ normalizedUrl: 'https://instagram.com/artist' })
+      );
+
+    renderWithProviders(
+      <GroupedLinksManager<DetectedLink>
+        initialLinks={[]}
+        suggestedLinks={[
+          {
+            ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
+            suggestionId: 'suggest-1',
+          } as DetectedLink & { suggestionId: string },
+        ]}
+        onAcceptSuggestion={onAcceptSuggestion}
+        suggestionsEnabled
+      />
+    );
+
+    const pill = screen.getByTestId('ingested-suggestion-pill');
+    expect(pill).toHaveTextContent('Instagram');
+    expect(pill).toHaveTextContent('@artist');
+
+    fireEvent.click(pill);
+    await waitFor(() => {
+      expect(onAcceptSuggestion).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('dismisses ingested suggestion pills without triggering accept', async () => {
+    const onAcceptSuggestion = vi.fn();
+    const onDismissSuggestion = vi.fn().mockResolvedValue(undefined);
+
+    renderWithProviders(
+      <GroupedLinksManager<DetectedLink>
+        initialLinks={[]}
+        suggestedLinks={[
+          {
+            ...igSocial({ normalizedUrl: 'https://instagram.com/artist' }),
+            suggestionId: 'suggest-2',
+          } as DetectedLink & { suggestionId: string },
+        ]}
+        onAcceptSuggestion={onAcceptSuggestion}
+        onDismissSuggestion={onDismissSuggestion}
+        suggestionsEnabled
+      />
+    );
+
+    const dismissButton = screen.getByLabelText(
+      /Dismiss Instagram suggestion/i
+    );
+    fireEvent.click(dismissButton);
+
+    await waitFor(() => {
+      expect(onDismissSuggestion).toHaveBeenCalledTimes(1);
+    });
+    expect(onAcceptSuggestion).not.toHaveBeenCalled();
   });
 
   it('accepts suggested links without duplicating canonical identities', async () => {

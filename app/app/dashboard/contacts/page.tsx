@@ -9,7 +9,7 @@ export default async function ContactsPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/dashboard/contacts');
+    redirect('/signin?redirect_url=/app/dashboard/contacts');
   }
 
   const dashboardData = await getDashboardDataCached();

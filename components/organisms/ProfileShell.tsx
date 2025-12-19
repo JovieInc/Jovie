@@ -7,6 +7,7 @@ import { ProfileNavButton } from '@/components/atoms/ProfileNavButton';
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import {
+  type ProfileNotificationsHydrationStatus,
   type ProfileNotificationsState,
   useProfileNotificationsController,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
@@ -34,6 +35,8 @@ import type {
 interface ProfileNotificationsContextValue {
   state: ProfileNotificationsState;
   setState: React.Dispatch<React.SetStateAction<ProfileNotificationsState>>;
+  hydrationStatus: ProfileNotificationsHydrationStatus;
+  hasStoredContacts: boolean;
   notificationsEnabled: boolean;
   channel: NotificationChannel;
   setChannel: React.Dispatch<React.SetStateAction<NotificationChannel>>;
@@ -141,7 +144,9 @@ export function ProfileShell({
     handleMenuOpenChange,
     handleNotificationsClick,
     handleUnsubscribe,
+    hasStoredContacts,
     hasActiveSubscriptions,
+    hydrationStatus,
     isNotificationMenuOpen,
     menuTriggerRef,
     openSubscription,
@@ -158,6 +163,8 @@ export function ProfileShell({
     () => ({
       state: notificationsState,
       setState: setNotificationsState,
+      hydrationStatus,
+      hasStoredContacts,
       notificationsEnabled,
       channel,
       setChannel,
@@ -169,6 +176,8 @@ export function ProfileShell({
     }),
     [
       channel,
+      hasStoredContacts,
+      hydrationStatus,
       notificationsEnabled,
       notificationsState,
       openSubscription,
@@ -193,7 +202,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
-        className='relative min-h-screen overflow-hidden bg-background text-foreground transition-colors duration-200'
+        className='relative min-h-screen overflow-hidden bg-base text-primary-token transition-colors duration-200 font-medium tracking-tight'
         data-test='public-profile-root'
       >
         {backgroundPattern !== 'none' && (
@@ -212,10 +221,11 @@ export function ProfileShell({
             <ProfileNavButton
               showBackButton={showBackButton}
               artistHandle={artist.handle}
+              hideBranding={Boolean(artist.settings?.hide_branding)}
             />
           </div>
 
-          <div className='absolute right-4 top-4 z-10 flex items-center gap-3'>
+          <div className='absolute right-4 top-4 z-10 flex items-center gap-2'>
             {showNotificationButton && notificationsEnabled ? (
               hasActiveSubscriptions ? (
                 <ProfileNotificationsMenu
