@@ -1,9 +1,11 @@
 import { useClerk } from '@clerk/nextjs';
+import * as Sentry from '@sentry/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
 import type { BillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
+import { logger } from '@/lib/utils/logger';
 
 type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 
@@ -75,9 +77,19 @@ export function useUserMenuActions({
 
     setLoading(prev => ({ ...prev, signOut: true }));
     try {
-      await signOut({ redirectUrl: '/' });
+      await Sentry.startSpan(
+        { op: 'ui.auth.signout', name: 'User menu sign out' },
+        () => signOut({ redirectUrl: '/' })
+      );
     } catch (error) {
-      console.error('Sign out error:', error);
+      Sentry.captureException(error);
+      logger.error(
+        logger.fmt`Sign out failed: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+        { surface: ANALYTICS_CONTEXT.surface },
+        'auth'
+      );
       showToast({
         type: 'error',
         message: "We couldn't sign you out. Please try again in a few seconds.",
@@ -91,52 +103,71 @@ export function useUserMenuActions({
 
     setLoading(prev => ({ ...prev, upgrade: true }));
     try {
-      track('billing_upgrade_clicked', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
+      await Sentry.startSpan(
+        { op: 'ui.click', name: 'User menu upgrade click' },
+        async span => {
+          span.setAttribute('plan', billingStatus.plan ?? 'unknown');
+          track('billing_upgrade_clicked', {
+            ...ANALYTICS_CONTEXT,
+            plan: billingStatus.plan ?? 'unknown',
+          });
 
-      const pricingResponse = await fetch('/api/stripe/pricing-options');
-      if (!pricingResponse.ok) {
-        throw new Error('Failed to load pricing options');
-      }
+          const pricingResponse = await Sentry.startSpan(
+            { op: 'http.client', name: 'GET /api/stripe/pricing-options' },
+            () => fetch('/api/stripe/pricing-options')
+          );
+          if (!pricingResponse.ok) {
+            throw new Error('Failed to load pricing options');
+          }
 
-      const pricingData =
-        (await pricingResponse.json()) as PricingOptionsResponse;
-      const monthPrice = pricingData.pricingOptions.find(
-        option => option.interval === 'month'
+          const pricingData =
+            (await pricingResponse.json()) as PricingOptionsResponse;
+          const monthPrice = pricingData.pricingOptions.find(
+            option => option.interval === 'month'
+          );
+
+          if (!monthPrice?.priceId) {
+            throw new Error('Monthly pricing option missing');
+          }
+
+          const checkoutResponse = await Sentry.startSpan(
+            { op: 'http.client', name: 'POST /api/stripe/checkout' },
+            () =>
+              fetch('/api/stripe/checkout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ priceId: monthPrice.priceId }),
+              })
+          );
+
+          if (!checkoutResponse.ok) {
+            throw new Error('Failed to create checkout session');
+          }
+
+          const checkout =
+            (await checkoutResponse.json()) as StripeRedirectResponse;
+          if (!checkout.url) {
+            throw new Error('Checkout URL missing from response');
+          }
+
+          track('billing_upgrade_checkout_redirected', {
+            ...ANALYTICS_CONTEXT,
+            interval: monthPrice.interval,
+          });
+
+          redirectToUrl(checkout.url);
+        }
       );
-
-      if (!monthPrice?.priceId) {
-        throw new Error('Monthly pricing option missing');
-      }
-
-      const checkoutResponse = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: monthPrice.priceId }),
-      });
-
-      if (!checkoutResponse.ok) {
-        throw new Error('Failed to create checkout session');
-      }
-
-      const checkout =
-        (await checkoutResponse.json()) as StripeRedirectResponse;
-      if (!checkout.url) {
-        throw new Error('Checkout URL missing from response');
-      }
-
-      track('billing_upgrade_checkout_redirected', {
-        ...ANALYTICS_CONTEXT,
-        interval: monthPrice.interval,
-      });
-
-      redirectToUrl(checkout.url);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to start upgrade';
 
+      Sentry.captureException(error);
+      logger.error(
+        logger.fmt`Upgrade start failed: ${message}`,
+        { plan: billingStatus.plan ?? 'unknown' },
+        'billing'
+      );
       track('billing_upgrade_failed', {
         ...ANALYTICS_CONTEXT,
         plan: billingStatus.plan ?? 'unknown',
@@ -160,53 +191,69 @@ export function useUserMenuActions({
     setLoading(prev => ({ ...prev, manageBilling: true }));
 
     try {
-      if (!billingStatus.hasStripeCustomer) {
-        track('billing_manage_billing_missing_customer', {
-          ...ANALYTICS_CONTEXT,
-          plan: billingStatus.plan ?? 'unknown',
-        });
+      await Sentry.startSpan(
+        { op: 'ui.click', name: 'User menu manage billing' },
+        async span => {
+          span.setAttribute('plan', billingStatus.plan ?? 'unknown');
+          if (!billingStatus.hasStripeCustomer) {
+            track('billing_manage_billing_missing_customer', {
+              ...ANALYTICS_CONTEXT,
+              plan: billingStatus.plan ?? 'unknown',
+            });
 
-        showToast({
-          type: 'warning',
-          message:
-            'We are still setting up your billing profile. Try again in a moment or start an upgrade to create it instantly.',
-          duration: 6000,
-        });
-        return;
-      }
+            showToast({
+              type: 'warning',
+              message:
+                'We are still setting up your billing profile. Try again in a moment or start an upgrade to create it instantly.',
+              duration: 6000,
+            });
+            return;
+          }
 
-      track('billing_manage_billing_clicked', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
+          track('billing_manage_billing_clicked', {
+            ...ANALYTICS_CONTEXT,
+            plan: billingStatus.plan ?? 'unknown',
+          });
 
-      const response = await fetch('/api/stripe/portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
+          const response = await Sentry.startSpan(
+            { op: 'http.client', name: 'POST /api/stripe/portal' },
+            () =>
+              fetch('/api/stripe/portal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+              })
+          );
 
-      if (!response.ok) {
-        throw new Error('Failed to create billing portal session');
-      }
+          if (!response.ok) {
+            throw new Error('Failed to create billing portal session');
+          }
 
-      const portal = (await response.json()) as StripeRedirectResponse;
+          const portal = (await response.json()) as StripeRedirectResponse;
 
-      if (!portal.url) {
-        throw new Error('Billing portal URL missing from response');
-      }
+          if (!portal.url) {
+            throw new Error('Billing portal URL missing from response');
+          }
 
-      track('billing_manage_billing_redirected', {
-        ...ANALYTICS_CONTEXT,
-        plan: billingStatus.plan ?? 'unknown',
-      });
+          track('billing_manage_billing_redirected', {
+            ...ANALYTICS_CONTEXT,
+            plan: billingStatus.plan ?? 'unknown',
+          });
 
-      redirectToUrl(portal.url);
+          redirectToUrl(portal.url);
+        }
+      );
     } catch (error) {
       const message =
         error instanceof Error
           ? error.message
           : 'Unable to open the billing portal';
 
+      Sentry.captureException(error);
+      logger.error(
+        logger.fmt`Billing portal open failed: ${message}`,
+        { plan: billingStatus.plan ?? 'unknown' },
+        'billing'
+      );
       track('billing_manage_billing_failed', {
         ...ANALYTICS_CONTEXT,
         plan: billingStatus.plan ?? 'unknown',

@@ -2,9 +2,11 @@
 
 import { RocketLaunchIcon } from '@heroicons/react/24/outline';
 import { Button, type ButtonProps } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { FEATURE_FLAGS, track, useFeatureFlag } from '@/lib/analytics';
+import { logger } from '@/lib/utils/logger';
 
 interface UpgradeButtonProps {
   className?: string;
@@ -43,65 +45,90 @@ export function UpgradeButton({
     }
 
     try {
-      // Track upgrade button click
-      track('upgrade_button_clicked', {
-        flow_type:
-          directUpgradeEnabled && priceId
-            ? 'direct_checkout'
-            : 'billing_remove_branding',
-        price_id: priceId || null,
-        feature_flag_enabled: directUpgradeEnabled,
-      });
+      await Sentry.startSpan(
+        { op: 'ui.click', name: 'Upgrade button click' },
+        async span => {
+          const flowType =
+            directUpgradeEnabled && priceId
+              ? 'direct_checkout'
+              : 'billing_remove_branding';
+          span.setAttribute('flow_type', flowType);
+          span.setAttribute('price_id', priceId ?? 'unknown');
+          span.setAttribute('feature_flag_enabled', directUpgradeEnabled);
 
-      if (directUpgradeEnabled && priceId) {
-        // Direct checkout flow - skip pricing page
-        track('checkout_initiated', {
-          flow_type: 'direct',
-          price_id: priceId,
-        });
-
-        const response = await fetch('/api/stripe/checkout', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ priceId }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          track('checkout_failed', {
-            flow_type: 'direct',
-            price_id: priceId,
-            error: errorData.error || 'Unknown error',
+          // Track upgrade button click
+          track('upgrade_button_clicked', {
+            flow_type: flowType,
+            price_id: priceId || null,
+            feature_flag_enabled: directUpgradeEnabled,
           });
-          throw new Error(
-            errorData.error || 'Failed to create checkout session'
-          );
+
+          if (directUpgradeEnabled && priceId) {
+            // Direct checkout flow - skip pricing page
+            track('checkout_initiated', {
+              flow_type: 'direct',
+              price_id: priceId,
+            });
+
+            const response = await Sentry.startSpan(
+              { op: 'http.client', name: 'POST /api/stripe/checkout' },
+              () =>
+                fetch('/api/stripe/checkout', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ priceId }),
+                })
+            );
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              track('checkout_failed', {
+                flow_type: 'direct',
+                price_id: priceId,
+                error: errorData.error || 'Unknown error',
+              });
+              throw new Error(
+                errorData.error || 'Failed to create checkout session'
+              );
+            }
+
+            const { url } = await response.json();
+
+            track('checkout_redirect', {
+              flow_type: 'direct',
+              price_id: priceId,
+            });
+
+            // Redirect to Stripe checkout
+            window.location.href = url;
+          } else {
+            // Traditional flow - redirect to billing remove-branding route
+            track('pricing_page_redirect', {
+              flow_type: 'traditional',
+            });
+            router.push('/billing/remove-branding');
+          }
         }
-
-        const { url } = await response.json();
-
-        track('checkout_redirect', {
-          flow_type: 'direct',
-          price_id: priceId,
-        });
-
-        // Redirect to Stripe checkout
-        window.location.href = url;
-      } else {
-        // Traditional flow - redirect to billing remove-branding route
-        track('pricing_page_redirect', {
-          flow_type: 'traditional',
-        });
-        router.push('/billing/remove-branding');
-      }
+      );
     } catch (err) {
-      console.error('Error starting upgrade flow:', err);
+      Sentry.captureException(err);
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to start upgrade';
       setError(errorMessage);
 
+      logger.error(
+        logger.fmt`Upgrade flow failed: ${errorMessage}`,
+        {
+          flow_type:
+            directUpgradeEnabled && priceId
+              ? 'direct_checkout'
+              : 'pricing_page',
+          price_id: priceId || null,
+        },
+        'billing'
+      );
       track('upgrade_flow_error', {
         flow_type:
           directUpgradeEnabled && priceId ? 'direct_checkout' : 'pricing_page',

@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -12,6 +13,7 @@ import {
 } from '@/components/auth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { identify, track } from '@/lib/analytics';
+import { logger } from '@/lib/utils/logger';
 import {
   generateUsernameSuggestions,
   validateUsernameFormat,
@@ -212,9 +214,15 @@ export function AppleStyleOnboardingForm({
       });
 
       try {
-        const response = await fetch(
-          `/api/handle/check?handle=${encodeURIComponent(normalizedInput)}`,
-          { signal: controller.signal }
+        const response = await Sentry.startSpan(
+          { op: 'http.client', name: 'GET /api/handle/check' },
+          async span => {
+            span.setAttribute('handle', normalizedInput);
+            return fetch(
+              `/api/handle/check?handle=${encodeURIComponent(normalizedInput)}`,
+              { signal: controller.signal }
+            );
+          }
         );
 
         if (validationSequence.current !== runId) return;
@@ -260,6 +268,14 @@ export function AppleStyleOnboardingForm({
           return;
         }
 
+        Sentry.captureException(error);
+        logger.warn(
+          logger.fmt`Handle check failed: ${
+            error instanceof Error ? error.message : 'Unknown error'
+          }`,
+          { handle: normalizedInput },
+          'onboarding'
+        );
         setHandleValidation({
           available: false,
           checking: false,
@@ -346,12 +362,23 @@ export function AppleStyleOnboardingForm({
         if (!trimmedName) {
           throw new Error('[DISPLAY_NAME_REQUIRED] Display name is required');
         }
-        await completeOnboarding({
-          username: resolvedHandle,
-          displayName: trimmedName,
-          email: userEmail,
-          redirectToDashboard: false,
-        });
+        await Sentry.startSpan(
+          { op: 'ui.submit', name: 'Onboarding save' },
+          async span => {
+            span.setAttribute('handle', resolvedHandle);
+            span.setAttribute('user_id', userId);
+            return Sentry.startSpan(
+              { op: 'server.action', name: 'completeOnboarding' },
+              () =>
+                completeOnboarding({
+                  username: resolvedHandle,
+                  displayName: trimmedName,
+                  email: userEmail,
+                  redirectToDashboard: false,
+                })
+            );
+          }
+        );
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
         setProfileReadyHandle(resolvedHandle);
@@ -369,11 +396,22 @@ export function AppleStyleOnboardingForm({
           return;
         }
 
+        Sentry.captureException(error);
         const errorMessage =
           error instanceof Error ? error.message : 'Unknown error';
         const errorCodeMatch =
           error instanceof Error ? error.message.match(/^\[([A-Z_]+)\]/) : null;
         const errorCode = errorCodeMatch?.[1];
+
+        logger.error(
+          logger.fmt`Onboarding save failed: ${errorMessage}`,
+          {
+            handle: resolvedHandle,
+            userId,
+            errorCode,
+          },
+          'onboarding'
+        );
 
         track('onboarding_error', {
           user_id: userId,
@@ -430,7 +468,16 @@ export function AppleStyleOnboardingForm({
         }, 2000);
       })
       .catch(err => {
-        console.error('Failed to copy link:', err);
+        Sentry.captureException(err);
+        logger.error(
+          logger.fmt`Failed to copy onboarding link: ${
+            err instanceof Error ? err.message : 'Unknown error'
+          }`,
+          {
+            handle: targetHandle,
+          },
+          'onboarding'
+        );
       });
   }, [PRODUCTION_PROFILE_BASE_URL, handle, handleInput, profileReadyHandle]);
 

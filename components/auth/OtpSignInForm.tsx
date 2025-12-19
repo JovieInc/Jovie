@@ -4,8 +4,10 @@ import * as Clerk from '@clerk/elements/common';
 import * as SignIn from '@clerk/elements/sign-in';
 import { useClerk } from '@clerk/nextjs';
 import { Card, CardContent } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { logger } from '@/lib/utils/logger';
 import {
   AuthButton,
   AuthGoogleIcon,
@@ -266,7 +268,20 @@ export function OtpSignInForm() {
                         className={secondaryButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
-                        onClick={() => setLastUsedAuthMethod('email')}
+                        onClick={() => {
+                          Sentry.startSpan(
+                            { op: 'ui.auth.submit', name: 'Sign in send code' },
+                            span => {
+                              span.setAttribute('method', 'email');
+                            }
+                          );
+                          logger.info(
+                            logger.fmt`Sign in code requested`,
+                            { method: 'email' },
+                            'auth'
+                          );
+                          setLastUsedAuthMethod('email');
+                        }}
                       >
                         {isLoading ? (
                           <>
@@ -363,6 +378,22 @@ export function OtpSignInForm() {
                         className={submitButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
+                        onClick={() => {
+                          Sentry.startSpan(
+                            {
+                              op: 'ui.auth.submit',
+                              name: 'Sign in verify code',
+                            },
+                            span => {
+                              span.setAttribute('method', 'email_code');
+                            }
+                          );
+                          logger.info(
+                            logger.fmt`Sign in verification submitted`,
+                            { method: 'email_code' },
+                            'auth'
+                          );
+                        }}
                       >
                         {isLoading ? (
                           <>

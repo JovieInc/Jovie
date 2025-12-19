@@ -4,7 +4,9 @@ import * as Clerk from '@clerk/elements/common';
 import * as SignUp from '@clerk/elements/sign-up';
 import { useClerk } from '@clerk/nextjs';
 import { Card, CardContent } from '@jovie/ui';
+import * as Sentry from '@sentry/nextjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { logger } from '@/lib/utils/logger';
 import {
   AuthButton,
   AuthGoogleIcon,
@@ -260,7 +262,20 @@ export function OtpSignUpForm() {
                         className={secondaryButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
-                        onClick={() => setLastUsedAuthMethod('email')}
+                        onClick={() => {
+                          Sentry.startSpan(
+                            { op: 'ui.auth.submit', name: 'Sign up send code' },
+                            span => {
+                              span.setAttribute('method', 'email');
+                            }
+                          );
+                          logger.info(
+                            logger.fmt`Sign up code requested`,
+                            { method: 'email' },
+                            'auth'
+                          );
+                          setLastUsedAuthMethod('email');
+                        }}
                       >
                         {isLoading ? (
                           <>
@@ -332,6 +347,19 @@ export function OtpSignUpForm() {
                       className={submitButtonClassName}
                       disabled={isLoading}
                       aria-busy={isLoading}
+                      onClick={() => {
+                        Sentry.startSpan(
+                          { op: 'ui.auth.submit', name: 'Sign up verify code' },
+                          span => {
+                            span.setAttribute('method', 'email_code');
+                          }
+                        );
+                        logger.info(
+                          logger.fmt`Sign up verification submitted`,
+                          { method: 'email_code' },
+                          'auth'
+                        );
+                      }}
                     >
                       {isLoading ? (
                         <>

@@ -24,8 +24,16 @@ function formatMsg(scope: string | undefined, msg: unknown) {
   return scope ? `[${scope}] ${String(msg)}` : String(msg);
 }
 
+function formatTemplate(strings: TemplateStringsArray, ...values: unknown[]) {
+  return strings.reduce((result, string, index) => {
+    const value = index < values.length ? String(values[index]) : '';
+    return `${result}${string}${value}`;
+  }, '');
+}
+
 export const logger = {
   enabled: active,
+  fmt: formatTemplate,
   group(label?: string) {
     if (!active) return;
     const c = safeConsole();
