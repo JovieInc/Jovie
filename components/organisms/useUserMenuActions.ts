@@ -33,7 +33,7 @@ interface UseUserMenuActionsParams {
   profileUrl?: string;
   settingsUrl?: string;
   redirectToUrl: (url: string) => void;
-  signOut: (options?: unknown) => Promise<void>;
+  signOut: ReturnType<typeof import('@clerk/nextjs').useClerk>['signOut'];
 }
 
 export function useUserMenuActions({
