@@ -14,6 +14,7 @@ export interface FooterProps {
   };
   showThemeToggle?: boolean;
   className?: string;
+  themeShortcutKey?: string;
   brandingMark?: 'wordmark' | 'icon';
   links?: Array<{
     href: string;
@@ -27,6 +28,7 @@ export function Footer({
   hideBranding = false,
   artistSettings,
   showThemeToggle = false,
+  themeShortcutKey,
   className = '',
   brandingMark = 'wordmark',
   links,
@@ -217,7 +219,10 @@ export function Footer({
             </div>
             {showThemeToggle && (
               <div className='flex items-center'>
-                <ThemeToggle appearance='segmented' />
+                <ThemeToggle
+                  appearance='segmented'
+                  shortcutKey={themeShortcutKey}
+                />
               </div>
             )}
           </div>
@@ -268,7 +273,10 @@ export function Footer({
               )}
               {showThemeToggle && (
                 <div className='flex items-center'>
-                  <ThemeToggle appearance={config.themeAppearance} />
+                  <ThemeToggle
+                    appearance={config.themeAppearance}
+                    shortcutKey={themeShortcutKey}
+                  />
                 </div>
               )}
             </div>

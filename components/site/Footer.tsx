@@ -6,9 +6,15 @@ interface SiteFooterProps {
   version?: FooterVersion;
   className?: string;
   brandingMark?: 'wordmark' | 'icon';
+  themeShortcutKey?: string;
 }
 
-export function Footer({ version, className, brandingMark }: SiteFooterProps) {
+export function Footer({
+  version,
+  className,
+  brandingMark,
+  themeShortcutKey,
+}: SiteFooterProps) {
   const mappedVariant =
     version === 1 || version === 'minimal'
       ? 'minimal'
@@ -22,6 +28,7 @@ export function Footer({ version, className, brandingMark }: SiteFooterProps) {
       variant={mappedVariant}
       brandingMark={brandingMark}
       showThemeToggle={true}
+      themeShortcutKey={themeShortcutKey}
       links={[
         { href: '/legal/privacy', label: 'Privacy' },
         { href: '/legal/terms', label: 'Terms of Service' },
