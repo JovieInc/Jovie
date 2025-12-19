@@ -31,10 +31,6 @@ interface PricingOptionsResponse {
   pricingOptions: PricingOption[];
 }
 
-type ClerkSignOut = ReturnType<
-  typeof import('@clerk/nextjs').useClerk
->['signOut'];
-
 interface UseUserMenuActionsParams {
   billingStatus: BillingStatus;
   profileUrl?: string;
