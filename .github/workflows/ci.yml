@@ -465,6 +465,10 @@ jobs:
         run: |
           CI=true BASE_URL=https://main.jov.ie pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
 
+      - name: Run Performance Budget Guard against staging
+        run: |
+          CI=true BASE_URL=https://main.jov.ie pnpm run test:budgets
+
       - name: Upload Playwright Artifacts on Failure
         if: failure()
         uses: actions/upload-artifact@v6
