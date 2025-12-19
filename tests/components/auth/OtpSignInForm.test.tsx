@@ -178,21 +178,20 @@ describe('OtpSignInForm', () => {
     );
   });
 
-  it('renders the multi-method start screen buttons', () => {
+  it('renders the multi-method sign-in buttons', () => {
     render(<OtpSignInForm />);
 
-    // Method chooser renders buttons directly and via Clerk.Connection
     expect(screen.getByText('Continue with email')).toBeInTheDocument();
     expect(screen.getByText('Continue with Spotify')).toBeInTheDocument();
     expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Continue code" button in verifications step', () => {
+  it('displays "Verify code" button in verifications step', () => {
     render(<OtpSignInForm />);
 
     const buttons = screen.getAllByTestId('signin-action');
     expect(
-      buttons.some(button => button.textContent?.includes('Continue code'))
+      buttons.some(button => button.textContent?.includes('Verify code'))
     ).toBe(true);
   });
 
