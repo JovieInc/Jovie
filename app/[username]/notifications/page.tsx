@@ -3,12 +3,17 @@
 import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  getNotificationSubscribeSuccessMessage,
+  NOTIFICATION_COPY,
+  subscribeToNotifications,
+} from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
@@ -26,6 +31,11 @@ export default function NotificationsPage() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [artistId, setArtistId] = useState<string | null>(null);
+  const [artistLookupError, setArtistLookupError] = useState<string | null>(
+    null
+  );
+  const [isArtistLoading, setIsArtistLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const { success: notifySuccess, error: notifyError } = useNotifications();
   const searchParams = useSearchParams();
@@ -33,6 +43,65 @@ export default function NotificationsPage() {
   const notificationsGate = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
   const forceNotifications = searchParams?.get('preview') === '1';
   const notificationsEnabled = notificationsGate.value || forceNotifications;
+
+  useEffect(() => {
+    if (!notificationsEnabled) {
+      setIsArtistLoading(false);
+      return;
+    }
+
+    if (!username) {
+      setArtistLookupError(NOTIFICATION_COPY.errors.artistNotFound);
+      setIsArtistLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    let isMounted = true;
+
+    const loadArtist = async () => {
+      setIsArtistLoading(true);
+      try {
+        const response = await fetch(
+          `/api/creator?username=${encodeURIComponent(username)}`,
+          { signal: controller.signal }
+        );
+
+        if (!response.ok) {
+          throw new Error(NOTIFICATION_COPY.errors.artistNotFound);
+        }
+
+        const data = (await response.json()) as { id?: string };
+
+        if (!data?.id) {
+          throw new Error(NOTIFICATION_COPY.errors.artistUnavailable);
+        }
+
+        if (isMounted) {
+          setArtistId(data.id);
+          setArtistLookupError(null);
+        }
+      } catch (loadError) {
+        if (!isMounted || controller.signal.aborted) return;
+        const message =
+          loadError instanceof Error
+            ? loadError.message
+            : NOTIFICATION_COPY.errors.artistUnavailable;
+        setArtistLookupError(message);
+      } finally {
+        if (isMounted) {
+          setIsArtistLoading(false);
+        }
+      }
+    };
+
+    void loadArtist();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [notificationsEnabled, username]);
 
   if (!notificationsEnabled) {
     return (
@@ -48,10 +117,31 @@ export default function NotificationsPage() {
     );
   }
 
+  if (!isArtistLoading && artistLookupError) {
+    return (
+      <div className='container mx-auto px-4 py-8 max-w-xl'>
+        <StarterEmptyState
+          title='We couldn’t find that artist'
+          description={artistLookupError}
+          primaryAction={{ label: 'Return home', href: '/' }}
+          secondaryAction={{ label: 'View profile', href: `/${username}` }}
+          testId='notifications-artist-missing'
+        />
+      </div>
+    );
+  }
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!artistId) {
+      const errorMessage = NOTIFICATION_COPY.errors.artistUnavailable;
+      setError(errorMessage);
+      notifyError(errorMessage);
+      return;
+    }
 
     // Client-side validation
     const normalizedEmail = normalizeSubscriptionEmail(email);
@@ -86,23 +176,12 @@ export default function NotificationsPage() {
       // 2. Submit the subscription request
 
       // For now, we'll just simulate the API call
-      const response = await fetch('/api/notifications/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          artist_id: '00000000-0000-0000-0000-000000000000', // This would be fetched from the username
-          email: normalizedEmail,
-          source: 'notifications_page',
-        }),
+      await subscribeToNotifications({
+        artistId,
+        channel: 'email',
+        email: normalizedEmail,
+        source: 'notifications_page',
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to subscribe');
-      }
 
       // Track successful subscription
       track('notifications_subscribe_success', {
@@ -111,12 +190,12 @@ export default function NotificationsPage() {
       });
 
       setSuccess(true);
-      notifySuccess(`You'll receive updates from ${username}.`);
+      notifySuccess(getNotificationSubscribeSuccessMessage('email'));
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage || 'Unable to subscribe right now.');
-      notifyError('Unable to turn on notifications right now.');
+        err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;
+      setError(errorMessage || NOTIFICATION_COPY.errors.subscribe);
+      notifyError(NOTIFICATION_COPY.errors.subscribe);
 
       // Track submission error
       track('notifications_subscribe_error', {
