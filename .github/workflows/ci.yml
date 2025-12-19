@@ -981,6 +981,34 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (staging deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -1020,6 +1048,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "main", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }
@@ -1227,6 +1257,34 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
       - name: Slack notify (production deploy)
         if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
@@ -1266,6 +1324,8 @@ jobs:
                   "color": "danger",
                   "fields": [
                     { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }
