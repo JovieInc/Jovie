@@ -20,7 +20,7 @@ export function AuthBackButton({
       type='button'
       onClick={onClick}
       disabled={disabled}
-      className={`text-sm text-[#6b6f76] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`text-sm text-secondary-token hover:text-primary-token transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md ${
         className ?? ''
       }`}
     >
