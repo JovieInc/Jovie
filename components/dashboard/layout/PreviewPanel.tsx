@@ -12,7 +12,7 @@ import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/Dashbo
 import { ProfilePreview } from '@/components/dashboard/molecules/ProfilePreview';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 
-const PREVIEW_PANEL_WIDTH = 400;
+const PREVIEW_PANEL_WIDTH = 360;
 
 export function PreviewPanel() {
   const { isOpen, close, previewData } = usePreviewPanel();
@@ -29,10 +29,10 @@ export function PreviewPanel() {
       isOpen={isOpen}
       width={PREVIEW_PANEL_WIDTH}
       ariaLabel='Live Preview'
-      className='bg-sidebar-surface border-sidebar-border'
+      className='bg-surface-0 border-subtle'
     >
       {/* Header */}
-      <div className='flex h-12 items-center justify-between border-b border-subtle bg-sidebar-surface/95 px-4 shrink-0 backdrop-blur-sm'>
+      <div className='flex h-12 items-center justify-between border-b border-subtle bg-surface-0/95 px-4 shrink-0 backdrop-blur-sm'>
         <h2 className='text-[13px] font-medium text-primary-token'>
           Live Preview
         </h2>
@@ -59,7 +59,7 @@ export function PreviewPanel() {
       </div>
 
       {/* Footer - URL Preview */}
-      <div className='shrink-0 border-t border-subtle bg-sidebar-surface/95 p-4 backdrop-blur-sm'>
+      <div className='shrink-0 border-t border-subtle bg-surface-0/95 p-4 backdrop-blur-sm'>
         <h3 className='text-[13px] font-medium text-primary-token mb-2'>
           Your Profile URL
         </h3>
