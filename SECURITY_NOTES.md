@@ -90,14 +90,42 @@ _Last reviewed: 2025-11-29_
       - Strong no-cache headers and `Referrer-Policy: no-referrer`.
     - Adds `Server-Timing` and `X-API-Response-Time` for observability.
 
+- **CSP status (now enforced)**
+  - `next.config.js` sets a global **Content-Security-Policy** header with an explicit allowlist to preserve current behavior.
+  - Inline scripts are allowed (`'unsafe-inline'`) to support the inline theme bootstrapping snippet and JSON-LD metadata in `app/layout.tsx`.
+  - `frame-ancestors 'none'` is included to match `X-Frame-Options: DENY`.
+
 - **HSTS (non-local only)**
   - `next.config.js` adds `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` for non-local environments only.
   - **Verification:** in local dev confirm `Strict-Transport-Security` is **absent**; in staging confirm the header is **present** (e.g., `curl -I https://main.jov.ie`).
   - **Permissions-Policy** remains conservative:
     - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
-  - Global **CSP** is intentionally **not** enabled yet:
-    - The app relies on multiple third-party scripts (Clerk, Statsig, Stripe JS, Vercel analytics, etc.).
-    - A strict CSP would require an explicit allowlist and coordination per dependency, so this is deferred to a dedicated hardening task.
+
+- **Third-party script inventory (current)**
+  - **Clerk**: Auth UI/SDK injection for sign-in and session management (`@clerk/nextjs`).
+  - **Statsig**: Feature flags + session replay plugin (loaded via `@statsig/react-bindings` and `@statsig/session-replay`).
+  - **Vercel Analytics**: Page analytics (`@vercel/analytics/react`).
+  - **Vercel Speed Insights**: Performance RUM (`@vercel/speed-insights/react`).
+  - **Vercel Toolbar**: Dev-only overlay in `app/layout.tsx` (enabled only in development).
+  - **Stripe Checkout**: Redirect flow only; no embedded Stripe JS at the moment (frame allowlist is still present for safety).
+
+- **CSP allowlist guidance**
+  - **script-src**
+    - Self + inline scripts.
+    - `https://va.vercel-scripts.com` (Vercel Analytics).
+    - `https://vitals.vercel-insights.com` (Speed Insights).
+    - `https://*.clerk.com` + `https://*.clerk.accounts.dev` (Clerk).
+    - `https://cdn.statsig.com` + `https://*.statsigcdn.com` (Statsig).
+  - **connect-src**
+    - `https://api.statsig.com`, `https://statsigapi.net`, `https://*.statsigcdn.com`, `https://*.statsig.com`.
+    - `https://va.vercel-scripts.com`, `https://vitals.vercel-insights.com`.
+    - `https://*.clerk.com`, `https://*.clerk.accounts.dev`.
+    - `https://api.stripe.com` for Stripe client calls (future-proofed).
+    - `https://*.ingest.sentry.io` for direct Sentry ingestion (most traffic goes through `/monitoring`).
+  - **img-src**
+    - Self, `data:`, `blob:`, plus the same image host allowlist as `next/image` (Spotify, Cloudinary, Clerk, Unsplash, Vercel Blob, etc.).
+  - **frame-src**
+    - `https://js.stripe.com` + `https://checkout.stripe.com` for checkout safety.
 
 ## 4. Dependencies & updates
 
