@@ -64,7 +64,7 @@ export function PreviewPanel() {
           Your Profile URL
         </h3>
         <div className='flex flex-col gap-2'>
-          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-mono truncate'>
+          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
             {typeof window !== 'undefined'
               ? `${window.location.origin}${profilePath}`
               : 'Loading...'}

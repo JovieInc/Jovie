@@ -1,4 +1,4 @@
-import type { useClerk } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';

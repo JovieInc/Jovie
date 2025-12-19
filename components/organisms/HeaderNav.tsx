@@ -16,6 +16,7 @@ export interface HeaderNavProps {
   logoVariant?: LogoVariant;
   hideNav?: boolean;
   hidePricingLink?: boolean;
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 export function HeaderNav({
@@ -25,6 +26,7 @@ export function HeaderNav({
   logoVariant = 'word',
   hideNav = false,
   hidePricingLink = false,
+  containerSize = 'lg',
 }: HeaderNavProps = {}) {
   // Note: sticky prop reserved for future use
   void _sticky;
@@ -34,7 +36,7 @@ export function HeaderNav({
       className={cn('sticky top-0 z-50 w-full bg-base', className)}
       style={{ fontSynthesisWeight: 'none' }}
     >
-      <Container>
+      <Container size={containerSize}>
         <div className='flex h-16 items-center'>
           {/* Logo - Left side */}
           <div className='flex items-center'>

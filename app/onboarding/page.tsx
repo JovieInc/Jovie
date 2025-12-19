@@ -60,6 +60,8 @@ export default async function OnboardingPage({
       showFooterPrompt={false}
       showFormTitle={false}
       logoSpinDelayMs={10000}
+      showLogoutButton
+      logoutRedirectUrl='/signin'
     >
       <div className='relative min-h-[500px]'>
         {/* Unified onboarding form */}

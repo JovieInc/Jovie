@@ -6,6 +6,7 @@ interface SiteFooterProps {
   version?: FooterVersion;
   className?: string;
   brandingMark?: 'wordmark' | 'icon';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   themeShortcutKey?: string;
 }
 
@@ -13,6 +14,7 @@ export function Footer({
   version,
   className,
   brandingMark,
+  containerSize,
   themeShortcutKey,
 }: SiteFooterProps) {
   const mappedVariant =
@@ -27,6 +29,7 @@ export function Footer({
       className={className}
       variant={mappedVariant}
       brandingMark={brandingMark}
+      containerSize={containerSize}
       showThemeToggle={true}
       themeShortcutKey={themeShortcutKey}
       links={[

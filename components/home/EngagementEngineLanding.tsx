@@ -78,7 +78,7 @@ export function EngagementEngineLanding() {
               <p className='text-xs font-medium tracking-wide uppercase text-secondary-token mb-3'>
                 The problem
               </p>
-              <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
+              <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
                 The old playbook can’t keep up.
               </h2>
               <p className='mt-4 text-base text-secondary-token leading-relaxed'>
@@ -116,7 +116,7 @@ export function EngagementEngineLanding() {
               <p className='text-xs font-medium tracking-wide uppercase text-secondary-token mb-3'>
                 What replaces it
               </p>
-              <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token'>
+              <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
                 A Jovie profile that behaves like an engine.
               </h2>
               <p className='mt-4 text-base text-secondary-token leading-relaxed'>

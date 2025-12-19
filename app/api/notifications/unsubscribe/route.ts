@@ -34,7 +34,7 @@ function normalizePhoneToE164(raw: string): string | null {
 const unsubscribeSchema = z
   .object({
     artist_id: z.string().uuid(),
-    channel: z.enum(['email', 'phone']).optional(),
+    channel: z.enum(['email', 'sms']).optional(),
     email: z.string().email().optional(),
     phone: z.string().min(1).max(64).optional(),
     token: z.string().optional(),
@@ -48,7 +48,7 @@ const unsubscribeSchema = z
       Boolean(data.email) ||
       Boolean(data.phone) ||
       (data.channel === 'email' && Boolean(data.email)) ||
-      (data.channel === 'phone' && Boolean(data.phone)),
+      (data.channel === 'sms' && Boolean(data.phone)),
     {
       message: 'Either email, phone, or token must be provided',
       path: ['channel'],
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         artist_id,
         error_type: 'missing_identifier',
         method,
-        channel: channel || (phone ? 'phone' : 'email'),
+        channel: channel || (phone ? 'sms' : 'email'),
       });
 
       return NextResponse.json(
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         artist_id,
         error_type: 'validation_error',
         validation_errors: ['Invalid phone number'],
-        channel: channel || 'phone',
+        channel: channel || 'sms',
       });
 
       return NextResponse.json(
@@ -163,8 +163,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetChannel: 'email' | 'phone' =
-      channel || (normalizedPhone ? 'phone' : 'email');
+    const targetChannel: 'email' | 'sms' =
+      channel || (normalizedPhone ? 'sms' : 'email');
 
     if (!normalizedEmail && !normalizedPhone) {
       await trackServerEvent('notifications_unsubscribe_error', {
@@ -190,9 +190,9 @@ export async function POST(request: NextRequest) {
     if (targetChannel === 'email' && normalizedEmail) {
       whereClauses.push(eq(notificationSubscriptions.email, normalizedEmail));
       whereClauses.push(eq(notificationSubscriptions.channel, 'email'));
-    } else if (targetChannel === 'phone' && normalizedPhone) {
+    } else if (targetChannel === 'sms' && normalizedPhone) {
       whereClauses.push(eq(notificationSubscriptions.phone, normalizedPhone));
-      whereClauses.push(eq(notificationSubscriptions.channel, 'phone'));
+      whereClauses.push(eq(notificationSubscriptions.channel, 'sms'));
     }
 
     const deleted = await db

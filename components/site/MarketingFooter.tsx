@@ -43,8 +43,20 @@ export function MarketingFooter() {
   }, [toggleLightDark]);
 
   if (pathname === '/investors') {
-    return <Footer version='minimal' themeShortcutKey={shortcutKey} />;
+    return (
+      <Footer
+        version='minimal'
+        containerSize='md'
+        themeShortcutKey={shortcutKey}
+      />
+    );
   }
 
-  return <Footer brandingMark='icon' themeShortcutKey={shortcutKey} />;
+  return (
+    <Footer
+      brandingMark='icon'
+      containerSize='md'
+      themeShortcutKey={shortcutKey}
+    />
+  );
 }
