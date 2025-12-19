@@ -14,7 +14,7 @@ This document outlines the comprehensive optimization of the Jovie test suite to
 - **Environment Time**: 32.79s (59.8% of total)
 
 ### Key Bottlenecks Identified
-1. **CSS Import in Setup**: `import '../styles/globals.css'` causing massive environment overhead
+1. **CSS Import in Setup**: Remove `app/globals.css` from global test setup to avoid massive environment overhead
 2. **Heavy Upfront Mocking**: 577-line setup file with extensive mocking
 3. **Complex Component Tests**: Full rendering instead of focused unit tests
 4. **Database Performance Simulation**: Artificially slow tests (876ms)
@@ -218,11 +218,11 @@ const mockDb = createTestDouble('Database', {
 
 ### 1. CSS Imports in Tests
 ```typescript
-// ❌ Don't do this - causes massive overhead
-import '../styles/globals.css';
+// ❌ Don't do this in setup files - causes massive overhead
+import '../app/globals.css';
 
-// ✅ Mock CSS imports instead
-vi.mock('../styles/globals.css', () => ({}));
+// ✅ Mock CSS imports per-test instead
+vi.mock('../../app/globals.css', () => ({}));
 ```
 
 ### 2. Heavy Upfront Mocking

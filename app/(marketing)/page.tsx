@@ -7,6 +7,7 @@ import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
 import { NewHomeHero } from '@/components/home/NewHomeHero';
 import { NewSocialProofSection } from '@/components/home/NewSocialProofSection';
 import { ProfileFeatureCardsModal } from '@/components/home/ProfileFeatureCardsModal';
+import { DeferredSection } from '@/components/organisms/DeferredSection';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
@@ -200,52 +201,76 @@ export default function HomePage() {
             </div>
           </Container>
         </section>
-        <ActionDrivenProfileSection />
+        <DeferredSection
+          testId='deferred-action-driven'
+          placeholderHeight={720}
+          rootMargin='240px 0px'
+        >
+          <ActionDrivenProfileSection />
+        </DeferredSection>
 
-        <section className='relative pb-14 sm:pb-16 bg-base overflow-hidden'>
-          <div className='absolute inset-0 -z-10'>
-            <div className='absolute inset-0 grid-bg opacity-60' />
-            <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.18),transparent)]' />
-            <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
-          </div>
-
-          <Container size='md'>
-            <div className='mx-auto max-w-5xl'>
-              <ProfileFeatureCardsModal />
+        <DeferredSection
+          testId='deferred-profile-features'
+          placeholderHeight={560}
+          rootMargin='240px 0px'
+        >
+          <section className='relative pb-14 sm:pb-16 bg-base overflow-hidden'>
+            <div className='absolute inset-0 -z-10'>
+              <div className='absolute inset-0 grid-bg opacity-60' />
+              <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.18),transparent)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
             </div>
-          </Container>
-        </section>
+
+            <Container size='md'>
+              <div className='mx-auto max-w-5xl'>
+                <ProfileFeatureCardsModal />
+              </div>
+            </Container>
+          </section>
+        </DeferredSection>
 
         {/* 4. How it works (3 steps) */}
-        <NewHowItWorks />
+        <DeferredSection
+          testId='deferred-how-it-works'
+          placeholderHeight={520}
+          rootMargin='240px 0px'
+        >
+          <NewHowItWorks />
+        </DeferredSection>
 
         {/* 6. Conversion CTA */}
-        <section className='relative py-14 sm:py-16 bg-base overflow-hidden border-t border-subtle'>
-          <div className='absolute inset-0 -z-10'>
-            <div className='absolute inset-0 grid-bg opacity-60' />
-            <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.22),transparent)]' />
-          </div>
-          <Container size='md'>
-            <div className='mx-auto max-w-5xl'>
-              <div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
-                <div className='min-w-0'>
-                  <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
-                    Claim your @handle. Build your audience.
-                  </h2>
-                </div>
+        <DeferredSection
+          testId='deferred-cta'
+          placeholderHeight={260}
+          rootMargin='240px 0px'
+        >
+          <section className='relative py-14 sm:py-16 bg-base overflow-hidden border-t border-subtle'>
+            <div className='absolute inset-0 -z-10'>
+              <div className='absolute inset-0 grid-bg opacity-60' />
+              <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.22),transparent)]' />
+            </div>
+            <Container size='md'>
+              <div className='mx-auto max-w-5xl'>
+                <div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
+                  <div className='min-w-0'>
+                    <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
+                      Claim your @handle. Build your audience.
+                    </h2>
+                  </div>
 
-                <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
-                  <Link
-                    href='/waitlist'
-                    className='inline-flex h-11 items-center justify-center rounded-lg bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'
-                  >
-                    Request early access
-                  </Link>
+                  <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
+                    <Link
+                      href='/waitlist'
+                      className='inline-flex h-11 items-center justify-center rounded-lg bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'
+                    >
+                      Request early access
+                    </Link>
+                  </div>
                 </div>
               </div>
-            </div>
-          </Container>
-        </section>
+            </Container>
+          </section>
+        </DeferredSection>
       </div>
     </>
   );

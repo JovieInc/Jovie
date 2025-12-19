@@ -1,4 +1,4 @@
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 
 // Spotify API configuration
 const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;

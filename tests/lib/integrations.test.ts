@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
+import { env } from '@/lib/env-server';
 
 /**
  * Integration Health Diagnostic Tests
@@ -19,7 +20,7 @@ describe('Integration Health Diagnostics', () => {
     it('should detect missing environment variables appropriately', () => {
       // In CI/test environment, env vars are expected to be undefined
       // This tests that our env validation handles missing vars gracefully
-      const clerkKey = env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+      const clerkKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
       const databaseUrl = env.DATABASE_URL;
 
       // In test mode, these might be undefined - that's expected
@@ -51,7 +52,7 @@ describe('Integration Health Diagnostics', () => {
 
   describe('Clerk Integration Health', () => {
     it('should have the necessary Clerk configuration', async () => {
-      const clerkKey = env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+      const clerkKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
       if (!clerkKey) {
         console.log('⏭ Skipping Clerk integration test - no publishable key');
@@ -91,7 +92,7 @@ describe('Integration Health Diagnostics', () => {
   describe('Stripe Integration Health', () => {
     it('should have the necessary Stripe configuration', async () => {
       const stripeSecretKey = env.STRIPE_SECRET_KEY;
-      const stripePublishableKey = env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+      const stripePublishableKey = publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
       if (!stripeSecretKey || !stripePublishableKey) {
         console.log('⏭ Skipping Stripe integration test - missing keys');
@@ -107,10 +108,10 @@ describe('Integration Health Diagnostics', () => {
   describe('Integration Summary', () => {
     it('should provide a comprehensive health report', () => {
       const integrations = {
-        clerk: !!env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+        clerk: !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
         database: !!env.DATABASE_URL,
         stripe: !!(
-          env.STRIPE_SECRET_KEY && env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+          env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
         ),
       };
 

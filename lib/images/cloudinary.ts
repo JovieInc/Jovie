@@ -1,4 +1,4 @@
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 
 export type CloudinaryCrop =
   | 'fill'
@@ -35,7 +35,7 @@ export function cloudinaryUrl(
   publicId: string,
   opts: CloudinaryOptions = {}
 ): string {
-  const cloud = env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  const cloud = publicEnv.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
   if (!cloud) {
     // Fallback: if Cloudinary is not configured, return the publicId as-is.
     return publicId;
