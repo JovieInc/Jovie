@@ -7,7 +7,7 @@ export default async function SettingsAccountPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/account');
+    redirect('/signin?redirect_url=/app/settings/account');
   }
 
   const dashboardData = await getDashboardDataCached();

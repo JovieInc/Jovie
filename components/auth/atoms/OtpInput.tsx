@@ -76,20 +76,22 @@ export function OtpInput({
         type='otp'
         autoSubmit={autoSubmit}
         autoFocus={autoFocus}
+        autoComplete='one-time-code'
+        inputMode='numeric'
         length={OTP_LENGTH}
         className='flex justify-center gap-2'
         aria-label={ariaLabel}
         render={({ value, status }) => (
           <div
             className={cn(
-              'flex h-12 w-10 items-center justify-center rounded-md border-2 text-xl font-mono transition-all',
-              'bg-[#23252a] text-white',
+              'flex h-12 w-10 items-center justify-center rounded-lg border text-xl font-sans transition-all',
+              'bg-[#15161a] text-white',
               // Status-based styling
               status === 'cursor'
                 ? 'border-white ring-2 ring-white/20'
                 : status === 'selected'
-                  ? 'border-zinc-500'
-                  : 'border-zinc-700',
+                  ? 'border-white/20'
+                  : 'border-white/10',
               // Focus-visible for keyboard navigation
               'focus-within:border-white focus-within:ring-2 focus-within:ring-white/20'
             )}

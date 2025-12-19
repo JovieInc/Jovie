@@ -16,6 +16,16 @@ export function ThemeToggle({
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme, resolvedTheme } = useTheme();
 
+  const cycleTheme = () => {
+    if (theme === 'light') {
+      setTheme('dark');
+    } else if (theme === 'dark') {
+      setTheme('system');
+    } else {
+      setTheme('light');
+    }
+  };
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -26,29 +36,19 @@ export function ThemeToggle({
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`inline-flex items-center gap-0 rounded-full border border-black/5 bg-black/5 p-0 dark:border-white/10 dark:bg-white/10 ${className}`}
+        className={`inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
       >
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
-        <div className='h-7 w-7 rounded-full bg-black/5 dark:bg-white/10' />
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
+        <div className='h-7 w-7 rounded-full bg-surface-1' />
       </div>
     ) : (
       <Button variant='ghost' size='sm' className='h-8 w-8 px-0' disabled>
         <span className='sr-only'>Loading theme toggle</span>
-        <div className='h-4 w-4 animate-pulse rounded-sm bg-gray-300 dark:bg-gray-600' />
+        <div className='h-4 w-4 animate-pulse rounded-sm bg-surface-2' />
       </Button>
     );
   }
-
-  const cycleTheme = () => {
-    if (theme === 'light') {
-      setTheme('dark');
-    } else if (theme === 'dark') {
-      setTheme('system');
-    } else {
-      setTheme('light');
-    }
-  };
 
   const getThemeIcon = () => {
     if (theme === 'system') {
@@ -129,17 +129,17 @@ export function ThemeToggle({
     const indicatorX = activeIndex * (buttonSizePx + gapPx);
 
     const baseBtn =
-      'relative z-10 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full leading-none outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+      'relative z-10 inline-flex h-7 w-7 flex-none items-center justify-center rounded-full leading-none outline-none transition-colors focus-ring-themed focus-visible:ring-offset-transparent';
 
     return (
       <div
         role='toolbar'
         aria-label='Theme'
-        className={`relative inline-flex items-center gap-0 rounded-full border border-black/5 bg-black/5 p-0 dark:border-white/10 dark:bg-white/10 ${className}`}
+        className={`relative inline-flex items-center gap-0 rounded-full border border-subtle bg-surface-2 p-0 ${className}`}
       >
         <div
           aria-hidden='true'
-          className='pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full bg-white ring-1 ring-inset ring-black/10 transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)] dark:bg-black/40 dark:ring-white/10'
+          className='pointer-events-none absolute top-0 bottom-0 left-0 w-7 rounded-full bg-surface-0 ring-1 ring-inset ring-(--color-border-subtle) transition-transform duration-150 ease-[cubic-bezier(.25,1,.5,1)]'
           style={{ transform: `translateX(${indicatorX}px)` }}
         />
 
@@ -223,23 +223,18 @@ export function ThemeToggle({
     );
   }
 
-  const isDarkUi = resolvedTheme === 'dark';
-
   return (
     <Button
       variant='ghost'
       size='sm'
       onClick={cycleTheme}
-      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
-        isDarkUi
-          ? 'bg-white/10 text-white ring-white/30 hover:bg-white/20'
-          : 'bg-white text-black ring-black/10 hover:bg-gray-50'
-      } ${className}`}
-      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()}`}
+      className={`h-8 w-8 p-0 flex items-center justify-center rounded-full shadow-sm ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token transition-colors hover:bg-surface-1 focus-ring-themed focus-visible:ring-offset-transparent ${className}`}
+      title={`Current: ${theme === 'system' ? `auto (${resolvedTheme})` : theme}. Click to switch to ${getNextTheme()} (T)`}
     >
       <span className='sr-only'>
-        Toggle theme (current:{' '}
-        {theme === 'system' ? `auto, showing ${resolvedTheme}` : theme})
+        Toggle theme. Current:{' '}
+        {theme === 'system' ? `auto (${resolvedTheme})` : theme}. Next:{' '}
+        {getNextTheme()}.
       </span>
       {getThemeIcon()}
     </Button>

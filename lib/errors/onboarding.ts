@@ -18,6 +18,7 @@ export enum OnboardingErrorCode {
 
   // Availability errors
   USERNAME_TAKEN = 'USERNAME_TAKEN',
+  EMAIL_IN_USE = 'EMAIL_IN_USE',
   PROFILE_EXISTS = 'PROFILE_EXISTS',
 
   // Database errors
@@ -58,15 +59,53 @@ export function createOnboardingError(
   };
 }
 
+function unwrapDatabaseError(
+  error: unknown,
+  depth = 0
+): { code: string | null; message: string; constraint: string | null } {
+  if (depth > 5) {
+    return { code: null, message: '', constraint: null };
+  }
+
+  const record = error as Record<string, unknown>;
+  const message = typeof record?.message === 'string' ? record.message : '';
+  const code = typeof record?.code === 'string' ? record.code : null;
+  const constraint =
+    typeof record?.constraint === 'string' ? record.constraint : null;
+
+  if (code || constraint) {
+    return { code, message, constraint };
+  }
+
+  const cause = record?.cause;
+  if (cause && typeof cause === 'object') {
+    return unwrapDatabaseError(cause, depth + 1);
+  }
+
+  return { code: null, message, constraint: null };
+}
+
 /**
  * Map database errors to onboarding error codes
  */
 export function mapDatabaseError(error: unknown): OnboardingError {
   const errorRecord = error as Record<string, unknown>;
-  const errorMessage = (errorRecord?.message as string)?.toLowerCase() || '';
+  const unwrapped = unwrapDatabaseError(error);
+  const errorMessage = (
+    unwrapped.message ||
+    (errorRecord?.message as string) ||
+    ''
+  ).toLowerCase();
+  const errorCode =
+    unwrapped.code ?? (errorRecord?.code as string | null) ?? null;
+  const constraint = (
+    unwrapped.constraint ??
+    (errorRecord?.constraint as string | null) ??
+    null
+  )?.toLowerCase();
 
   // Unique constraint violations
-  if (errorRecord?.code === '23505' || errorMessage.includes('duplicate')) {
+  if (errorCode === '23505' || errorMessage.includes('duplicate')) {
     // Handle various forms of username unique errors (normalized/index names)
     if (
       errorMessage.includes('username') ||
@@ -76,29 +115,41 @@ export function mapDatabaseError(error: unknown): OnboardingError {
       return createOnboardingError(
         OnboardingErrorCode.USERNAME_TAKEN,
         'Username is already taken',
-        errorRecord?.message as string
+        unwrapped.message || (errorRecord?.message as string)
       );
     }
+
+    if (
+      constraint === 'users_email_unique' ||
+      errorMessage.includes('users_email_unique')
+    ) {
+      return createOnboardingError(
+        OnboardingErrorCode.EMAIL_IN_USE,
+        'Email is already in use',
+        unwrapped.message || (errorRecord?.message as string)
+      );
+    }
+
     if (errorMessage.includes('user_id')) {
       return createOnboardingError(
         OnboardingErrorCode.PROFILE_EXISTS,
         'Profile already exists for this user',
-        errorRecord?.message as string
+        unwrapped.message || (errorRecord?.message as string)
       );
     }
     return createOnboardingError(
       OnboardingErrorCode.CONSTRAINT_VIOLATION,
       'Data constraint violation',
-      errorRecord?.message as string
+      unwrapped.message || (errorRecord?.message as string)
     );
   }
 
   // Foreign key violations
-  if (errorRecord?.code === '23503') {
+  if (errorCode === '23503') {
     return createOnboardingError(
       OnboardingErrorCode.DATABASE_ERROR,
       'Invalid reference data',
-      errorRecord?.message as string
+      unwrapped.message || (errorRecord?.message as string)
     );
   }
 
@@ -113,11 +164,11 @@ export function mapDatabaseError(error: unknown): OnboardingError {
   }
 
   // JWT/auth errors
-  if (errorRecord?.code === 'PGRST301' || errorMessage.includes('jwt')) {
+  if (errorCode === 'PGRST301' || errorMessage.includes('jwt')) {
     return createOnboardingError(
       OnboardingErrorCode.INVALID_SESSION,
       'Authentication session expired',
-      errorRecord?.message as string,
+      unwrapped.message || (errorRecord?.message as string),
       true // Retryable
     );
   }
@@ -154,6 +205,8 @@ export function getUserFriendlyMessage(code: OnboardingErrorCode): string {
       return 'This username is reserved. Please choose another';
     case OnboardingErrorCode.USERNAME_TAKEN:
       return 'Username is already taken. Please choose another';
+    case OnboardingErrorCode.EMAIL_IN_USE:
+      return 'This email is already associated with another account.';
     case OnboardingErrorCode.PROFILE_EXISTS:
       return 'You already have a profile. Redirecting to dashboard...';
     case OnboardingErrorCode.RATE_LIMITED:

@@ -4,6 +4,7 @@ import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { ThemeToggle } from '@/components/site/ThemeToggle';
 import { FEATURES } from '@/lib/features';
+import { cn } from '@/lib/utils';
 
 export interface FooterProps {
   variant?: 'marketing' | 'profile' | 'minimal' | 'regular';
@@ -15,6 +16,7 @@ export interface FooterProps {
   showThemeToggle?: boolean;
   className?: string;
   brandingMark?: 'wordmark' | 'icon';
+  containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   links?: Array<{
     href: string;
     label: string;
@@ -29,10 +31,21 @@ export function Footer({
   showThemeToggle = false,
   className = '',
   brandingMark = 'wordmark',
+  containerSize = 'lg',
   links,
 }: FooterProps) {
   // Use user's setting if available, otherwise fall back to hideBranding prop
   const shouldHideBranding = artistSettings?.hide_branding ?? hideBranding;
+
+  const containerSizes = {
+    sm: 'max-w-3xl',
+    md: 'max-w-5xl',
+    lg: 'max-w-6xl',
+    xl: 'max-w-7xl',
+    full: 'max-w-none',
+  } as const;
+
+  const maxWidthClass = containerSizes[containerSize];
 
   // Profile footer logic - hide if branding should be hidden
   if (variant === 'profile' && shouldHideBranding) {
@@ -42,10 +55,12 @@ export function Footer({
   // Variant-specific configurations
   const variantConfigs = {
     marketing: {
-      containerClass: 'bg-black text-white',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
-      colorVariant: 'dark' as const,
+      containerClass: 'border-t border-subtle bg-base',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4',
+        maxWidthClass
+      ),
+      colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
       showLinks: true,
@@ -62,8 +77,10 @@ export function Footer({
     },
     minimal: {
       containerClass: 'border-t border-subtle bg-base',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 py-5 md:h-16 md:py-0',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 py-5 md:h-16 md:py-0',
+        maxWidthClass
+      ),
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -73,8 +90,10 @@ export function Footer({
     regular: {
       // Clerk-like footer: subtle border top, compact spacing, segmented theme selector
       containerClass: 'border-t border-subtle bg-base',
-      contentClass:
-        'mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-6 pb-6 flex items-center justify-between',
+      contentClass: cn(
+        'mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-6 flex items-center justify-between',
+        maxWidthClass
+      ),
       colorVariant: 'light' as const,
       showBranding: false,
       layout: 'horizontal' as const,
@@ -89,20 +108,24 @@ export function Footer({
   if (variant === 'profile') {
     return (
       <footer className={`${config.containerClass} ${className}`}>
-        <div className='flex flex-col items-center justify-center space-y-1.5 pb-4'>
+        <div className='flex flex-col items-center justify-center space-y-1.5 pb-2'>
           <FooterBranding
             artistHandle={artistHandle}
             variant={config.colorVariant}
             size='sm'
+            showCTA={false}
+            mark='wordmark'
           />
         </div>
 
         {/* Mobile privacy link - small and corner-aligned to keep footer tight */}
-        <div className='md:hidden absolute bottom-2 right-4 text-[11px]'>
+        <div className='md:hidden absolute bottom-2 right-4'>
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[{ href: '/legal/privacy', label: 'Privacy' }]}
+            links={[]}
+            className='gap-2 text-[10px] leading-4'
+            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
         </div>
 
@@ -111,7 +134,9 @@ export function Footer({
           <FooterNavigation
             variant={config.colorVariant}
             ariaLabel='Legal'
-            links={[{ href: '/legal/privacy', label: 'Privacy' }]}
+            links={[]}
+            className='gap-2 text-[10px] leading-4'
+            linkClassName='text-[10px] leading-4 opacity-60 hover:opacity-100'
           />
         </div>
       </footer>
@@ -136,90 +161,99 @@ export function Footer({
       { href: '/legal/terms', label: 'Terms of Service' },
     ];
 
+    const footerLinkClassName =
+      'inline-flex rounded-md px-2 py-1 -mx-2 -my-1 text-[13px] leading-5 font-medium tracking-tight text-secondary-token hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+
     return (
       <footer className={`border-t border-subtle bg-base ${className}`}>
-        <div className='mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 pt-10 pb-6'>
-          <div className='grid grid-cols-1 md:grid-cols-4 gap-8'>
+        <div
+          className={cn(
+            'mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6',
+            maxWidthClass
+          )}
+        >
+          <div className='grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
             {/* Brand */}
-            <div>
+            <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
               <FooterBranding
                 variant='light'
                 showCTA={false}
                 mark={brandingMark}
-                className={brandingMark === 'icon' ? 'items-start' : ''}
+                className={cn(
+                  'items-center sm:items-start',
+                  brandingMark === 'icon' ? 'sm:justify-start' : ''
+                )}
               />
             </div>
 
-            {/* Product */}
-            <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
-                Product
-              </h3>
-              <ul className='space-y-2'>
-                {productLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
+              {/* Product */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Product
+                </h3>
+                <ul className='space-y-2'>
+                  {productLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Company */}
-            <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
-                Company
-              </h3>
-              <ul className='space-y-2'>
-                {companyLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+              {/* Company */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Company
+                </h3>
+                <ul className='space-y-2'>
+                  {companyLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-            {/* Legal */}
-            <div>
-              <h3 className='text-sm font-semibold text-primary-token mb-3'>
-                Legal
-              </h3>
-              <ul className='space-y-2'>
-                {legalLinks.map(link => (
-                  <li key={`${link.href}-${link.label}`}>
-                    <Link
-                      href={link.href}
-                      className='text-sm text-secondary-token hover:text-primary-token transition-colors'
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              {/* Legal */}
+              <div>
+                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+                  Legal
+                </h3>
+                <ul className='space-y-2'>
+                  {legalLinks.map(link => (
+                    <li key={`${link.href}-${link.label}`}>
+                      <Link href={link.href} className={footerLinkClassName}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
 
-          <div className='mt-8 border-t border-subtle pt-5 flex items-center justify-between'>
-            <div className='flex flex-col'>
+          <div className='mt-8 border-t border-subtle pt-5'>
+            <div className='grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'>
               <Copyright
                 variant='light'
-                className='text-[11px] tracking-tight text-tertiary-token'
+                className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'
               />
+              {showThemeToggle && (
+                <div className='flex items-center gap-3 justify-self-start sm:justify-self-end'>
+                  <div className='flex items-center sm:hidden'>
+                    <ThemeToggle appearance='icon' />
+                  </div>
+                  <div className='hidden sm:flex items-center'>
+                    <ThemeToggle appearance='segmented' />
+                  </div>
+                </div>
+              )}
             </div>
-            {showThemeToggle && (
-              <div className='flex items-center'>
-                <ThemeToggle appearance='segmented' />
-              </div>
-            )}
           </div>
         </div>
       </footer>
@@ -239,12 +273,12 @@ export function Footer({
                 variant={config.colorVariant}
                 className={
                   variant === 'minimal'
-                    ? 'text-[11px] tracking-tight text-secondary-token'
-                    : undefined
+                    ? 'text-[11px] leading-4 font-medium tracking-tight text-secondary-token'
+                    : 'text-[12px] leading-4 font-medium tracking-tight text-tertiary-token'
                 }
               />
               {variant === 'minimal' && (
-                <p className='text-[11px] tracking-tight text-tertiary-token'>
+                <p className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'>
                   Made for musicians, by musicians
                 </p>
               )}
@@ -258,18 +292,27 @@ export function Footer({
                   variant={config.colorVariant}
                   ariaLabel={variant === 'minimal' ? 'Legal' : undefined}
                   links={links}
-                  className={variant === 'minimal' ? 'gap-2' : ''}
+                  className={
+                    variant === 'minimal'
+                      ? 'gap-2 flex-wrap justify-center'
+                      : ''
+                  }
                   linkClassName={
                     variant === 'minimal'
-                      ? 'text-[11px] tracking-tight font-medium'
+                      ? 'text-[11px] leading-4 font-medium tracking-tight'
                       : ''
                   }
                 />
               )}
               {showThemeToggle && (
-                <div className='flex items-center'>
-                  <ThemeToggle appearance={config.themeAppearance} />
-                </div>
+                <>
+                  <div className='flex items-center md:hidden'>
+                    <ThemeToggle appearance='icon' />
+                  </div>
+                  <div className='hidden md:flex items-center'>
+                    <ThemeToggle appearance={config.themeAppearance} />
+                  </div>
+                </>
               )}
             </div>
           </>

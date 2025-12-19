@@ -6,7 +6,14 @@ import { useClerk } from '@clerk/nextjs';
 import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AuthButton, AuthInput, authButtonVariants, OtpInput } from './atoms';
+import {
+  AuthButton,
+  AuthGoogleIcon,
+  AuthInput,
+  AuthSpotifyIcon,
+  authButtonVariants,
+  OtpInput,
+} from './atoms';
 import { ButtonSpinner } from './ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
@@ -46,47 +53,6 @@ function authMethodFromClerkLastStrategy(
   if (lastStrategy.includes('email')) return 'email';
   if (lastStrategy.includes('google')) return 'google';
   return null;
-}
-
-function GoogleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox='0 0 24 24'
-      aria-hidden='true'
-      className={className ?? 'h-4 w-4'}
-      fill='none'
-    >
-      <path
-        d='M21.6 12.2727C21.6 11.6182 21.5455 11 21.4364 10.4H12V14.2818H17.4C17.1636 15.5091 16.4727 16.5455 15.4364 17.2V19.7182H18.6727C20.5636 17.9636 21.6 15.3182 21.6 12.2727Z'
-        fill='currentColor'
-      />
-      <path
-        d='M12 22C14.7 22 16.9636 21.1091 18.6727 19.7182L15.4364 17.2C14.5455 17.8 13.4091 18.1636 12 18.1636C9.4 18.1636 7.2 16.4091 6.4 14.0364H3.07273V16.6273C4.77273 19.9727 8.23636 22 12 22Z'
-        fill='currentColor'
-      />
-      <path
-        d='M6.4 14.0364C6.2 13.4364 6.09091 12.8 6.09091 12.1455C6.09091 11.4909 6.2 10.8545 6.4 10.2545V7.66364H3.07273C2.36364 9.07273 2 10.6727 2 12.1455C2 13.6182 2.36364 15.2182 3.07273 16.6273L6.4 14.0364Z'
-        fill='currentColor'
-      />
-      <path
-        d='M12 6.12727C13.5455 6.12727 14.9273 6.65455 16.0182 7.69091L18.7455 4.96364C16.9636 3.29091 14.7 2.29091 12 2.29091C8.23636 2.29091 4.77273 4.31818 3.07273 7.66364L6.4 10.2545C7.2 7.88182 9.4 6.12727 12 6.12727Z'
-        fill='currentColor'
-      />
-    </svg>
-  );
-}
-
-function SpotifyIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox='0 0 24 24'
-      aria-hidden='true'
-      className={className ?? 'h-5 w-5'}
-      fill='currentColor'
-    >
-      <path d='M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.48.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.32 11.28-1.08 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z' />
-    </svg>
-  );
 }
 
 export function OtpSignInForm() {
@@ -174,7 +140,7 @@ export function OtpSignInForm() {
   );
 
   const orderedMethods = useMemo((): AuthMethod[] => {
-    const base: AuthMethod[] = ['spotify', 'google', 'email'];
+    const base: AuthMethod[] = ['google', 'email', 'spotify'];
     if (!lastAuthMethod) return base;
     return [lastAuthMethod, ...base.filter(m => m !== lastAuthMethod)];
   }, [lastAuthMethod]);
@@ -183,15 +149,18 @@ export function OtpSignInForm() {
     method: AuthMethod,
     isPrimary: boolean
   ): JSX.Element => {
+    const isGooglePrimary = method === 'google' && isPrimary;
     const className = isPrimary
-      ? submitButtonClassName
+      ? isGooglePrimary
+        ? authButtonVariants({ variant: 'oauthPrimary' })
+        : authButtonVariants({ variant: 'primaryLight' })
       : secondaryButtonClassName;
 
     if (method === 'email') {
       return (
         <div>
           <AuthButton
-            variant={isPrimary ? 'primary' : 'secondary'}
+            variant={isPrimary ? 'primaryLight' : 'secondary'}
             onClick={() => {
               setLastUsedAuthMethod('email');
               setIsEmailOpen(true);
@@ -221,7 +190,7 @@ export function OtpSignInForm() {
                 </>
               ) : (
                 <>
-                  <GoogleIcon />
+                  <AuthGoogleIcon />
                   <span>Continue with Google</span>
                 </>
               )}
@@ -248,7 +217,7 @@ export function OtpSignInForm() {
               </>
             ) : (
               <>
-                <SpotifyIcon />
+                <AuthSpotifyIcon />
                 <span>Continue with Spotify</span>
               </>
             )}
@@ -267,7 +236,7 @@ export function OtpSignInForm() {
           </div>
           <SignIn.Step name='start' aria-label='Choose a sign-in method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              <h1 className='text-lg font-medium text-[rgb(227,228,230)] mb-0 text-center'>
+              <h1 className='text-[18px] leading-6 font-medium text-[rgb(227,228,230)] mb-0 text-center'>
                 {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
               </h1>
 
@@ -278,6 +247,7 @@ export function OtpSignInForm() {
                     <AuthInput
                       type='email'
                       placeholder='Enter your email address'
+                      autoComplete='email'
                     />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
@@ -312,10 +282,23 @@ export function OtpSignInForm() {
                   </AuthButton>
                 </div>
               ) : (
-                <div className='pt-4 space-y-3'>
+                <div className='pt-6 space-y-3'>
                   {renderMethodButton(orderedMethods[0], true)}
+
+                  {lastAuthMethod ? (
+                    <p className='-mt-1 text-xs text-[#6b6f76] text-center'>
+                      You used{' '}
+                      {lastAuthMethod === 'google'
+                        ? 'Google'
+                        : lastAuthMethod === 'spotify'
+                          ? 'Spotify'
+                          : 'email'}{' '}
+                      last time
+                    </p>
+                  ) : null}
+
                   {orderedMethods.length > 1 ? (
-                    <div className='mt-6 space-y-3'>
+                    <div className='mt-8 space-y-3'>
                       {orderedMethods.slice(1).map(method => (
                         <div key={method}>
                           {renderMethodButton(method, false)}

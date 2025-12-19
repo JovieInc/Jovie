@@ -7,7 +7,7 @@ export default async function SettingsRemoveBrandingPage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/remove-branding');
+    redirect('/signin?redirect_url=/app/settings/remove-branding');
   }
 
   const dashboardData = await getDashboardDataCached();

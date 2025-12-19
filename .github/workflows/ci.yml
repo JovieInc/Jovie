@@ -3,10 +3,6 @@ name: CI
 on:
   pull_request:
     branches: [main, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
   push:
     branches: [main, production, 'codegen-bot/**']
     paths-ignore:
@@ -14,10 +10,6 @@ on:
       - 'docs/**'
   merge_group:
     branches: [main, production]
-    paths-ignore:
-      - '**/*.md'
-      - 'docs/**'
-      - '.vscode/**'
   workflow_dispatch:
 
 permissions: read-all
@@ -67,6 +59,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping guardrails."
+            exit 0
+          fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping guardrails."
+            exit 0
+          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm run next:proxy-guard
@@ -84,6 +94,24 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping fast checks."
+            exit 0
+          fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping fast checks."
+            exit 0
+          fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache TypeScript artifacts
         if: ${{ matrix.check == 'typecheck' }}
@@ -136,8 +164,11 @@ jobs:
 
           # sanitize: lowercase, replace slashes with dashes, remove invalid chars, collapse repeats
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch
         id: create-branch
         uses: neondatabase/create-branch-action@v6
@@ -313,8 +344,11 @@ jobs:
         run: |
           RAW="${{ github.head_ref }}"
           SANITIZED=$(echo "$RAW" | tr '[:upper:]' '[:lower:]' | sed -E 's|/|-|g; s|[^a-z0-9._-]|-|g; s/-{2,}/-/g; s/^-+//; s/-+$//')
-          echo "Using sanitized branch name: $SANITIZED"
-          echo "name=$SANITIZED" >> $GITHUB_OUTPUT
+          BASE=$(echo "$SANITIZED" | cut -c1-40)
+          SUFFIX="${{ github.run_id }}-${{ github.run_attempt }}"
+          FINAL="${BASE}-${SUFFIX}"
+          echo "Using sanitized branch name: $FINAL"
+          echo "name=$FINAL" >> $GITHUB_OUTPUT
 
       - name: Create or reuse Neon branch
         id: create-branch

@@ -1,5 +1,5 @@
 // Fan-facing notification channels stored in the DB today
-export type NotificationChannel = 'phone' | 'email';
+export type NotificationChannel = 'sms' | 'email';
 
 // App-wide delivery channels (allows future push/in-app support)
 export type NotificationDeliveryChannel = 'email' | 'push' | 'in_app';
