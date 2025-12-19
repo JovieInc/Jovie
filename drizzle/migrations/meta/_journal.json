@@ -141,6 +141,13 @@
       "when": 1765918634662,
       "tag": "0019_colorful_master_mold",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1766003639321,
+      "tag": "0020_harsh_madame_web",
+      "breakpoints": true
     }
   ]
 }

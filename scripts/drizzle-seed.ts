@@ -18,7 +18,13 @@ import {
 } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/lib/db/schema';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import {
+  creatorProfiles,
+  type NewProvider,
+  providers,
+  socialLinks,
+  users,
+} from '@/lib/db/schema';
 
 // Load .env.local first to override defaults, then fallback to .env
 dotenvConfig({ path: '.env.local', override: true });
@@ -229,6 +235,113 @@ const ARTISTS: ArtistSeed[] = [
   makeArtist('Måneskin'),
 ];
 
+const PROVIDER_SEED: NewProvider[] = [
+  {
+    id: 'spotify',
+    displayName: 'Spotify',
+    kind: 'music_streaming',
+    baseUrl: 'https://open.spotify.com',
+    isActive: true,
+  },
+  {
+    id: 'apple_music',
+    displayName: 'Apple Music',
+    kind: 'music_streaming',
+    baseUrl: 'https://music.apple.com',
+    isActive: true,
+  },
+  {
+    id: 'youtube_music',
+    displayName: 'YouTube Music',
+    kind: 'music_streaming',
+    baseUrl: 'https://music.youtube.com',
+    isActive: true,
+  },
+  {
+    id: 'amazon_music',
+    displayName: 'Amazon Music',
+    kind: 'music_streaming',
+    baseUrl: 'https://music.amazon.com',
+    isActive: true,
+  },
+  {
+    id: 'deezer',
+    displayName: 'Deezer',
+    kind: 'music_streaming',
+    baseUrl: 'https://www.deezer.com',
+    isActive: true,
+  },
+  {
+    id: 'tidal',
+    displayName: 'Tidal',
+    kind: 'music_streaming',
+    baseUrl: 'https://listen.tidal.com',
+    isActive: true,
+  },
+  {
+    id: 'soundcloud',
+    displayName: 'SoundCloud',
+    kind: 'social',
+    baseUrl: 'https://soundcloud.com',
+    isActive: true,
+  },
+  {
+    id: 'bandcamp',
+    displayName: 'Bandcamp',
+    kind: 'retail',
+    baseUrl: 'https://bandcamp.com',
+    isActive: true,
+  },
+  {
+    id: 'audiomack',
+    displayName: 'Audiomack',
+    kind: 'music_streaming',
+    baseUrl: 'https://audiomack.com',
+    isActive: true,
+  },
+  {
+    id: 'pandora',
+    displayName: 'Pandora',
+    kind: 'music_streaming',
+    baseUrl: 'https://www.pandora.com',
+    isActive: false,
+  },
+  {
+    id: 'boomplay',
+    displayName: 'Boomplay',
+    kind: 'music_streaming',
+    baseUrl: 'https://www.boomplay.com',
+    isActive: false,
+  },
+];
+
+async function seedProvidersDirectory() {
+  if (
+    typeof (globalThis as { EdgeRuntime?: string }).EdgeRuntime !== 'undefined'
+  ) {
+    throw new Error('Provider seeding is not supported in Edge runtime');
+  }
+
+  console.log('📚 Seeding providers directory...');
+  await db
+    .insert(providers)
+    .values(PROVIDER_SEED)
+    .onConflictDoUpdate({
+      target: providers.id,
+      set: {
+        displayName: drizzleSql`excluded.display_name`,
+        kind: drizzleSql`excluded.kind`,
+        baseUrl: drizzleSql`excluded.base_url`,
+        isActive: drizzleSql`excluded.is_active`,
+        metadata: drizzleSql`excluded.metadata`,
+        updatedAt: drizzleSql`now()`,
+      },
+    });
+
+  const providerCount = await db.select().from(providers);
+  console.log(`  ✅ Providers seeded: ${providerCount.length}`);
+}
+
 async function ensureSeedFunction() {
   // Create or replace the RLS-safe seed function used by this script
   const fnSql = `
@@ -365,6 +478,9 @@ async function seedDatabase() {
   console.log('🌱 Starting Drizzle database seeding...\n');
 
   try {
+    console.log('🧭 Seeding provider directory...');
+    await seedProvidersDirectory();
+
     // Ensure the seed function exists (no-op if already created)
     console.log('🛠️  Ensuring seed function exists...');
     await ensureSeedFunction();
@@ -396,10 +512,12 @@ async function seedDatabase() {
 
     // Verify the data
     console.log('\n🔍 Verification:');
+    const providerCount = await db.select().from(providers);
     const userCount = await db.select().from(users); // may be RLS-filtered
     const profileCount = await db.select().from(creatorProfiles); // is_public=true allows visibility
     const linkCount = await db.select().from(socialLinks); // visible through public profiles policy
 
+    console.log(`  • Providers: ${providerCount.length}`);
     console.log(`  • Users: ${userCount.length}`);
     console.log(`  • Creator Profiles: ${profileCount.length}`);
     console.log(`  • Social Links: ${linkCount.length}`);
