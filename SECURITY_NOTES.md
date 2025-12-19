@@ -90,10 +90,10 @@ _Last reviewed: 2025-11-29_
       - Strong no-cache headers and `Referrer-Policy: no-referrer`.
     - Adds `Server-Timing` and `X-API-Response-Time` for observability.
 
-- **Planned tightening (low-risk)**
-  - Add **HSTS** via `next.config.js` headers:
-    - `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` on non-local environments.
-  - Add a conservative **Permissions-Policy**:
+- **HSTS (non-local only)**
+  - `next.config.js` adds `Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` for non-local environments only.
+  - **Verification:** in local dev confirm `Strict-Transport-Security` is **absent**; in staging confirm the header is **present** (e.g., `curl -I https://main.jov.ie`).
+  - **Permissions-Policy** remains conservative:
     - `Permissions-Policy: camera=(), microphone=(), geolocation=()`.
   - Global **CSP** is intentionally **not** enabled yet:
     - The app relies on multiple third-party scripts (Clerk, Statsig, Stripe JS, Vercel analytics, etc.).

@@ -100,11 +100,10 @@ const nextConfig = {
       },
     ];
 
-    const isProdLike =
-      process.env.NODE_ENV === 'production' ||
-      process.env.VERCEL_ENV === 'production';
+    const isNonLocalEnv =
+      process.env.VERCEL_ENV && process.env.VERCEL_ENV !== 'development';
 
-    if (isProdLike) {
+    if (isNonLocalEnv) {
       securityHeaders.push({
         key: 'Strict-Transport-Security',
         value: 'max-age=31536000; includeSubDomains; preload',
