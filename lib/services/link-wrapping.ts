@@ -165,7 +165,7 @@ export async function createWrappedLink(
         titleAlias: category.alias || getCrawlerSafeLabel(domain),
         clickCount: 0,
         createdAt: new Date().toISOString(),
-        expiresAt: expiresAt?.toISOString() || undefined,
+        expiresAt: (expiresAt as Date | null)?.toISOString() || undefined,
       };
     }
 

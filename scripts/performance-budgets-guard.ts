@@ -81,6 +81,16 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
   const page = await browser.newPage();
 
   await page.addInitScript(() => {
+    type LayoutShiftEntry = PerformanceEntry & {
+      hadRecentInput?: boolean;
+      value?: number;
+    };
+
+    type FirstInputEntry = PerformanceEntry & {
+      processingStart?: number;
+      startTime: number;
+    };
+
     const metrics = {
       lcp: 0,
       cls: 0,
@@ -96,18 +106,19 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
     }).observe({ type: 'largest-contentful-paint', buffered: true });
 
     new PerformanceObserver(list => {
-      for (const entry of list.getEntries()) {
+      for (const entry of list.getEntries() as LayoutShiftEntry[]) {
         // Only count layout shifts without recent input.
         if (!entry.hadRecentInput) {
-          metrics.cls += entry.value || 0;
+          metrics.cls += entry.value ?? 0;
         }
       }
     }).observe({ type: 'layout-shift', buffered: true });
 
     new PerformanceObserver(list => {
-      const entry = list.getEntries()[0];
+      const entry =
+        (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
       if (entry) {
-        metrics.fid = entry.processingStart - entry.startTime;
+        metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
       }
     }).observe({ type: 'first-input', buffered: true });
 
