@@ -68,6 +68,7 @@ export interface GroupedLinksManagerProps<
     }
   ) => Promise<void> | void;
   suggestionsEnabled?: boolean;
+  profileId?: string;
 }
 
 // Client Component scaffold for a single, grouped Links Manager
@@ -129,6 +130,27 @@ const SOCIAL_FIRST_ORDER = [
   'website',
 ] as const;
 
+function buildSuggestionEventProperties(
+  suggestion: {
+    platform: { id: string };
+    sourcePlatform?: string | null;
+    sourceType?: string | null;
+    confidence?: number | null;
+  },
+  profileId?: string
+) {
+  const confidenceValue =
+    typeof suggestion.confidence === 'number' ? suggestion.confidence : null;
+
+  return {
+    platformId: suggestion.platform.id,
+    sourcePlatform: suggestion.sourcePlatform ?? null,
+    sourceType: suggestion.sourceType ?? null,
+    confidence: confidenceValue,
+    profileId: profileId ?? null,
+  };
+}
+
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
   className,
@@ -140,6 +162,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   onAcceptSuggestion,
   onDismissSuggestion,
   suggestionsEnabled = false,
+  profileId,
 }: GroupedLinksManagerProps<T>) {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
 
@@ -175,16 +198,21 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     () => suggestedLinks
   );
 
+  const suggestionKey = useCallback(
+    (s: T & { suggestionId?: string }) =>
+      s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`,
+    []
+  );
+
   const suggestedLinksSignature = useMemo(() => {
-    const keys = suggestedLinks
-      .map(s => s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`)
-      .sort();
+    const keys = suggestedLinks.map(s => suggestionKey(s)).sort();
     return keys.join('|');
-  }, [suggestedLinks]);
+  }, [suggestedLinks, suggestionKey]);
 
   const prevSuggestedLinksSignatureRef = useRef<string>(
     suggestedLinksSignature
   );
+  const surfacedSuggestionKeysRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (prevSuggestedLinksSignatureRef.current === suggestedLinksSignature) {
@@ -193,6 +221,24 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     prevSuggestedLinksSignatureRef.current = suggestedLinksSignature;
     setPendingSuggestions(suggestedLinks);
   }, [suggestedLinks, suggestedLinksSignature]);
+
+  useEffect(() => {
+    if (!suggestionsEnabled || pendingSuggestions.length === 0) {
+      return;
+    }
+
+    pendingSuggestions.forEach(suggestion => {
+      const key = suggestionKey(suggestion);
+      if (surfacedSuggestionKeysRef.current.has(key)) {
+        return;
+      }
+      surfacedSuggestionKeysRef.current.add(key);
+      void track(
+        'link_suggestion_surfaced',
+        buildSuggestionEventProperties(suggestion, profileId)
+      );
+    });
+  }, [pendingSuggestions, profileId, suggestionKey, suggestionsEnabled]);
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -425,9 +471,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
   }
 
-  const suggestionKey = (s: T & { suggestionId?: string }) =>
-    s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`;
-
   const insertLinkWithSectionOrdering = useCallback(
     (existing: T[], nextLink: T): T[] => {
       if (existing.length === 0) return [nextLink];
@@ -464,7 +507,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     },
     [sectionOf]
   );
-
   async function handleAcceptSuggestionClick(
     suggestion: (typeof pendingSuggestions)[number]
   ) {
@@ -508,6 +550,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         setLastAddedId(idFor(nextLink));
       }
       onLinkAdded?.([nextLink]);
+      void track(
+        'link_suggestion_accepted',
+        buildSuggestionEventProperties(suggestion, profileId)
+      );
     }
   }
 
@@ -526,6 +572,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     }
     setPendingSuggestions(prev =>
       prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
+    );
+    void track(
+      'link_suggestion_dismissed',
+      buildSuggestionEventProperties(suggestion, profileId)
     );
   }
 

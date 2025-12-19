@@ -246,8 +246,6 @@ type LinktreePageProps = {
         profilePicture?: { url?: string | null } | null;
       };
       account?: { displayName?: string | null; profilePicture?: string | null };
-      links?: unknown;
-      allLinks?: unknown;
       page?: { links?: unknown };
       data?: { links?: unknown };
       profile?: { links?: unknown };
