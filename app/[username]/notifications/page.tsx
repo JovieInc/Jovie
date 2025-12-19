@@ -9,6 +9,11 @@ import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  getNotificationSubscribeSuccessMessage,
+  NOTIFICATION_COPY,
+  subscribeToNotifications,
+} from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
@@ -86,23 +91,12 @@ export default function NotificationsPage() {
       // 2. Submit the subscription request
 
       // For now, we'll just simulate the API call
-      const response = await fetch('/api/notifications/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          artist_id: '00000000-0000-0000-0000-000000000000', // This would be fetched from the username
-          email: normalizedEmail,
-          source: 'notifications_page',
-        }),
+      await subscribeToNotifications({
+        artistId: '00000000-0000-0000-0000-000000000000', // TODO: replace with resolved artist id
+        channel: 'email',
+        email: normalizedEmail,
+        source: 'notifications_page',
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to subscribe');
-      }
 
       // Track successful subscription
       track('notifications_subscribe_success', {
@@ -111,12 +105,12 @@ export default function NotificationsPage() {
       });
 
       setSuccess(true);
-      notifySuccess(`You'll receive updates from ${username}.`);
+      notifySuccess(getNotificationSubscribeSuccessMessage('email'));
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'An error occurred';
-      setError(errorMessage || 'Unable to subscribe right now.');
-      notifyError('Unable to turn on notifications right now.');
+        err instanceof Error ? err.message : NOTIFICATION_COPY.errors.subscribe;
+      setError(errorMessage || NOTIFICATION_COPY.errors.subscribe);
+      notifyError(NOTIFICATION_COPY.errors.subscribe);
 
       // Track submission error
       track('notifications_subscribe_error', {

@@ -1,0 +1,157 @@
+import type {
+  NotificationApiResponse,
+  NotificationChannel,
+  NotificationErrorEnvelope,
+  NotificationStatusResponse,
+  NotificationSubscribeResponse,
+  NotificationUnsubscribeResponse,
+} from '@/types/notifications';
+
+export type NotificationSubscribePayload = {
+  artistId: string;
+  channel: NotificationChannel;
+  email?: string;
+  phone?: string;
+  countryCode?: string;
+  city?: string;
+  source?: string;
+};
+
+export type NotificationUnsubscribePayload = {
+  artistId: string;
+  channel?: NotificationChannel;
+  email?: string;
+  phone?: string;
+  token?: string;
+  method?: 'email_link' | 'dashboard' | 'api' | 'dropdown';
+};
+
+export type NotificationStatusPayload = {
+  artistId: string;
+  email?: string;
+  phone?: string;
+};
+
+export const NOTIFICATION_COPY = {
+  errors: {
+    generic: 'We couldn’t update notifications. Please try again.',
+    subscribe: 'We couldn’t turn on notifications. Try again in a moment.',
+    unsubscribe:
+      'We couldn’t update your notifications. Try again in a moment.',
+    missingContact:
+      'We need your contact to manage this subscription. Add it again to continue.',
+  },
+  success: {
+    subscribe: {
+      email:
+        "You're in. We'll email you when this artist releases something new.",
+      sms: "You're in. We'll text you when this artist releases something new.",
+    },
+    unsubscribe: {
+      email: 'You’re unsubscribed from email updates.',
+      sms: 'You’re unsubscribed from text updates.',
+    },
+  },
+} as const;
+
+const isNotificationError = (
+  value: unknown
+): value is NotificationErrorEnvelope =>
+  Boolean(
+    value &&
+      typeof value === 'object' &&
+      'success' in value &&
+      (value as { success?: boolean }).success === false
+  );
+
+const parseResponseJson = async <T>(
+  response: Response
+): Promise<NotificationApiResponse<T> | null> => {
+  try {
+    return (await response.json()) as NotificationApiResponse<T>;
+  } catch {
+    return null;
+  }
+};
+
+const requestNotifications = async <T>(
+  url: string,
+  payload: Record<string, unknown>,
+  fallbackError: string
+): Promise<T> => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await parseResponseJson<T>(response);
+
+  if (!response.ok || !data || isNotificationError(data)) {
+    const message =
+      data && isNotificationError(data) ? data.error : fallbackError;
+    throw new Error(message);
+  }
+
+  return data as T;
+};
+
+export const subscribeToNotifications = async (
+  payload: NotificationSubscribePayload
+): Promise<NotificationSubscribeResponse> =>
+  requestNotifications<NotificationSubscribeResponse>(
+    '/api/notifications/subscribe',
+    {
+      artist_id: payload.artistId,
+      channel: payload.channel,
+      email: payload.email,
+      phone: payload.phone,
+      country_code: payload.countryCode,
+      city: payload.city,
+      source: payload.source,
+    },
+    NOTIFICATION_COPY.errors.subscribe
+  );
+
+export const unsubscribeFromNotifications = async (
+  payload: NotificationUnsubscribePayload
+): Promise<NotificationUnsubscribeResponse> =>
+  requestNotifications<NotificationUnsubscribeResponse>(
+    '/api/notifications/unsubscribe',
+    {
+      artist_id: payload.artistId,
+      channel: payload.channel,
+      email: payload.email,
+      phone: payload.phone,
+      token: payload.token,
+      method: payload.method,
+    },
+    NOTIFICATION_COPY.errors.unsubscribe
+  );
+
+export const getNotificationStatus = async (
+  payload: NotificationStatusPayload
+): Promise<NotificationStatusResponse> =>
+  requestNotifications<NotificationStatusResponse>(
+    '/api/notifications/status',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      phone: payload.phone,
+    },
+    NOTIFICATION_COPY.errors.generic
+  );
+
+export const getNotificationSubscribeSuccessMessage = (
+  channel: NotificationChannel
+) =>
+  channel === 'sms'
+    ? NOTIFICATION_COPY.success.subscribe.sms
+    : NOTIFICATION_COPY.success.subscribe.email;
+
+export const getNotificationUnsubscribeSuccessMessage = (
+  channel: NotificationChannel
+) =>
+  channel === 'sms'
+    ? NOTIFICATION_COPY.success.unsubscribe.sms
+    : NOTIFICATION_COPY.success.unsubscribe.email;
