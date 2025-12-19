@@ -1,4 +1,4 @@
-import type { useClerk } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
@@ -10,10 +10,6 @@ type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];
 const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
-
-type ClerkSignOut = ReturnType<
-  typeof import('@clerk/nextjs').useClerk
->['signOut'];
 
 export interface UserMenuLoadingState {
   signOut: boolean;

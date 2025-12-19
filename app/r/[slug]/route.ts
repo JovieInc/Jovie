@@ -6,8 +6,11 @@ import {
 import { resolveReleaseBySlug } from '@/lib/discography/store';
 import type { ProviderKey } from '@/lib/discography/types';
 
+type ReleaseEntry = NonNullable<ReturnType<typeof resolveReleaseBySlug>>;
+type ReleaseRecord = ReleaseEntry['release'];
+
 function pickProviderUrl(
-  release: ReturnType<typeof resolveReleaseBySlug>['release'],
+  release: ReleaseRecord,
   forcedProvider?: ProviderKey | null
 ): string | null {
   const providerOrder: ProviderKey[] = forcedProvider
@@ -18,11 +21,15 @@ function pickProviderUrl(
     : PRIMARY_PROVIDER_KEYS;
 
   for (const key of providerOrder) {
-    const match = release.providers.find(provider => provider.key === key);
+    const match = release.providers.find(
+      (provider: ReleaseRecord['providers'][number]) => provider.key === key
+    );
     if (match?.url) return match.url;
   }
 
-  const fallback = release.providers.find(provider => provider.url);
+  const fallback = release.providers.find(
+    (provider: ReleaseRecord['providers'][number]) => provider.url
+  );
   return fallback?.url ?? null;
 }
 
