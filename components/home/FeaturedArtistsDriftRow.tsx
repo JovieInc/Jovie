@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
@@ -19,12 +19,16 @@ export function FeaturedArtistsDriftRow({
 }: FeaturedArtistsDriftRowProps) {
   const prefersReducedMotion = useReducedMotion();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
-  const [shiftPx, setShiftPx] = useState<number>(0);
+  const shiftPxRef = useRef<number>(0);
 
   useEffect(() => {
     if (prefersReducedMotion) {
-      setShiftPx(0);
+      shiftPxRef.current = 0;
+      if (rowRef.current) {
+        rowRef.current.style.transform = '';
+      }
       return;
     }
 
@@ -37,7 +41,10 @@ export function FeaturedArtistsDriftRow({
       const denom = viewportH + rect.height;
 
       if (denom <= 0) {
-        setShiftPx(0);
+        shiftPxRef.current = 0;
+        if (rowRef.current) {
+          rowRef.current.style.transform = '';
+        }
         return;
       }
 
@@ -45,7 +52,12 @@ export function FeaturedArtistsDriftRow({
       const progress = Math.max(0, Math.min(1, rawProgress));
       const nextShift = Math.round(progress * MAX_SHIFT_PX);
 
-      setShiftPx(prev => (prev === nextShift ? prev : nextShift));
+      if (shiftPxRef.current !== nextShift) {
+        shiftPxRef.current = nextShift;
+        if (rowRef.current) {
+          rowRef.current.style.transform = `translate3d(${-nextShift}px, 0, 0)`;
+        }
+      }
     };
 
     const onScrollOrResize = () => {
@@ -77,12 +89,8 @@ export function FeaturedArtistsDriftRow({
         className='w-full overflow-x-auto overflow-y-hidden scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
       >
         <div
+          ref={rowRef}
           className='flex flex-nowrap items-center justify-start gap-8 sm:gap-10 px-4 sm:px-6 lg:px-8 py-2 w-max will-change-transform'
-          style={{
-            transform: prefersReducedMotion
-              ? undefined
-              : `translate3d(${-shiftPx}px, 0, 0)`,
-          }}
         >
           {creators.map(creator => (
             <Link
