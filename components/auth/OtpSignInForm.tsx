@@ -17,11 +17,11 @@ import {
 import { ButtonSpinner } from './ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
-  'mt-2 text-sm text-red-400 text-center animate-in fade-in-0 duration-200';
+  'mt-2 text-sm text-destructive text-center animate-in fade-in-0 duration-200';
 const STEP_TRANSITION_CLASSES =
   'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
 const FOOTER_LINK_CLASSES =
-  'text-white hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f10] rounded-md';
+  'text-primary-token hover:underline focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md';
 
 const submitButtonClassName = authButtonVariants({ variant: 'primary' });
 const secondaryButtonClassName = authButtonVariants({ variant: 'secondary' });
@@ -239,7 +239,7 @@ export function OtpSignInForm() {
           </div>
           <SignIn.Step name='start' aria-label='Choose a sign-in method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              <h1 className='text-[18px] leading-6 font-medium text-[rgb(227,228,230)] mb-0 text-center'>
+              <h1 className='text-[18px] leading-6 font-medium text-primary-token mb-0 text-center'>
                 {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
               </h1>
 
@@ -293,7 +293,7 @@ export function OtpSignInForm() {
                   {renderMethodButton(orderedMethods[0], true)}
 
                   {lastAuthMethod ? (
-                    <p className='-mt-1 text-xs text-[#6b6f76] text-center'>
+                    <p className='-mt-1 text-xs text-secondary-token text-center'>
                       You used{' '}
                       {lastAuthMethod === 'google'
                         ? 'Google'
@@ -314,7 +314,7 @@ export function OtpSignInForm() {
                     </div>
                   ) : null}
 
-                  <p className='mt-10 text-sm text-[#6b6f76] text-center'>
+                  <p className='mt-10 text-sm text-secondary-token text-center'>
                     Don&apos;t have access?{' '}
                     <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
                       Join the waitlist
@@ -331,7 +331,7 @@ export function OtpSignInForm() {
           >
             <SignIn.Strategy name='email_code'>
               <div className={STEP_TRANSITION_CLASSES}>
-                <h1 className='text-lg font-medium text-[rgb(227,228,230)] mb-0 text-center'>
+                <h1 className='text-lg font-medium text-primary-token mb-0 text-center'>
                   Check your email
                 </h1>
 

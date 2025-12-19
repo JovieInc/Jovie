@@ -85,22 +85,25 @@ export function OtpInput({
           <div
             className={cn(
               'flex h-12 w-10 items-center justify-center rounded-lg border text-xl font-sans transition-all',
-              'bg-[#15161a] text-white',
+              'bg-surface-0 text-primary-token',
               // Status-based styling
               status === 'cursor'
-                ? 'border-white ring-2 ring-white/20'
+                ? 'border-default ring-2 ring-[rgb(var(--focus-ring))]/30'
                 : status === 'selected'
-                  ? 'border-white/20'
-                  : 'border-white/10',
+                  ? 'border-default'
+                  : 'border-subtle',
               // Focus-visible for keyboard navigation
-              'focus-within:border-white focus-within:ring-2 focus-within:ring-white/20'
+              'focus-within:border-default focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]/30'
             )}
             data-status={status}
             role='presentation'
           >
             {value}
             {status === 'cursor' && (
-              <span className='animate-pulse text-white/60' aria-hidden='true'>
+              <span
+                className='animate-pulse text-secondary-token'
+                aria-hidden='true'
+              >
                 |
               </span>
             )}
