@@ -1158,6 +1158,7 @@ export function EnhancedDashboardLinks({
             suggestionsEnabled ? handleDismissSuggestion : undefined
           }
           suggestionsEnabled={suggestionsEnabled}
+          profileId={profileId}
         />
       </div>
     </div>

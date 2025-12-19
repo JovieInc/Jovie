@@ -4,6 +4,8 @@ import { useToast } from '@/components/molecules/ToastContainer';
 import type { BillingStatus } from '@/hooks/use-billing-status';
 import { track } from '@/lib/analytics';
 
+type SignOutFn = ReturnType<typeof import('@clerk/nextjs').useClerk>['signOut'];
+
 const ANALYTICS_CONTEXT = {
   surface: 'sidebar_user_menu',
 } as const;
@@ -33,7 +35,7 @@ interface UseUserMenuActionsParams {
   profileUrl?: string;
   settingsUrl?: string;
   redirectToUrl: (url: string) => void;
-  signOut: (options?: unknown) => Promise<void>;
+  signOut: SignOutFn;
 }
 
 export function useUserMenuActions({
@@ -72,7 +74,7 @@ export function useUserMenuActions({
 
     setLoading(prev => ({ ...prev, signOut: true }));
     try {
-      await signOut(() => router.push('/'));
+      await signOut({ redirectUrl: '/' });
     } catch (error) {
       console.error('Sign out error:', error);
       showToast({
