@@ -2,6 +2,12 @@
 
 This document describes the environment variables used in the Jovie application.
 
+## Guardrail: keep real secrets out of git
+
+- **Never commit real credentials** to `.env.local` or any `env-backup/.env.*` files.
+- Use `.env.example` as a **redacted template** and share live values via Vercel, 1Password, or your team’s secret manager.
+- If you need to onboard locally, copy `.env.example` to `.env.local` and replace placeholders on your machine only.
+
 ## Database Configuration
 
 ### `DATABASE_URL`
