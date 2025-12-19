@@ -54,6 +54,7 @@ main.jov.ie  jov.ie
    - E2E smoke tests
 
 2. ✅ **Database Migrations:**
+   - Run the DB safety preflight (environment + migration list)
    - Run `pnpm run drizzle:migrate` against main database
    - Seed data if needed
 
@@ -80,6 +81,7 @@ main.jov.ie  jov.ie
 **Process:**
 
 1. ✅ **Production Deployment:**
+   - Run the DB safety preflight (environment + migration list)
    - Deploy to production environment (jov.ie)
    - Run database migrations on production
    - Post-deployment verification
@@ -113,6 +115,7 @@ main.jov.ie  jov.ie
 ### **Database Strategy:**
 
 - ✅ **Migrations:** Run automatically on deployment via `drizzle:migrate`
+- ✅ **Preflight:** Environment and migration list validation before main/production migrations
 - ✅ **Long-lived branches:** Only `main` and `production` (no ephemeral preview)
 - ✅ **PR branches:** Ephemeral Neon branches auto-created per PR
 - ✅ **Cleanup:** Ephemeral branches deleted when PR closes

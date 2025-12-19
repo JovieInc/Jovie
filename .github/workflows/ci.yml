@@ -738,6 +738,11 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
+      - name: DB safety check (main - preflight)
+        run: pnpm run drizzle:migrate:preflight
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
+          GIT_BRANCH: main
       - name: DB migrate (main - Drizzle)
         run: pnpm run drizzle:migrate
         env:
@@ -1119,6 +1124,12 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
+      - name: DB safety check (production - preflight)
+        run: pnpm run drizzle:migrate:preflight
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          GIT_BRANCH: production
+          ALLOW_PROD_MIGRATIONS: 'true'
       - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
         run: pnpm run drizzle:migrate:prod
         env:
