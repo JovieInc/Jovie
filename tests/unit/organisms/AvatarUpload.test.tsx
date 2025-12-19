@@ -71,8 +71,10 @@ describe('AvatarUpload - Error Handling', () => {
 
     const fileInput = screen.getByLabelText('Choose profile photo file');
 
-    const largeFile = new File(['x'.repeat(30 * 1024 * 1024)], 'large.jpg', {
-      type: 'image/jpeg',
+    const largeFile = new File(['x'], 'large.jpg', { type: 'image/jpeg' });
+    Object.defineProperty(largeFile, 'size', {
+      value: 30 * 1024 * 1024,
+      writable: false,
     });
 
     fireEvent.change(fileInput, { target: { files: [largeFile] } });

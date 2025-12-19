@@ -99,6 +99,28 @@ export function loadNextJsMocks() {
 }
 
 /**
+ * Lazy load Next.js navigation mocks only when needed
+ */
+export function loadNextNavigationMocks() {
+  if (loadedMocks.has('next-navigation')) return;
+
+  vi.mock('next/navigation', () => {
+    return {
+      useRouter: () => ({
+        push: vi.fn(),
+        replace: vi.fn(),
+        refresh: vi.fn(),
+        prefetch: vi.fn().mockResolvedValue(undefined),
+      }),
+      usePathname: () => '/',
+      useSearchParams: () => new URLSearchParams(),
+    };
+  });
+
+  loadedMocks.add('next-navigation');
+}
+
+/**
  * Lazy load browser API mocks only when needed
  */
 export function loadBrowserApiMocks() {
@@ -150,6 +172,50 @@ export function loadBrowserApiMocks() {
   loadedMocks.add('browser-apis');
 }
 
+/**
+ * Lazy load server-only mocks only when needed
+ */
+export function loadServerOnlyMocks() {
+  if (loadedMocks.has('server-only')) return;
+
+  vi.mock('server-only', () => ({
+    default: vi.fn(),
+  }));
+
+  loadedMocks.add('server-only');
+}
+
+/**
+ * Lazy load notification hook mocks only when needed
+ */
+export function loadNotificationsMocks() {
+  if (loadedMocks.has('notifications')) return;
+
+  vi.mock('@/lib/hooks/useNotifications', () => ({
+    useNotifications: () => ({
+      showToast: vi.fn(),
+      hideToast: vi.fn(),
+      clearToasts: vi.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warning: vi.fn(),
+      undo: vi.fn(),
+      retry: vi.fn(),
+      saveSuccess: vi.fn(),
+      saveError: vi.fn(),
+      uploadSuccess: vi.fn(),
+      uploadError: vi.fn(),
+      networkError: vi.fn(),
+      genericError: vi.fn(),
+      handleError: vi.fn(),
+      withLoadingToast: vi.fn(),
+    }),
+  }));
+
+  loadedMocks.add('notifications');
+}
+
 // Define mocked components outside the function to avoid hoisting issues
 const MockedHeadlessUiComponents = {
   // Dialog components
@@ -194,17 +260,60 @@ export function loadHeadlessUiMocks() {
 }
 
 /**
+ * Lazy load framer-motion mocks only when needed
+ */
+export function loadFramerMotionMocks() {
+  if (loadedMocks.has('framer-motion')) return;
+
+  vi.mock('framer-motion', () => createFramerMotionMock());
+
+  loadedMocks.add('framer-motion');
+}
+
+export function createFramerMotionMock() {
+  const MockAnimatePresence = ({ children }: { children: React.ReactNode }) =>
+    React.createElement(React.Fragment, null, children);
+
+  const MockMotionComponent: React.FC<
+    React.HTMLAttributes<HTMLDivElement>
+  > = props => React.createElement('div', props);
+
+  const motion = new Proxy(MockMotionComponent, {
+    get: () => MockMotionComponent,
+  });
+
+  return {
+    __esModule: true,
+    AnimatePresence: MockAnimatePresence,
+    motion,
+  };
+}
+
+/**
+ * Lazy load @jovie/ui mocks only when needed
+ */
+export function loadJovieUiMocks() {
+  if (loadedMocks.has('@jovie/ui')) return;
+
+  vi.mock('@jovie/ui', async () => {
+    const actual =
+      await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
+    return {
+      __esModule: true,
+      ...actual,
+    };
+  });
+
+  loadedMocks.add('@jovie/ui');
+}
+
+/**
  * Load only the essential mocks needed for most tests
  */
 export function loadEssentialMocks() {
   loadBrowserApiMocks();
-  loadNextJsMocks(); // Add Next.js mocks to essential mocks
-  loadClerkMocks(); // Add Clerk mocks to essential mocks
-
-  // Mock server-only modules
-  vi.mock('server-only', () => ({
-    default: vi.fn(),
-  }));
+  loadNextJsMocks();
+  loadServerOnlyMocks();
 
   // Mock console methods to reduce noise
   global.console = {
@@ -223,6 +332,10 @@ export function loadAllMocks() {
   loadFeatureFlagMocks();
   loadNextJsMocks();
   loadHeadlessUiMocks();
+  loadFramerMotionMocks();
+  loadJovieUiMocks();
+  loadNextNavigationMocks();
+  loadNotificationsMocks();
 }
 
 /**

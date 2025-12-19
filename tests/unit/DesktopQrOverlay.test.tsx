@@ -1,5 +1,11 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('framer-motion', async () => {
+  const { createFramerMotionMock } = await import('../utils/lazy-mocks');
+  return createFramerMotionMock();
+});
+
 import { DesktopQrOverlay } from '@/components/profile/DesktopQrOverlay';
 
 function mockMatchMedia(matches: boolean) {

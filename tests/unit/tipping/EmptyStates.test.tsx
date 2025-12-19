@@ -1,9 +1,5 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  TippingEmptyState,
-  TippingMetricsSkeleton,
-} from '@/components/tipping/EmptyStates';
 
 // Mock next/image
 vi.mock('next/image', () => ({
@@ -12,6 +8,15 @@ vi.mock('next/image', () => ({
     return <img {...props} />;
   },
 }));
+vi.mock('framer-motion', async () => {
+  const { createFramerMotionMock } = await import('../../utils/lazy-mocks');
+  return createFramerMotionMock();
+});
+
+import {
+  TippingEmptyState,
+  TippingMetricsSkeleton,
+} from '@/components/tipping/EmptyStates';
 
 describe('TippingEmptyState', () => {
   it('renders no-venmo empty state correctly', () => {

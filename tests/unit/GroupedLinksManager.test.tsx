@@ -69,6 +69,10 @@ vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
     ),
   };
 });
+vi.mock('framer-motion', async () => {
+  const { createFramerMotionMock } = await import('../utils/lazy-mocks');
+  return createFramerMotionMock();
+});
 
 // dnd-kit minimal mocks to avoid complex interactions in unit tests
 vi.mock('@dnd-kit/core', () => {
