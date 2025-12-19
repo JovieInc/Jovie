@@ -12,7 +12,7 @@ import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
 } from '@/lib/username/sync';
-import { validateUsername } from '@/lib/validation/username';
+import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
 export const runtime = 'nodejs';
@@ -86,37 +86,49 @@ const venmoHandleSchema = z.preprocess(
     .transform(handle => `@${handle}`)
 );
 
-const ProfileUpdateSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(3)
-    .max(30)
-    .refine(
-      value => validateUsername(value).isValid,
-      'Username is invalid or reserved'
-    )
-    .optional(),
-  displayName: z
-    .string()
-    .trim()
-    .min(1, 'Display name cannot be empty')
-    .max(50)
-    .optional(),
-  bio: z.string().trim().max(512).optional(),
-  creatorType: z
-    .enum(['artist', 'podcaster', 'influencer', 'creator'])
-    .optional(),
-  avatarUrl: httpUrlSchema.optional(),
-  spotifyUrl: httpUrlSchema.optional(),
-  appleMusicUrl: httpUrlSchema.optional(),
-  youtubeUrl: httpUrlSchema.optional(),
-  isPublic: z.boolean().optional(),
-  marketingOptOut: z.boolean().optional(),
-  settings: settingsSchema.optional(),
-  theme: themeSchema.optional(),
-  venmo_handle: venmoHandleSchema.optional(),
-});
+const ProfileUpdateSchema = z
+  .object({
+    username: z
+      .string()
+      .trim()
+      .min(3)
+      .max(30)
+      .superRefine((value, ctx) => {
+        const validation = validateUsername(value);
+        if (!validation.isValid) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: validation.error ?? 'Username is invalid or reserved',
+          });
+        }
+      })
+      .transform(value => normalizeUsername(value))
+      .optional(),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, 'Display name cannot be empty')
+      .max(60, 'Display name must be 60 characters or fewer')
+      .optional(),
+    bio: z
+      .string()
+      .trim()
+      .max(512, 'Bio must be 512 characters or fewer')
+      .optional(),
+    creatorType: z
+      .enum(['artist', 'podcaster', 'influencer', 'creator'])
+      .optional(),
+    avatarUrl: httpUrlSchema.optional(),
+    spotifyUrl: httpUrlSchema.optional(),
+    appleMusicUrl: httpUrlSchema.optional(),
+    youtubeUrl: httpUrlSchema.optional(),
+    isPublic: z.boolean().optional(),
+    marketingOptOut: z.boolean().optional(),
+    settings: settingsSchema.optional(),
+    theme: themeSchema.optional(),
+    venmo_handle: venmoHandleSchema.optional(),
+  })
+  .strict();
 
 type ProfileUpdateInput = z.infer<typeof ProfileUpdateSchema>;
 
@@ -188,8 +200,7 @@ export async function PUT(req: Request) {
         );
       }
 
-      const validUpdates: Record<string, unknown> = {};
-      const allowedFields = [
+      const allowedFields = new Set([
         'username',
         'displayName',
         'bio',
@@ -203,22 +214,23 @@ export async function PUT(req: Request) {
         'settings',
         'theme',
         'venmo_handle',
-      ];
+      ]);
 
-      for (const [key, value] of Object.entries(updates)) {
-        if (allowedFields.includes(key)) {
-          validUpdates[key] = value;
-        }
-      }
+      const unknownFields = Object.keys(updates).filter(
+        key => !allowedFields.has(key)
+      );
 
-      if (Object.keys(validUpdates).length === 0) {
+      if (unknownFields.length > 0) {
+        const label = unknownFields.length > 1 ? 'fields' : 'field';
         return NextResponse.json(
-          { error: 'No supported changes detected' },
+          {
+            error: `Unsupported ${label}: ${unknownFields.join(', ')}`,
+          },
           { status: 400, headers: NO_STORE_HEADERS }
         );
       }
 
-      const parsedUpdatesResult = ProfileUpdateSchema.safeParse(validUpdates);
+      const parsedUpdatesResult = ProfileUpdateSchema.safeParse(updates);
 
       if (!parsedUpdatesResult.success) {
         const firstError = parsedUpdatesResult.error.issues[0]?.message;

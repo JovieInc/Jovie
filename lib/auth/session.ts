@@ -23,7 +23,12 @@ export function validateClerkUserId(userId: string): void {
  * Sets up the database session for the authenticated user
  * This enables RLS policies to work properly with Clerk user ID
  */
-export async function setupDbSession() {
+async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
+  if (clerkUserId) {
+    validateClerkUserId(clerkUserId);
+    return clerkUserId;
+  }
+
   const { userId } = await auth();
 
   if (!userId) {
@@ -32,6 +37,15 @@ export async function setupDbSession() {
 
   // Validate userId format to prevent SQL injection
   validateClerkUserId(userId);
+  return userId;
+}
+
+/**
+ * Sets up the database session for the authenticated user
+ * This enables RLS policies to work properly with Clerk user ID
+ */
+export async function setupDbSession(clerkUserId?: string) {
+  const userId = await resolveClerkUserId(clerkUserId);
 
   // Set the session variable for RLS
   // Using sql.raw with validated input to prevent SQL injection
@@ -49,9 +63,10 @@ export async function setupDbSession() {
  * Wrapper function to run database operations with proper session setup
  */
 export async function withDbSession<T>(
-  operation: (userId: string) => Promise<T>
+  operation: (userId: string) => Promise<T>,
+  options?: { clerkUserId?: string }
 ): Promise<T> {
-  const { userId } = await setupDbSession();
+  const { userId } = await setupDbSession(options?.clerkUserId);
   return await operation(userId);
 }
 
@@ -60,15 +75,10 @@ export async function withDbSession<T>(
  * Ensures SET LOCAL app.clerk_user_id is applied within the transaction scope.
  */
 export async function withDbSessionTx<T>(
-  operation: (tx: DbType, userId: string) => Promise<T>
+  operation: (tx: DbType, userId: string) => Promise<T>,
+  options?: { clerkUserId?: string }
 ): Promise<T> {
-  const { userId } = await auth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  // Validate userId format to prevent SQL injection
-  validateClerkUserId(userId);
+  const userId = await resolveClerkUserId(options?.clerkUserId);
 
   // In tests, db may be a lightweight mock without transaction support.
   if (typeof (db as DbType).transaction !== 'function') {

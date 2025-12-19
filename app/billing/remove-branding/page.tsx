@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import {
   createBillingPortalSession,
   createCheckoutSession,
@@ -38,7 +38,7 @@ export default async function RemoveBrandingPage() {
     redirect('/pricing');
   }
 
-  const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const successUrl = `${baseUrl}/billing/success`;
   const cancelUrl = `${baseUrl}/billing/cancel`;
 

@@ -5,7 +5,7 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { env } from '@/lib/env';
+import { publicEnv } from '@/lib/env-public';
 import {
   createBillingPortalSession,
   createCheckoutSession,
@@ -103,7 +103,8 @@ export async function POST(request: NextRequest) {
       );
 
       if (alreadySubscribedToPlan) {
-        const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl =
+          publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const returnUrl = `${baseUrl}/app/dashboard`;
         const portalSession = await createBillingPortalSession({
           customerId: customerResult.customerId,
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create URLs for success and cancel
-    const baseUrl = env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const successUrl = `${baseUrl}/billing/success`;
     const cancelUrl = `${baseUrl}/billing/cancel`;
 

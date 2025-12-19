@@ -64,6 +64,7 @@ vi.mock('@/lib/cache/profile', () => ({
 }));
 
 vi.mock('@/lib/validation/username', () => ({
+  normalizeUsername: vi.fn((value: string) => value.toLowerCase().trim()),
   validateUsername: vi.fn(() => ({ isValid: true })),
 }));
 
@@ -114,6 +115,28 @@ describe('PUT /api/dashboard/profile', () => {
     expect(returning).toHaveBeenCalled();
   });
 
+  it('normalizes usernames before syncing', async () => {
+    const request = new NextRequest('http://localhost/api/dashboard/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        updates: {
+          username: 'New-Handle',
+        },
+      }),
+    });
+
+    const response = await PUT(request);
+
+    expect(response.status).toBe(200);
+    expect(syncCanonicalUsernameFromApp).toHaveBeenCalledWith(
+      'user_123',
+      'new-handle'
+    );
+  });
+
   it('downloads the uploaded avatar and forwards it to Clerk', async () => {
     const arrayBuffer = new TextEncoder().encode('avatar-data').buffer;
     const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue(
@@ -155,6 +178,46 @@ describe('PUT /api/dashboard/profile', () => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ updates: { unsupported: 'value' } }),
+    });
+
+    const response = await PUT(request);
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload).toEqual({
+      error: 'Unsupported field: unsupported',
+    });
+  });
+
+  it('rejects invalid display names', async () => {
+    const request = new NextRequest('http://localhost/api/dashboard/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        updates: {
+          displayName: '   ',
+        },
+      }),
+    });
+
+    const response = await PUT(request);
+
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects invalid urls', async () => {
+    const request = new NextRequest('http://localhost/api/dashboard/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        updates: {
+          youtubeUrl: 'ftp://example.com/video',
+        },
+      }),
     });
 
     const response = await PUT(request);

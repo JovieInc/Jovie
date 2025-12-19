@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { stripeWebhookEvents, users } from '@/lib/db/schema';
-import { env } from '@/lib/env';
+import { env } from '@/lib/env-server';
 import {
   captureCriticalError,
   captureWarning,
