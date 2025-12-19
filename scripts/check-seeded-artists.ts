@@ -10,6 +10,9 @@ import { config as dotenvConfig } from 'dotenv';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
+console.error('❌ Seed profiles have been removed; this script is disabled.');
+process.exit(1);
+
 // Load environment variables
 dotenvConfig({ path: '.env.local', override: true });
 dotenvConfig();

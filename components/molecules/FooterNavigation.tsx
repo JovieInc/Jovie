@@ -23,7 +23,10 @@ export function FooterNavigation({
   linkClassName = '',
   links = defaultLinks,
 }: FooterNavigationProps) {
-  const textSize = variant === 'light' ? 'text-sm' : 'text-xs';
+  const textSize =
+    variant === 'light'
+      ? 'text-[13px] leading-5 font-medium tracking-tight'
+      : 'text-[12px] leading-4 font-medium tracking-tight';
 
   return (
     <nav

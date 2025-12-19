@@ -12,6 +12,7 @@ import {
 const YOUTUBE_CONFIG: StrategyConfig = {
   platformId: 'youtube',
   platformName: 'YouTube',
+  canonicalHost: 'www.youtube.com',
   validHosts: new Set(['youtube.com', 'www.youtube.com']),
   defaultTimeoutMs: 10000,
 } as const;

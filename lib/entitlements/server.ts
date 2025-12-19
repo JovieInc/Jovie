@@ -1,12 +1,13 @@
 'server only';
 
-import { auth } from '@clerk/nextjs/server';
+import { auth, currentUser } from '@clerk/nextjs/server';
+import { isAdminEmail } from '@/lib/admin/roles';
+import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import type { UserEntitlements } from '@/types';
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
   const { userId } = await auth();
-
   if (!userId) {
     return {
       userId: null,
@@ -19,27 +20,32 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     };
   }
 
+  const clerkIdentity = resolveClerkIdentity(await currentUser());
+  const clerkEmail = clerkIdentity.email;
+
   const billing = await getUserBillingInfo();
 
   if (!billing.success || !billing.data) {
+    const adminFromEmail = isAdminEmail(clerkEmail);
     return {
       userId,
-      email: null,
+      email: clerkEmail,
       isAuthenticated: true,
-      isAdmin: false,
+      isAdmin: adminFromEmail,
       isPro: false,
       hasAdvancedFeatures: false,
       canRemoveBranding: false,
     };
   }
 
-  const { email, isPro, isAdmin } = billing.data;
+  const { email: emailFromDb, isPro, isAdmin } = billing.data;
+  const effectiveEmail = emailFromDb || clerkEmail;
   const pro = isPro ?? false;
-  const admin = isAdmin ?? false;
+  const admin = Boolean(isAdmin) || isAdminEmail(effectiveEmail);
 
   return {
     userId,
-    email,
+    email: effectiveEmail,
     isAuthenticated: true,
     isAdmin: admin,
     isPro: pro,

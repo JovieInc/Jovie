@@ -1,6 +1,11 @@
 'use client';
 
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  type Variants,
+} from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface AnimatedAccordionProps {
@@ -29,7 +34,7 @@ export function AnimatedAccordion({
   const shouldReduceMotion = useReducedMotion();
 
   // Motion variants for the container
-  const containerVariants = {
+  const containerVariants: Variants = {
     open: {
       opacity: 1,
       height: 'auto',
@@ -64,7 +69,7 @@ export function AnimatedAccordion({
   };
 
   // Motion variants for the content
-  const contentVariants = {
+  const contentVariants: Variants = {
     open: {
       y: 0,
       opacity: 1,

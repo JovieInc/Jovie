@@ -7,7 +7,7 @@ export default async function SettingsAppearancePage() {
   const { userId } = await auth();
 
   if (!userId) {
-    redirect('/sign-in?redirect_url=/app/settings/appearance');
+    redirect('/signin?redirect_url=/app/settings/appearance');
   }
 
   const dashboardData = await getDashboardDataCached();

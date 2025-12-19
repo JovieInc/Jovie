@@ -9,7 +9,7 @@ import { Container } from '@/components/site/Container';
 export function ProfileSkeleton() {
   return (
     <div
-      className='min-h-screen bg-white dark:bg-black transition-colors duration-200 relative overflow-hidden'
+      className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden'
       role='status'
       aria-busy='true'
       aria-label='Loading Jovie profile'
@@ -21,13 +21,13 @@ export function ProfileSkeleton() {
         {/* Top chrome placeholders to prevent layout shift */}
         <div className='absolute top-4 left-4 z-10'>
           <div
-            className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none'
+            className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
             aria-hidden='true'
           />
         </div>
         <div className='absolute top-4 right-4 z-10'>
           <div
-            className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none'
+            className='h-8 w-8 rounded-full skeleton motion-reduce:animate-none'
             aria-hidden='true'
           />
         </div>

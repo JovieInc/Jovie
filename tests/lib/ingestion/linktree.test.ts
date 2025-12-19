@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
 import {
@@ -9,6 +11,9 @@ import {
   normalizeHandle,
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+
+const readFixture = (name: string) =>
+  readFileSync(path.join(__dirname, 'fixtures', 'linktree', name), 'utf-8');
 
 describe('Linktree Strategy', () => {
   describe('isLinktreeUrl', () => {
@@ -260,6 +265,43 @@ describe('Linktree Strategy', () => {
       const result = extractLinktree(html);
       // Should not throw, may or may not extract data depending on regex
       expect(result).toBeDefined();
+    });
+
+    it('prefers structured Next.js data when available', () => {
+      const html = readFixture('structured.html');
+      const result = extractLinktree(html);
+
+      expect(result.displayName).toBe('Casey Stone');
+      expect(result.avatarUrl).toBe('https://cdn.linktr.ee/profiles/casey.jpg');
+
+      const platforms = result.links.map(link => link.platformId).sort();
+      expect(platforms).toEqual([
+        'instagram',
+        'spotify',
+        'twitter',
+        'youtube-music',
+      ]);
+      expect(
+        result.links.some(link => {
+          try {
+            return new URL(link.url).host === 'open.spotify.com';
+          } catch {
+            return false;
+          }
+        })
+      ).toBe(true);
+      // Internal Linktree URLs should be ignored
+      expect(
+        result.links.some(link => link.url.includes('linktr.ee/internal'))
+      ).toBe(false);
+    });
+
+    it('falls back to href scanning when structured data is missing', () => {
+      const html = readFixture('edge-case.html');
+      const result = extractLinktree(html);
+
+      const platforms = result.links.map(link => link.platformId).sort();
+      expect(platforms).toEqual(['instagram', 'tiktok']);
     });
   });
 

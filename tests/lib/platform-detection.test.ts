@@ -136,6 +136,34 @@ describe('Platform Detection', () => {
     });
   });
 
+  describe('Twitch and OnlyFans detection', () => {
+    it('detects Twitch profiles and validates format', () => {
+      const urls = [
+        'twitch.tv/streamer123',
+        'https://www.twitch.tv/streamer_456/',
+      ];
+
+      urls.forEach(url => {
+        const detected = detectPlatform(url);
+        expect(detected.platform.id).toBe('twitch');
+        expect(detected.isValid).toBe(true);
+      });
+    });
+
+    it('detects OnlyFans profiles and validates format', () => {
+      const urls = [
+        'onlyfans.com/creator.name',
+        'https://www.onlyfans.com/creator_name',
+      ];
+
+      urls.forEach(url => {
+        const detected = detectPlatform(url);
+        expect(detected.platform.id).toBe('onlyfans');
+        expect(detected.isValid).toBe(true);
+      });
+    });
+  });
+
   describe('Linktree detection', () => {
     it('detects linktree hosts and normalizes URL', () => {
       const url = 'linktr.ee/example';

@@ -1,6 +1,10 @@
 export { AuthBackButton } from './AuthBackButton';
 export { AuthButton, authButtonVariants } from './AuthButton';
 export { AuthFooterLink } from './AuthFooterLink';
+export { AuthGoogleIcon } from './AuthGoogleIcon';
 export { AuthInput } from './AuthInput';
 export { AuthLink } from './AuthLink';
+export { AuthLinkPreviewCard } from './AuthLinkPreviewCard';
+export { AuthSpotifyIcon } from './AuthSpotifyIcon';
+export { AuthTextInput } from './AuthTextInput';
 export { OtpInput } from './OtpInput';

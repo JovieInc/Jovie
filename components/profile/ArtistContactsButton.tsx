@@ -105,7 +105,7 @@ export function ArtistContactsButton({
     available.length === 1 && available[0].channels.length === 1;
 
   const triggerClass =
-    'group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 cursor-pointer ring-1 ring-black/5 dark:ring-white/10 bg-white/70 dark:bg-white/10 text-gray-800 dark:text-gray-100 hover:bg-white';
+    'group flex h-8 w-8 items-center justify-center rounded-full transition-all duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base) cursor-pointer ring-1 ring-(--color-border-subtle) bg-surface-0 text-primary-token hover:bg-surface-1';
 
   const performAction = (
     channel: PublicContactChannel,
@@ -195,38 +195,34 @@ export function ArtistContactsButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-72 rounded-xl border border-gray-200/60 bg-white/95 p-2 shadow-lg shadow-black/10 dark:border-white/10 dark:bg-gray-900/95 backdrop-blur-xl'
+        className='w-72 rounded-xl border border-subtle bg-surface-0 p-2 shadow-lg backdrop-blur-xl'
       >
         <div className='px-2 pb-2 pt-1'>
-          <p className='text-xs font-semibold text-gray-700 dark:text-gray-200'>
-            Contacts
-          </p>
-          <p className='text-xs text-gray-500 dark:text-gray-400'>
-            {artistName}
-          </p>
+          <p className='text-xs font-semibold text-primary-token'>Contacts</p>
+          <p className='text-xs text-secondary-token'>{artistName}</p>
         </div>
-        <DropdownMenuSeparator className='bg-gray-200/70 dark:bg-white/10' />
+        <DropdownMenuSeparator className='bg-transparent border-t border-subtle' />
         <div className='max-h-80 overflow-auto'>
           {available.map(contact => {
             const primary = primaryChannel(contact);
             return (
               <div
                 key={contact.id}
-                className='group/contact flex items-center justify-between gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-gray-100/70 dark:hover:bg-white/5'
+                className='group/contact flex items-center justify-between gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-surface-1'
               >
                 <button
                   type='button'
-                  className='flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-md px-1'
+                  className='flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] rounded-md px-1'
                   data-contact-encoded={primary.encoded}
                   data-role={contact.role}
                   data-territories={contact.territoryCount}
                   onClick={() => performAction(primary, contact)}
                 >
-                  <span className='text-sm font-semibold text-gray-800 dark:text-gray-100'>
+                  <span className='text-sm font-semibold text-primary-token'>
                     {buildTerritoryLabel(contact)}
                   </span>
                   {contact.secondaryLabel ? (
-                    <span className='text-xs text-gray-500 dark:text-gray-400'>
+                    <span className='text-xs text-secondary-token'>
                       {contact.secondaryLabel}
                     </span>
                   ) : null}
@@ -236,7 +232,7 @@ export function ArtistContactsButton({
                     <button
                       key={`${contact.id}-${channel.type}`}
                       type='button'
-                      className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-gray-700 dark:text-gray-100 hover:bg-gray-200/60 dark:hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 data-[preferred=true]:bg-gray-200/80 dark:data-[preferred=true]:bg-white/10'
+                      className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent text-primary-token hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))] data-[preferred=true]:bg-surface-2'
                       data-contact-encoded={channel.encoded}
                       data-channel={channel.type}
                       data-preferred={channel.preferred ? 'true' : undefined}

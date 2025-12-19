@@ -8,6 +8,7 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
@@ -55,6 +56,15 @@ export function WaitlistTable({
   pageSize,
   total,
 }: WaitlistTableProps) {
+  const [rows, setRows] = useState<WaitlistEntryRow[]>(entries);
+  const [approveStatuses, setApproveStatuses] = useState<
+    Record<string, 'idle' | 'loading' | 'success' | 'error'>
+  >({});
+
+  useEffect(() => {
+    setRows(entries);
+  }, [entries]);
+
   const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
   const canPrev = page > 1;
   const canNext = page < totalPages;
@@ -74,6 +84,48 @@ export function WaitlistTable({
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
   const nextHref = canNext ? buildHref(page + 1) : undefined;
+
+  const approveEntry = useCallback(async (entryId: string) => {
+    setApproveStatuses(prev => ({ ...prev, [entryId]: 'loading' }));
+
+    try {
+      const response = await fetch('/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ entryId }),
+      });
+
+      const payload = (await response.json().catch(() => null)) as {
+        success?: boolean;
+        status?: string;
+        error?: string;
+      } | null;
+
+      if (!response.ok || !payload?.success) {
+        setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
+        return;
+      }
+
+      setRows(prev =>
+        prev.map(entry =>
+          entry.id === entryId
+            ? {
+                ...entry,
+                status: 'invited',
+                updatedAt: new Date(),
+              }
+            : entry
+        )
+      );
+
+      setApproveStatuses(prev => ({ ...prev, [entryId]: 'success' }));
+    } catch {
+      setApproveStatuses(prev => ({ ...prev, [entryId]: 'error' }));
+    }
+  }, []);
 
   return (
     <AdminTableShell
@@ -157,20 +209,26 @@ export function WaitlistTable({
               >
                 Created
               </th>
+              <th
+                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
+                style={{ top: stickyTopPx }}
+              >
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {entries.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   className='px-3 py-10 text-center text-sm text-secondary-token'
                 >
                   No waitlist entries yet.
                 </td>
               </tr>
             ) : (
-              entries.map(entry => {
+              rows.map(entry => {
                 const platformLabel =
                   PLATFORM_LABELS[entry.primarySocialPlatform] ??
                   entry.primarySocialPlatform;
@@ -184,6 +242,11 @@ export function WaitlistTable({
                   entry.heardAbout && entry.heardAbout.length > 30
                     ? entry.heardAbout.slice(0, 30) + '…'
                     : entry.heardAbout;
+
+                const isApproved =
+                  entry.status === 'invited' || entry.status === 'claimed';
+                const approveStatus = approveStatuses[entry.id] ?? 'idle';
+                const isApproving = approveStatus === 'loading';
 
                 return (
                   <tr
@@ -280,6 +343,24 @@ export function WaitlistTable({
                             minute: '2-digit',
                           }).format(entry.createdAt)
                         : '—'}
+                    </td>
+                    <td className='px-3 py-3'>
+                      <div className='flex items-center justify-end gap-2'>
+                        <Button
+                          size='sm'
+                          variant='secondary'
+                          disabled={isApproved || isApproving}
+                          onClick={() => {
+                            void approveEntry(entry.id);
+                          }}
+                        >
+                          {isApproved
+                            ? 'Approved'
+                            : isApproving
+                              ? 'Approving…'
+                              : 'Approve'}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 );

@@ -27,10 +27,16 @@ import {
 import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
 import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
+import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
+import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
+import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
+import { useToast } from '@/components/molecules/ToastContainer';
 import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
@@ -60,17 +66,6 @@ interface AdminCreatorProfilesWithSidebarProps {
   basePath?: string;
 }
 
-function isFormElement(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  const tag = target.tagName;
-  return (
-    tag === 'INPUT' ||
-    tag === 'TEXTAREA' ||
-    tag === 'SELECT' ||
-    tag === 'BUTTON'
-  );
-}
-
 function mapProfileToContact(
   profile: AdminCreatorProfileRow | null
 ): Contact | null {
@@ -87,25 +82,20 @@ function mapProfileToContact(
   };
 }
 
-function SortIndicator({ direction }: { direction?: 'asc' | 'desc' }) {
-  if (!direction) {
-    return (
-      <span className='text-xs text-secondary-token' aria-hidden='true'>
-        ⇅
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className='text-xs text-primary-token'
-      aria-hidden='true'
-      aria-label={direction === 'asc' ? 'Ascending' : 'Descending'}
-    >
-      {direction === 'asc' ? '▴' : '▾'}
-    </span>
-  );
-}
+type AdminCreatorSocialLinksResponse =
+  | {
+      success: true;
+      links: Array<{
+        id: string;
+        label: string;
+        url: string;
+        platformType: string;
+      }>;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
@@ -118,6 +108,7 @@ export function AdminCreatorProfilesWithSidebar({
   basePath = '/app/admin/creators',
 }: AdminCreatorProfilesWithSidebarProps) {
   const router = useRouter();
+  const { showToast } = useToast();
   const {
     profiles,
     statuses: verificationStatuses,
@@ -137,6 +128,10 @@ export function AdminCreatorProfilesWithSidebar({
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftContact, setDraftContact] = useState<Contact | null>(null);
+
+  const [ingestRefreshStatuses, setIngestRefreshStatuses] = useState<
+    Record<string, 'idle' | 'loading' | 'success' | 'error'>
+  >({});
   const tableMetaCtx = useOptionalTableMeta();
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
@@ -144,69 +139,32 @@ export function AdminCreatorProfilesWithSidebar({
     [tableMetaCtx]
   );
 
-  // New states for dialogs and responsive
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] =
     useState<AdminCreatorProfileRow | null>(null);
 
-  // Detect mobile breakpoint
-  React.useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
-    setIsMobile(mediaQuery.matches);
+  const {
+    totalPages,
+    canPrev,
+    canNext,
+    from,
+    to,
+    prevHref,
+    nextHref,
+    clearHref,
+    buildHref,
+  } = useAdminTablePaginationLinks<AdminCreatorProfilesSort>({
+    basePath,
+    page,
+    pageSize,
+    search,
+    sort,
+    total,
+  });
 
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-    mediaQuery.addEventListener('change', handler);
-    return () => mediaQuery.removeEventListener('change', handler);
-  }, []);
-
-  const totalPages = total > 0 ? Math.max(Math.ceil(total / pageSize), 1) : 1;
-  const canPrev = page > 1;
-  const canNext = page < totalPages;
-
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = total === 0 ? 0 : Math.min(page * pageSize, total);
-
-  const buildHref = (
-    targetPage: number,
-    overrideSort?: AdminCreatorProfilesSort,
-    includeSearch = true
-  ): string => {
-    const params = new URLSearchParams();
-    params.set('page', String(targetPage));
-    params.set('pageSize', String(pageSize));
-    params.set('sort', overrideSort ?? sort);
-    if (includeSearch && search) {
-      params.set('q', search);
-    }
-    const query = params.toString();
-    return query.length > 0 ? `${basePath}?${query}` : basePath;
-  };
-
-  const prevHref = canPrev ? buildHref(page - 1) : undefined;
-  const nextHref = canNext ? buildHref(page + 1) : undefined;
-  const clearHref = buildHref(1, undefined, false);
   const createSortHref = (column: SortableColumnKey) =>
-    buildHref(1, getNextSort(sort, column));
-
-  const renderSortHeader = (column: SortableColumnKey) => {
-    const columnConfig = SORTABLE_COLUMNS[column];
-    const direction = getSortDirection(sort, column);
-
-    return (
-      <button
-        type='button'
-        onClick={event => {
-          event.stopPropagation();
-          router.push(createSortHref(column));
-        }}
-        className='inline-flex w-full items-center gap-1 text-xs uppercase tracking-wide font-semibold text-left hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-      >
-        {columnConfig.label}
-        <SortIndicator direction={direction} />
-      </button>
-    );
-  };
+    buildHref({ page: 1, sort: getNextSort(sort, column) });
 
   const filteredProfiles = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -221,27 +179,65 @@ export function AdminCreatorProfilesWithSidebar({
     });
   }, [profilesWithActions, searchTerm]);
 
+  const rowIds = useMemo(
+    () => filteredProfiles.map(profile => profile.id),
+    [filteredProfiles]
+  );
+
+  const {
+    selectedIds,
+    selectedCount,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+  } = useRowSelection(rowIds);
+
   const selectedProfile = useMemo(
     () => filteredProfiles.find(p => p.id === selectedId) ?? null,
     [filteredProfiles, selectedId]
   );
 
-  const selectedIndex = useMemo(
-    () => filteredProfiles.findIndex(p => p.id === selectedId),
-    [filteredProfiles, selectedId]
-  );
+  const hydrateContactSocialLinks = useCallback(
+    async (profileId: string): Promise<void> => {
+      const contactBase = mapProfileToContact(
+        filteredProfiles.find(p => p.id === profileId) ?? null
+      );
+      if (!contactBase) return;
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const selectedCount = selectedIds.size;
-  const allSelected =
-    filteredProfiles.length > 0 && selectedCount === filteredProfiles.length;
-  const someSelected =
-    selectedCount > 0 && selectedCount < filteredProfiles.length;
-  const headerCheckboxState: boolean | 'indeterminate' = allSelected
-    ? true
-    : someSelected
-      ? 'indeterminate'
-      : false;
+      try {
+        const response = await fetch(
+          `/api/admin/creator-social-links?profileId=${encodeURIComponent(profileId)}`,
+          {
+            headers: {
+              Accept: 'application/json',
+            },
+          }
+        );
+
+        const payload = (await response
+          .json()
+          .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
+
+        if (!response.ok || !payload || !payload.success) {
+          setDraftContact(contactBase);
+          return;
+        }
+
+        setDraftContact({
+          ...contactBase,
+          socialLinks: payload.links.map(link => ({
+            id: link.id,
+            label: link.label,
+            url: link.url,
+            platformType: link.platformType,
+          })),
+        });
+      } catch {
+        setDraftContact(contactBase);
+      }
+    },
+    [filteredProfiles]
+  );
 
   const effectiveContact = useMemo(() => {
     if (draftContact && draftContact.id === selectedId) return draftContact;
@@ -254,75 +250,68 @@ export function AdminCreatorProfilesWithSidebar({
     setDraftContact(null);
   }, []);
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds(prev => {
-      if (filteredProfiles.length === 0) return new Set<string>();
-      if (prev.size === filteredProfiles.length) return new Set<string>();
-      return new Set(filteredProfiles.map(p => p.id));
-    });
-  };
-
   React.useEffect(() => {
-    setSelectedIds(prev => {
-      const next = new Set<string>();
-      filteredProfiles.forEach(profile => {
-        if (prev.has(profile.id)) next.add(profile.id);
-      });
-      return next;
-    });
-  }, [filteredProfiles]);
+    if (!sidebarOpen || !selectedId) return;
+    void hydrateContactSocialLinks(selectedId);
+  }, [hydrateContactSocialLinks, selectedId, sidebarOpen]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (isFormElement(event.target)) return;
+  const refreshIngest = useCallback(
+    async (profileId: string): Promise<void> => {
+      setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'loading' }));
+      try {
+        const response = await fetch('/app/admin/creators/bulk-refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+          body: JSON.stringify({ profileIds: [profileId] }),
+        });
 
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (filteredProfiles.length === 0) return;
+        const payload = (await response.json().catch(() => ({}))) as {
+          success?: boolean;
+          queuedCount?: number;
+          error?: string;
+        };
 
-      event.preventDefault();
-
-      if (event.key === 'ArrowDown') {
-        if (selectedIndex === -1) {
-          setSelectedId(filteredProfiles[0]?.id ?? null);
-        } else {
-          const nextIndex = Math.min(
-            selectedIndex + 1,
-            filteredProfiles.length - 1
-          );
-          setSelectedId(filteredProfiles[nextIndex]?.id ?? null);
+        if (!response.ok || !payload.success) {
+          throw new Error(payload.error ?? 'Failed to queue ingestion');
         }
-      } else if (event.key === 'ArrowUp') {
-        if (selectedIndex === -1) {
-          setSelectedId(
-            filteredProfiles[filteredProfiles.length - 1]?.id ?? null
-          );
-        } else {
-          const prevIndex = Math.max(selectedIndex - 1, 0);
-          setSelectedId(filteredProfiles[prevIndex]?.id ?? null);
+
+        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'success' }));
+        showToast({
+          type: 'success',
+          message: 'Ingestion refresh queued',
+        });
+        router.refresh();
+
+        if (selectedId === profileId) {
+          void hydrateContactSocialLinks(profileId);
         }
+      } catch (error) {
+        setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
+        showToast({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Refresh failed',
+        });
+      } finally {
+        window.setTimeout(() => {
+          setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'idle' }));
+        }, 2200);
       }
-    } else if (event.key === ' ' || event.key === 'Spacebar') {
-      if (!selectedProfile) return;
-      event.preventDefault();
-      setSidebarOpen(open => !open);
-    } else if (event.key === 'Escape') {
-      if (sidebarOpen) {
-        event.preventDefault();
-        setSidebarOpen(false);
-      }
-    }
-  };
+    },
+    [hydrateContactSocialLinks, router, selectedId, showToast]
+  );
+
+  const { handleKeyDown } = useAdminTableKeyboardNavigation({
+    items: filteredProfiles,
+    selectedId,
+    onSelect: setSelectedId,
+    onToggleSidebar: () => setSidebarOpen(open => !open),
+    onCloseSidebar: () => setSidebarOpen(false),
+    isSidebarOpen: sidebarOpen,
+    getId: profile => profile.id,
+  });
 
   const handleContactChange = (updated: Contact) => {
     setDraftContact(updated);
@@ -520,6 +509,7 @@ export function AdminCreatorProfilesWithSidebar({
                       aria-label='Select all creators'
                       checked={headerCheckboxState}
                       onCheckedChange={toggleSelectAll}
+                      className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
                     />
                   </th>
                   <th
@@ -573,9 +563,12 @@ export function AdminCreatorProfilesWithSidebar({
                         'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
-                    onClick={() => router.push(createSortHref('created'))}
                   >
-                    {renderSortHeader('created')}
+                    <SortableHeaderButton
+                      label={SORTABLE_COLUMNS.created.label}
+                      direction={getSortDirection(sort, 'created')}
+                      onClick={() => router.push(createSortHref('created'))}
+                    />
                   </th>
                   <th
                     className={cn(
@@ -584,9 +577,12 @@ export function AdminCreatorProfilesWithSidebar({
                         'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
-                    onClick={() => router.push(createSortHref('claimed'))}
                   >
-                    {renderSortHeader('claimed')}
+                    <SortableHeaderButton
+                      label={SORTABLE_COLUMNS.claimed.label}
+                      direction={getSortDirection(sort, 'claimed')}
+                      onClick={() => router.push(createSortHref('claimed'))}
+                    />
                   </th>
                   <th
                     className={cn(
@@ -595,9 +591,12 @@ export function AdminCreatorProfilesWithSidebar({
                         'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
-                    onClick={() => router.push(createSortHref('verified'))}
                   >
-                    {renderSortHeader('verified')}
+                    <SortableHeaderButton
+                      label={SORTABLE_COLUMNS.verified.label}
+                      direction={getSortDirection(sort, 'verified')}
+                      onClick={() => router.push(createSortHref('verified'))}
+                    />
                   </th>
                   <th
                     className={cn(
@@ -674,6 +673,7 @@ export function AdminCreatorProfilesWithSidebar({
                                 aria-label={`Select ${profile.username}`}
                                 checked={isChecked}
                                 onCheckedChange={() => toggleSelect(profile.id)}
+                                className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
                               />
                             </div>
                           </div>
@@ -776,10 +776,14 @@ export function AdminCreatorProfilesWithSidebar({
                               status={
                                 verificationStatuses[profile.id] ?? 'idle'
                               }
+                              refreshIngestStatus={
+                                ingestRefreshStatuses[profile.id] ?? 'idle'
+                              }
                               open={openMenuProfileId === profile.id}
                               onOpenChange={open =>
                                 setOpenMenuProfileId(open ? profile.id : null)
                               }
+                              onRefreshIngest={() => refreshIngest(profile.id)}
                               onToggleVerification={async () => {
                                 const result = await toggleVerification(
                                   profile.id,
@@ -844,6 +848,12 @@ export function AdminCreatorProfilesWithSidebar({
             mode={mode}
             isOpen={sidebarOpen && Boolean(effectiveContact)}
             onClose={handleSidebarClose}
+            onRefresh={() => {
+              router.refresh();
+              if (selectedId) {
+                void hydrateContactSocialLinks(selectedId);
+              }
+            }}
             onContactChange={handleContactChange}
             onAvatarUpload={handleAvatarUpload}
           />

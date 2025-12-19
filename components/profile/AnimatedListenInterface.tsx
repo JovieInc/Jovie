@@ -1,6 +1,11 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import {
+  AnimatePresence,
+  type MotionProps,
+  motion,
+  type Variants,
+} from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import {
@@ -99,7 +104,7 @@ export function AnimatedListenInterface({
   };
 
   // Container animation variants
-  const containerVariants = {
+  const containerVariants: Variants = {
     hidden: {
       opacity: 0,
       scale: 0.95,
@@ -128,7 +133,7 @@ export function AnimatedListenInterface({
   };
 
   // Individual DSP button animation variants
-  const itemVariants = {
+  const itemVariants: Variants = {
     hidden: {
       opacity: 0,
       y: 30,
@@ -149,7 +154,7 @@ export function AnimatedListenInterface({
     <AnimatePresence mode='wait'>
       <motion.div
         key='listen-interface'
-        variants={prefersReducedMotion ? {} : containerVariants}
+        variants={prefersReducedMotion ? undefined : containerVariants}
         initial={prefersReducedMotion ? { opacity: 1 } : 'hidden'}
         animate={prefersReducedMotion ? { opacity: 1 } : 'visible'}
         exit={prefersReducedMotion ? { opacity: 0 } : 'exit'}
@@ -157,12 +162,12 @@ export function AnimatedListenInterface({
       >
         {/* DSP Buttons */}
         <motion.div
-          variants={prefersReducedMotion ? {} : itemVariants}
+          variants={prefersReducedMotion ? undefined : itemVariants}
           className='space-y-3'
         >
           {availableDSPs.length === 0 ? (
-            <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5 text-center'>
-              <p className='text-sm text-gray-600 dark:text-gray-400'>
+            <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl text-center'>
+              <p className='text-sm text-secondary-token'>
                 Streaming links aren&apos;t available for this profile yet.
               </p>
             </div>
@@ -172,23 +177,23 @@ export function AnimatedListenInterface({
                 key={dsp.key}
                 onClick={() => handleDSPClick(dsp)}
                 disabled={selectedDSP === dsp.key}
-                variants={prefersReducedMotion ? {} : itemVariants}
+                variants={prefersReducedMotion ? undefined : itemVariants}
                 whileHover={
-                  prefersReducedMotion
-                    ? {}
+                  (prefersReducedMotion
+                    ? undefined
                     : {
                         scale: 1.02,
                         y: -2,
                         transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] },
-                      }
+                      }) satisfies MotionProps['whileHover']
                 }
                 whileTap={
-                  prefersReducedMotion
-                    ? {}
+                  (prefersReducedMotion
+                    ? undefined
                     : {
                         scale: 0.98,
                         transition: { duration: 0.1 },
-                      }
+                      }) satisfies MotionProps['whileTap']
                 }
                 className='w-full group relative overflow-hidden rounded-xl p-4 font-semibold text-base transition-all duration-300 ease-out shadow-lg hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/50 disabled:cursor-not-allowed'
                 style={{
@@ -228,7 +233,7 @@ export function AnimatedListenInterface({
                     dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
                     animate={
                       prefersReducedMotion
-                        ? {}
+                        ? undefined
                         : { rotate: selectedDSP === dsp.key ? [0, 360] : 0 }
                     }
                     transition={
@@ -268,8 +273,8 @@ export function AnimatedListenInterface({
 
         {/* Footer note */}
         <motion.p
-          variants={prefersReducedMotion ? {} : itemVariants}
-          className='text-xs text-gray-500 dark:text-gray-400 text-center mt-6'
+          variants={prefersReducedMotion ? undefined : itemVariants}
+          className='text-xs text-tertiary-token text-center mt-6'
         >
           Tap to open in the app or your browser
         </motion.p>

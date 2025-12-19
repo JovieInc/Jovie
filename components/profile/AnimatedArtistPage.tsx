@@ -1,7 +1,7 @@
 'use client';
 
 import { useFeatureGate } from '@statsig/react-bindings';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
@@ -75,8 +75,8 @@ function renderContent(
             }
           >
             <div className='space-y-4 text-center'>
-              <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5'>
-                <p className='text-gray-600 dark:text-gray-400' role='alert'>
+              <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl'>
+                <p className='text-secondary-token' role='alert'>
                   Tipping is not available yet. We&apos;re focused on getting
                   the core Jovie profile experience right before launching
                   tipping.
@@ -137,8 +137,8 @@ function renderContent(
               />
             ) : (
               <div className='text-center'>
-                <div className='bg-white/60 dark:bg-white/5 backdrop-blur-lg border border-gray-200/30 dark:border-white/10 rounded-2xl p-8 shadow-xl shadow-black/5'>
-                  <p className='text-gray-600 dark:text-gray-400' role='alert'>
+                <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-8 shadow-xl'>
+                  <p className='text-secondary-token' role='alert'>
                     Venmo tipping is not available for this artist yet.
                   </p>
                 </div>
@@ -185,7 +185,7 @@ export function AnimatedArtistPage({
   const tippingEnabled = tippingGate.value;
 
   // Page-level animation variants with Apple-style easing
-  const pageVariants = {
+  const pageVariants: Variants = {
     initial: {
       opacity: 0,
       scale: 0.98,
@@ -237,7 +237,7 @@ export function AnimatedArtistPage({
           <AnimatePresence mode='wait'>
             <motion.div
               key={mode} // Keep key only on the content that should change
-              variants={prefersReducedMotion ? {} : pageVariants}
+              variants={prefersReducedMotion ? undefined : pageVariants}
               initial={prefersReducedMotion ? { opacity: 1 } : 'initial'}
               animate={prefersReducedMotion ? { opacity: 1 } : 'animate'}
               exit={prefersReducedMotion ? { opacity: 0 } : 'exit'}

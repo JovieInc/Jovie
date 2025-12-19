@@ -2,6 +2,11 @@
  * Stripe Webhooks Handler
  * Handles subscription events and updates user billing status
  * Webhooks are the source of truth for billing status
+ *
+ * Security Notes:
+ * - Stripe customer IDs and subscription IDs are considered PII and are NOT logged
+ * - Only internal user IDs, event IDs, event types, and price IDs are safe to log
+ * - All errors are sent to error tracking with sanitized context
  */
 
 import { eq } from 'drizzle-orm';
@@ -68,8 +73,8 @@ async function getUserIdFromStripeCustomer(
       'Failed to lookup user by Stripe customer ID in fallback',
       error,
       {
-        stripeCustomerId,
         function: 'getUserIdFromStripeCustomer',
+        route: '/api/stripe/webhooks',
       }
     );
     return null;
@@ -83,7 +88,11 @@ export async function POST(request: NextRequest) {
     const signature = headersList.get('stripe-signature');
 
     if (!signature) {
-      console.error('Missing Stripe signature');
+      await captureCriticalError(
+        'Missing Stripe webhook signature',
+        new Error('Missing signature header'),
+        { route: '/api/stripe/webhooks' }
+      );
       return NextResponse.json(
         { error: 'Missing signature' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -95,17 +104,14 @@ export async function POST(request: NextRequest) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
-      console.error('Invalid webhook signature:', error);
+      await captureCriticalError('Invalid Stripe webhook signature', error, {
+        route: '/api/stripe/webhooks',
+      });
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
-
-    console.log('Received webhook event:', {
-      type: event.type,
-      id: event.id,
-    });
 
     // Record the event for auditing and idempotency. If an event with the same
     // Stripe event ID already exists, we skip further processing to keep
@@ -122,10 +128,7 @@ export async function POST(request: NextRequest) {
       .returning({ id: stripeWebhookEvents.id });
 
     if (!webhookRecord) {
-      console.log('Duplicate Stripe webhook event, skipping processing', {
-        eventId: event.id,
-        type: event.type,
-      });
+      // Duplicate event - skip processing (this is expected behavior)
       return NextResponse.json(
         { received: true },
         { headers: NO_STORE_HEADERS }
@@ -167,13 +170,15 @@ export async function POST(request: NextRequest) {
         break;
 
       default:
-        console.log('Unhandled webhook event type:', event.type);
+        // Unhandled event types are expected - Stripe sends many event types
         break;
     }
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    await captureCriticalError('Stripe webhook processing failed', error, {
+      route: '/api/stripe/webhooks',
+    });
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500, headers: NO_STORE_HEADERS }
@@ -182,19 +187,11 @@ export async function POST(request: NextRequest) {
 }
 
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  console.log('Processing checkout completion:', {
-    sessionId: session.id,
-    customerId: session.customer,
-    subscriptionId: session.subscription,
-  });
-
   let userId = session.metadata?.clerk_user_id;
 
   // Fallback: Look up user by Stripe customer ID if metadata is missing
   if (!userId && typeof session.customer === 'string') {
     await logFallback('No user ID in checkout session metadata', {
-      sessionId: session.id,
-      customerId: session.customer,
       event: 'checkout.session.completed',
     });
     userId = (await getUserIdFromStripeCustomer(session.customer)) ?? undefined;
@@ -205,8 +202,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       'Cannot identify user for checkout session',
       new Error('Missing user ID in checkout session'),
       {
-        sessionId: session.id,
-        customerId: session.customer,
         route: '/api/stripe/webhooks',
         event: 'checkout.session.completed',
       }
@@ -227,32 +222,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 }
 
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
-  console.log('Processing subscription creation:', {
-    subscriptionId: subscription.id,
-    customerId: subscription.customer,
-    status: subscription.status,
-  });
-
   let userId: string | undefined = subscription.metadata?.clerk_user_id;
 
   // Fallback: Look up user by Stripe customer ID if metadata is missing
   if (!userId && typeof subscription.customer === 'string') {
-    console.warn(
-      '[FALLBACK] No user ID in metadata, looking up by customer ID',
-      {
-        subscriptionId: subscription.id,
-        customerId: subscription.customer,
-      }
-    );
+    await logFallback('No user ID in subscription metadata', {
+      event: 'customer.subscription.created',
+    });
     userId =
       (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
   }
 
   if (!userId) {
-    console.error('[CRITICAL] Cannot identify user for subscription', {
-      subscriptionId: subscription.id,
-      customerId: subscription.customer,
-    });
+    await captureCriticalError(
+      'Cannot identify user for subscription creation',
+      new Error('Missing user ID in subscription'),
+      {
+        route: '/api/stripe/webhooks',
+        event: 'customer.subscription.created',
+      }
+    );
     throw new Error('Missing user ID in subscription');
   }
 
@@ -261,32 +250,26 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
-  console.log('Processing subscription update:', {
-    subscriptionId: subscription.id,
-    customerId: subscription.customer,
-    status: subscription.status,
-  });
-
   let userId: string | undefined = subscription.metadata?.clerk_user_id;
 
   // Fallback: Look up user by Stripe customer ID if metadata is missing
   if (!userId && typeof subscription.customer === 'string') {
-    console.warn(
-      '[FALLBACK] No user ID in metadata, looking up by customer ID',
-      {
-        subscriptionId: subscription.id,
-        customerId: subscription.customer,
-      }
-    );
+    await logFallback('No user ID in subscription metadata', {
+      event: 'customer.subscription.updated',
+    });
     userId =
       (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
   }
 
   if (!userId) {
-    console.error('[CRITICAL] Cannot identify user for subscription', {
-      subscriptionId: subscription.id,
-      customerId: subscription.customer,
-    });
+    await captureCriticalError(
+      'Cannot identify user for subscription update',
+      new Error('Missing user ID in subscription'),
+      {
+        route: '/api/stripe/webhooks',
+        event: 'customer.subscription.updated',
+      }
+    );
     throw new Error('Missing user ID in subscription');
   }
 
@@ -295,31 +278,26 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 }
 
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  console.log('Processing subscription deletion:', {
-    subscriptionId: subscription.id,
-    customerId: subscription.customer,
-  });
-
   let userId: string | undefined = subscription.metadata?.clerk_user_id;
 
   // Fallback: Look up user by Stripe customer ID if metadata is missing
   if (!userId && typeof subscription.customer === 'string') {
-    console.warn(
-      '[FALLBACK] No user ID in metadata, looking up by customer ID',
-      {
-        subscriptionId: subscription.id,
-        customerId: subscription.customer,
-      }
-    );
+    await logFallback('No user ID in subscription metadata', {
+      event: 'customer.subscription.deleted',
+    });
     userId =
       (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
   }
 
   if (!userId) {
-    console.error('[CRITICAL] Cannot identify user for subscription', {
-      subscriptionId: subscription.id,
-      customerId: subscription.customer,
-    });
+    await captureCriticalError(
+      'Cannot identify user for subscription deletion',
+      new Error('Missing user ID in subscription'),
+      {
+        route: '/api/stripe/webhooks',
+        event: 'customer.subscription.deleted',
+      }
+    );
     throw new Error('Missing user ID in subscription');
   }
 
@@ -331,14 +309,18 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   });
 
   if (!result.success) {
-    console.error('[CRITICAL] Failed to downgrade user:', {
-      userId,
-      error: result.error,
-    });
+    await captureCriticalError(
+      'Failed to downgrade user on subscription deletion',
+      new Error(result.error || 'Unknown error'),
+      {
+        userId,
+        route: '/api/stripe/webhooks',
+        event: 'customer.subscription.deleted',
+      }
+    );
     throw new Error(`Failed to downgrade user: ${result.error}`);
   }
 
-  console.log('User downgraded to free plan:', { userId });
   revalidatePath('/app/dashboard');
 }
 
@@ -353,12 +335,6 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
           ? (subField as Stripe.Subscription).id
           : null;
 
-    console.log('Processing successful payment:', {
-      invoiceId: invoice.id,
-      customerId: invoice.customer,
-      subscriptionId,
-    });
-
     // If this is for a subscription, ensure the user's status is up to date
     if (subscriptionId && typeof subscriptionId === 'string') {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -370,7 +346,15 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice) {
       }
     }
   } catch (error) {
-    console.error('Error handling payment success:', error);
+    await captureCriticalError(
+      'Error handling payment success webhook',
+      error,
+      {
+        invoiceId: invoice.id,
+        route: '/api/stripe/webhooks',
+        event: 'invoice.payment_succeeded',
+      }
+    );
   }
 }
 
@@ -384,13 +368,18 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         ? (subField as Stripe.Subscription).id
         : null;
 
-  console.error('[PAYMENT_FAILED] Payment failed for invoice:', {
-    invoiceId: invoice.id,
-    customerId: invoice.customer,
-    subscriptionId,
-    amountDue: invoice.amount_due,
-    attemptCount: invoice.attempt_count,
-  });
+  // Log payment failure with safe metadata only (invoice ID is safe, no customer/subscription IDs)
+  await captureCriticalError(
+    'Payment failed for invoice',
+    new Error('Invoice payment failed'),
+    {
+      invoiceId: invoice.id,
+      amountDue: invoice.amount_due,
+      attemptCount: invoice.attempt_count,
+      route: '/api/stripe/webhooks',
+      event: 'invoice.payment_failed',
+    }
+  );
 
   // If subscription payment failed, fetch subscription and downgrade user
   if (subscriptionId && typeof subscriptionId === 'string') {
@@ -411,20 +400,18 @@ async function handlePaymentFailed(invoice: Stripe.Invoice) {
         });
 
         if (!result.success) {
-          console.error(
-            '[CRITICAL] Failed to downgrade user after payment failure:',
+          await captureCriticalError(
+            'Failed to downgrade user after payment failure',
+            new Error(result.error || 'Unknown error'),
             {
               userId,
-              error: result.error,
+              subscriptionStatus: subscription.status,
+              route: '/api/stripe/webhooks',
+              event: 'invoice.payment_failed',
             }
           );
           throw new Error(`Failed to downgrade user: ${result.error}`);
         }
-
-        console.log('User downgraded after payment failure:', {
-          userId,
-          subscriptionStatus: subscription.status,
-        });
       }
     }
   }
@@ -448,38 +435,45 @@ async function processSubscription(
     });
 
     if (!result.success) {
-      console.error('[CRITICAL] Failed to downgrade inactive subscription:', {
-        userId,
-        status: subscription.status,
-        error: result.error,
-      });
+      await captureCriticalError(
+        'Failed to downgrade inactive subscription',
+        new Error(result.error || 'Unknown error'),
+        {
+          userId,
+          subscriptionStatus: subscription.status,
+          route: '/api/stripe/webhooks',
+        }
+      );
       throw new Error(`Failed to downgrade user: ${result.error}`);
     }
-
-    console.log('User subscription inactive, downgraded:', {
-      userId,
-      status: subscription.status,
-    });
     return;
   }
 
   // Get the price ID from the subscription to determine the plan
   const priceId = subscription.items.data[0]?.price.id;
   if (!priceId) {
-    console.error('[CRITICAL] No price ID found in subscription:', {
-      subscriptionId: subscription.id,
-      userId,
-    });
+    await captureCriticalError(
+      'No price ID found in subscription',
+      new Error('Missing price ID'),
+      {
+        userId,
+        route: '/api/stripe/webhooks',
+      }
+    );
     throw new Error('No price ID in subscription');
   }
 
   const plan = getPlanFromPriceId(priceId);
   if (!plan) {
-    console.error('[CRITICAL] Unknown price ID:', {
-      priceId,
-      subscriptionId: subscription.id,
-      userId,
-    });
+    await captureCriticalError(
+      'Unknown price ID in subscription',
+      new Error(`Unknown price ID: ${priceId}`),
+      {
+        priceId,
+        userId,
+        route: '/api/stripe/webhooks',
+      }
+    );
     throw new Error(`Unknown price ID: ${priceId}`);
   }
 
@@ -492,19 +486,17 @@ async function processSubscription(
   });
 
   if (!result.success) {
-    console.error('[CRITICAL] Failed to update user billing status:', {
-      userId,
-      error: result.error,
-    });
+    await captureCriticalError(
+      'Failed to update user billing status',
+      new Error(result.error || 'Unknown error'),
+      {
+        userId,
+        plan,
+        route: '/api/stripe/webhooks',
+      }
+    );
     throw new Error(`Failed to update billing status: ${result.error}`);
   }
-
-  console.log('User billing status updated:', {
-    userId,
-    plan,
-    subscriptionId: subscription.id,
-    status: subscription.status,
-  });
 }
 
 // Only allow POST requests (webhooks)
