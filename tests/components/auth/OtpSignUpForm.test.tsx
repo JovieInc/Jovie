@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { OtpSignUpForm } from '@/components/auth/OtpSignUpForm';
 
@@ -168,14 +168,14 @@ describe('OtpSignUpForm', () => {
     const startStep = screen.getByTestId('signup-step-start');
     const verificationsStep = screen.getByTestId('signup-step-verifications');
 
-    expect(startStep).toHaveAttribute('aria-label', 'Enter your email address');
+    expect(startStep).toHaveAttribute('aria-label', 'Choose a sign-up method');
     expect(verificationsStep).toHaveAttribute(
       'aria-label',
       'Verify your email with code'
     );
   });
 
-  it('renders the multi-method start screen buttons', () => {
+  it('renders the multi-method sign-up buttons', () => {
     render(<OtpSignUpForm />);
 
     expect(screen.getByText('Continue with email')).toBeInTheDocument();
@@ -218,8 +218,8 @@ describe('OtpSignUpForm', () => {
   it('renders OTP input with type="otp" and autoSubmit', () => {
     render(<OtpSignUpForm />);
 
-    const inputs = screen.getAllByTestId('clerk-input');
-    const otpInput = inputs[0];
+    const verificationsStep = screen.getByTestId('signup-step-verifications');
+    const otpInput = within(verificationsStep).getByTestId('clerk-input');
     expect(otpInput).toHaveAttribute('data-type', 'otp');
     expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });
