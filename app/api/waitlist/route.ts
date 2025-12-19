@@ -119,7 +119,7 @@ function isMissingWaitlistSchemaError(error: unknown): boolean {
 
 // Request body schema
 const waitlistRequestSchema = z.object({
-  primaryGoal: z.enum(['streams', 'merch', 'tickets']).optional().nullable(),
+  primaryGoal: z.enum(['streams', 'merch', 'tickets']),
   primarySocialUrl: z
     .string()
     .trim()
@@ -134,8 +134,11 @@ const waitlistRequestSchema = z.object({
     .refine(hasSafeHttpProtocol, 'URL must start with http or https')
     .optional()
     .nullable(),
-  heardAbout: z.string().max(1000).optional().nullable(),
-  selectedPlan: z.string().optional().nullable(), // free|pro|growth|branding
+  heardAbout: z.string().trim().max(280).optional().nullable(),
+  selectedPlan: z
+    .enum(['free', 'branding', 'pro', 'growth'])
+    .optional()
+    .nullable(),
 });
 
 export async function GET() {
@@ -297,6 +300,7 @@ export async function POST(request: Request) {
       heardAbout,
       selectedPlan,
     } = parseResult.data;
+    const sanitizedHeardAbout = heardAbout?.trim() || null;
 
     // Detect platform and normalize primary social URL
     const { platform, normalizedUrl } = detectPlatformFromUrl(primarySocialUrl);
@@ -323,7 +327,7 @@ export async function POST(request: Request) {
           primarySocialUrlNormalized: normalizedUrl,
           spotifyUrl: spotifyUrl ?? null,
           spotifyUrlNormalized,
-          heardAbout: heardAbout ?? null,
+          heardAbout: sanitizedHeardAbout,
           selectedPlan: selectedPlan ?? null,
           updatedAt: new Date(),
         };
@@ -365,7 +369,7 @@ export async function POST(request: Request) {
       primarySocialUrlNormalized: normalizedUrl,
       spotifyUrl: spotifyUrl ?? null,
       spotifyUrlNormalized,
-      heardAbout: heardAbout ?? null,
+      heardAbout: sanitizedHeardAbout,
       selectedPlan: selectedPlan ?? null, // Quietly track pricing tier interest
       status: 'new' as const,
     };
