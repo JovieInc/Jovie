@@ -433,6 +433,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                                 width={32}
                                 height={32}
                                 className='h-8 w-8 rounded-full object-cover flex-shrink-0'
+                                loading='lazy'
                                 aria-hidden='true'
                               />
                             ) : (

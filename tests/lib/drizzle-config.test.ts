@@ -7,7 +7,7 @@ describe('Database Connection', () => {
 
   test('throws error when DATABASE_URL is missing', async () => {
     // Mock the environment module
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: undefined,
       },
@@ -18,7 +18,7 @@ describe('Database Connection', () => {
   });
 
   test('selects postgres driver for standard postgres URL', async () => {
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
       },
@@ -31,7 +31,7 @@ describe('Database Connection', () => {
   });
 
   test('selects postgres driver for postgresql URL', async () => {
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
       },
@@ -44,7 +44,7 @@ describe('Database Connection', () => {
   });
 
   test('selects neon driver for postgres+neon URL', async () => {
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: 'postgres+neon://user:pass@host/db',
       },
@@ -57,7 +57,7 @@ describe('Database Connection', () => {
   });
 
   test('selects neon driver for postgresql+neon URL', async () => {
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: 'postgresql+neon://user:pass@host/db',
       },
@@ -70,7 +70,7 @@ describe('Database Connection', () => {
   });
 
   test('handles connection cleanup properly', async () => {
-    vi.doMock('../../lib/env', () => ({
+    vi.doMock('../../lib/env-server', () => ({
       env: {
         DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
       },
@@ -87,7 +87,7 @@ describe('Database Connection', () => {
   test('reuses connection in development', async () => {
     vi.stubEnv('NODE_ENV', 'development');
     try {
-      vi.doMock('../../lib/env', () => ({
+      vi.doMock('../../lib/env-server', () => ({
         env: {
           DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
         },
@@ -108,7 +108,7 @@ describe('Database Connection', () => {
   test('creates new connection in production', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     try {
-      vi.doMock('../../lib/env', () => ({
+      vi.doMock('../../lib/env-server', () => ({
         env: {
           DATABASE_URL: 'postgres://user:pass@localhost:5432/db',
         },

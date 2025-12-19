@@ -37,9 +37,9 @@ This document summarizes all the changes made to eliminate console warnings and 
 **Warning**: Serializing big strings (172kiB) impacts deserialization performance.
 
 **Solution**:
-- Added `maxSize: 244000` to webpack splitChunks configuration
-- Improved cache group strategy with size limits
-- Added common chunk group for better optimization
+- Added targeted cache groups for large client dependencies (`lucide-react`, `simple-icons`, `framer-motion`, `recharts`)
+- Tightened `maxSize` to 200kb to keep cached chunks under serialization thresholds
+- Preserved a `common` group to reuse shared modules and minimize duplication
 
 ### 5. React Strict Mode for Next.js 16 Compatibility
 **Issue**: Missing React Strict Mode to catch potential compatibility issues.

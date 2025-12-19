@@ -3,6 +3,8 @@ import type { NextRequest } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
 import { LinkType } from '@/types/db';
 
+const PERF_LATENCY_ENABLED = process.env.PERF_LATENCY === 'true';
+
 const DEFAULT_MEMBER = {
   id: 'aud-1',
   visits: 1,
@@ -28,7 +30,14 @@ type BenchmarkState = {
   };
 };
 
+/**
+ * Bench-only latency. Enable with PERF_LATENCY=true to profile realistic delays.
+ */
 function sleep(ms: number) {
+  if (!PERF_LATENCY_ENABLED) {
+    return Promise.resolve();
+  }
+
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
