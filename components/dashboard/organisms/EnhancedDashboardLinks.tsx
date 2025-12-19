@@ -998,6 +998,13 @@ export function EnhancedDashboardLinks({
 
   return (
     <div className='min-w-0 min-h-screen'>
+      <div
+        className='sr-only'
+        data-testid='profile-id'
+        data-profile-id={profileId ?? ''}
+      >
+        {profileId ?? ''}
+      </div>
       {/* Main content / links manager */}
       <div className='w-full min-w-0 space-y-4'>
         {profileId && artist && (

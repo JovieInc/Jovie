@@ -1,5 +1,11 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,7 +66,7 @@ const igSocial = (overrides: Partial<DetectedLink> = {}): DetectedLink => ({
 // Dynamic mocked payload for UniversalLinkInput per test
 let nextAddPayload: DetectedLink | null = null;
 
-vi.mock('@/components/dashboard/atoms/UniversalLinkInput', async () => {
+vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
   return {
     UniversalLinkInput: ({ onAdd }: { onAdd: (l: DetectedLink) => void }) => (
       <button onClick={() => nextAddPayload && onAdd(nextAddPayload)}>
@@ -128,6 +134,50 @@ vi.mock('@/components/atoms/SocialIcon', () => {
   } as unknown as typeof import('@/components/atoms/SocialIcon');
 });
 
+vi.mock('@/components/dashboard/atoms/LinkPill', () => {
+  const MockLinkPill = ({
+    platformName,
+    primaryText,
+    menuItems,
+    menuId,
+    isMenuOpen,
+    onMenuOpenChange,
+    badgeText,
+  }: {
+    platformName: string;
+    primaryText: string;
+    menuItems: Array<{ id: string; label: string; onSelect: () => void }>;
+    menuId: string;
+    isMenuOpen: boolean;
+    onMenuOpenChange: (open: boolean) => void;
+    badgeText?: string;
+  }) => (
+    <div data-testid={`link-pill-${menuId}`}>
+      <span>{primaryText || platformName}</span>
+      {badgeText ? <span>{badgeText}</span> : null}
+      <button
+        type='button'
+        aria-label={`Open actions for ${platformName}`}
+        onClick={() => onMenuOpenChange(!isMenuOpen)}
+      >
+        Actions
+      </button>
+      {isMenuOpen
+        ? menuItems.map(item => (
+            <button key={item.id} type='button' onClick={item.onSelect}>
+              {item.label}
+            </button>
+          ))
+        : null}
+    </div>
+  );
+
+  return {
+    __esModule: true,
+    LinkPill: MockLinkPill,
+  } as unknown as typeof import('@/components/dashboard/atoms/LinkPill');
+});
+
 // Import after mocks
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 
@@ -135,7 +185,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
-const shouldRunGroupedLinksTests = process.env.RUN_GROUPED_LINKS_TESTS === '1';
+const shouldRunGroupedLinksTests = process.env.RUN_GROUPED_LINKS_TESTS !== '0';
 
 const describeFn = shouldRunGroupedLinksTests ? describe : describe.skip;
 
@@ -231,7 +281,7 @@ describeFn('GroupedLinksManager', () => {
     expect(hasDSP).toBe(true);
   });
 
-  it('toggles visibility and fires onLinksChange', () => {
+  it('toggles visibility and fires onLinksChange', async () => {
     const onLinksChange = vi.fn();
 
     renderWithProviders(
@@ -245,17 +295,23 @@ describeFn('GroupedLinksManager', () => {
     expect(onLinksChange).toHaveBeenCalledTimes(1);
 
     // Click "Hide" on the first row
-    const hideBtn = screen.getByRole('button', { name: /Hide link/i });
+    const menuTrigger = screen.getByRole('button', {
+      name: /Open actions for Instagram/i,
+    });
+    fireEvent.click(menuTrigger);
+    const hideBtn = screen.getByRole('button', { name: /Hide/i });
     fireEvent.click(hideBtn);
 
-    expect(onLinksChange).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(onLinksChange).toHaveBeenCalledTimes(2);
+    });
     const updated = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
     // Expect isVisible false for the first link
     const vis = (updated[0] as unknown as { isVisible?: boolean }).isVisible;
     expect(vis).toBe(false);
   });
 
-  it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', () => {
+  it('caps visible social links at MAX_SOCIAL_LINKS and adds new socials as hidden', async () => {
     const onLinksChange = vi.fn();
 
     const initial = Array.from({ length: MAX_SOCIAL_LINKS }, (_, i) =>
@@ -269,13 +325,17 @@ describeFn('GroupedLinksManager', () => {
       />
     );
 
-    // ignore initial mount call
+    await waitFor(() => {
+      expect(onLinksChange).toHaveBeenCalled();
+    });
     onLinksChange.mockClear();
 
     nextAddPayload = makeSocial('social-extra');
     fireEvent.click(screen.getByText('mock-add'));
 
-    expect(onLinksChange).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(onLinksChange).toHaveBeenCalled();
+    });
     const latest = onLinksChange.mock.calls.at(-1)?.[0] as DetectedLink[];
 
     // Should have MAX_SOCIAL_LINKS + 1 total links
@@ -293,5 +353,64 @@ describeFn('GroupedLinksManager', () => {
     const extraVisible =
       (extra as unknown as { isVisible?: boolean }).isVisible ?? true;
     expect(extraVisible).toBe(false);
+  });
+
+  it('accepts suggested links without duplicating canonical identities', async () => {
+    const onLinksChange = vi.fn();
+
+    renderWithProviders(
+      <GroupedLinksManager
+        initialLinks={[
+          igSocial({
+            normalizedUrl: 'https://instagram.com/artist',
+            originalUrl: 'https://instagram.com/artist',
+          }),
+        ]}
+        suggestedLinks={[
+          {
+            ...igSocial({
+              normalizedUrl: 'https://www.instagram.com/@Artist/',
+              originalUrl: 'https://www.instagram.com/@Artist/',
+            }),
+            suggestionId: 'sug-1',
+            state: 'suggested',
+          },
+        ]}
+        suggestionsEnabled
+        onAcceptSuggestion={async suggestion => ({
+          ...suggestion,
+          id: 'accepted-1',
+          isVisible: true,
+        })}
+        onLinksChange={onLinksChange}
+      />
+    );
+
+    // Ignore initial effect
+    onLinksChange.mockClear();
+
+    const suggestionPill = screen.getByTestId(/link-pill-suggestion::/);
+    const initialMenus = screen.getAllByRole('button', {
+      name: /Open actions for Instagram/i,
+    });
+    expect(initialMenus).toHaveLength(2);
+
+    fireEvent.click(
+      within(suggestionPill).getByRole('button', {
+        name: /Open actions for Instagram/i,
+      })
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId(/link-pill-suggestion::/)).toBeNull();
+    });
+
+    const remainingMenus = screen.getAllByRole('button', {
+      name: /Open actions for Instagram/i,
+    });
+    expect(remainingMenus).toHaveLength(1);
+    expect(onLinksChange).not.toHaveBeenCalled();
   });
 });

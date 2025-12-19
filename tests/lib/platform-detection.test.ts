@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
+import {
+  canonicalIdentity,
+  detectPlatform,
+  normalizeUrl,
+} from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
   describe('Unsafe inputs', () => {
@@ -26,6 +30,55 @@ describe('Platform Detection', () => {
     it('normalizeUrl throws away dangerous inputs and returns original string', () => {
       const input = 'javascript:alert(1)';
       expect(normalizeUrl(input)).toBe(input);
+    });
+  });
+
+  describe('canonicalIdentity', () => {
+    it('normalizes social handles regardless of @ or host variations', () => {
+      const linkA = detectPlatform('https://instagram.com/@HelloWorld');
+      const linkB = detectPlatform('https://www.instagram.com/helloworld/');
+
+      const identityA = canonicalIdentity({
+        platform: linkA.platform,
+        normalizedUrl: linkA.normalizedUrl,
+      });
+      const identityB = canonicalIdentity({
+        platform: linkB.platform,
+        normalizedUrl: linkB.normalizedUrl,
+      });
+
+      expect(identityA).toBe('instagram:helloworld');
+      expect(identityB).toBe(identityA);
+    });
+
+    it('prefers YouTube handles, then channel IDs, then legacy paths', () => {
+      const youtubePlatform = {
+        id: 'youtube',
+        name: 'YouTube',
+        category: 'social' as const,
+        icon: 'youtube',
+        color: 'ff0000',
+        placeholder: 'https://youtube.com/@',
+      };
+
+      expect(
+        canonicalIdentity({
+          platform: youtubePlatform,
+          normalizedUrl: 'https://youtube.com/@MyChannel',
+        })
+      ).toBe('youtube:mychannel');
+      expect(
+        canonicalIdentity({
+          platform: youtubePlatform,
+          normalizedUrl: 'https://www.youtube.com/channel/UCabc123',
+        })
+      ).toBe('youtube:channel:ucabc123');
+      expect(
+        canonicalIdentity({
+          platform: youtubePlatform,
+          normalizedUrl: 'https://youtube.com/c/SomeLegacy',
+        })
+      ).toBe('youtube:youtube.com/c/somelegacy');
     });
   });
 
