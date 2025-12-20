@@ -259,7 +259,10 @@ export function DashboardAudienceTable({
   };
 
   return (
-    <div className='flex h-full min-h-0 flex-col' data-testid='dashboard-audience-table'>
+    <div
+      className='flex h-full min-h-0 flex-col'
+      data-testid='dashboard-audience-table'
+    >
       <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
         <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
           <div>
@@ -286,7 +289,19 @@ export function DashboardAudienceTable({
                 {paginationLabel()}
               </div>
             ) : (
-              <table className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'>
+              <table
+                className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'
+                aria-label={
+                  mode === 'members'
+                    ? 'Audience members table'
+                    : 'Subscribers table'
+                }
+              >
+                <caption className='sr-only'>
+                  {mode === 'members'
+                    ? 'Table showing all audience members with their visit history, location, and engagement data'
+                    : 'Table showing all subscribers with their contact information and signup dates'}
+                </caption>
                 <thead
                   className={cn(
                     'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
@@ -656,6 +671,11 @@ export function DashboardAudienceTable({
         isOpen={Boolean(selectedMember)}
         onClose={() => setSelectedMember(null)}
       />
+      <div className='sr-only' aria-live='polite' aria-atomic='true'>
+        {paginationLabel()}
+        {selectedCount > 0 &&
+          `${selectedCount} ${selectedCount === 1 ? 'row' : 'rows'} selected`}
+      </div>
     </div>
   );
 }

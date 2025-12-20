@@ -229,6 +229,12 @@ export function DashboardActivityFeed({
           </div>
         )}
       </div>
+      <div className='sr-only' aria-live='polite' aria-atomic='true'>
+        {activities.length > 0 &&
+          `${activities.length} ${activities.length === 1 ? 'activity' : 'activities'} loaded`}
+        {isRefreshing && 'Refreshing activity feed'}
+        {error && `Error: ${error}`}
+      </div>
     </div>
   );
 }
