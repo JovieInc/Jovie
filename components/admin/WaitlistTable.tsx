@@ -8,7 +8,8 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
@@ -60,6 +61,8 @@ export function WaitlistTable({
   const [approveStatuses, setApproveStatuses] = useState<
     Record<string, 'idle' | 'loading' | 'success' | 'error'>
   >({});
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const tbodyRef = useRef<HTMLTableSectionElement | null>(null);
 
   useEffect(() => {
     setRows(entries);
@@ -84,6 +87,15 @@ export function WaitlistTable({
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
   const nextHref = canNext ? buildHref(page + 1) : undefined;
+
+  // Virtualization for table rows
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 60, // Estimated row height in pixels
+    overscan: 5, // Render 5 extra rows above/below viewport
+  });
 
   const approveEntry = useCallback(async (entryId: string) => {
     setApproveStatuses(prev => ({ ...prev, [entryId]: 'loading' }));
@@ -129,6 +141,9 @@ export function WaitlistTable({
 
   return (
     <AdminTableShell
+      scrollContainerProps={{
+        ref: scrollContainerRef,
+      }}
       toolbar={
         <div className='flex h-14 w-full items-center gap-3 px-4'>
           <div className='text-xs text-secondary-token'>
@@ -217,7 +232,14 @@ export function WaitlistTable({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody
+            ref={tbodyRef}
+            style={{
+              position: 'relative',
+              height:
+                rows.length > 0 ? `${rowVirtualizer.getTotalSize()}px` : 'auto',
+            }}
+          >
             {rows.length === 0 ? (
               <tr>
                 <td
@@ -228,7 +250,8 @@ export function WaitlistTable({
                 </td>
               </tr>
             ) : (
-              rows.map(entry => {
+              rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const entry = rows[virtualRow.index];
                 const platformLabel =
                   PLATFORM_LABELS[entry.primarySocialPlatform] ??
                   entry.primarySocialPlatform;
@@ -251,7 +274,16 @@ export function WaitlistTable({
                 return (
                   <tr
                     key={entry.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
                     className='border-b border-subtle last:border-b-0 hover:bg-surface-2'
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                   >
                     <td className='px-3 py-3 font-medium text-primary-token'>
                       {entry.fullName}

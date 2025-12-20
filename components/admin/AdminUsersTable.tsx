@@ -12,7 +12,8 @@ import {
 } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
@@ -61,6 +62,8 @@ export function AdminUsersTable({
   const router = useRouter();
   const notifications = useNotifications();
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const tbodyRef = useRef<HTMLTableSectionElement | null>(null);
 
   const {
     totalPages,
@@ -97,6 +100,15 @@ export function AdminUsersTable({
     () => users.filter(user => selectedIds.has(user.id)),
     [selectedIds, users]
   );
+
+  // Virtualization for table rows
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: users.length,
+    getScrollElement: () => scrollContainerRef.current,
+    estimateSize: () => 60, // Estimated row height in pixels
+    overscan: 5, // Render 5 extra rows above/below viewport
+  });
 
   const copySelectedEmails = async (): Promise<void> => {
     const emails = selectedUsers
@@ -207,6 +219,9 @@ export function AdminUsersTable({
           </div>
         </div>
       }
+      scrollContainerProps={{
+        ref: scrollContainerRef,
+      }}
     >
       {({ headerElevated, stickyTopPx }) => (
         <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
@@ -363,7 +378,16 @@ export function AdminUsersTable({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody
+            ref={tbodyRef}
+            style={{
+              position: 'relative',
+              height:
+                users.length > 0
+                  ? `${rowVirtualizer.getTotalSize()}px`
+                  : 'auto',
+            }}
+          >
             {users.length === 0 ? (
               <tr>
                 <td
@@ -374,14 +398,25 @@ export function AdminUsersTable({
                 </td>
               </tr>
             ) : (
-              users.map((user, index) => {
+              rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const user = users[virtualRow.index];
+                const index = virtualRow.index;
                 const isChecked = selectedIds.has(user.id);
                 const rowNumber = (page - 1) * pageSize + index + 1;
 
                 return (
                   <tr
                     key={user.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
                     className='group border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2'
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
                     onContextMenu={event => {
                       event.preventDefault();
                       setOpenMenuUserId(user.id);
