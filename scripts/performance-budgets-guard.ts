@@ -115,12 +115,8 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
     }).observe({ type: 'layout-shift', buffered: true });
 
     new PerformanceObserver(list => {
-<<<<<<< Updated upstream
       const entry =
         (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
-=======
-      const entry = (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
->>>>>>> Stashed changes
       if (entry) {
         metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
       }
