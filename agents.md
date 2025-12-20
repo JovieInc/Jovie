@@ -874,14 +874,34 @@ All AI agents **MUST** commit their work at the end of every job/task. This ensu
      - Use imperative mood ("add" not "added" or "adds")
      - No period at the end
      - Keep it under 72 characters when possible
+   - **Body rules (if including a body):**
+     - Each line must not exceed 100 characters (enforced by commitlint)
+     - Wrap long lines to stay within the limit
+     - Use blank line to separate body from subject
    - **Examples:**
+
      - ✅ `feat: add skeleton loaders for auth screens`
      - ✅ `fix(auth): resolve login redirect issue`
      - ✅ `chore: update cursor rules for commit messages`
      - ✅ `feat(dashboard): add user avatar component (#123)`
+     - ✅ Commit with body (lines ≤ 100 chars):
+
+       ```
+       chore: update agent guidelines and commit message format
+
+       - Clarify AI agent restrictions on merging PRs to production
+       - Update commit message format to follow Conventional Commits
+       - Enhance documentation on feature flag creation
+       ```
+
      - ❌ `[feat]: add skeleton loaders` (brackets not allowed)
      - ❌ `feat: Added skeleton loaders` (not imperative)
      - ❌ `feat: Add skeleton loaders.` (period not allowed)
+     - ❌ Body line too long:
+       ```
+       - Clarify AI agent restrictions on merging PRs to production and modifying repository settings.
+       ```
+       (exceeds 100 characters)
 
 5. **Do NOT commit if:**
 
@@ -904,7 +924,15 @@ pnpm typecheck && pnpm lint
 git add -A
 
 # 3. Commit with conventional message (will be validated by commitlint)
+# Simple commit (subject only):
 git commit -m "feat: add skeleton loaders for auth screens"
+
+# Or with body (wrap body lines to ≤ 100 characters):
+git commit -m "chore: update agent guidelines
+
+- Clarify AI agent restrictions on merging PRs
+- Update commit message format to follow Conventional Commits
+- Enhance documentation on feature flag creation"
 
 # 4. (Optional) Push if on feature branch
 git push origin feat/auth-skeleton-loaders
