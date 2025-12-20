@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { DashboardRefreshButton as DashboardRefreshButtonMolecule } from '@/components/dashboard/molecules/DashboardRefreshButton';
-import type { DashboardRefreshButtonProps as DashboardRefreshButtonMoleculeProps } from '@/components/dashboard/molecules/DashboardRefreshButton';
+import {
+  DashboardRefreshButton as DashboardRefreshButtonMolecule,
+  type DashboardRefreshButtonProps as DashboardRefreshButtonMoleculeProps,
+} from '@/components/dashboard/molecules/DashboardRefreshButton';
 
 /**
  * @deprecated This component is a wrapper that adds business logic (router refresh).
@@ -14,9 +16,7 @@ export type DashboardRefreshButtonProps = Omit<
   'onRefresh'
 >;
 
-export function DashboardRefreshButton(
-  props: DashboardRefreshButtonProps
-) {
+export function DashboardRefreshButton(props: DashboardRefreshButtonProps) {
   const router = useRouter();
 
   return (
@@ -28,3 +28,5 @@ export function DashboardRefreshButton(
     />
   );
 }
+
+DashboardRefreshButton.displayName = 'DashboardRefreshButton';

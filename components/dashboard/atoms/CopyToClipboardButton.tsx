@@ -1,8 +1,10 @@
 'use client';
 
 import { track } from '@/lib/analytics';
-import { CopyToClipboardButton as CopyToClipboardButtonMolecule } from '@/components/dashboard/molecules/CopyToClipboardButton';
-import type { CopyToClipboardButtonProps as CopyToClipboardButtonMoleculeProps } from '@/components/dashboard/molecules/CopyToClipboardButton';
+import {
+  CopyToClipboardButton as CopyToClipboardButtonMolecule,
+  type CopyToClipboardButtonProps as CopyToClipboardButtonMoleculeProps,
+} from '@/components/dashboard/molecules/CopyToClipboardButton';
 
 /**
  * @deprecated This component is a wrapper that adds business logic (analytics tracking).
@@ -27,3 +29,5 @@ export function CopyToClipboardButton(props: CopyToClipboardButtonProps) {
     />
   );
 }
+
+CopyToClipboardButton.displayName = 'CopyToClipboardButton';
