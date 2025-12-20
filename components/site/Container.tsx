@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 interface ContainerProps {
   children: React.ReactNode;
   className?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
 }
 
 const containerSizes = {
@@ -12,6 +12,7 @@ const containerSizes = {
   lg: 'max-w-6xl',
   xl: 'max-w-7xl',
   full: 'max-w-none',
+  homepage: 'max-w-[1100px]',
 };
 
 export function Container({
