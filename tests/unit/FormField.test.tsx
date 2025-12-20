@@ -1,11 +1,9 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 
 describe('FormField', () => {
-  afterEach(cleanup);
-
   it('renders correctly with label', () => {
     render(
       <FormField label='Email'>

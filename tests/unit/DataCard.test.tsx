@@ -1,11 +1,9 @@
 import { Button } from '@jovie/ui';
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { DataCard } from '@/components/molecules/DataCard';
 
 describe('DataCard', () => {
-  afterEach(cleanup);
-
   it('renders correctly with title', () => {
     render(<DataCard title='Test Card' />);
 

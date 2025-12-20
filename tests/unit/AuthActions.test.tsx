@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { AuthActions } from '@/components/molecules/AuthActions';
 
 describe('AuthActions', () => {
-  afterEach(cleanup);
-
   it('always renders log in and request early access links', () => {
     render(<AuthActions />);
 

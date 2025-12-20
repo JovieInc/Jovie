@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  within,
-} from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema';
@@ -60,7 +54,6 @@ function renderDashboard(
 
 describe('DashboardOverview', () => {
   afterEach(() => {
-    cleanup();
     vi.useRealTimers();
     // Reset clipboard mock between tests
     (navigator as any).clipboard = undefined;

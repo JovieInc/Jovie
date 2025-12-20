@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { FlyoutItem } from '@/components/molecules/FlyoutItem';
 import type { Feature } from '@/lib/features';
 
@@ -13,8 +13,6 @@ const mockFeature: Feature = {
 };
 
 describe('FlyoutItem', () => {
-  afterEach(cleanup);
-
   it('renders feature information correctly', () => {
     render(<FlyoutItem feature={mockFeature} />);
 

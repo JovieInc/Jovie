@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { IconBadge } from '@/components/atoms/IconBadge';
 
 describe('IconBadge', () => {
-  afterEach(cleanup);
-
   it('renders icon with correct styling', () => {
     const { container } = render(
       <IconBadge name='Bolt' colorVar='--accent-speed' />

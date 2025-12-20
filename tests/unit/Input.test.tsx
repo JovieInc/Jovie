@@ -1,10 +1,8 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { Input } from '@/components/atoms/Input';
 
 describe('Input', () => {
-  afterEach(cleanup);
-
   it('renders correctly with default props', () => {
     render(<Input placeholder='Enter text' />);
     const input = screen.getByPlaceholderText('Enter text');

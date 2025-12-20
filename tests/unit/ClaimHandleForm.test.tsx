@@ -1,48 +1,36 @@
-import { useAuth } from '@clerk/nextjs';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useRouter } from 'next/navigation';
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { ClaimHandleForm } from '@/components/home/ClaimHandleForm';
+import { describe, expect, test, vi } from 'vitest';
+
+// Use hoisted mocks for shared state
+const { mockPush, mockPrefetch, mockFetch } = vi.hoisted(() => ({
+  mockPush: vi.fn(),
+  mockPrefetch: vi.fn(),
+  mockFetch: vi.fn().mockResolvedValue({
+    ok: true,
+    json: async () => ({ available: true }),
+  }),
+}));
 
 // Mock dependencies
 vi.mock('@clerk/nextjs', () => ({
-  useAuth: vi.fn(),
+  useAuth: () => ({
+    isSignedIn: false,
+  }),
 }));
 
 vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
+  useRouter: () => ({
+    push: mockPush,
+    prefetch: mockPrefetch,
+  }),
 }));
 
 // Mock fetch for handle checking
-global.fetch = vi.fn() as unknown as typeof fetch;
+global.fetch = mockFetch as unknown as typeof fetch;
 
-const mockPush = vi.fn();
-const mockPrefetch = vi.fn();
-const mockUseAuth = vi.mocked(useAuth);
-const mockUseRouter = vi.mocked(useRouter);
+import { ClaimHandleForm } from '@/components/home/ClaimHandleForm';
 
 describe('ClaimHandleForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseRouter.mockReturnValue({
-      push: mockPush,
-      prefetch: mockPrefetch,
-    } as any);
-    mockUseAuth.mockReturnValue({
-      isSignedIn: false,
-    } as any);
-
-    // Mock fetch to respond immediately
-    (global.fetch as unknown as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({ available: true }),
-    });
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   test('prevents layout jumps with consistent spacing', () => {
     render(<ClaimHandleForm />);
 
@@ -101,9 +89,6 @@ describe('ClaimHandleForm', () => {
 
   // Simplified test for validation - focus on the core behavior
   test('has validation functionality', () => {
-    // Reset the mock to clear any previous calls
-    vi.clearAllMocks();
-
     render(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });

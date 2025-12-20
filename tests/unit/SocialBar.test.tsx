@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SocialBar } from '@/components/organisms/SocialBar';
 import type { LegacySocialLink } from '@/types/db';
@@ -8,7 +8,6 @@ global.fetch = vi.fn();
 
 describe('SocialBar', () => {
   afterEach(() => {
-    cleanup();
     vi.clearAllMocks();
   });
 

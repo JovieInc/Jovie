@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import TipPromo from '@/components/organisms/TipPromo';
 
@@ -9,7 +9,6 @@ describe('TipPromo', () => {
   });
 
   afterEach(() => {
-    cleanup();
     // Clean up environment variable mocks
     delete process.env.NEXT_PUBLIC_FEATURE_TIPS;
   });
@@ -20,14 +19,10 @@ describe('TipPromo', () => {
     render(<TipPromo />);
     expect(screen.queryByText('Tip, instantly.')).not.toBeInTheDocument();
 
-    cleanup();
-
     // Test with "false"
     process.env.NEXT_PUBLIC_FEATURE_TIPS = 'false';
     render(<TipPromo />);
     expect(screen.queryByText('Tip, instantly.')).not.toBeInTheDocument();
-
-    cleanup();
 
     // Test with empty string
     process.env.NEXT_PUBLIC_FEATURE_TIPS = '';
