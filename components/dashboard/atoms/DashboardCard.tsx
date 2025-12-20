@@ -17,9 +17,6 @@ interface DashboardCardProps {
   padding?: 'default' | 'large' | 'compact';
 }
 
-type DashboardCardElementProps = DashboardCardProps &
-  Omit<React.ComponentPropsWithoutRef<'div'>, keyof DashboardCardProps>;
-
 export function DashboardCard({
   variant = 'default',
   children,
@@ -27,26 +24,27 @@ export function DashboardCard({
   onClick,
   hover = true,
   padding = 'default',
-  ...rest
-}: DashboardCardElementProps) {
-  const Component = onClick ? 'button' : 'div';
+}: DashboardCardProps) {
+  const baseProps = {
+    className: cn(
+      cardTokens.base,
+      cardTokens.padding[padding],
+      cardTokens.variants[variant],
+      !hover &&
+        variant === 'interactive' &&
+        'hover:shadow-none hover:transform-none hover:ring-0 hover:border-subtle hover:bg-surface-1',
+      className
+    ),
+    onClick,
+  };
 
-  return (
-    <Component
-      className={cn(
-        cardTokens.base,
-        cardTokens.padding[padding],
-        cardTokens.variants[variant],
-        !hover &&
-          variant === 'interactive' &&
-          'hover:shadow-none hover:transform-none hover:ring-0 hover:border-subtle hover:bg-surface-1',
-        className
-      )}
-      onClick={onClick}
-      type={onClick ? 'button' : undefined}
-      {...rest}
-    >
-      {children}
-    </Component>
-  );
+  if (onClick) {
+    return (
+      <button {...baseProps} type='button'>
+        {children}
+      </button>
+    );
+  }
+
+  return <div {...baseProps}>{children}</div>;
 }
