@@ -15,13 +15,9 @@ export function InsightSection() {
               action — based on the fan and the moment.
             </p>
 
-            <p>
-              New fans are guided to subscribe.
-            </p>
+            <p>New fans are guided to subscribe.</p>
 
-            <p>
-              Returning fans are guided to listen.
-            </p>
+            <p>Returning fans are guided to listen.</p>
 
             <p>
               Every interaction feeds the system so the page continuously
@@ -33,4 +29,3 @@ export function InsightSection() {
     </section>
   );
 }
-

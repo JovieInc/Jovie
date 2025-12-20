@@ -1,25 +1,25 @@
 {
-    "version": 1,
-    "hooks": {
-        "afterFileEdit": [
-            {
-                "command": "sh .cursor/hooks/after-file-edit.sh"
-            }
-        ],
-        "beforeStop": [
-            {
-                "command": "sh .cursor/hooks/before-stop.sh"
-            }
-        ],
-        "onTaskComplete": [
-            {
-                "command": "sh .cursor/hooks/on-task-complete.sh"
-            }
-        ],
-        "onError": [
-            {
-                "command": "sh .cursor/hooks/on-error.sh"
-            }
-        ]
-    }
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "sh .cursor/hooks/after-file-edit.sh"
+      }
+    ],
+    "beforeStop": [
+      {
+        "command": "sh .cursor/hooks/before-stop.sh"
+      }
+    ],
+    "onTaskComplete": [
+      {
+        "command": "sh .cursor/hooks/on-task-complete.sh"
+      }
+    ],
+    "onError": [
+      {
+        "command": "sh .cursor/hooks/on-error.sh"
+      }
+    ]
+  }
 }
