@@ -1,5 +1,9 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
+import {
+  NextResponse,
+  type NextFetchEvent,
+  type NextRequest,
+} from 'next/server';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -43,7 +47,30 @@ const EU_EEA_UK = [
 const US_STATES = ['CA', 'CO', 'VA', 'CT', 'UT'];
 const CA_PROVINCES = ['QC'];
 
-export default clerkMiddleware(async (auth, req) => {
+const CLERK_SENSITIVE_PATTERNS = [
+  'dummy',
+  'mock',
+  '1234567890',
+  'test-key',
+  'placeholder',
+] as const;
+
+function isMockOrMissingClerkConfig(): boolean {
+  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!publishableKey || !secretKey) return true;
+
+  const publishableLower = publishableKey.toLowerCase();
+  const secretLower = secretKey.toLowerCase();
+
+  return CLERK_SENSITIVE_PATTERNS.some(
+    pattern =>
+      publishableLower.includes(pattern) || secretLower.includes(pattern)
+  );
+}
+
+async function handleRequest(req: NextRequest, userId: string | null) {
   await ensureSentry();
   try {
     // Start performance timing
@@ -75,8 +102,6 @@ export default clerkMiddleware(async (auth, req) => {
         return createBotResponse(204);
       }
     }
-
-    const { userId } = await auth();
 
     // Safely access geo information
     let country = '';
@@ -237,7 +262,23 @@ export default clerkMiddleware(async (auth, req) => {
     // Fallback to basic middleware behavior if Clerk auth fails
     return NextResponse.next();
   }
+}
+
+const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
+  return handleRequest(req, userId);
 });
+
+export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  const shouldBypassClerk =
+    process.env.NODE_ENV === 'test' && isMockOrMissingClerkConfig();
+
+  if (shouldBypassClerk) {
+    return handleRequest(req, null);
+  }
+
+  return clerkWrappedMiddleware(req, event);
+}
 
 export const config = {
   matcher: [

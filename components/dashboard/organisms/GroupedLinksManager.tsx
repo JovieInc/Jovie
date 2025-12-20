@@ -204,6 +204,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     []
   );
 
+  // Memoize signature calculation - use previous value if array reference unchanged
   const suggestedLinksSignature = useMemo(() => {
     const keys = suggestedLinks.map(s => suggestionKey(s)).sort();
     return keys.join('|');
@@ -241,6 +242,27 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   }, [pendingSuggestions, profileId, suggestionKey, suggestionsEnabled]);
 
   const groups = useMemo(() => groupLinks(links), [links]);
+
+  // Memoize sorted groups to avoid O(n log n) sort on every render
+  const sortedGroups = useMemo(() => {
+    const sorted: Record<LinkSection, T[]> = {
+      social: [],
+      dsp: [],
+      earnings: [],
+      custom: [],
+    };
+
+    (['social', 'dsp', 'earnings', 'custom'] as const).forEach(section => {
+      sorted[section] = groups[section]
+        .slice()
+        .sort(
+          (a, b) =>
+            popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
+        );
+    });
+
+    return sorted;
+  }, [groups]);
 
   // Stable ids for DnD + menu control
   const idFor = useCallback(
@@ -942,15 +964,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
               {(['social', 'dsp', 'earnings', 'custom'] as const).map(
                 section => {
-                  const groupItems = groups[section];
-
-                  const items = groupItems
-                    .slice()
-                    .sort(
-                      (a, b) =>
-                        popularityIndex(a.platform.id) -
-                        popularityIndex(b.platform.id)
-                    );
+                  const items = sortedGroups[section];
 
                   const isAddingToThis =
                     addingLink && sectionOf(addingLink) === section;

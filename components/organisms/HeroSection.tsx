@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
 
@@ -45,21 +45,24 @@ export function HeroSection({
   showBackgroundEffects = true,
 }: HeroSectionProps) {
   // Process headline to add gradient to highlighted text
-  const processedHeadline =
-    highlightText && typeof headline === 'string'
-      ? headline.split(highlightText).reduce((acc, part, index, array) => {
-          if (index === array.length - 1) {
-            return [...acc, part];
-          }
-          return [
-            ...acc,
-            part,
-            <GradientText key={index} variant={gradientVariant}>
-              {highlightText}
-            </GradientText>,
-          ];
-        }, [] as ReactNode[])
-      : headline;
+  // Memoized to prevent re-computation on every render
+  const processedHeadline = useMemo(() => {
+    if (!highlightText || typeof headline !== 'string') {
+      return headline;
+    }
+    return headline.split(highlightText).reduce((acc, part, index, array) => {
+      if (index === array.length - 1) {
+        return [...acc, part];
+      }
+      return [
+        ...acc,
+        part,
+        <GradientText key={index} variant={gradientVariant}>
+          {highlightText}
+        </GradientText>,
+      ];
+    }, [] as ReactNode[]);
+  }, [headline, highlightText, gradientVariant]);
 
   return (
     <section

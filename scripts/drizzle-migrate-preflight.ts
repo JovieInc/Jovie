@@ -8,7 +8,7 @@
  * - Logs the migrations that will run.
  */
 
-import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
+import { neonConfig, Pool } from '@neondatabase/serverless';
 import { config } from 'dotenv';
 import { existsSync, readdirSync, readFileSync } from 'fs';
 import path from 'path';
@@ -227,8 +227,8 @@ async function runPreflight(): Promise<void> {
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 
-  pool.on('connect', (client: PoolClient) => {
-    client
+  pool.on('connect', (client: unknown) => {
+    (client as { query: (sql: string) => Promise<unknown> })
       .query("SET app.allow_schema_changes = 'true'")
       .catch(() => undefined);
   });

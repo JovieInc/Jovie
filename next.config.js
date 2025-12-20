@@ -69,6 +69,8 @@ const nextConfig = {
   // Build optimizations
   poweredByHeader: false,
   compress: true,
+  // Note: cacheComponents disabled due to incompatibility with runtime='nodejs' in API routes
+  // Using traditional caching (unstable_cache) instead
   images: {
     remotePatterns: [
       {
@@ -215,6 +217,7 @@ const nextConfig = {
     swcTraceProfiling: false,
     // Web vitals attribution with valid metric names only
     webVitalsAttribution: ['CLS', 'FCP', 'INP', 'LCP', 'TTFB'],
+    // Note: cacheComponents removed due to incompatibility with runtime='nodejs' in API routes
   },
   compiler: {
     // Keep console logs in Vercel Preview builds for debugging

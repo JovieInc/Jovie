@@ -1,4 +1,4 @@
-import { cacheLife, cacheTag, unstable_noStore } from 'next/cache';
+import { unstable_cache, unstable_noStore } from 'next/cache';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
@@ -27,7 +27,9 @@ import {
   LegacySocialLink,
 } from '@/types/db';
 
-export const runtime = 'edge';
+// Note: runtime = 'edge' removed for cacheComponents compatibility
+// Edge runtime is incompatible with Cache Components
+// Use Node runtime for cache components support
 
 // Use a client wrapper to avoid ssr:false in a Server Component
 
@@ -131,11 +133,16 @@ const fetchProfileAndLinks = async (
 };
 
 // Cache public profile reads across requests; tags keep updates fast and precise.
+// Using unstable_cache instead of 'use cache' due to cacheComponents incompatibility
 const getCachedProfileAndLinks = async (username: string) => {
-  'use cache';
-  cacheTag('public-profile', `public-profile:${username}`);
-  cacheLife('hours');
-  return fetchProfileAndLinks(username);
+  return unstable_cache(
+    async () => fetchProfileAndLinks(username),
+    [`public-profile-${username}`],
+    {
+      tags: ['public-profile', `public-profile:${username}`],
+      revalidate: 3600, // 1 hour
+    }
+  )();
 };
 
 // Memoize per-request to avoid duplicate DB work between generateMetadata and page render.
@@ -345,4 +352,5 @@ export async function generateMetadata({ params }: Props) {
 // Cache the full HTML at the edge for 60s to make repeat visits instant.
 // The underlying DB query is also cached via unstable_cache with the same TTL.
 // 404s are still rendered correctly on cache miss.
-export const revalidate = 60;
+// Note: revalidate removed for cacheComponents compatibility
+// Using unstable_cache() for caching instead

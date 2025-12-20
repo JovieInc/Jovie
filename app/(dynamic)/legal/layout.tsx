@@ -2,8 +2,8 @@ import { Container } from '@/components/site/Container';
 import { Footer } from '@/components/site/Footer';
 import { Header } from '@/components/site/Header';
 
-// Force dynamic rendering for all legal pages
-export const dynamic = 'force-dynamic';
+// Note: dynamic = 'force-dynamic' removed for cacheComponents compatibility
+// Legal pages will still be dynamic by default
 
 export default function LegalLayout({
   children,
