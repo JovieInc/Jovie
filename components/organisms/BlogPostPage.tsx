@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { Avatar } from '@/components/atoms/Avatar';
-import { Badge } from '@/components/ui/Badge';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import { Container } from '@/components/site/Container';
+import { Badge } from '@/components/ui/Badge';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';
 import { cn } from '@/lib/utils';
 

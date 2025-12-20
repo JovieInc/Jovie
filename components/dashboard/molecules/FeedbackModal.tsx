@@ -1,7 +1,7 @@
 'use client';
 
-import { track } from '@/lib/analytics';
 import { DashboardFeedbackModal as DashboardFeedbackModalOrganism } from '@/components/dashboard/organisms/DashboardFeedbackModal';
+import { track } from '@/lib/analytics';
 
 interface FeedbackModalProps {
   isOpen: boolean;
