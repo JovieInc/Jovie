@@ -2,8 +2,9 @@
 
 import { BoltIcon } from '@heroicons/react/24/outline';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 type Activity = {
@@ -43,9 +44,8 @@ export function DashboardActivityFeed({
   const [error, setError] = useState<string | null>(null);
   const hasLoadedOnceRef = useRef(false);
 
-  useEffect(() => {
-    if (!gate) return;
-
+  // Fetch activity data
+  const fetchActivity = useCallback(async () => {
     const controller = new AbortController();
     const isInitialLoad = !hasLoadedOnceRef.current;
     if (isInitialLoad) {
@@ -57,49 +57,69 @@ export function DashboardActivityFeed({
 
     const url = `/api/dashboard/activity/recent?profileId=${encodeURIComponent(profileId)}&range=${encodeURIComponent(range)}`;
 
-    void fetch(url, { signal: controller.signal })
-      .then(async response => {
-        const payload = await response.json().catch(() => null);
-        if (!response.ok) {
-          throw new Error(payload?.error ?? 'Unable to load activity');
-        }
-        const data = payload as { activities?: Activity[] };
-        setActivities(data.activities ?? []);
-        hasLoadedOnceRef.current = true;
-        setIsLoading(false);
-        setIsRefreshing(false);
-      })
-      .catch(err => {
-        if (controller.signal.aborted) return;
-        setError(
-          err instanceof Error ? err.message : 'Failed to load activity'
-        );
-        setIsLoading(false);
-        setIsRefreshing(false);
-      });
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(payload?.error ?? 'Unable to load activity');
+      }
+      const data = payload as { activities?: Activity[] };
+      setActivities(data.activities ?? []);
+      hasLoadedOnceRef.current = true;
+      setIsLoading(false);
+      setIsRefreshing(false);
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(err instanceof Error ? err.message : 'Failed to load activity');
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [profileId, range]);
 
-    const interval = setInterval(() => {
-      if (gate) {
-        void fetch(url, { signal: controller.signal })
-          .then(async response => {
-            const payload = await response.json().catch(() => null);
-            if (!response.ok) {
-              throw new Error(payload?.error ?? 'Unable to load activity');
-            }
+  // Use polling coordinator for auto-refresh
+  const { registerTask, unregisterTask } = usePollingCoordinator();
+
+  // Initial load
+  useEffect(() => {
+    if (!gate) return;
+    void fetchActivity();
+  }, [gate, fetchActivity, refreshSignal]);
+
+  // Register polling task after initial load
+  useEffect(() => {
+    if (!gate) {
+      unregisterTask('activity-feed');
+      return;
+    }
+
+    // Only register polling after initial load completes
+    if (!hasLoadedOnceRef.current) {
+      return;
+    }
+
+    const cleanup = registerTask({
+      id: 'activity-feed',
+      callback: async () => {
+        // Only refresh silently (no loading state) for polling
+        const url = `/api/dashboard/activity/recent?profileId=${encodeURIComponent(profileId)}&range=${encodeURIComponent(range)}`;
+        try {
+          const response = await fetch(url);
+          const payload = await response.json().catch(() => null);
+          if (response.ok) {
             const data = payload as { activities?: Activity[] };
             setActivities(data.activities ?? []);
-          })
-          .catch(() => {
-            // ignore auto-refresh errors
-          });
-      }
-    }, 60_000);
+          }
+        } catch {
+          // ignore auto-refresh errors
+        }
+      },
+      intervalMs: 60_000,
+      priority: 2,
+      enabled: true,
+    });
 
-    return () => {
-      controller.abort();
-      clearInterval(interval);
-    };
-  }, [gate, profileId, range, refreshSignal]);
+    return cleanup;
+  }, [gate, profileId, range, registerTask, unregisterTask]);
 
   if (!gate) {
     return null;

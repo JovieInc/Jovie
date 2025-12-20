@@ -11,6 +11,7 @@ import { Input } from '@/components/atoms/Input';
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
+import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
@@ -648,41 +649,45 @@ export function EnhancedDashboardLinks({
     [autoRefreshUntilMs]
   );
 
+  // Use polling coordinator to manage suggestion syncing
+  const { registerTask, unregisterTask, updateTask } = usePollingCoordinator();
+
   useEffect(() => {
-    if (!profileId || !suggestionsEnabled) return;
+    if (!profileId || !suggestionsEnabled) {
+      unregisterTask('sync-suggestions');
+      return;
+    }
 
-    let mounted = true;
+    const cleanup = registerTask({
+      id: 'sync-suggestions',
+      callback: async () => {
+        await syncSuggestionsFromServer();
+        if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
+          setAutoRefreshUntilMs(null);
+        }
+      },
+      intervalMs: pollIntervalMs,
+      priority: 1,
+      enabled: true,
+    });
 
-    const tick = async () => {
-      if (!mounted) return;
-      if (
-        typeof document !== 'undefined' &&
-        document.visibilityState === 'hidden'
-      )
-        return;
-      await syncSuggestionsFromServer();
-      if (autoRefreshUntilMs && Date.now() >= autoRefreshUntilMs) {
-        setAutoRefreshUntilMs(null);
-      }
-    };
-
-    void tick();
-    const intervalId = window.setInterval(() => {
-      void tick();
-    }, pollIntervalMs);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(intervalId);
-      suggestionSyncAbortRef.current?.abort();
-    };
+    return cleanup;
   }, [
-    autoRefreshUntilMs,
-    pollIntervalMs,
     profileId,
     suggestionsEnabled,
+    pollIntervalMs,
+    autoRefreshUntilMs,
     syncSuggestionsFromServer,
+    registerTask,
+    unregisterTask,
   ]);
+
+  // Update interval when pollIntervalMs changes
+  useEffect(() => {
+    if (profileId && suggestionsEnabled) {
+      updateTask('sync-suggestions', { intervalMs: pollIntervalMs });
+    }
+  }, [pollIntervalMs, profileId, suggestionsEnabled, updateTask]);
 
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);

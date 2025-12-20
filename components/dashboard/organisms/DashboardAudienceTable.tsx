@@ -9,6 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import * as React from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
@@ -121,6 +122,7 @@ export function DashboardAudienceTable({
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
   const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const tbodyRef = React.useRef<HTMLTableSectionElement | null>(null);
   const [headerElevated, setHeaderElevated] = React.useState(false);
   const [openMenuRowId, setOpenMenuRowId] = React.useState<string | null>(null);
   const [selectedMember, setSelectedMember] =
@@ -174,6 +176,15 @@ export function DashboardAudienceTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const activeColumns =
     mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
+
+  // Virtualization for table rows
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 60, // Estimated row height in pixels
+    overscan: 5, // Render 5 extra rows above/below viewport
+  });
 
   const sortableColumnMap: Partial<
     Record<ColumnKey, MemberSortColumn | SubscriberSortColumn>
@@ -374,19 +385,36 @@ export function DashboardAudienceTable({
                   </tr>
                 </thead>
 
-                <tbody>
-                  {rows.map((row, index) => {
+                <tbody
+                  ref={tbodyRef}
+                  style={{
+                    position: 'relative',
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                    const row = rows[virtualRow.index];
                     const deviceIndicator = getDeviceIndicator(row.deviceType);
                     const isChecked = selectedIds.has(row.id);
-                    const rowNumber = (page - 1) * pageSize + index + 1;
+                    const rowNumber =
+                      (page - 1) * pageSize + virtualRow.index + 1;
 
                     return (
                       <tr
                         key={row.id}
+                        data-index={virtualRow.index}
+                        ref={rowVirtualizer.measureElement}
                         className={cn(
                           'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
                           selectedMember?.id === row.id && 'bg-surface-2'
                         )}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${virtualRow.start}px)`,
+                        }}
                         onClick={() => setSelectedMember(row)}
                         onContextMenu={event => {
                           event.preventDefault();

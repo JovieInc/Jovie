@@ -18,6 +18,7 @@ export interface AdminTableShellProps {
     React.HTMLAttributes<HTMLDivElement>,
     'children' | 'className' | 'ref'
   >;
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
 }
 
 const TOOLBAR_HEIGHT_PX = 56;
@@ -28,8 +29,10 @@ export function AdminTableShell({
   children,
   className,
   scrollContainerProps,
+  scrollContainerRef: externalRef,
 }: AdminTableShellProps) {
-  const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
+  const internalRef = React.useRef<HTMLDivElement | null>(null);
+  const tableContainerRef = externalRef ?? internalRef;
   const [headerElevated, setHeaderElevated] = React.useState(false);
 
   React.useEffect(() => {
@@ -43,7 +46,7 @@ export function AdminTableShell({
     handleScroll();
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [tableContainerRef]);
 
   const stickyTopPx = toolbar ? TOOLBAR_HEIGHT_PX : 0;
 
