@@ -239,13 +239,11 @@
       "pnpm migration:guard"
     ],
     "*.{js,jsx,ts,tsx}": [
-      "biome check --fix",
-      "biome format --write",
-      "eslint --fix --max-warnings=0 --no-warn-ignored"
+      "biome format --write --no-errors-on-unmatched",
+      "eslint --fix --max-warnings=0 --no-warn-ignored --cache --cache-location .eslintcache"
     ],
     "*.{json,css}": [
-      "biome check --fix",
-      "biome format --write"
+      "biome format --write --no-errors-on-unmatched"
     ],
     "ignore": [
       "app/.well-known/**"
