@@ -42,7 +42,9 @@ export default defineConfig({
           command: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="" npm run dev',
           url: 'http://localhost:3000',
           reuseExistingServer: !process.env.CI,
-          timeout: 120000,
+          timeout: 60000,
+          stdout: 'pipe',
+          stderr: 'pipe',
           env: {
             NODE_ENV: 'test',
             NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: '',
