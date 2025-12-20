@@ -119,7 +119,7 @@ pnpm dev
 To ensure these improvements are maintained:
 
 1. **CI/CD**: The updated lint scripts will catch issues in CI
-2. **Pre-commit Hooks**: Existing husky setup will run the new ESLint CLI
+2. **Pre-commit Hooks**: Native Git hooks will run the new ESLint CLI
 3. **React Strict Mode**: Will warn about deprecated patterns in development
 4. **Analytics**: Runtime-aware implementation provides better error handling
 

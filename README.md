@@ -55,13 +55,18 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
    cp .env.example .env.local
    ```
 
-4. **Run database migrations**
+4. **Install Git hooks** (one-time setup)
+   ```bash
+   pnpm run hooks:install
+   ```
+
+5. **Run database migrations**
 
    ```bash
    pnpm run drizzle:migrate
    ```
 
-5. **Start the development server**
+6. **Start the development server**
    ```bash
    pnpm run dev
    ```

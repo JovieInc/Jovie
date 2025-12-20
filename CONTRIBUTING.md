@@ -51,6 +51,10 @@
    ```bash
    pnpm run format
    ```
+6. Install Git hooks (one-time setup):
+   ```bash
+   pnpm run hooks:install
+   ```
 
 ### Submitting Changes
 

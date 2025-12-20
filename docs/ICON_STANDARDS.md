@@ -121,7 +121,7 @@ The following ESLint rule enforces these standards:
 ### Pre-commit Hooks
 
 Icon usage validation runs automatically on:
-- Pre-commit (via husky)
+- Pre-commit (via native Git hooks)
 - CI/CD pipeline
 - Pre-push workflow
 

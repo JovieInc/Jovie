@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+set -e
+
+# Run pre-push checks
+pnpm run pre-push
+
+

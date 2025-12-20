@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -e
+
+# Run proxy guard check
+pnpm run next:proxy-guard
+
+# Run lint-staged
+lint-staged
+
+
