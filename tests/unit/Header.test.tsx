@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 
 // Import the individual atomic components to test them directly
 import { LogoLink } from '@/components/atoms/LogoLink';
@@ -14,8 +14,6 @@ vi.mock('@clerk/nextjs', () => ({
 }));
 
 describe('Atomic Design Structure', () => {
-  afterEach(cleanup);
-
   describe('Atoms', () => {
     it('LogoLink component works correctly', () => {
       render(<LogoLink />);

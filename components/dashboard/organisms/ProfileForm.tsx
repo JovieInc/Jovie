@@ -143,6 +143,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       onSubmit={handleSubmit}
       className='space-y-4'
       noValidate
+      data-testid='profile-form'
     >
       {/* Screen reader announcements */}
       <div

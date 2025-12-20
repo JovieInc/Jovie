@@ -980,7 +980,7 @@ export function SettingsPolished({
     : sections;
 
   return (
-    <div className='space-y-8 pb-8'>
+    <div className='space-y-8 pb-8' data-testid='settings-polished'>
       {visibleSections.map(section => (
         <SettingsSection
           key={section.id}

@@ -1,40 +1,32 @@
 'use client';
 
-import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
-import { useTransition } from 'react';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import {
+  DashboardRefreshButton as DashboardRefreshButtonMolecule,
+  type DashboardRefreshButtonProps as DashboardRefreshButtonMoleculeProps,
+} from '@/components/dashboard/molecules/DashboardRefreshButton';
 
-export interface DashboardRefreshButtonProps {
-  ariaLabel?: string;
-  className?: string;
-  onRefreshed?: () => void;
-}
+/**
+ * @deprecated This component is a wrapper that adds business logic (router refresh).
+ * For new code, use the molecule version directly and handle refresh in the parent component.
+ * This wrapper exists for backward compatibility.
+ */
+export type DashboardRefreshButtonProps = Omit<
+  DashboardRefreshButtonMoleculeProps,
+  'onRefresh'
+>;
 
-export function DashboardRefreshButton({
-  ariaLabel = 'Refresh',
-  className,
-  onRefreshed,
-}: DashboardRefreshButtonProps) {
+export function DashboardRefreshButton(props: DashboardRefreshButtonProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
 
   return (
-    <DashboardHeaderActionButton
-      ariaLabel={ariaLabel}
-      disabled={isPending}
-      onClick={() => {
-        startTransition(() => {
-          router.refresh();
-          onRefreshed?.();
-        });
+    <DashboardRefreshButtonMolecule
+      {...props}
+      onRefresh={() => {
+        router.refresh();
       }}
-      icon={
-        <ArrowPathIcon
-          className={isPending ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
-        />
-      }
-      className={className}
     />
   );
 }
+
+DashboardRefreshButton.displayName = 'DashboardRefreshButton';

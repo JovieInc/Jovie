@@ -1,8 +1,8 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import {
-  NextResponse,
   type NextFetchEvent,
   type NextRequest,
+  NextResponse,
 } from 'next/server';
 import {
   AUDIENCE_ANON_COOKIE,

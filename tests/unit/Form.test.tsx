@@ -1,12 +1,10 @@
 import { Button } from '@jovie/ui';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { Input } from '@/components/atoms/Input';
 import { Form } from '@/components/organisms/Form';
 
 describe('Form', () => {
-  afterEach(cleanup);
-
   it('renders children correctly', () => {
     render(
       <Form>

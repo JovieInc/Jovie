@@ -53,7 +53,7 @@ describe('LinkActions Keyboard Accessibility', () => {
     await user.click(menuButton);
 
     // Find and click the Hide button in the dropdown
-    const toggleButton = screen.getByRole('button', { name: /^hide$/i });
+    const toggleButton = screen.getByRole('menuitem', { name: /^hide$/i });
     expect(toggleButton).toBeInTheDocument();
 
     await user.click(toggleButton);
@@ -75,7 +75,7 @@ describe('LinkActions Keyboard Accessibility', () => {
     await user.click(menuButton);
 
     // Find and click the Delete button in the dropdown
-    const removeButton = screen.getByRole('button', { name: /delete/i });
+    const removeButton = screen.getByRole('menuitem', { name: /delete/i });
     expect(removeButton).toBeInTheDocument();
 
     await user.click(removeButton);
@@ -95,7 +95,9 @@ describe('LinkActions Keyboard Accessibility', () => {
     // Open menu and check for Hide
     const menuButton = screen.getByRole('button', { name: /link actions/i });
     await user.click(menuButton);
-    expect(screen.getByRole('button', { name: /^hide$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /^hide$/i })
+    ).toBeInTheDocument();
 
     // Close menu and rerender with isVisible=false
     await user.click(menuButton);
@@ -109,7 +111,9 @@ describe('LinkActions Keyboard Accessibility', () => {
 
     // Open menu and check for Show
     await user.click(screen.getByRole('button', { name: /link actions/i }));
-    expect(screen.getByRole('button', { name: /^show$/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('menuitem', { name: /^show$/i })
+    ).toBeInTheDocument();
   });
 
   it('drag handle has correct aria-label', () => {

@@ -18,12 +18,14 @@ export function OnboardingFormWrapper({
   skipNameStep = false,
 }: OnboardingFormWrapperProps) {
   return (
-    <AppleStyleOnboardingForm
-      initialDisplayName={initialDisplayName}
-      initialHandle={initialHandle}
-      userEmail={userEmail}
-      userId={userId}
-      skipNameStep={skipNameStep}
-    />
+    <div data-testid='onboarding-form-wrapper'>
+      <AppleStyleOnboardingForm
+        initialDisplayName={initialDisplayName}
+        initialHandle={initialHandle}
+        userEmail={userEmail}
+        userId={userId}
+        skipNameStep={skipNameStep}
+      />
+    </div>
   );
 }

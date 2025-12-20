@@ -116,7 +116,7 @@ export function DashboardOverview({
   if (!allTasksComplete) {
     return (
       <DashboardOverviewControlsProvider>
-        <div className='space-y-2'>
+        <div className='space-y-2' data-testid='dashboard-overview'>
           {header}
 
           <DashboardOverviewMetricsClient
@@ -207,7 +207,7 @@ export function DashboardOverview({
 
   return (
     <DashboardOverviewControlsProvider>
-      <div className='space-y-2'>
+      <div className='space-y-2' data-testid='dashboard-overview'>
         {header}
 
         <DashboardOverviewMetricsClient

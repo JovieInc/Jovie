@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import SupportPage from '@/app/(marketing)/support/page';
 
 // Mock the analytics module
@@ -14,8 +14,6 @@ vi.mock('@/constants/app', () => ({
 }));
 
 describe('SupportPage', () => {
-  afterEach(cleanup);
-
   it('renders the support page correctly', () => {
     render(<SupportPage />);
 

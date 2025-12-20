@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { InfoBox } from '@/components/molecules/InfoBox';
 
 describe('InfoBox', () => {
-  afterEach(cleanup);
-
   it('renders correctly with children', () => {
     render(
       <InfoBox>

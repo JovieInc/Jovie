@@ -37,7 +37,10 @@ export function DashboardTopBar({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className='text-sm font-medium text-primary-token dark:text-secondary-token'>
+                  <span
+                    className='text-sm font-medium text-primary-token dark:text-secondary-token'
+                    aria-current={isLast ? 'page' : undefined}
+                  >
                     {crumb.label}
                   </span>
                 )}

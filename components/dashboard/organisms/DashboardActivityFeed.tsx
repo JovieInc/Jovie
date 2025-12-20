@@ -126,7 +126,7 @@ export function DashboardActivityFeed({
   }
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-4' data-testid='dashboard-activity-feed'>
       <div className='flex items-start justify-between gap-4'>
         <div className='min-w-0'>
           <h3 className='text-sm font-semibold leading-5 text-primary-token'>
@@ -228,6 +228,12 @@ export function DashboardActivityFeed({
             </ul>
           </div>
         )}
+      </div>
+      <div className='sr-only' aria-live='polite' aria-atomic='true'>
+        {activities.length > 0 &&
+          `${activities.length} ${activities.length === 1 ? 'activity' : 'activities'} loaded`}
+        {isRefreshing && 'Refreshing activity feed'}
+        {error && `Error: ${error}`}
       </div>
     </div>
   );

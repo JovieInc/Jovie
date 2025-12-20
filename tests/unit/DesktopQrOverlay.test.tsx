@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DesktopQrOverlay } from '@/components/profile/DesktopQrOverlay';
 
@@ -22,7 +22,6 @@ describe('DesktopQrOverlay', () => {
   });
 
   afterEach(() => {
-    cleanup();
     vi.unstubAllGlobals();
   });
 

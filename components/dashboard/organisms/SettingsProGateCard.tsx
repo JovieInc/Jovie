@@ -25,7 +25,7 @@ export function SettingsProGateCard({
   const Icon = icon;
 
   return (
-    <DashboardCard variant='settings'>
+    <DashboardCard variant='settings' data-testid='settings-pro-gate-card'>
       <div className='text-center py-4'>
         <Icon className='mx-auto h-12 w-12 text-secondary-token mb-4' />
         <h3 className='text-lg font-medium text-primary-token mb-2'>{title}</h3>

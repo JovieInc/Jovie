@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { GradientText } from '@/components/atoms/GradientText';
 import { Container } from '@/components/site/Container';
 

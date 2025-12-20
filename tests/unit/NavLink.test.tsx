@@ -1,10 +1,8 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { NavLink } from '@/components/ui/NavLink';
 
 describe('NavLink', () => {
-  afterEach(cleanup);
-
   it('renders with default variant', () => {
     render(<NavLink href='/test'>Test Link</NavLink>);
 
