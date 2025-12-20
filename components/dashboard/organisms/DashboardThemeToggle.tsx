@@ -1,44 +1,65 @@
 'use client';
 
+import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import { DashboardThemeToggle as DashboardThemeToggleOrganism } from '@/components/dashboard/organisms/DashboardThemeToggle';
+import React, { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
-interface EnhancedThemeToggleProps {
+interface DashboardThemeToggleProps {
   onThemeChange?: (theme: 'light' | 'dark' | 'system') => void;
+  onThemeSave?: (theme: 'light' | 'dark' | 'system') => Promise<void>;
   showSystemOption?: boolean;
   variant?: 'default' | 'compact';
 }
 
-/**
- * @deprecated This component is a wrapper that adds business logic (API call to save theme).
- * For new code, use DashboardThemeToggle from organisms directly and handle theme saving in the parent component.
- * This wrapper exists for backward compatibility.
- */
-export function EnhancedThemeToggle({
+export function DashboardThemeToggle({
   onThemeChange,
+  onThemeSave,
   showSystemOption = false,
   variant = 'default',
-}: EnhancedThemeToggleProps) {
-  const handleThemeSave = async (newTheme: 'light' | 'dark' | 'system') => {
-    try {
-      // Save theme preference to database for signed-in users
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: newTheme },
-          },
-        }),
-      });
+}: DashboardThemeToggleProps) {
+  const [mounted, setMounted] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return showSystemOption ? (
+      <div className='space-y-3'>
+        <div className='animate-pulse space-y-3'>
+          <div className='h-4 bg-surface-hover-token rounded w-24'></div>
+          <div className='h-8 bg-surface-hover-token rounded'></div>
+        </div>
+      </div>
+    ) : (
+      <div className='flex items-center space-x-3'>
+        <span className='text-sm text-secondary-token'>Light</span>
+        <div className='relative inline-flex h-6 w-11 shrink-0 cursor-not-allowed rounded-full border border-border bg-surface-hover-token p-0.5 transition-colors duration-200 ease-in-out'>
+          <span className='translate-x-0 inline-block h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out'></span>
+        </div>
+        <span className='text-sm text-secondary-token'>Dark</span>
+      </div>
+    );
+  }
+
+  const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
+    setIsUpdating(true);
+    setTheme(newTheme);
+
+    try {
+      // Call optional save handler (extracted from component)
+      if (onThemeSave) {
+        await onThemeSave(newTheme);
       }
+
+      onThemeChange?.(newTheme);
     } catch (error) {
       console.error('Error saving theme preference:', error);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -61,15 +82,13 @@ export function EnhancedThemeToggle({
                 handleThemeChange(option.value as 'light' | 'dark' | 'system')
               }
               disabled={isUpdating}
-              className={`
-                flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200
-                ${
-                  theme === option.value
-                    ? 'border-accent bg-accent/10 text-primary-token'
-                    : 'border-border hover:bg-surface-hover-token text-secondary-token'
-                }
-                disabled:opacity-50 disabled:cursor-not-allowed
-              `}
+              className={cn(
+                'flex flex-col items-center justify-center p-3 rounded-lg border-2 transition-all duration-200',
+                theme === option.value
+                  ? 'border-accent bg-accent/10 text-primary-token'
+                  : 'border-border hover:bg-surface-hover-token text-secondary-token',
+                'disabled:opacity-50 disabled:cursor-not-allowed'
+              )}
             >
               <span className='text-lg mb-1'>{option.icon}</span>
               <span className='text-xs font-medium'>{option.label}</span>
@@ -145,9 +164,11 @@ export function EnhancedThemeToggle({
           type='button'
           disabled={isUpdating}
           onClick={() => handleThemeChange(isDark ? 'light' : 'dark')}
-          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed ${
-            isDark ? 'bg-accent' : 'bg-surface-hover-token'
-          } p-0.5`}
+          className={cn(
+            'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 disabled:cursor-not-allowed',
+            isDark ? 'bg-accent' : 'bg-surface-hover-token',
+            'p-0.5'
+          )}
           role='switch'
           aria-checked={isDark}
         >
@@ -158,9 +179,11 @@ export function EnhancedThemeToggle({
           </span>
           <span
             aria-hidden='true'
-            className={`flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center ${
-              isDark ? 'translate-x-5' : 'translate-x-0'
-            } ${isUpdating ? 'animate-pulse' : ''}`}
+            className={cn(
+              'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center',
+              isDark ? 'translate-x-5' : 'translate-x-0',
+              isUpdating && 'animate-pulse'
+            )}
           >
             {isDark ? (
               <svg
