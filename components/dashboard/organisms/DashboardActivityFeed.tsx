@@ -126,7 +126,7 @@ export function DashboardActivityFeed({
   }
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-4' data-testid='dashboard-activity-feed'>
       <div className='flex items-start justify-between gap-4'>
         <div className='min-w-0'>
           <h3 className='text-sm font-semibold leading-5 text-primary-token'>

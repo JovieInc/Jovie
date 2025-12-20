@@ -1082,7 +1082,7 @@ export function EnhancedDashboardLinks({
   ]);
 
   return (
-    <div className='min-w-0 min-h-screen'>
+    <div className='min-w-0 min-h-screen' data-testid='enhanced-dashboard-links'>
       {/* Main content / links manager */}
       <div className='w-full min-w-0 space-y-4'>
         {profileId && artist && (

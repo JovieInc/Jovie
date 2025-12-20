@@ -21,6 +21,7 @@ export function DashboardHeader({
 
   return (
     <header
+      data-testid='dashboard-header'
       className={cn(
         'sticky top-0 z-20 border-b border-subtle bg-bg-base',
         className
@@ -47,7 +48,10 @@ export function DashboardHeader({
                     {crumb.label}
                   </Link>
                 ) : (
-                  <span className='truncate text-[13px] font-medium text-primary-token'>
+                  <span
+                    className='truncate text-[13px] font-medium text-primary-token'
+                    aria-current={isLast ? 'page' : undefined}
+                  >
                     {crumb.label}
                   </span>
                 )}

@@ -259,7 +259,7 @@ export function DashboardAudienceTable({
   };
 
   return (
-    <div className='flex h-full min-h-0 flex-col'>
+    <div className='flex h-full min-h-0 flex-col' data-testid='dashboard-audience-table'>
       <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
         <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
           <div>

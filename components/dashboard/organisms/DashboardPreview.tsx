@@ -71,7 +71,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
   // Clipboard handled by CopyToClipboardButton atom
 
   return (
-    <>
+    <div data-testid='dashboard-preview'>
       <div className='mb-4'>
         <h3 className='text-lg font-medium text-primary-token'>Live Preview</h3>
         <p className='text-sm text-secondary-token mt-1'>
@@ -150,6 +150,6 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
           </svg>
         </Link>
       </div>
-    </>
+    </div>
   );
 };

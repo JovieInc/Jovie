@@ -90,7 +90,8 @@ export function DashboardAudienceClient({
   );
 
   return (
-    <DashboardAudienceTable
+    <div data-testid='dashboard-audience-client'>
+      <DashboardAudienceTable
       mode={mode}
       rows={initialRows}
       total={total}
@@ -101,6 +102,7 @@ export function DashboardAudienceClient({
       onPageChange={handlePageChange}
       onPageSizeChange={handlePageSizeChange}
       onSortChange={handleSortChange}
-    />
+      />
+    </div>
   );
 }

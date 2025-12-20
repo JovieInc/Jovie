@@ -260,7 +260,7 @@ export function ContactsManager({
   }
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-4' data-testid='contacts-manager'>
       <div className='space-y-1'>
         <h1 className='text-2xl font-semibold text-primary-token'>Contacts</h1>
         <p className='text-secondary-token'>

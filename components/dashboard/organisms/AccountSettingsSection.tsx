@@ -314,7 +314,7 @@ export function AccountSettingsSection() {
   }
 
   return (
-    <div className='space-y-6'>
+    <div className='space-y-6' data-testid='account-settings-section'>
       <DashboardCard variant='settings'>
         <div className='flex items-start justify-between gap-6'>
           <div className='flex-1'>
