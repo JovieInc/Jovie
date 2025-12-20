@@ -3,17 +3,13 @@
 import { auth } from '@clerk/nextjs/server';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import {
-  PRIMARY_PROVIDER_KEYS,
-  PROVIDER_CONFIG,
-} from '@/lib/discography/config';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import {
   getReleasesForProfile,
   mapReleaseToViewModel,
   updateProviderLink,
 } from '@/lib/discography/store';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
-import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { getDashboardData } from '../actions';
 
 function buildProviderLabels() {
@@ -119,6 +115,5 @@ export async function resetProviderOverride(params: {
   return mapReleaseToViewModel(updated, providerLabels, profile.id);
 }
 
-export const primaryProviderKeys = PRIMARY_PROVIDER_KEYS;
-export const providerConfig = PROVIDER_CONFIG;
-export const buildSmartPath = buildSmartLinkPath;
+// Constants moved to separate file to comply with "use server" restrictions
+// Import from './config' instead
