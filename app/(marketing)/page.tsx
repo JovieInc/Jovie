@@ -12,7 +12,7 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} - AI-Powered Link-in-Bio for Artists`;
   const description =
-    'An AI-powered link-in-bio that guides every fan to the action they're most likely to take — and gets better automatically.';
+    "An AI-powered link-in-bio that guides every fan to the action they're most likely to take — and gets better automatically.";
   const keywords = [
     'creator profile',
     'music artist',
@@ -107,7 +107,7 @@ export default function HomePage() {
             '@type': 'WebSite',
             name: APP_NAME,
             description:
-              'An AI-powered link-in-bio that guides every fan to the action they're most likely to take.',
+              "An AI-powered link-in-bio that guides every fan to the action they're most likely to take.",
             url: APP_URL,
             potentialAction: {
               '@type': 'SearchAction',

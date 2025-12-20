@@ -48,7 +48,7 @@ const features = [
   },
   {
     title: 'Zero setup',
-    description: 'Your profile is created for you. Sign in and it's ready.',
+    description: "Your profile is created for you. Sign in and it's ready.",
     icon: Zap,
   },
 ];
@@ -59,7 +59,7 @@ export function WhatYouGetSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center mb-12'>
           <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token mb-4'>
-            Everything you need to convert fans — nothing you don't.
+            Everything you need to convert fans — nothing you don&apos;t.
           </h2>
         </div>
 
@@ -87,4 +87,3 @@ export function WhatYouGetSection() {
     </section>
   );
 }
-
