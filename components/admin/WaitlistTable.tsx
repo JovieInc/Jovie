@@ -141,9 +141,7 @@ export function WaitlistTable({
 
   return (
     <AdminTableShell
-      scrollContainerProps={{
-        ref: scrollContainerRef,
-      }}
+      scrollContainerRef={scrollContainerRef}
       toolbar={
         <div className='flex h-14 w-full items-center gap-3 px-4'>
           <div className='text-xs text-secondary-token'>

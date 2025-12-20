@@ -219,9 +219,7 @@ export function AdminUsersTable({
           </div>
         </div>
       }
-      scrollContainerProps={{
-        ref: scrollContainerRef,
-      }}
+      scrollContainerRef={scrollContainerRef}
     >
       {({ headerElevated, stickyTopPx }) => (
         <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>

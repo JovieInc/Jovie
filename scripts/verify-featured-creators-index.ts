@@ -200,9 +200,11 @@ async function main() {
     if (indexInfo.idx_scan !== undefined) {
       console.log('📊 Index usage statistics:');
       console.log(`   Scans: ${indexInfo.idx_scan.toLocaleString()}`);
-      console.log(`   Tuples read: ${indexInfo.idx_tup_read.toLocaleString()}`);
       console.log(
-        `   Tuples fetched: ${indexInfo.idx_tup_fetch.toLocaleString()}\n`
+        `   Tuples read: ${(indexInfo.idx_tup_read ?? 0).toLocaleString()}`
+      );
+      console.log(
+        `   Tuples fetched: ${(indexInfo.idx_tup_fetch ?? 0).toLocaleString()}\n`
       );
 
       if (indexInfo.idx_scan === 0 && (tableStats?.n_live_tup || 0) > 0) {
