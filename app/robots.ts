@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/legal/privacy', '/legal/terms'],
+        allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
         disallow: [
           '/investors',
           '/api/',
@@ -23,7 +23,7 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: 'Googlebot',
-        allow: ['/', '/legal/privacy', '/legal/terms'],
+        allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
         disallow: [
           '/investors',
           '/api/',
@@ -40,7 +40,7 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: 'Bingbot',
-        allow: ['/', '/legal/privacy', '/legal/terms'],
+        allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
         disallow: [
           '/investors',
           '/api/',
@@ -57,7 +57,7 @@ export default function robots(): MetadataRoute.Robots {
       },
       {
         userAgent: 'Slurp',
-        allow: ['/', '/legal/privacy', '/legal/terms'],
+        allow: ['/', '/blog', '/blog/', '/legal/privacy', '/legal/terms'],
         disallow: [
           '/investors',
           '/api/',
