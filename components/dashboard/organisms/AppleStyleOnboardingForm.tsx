@@ -390,10 +390,32 @@ export function AppleStyleOnboardingForm({
           userMessage = 'Could not save. Please refresh and try again.';
         } else if (message.includes('USERNAME_TAKEN')) {
           userMessage = 'Not available. Try another handle.';
-        } else if (message.includes('RATE_LIMITED')) {
+        } else if (message.includes('EMAIL_IN_USE')) {
+          userMessage =
+            'This email is already in use. Please sign in with the original account or use a different email.';
+        } else if (
+          message.includes('RATE_LIMITED') ||
+          message.includes('TOO_MANY_ATTEMPTS')
+        ) {
           userMessage = 'Too many attempts. Please try again in a few moments.';
-        } else if (message.includes('INVALID_USERNAME')) {
+        } else if (
+          message.includes('INVALID_USERNAME') ||
+          message.includes('USERNAME_RESERVED') ||
+          message.includes('USERNAME_INVALID_FORMAT') ||
+          message.includes('USERNAME_TOO_SHORT') ||
+          message.includes('USERNAME_TOO_LONG')
+        ) {
           userMessage = 'That handle can’t be used. Try another one.';
+        } else if (message.includes('DISPLAY_NAME_REQUIRED')) {
+          userMessage = 'Please enter your name to continue.';
+        }
+
+        if (
+          process.env.NODE_ENV === 'development' &&
+          userMessage === 'Could not save. Please try again.' &&
+          errorCode
+        ) {
+          userMessage = `Could not save (${errorCode}). Please try again.`;
         }
 
         setState(prev => ({

@@ -9,7 +9,6 @@ import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { BillingPortalLink } from '@/components/molecules/BillingPortalLink';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { getActivePriceIds } from '@/lib/stripe/config';
 
 interface BillingInfo {
   isPro: boolean;
@@ -19,6 +18,9 @@ interface BillingInfo {
 
 export function BillingDashboard() {
   const [billingInfo, setBillingInfo] = useState<BillingInfo | null>(null);
+  const [defaultPriceId, setDefaultPriceId] = useState<string | undefined>(
+    undefined
+  );
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const { error: notifyError } = useNotifications();
@@ -28,13 +30,29 @@ export function BillingDashboard() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch('/api/billing/status');
-      if (!response.ok) {
+      // Fetch billing status and pricing options in parallel
+      const [billingResponse, pricingResponse] = await Promise.all([
+        fetch('/api/billing/status'),
+        fetch('/api/stripe/pricing-options'),
+      ]);
+
+      if (!billingResponse.ok) {
         throw new Error('Failed to fetch billing status');
       }
 
-      const data = await response.json();
-      setBillingInfo(data);
+      const billingData = await billingResponse.json();
+      setBillingInfo(billingData);
+
+      // Get default price ID from pricing options
+      if (pricingResponse.ok) {
+        const pricingData = await pricingResponse.json();
+        const firstPriceId =
+          pricingData.pricingOptions?.[0]?.priceId ||
+          pricingData.options?.[0]?.priceId;
+        if (firstPriceId) {
+          setDefaultPriceId(firstPriceId);
+        }
+      }
     } catch (err) {
       console.error('Error fetching billing info:', err);
       setBillingInfo(null);
@@ -74,9 +92,6 @@ export function BillingDashboard() {
       />
     );
   }
-
-  const activePriceIds = getActivePriceIds();
-  const defaultPriceId = activePriceIds[0]; // Use first active price as default
 
   return (
     <div className='space-y-6'>

@@ -227,8 +227,8 @@ async function runPreflight(): Promise<void> {
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 
-  pool.on('connect', client => {
-    client
+  pool.on('connect', (client: unknown) => {
+    (client as { query: (sql: string) => Promise<unknown> })
       .query("SET app.allow_schema_changes = 'true'")
       .catch(() => undefined);
   });

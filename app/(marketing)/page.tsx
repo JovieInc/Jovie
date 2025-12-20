@@ -16,8 +16,8 @@ const NewHowItWorks = dynamic(() =>
   import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
 );
 
-// Root layout handles dynamic rendering
-export const revalidate = 3600; // Revalidate every hour
+// Note: revalidate removed for cacheComponents compatibility
+// Use 'use cache' directive with cacheLife() for caching instead
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} - Claim your @handle`;

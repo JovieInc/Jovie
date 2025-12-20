@@ -62,13 +62,27 @@ interface ClientProvidersProps {
   publishableKey: string;
 }
 
-// Inner component that uses Clerk hooks (must be inside ClerkProvider)
-function ClientProvidersInner({
+interface ClientProvidersInnerBaseProps {
+  children: React.ReactNode;
+  initialThemeMode?: ThemeMode;
+  userId?: string;
+}
+
+function isMockPublishableKey(publishableKey: string): boolean {
+  const lower = publishableKey.toLowerCase();
+  return (
+    lower.includes('mock') ||
+    lower.includes('dummy') ||
+    lower.includes('placeholder') ||
+    lower.includes('test-key')
+  );
+}
+
+function ClientProvidersInnerBase({
   children,
   initialThemeMode = 'system',
-}: Omit<ClientProvidersProps, 'publishableKey'>) {
-  const { user } = useUser();
-
+  userId,
+}: ClientProvidersInnerBaseProps) {
   useEffect(() => {
     // Environment-gated startup log
     try {
@@ -110,11 +124,28 @@ function ClientProvidersInner({
         storageKey='jovie-theme'
       >
         <ThemeKeyboardShortcut />
-        <MyStatsig userId={user?.id}>
+        <MyStatsig userId={userId}>
           <LazyProviders>{children}</LazyProviders>
         </MyStatsig>
       </ThemeProvider>
     </React.StrictMode>
+  );
+}
+
+// Inner component that uses Clerk hooks (must be inside ClerkProvider)
+function ClientProvidersInner({
+  children,
+  initialThemeMode = 'system',
+}: Omit<ClientProvidersProps, 'publishableKey'>) {
+  const { user } = useUser();
+
+  return (
+    <ClientProvidersInnerBase
+      userId={user?.id}
+      initialThemeMode={initialThemeMode}
+    >
+      {children}
+    </ClientProvidersInnerBase>
   );
 }
 
@@ -140,6 +171,18 @@ export function ClientProviders({
   initialThemeMode = 'system',
   publishableKey,
 }: ClientProvidersProps) {
+  const shouldBypassClerk =
+    process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    isMockPublishableKey(publishableKey);
+
+  if (shouldBypassClerk) {
+    return (
+      <ClientProvidersInnerBase initialThemeMode={initialThemeMode}>
+        {children}
+      </ClientProvidersInnerBase>
+    );
+  }
+
   return (
     <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
       <ClientProvidersInner initialThemeMode={initialThemeMode}>
