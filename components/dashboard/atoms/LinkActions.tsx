@@ -1,6 +1,13 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -83,7 +90,8 @@ export const LinkActions = memo(function LinkActions({
         case 'ArrowDown':
           e.preventDefault();
           setFocusedIndex(prev => {
-            const next = prev === null ? 0 : Math.min(prev + 1, menuItems.length - 1);
+            const next =
+              prev === null ? 0 : Math.min(prev + 1, menuItems.length - 1);
             itemRefs.current[next]?.focus();
             return next;
           });
@@ -91,7 +99,8 @@ export const LinkActions = memo(function LinkActions({
         case 'ArrowUp':
           e.preventDefault();
           setFocusedIndex(prev => {
-            const next = prev === null ? menuItems.length - 1 : Math.max(prev - 1, 0);
+            const next =
+              prev === null ? menuItems.length - 1 : Math.max(prev - 1, 0);
             itemRefs.current[next]?.focus();
             return next;
           });

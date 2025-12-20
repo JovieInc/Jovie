@@ -92,16 +92,16 @@ export function DashboardAudienceClient({
   return (
     <div data-testid='dashboard-audience-client'>
       <DashboardAudienceTable
-      mode={mode}
-      rows={initialRows}
-      total={total}
-      page={page}
-      pageSize={pageSize}
-      sort={sort}
-      direction={direction}
-      onPageChange={handlePageChange}
-      onPageSizeChange={handlePageSizeChange}
-      onSortChange={handleSortChange}
+        mode={mode}
+        rows={initialRows}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        sort={sort}
+        direction={direction}
+        onPageChange={handlePageChange}
+        onPageSizeChange={handlePageSizeChange}
+        onSortChange={handleSortChange}
       />
     </div>
   );

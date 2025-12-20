@@ -93,7 +93,11 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className='space-y-4' data-testid='listen-now-form'>
+    <form
+      onSubmit={handleSubmit}
+      className='space-y-4'
+      data-testid='listen-now-form'
+    >
       <FormField label='Spotify URL' error={error}>
         <Input
           type='url'

@@ -20,11 +20,11 @@ export function OnboardingFormWrapper({
   return (
     <div data-testid='onboarding-form-wrapper'>
       <AppleStyleOnboardingForm
-      initialDisplayName={initialDisplayName}
-      initialHandle={initialHandle}
-      userEmail={userEmail}
-      userId={userId}
-      skipNameStep={skipNameStep}
+        initialDisplayName={initialDisplayName}
+        initialHandle={initialHandle}
+        userEmail={userEmail}
+        userId={userId}
+        skipNameStep={skipNameStep}
       />
     </div>
   );
