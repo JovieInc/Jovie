@@ -17,6 +17,9 @@ interface DashboardCardProps {
   padding?: 'default' | 'large' | 'compact';
 }
 
+type DashboardCardElementProps = DashboardCardProps &
+  Omit<React.ComponentPropsWithoutRef<'div'>, keyof DashboardCardProps>;
+
 export function DashboardCard({
   variant = 'default',
   children,
@@ -24,7 +27,8 @@ export function DashboardCard({
   onClick,
   hover = true,
   padding = 'default',
-}: DashboardCardProps) {
+  ...rest
+}: DashboardCardElementProps) {
   const Component = onClick ? 'button' : 'div';
 
   return (
@@ -40,6 +44,7 @@ export function DashboardCard({
       )}
       onClick={onClick}
       type={onClick ? 'button' : undefined}
+      {...rest}
     >
       {children}
     </Component>

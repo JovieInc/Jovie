@@ -14,12 +14,14 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 **AI agents must NEVER merge PRs to the `production` branch.**
 
 This includes:
+
 - Running `gh pr merge` on any PR targeting `production`
 - Running `gh pr review --approve` on production PRs
 - Enabling auto-merge on production PRs
 - Any action that results in code being deployed to production
 
 **Production merges require explicit human approval and action.** AI agents may:
+
 - Create PRs targeting `main`
 - Merge PRs to `main` (with auto-merge label, after CI passes)
 - Create promotion PRs from `main` → `production` (via workflow trigger)
@@ -32,6 +34,7 @@ But **only the human operator** may approve and merge to `production`.
 **AI agents must NEVER modify repository settings, branch protection rules, or rulesets.**
 
 This includes:
+
 - Modifying branch protection rules via GitHub API or CLI
 - Changing ruleset configurations (`.github/rulesets/*.yml`)
 - Disabling or bypassing linear history requirements
@@ -41,6 +44,7 @@ This includes:
 - Any `gh api` calls that modify repository or branch settings
 
 **Repository configuration changes require explicit human approval.** If a workflow or process requires a settings change, AI agents must:
+
 1. Document the proposed change and rationale
 2. Request human approval before proceeding
 3. Never execute the change autonomously
@@ -58,14 +62,16 @@ Violations of this rule can cause merge conflicts, break CI/CD pipelines, and co
 **When creating a new feature flag:**
 
 1. **Add to code constants** (`lib/statsig/flags.ts`):
+
    ```typescript
    export const STATSIG_FLAGS = {
      // ... existing flags
-     NEW_FEATURE: 'feature_new_feature',
+     NEW_FEATURE: "feature_new_feature",
    } as const;
    ```
 
 2. **Create gate in Statsig** using one of these methods:
+
    - **Recommended**: Use the Statsig MCP server (configured in `.claude.json`)
      - Ask Claude Code to create the gate via MCP
      - Provide: gate name, description, default value, expiry (if temporary)
@@ -74,23 +80,29 @@ Violations of this rule can cause merge conflicts, break CI/CD pipelines, and co
      - Use exact name from `STATSIG_FLAGS` constant
 
 3. **Document the gate** in `docs/STATSIG_FEATURE_GATES.md`:
+
    - Add entry with status, default, description, expiry, and usage locations
    - Update migration checklist if applicable
 
 4. **Use in code**:
+
    ```typescript
-   import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+   import { STATSIG_FLAGS } from "@/lib/statsig/flags";
 
    // Client-side
    const isEnabled = statsig.checkGate(STATSIG_FLAGS.NEW_FEATURE);
 
    // Server-side
-   const isEnabled = await statsig.checkGateForUser(user, STATSIG_FLAGS.NEW_FEATURE);
+   const isEnabled = await statsig.checkGateForUser(
+     user,
+     STATSIG_FLAGS.NEW_FEATURE
+   );
    ```
 
 ### Statsig MCP Server
 
 The Statsig MCP server is configured for Claude Code and enables:
+
 - Programmatic gate creation and management
 - Gate status checking and updates
 - Experiment configuration
@@ -101,11 +113,13 @@ Configuration location: `.claude.json` (project-specific)
 ## 1. Branch & Environment Model
 
 - **Feature branches**
+
   - **Base:** always branch from `main`.
   - **Naming:** `feat/<slug>`, `fix/<slug>`, `chore/<slug>` (3–6 word kebab-case slug).
   - **Never** push directly to `main` or `production`.
 
 - **Long-lived branches**
+
   - **`main`**
     - Source of truth for all day-to-day development.
     - Must always be **green** on: `pnpm typecheck`, `pnpm lint`, `pnpm test`, basic E2E smoke.
@@ -126,11 +140,13 @@ Configuration location: `.claude.json` (project-specific)
 ## 2. PR Expectations (All Agents)
 
 - **Before opening a PR**
+
   - Start from latest `main`.
   - Keep scope tight: one user-visible outcome per PR.
   - Wrap new behavior behind a feature flag named `feature_<slug>` where appropriate.
 
 - **When opening a PR**
+
   - **Base branch:** `main`.
   - **Title:** `[feat|fix|chore]: <slug>` (conventional commit style).
   - **Body includes:**
@@ -149,10 +165,12 @@ Configuration location: `.claude.json` (project-specific)
 ## 3. Codex Auto-Fix CI
 
 - **Trigger:**
+
   - Runs after the primary `CI` workflow **fails** on a PR into `main`.
   - Only for PRs from the same repo (no forks).
 
 - **Behavior:**
+
   - Uses the Codex CLI to:
     - Read the repo and CI logs.
     - Apply minimal, targeted fixes so `pnpm typecheck`, `pnpm lint`, and `pnpm test` all pass.
@@ -186,20 +204,24 @@ Configuration location: `.claude.json` (project-specific)
 The database has an event trigger that **blocks direct DDL changes** to the public schema. This ensures all schema changes go through Drizzle migrations.
 
 **What's blocked:**
+
 - `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE` outside of migrations
 - Direct index, sequence, or type modifications
 
 **What's allowed:**
+
 - Drizzle migrations (automatically detected via lock on `__drizzle_migrations`)
 - Changes to the `drizzle` schema (migration tracking)
 
 **Emergency bypass (use sparingly):**
+
 ```sql
 SET app.allow_schema_changes = 'true';
 -- Your emergency DDL here
 ```
 
 **To install on a new database:**
+
 ```bash
 psql $DATABASE_URL -f scripts/setup-migration-protection.sql
 ```
@@ -214,6 +236,7 @@ psql $DATABASE_URL -f scripts/setup-migration-protection.sql
   - **Linear append-only migrations** - never edit or squash migrations **after they're merged to main**.
 
 **IMPORTANT: When Squashing Is Safe**
+
 - ✅ **Before merge to main**: Squash, edit, delete migrations freely on your feature branch
 - ✅ **Local only**: If migrations haven't been pushed/shared, you control the history
 - ❌ **After merge to main**: Append-only policy strictly enforced - NEVER modify
@@ -226,19 +249,23 @@ psql $DATABASE_URL -f scripts/setup-migration-protection.sql
 When creating new database migrations, you **MUST** follow this exact process:
 
 1. **Update your schema first:**
+
    ```typescript
    // lib/db/schema.ts
-   export const myTable = pgTable('my_table', {
-     id: uuid('id').primaryKey().defaultRandom(),
-     newColumn: text('new_column'), // ← Add your changes here
+   export const myTable = pgTable("my_table", {
+     id: uuid("id").primaryKey().defaultRandom(),
+     newColumn: text("new_column"), // ← Add your changes here
    });
    ```
 
 2. **Generate migration using Drizzle:**
+
    ```bash
    pnpm run drizzle:generate
    ```
+
    This command:
+
    - Reads your `lib/db/schema.ts` file
    - Compares with previous snapshot to detect changes
    - Creates a new `.sql` file in `drizzle/migrations/`
@@ -246,22 +273,25 @@ When creating new database migrations, you **MUST** follow this exact process:
    - Generates a snapshot file in `drizzle/migrations/meta/`
 
 3. **NEVER manually create migration files:**
+
    - ❌ **WRONG**: Write SQL in `0011_my_migration.sql` directly
    - ❌ **WRONG**: Copy/paste SQL from another tool
    - ❌ **WRONG**: Manually edit `_journal.json`
    - ✅ **RIGHT**: Update `schema.ts`, then run `pnpm drizzle:generate`
 
-3. **Verify journal is updated:**
+4. **Verify journal is updated:**
+
    - Check that `drizzle/migrations/meta/_journal.json` includes your new migration
    - Journal entry must have: `idx`, `version`, `when`, `tag`, `breakpoints`
    - Migration will be **silently skipped** if not in journal
 
-4. **Why this matters:**
+5. **Why this matters:**
    - Drizzle's migration runner (`pnpm run drizzle:migrate`) only applies migrations listed in `_journal.json`
    - If you create a `.sql` file but forget to update `_journal.json`, the migration will **never run** in CI or production
    - This causes "column does not exist" errors and schema drift between environments
 
 **Example of a properly registered migration:**
+
 ```json
 {
   "idx": 13,
@@ -273,6 +303,7 @@ When creating new database migrations, you **MUST** follow this exact process:
 ```
 
 **If you discover an unregistered migration:**
+
 1. DO NOT manually add it to `_journal.json` - this can cause migration order issues
 2. Instead, regenerate the migration using `pnpm run drizzle:generate`
 3. Or consult with team lead before manually editing the journal
@@ -282,17 +313,20 @@ When creating new database migrations, you **MUST** follow this exact process:
 A pre-commit hook automatically validates migration files to catch common issues:
 
 **What it checks:**
+
 1. Every `.sql` file in `drizzle/migrations/` has a corresponding entry in `_journal.json`
 2. Journal entries have all required fields: `idx`, `version`, `when`, `tag`, `breakpoints`
 3. Migration filenames match journal `tag` values
 4. No gaps in migration `idx` sequence
 
 **When it runs:**
+
 - Automatically on `git commit`
 - Before pushing to remote
 - Can be bypassed with `--no-verify` flag (use sparingly!)
 
 **If validation fails:**
+
 ```bash
 ❌ Migration validation failed:
    - Migration file 0015_my_feature.sql found but not in _journal.json
@@ -300,6 +334,7 @@ A pre-commit hook automatically validates migration files to catch common issues
 ```
 
 **To fix:**
+
 1. Remove the manually created `.sql` file
 2. Run `pnpm drizzle-kit generate` to regenerate it properly
 3. Commit again
@@ -311,6 +346,7 @@ A pre-commit hook automatically validates migration files to catch common issues
 **If you need multiple migrations in a single PR**, use one of these approaches:
 
 #### Option 1: `schema:bulk` Label (Recommended)
+
 Use when intentionally adding multiple related migrations:
 
 ```bash
@@ -323,12 +359,14 @@ pnpm migration:allow-multiple
 ```
 
 This label:
+
 - ✅ Allows multiple migrations in the PR
 - ✅ Still validates each migration individually
 - ✅ Checks for CONCURRENTLY keyword
-- ✅ Verifies migrations are registered in _journal.json
+- ✅ Verifies migrations are registered in \_journal.json
 
 #### Option 2: `skip-migration-guard` Label (Exceptional Cases Only)
+
 Use ONLY when fixing broken migrations or schema consolidation:
 
 ```bash
@@ -338,16 +376,19 @@ pnpm migration:skip-guard
 ```
 
 **WARNING:** This completely bypasses migration validation. Only use for:
+
 - Fixing migration errors (e.g., removing CONCURRENTLY)
 - Cleaning up migration conflicts
 - Emergency schema fixes approved by team
 
 #### Option 3: Environment Variable (Local Testing)
+
 ```bash
 SKIP_MIGRATION_GUARD=true pnpm migration:guard
 ```
 
 **Quick reference:**
+
 - Check status: `bash scripts/handle-multiple-migrations.sh`
 - Allow multiple: `bash scripts/handle-multiple-migrations.sh --bulk`
 - Skip all checks: `bash scripts/handle-multiple-migrations.sh --skip`
@@ -360,6 +401,7 @@ SKIP_MIGRATION_GUARD=true pnpm migration:guard
 ✅ To consolidate multiple local iterations into a single migration
 
 **Workflow for squashing local migrations:**
+
 ```bash
 # 1. You created multiple migrations during development
 #    (All generated via pnpm drizzle:generate from schema changes)
@@ -390,12 +432,14 @@ git push --force-with-lease
 ```
 
 **CRITICAL: Always use Drizzle to generate migrations**
+
 - ✅ CORRECT: `pnpm drizzle:generate` (Drizzle reads schema.ts, generates SQL + journal)
 - ❌ WRONG: Manually creating `.sql` files
 - ❌ WRONG: Manually editing `_journal.json`
 - ❌ WRONG: Using raw SQL generators outside of Drizzle
 
 **Why Drizzle generation is mandatory:**
+
 1. Ensures `schema.ts` and migrations stay synchronized
 2. Automatically updates journal with correct metadata
 3. Generates type-safe, validated SQL
@@ -416,6 +460,7 @@ Instead of squashing, you can use `pnpm migration:allow-multiple` to allow multi
 **NEVER use `CONCURRENTLY` in Drizzle migration files.** This is a common PostgreSQL mistake that will break your migrations.
 
 **❌ WRONG - Will fail in Drizzle:**
+
 ```sql
 -- ❌ FORBIDDEN - Cannot run inside transaction blocks
 CREATE INDEX CONCURRENTLY idx_name ON table_name (column_name);
@@ -423,6 +468,7 @@ CREATE UNIQUE INDEX CONCURRENTLY uniq_name ON table_name (column_name);
 ```
 
 **✅ RIGHT - Use standard CREATE INDEX:**
+
 ```sql
 -- ✅ CORRECT - Works in Drizzle transaction blocks
 CREATE INDEX IF NOT EXISTS idx_name ON table_name (column_name);
@@ -430,12 +476,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_name ON table_name (column_name);
 ```
 
 **Why CONCURRENTLY fails:**
+
 - Drizzle's `migrate()` function **wraps all migrations in transaction blocks** for atomicity
 - PostgreSQL **explicitly forbids** `CREATE INDEX CONCURRENTLY` inside transactions
 - Error: `CREATE INDEX CONCURRENTLY cannot run inside a transaction block`
 - This breaks E2E tests, CI/CD pipeline, and production deployments
 
 **Production safety notes:**
+
 - Always use `IF NOT EXISTS` to make index creation idempotent
 - Test index creation time on staging first (for large tables)
 - For very large tables (>10M rows), consider:
@@ -445,6 +493,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_name ON table_name (column_name);
 - Drizzle migrations run quickly during deployment; indexes are created before traffic hits
 
 **Migration validation:**
+
 - Pre-commit hook automatically detects `CONCURRENTLY` in migrations
 - CI will fail if CONCURRENTLY is present
 - This prevents broken deployments before they reach production
@@ -455,13 +504,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_name ON table_name (column_name);
 When writing raw SQL migrations, you **MUST** use correct PostgreSQL syntax. Common mistakes to avoid:
 
 #### ❌ WRONG: `CREATE TYPE IF NOT EXISTS`
+
 PostgreSQL does **NOT** support `IF NOT EXISTS` for `CREATE TYPE`:
+
 ```sql
 -- ❌ INVALID SYNTAX - will fail
 CREATE TYPE IF NOT EXISTS my_enum AS ENUM ('a', 'b', 'c');
 ```
 
 #### ✅ RIGHT: Use DO block with pg_type check
+
 ```sql
 -- ✅ CORRECT - check pg_type catalog first
 DO $$
@@ -473,7 +525,9 @@ END $$;
 ```
 
 #### ❌ WRONG: Multiple statements in Neon MCP
+
 The Neon MCP `run_sql` tool cannot execute multiple statements:
+
 ```sql
 -- ❌ FAILS with "cannot insert multiple commands into a prepared statement"
 CREATE INDEX idx_a ON table_a (col);
@@ -481,6 +535,7 @@ CREATE INDEX idx_b ON table_b (col);
 ```
 
 #### ✅ RIGHT: One statement per call
+
 ```sql
 -- ✅ CORRECT - execute each statement separately
 CREATE INDEX idx_a ON table_a (col);
@@ -489,6 +544,7 @@ CREATE INDEX idx_b ON table_b (col);
 ```
 
 #### Other PostgreSQL gotchas:
+
 - **Enums are case-sensitive** - `'Active'` ≠ `'active'`
 - **Use `timestamp` not `datetime`** - PostgreSQL uses `timestamp` or `timestamptz`
 - **Use `text` not `varchar`** - In PostgreSQL, `text` is preferred over `varchar` for variable-length strings
@@ -508,6 +564,7 @@ Before merging any migration:
 ## 5.5 CI/CD Workflow Details (YC-Aligned Rapid Deployment)
 
 ### Fast Path (Feature PRs → main)
+
 - **Triggers:** PRs to `main` branch
 - **Checks:** TypeScript typecheck + ESLint (~10-15s total)
 - **Auto-merge:** Enabled for dependabot, codegen, PRs with `auto-merge` label
@@ -515,6 +572,7 @@ Before merging any migration:
 - **Timeline:** Feature → production in ~2 minutes (if auto-merge eligible)
 
 ### Full CI (main → production PRs)
+
 - **Triggers:** Push to `main` or PRs to `production`
 - **Checks:**
   - All fast checks (typecheck, lint)
@@ -528,6 +586,7 @@ Before merging any migration:
 - **Timeline:** Main → production in ~5 minutes (with review)
 
 ### Database Migrations
+
 - **Auto-run:** Migrations run automatically on Vercel deploy via `drizzle:migrate` script
 - **Ephemeral Neon branches:** Auto-created per PR with unique name, auto-deleted on PR close
 - **Long-lived branches:** Only `main` and `production` (NO preview branch)
@@ -535,17 +594,20 @@ Before merging any migration:
 - **Testing:** Each PR gets isolated ephemeral database for safe schema testing
 
 ### Environment URLs
+
 - **Main staging:** [main.jov.ie](https://main.jov.ie) - Deployed from `main` branch
 - **Production:** [jov.ie](https://jov.ie) - Deployed from `production` branch
 - **PR previews:** Unique Vercel preview URLs per PR (ephemeral)
 
 ### YC-Optimized Velocity
+
 - **Ship multiple times per day:** Fast CI enables rapid iteration
 - **Feature → main:** ~2 minutes (auto-merge)
 - **Main → production:** ~5 minutes (manual review + auto-deploy)
 - **Total:** Ship to production in < 10 minutes from PR creation
 
 ### Rollback Strategy
+
 - **Code rollback:** `git revert` + push to main
 - **Database rollback:** Create reverse migration (append-only, no destructive rollback)
 - **Emergency:** Direct PR to production (bypass main)
@@ -554,11 +616,13 @@ Before merging any migration:
 ## 6. Agent-Specific Notes
 
 - **Claude (feature work, refactors)**
+
   - Own end-to-end changes: schema → backend → UI → tests.
   - Prefer server components and feature-flagged rollouts.
   - Always use Statsig for feature gates/experiments; do not introduce any other flag or analytics SDKs.
 
 - **Codex (CI auto-fix, focused cleanups)**
+
   - Operates only via the `codex-autofix` workflow.
   - Keeps edits minimal and focused on fixing CI regressions.
 
@@ -576,6 +640,7 @@ Before merging any migration:
 ## 8. Engineering Guardrails & Architecture
 
 ### 8.1 Component Architecture (Atomic)
+
 - **One component per file.** Named export only; no default exports. Export name must match file name.
 - **Atoms:** UI-only primitives (no business logic, no API calls), usually under `components/atoms/`.
 - **Molecules:** Small combinations of atoms with minimal state, under `components/molecules/`.
@@ -587,6 +652,7 @@ Before merging any migration:
 - **Deprecation:** Mark old components with `/** @deprecated Reason */` and point to the replacement.
 
 ### 8.2 Design Aesthetic & Copy
+
 - **Brand:** Color-agnostic; Jovie logo is black or white only.
 - **Surfaces:**
   - Dark mode: black background, white text/buttons; primary CTAs are solid black with white text.
@@ -598,6 +664,7 @@ Before merging any migration:
   - Apple-level clarity; concise, active voice; focus copy on activation and MRR.
 
 ### 8.3 Stack & Packages
+
 - **Runtime & framework:** Next.js App Router + React Server Components.
 - **Package manager:** `pnpm` only.
 - **DB:** Neon + Drizzle (`@neondatabase/serverless`, `drizzle-orm/neon-serverless` with WebSocket support for transactions).
@@ -608,6 +675,7 @@ Before merging any migration:
 - **Analytics & flags:** Statsig-only for product analytics and feature flags; do not add PostHog/Segment/RudderStack.
 
 ### 8.4 Tailwind & Layout
+
 - `tailwind.config.js`, `postcss.config.mjs`, and the top of `styles/globals.css` are effectively locked.
 - Do **not** rename/move `tailwind.config.js`, add `@config`/`@source` directives, or switch to TS configs.
 - Add custom utilities via `@utility` in `globals.css`; add new content paths via the `content` array in `tailwind.config.js`.
@@ -616,11 +684,13 @@ Before merging any migration:
 ## 9. Runtime, Auth, Database & RLS
 
 ### 9.1 Runtime Modes (Vercel)
+
 - Use **Edge runtime** (`export const runtime = 'edge'`) for latency-sensitive public reads (e.g., public profiles).
 - Use **Node runtime** (`export const runtime = 'nodejs'`) for Stripe, Node-only libraries, and heavy compute.
 - Never import Node-only libraries (e.g., `stripe`, Node crypto) into Edge code.
 
 ### 9.2 Auth (Clerk)
+
 - Use `clerkMiddleware()` in `middleware.ts` to protect private routes.
 - Wrap the app with `<ClerkProvider>` in `app/layout.tsx`.
 - Import server helpers (e.g., `auth`) from `@clerk/nextjs/server` and client hooks/components from `@clerk/nextjs`.
@@ -648,6 +718,7 @@ Before merging any migration:
   - Do **not** reintroduce password fields or OAuth buttons in new auth or onboarding UI.
 
 ### 9.3 Database (Neon + Drizzle)
+
 - Use the transaction-capable client: `@neondatabase/serverless` + `drizzle-orm/neon-serverless`.
 - WebSocket support is configured via `neonConfig.webSocketConstructor = ws` for full transaction capabilities.
 - The database client uses connection pooling (`Pool`) for production-ready performance.
@@ -657,6 +728,7 @@ Before merging any migration:
 - Set `app.clerk_user_id` per request on the server before DB calls when RLS policies depend on it (use `withDbSession` or `withDbSessionTx` helpers).
 
 ### 9.4 Postgres RLS Pattern
+
 - Use `current_setting('app.user_id', true)` in RLS policies to authorize access.
 - Do not hardcode user IDs in policies; always drive them through the session variable.
 
@@ -736,19 +808,16 @@ Before merging any migration:
 - Capture unexpected exceptions with `Sentry.captureException(error)` inside `catch` blocks or fail-fast paths where errors should be surfaced.
 - Create spans for key UI/API actions (`button clicks`, `fetch calls`, `critical business logic`) using `Sentry.startSpan` with meaningful `op` and `name` values, and attach attributes/metrics describing inputs or request-specific data.
   ```javascript
-  Sentry.startSpan(
-    { op: 'ui.click', name: 'Test Button Click' },
-    span => {
-      span.setAttribute('config', value);
-      span.setAttribute('metric', metric);
-      doSomething();
-    }
-  );
+  Sentry.startSpan({ op: "ui.click", name: "Test Button Click" }, (span) => {
+    span.setAttribute("config", value);
+    span.setAttribute("metric", metric);
+    doSomething();
+  });
   ```
 - Wrap API requests similarly so the span describes the route and HTTP operation when calling fetchers.
   ```javascript
   return Sentry.startSpan(
-    { op: 'http.client', name: `GET /api/users/${userId}` },
+    { op: "http.client", name: `GET /api/users/${userId}` },
     async () => {
       const response = await fetch(`/api/users/${userId}`);
       return response.json();
@@ -764,29 +833,34 @@ All AI agents **MUST** commit their work at the end of every job/task. This ensu
 ### Rules
 
 1. **Always commit before ending a session:**
+
    - After completing a task, stage and commit all changes.
    - Use conventional commit format: `[feat|fix|chore]: <description>`.
    - Keep commit messages concise but descriptive.
 
 2. **Commit command sequence:**
+
    ```bash
    git add -A
    git commit -m "[type]: <description>"
    ```
 
 3. **When to commit:**
+
    - At the end of every completed task.
    - Before switching to a different task.
    - Before ending a conversation/session.
    - After any significant milestone within a larger task.
 
 4. **Commit message format:**
+
    - `feat:` for new features or enhancements.
    - `fix:` for bug fixes.
    - `chore:` for maintenance, refactors, docs, or config changes.
    - Include ticket/issue number if available: `[feat]: add user avatar (#123)`.
 
 5. **Do NOT commit if:**
+
    - The code is in a broken state (fails typecheck/lint).
    - You are explicitly told not to commit.
    - The changes are exploratory/experimental and the user hasn't approved them.
