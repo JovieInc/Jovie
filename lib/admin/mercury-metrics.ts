@@ -37,6 +37,12 @@ export interface AdminMercuryMetrics {
   balanceUsd: number;
   burnRateUsd: number;
   burnWindowDays: number;
+  /** Indicates whether Mercury credentials are configured */
+  isConfigured: boolean;
+  /** Indicates whether the Mercury API call succeeded */
+  isAvailable: boolean;
+  /** Error message if Mercury API call failed */
+  errorMessage?: string;
 }
 
 function getMercuryEnv(): MercuryEnv | null {
@@ -165,11 +171,21 @@ async function getCheckingTransactionsCents(
 }
 
 export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
-  try {
-    if (!getMercuryEnv()) {
-      return { balanceUsd: 0, burnRateUsd: 0, burnWindowDays: 30 };
-    }
+  const env = getMercuryEnv();
 
+  if (!env) {
+    return {
+      balanceUsd: 0,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      isConfigured: false,
+      isAvailable: false,
+      errorMessage:
+        'Mercury credentials not configured (MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID required)',
+    };
+  }
+
+  try {
     const endDate = new Date();
     const startDate = new Date(endDate.getTime() - 30 * MS_PER_DAY);
 
@@ -189,9 +205,19 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
       balanceUsd: centsToUsd(balanceCents),
       burnRateUsd: centsToUsd(debitCents),
       burnWindowDays: 30,
+      isConfigured: true,
+      isAvailable: true,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error loading Mercury metrics:', error);
-    return { balanceUsd: 0, burnRateUsd: 0, burnWindowDays: 30 };
+    return {
+      balanceUsd: 0,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      isConfigured: true,
+      isAvailable: false,
+      errorMessage: `Mercury API error: ${message}`,
+    };
   }
 }
