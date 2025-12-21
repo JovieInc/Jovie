@@ -127,7 +127,7 @@ export function DashboardSidebar({
                   asChild
                   size='sm'
                   variant='secondary'
-                  className='flex-1'
+                  className='flex-1 min-h-[44px]'
                 >
                   <Link
                     href={profileHref}
@@ -142,7 +142,7 @@ export function DashboardSidebar({
                   idleLabel='Copy link'
                   successLabel='Copied'
                   errorLabel='Copy failed'
-                  className='flex-1'
+                  className='flex-1 min-h-[44px]'
                 />
               </div>
             ) : null}
