@@ -38,18 +38,20 @@ export default async function AdminWaitlistPage({
   } = await getAdminWaitlistEntries({ page, pageSize });
 
   return (
-    <div className='flex h-full min-h-0 flex-col gap-8'>
-      <header className='space-y-2'>
-        <p className='text-xs uppercase tracking-wide text-tertiary-token'>
+    <div className='flex h-full min-h-0 flex-col gap-4 sm:gap-6 lg:gap-8'>
+      <header className='space-y-1 sm:space-y-2'>
+        <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
           Internal
         </p>
-        <h1 className='text-3xl font-semibold text-primary-token'>Waitlist</h1>
-        <p className='text-sm text-secondary-token'>
+        <h1 className='text-2xl sm:text-3xl font-semibold text-primary-token'>
+          Waitlist
+        </h1>
+        <p className='text-xs sm:text-sm text-secondary-token'>
           Review waitlist submissions for early access.
         </p>
       </header>
 
-      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8'>
+      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8'>
         <WaitlistTable
           entries={entries}
           page={currentPage}
