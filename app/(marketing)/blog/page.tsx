@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
-import { Badge } from '@/components/ui/Badge';
 import { APP_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 
