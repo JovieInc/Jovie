@@ -4,7 +4,12 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import {
+  checkPublicRateLimit,
+  getPublicRateLimitStatus,
+} from '@/lib/utils/rate-limit';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -39,6 +44,36 @@ function inferDeviceType(
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract client IP for rate limiting
+    const clientIP = extractClientIP(request.headers);
+
+    // Rate limiting check
+    if (checkPublicRateLimit(clientIP, 'visit')) {
+      const status = getPublicRateLimitStatus(clientIP, 'visit');
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(status.retryAfterSeconds),
+            'X-RateLimit-Limit': String(status.limit),
+            'X-RateLimit-Remaining': String(status.remaining),
+          },
+        }
+      );
+    }
+
+    // Bot detection - silently skip recording for bots
+    const botResult = detectBot(request, '/api/audience/visit');
+    if (botResult.isBot) {
+      // Return success but don't record - prevents metric inflation
+      return NextResponse.json(
+        { success: true, fingerprint: 'bot-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json();
     const parsed = visitSchema.safeParse(body);
 
@@ -61,8 +96,7 @@ export async function POST(request: NextRequest) {
 
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
-    const resolvedIpAddress =
-      ipAddress ?? extractClientIP(request.headers) ?? undefined;
+    const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
     const resolvedReferrer =
       referrer ?? request.headers.get('referer') ?? undefined;
     const resolvedGeoCity =
@@ -73,8 +107,9 @@ export async function POST(request: NextRequest) {
       request.headers.get('cf-ipcountry') ??
       undefined;
 
+    // Validate profile exists AND is public before recording
     const [profile] = await db
-      .select({ id: creatorProfiles.id })
+      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -83,6 +118,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Only record visits for public profiles
+    if (!profile.isPublic) {
+      return NextResponse.json(
+        { error: 'Profile is not public' },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
