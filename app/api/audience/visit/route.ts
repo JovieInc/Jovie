@@ -1,6 +1,14 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  checkVisitRateLimit,
+  getRateLimitHeaders,
+} from '@/lib/analytics/tracking-rate-limit';
+import {
+  isTrackingTokenEnabled,
+  validateTrackingToken,
+} from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -28,6 +36,8 @@ const visitSchema = z.object({
   geoCity: z.string().optional(),
   geoCountry: z.string().optional(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
+  // HMAC-SHA256 signed tracking token for request authentication
+  trackingToken: z.string().optional(),
 });
 
 function inferDeviceType(
@@ -47,7 +57,7 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting
     const clientIP = extractClientIP(request.headers);
 
-    // Rate limiting check
+    // Public rate limiting check (per-IP)
     if (checkPublicRateLimit(clientIP, 'visit')) {
       const status = getPublicRateLimitStatus(clientIP, 'visit');
       return NextResponse.json(
@@ -92,7 +102,19 @@ export async function POST(request: NextRequest) {
       geoCity,
       geoCountry,
       deviceType,
+      trackingToken,
     } = parsed.data;
+
+    // Validate tracking token if enabled
+    if (isTrackingTokenEnabled()) {
+      const tokenValidation = validateTrackingToken(trackingToken, profileId);
+      if (!tokenValidation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid tracking token', reason: tokenValidation.error },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
 
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
@@ -106,6 +128,24 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
       undefined;
+
+    // Per-creator rate limiting (50k visits/hour)
+    const rateLimitResult = await checkVisitRateLimit(
+      profileId,
+      resolvedIpAddress
+    );
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...getRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
 
     // Validate profile exists AND is public before recording
     const [profile] = await db
