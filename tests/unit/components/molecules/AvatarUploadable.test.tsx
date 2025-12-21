@@ -567,7 +567,7 @@ describe('AvatarUploadable Component', () => {
       });
     });
 
-    it.skip('tracks validation errors', async () => {
+    it('tracks validation errors', async () => {
       render(
         <AvatarUploadable
           src='https://example.com/avatar.jpg'
@@ -586,10 +586,15 @@ describe('AvatarUploadable Component', () => {
         1024
       );
 
-      fireEvent.change(fileInput, { target: { files: [invalidFile] } });
+      await act(async () => {
+        fireEvent.change(fileInput, { target: { files: [invalidFile] } });
+        await Promise.resolve();
+      });
 
-      await Promise.resolve();
-      vi.runAllTimers();
+      await act(async () => {
+        vi.runAllTimers();
+      });
+
       expect(track).toHaveBeenCalledWith(
         'avatar_upload_error',
         expect.objectContaining({

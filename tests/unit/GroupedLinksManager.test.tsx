@@ -135,11 +135,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);
 };
 
-const shouldRunGroupedLinksTests = process.env.RUN_GROUPED_LINKS_TESTS === '1';
-
-const describeFn = shouldRunGroupedLinksTests ? describe : describe.skip;
-
-describeFn('GroupedLinksManager', () => {
+describe('GroupedLinksManager', () => {
   beforeEach(() => {
     nextAddPayload = null;
   });

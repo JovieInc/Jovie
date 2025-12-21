@@ -224,7 +224,7 @@ vi.mock('@/components/dashboard/organisms/GroupedLinksManager', () => ({
   },
 }));
 
-describe.skip('EnhancedDashboardLinks', () => {
+describe('EnhancedDashboardLinks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setPreviewDataMock.mockClear();
