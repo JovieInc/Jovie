@@ -1,6 +1,6 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { useMemo } from 'react';
-import { Table, type Column } from '@/components/admin/table';
+import { type Column, Table } from '@/components/admin/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
