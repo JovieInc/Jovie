@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
@@ -102,12 +103,14 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Error in analytics API:', error);
+
     if (error instanceof Error && error.message === 'Unauthorized') {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
+
     // Gracefully handle missing user/profile by returning zeroed stats
     if (
       error instanceof Error &&
@@ -125,6 +128,15 @@ export async function GET(request: Request) {
         { status: 200, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Capture unexpected errors in Sentry
+    Sentry.captureException(error, {
+      tags: {
+        route: '/api/dashboard/analytics',
+        errorType: 'api_error',
+      },
+    });
+
     return NextResponse.json(
       { error: 'Failed to fetch analytics data' },
       { status: 500, headers: NO_STORE_HEADERS }

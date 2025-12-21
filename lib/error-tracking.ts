@@ -1,8 +1,8 @@
 /**
  * Error Tracking Utility
  *
- * Provides structured error logging with PostHog integration for production monitoring.
- * Follows YC principle: "do things that don't scale" - using existing PostHog instead of Sentry.
+ * Provides structured error logging with Sentry integration for production monitoring.
+ * Uses Sentry as the primary error tracking service with PostHog as a secondary sink.
  *
  * Usage:
  *   import { captureError, captureCriticalError } from '@/lib/error-tracking'
@@ -17,6 +17,7 @@
  *   }
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 
 type ErrorSeverity = 'error' | 'critical' | 'warning';
@@ -73,10 +74,11 @@ function formatError(error: unknown): {
 }
 
 /**
- * Capture an error and send to PostHog
+ * Capture an error and send to Sentry and PostHog
  *
  * This function:
  * - Logs to console for debugging
+ * - Sends error to Sentry for error tracking
  * - Sends error event to PostHog for monitoring
  * - Never throws (safe to use in catch blocks)
  *
@@ -114,7 +116,28 @@ export async function captureError(
     console.error(consoleMessage, consoleData);
   }
 
-  // Send to PostHog for monitoring (fire-and-forget to avoid blocking)
+  // Send to Sentry for error tracking (primary)
+  try {
+    const errorInstance =
+      error instanceof Error ? error : new Error(errorData.message);
+
+    Sentry.captureException(errorInstance, {
+      extra: {
+        message,
+        ...metadata.context,
+      },
+      level: severity === 'critical' ? 'fatal' : severity,
+      tags: {
+        severity,
+        environment: metadata.environment,
+        ...(context?.route ? { route: String(context.route) } : {}),
+      },
+    });
+  } catch (sentryError) {
+    console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
+  }
+
+  // Send to PostHog for monitoring (secondary, fire-and-forget)
   const eventName =
     severity === 'critical' ? '$exception_critical' : '$exception';
 

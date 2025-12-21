@@ -1,9 +1,24 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  checkClickRateLimit,
+  getRateLimitHeaders,
+} from '@/lib/analytics/tracking-rate-limit';
+import {
+  isTrackingTokenEnabled,
+  validateTrackingToken,
+} from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { detectBot } from '@/lib/utils/bot-detection';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { encryptIP } from '@/lib/utils/pii-encryption';
+import {
+  checkPublicRateLimit,
+  getPublicRateLimitStatus,
+} from '@/lib/utils/rate-limit';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -31,6 +46,8 @@ const clickSchema = z.object({
   browser: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   audienceMemberId: z.string().uuid().optional(),
+  // HMAC-SHA256 signed tracking token for request authentication
+  trackingToken: z.string().optional(),
 });
 
 const ACTION_ICONS: Record<string, string> = {
@@ -110,6 +127,36 @@ async function findAudienceMember(
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract client IP for rate limiting
+    const clientIP = extractClientIP(request.headers);
+
+    // Public rate limiting check (per-IP)
+    if (checkPublicRateLimit(clientIP, 'click')) {
+      const status = getPublicRateLimitStatus(clientIP, 'click');
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(status.retryAfterSeconds),
+            'X-RateLimit-Limit': String(status.limit),
+            'X-RateLimit-Remaining': String(status.remaining),
+          },
+        }
+      );
+    }
+
+    // Bot detection - detect but continue to record with isBot flag
+    const botDetection = detectBot(request, '/api/audience/click');
+    if (botDetection.isBot && botDetection.shouldBlock) {
+      // Return success but don't record for blocked bots
+      return NextResponse.json(
+        { success: true, fingerprint: 'bot-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json();
     const parsed = clickSchema.safeParse(body);
 
@@ -136,10 +183,41 @@ export async function POST(request: NextRequest) {
       browser,
       metadata,
       audienceMemberId,
+      trackingToken,
     } = parsed.data;
 
+    // Validate tracking token if enabled
+    if (isTrackingTokenEnabled()) {
+      const tokenValidation = validateTrackingToken(trackingToken, profileId);
+      if (!tokenValidation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid tracking token', reason: tokenValidation.error },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
+    // Resolve IP address from body or headers
+    const resolvedIP = ipAddress ?? clientIP ?? undefined;
+
+    // Per-creator rate limiting (10k clicks/hour)
+    const rateLimitResult = await checkClickRateLimit(profileId, resolvedIP);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...getRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
+    // Validate profile exists AND is public before recording
     const [profile] = await db
-      .select({ id: creatorProfiles.id })
+      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -151,9 +229,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fingerprint = createFingerprint(ipAddress, userAgent);
+    // Only record clicks for public profiles
+    if (!profile.isPublic) {
+      return NextResponse.json(
+        { error: 'Profile is not public' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
+
+    // Encrypt IP address for storage (GDPR/CCPA compliance)
+    const encryptedIP = encryptIP(resolvedIP);
 
     await withSystemIngestionSession(async tx => {
       let member = await findAudienceMember(
@@ -231,7 +320,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: profileId,
         linkId,
         linkType,
-        ipAddress,
+        ipAddress: encryptedIP,
         userAgent,
         referrer,
         country,
@@ -239,6 +328,7 @@ export async function POST(request: NextRequest) {
         deviceType: normalizedDevice,
         os,
         browser,
+        isBot: botDetection.isBot,
         metadata: metadata ?? {},
         audienceMemberId: member.id,
       });

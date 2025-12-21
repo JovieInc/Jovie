@@ -1,10 +1,23 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  checkVisitRateLimit,
+  getRateLimitHeaders,
+} from '@/lib/analytics/tracking-rate-limit';
+import {
+  isTrackingTokenEnabled,
+  validateTrackingToken,
+} from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import {
+  checkPublicRateLimit,
+  getPublicRateLimitStatus,
+} from '@/lib/utils/rate-limit';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -23,6 +36,8 @@ const visitSchema = z.object({
   geoCity: z.string().optional(),
   geoCountry: z.string().optional(),
   deviceType: z.enum(['mobile', 'desktop', 'tablet', 'unknown']).optional(),
+  // HMAC-SHA256 signed tracking token for request authentication
+  trackingToken: z.string().optional(),
 });
 
 function inferDeviceType(
@@ -39,6 +54,36 @@ function inferDeviceType(
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract client IP for rate limiting
+    const clientIP = extractClientIP(request.headers);
+
+    // Public rate limiting check (per-IP)
+    if (checkPublicRateLimit(clientIP, 'visit')) {
+      const status = getPublicRateLimitStatus(clientIP, 'visit');
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(status.retryAfterSeconds),
+            'X-RateLimit-Limit': String(status.limit),
+            'X-RateLimit-Remaining': String(status.remaining),
+          },
+        }
+      );
+    }
+
+    // Bot detection - silently skip recording for bots
+    const botResult = detectBot(request, '/api/audience/visit');
+    if (botResult.isBot) {
+      // Return success but don't record - prevents metric inflation
+      return NextResponse.json(
+        { success: true, fingerprint: 'bot-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json();
     const parsed = visitSchema.safeParse(body);
 
@@ -57,12 +102,23 @@ export async function POST(request: NextRequest) {
       geoCity,
       geoCountry,
       deviceType,
+      trackingToken,
     } = parsed.data;
+
+    // Validate tracking token if enabled
+    if (isTrackingTokenEnabled()) {
+      const tokenValidation = validateTrackingToken(trackingToken, profileId);
+      if (!tokenValidation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid tracking token', reason: tokenValidation.error },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
 
     const resolvedUserAgent =
       userAgent ?? request.headers.get('user-agent') ?? undefined;
-    const resolvedIpAddress =
-      ipAddress ?? extractClientIP(request.headers) ?? undefined;
+    const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
     const resolvedReferrer =
       referrer ?? request.headers.get('referer') ?? undefined;
     const resolvedGeoCity =
@@ -73,8 +129,27 @@ export async function POST(request: NextRequest) {
       request.headers.get('cf-ipcountry') ??
       undefined;
 
+    // Per-creator rate limiting (50k visits/hour)
+    const rateLimitResult = await checkVisitRateLimit(
+      profileId,
+      resolvedIpAddress
+    );
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...getRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
+    // Validate profile exists AND is public before recording
     const [profile] = await db
-      .select({ id: creatorProfiles.id })
+      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -83,6 +158,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Only record visits for public profiles
+    if (!profile.isPublic) {
+      return NextResponse.json(
+        { error: 'Profile is not public' },
+        { status: 403, headers: NO_STORE_HEADERS }
       );
     }
 
