@@ -13,10 +13,10 @@ import { publicEnv } from '@/lib/env-public';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
-// Configure Inter font
+// Configure Inter font with variable weight to support Linear's 538 weight
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '538', '600', '700'], // Add 538 for Linear's exact weight
+  weight: 'variable', // Use variable font for full weight range (100-900) including 538
   display: 'swap',
   variable: '--font-inter',
   adjustFontFallback: true,
