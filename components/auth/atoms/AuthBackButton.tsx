@@ -1,30 +1,45 @@
 'use client';
 
-import type { MouseEventHandler } from 'react';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
-export interface AuthBackButtonProps {
-  onClick: MouseEventHandler<HTMLButtonElement>;
-  disabled?: boolean;
-  children?: string;
+interface AuthBackButtonProps {
+  onClick?: () => void;
+  href?: string;
   className?: string;
+  ariaLabel?: string;
 }
 
 export function AuthBackButton({
   onClick,
-  disabled = false,
-  children = 'Back',
+  href,
   className,
+  ariaLabel = 'Go back',
 }: AuthBackButtonProps) {
+  const baseClasses =
+    'fixed top-4 left-4 md:top-6 md:left-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-primary-token hover:bg-white/5 transition-colors focus-ring-themed';
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className={cn(baseClasses, className)}
+        aria-label={ariaLabel}
+      >
+        <ArrowLeft className='h-5 w-5' />
+      </Link>
+    );
+  }
+
   return (
     <button
       type='button'
       onClick={onClick}
-      disabled={disabled}
-      className={`text-sm text-secondary-token hover:text-primary-token transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md ${
-        className ?? ''
-      }`}
+      className={cn(baseClasses, className)}
+      aria-label={ariaLabel}
     >
-      {children}
+      <ArrowLeft className='h-5 w-5' />
     </button>
   );
 }
