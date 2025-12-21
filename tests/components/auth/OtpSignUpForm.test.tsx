@@ -223,7 +223,11 @@ describe('OtpSignUpForm', () => {
     renderSignUp();
 
     const verificationsStep = screen.getByTestId('signup-step-verifications');
-    const otpInput = within(verificationsStep).getByTestId('clerk-input');
+    const otpInputs = within(verificationsStep).getAllByTestId('clerk-input');
+    const otpInput = otpInputs.find(
+      input => input.getAttribute('data-type') === 'otp'
+    );
+    expect(otpInput).toBeDefined();
     expect(otpInput).toHaveAttribute('data-type', 'otp');
     expect(otpInput).toHaveAttribute('data-auto-submit', 'true');
   });

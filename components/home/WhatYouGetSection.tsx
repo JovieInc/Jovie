@@ -1,5 +1,5 @@
+import { Eye, Heart, Music, Sparkles, Users, Zap } from 'lucide-react';
 import { Container } from '@/components/site/Container';
-import { Sparkles, Users, Eye, Music, Heart, Zap } from 'lucide-react';
 
 const features = [
   {

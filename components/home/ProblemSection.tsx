@@ -1,5 +1,5 @@
-import { Container } from '@/components/site/Container';
 import { CheckCircle2 } from 'lucide-react';
+import { Container } from '@/components/site/Container';
 
 const benefits = [
   {

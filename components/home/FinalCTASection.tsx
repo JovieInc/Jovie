@@ -1,7 +1,7 @@
-import { Container } from '@/components/site/Container';
+import { ArrowRight } from 'lucide-react';
 import { LinearButton } from '@/components/atoms/LinearButton';
 import { Spacer } from '@/components/atoms/Spacer';
-import { ArrowRight } from 'lucide-react';
+import { Container } from '@/components/site/Container';
 
 export function FinalCTASection() {
   return (

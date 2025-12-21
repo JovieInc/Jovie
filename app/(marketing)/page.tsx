@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { ProblemSection } from '@/components/home/ProblemSection';
-import { InsightSection } from '@/components/home/InsightSection';
-import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { InsightSection } from '@/components/home/InsightSection';
+import { ProblemSection } from '@/components/home/ProblemSection';
+import { RedesignedHero } from '@/components/home/RedesignedHero';
+import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 export async function generateMetadata(): Promise<Metadata> {

@@ -1,8 +1,8 @@
 'use client';
 
-import { Container } from '@/components/site/Container';
-import { LinearButton } from '@/components/atoms/LinearButton';
 import { ArrowRight } from 'lucide-react';
+import { LinearButton } from '@/components/atoms/LinearButton';
+import { Container } from '@/components/site/Container';
 
 export function RedesignedHero() {
   return (
