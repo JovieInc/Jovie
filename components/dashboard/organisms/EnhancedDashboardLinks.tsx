@@ -10,8 +10,8 @@ import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
-import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
+import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,

@@ -7,9 +7,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
