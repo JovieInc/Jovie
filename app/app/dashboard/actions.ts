@@ -107,6 +107,8 @@ export interface ProfileSocialLink {
     signals?: string[];
     linkType?: string | null;
   } | null;
+  // Optimistic locking version for concurrent edit detection
+  version?: number;
 }
 
 const DSP_PLATFORMS = [

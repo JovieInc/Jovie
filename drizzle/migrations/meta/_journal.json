@@ -181,7 +181,21 @@
       "idx": 25,
       "version": "7",
       "when": 1766262262054,
-      "tag": "0025_billing_hardening",
+      "tag": "0025_unique_username_normalized",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1766268420000,
+      "tag": "0026_billing_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1766268480000,
+      "tag": "0027_dashboard_links_hardening",
       "breakpoints": true
     }
   ]

@@ -278,7 +278,9 @@ export const creatorProfiles = pgTable(
       ),
     // CRITICAL: Unique constraint added in migration 0025 to prevent race conditions
     // during onboarding where two users could claim the same handle simultaneously
-    usernameNormalizedUnique: uniqueIndex('creator_profiles_username_normalized_unique')
+    usernameNormalizedUnique: uniqueIndex(
+      'creator_profiles_username_normalized_unique'
+    )
       .on(table.usernameNormalized)
       .where(drizzleSql`username_normalized IS NOT NULL`),
   })
@@ -491,9 +493,34 @@ export const socialLinks = pgTable('social_links', {
   evidence: jsonb('evidence')
     .$type<{ sources?: string[]; signals?: string[] }>()
     .default({}),
+  // Optimistic locking version for concurrent edit detection
+  version: integer('version').default(1).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// Idempotency keys for dashboard API deduplication
+export const dashboardIdempotencyKeys = pgTable(
+  'dashboard_idempotency_keys',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    key: text('key').notNull(),
+    userId: text('user_id').notNull(),
+    endpoint: text('endpoint').notNull(),
+    responseStatus: integer('response_status').notNull(),
+    responseBody: jsonb('response_body').$type<Record<string, unknown>>(),
+    expiresAt: timestamp('expires_at').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    keyUserEndpointUnique: uniqueIndex(
+      'dashboard_idempotency_keys_key_user_endpoint_unique'
+    ).on(table.key, table.userId, table.endpoint),
+    expiresAtIndex: index('dashboard_idempotency_keys_expires_at_idx').on(
+      table.expiresAt
+    ),
+  })
+);
 
 export const socialAccounts = pgTable('social_accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1008,3 +1035,8 @@ export type NewWaitlistInvite = typeof waitlistInvites.$inferInsert;
 
 export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
 export type NewBillingAuditLog = typeof billingAuditLog.$inferInsert;
+
+export type DashboardIdempotencyKey =
+  typeof dashboardIdempotencyKeys.$inferSelect;
+export type NewDashboardIdempotencyKey =
+  typeof dashboardIdempotencyKeys.$inferInsert;
