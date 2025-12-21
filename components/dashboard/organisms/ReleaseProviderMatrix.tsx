@@ -7,7 +7,6 @@ import {
   resetProviderOverride,
   saveProviderOverride,
 } from '@/app/app/dashboard/releases/actions';
-import { type Column, Table } from '@/components/admin/table';
 import { Icon } from '@/components/atoms/Icon';
 import {
   Dialog,
@@ -166,156 +165,6 @@ export function ReleaseProviderMatrix({
     });
   };
 
-  const columns: Column<ReleaseViewModel>[] = useMemo(
-    () => [
-      {
-        id: 'release',
-        header: 'Release',
-        cell: release => {
-          const manualOverrideCount = release.providers.filter(
-            provider => provider.source === 'manual'
-          ).length;
-
-          return (
-            <div className='flex flex-col gap-1'>
-              <div className='flex items-center gap-2'>
-                <span className='text-sm font-semibold text-primary-token'>
-                  {release.title}
-                </span>
-                {manualOverrideCount > 0 ? (
-                  <Badge
-                    variant='secondary'
-                    className='bg-amber-100/70 text-amber-900'
-                  >
-                    {manualOverrideCount} override
-                    {manualOverrideCount > 1 ? 's' : ''}
-                  </Badge>
-                ) : null}
-              </div>
-              <p className='text-xs text-secondary-token'>
-                {release.releaseDate
-                  ? new Date(release.releaseDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })
-                  : 'Release date TBD'}
-              </p>
-            </div>
-          );
-        },
-        width: 'w-[240px]',
-      },
-      {
-        id: 'smartLink',
-        header: 'Smart Link',
-        cell: release => (
-          <Button
-            variant='secondary'
-            size='sm'
-            data-testid={`smart-link-copy-${release.id}`}
-            data-url={`${getBaseUrl()}${release.smartLinkPath}`}
-            onClick={() =>
-              void handleCopy(
-                release.smartLinkPath,
-                `${release.title} smart link`,
-                `smart-link-copy-${release.id}`
-              )
-            }
-            className='inline-flex items-center gap-2'
-          >
-            <Icon name='Copy' className='h-4 w-4' aria-hidden='true' />
-            Copy smart link
-          </Button>
-        ),
-        width: 'w-[180px]',
-      },
-      ...primaryProviders.map(providerKey => ({
-        id: providerKey,
-        header: providerConfig[providerKey].label,
-        cell: (release: ReleaseViewModel) => {
-          const provider = release.providers.find(
-            item => item.key === providerKey
-          );
-          const available = Boolean(provider?.url);
-          const testId = `provider-copy-${release.id}-${providerKey}`;
-
-          return (
-            <div className='flex flex-col gap-2'>
-              <Button
-                variant='ghost'
-                size='sm'
-                disabled={!available}
-                data-testid={testId}
-                data-url={
-                  provider?.path ? `${getBaseUrl()}${provider.path}` : undefined
-                }
-                onClick={() => {
-                  if (!provider?.path) return;
-                  void handleCopy(
-                    provider.path,
-                    `${release.title} – ${providerConfig[providerKey].label}`,
-                    testId
-                  );
-                }}
-                className='inline-flex items-center gap-1'
-              >
-                <Icon
-                  name={available ? 'Copy' : 'AlertCircle'}
-                  className='h-4 w-4'
-                  aria-hidden='true'
-                />
-                {available ? 'Copy link' : 'Add link'}
-              </Button>
-              <div className='flex flex-wrap items-center gap-1 text-[11px] text-secondary-token'>
-                <Badge
-                  variant='secondary'
-                  className={cn(
-                    'border border-subtle text-[11px]',
-                    provider?.source === 'manual'
-                      ? 'bg-amber-50 text-amber-900'
-                      : 'bg-surface-2/70'
-                  )}
-                >
-                  {provider?.source === 'manual'
-                    ? 'Manual override'
-                    : available
-                      ? 'Detected'
-                      : 'Missing'}
-                </Badge>
-                {provider?.url ? (
-                  <span className='truncate text-ellipsis text-secondary-token max-w-[120px]'>
-                    {provider.url}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          );
-        },
-        width: 'w-[180px]',
-      })),
-      {
-        id: 'edit',
-        header: 'Edit',
-        cell: release => (
-          <Button
-            variant='ghost'
-            size='sm'
-            className='inline-flex items-center gap-1 text-primary-token'
-            data-testid={`edit-links-${release.id}`}
-            onClick={() => openEditor(release)}
-          >
-            <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
-            Edit links
-          </Button>
-        ),
-        width: 'w-[120px]',
-        align: 'right',
-      },
-    ],
-    [primaryProviders, providerConfig]
-  );
-
   return (
     <section className='space-y-4' data-testid='releases-matrix'>
       <header className='space-y-1'>
@@ -336,15 +185,190 @@ export function ReleaseProviderMatrix({
         </div>
       </header>
 
-      <div className='overflow-hidden rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
-        <Table
-          data={rows}
-          columns={columns}
-          getRowId={release => release.id}
-          virtualizationThreshold={50}
-          rowHeight={80}
-          caption='Releases with provider links'
-        />
+      {/* Mobile scroll hint */}
+      <p className='mb-2 text-xs text-secondary-token sm:hidden'>
+        ← Swipe to see more →
+      </p>
+      <div className='overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-subtle scrollbar-track-transparent'>
+        <div className='min-w-[700px] rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
+        <table className='min-w-full divide-y divide-subtle'>
+          <thead className='bg-surface-2/50'>
+            <tr>
+              <th
+                scope='col'
+                className='px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-secondary-token'
+              >
+                Release
+              </th>
+              <th
+                scope='col'
+                className='px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-secondary-token'
+              >
+                Smart Link
+              </th>
+              {primaryProviders.map(provider => (
+                <th
+                  key={provider}
+                  scope='col'
+                  className='px-3 py-3 text-left text-xs font-medium uppercase tracking-wide text-secondary-token'
+                >
+                  {providerConfig[provider].label}
+                </th>
+              ))}
+              <th
+                scope='col'
+                className='px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-secondary-token'
+              >
+                Edit
+              </th>
+            </tr>
+          </thead>
+          <tbody className='divide-y divide-subtle'>
+            {rows.map(release => {
+              const manualOverrideCount = release.providers.filter(
+                provider => provider.source === 'manual'
+              ).length;
+
+              return (
+                <tr key={release.slug} className='hover:bg-surface-2/40'>
+                  <td className='max-w-xs px-4 py-4 align-top'>
+                    <div className='flex flex-col gap-1'>
+                      <div className='flex items-center gap-2'>
+                        <span className='text-sm font-semibold text-primary-token'>
+                          {release.title}
+                        </span>
+                        {manualOverrideCount > 0 ? (
+                          <Badge
+                            variant='secondary'
+                            className='bg-amber-100/70 text-amber-900'
+                          >
+                            {manualOverrideCount} override
+                            {manualOverrideCount > 1 ? 's' : ''}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className='text-xs text-secondary-token'>
+                        {release.releaseDate
+                          ? new Date(release.releaseDate).toLocaleDateString(
+                              'en-US',
+                              {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              }
+                            )
+                          : 'Release date TBD'}
+                      </p>
+                    </div>
+                  </td>
+                  <td className='px-4 py-4 align-top'>
+                    <Button
+                      variant='secondary'
+                      size='sm'
+                      data-testid={`smart-link-copy-${release.id}`}
+                      data-url={`${getBaseUrl()}${release.smartLinkPath}`}
+                      onClick={() =>
+                        void handleCopy(
+                          release.smartLinkPath,
+                          `${release.title} smart link`,
+                          `smart-link-copy-${release.id}`
+                        )
+                      }
+                      className='inline-flex items-center gap-2'
+                    >
+                      <Icon
+                        name='Copy'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
+                      Copy smart link
+                    </Button>
+                  </td>
+                  {primaryProviders.map(providerKey => {
+                    const provider = release.providers.find(
+                      item => item.key === providerKey
+                    );
+                    const available = Boolean(provider?.url);
+                    const testId = `provider-copy-${release.id}-${providerKey}`;
+
+                    return (
+                      <td key={providerKey} className='px-3 py-4 align-top'>
+                        <div className='flex flex-col gap-2'>
+                          <Button
+                            variant='ghost'
+                            size='sm'
+                            disabled={!available}
+                            data-testid={testId}
+                            data-url={
+                              provider?.path
+                                ? `${getBaseUrl()}${provider.path}`
+                                : undefined
+                            }
+                            onClick={() => {
+                              if (!provider?.path) return;
+                              void handleCopy(
+                                provider.path,
+                                `${release.title} – ${providerConfig[providerKey].label}`,
+                                testId
+                              );
+                            }}
+                            className='inline-flex items-center gap-1'
+                          >
+                            <Icon
+                              name={available ? 'Copy' : 'AlertCircle'}
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                            {available ? 'Copy link' : 'Add link'}
+                          </Button>
+                          <div className='flex flex-wrap items-center gap-1 text-[11px] text-secondary-token'>
+                            <Badge
+                              variant='secondary'
+                              className={cn(
+                                'border border-subtle text-[11px]',
+                                provider?.source === 'manual'
+                                  ? 'bg-amber-50 text-amber-900'
+                                  : 'bg-surface-2/70'
+                              )}
+                            >
+                              {provider?.source === 'manual'
+                                ? 'Manual override'
+                                : available
+                                  ? 'Detected'
+                                  : 'Missing'}
+                            </Badge>
+                            {provider?.url ? (
+                              <span className='truncate text-ellipsis text-secondary-token'>
+                                {provider.url}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </td>
+                    );
+                  })}
+                  <td className='px-4 py-4 align-top text-right'>
+                    <Button
+                      variant='ghost'
+                      size='sm'
+                      className='inline-flex items-center gap-1 text-primary-token'
+                      data-testid={`edit-links-${release.id}`}
+                      onClick={() => openEditor(release)}
+                    >
+                      <Icon
+                        name='PencilLine'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
+                      Edit links
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        </div>
       </div>
 
       <Dialog open={Boolean(editingRelease)} onClose={closeEditor} size='3xl'>

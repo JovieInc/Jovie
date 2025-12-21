@@ -29,6 +29,13 @@ export function DashboardHeader({
     >
       <div className='relative flex h-12 w-full items-center gap-2 px-4 sm:px-6 lg:px-8'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
+        {/* Mobile: Show current page title centered */}
+        <h1 className='flex-1 text-center text-[15px] font-semibold text-primary-token sm:hidden'>
+          <span className='block max-w-[200px] truncate mx-auto'>
+            {currentLabel}
+          </span>
+        </h1>
+        {/* Desktop: Full breadcrumb navigation */}
         <nav
           aria-label='Breadcrumb'
           className='hidden min-w-0 items-center gap-1 text-[13px] text-secondary-token sm:flex'
@@ -64,9 +71,6 @@ export function DashboardHeader({
             );
           })}
         </nav>
-        <div className='absolute left-1/2 hidden min-w-0 -translate-x-1/2 text-[13px] font-medium text-primary-token sm:hidden'>
-          <span className='block max-w-[180px] truncate'>{currentLabel}</span>
-        </div>
         {action ? (
           <div className='ml-auto flex items-center gap-2'>{action}</div>
         ) : null}
