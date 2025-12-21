@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Input } from '@jovie/ui';
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   resetProviderOverride,
@@ -16,9 +16,11 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { ReleaseMobileCard } from './ReleaseMobileCard';
 
 interface ReleaseProviderMatrixProps {
   releases: ReleaseViewModel[];
@@ -71,6 +73,7 @@ export function ReleaseProviderMatrix({
   );
   const [drafts, setDrafts] = useState<DraftState>({});
   const [isSaving, startSaving] = useTransition();
+  const isMobile = useIsMobile();
 
   const providerList = useMemo(
     () =>
@@ -165,6 +168,62 @@ export function ReleaseProviderMatrix({
       }
     });
   };
+
+  // Mobile-specific handlers that work with a specific release
+  const handleMobileSaveOverride = useCallback(
+    async (releaseId: string, provider: ProviderKey, url: string) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (!release) return;
+
+      return new Promise<void>((resolve, reject) => {
+        startSaving(async () => {
+          try {
+            const updated = await saveProviderOverride({
+              profileId: release.profileId,
+              releaseId: release.id,
+              provider,
+              url,
+            });
+            updateRow(updated);
+            toast.success('Link updated');
+            resolve();
+          } catch (error) {
+            console.error(error);
+            toast.error('Failed to save override');
+            reject(error);
+          }
+        });
+      });
+    },
+    [rows]
+  );
+
+  const handleMobileResetOverride = useCallback(
+    async (releaseId: string, provider: ProviderKey) => {
+      const release = rows.find(r => r.id === releaseId);
+      if (!release) return;
+
+      return new Promise<void>((resolve, reject) => {
+        startSaving(async () => {
+          try {
+            const updated = await resetProviderOverride({
+              profileId: release.profileId,
+              releaseId: release.id,
+              provider,
+            });
+            updateRow(updated);
+            toast.success('Reverted to detected link');
+            resolve();
+          } catch (error) {
+            console.error(error);
+            toast.error('Failed to reset link');
+            reject(error);
+          }
+        });
+      });
+    },
+    [rows]
+  );
 
   const columns: Column<ReleaseViewModel>[] = useMemo(
     () => [
@@ -319,24 +378,28 @@ export function ReleaseProviderMatrix({
   return (
     <section className='space-y-4' data-testid='releases-matrix'>
       <header className='space-y-1'>
-        <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
+        <p className='text-xs sm:text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
           Discography
         </p>
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <div className='space-y-1'>
-            <h1 className='text-2xl font-semibold text-primary-token'>
+            <h1 className='text-xl sm:text-2xl font-semibold text-primary-token'>
               Releases
             </h1>
-            <p className='max-w-3xl text-sm text-secondary-token'>
+            <p className='max-w-3xl text-xs sm:text-sm text-secondary-token'>
               Share one smart link per release and keep provider URLs pristine.
-              Copy-ready variants for each DSP make sure fans land in the right
-              app every time.
+              <span className='hidden sm:inline'>
+                {' '}
+                Copy-ready variants for each DSP make sure fans land in the
+                right app every time.
+              </span>
             </p>
           </div>
         </div>
       </header>
 
-      <div className='overflow-hidden rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
+      {/* Desktop Table - hidden on mobile */}
+      <div className='hidden md:block overflow-hidden rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
         <Table
           data={rows}
           columns={columns}
@@ -347,8 +410,38 @@ export function ReleaseProviderMatrix({
         />
       </div>
 
-      <Dialog open={Boolean(editingRelease)} onClose={closeEditor} size='3xl'>
-        <DialogTitle className='flex items-center gap-3 text-xl font-semibold text-primary-token'>
+      {/* Mobile Card List - shown only on mobile */}
+      <div className='md:hidden space-y-3'>
+        {rows.length === 0 ? (
+          <div className='text-center py-12 text-secondary-token bg-surface-0 border border-subtle rounded-xl'>
+            No releases found. Add your first release to get started.
+          </div>
+        ) : (
+          rows.map(release => (
+            <ReleaseMobileCard
+              key={release.id}
+              release={release}
+              providerConfig={providerConfig}
+              primaryProviders={primaryProviders}
+              onCopy={handleCopy}
+              onSaveOverride={(provider, url) =>
+                handleMobileSaveOverride(release.id, provider, url)
+              }
+              onResetOverride={provider =>
+                handleMobileResetOverride(release.id, provider)
+              }
+            />
+          ))
+        )}
+      </div>
+
+      {/* Desktop Edit Dialog - shown only when editing from desktop table */}
+      <Dialog
+        open={Boolean(editingRelease) && !isMobile}
+        onClose={closeEditor}
+        size='3xl'
+      >
+        <DialogTitle className='flex items-center gap-3 text-lg sm:text-xl font-semibold text-primary-token'>
           <Icon
             name='Link'
             className='h-5 w-5 text-secondary-token'
@@ -356,25 +449,25 @@ export function ReleaseProviderMatrix({
           />
           Edit release links
         </DialogTitle>
-        <DialogDescription className='text-sm text-secondary-token'>
+        <DialogDescription className='text-xs sm:text-sm text-secondary-token'>
           Swap in a preferred DSP link or revert back to our detected URL. All
           changes are live for your smart link immediately.
         </DialogDescription>
         <DialogBody className='space-y-4'>
           {editingRelease ? (
-            <div className='space-y-3 rounded-xl border border-subtle bg-surface-2/60 p-4'>
+            <div className='space-y-3 rounded-xl border border-subtle bg-surface-2/60 p-3 sm:p-4'>
               <div className='flex flex-wrap items-center justify-between gap-2'>
-                <div>
-                  <p className='text-sm font-semibold text-primary-token'>
+                <div className='min-w-0 flex-1'>
+                  <p className='text-sm font-semibold text-primary-token truncate'>
                     {editingRelease.title}
                   </p>
-                  <p className='text-xs text-secondary-token'>
+                  <p className='text-xs text-secondary-token truncate'>
                     Smart link: {editingRelease.smartLinkPath}
                   </p>
                 </div>
                 <Badge
                   variant='secondary'
-                  className='border border-subtle bg-transparent text-secondary-token'
+                  className='border border-subtle bg-transparent text-secondary-token flex-shrink-0'
                 >
                   {editingRelease.releaseDate
                     ? new Date(editingRelease.releaseDate).toLocaleDateString()
