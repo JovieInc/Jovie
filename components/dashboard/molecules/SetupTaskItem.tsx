@@ -38,7 +38,7 @@ export function SetupTaskItem({
         {complete ? completeLabel : incompleteLabel}
       </span>
       {!complete && action ? (
-        <div className='mt-auto flex shrink-0'>{action}</div>
+        <div className='mt-auto flex shrink-0 [&_a]:min-h-[44px] [&_a]:flex [&_a]:items-center [&_button]:min-h-[44px]'>{action}</div>
       ) : null}
     </li>
   );

@@ -19,12 +19,22 @@ runs:
       id: files
       shell: bash
       run: |
-        # Fetch production branch to compare against
-        git fetch origin production --depth=1 2>/dev/null || {
-          echo "Warning: Could not fetch production branch"
-          echo "files=" >> $GITHUB_OUTPUT
-          exit 0
-        }
+        # Fetch production branch with enough history to find merge base
+        # The caller must use fetch-depth: 0 for full history, or we need to unshallow
+        if git rev-parse --is-shallow-repository | grep -q true; then
+          echo "Repository is shallow, fetching full history for accurate diff..."
+          git fetch --unshallow origin production 2>/dev/null || git fetch origin production 2>/dev/null || {
+            echo "Warning: Could not fetch production branch"
+            echo "files=" >> $GITHUB_OUTPUT
+            exit 0
+          }
+        else
+          git fetch origin production 2>/dev/null || {
+            echo "Warning: Could not fetch production branch"
+            echo "files=" >> $GITHUB_OUTPUT
+            exit 0
+          }
+        fi
 
         # Get list of changed files between production and current HEAD
         CHANGED=$(git diff --name-only origin/production...HEAD 2>/dev/null || echo "")
@@ -52,8 +62,12 @@ runs:
           exit 0
         fi
 
+        # Filter out docs, tests, and markdown files for pattern matching
+        # These paths should not block fast lane
+        SOURCE_FILES=$(echo "$FILES" | grep -vE '^(docs/|tests/|__tests__/|\.github/|.*\.md$|.*\.test\.|.*\.spec\.)' || echo "")
+
         # --- Migration Detection ---
-        # Any changes to drizzle/migrations/ or schema files
+        # Any changes to drizzle/migrations/ (always use full FILES for migrations)
         if echo "$FILES" | grep -qE '^drizzle/migrations/'; then
           echo "BLOCKED: Database migrations detected"
           BLOCKERS+=("migration")
@@ -61,12 +75,14 @@ runs:
 
         # --- Auth/Clerk Detection ---
         # Changes to auth routes, lib/auth, middleware, or Clerk-related files
-        if echo "$FILES" | grep -qE '^(app/\(auth\)/|lib/auth/|middleware\.ts)'; then
+        # Only check source files (not tests/docs)
+        if echo "$SOURCE_FILES" | grep -qE '^(app/\(auth\)/|lib/auth/|middleware\.ts)'; then
           echo "BLOCKED: Auth/Clerk changes detected"
           BLOCKERS+=("auth")
         fi
-        # Also check for Clerk in any path
-        if echo "$FILES" | grep -qiE 'clerk'; then
+        # Check for Clerk in source paths (not docs/tests)
+        # Pattern: /clerk/ or clerk. (component files) but not in test/doc paths
+        if echo "$SOURCE_FILES" | grep -qiE '(/clerk/|clerk\.(ts|tsx|js|jsx)$)'; then
           if [[ ! " ${BLOCKERS[*]} " =~ " auth " ]]; then
             echo "BLOCKED: Clerk-related files detected"
             BLOCKERS+=("auth")
@@ -74,20 +90,21 @@ runs:
         fi
 
         # --- Core Flow Detection ---
-        # Onboarding, subscribe, signin, signup flows
-        if echo "$FILES" | grep -qE '^(app/onboarding/|app/\[username\]/subscribe/|components/onboarding/|app/\(auth\)/signin/|app/\(auth\)/signup/)'; then
+        # Onboarding, subscribe, signin, signup flows (source files only)
+        if echo "$SOURCE_FILES" | grep -qE '^(app/onboarding/|app/\[username\]/subscribe/|components/onboarding/|app/\(auth\)/signin/|app/\(auth\)/signup/)'; then
           echo "BLOCKED: Core flow changes detected (onboarding/subscribe/auth)"
           BLOCKERS+=("core-flow")
         fi
 
         # --- Payment Detection ---
-        # Billing, pricing, Stripe-related files
-        if echo "$FILES" | grep -qE '^(app/billing/|app/\(marketing\)/pricing/|app/api/stripe/|lib/stripe/)'; then
+        # Billing, pricing, Stripe-related files (source files only)
+        if echo "$SOURCE_FILES" | grep -qE '^(app/billing/|app/\(marketing\)/pricing/|app/api/stripe/|lib/stripe/)'; then
           echo "BLOCKED: Payment/billing changes detected"
           BLOCKERS+=("payments")
         fi
-        # Also check for payment-related keywords in paths
-        if echo "$FILES" | grep -qiE '(payment|checkout|subscription)'; then
+        # Check for payment-related source files (not just any keyword match)
+        # Pattern: files in payment/checkout/subscription directories, not just containing the word
+        if echo "$SOURCE_FILES" | grep -qE '^(app|lib|components)/.*(payment|checkout|subscription)/'; then
           if [[ ! " ${BLOCKERS[*]} " =~ " payments " ]]; then
             echo "BLOCKED: Payment-related files detected"
             BLOCKERS+=("payments")
