@@ -268,7 +268,7 @@ export function OtpSignUpForm() {
                             <span>Sending code...</span>
                           </>
                         ) : (
-                          'Send code'
+                          'Continue with email'
                         )}
                       </SignUp.Action>
                     )}

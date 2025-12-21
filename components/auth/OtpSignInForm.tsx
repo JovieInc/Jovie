@@ -60,6 +60,7 @@ export function OtpSignInForm() {
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
   const [otpCode, setOtpCode] = useState('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const emailFocusAttemptRef = useRef(0);
 
   useEffect(() => {
@@ -252,6 +253,7 @@ export function OtpSignInForm() {
                       type='email'
                       placeholder='Enter your email address'
                       autoComplete='email'
+                      onChange={e => setUserEmail(e.target.value)}
                     />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
@@ -260,7 +262,7 @@ export function OtpSignInForm() {
                     {isLoading => (
                       <SignIn.Action
                         submit
-                        className={submitButtonClassName}
+                        className={secondaryButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
                         onClick={() => setLastUsedAuthMethod('email')}
@@ -271,7 +273,7 @@ export function OtpSignInForm() {
                             <span>Sending code...</span>
                           </>
                         ) : (
-                          'Send code'
+                          'Continue with email'
                         )}
                       </SignIn.Action>
                     )}
@@ -337,12 +339,16 @@ export function OtpSignInForm() {
                 </h1>
 
                 <p
-                  className='mt-6 mb-12 text-sm text-secondary text-center'
+                  className='mt-6 mb-12 text-[15px] leading-relaxed text-secondary-token text-center'
                   id='otp-description'
                 >
-                  We sent a 6-digit code to your email.
-                  <br />
-                  Codes expire after 10 minutes.
+                  We&apos;ve sent you a 6-digit login code.{' '}
+                  {userEmail && (
+                    <>
+                      Please check your inbox at{' '}
+                      <span className='text-primary-token'>{userEmail}</span>.
+                    </>
+                  )}
                 </p>
 
                 <div className='space-y-4'>
