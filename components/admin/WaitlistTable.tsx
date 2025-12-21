@@ -10,9 +10,17 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { type Column, Table } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from './WaitlistMobileCard';
+
+interface Column<T> {
+  id: string;
+  header: string | React.ReactNode;
+  cell: (row: T, index: number) => React.ReactNode;
+  width?: string;
+  hideOnMobile?: boolean;
+  align?: 'left' | 'center' | 'right';
+}
 
 /** Map platform ID to display name */
 const PLATFORM_LABELS: Record<string, string> = {
@@ -314,9 +322,9 @@ export function WaitlistTable({
   );
 
   return (
-    <div className='space-y-4'>
-      {/* Custom toolbar - responsive */}
-      <div className='flex h-12 sm:h-14 w-full items-center gap-3 px-3 sm:px-4 bg-surface-0 border border-subtle rounded-lg'>
+    <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
+      {/* Custom toolbar - sticky at top */}
+      <div className='sticky top-0 z-30 flex h-12 sm:h-14 w-full items-center gap-3 px-3 sm:px-4 bg-surface-1/80 backdrop-blur border-b border-subtle'>
         <div className='text-xs text-secondary-token'>
           <span className='hidden sm:inline'>Showing </span>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
@@ -326,19 +334,56 @@ export function WaitlistTable({
       </div>
 
       {/* Desktop Table - hidden on mobile */}
-      <div className='hidden md:block'>
-        <Table
-          data={rows}
-          columns={columns}
-          getRowId={entry => entry.id}
-          virtualizationThreshold={20}
-          rowHeight={60}
-          caption='Waitlist entries table'
-        />
+      <div className='hidden md:block overflow-x-auto'>
+        <table className='w-full min-w-[960px] table-fixed border-separate border-spacing-0 text-[13px]'>
+          <caption className='sr-only'>Waitlist entries table</caption>
+          <thead>
+            <tr>
+              {columns.map(column => (
+                <th
+                  key={column.id}
+                  className={`sticky top-12 sm:top-14 z-20 px-4 py-3 border-b border-subtle text-[13px] bg-surface-1/80 backdrop-blur text-left ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                >
+                  <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
+                    {column.header}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={columns.length}
+                  className='py-12 text-center text-secondary-token'
+                >
+                  No waitlist entries found.
+                </td>
+              </tr>
+            ) : (
+              rows.map((row, index) => (
+                <tr
+                  key={row.id}
+                  className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
+                >
+                  {columns.map(column => (
+                    <td
+                      key={column.id}
+                      className={`px-4 py-3 ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                    >
+                      {column.cell(row, index)}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Mobile Card List - shown only on mobile */}
-      <div className='md:hidden space-y-3'>
+      <div className='md:hidden p-3 space-y-3'>
         {rows.length === 0 ? (
           <div className='text-center py-12 text-secondary-token'>
             No waitlist entries found.
@@ -356,7 +401,7 @@ export function WaitlistTable({
       </div>
 
       {/* Custom footer with pagination - responsive */}
-      <div className='flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-secondary-token bg-surface-0 border border-subtle rounded-lg'>
+      <div className='flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-secondary-token border-t border-subtle'>
         <div className='flex items-center gap-1'>
           <span className='hidden sm:inline'>Page </span>
           <span className='font-medium text-primary-token'>{page}</span>
