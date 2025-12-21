@@ -1,11 +1,20 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  checkClickRateLimit,
+  getRateLimitHeaders,
+} from '@/lib/analytics/tracking-rate-limit';
+import {
+  isTrackingTokenEnabled,
+  validateTrackingToken,
+} from '@/lib/analytics/tracking-token';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { encryptIP } from '@/lib/utils/pii-encryption';
 import {
   checkPublicRateLimit,
   getPublicRateLimitStatus,
@@ -14,7 +23,6 @@ import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
-  hashIpAddress,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -38,6 +46,8 @@ const clickSchema = z.object({
   browser: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   audienceMemberId: z.string().uuid().optional(),
+  // HMAC-SHA256 signed tracking token for request authentication
+  trackingToken: z.string().optional(),
 });
 
 const ACTION_ICONS: Record<string, string> = {
@@ -120,7 +130,7 @@ export async function POST(request: NextRequest) {
     // Extract client IP for rate limiting
     const clientIP = extractClientIP(request.headers);
 
-    // Rate limiting check
+    // Public rate limiting check (per-IP)
     if (checkPublicRateLimit(clientIP, 'click')) {
       const status = getPublicRateLimitStatus(clientIP, 'click');
       return NextResponse.json(
@@ -137,10 +147,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Bot detection - silently skip recording for bots
-    const botResult = detectBot(request, '/api/audience/click');
-    if (botResult.isBot) {
-      // Return success but don't record - prevents metric inflation
+    // Bot detection - detect but continue to record with isBot flag
+    const botDetection = detectBot(request, '/api/audience/click');
+    if (botDetection.isBot && botDetection.shouldBlock) {
+      // Return success but don't record for blocked bots
       return NextResponse.json(
         { success: true, fingerprint: 'bot-filtered' },
         { headers: NO_STORE_HEADERS }
@@ -173,10 +183,37 @@ export async function POST(request: NextRequest) {
       browser,
       metadata,
       audienceMemberId,
+      trackingToken,
     } = parsed.data;
 
+    // Validate tracking token if enabled
+    if (isTrackingTokenEnabled()) {
+      const tokenValidation = validateTrackingToken(trackingToken, profileId);
+      if (!tokenValidation.valid) {
+        return NextResponse.json(
+          { error: 'Invalid tracking token', reason: tokenValidation.error },
+          { status: 401, headers: NO_STORE_HEADERS }
+        );
+      }
+    }
+
     // Resolve IP address from body or headers
-    const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+    const resolvedIP = ipAddress ?? clientIP ?? undefined;
+
+    // Per-creator rate limiting (10k clicks/hour)
+    const rateLimitResult = await checkClickRateLimit(profileId, resolvedIP);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded', reason: rateLimitResult.reason },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...getRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
 
     // Validate profile exists AND is public before recording
     const [profile] = await db
@@ -200,11 +237,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fingerprint = createFingerprint(resolvedIpAddress, userAgent);
-    // Hash IP before storage for privacy compliance
-    const hashedIp = hashIpAddress(resolvedIpAddress);
+    const fingerprint = createFingerprint(resolvedIP, userAgent);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
+
+    // Encrypt IP address for storage (GDPR/CCPA compliance)
+    const encryptedIP = encryptIP(resolvedIP);
 
     await withSystemIngestionSession(async tx => {
       let member = await findAudienceMember(
@@ -282,7 +320,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: profileId,
         linkId,
         linkType,
-        ipAddress: hashedIp, // Store hashed IP for privacy compliance
+        ipAddress: encryptedIP,
         userAgent,
         referrer,
         country,
@@ -290,6 +328,7 @@ export async function POST(request: NextRequest) {
         deviceType: normalizedDevice,
         os,
         browser,
+        isBot: botDetection.isBot,
         metadata: metadata ?? {},
         audienceMemberId: member.id,
       });
