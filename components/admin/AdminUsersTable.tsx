@@ -1,33 +1,20 @@
 'use client';
 
-import {
-  Badge,
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-} from '@jovie/ui';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { Badge, Button, Input } from '@jovie/ui';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Copy, UserCog } from 'lucide-react';
+import { Table, type Column } from '@/components/admin/table';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
-import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
-import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
-import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';
 import {
   getNextUserSort,
-  getUserSortDirection,
   type UserSortableColumnKey,
 } from '@/components/admin/users-sort-config';
 import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { cn } from '@/lib/utils';
 
 export interface AdminUsersTableProps {
   users: AdminUserRow[];
@@ -62,8 +49,7 @@ export function AdminUsersTable({
   const router = useRouter();
   const notifications = useNotifications();
   const [openMenuUserId, setOpenMenuUserId] = useState<string | null>(null);
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const tbodyRef = useRef<HTMLTableSectionElement | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const {
     totalPages,
@@ -84,15 +70,6 @@ export function AdminUsersTable({
     total,
   });
 
-  const rowIds = useMemo(() => users.map(user => user.id), [users]);
-  const {
-    selectedIds,
-    selectedCount,
-    headerCheckboxState,
-    toggleSelect,
-    toggleSelectAll,
-  } = useRowSelection(rowIds);
-
   const createSortHref = (column: UserSortableColumnKey) =>
     buildHref({ page: 1, sort: getNextUserSort(sort, column) });
 
@@ -100,15 +77,6 @@ export function AdminUsersTable({
     () => users.filter(user => selectedIds.has(user.id)),
     [selectedIds, users]
   );
-
-  // Virtualization for table rows
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: users.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 60, // Estimated row height in pixels
-    overscan: 5, // Render 5 extra rows above/below viewport
-  });
 
   const copySelectedEmails = async (): Promise<void> => {
     const emails = selectedUsers
@@ -151,360 +119,205 @@ export function AdminUsersTable({
     notifications.error('Failed to copy Clerk IDs');
   };
 
-  return (
-    <AdminTableShell
-      toolbar={
-        <div className='flex h-14 w-full items-center gap-3 px-4'>
-          <div className='hidden sm:block text-xs text-secondary-token'>
-            Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-            {total.toLocaleString()} users
-          </div>
-          <div className='ml-auto flex items-center gap-3'>
-            <form
-              action='/app/admin/users'
-              method='get'
-              className='relative isolate flex items-center gap-2'
-            >
-              <input type='hidden' name='sort' value={sort} />
-              <input type='hidden' name='pageSize' value={String(pageSize)} />
-              <Input
-                name='q'
-                defaultValue={search}
-                placeholder='Search by email or name'
-                className='w-[240px]'
-              />
-              <input type='hidden' name='page' value='1' />
-              <Button type='submit' size='sm' variant='secondary'>
-                Search
-              </Button>
-              {search ? (
-                <Button asChild size='sm' variant='ghost'>
-                  <Link href={clearHref}>Clear</Link>
-                </Button>
-              ) : null}
-            </form>
-          </div>
-        </div>
-      }
-      footer={
-        <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
-          <div className='flex items-center gap-2'>
-            <span>
-              Page {page} of {totalPages}
-            </span>
-            <span className='text-tertiary-token'>
-              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-              {total.toLocaleString()}
-            </span>
-          </div>
-          <div className='flex items-center gap-3'>
-            <AdminPageSizeSelect
-              initialPageSize={pageSize}
-              onPageSizeChange={nextPageSize => {
-                router.push(buildHref({ page: 1, pageSize: nextPageSize }));
-              }}
-            />
-            <div className='flex items-center gap-2'>
-              <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                  Previous
-                </Link>
-              </Button>
-              <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                  Next
-                </Link>
-              </Button>
+  // Define table columns
+  const columns: Column<AdminUserRow>[] = useMemo(
+    () => [
+      {
+        id: 'name',
+        header: 'Name',
+        cell: user => (
+          <div>
+            <div className='font-semibold text-primary-token'>
+              {user.name ?? '—'}
             </div>
+            <div className='text-xs text-secondary-token'>{user.clerkId}</div>
+          </div>
+        ),
+        sortable: true,
+        width: 'w-[260px]',
+      },
+      {
+        id: 'email',
+        header: 'Email',
+        cell: user => user.email ?? '—',
+        sortable: true,
+        width: 'w-[280px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'created',
+        header: 'Sign up',
+        cell: user =>
+          new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+          }).format(user.createdAt),
+        sortable: true,
+        width: 'w-[160px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'plan',
+        header: 'Plan',
+        cell: user => (
+          <Badge
+            size='sm'
+            variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+          >
+            {user.plan}
+          </Badge>
+        ),
+        width: 'w-[140px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        cell: user =>
+          user.deletedAt ? (
+            <Badge size='sm' variant='warning'>
+              Deleted
+            </Badge>
+          ) : (
+            <Badge size='sm' variant='success'>
+              Active
+            </Badge>
+          ),
+        width: 'w-[120px]',
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: user => (
+          <div className='flex items-center justify-end'>
+            <UserActionsMenu
+              user={user}
+              open={openMenuUserId === user.id}
+              onOpenChange={open => setOpenMenuUserId(open ? user.id : null)}
+            />
+          </div>
+        ),
+        align: 'right',
+        width: 'w-[72px]',
+      },
+    ],
+    [openMenuUserId]
+  );
+
+  // Handle sorting with URL navigation
+  const handleSortChange = (columnId: string) => {
+    // Always use the createSortHref helper which handles the sort toggle logic
+    router.push(createSortHref(columnId as UserSortableColumnKey));
+  };
+
+  // Determine current sort column and direction
+  const sortColumn = sort
+    ? sort.startsWith('-')
+      ? sort.slice(1)
+      : sort
+    : null;
+  const sortDirection = sort ? (sort.startsWith('-') ? 'desc' : 'asc') : null;
+
+  return (
+    <div className='space-y-4'>
+      {/* Custom toolbar with search */}
+      <div className='flex h-14 w-full items-center gap-3 px-4 bg-surface-0 border border-subtle rounded-lg'>
+        <div className='hidden sm:block text-xs text-secondary-token'>
+          Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+          {total.toLocaleString()} users
+        </div>
+        <div className='ml-auto flex items-center gap-3'>
+          <form
+            action='/app/admin/users'
+            method='get'
+            className='relative isolate flex items-center gap-2'
+          >
+            <input type='hidden' name='sort' value={sort} />
+            <input type='hidden' name='pageSize' value={String(pageSize)} />
+            <Input
+              name='q'
+              defaultValue={search}
+              placeholder='Search by email or name'
+              className='w-[240px]'
+            />
+            <input type='hidden' name='page' value='1' />
+            <Button type='submit' size='sm' variant='secondary'>
+              Search
+            </Button>
+            {search ? (
+              <Button asChild size='sm' variant='ghost'>
+                <Link href={clearHref}>Clear</Link>
+              </Button>
+            ) : null}
+          </form>
+        </div>
+      </div>
+
+      {/* Table */}
+      <Table
+        data={users}
+        columns={columns}
+        getRowId={user => user.id}
+        selectable
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        sortColumn={sortColumn}
+        sortDirection={sortDirection as 'asc' | 'desc' | null}
+        onSortChange={handleSortChange}
+        bulkActions={[
+          {
+            label: 'Copy emails',
+            icon: <Copy className='h-4 w-4' />,
+            onClick: () => {
+              void copySelectedEmails();
+            },
+          },
+          {
+            label: 'Copy Clerk IDs',
+            icon: <UserCog className='h-4 w-4' />,
+            onClick: () => {
+              void copySelectedClerkIds();
+            },
+          },
+        ]}
+        virtualizationThreshold={20}
+        rowHeight={60}
+        caption='Admin users table'
+      />
+
+      {/* Custom footer with pagination */}
+      <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-secondary-token bg-surface-0 border border-subtle rounded-lg'>
+        <div className='flex items-center gap-2'>
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <span className='text-tertiary-token'>
+            {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+            {total.toLocaleString()}
+          </span>
+        </div>
+        <div className='flex items-center gap-3'>
+          <AdminPageSizeSelect
+            initialPageSize={pageSize}
+            onPageSizeChange={nextPageSize => {
+              router.push(buildHref({ page: 1, pageSize: nextPageSize }));
+            }}
+          />
+          <div className='flex items-center gap-2'>
+            <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
+              <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+                Previous
+              </Link>
+            </Button>
+            <Button asChild size='sm' variant='ghost' disabled={!canNext}>
+              <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+                Next
+              </Link>
+            </Button>
           </div>
         </div>
-      }
-      scrollContainerRef={scrollContainerRef}
-    >
-      {({ headerElevated, stickyTopPx }) => (
-        <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
-          <colgroup>
-            <col className='w-14' />
-            <col className='w-[260px]' />
-            <col className='w-[280px]' />
-            <col className='w-[160px]' />
-            <col className='w-[140px]' />
-            <col className='w-[120px]' />
-            <col className='w-[72px]' />
-          </colgroup>
-          <thead className='text-left text-secondary-token'>
-            <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-              <th
-                className={cn(
-                  'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <Checkbox
-                  aria-label='Select all users'
-                  checked={headerCheckboxState}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </th>
-
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <span className='sr-only'>Bulk actions</span>
-                <div
-                  className={cn(
-                    'inline-flex items-center transition-all duration-150',
-                    selectedCount > 0
-                      ? 'opacity-100 translate-y-0'
-                      : 'pointer-events-none opacity-0 -translate-y-0.5'
-                  )}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant='secondary'
-                        size='sm'
-                        className='normal-case'
-                      >
-                        Bulk actions
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align='start'>
-                      <DropdownMenuItem
-                        disabled={selectedCount === 0}
-                        onClick={() => {
-                          void copySelectedEmails();
-                        }}
-                      >
-                        Copy emails
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        disabled={selectedCount === 0}
-                        onClick={() => {
-                          void copySelectedClerkIds();
-                        }}
-                      >
-                        Copy Clerk IDs
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </th>
-
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <SortableHeaderButton
-                  label='Name'
-                  direction={getUserSortDirection(sort, 'name')}
-                  onClick={() => router.push(createSortHref('name'))}
-                />
-              </th>
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <SortableHeaderButton
-                  label='Email'
-                  direction={getUserSortDirection(sort, 'email')}
-                  onClick={() => router.push(createSortHref('email'))}
-                />
-              </th>
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <SortableHeaderButton
-                  label='Sign up'
-                  direction={getUserSortDirection(sort, 'created')}
-                  onClick={() => router.push(createSortHref('created'))}
-                />
-              </th>
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <span className='inline-flex items-center font-semibold'>
-                  Plan
-                </span>
-              </th>
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <span className='inline-flex items-center font-semibold'>
-                  Status
-                </span>
-              </th>
-              <th
-                className={cn(
-                  'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                  headerElevated &&
-                    'shadow-sm shadow-black/10 dark:shadow-black/40'
-                )}
-                style={{ top: stickyTopPx }}
-              >
-                <span className='sr-only'>Actions</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody
-            ref={tbodyRef}
-            style={{
-              position: 'relative',
-              height:
-                users.length > 0
-                  ? `${rowVirtualizer.getTotalSize()}px`
-                  : 'auto',
-            }}
-          >
-            {users.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={7}
-                  className='px-4 py-10 text-center text-sm text-secondary-token'
-                >
-                  No users found.
-                </td>
-              </tr>
-            ) : (
-              rowVirtualizer.getVirtualItems().map(virtualRow => {
-                const user = users[virtualRow.index];
-                const index = virtualRow.index;
-                const isChecked = selectedIds.has(user.id);
-                const rowNumber = (page - 1) * pageSize + index + 1;
-
-                return (
-                  <tr
-                    key={user.id}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    className='group border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2'
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                    onContextMenu={event => {
-                      event.preventDefault();
-                      setOpenMenuUserId(user.id);
-                    }}
-                  >
-                    <td className='w-14 px-4 py-3 align-middle'>
-                      <div className='relative flex h-7 w-7 items-center justify-center'>
-                        <span
-                          className={cn(
-                            'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
-                            isChecked
-                              ? 'opacity-0'
-                              : 'opacity-100 group-hover:opacity-0'
-                          )}
-                          aria-hidden='true'
-                        >
-                          {rowNumber}
-                        </span>
-                        <div
-                          className={cn(
-                            'absolute inset-0 transition-opacity',
-                            isChecked
-                              ? 'opacity-100'
-                              : 'opacity-0 group-hover:opacity-100'
-                          )}
-                        >
-                          <Checkbox
-                            aria-label={`Select ${user.email ?? user.clerkId}`}
-                            checked={isChecked}
-                            onCheckedChange={() => toggleSelect(user.id)}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 align-middle text-sm text-secondary-token'>
-                      <span className='text-tertiary-token'>—</span>
-                    </td>
-                    <td className='px-4 py-3 align-middle text-sm text-primary-token'>
-                      <div className='font-semibold'>{user.name ?? '—'}</div>
-                      <div className='text-xs text-secondary-token'>
-                        {user.clerkId}
-                      </div>
-                    </td>
-                    <td className='px-4 py-3 align-middle text-sm text-secondary-token'>
-                      {user.email ?? '—'}
-                    </td>
-                    <td className='px-4 py-3 align-middle text-sm text-secondary-token whitespace-nowrap'>
-                      {new Intl.DateTimeFormat('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      }).format(user.createdAt)}
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      <Badge
-                        size='sm'
-                        variant={user.plan === 'pro' ? 'primary' : 'secondary'}
-                      >
-                        {user.plan}
-                      </Badge>
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      {user.deletedAt ? (
-                        <Badge size='sm' variant='warning'>
-                          Deleted
-                        </Badge>
-                      ) : (
-                        <Badge size='sm' variant='success'>
-                          Active
-                        </Badge>
-                      )}
-                    </td>
-                    <td className='px-4 py-3 align-middle'>
-                      <div className='flex items-center justify-end'>
-                        <UserActionsMenu
-                          user={user}
-                          open={openMenuUserId === user.id}
-                          onOpenChange={open =>
-                            setOpenMenuUserId(open ? user.id : null)
-                          }
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      )}
-    </AdminTableShell>
+      </div>
+    </div>
   );
 }
