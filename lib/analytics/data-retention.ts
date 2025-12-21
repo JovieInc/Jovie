@@ -8,7 +8,7 @@
  * Compliance: GDPR Article 5(1)(e), CCPA data minimization
  */
 
-import { lt, sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, lt } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
