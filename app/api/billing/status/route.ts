@@ -4,6 +4,7 @@
  */
 
 import { auth } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
@@ -49,6 +50,16 @@ export async function GET() {
     );
   } catch (error) {
     console.error('Error getting billing status:', error);
+
+    // Capture billing errors in Sentry (revenue-critical)
+    Sentry.captureException(error, {
+      level: 'error',
+      tags: {
+        route: '/api/billing/status',
+        errorType: 'billing_error',
+      },
+    });
+
     return NextResponse.json(
       { error: 'Failed to get billing status' },
       { status: 500, headers: NO_STORE_HEADERS }

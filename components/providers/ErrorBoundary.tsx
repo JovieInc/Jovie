@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import React, { Component, type ErrorInfo, type ReactNode } from 'react';
 import {
   createErrorToast,
@@ -40,6 +41,16 @@ export class ErrorBoundary extends Component<Props, State> {
     // Call custom error handler if provided
     this.props.onError?.(error, errorInfo);
 
+    // Capture error in Sentry with component stack context
+    Sentry.captureException(error, {
+      extra: {
+        componentStack: errorInfo.componentStack,
+      },
+      tags: {
+        errorBoundary: 'true',
+      },
+    });
+
     // Show toast notification if enabled and error is user-facing
     if (this.props.showToast !== false && isUserFacingError(error)) {
       // We can't use hooks in class components, so we'll dispatch a custom event
@@ -55,7 +66,7 @@ export class ErrorBoundary extends Component<Props, State> {
       window.dispatchEvent(toastEvent);
     }
 
-    // Track error for monitoring (if you have error tracking)
+    // Track error for monitoring with gtag as backup
     if (typeof window !== 'undefined' && 'gtag' in window) {
       // @ts-expect-error - gtag is not typed
       window.gtag('event', 'exception', {
@@ -118,6 +129,16 @@ export const useErrorHandler = () => {
   const handleError = React.useCallback(
     (error: Error, errorInfo?: ErrorInfo) => {
       console.error('Error caught by useErrorHandler:', error, errorInfo);
+
+      // Capture error in Sentry
+      Sentry.captureException(error, {
+        extra: {
+          componentStack: errorInfo?.componentStack,
+        },
+        tags: {
+          errorHandler: 'useErrorHandler',
+        },
+      });
 
       // Show toast for user-facing errors
       if (isUserFacingError(error)) {
