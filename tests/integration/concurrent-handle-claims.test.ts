@@ -11,7 +11,7 @@
  * 3. Database-level conflict detection
  */
 
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the database module
 vi.mock('@/lib/db', () => {
