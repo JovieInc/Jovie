@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';

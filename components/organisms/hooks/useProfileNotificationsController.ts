@@ -75,7 +75,11 @@ export function useProfileNotificationsController({
       if (!notificationsEnabled) return 'idle';
       return hasInitialStoredContacts ? 'checking' : 'done';
     });
-  const [channel, setChannel] = useState<NotificationChannel>('sms');
+  // Default channel based on stored contacts: if user has email but not sms, default to email
+  const [channel, setChannel] = useState<NotificationChannel>(() => {
+    if (storedContacts?.email && !storedContacts?.sms) return 'email';
+    return 'sms';
+  });
   const [subscribedChannels, setSubscribedChannels] =
     useState<NotificationSubscriptionState>({});
   const [subscriptionDetails, setSubscriptionDetails] =

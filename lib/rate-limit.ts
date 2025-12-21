@@ -21,6 +21,29 @@ export const apiRateLimit = redis
     })
   : null;
 
+// CRITICAL: Rate limiter for onboarding - 3 attempts per hour per user
+// This is stricter than the general API rate limit to prevent abuse
+// Uses Redis for persistence across server restarts and instances
+export const onboardingRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(3, '1 h'),
+      analytics: true,
+      prefix: 'onboarding',
+    })
+  : null;
+
+// Rate limiter for handle availability checks - 30 per minute per IP
+// More lenient than onboarding but still prevents enumeration attacks
+export const handleCheckRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(30, '1 m'),
+      analytics: true,
+      prefix: 'handle_check',
+    })
+  : null;
+
 // Rate limiter for dashboard link management - 30 requests per minute per user
 // This is stricter to prevent abuse of link CRUD operations
 export const dashboardLinksRateLimit = redis

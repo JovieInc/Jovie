@@ -2,14 +2,12 @@ import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { type DbType } from '@/lib/db';
 import {
   audienceMembers,
   creatorProfiles,
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
-import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { checkStatsigGateForUser } from '@/lib/statsig/server';
 import { formatCountryLabel } from '@/lib/utils/audience';
@@ -114,27 +112,17 @@ export async function getAudienceServerData(params: {
   userId: string;
   selectedProfileId: string | null;
   searchParams: Record<string, string | string[] | undefined>;
-  rlsBypass?: boolean;
-  modeOverride?: AudienceMode;
 }): Promise<AudienceServerData> {
   noStore();
 
-  const { userId, selectedProfileId, searchParams, rlsBypass, modeOverride } =
-    params;
+  const { userId, selectedProfileId, searchParams } = params;
 
   const isAudienceV2Enabled = await checkStatsigGateForUser(
     STATSIG_FLAGS.AUDIENCE_V2,
     { userID: userId }
   );
 
-  const modeFromGate: AudienceMode = isAudienceV2Enabled
-    ? 'members'
-    : 'subscribers';
-
-  const overrideAllowed = process.env.NODE_ENV !== 'production';
-
-  const mode: AudienceMode =
-    overrideAllowed && modeOverride ? modeOverride : modeFromGate;
+  const mode: AudienceMode = isAudienceV2Enabled ? 'members' : 'subscribers';
 
   if (!selectedProfileId) {
     return {
@@ -148,26 +136,9 @@ export async function getAudienceServerData(params: {
     };
   }
 
-  const bypassEnabled =
-    Boolean(rlsBypass) &&
-    process.env.NODE_ENV !== 'production' &&
-    process.env.ALLOW_AUDIENCE_RLS_BYPASS === '1';
-
-  const withAudienceReadSession = async <T>(
-    operation: (tx: DbType, clerkUserId: string | null) => Promise<T>
-  ): Promise<T> => {
-    if (bypassEnabled) {
-      return await withSystemIngestionSession(async tx => {
-        return await operation(tx, null);
-      });
-    }
-
-    return await withDbSessionTx(async (tx, clerkUserId) => {
-      return await operation(tx, clerkUserId);
-    });
-  };
-
-  return await withAudienceReadSession(async (tx, clerkUserId) => {
+  // All audience reads now go through authenticated RLS-protected sessions
+  // RLS bypass capability has been removed for security hardening
+  return await withDbSessionTx(async (tx, clerkUserId) => {
     if (mode === 'members') {
       const parsed = memberQuerySchema.safeParse({
         page: searchParams.page,

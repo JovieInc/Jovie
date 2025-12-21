@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { GET, PUT, PATCH } from '@/app/api/dashboard/social-links/route';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PATCH, PUT } from '@/app/api/dashboard/social-links/route';
 
 const hoisted = vi.hoisted(() => {
   const profileResult = [
