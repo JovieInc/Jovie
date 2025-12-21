@@ -10,8 +10,10 @@ import {
 } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard';
+import { cn } from '@/lib/utils';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -50,6 +52,23 @@ export function AuthLayout({
   logoutRedirectUrl = '/signin',
 }: AuthLayoutProps) {
   const [shouldSpinLogo, setShouldSpinLogo] = useState(false);
+  const { isKeyboardVisible } = useMobileKeyboard();
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Scroll form into view when keyboard appears on mobile
+  useEffect(() => {
+    if (isKeyboardVisible && formRef.current) {
+      // Slight delay to let keyboard fully appear
+      const timer = setTimeout(() => {
+        formRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isKeyboardVisible]);
 
   // One-time idle-triggered spin
   useEffect(() => {
@@ -99,7 +118,28 @@ export function AuthLayout({
   );
 
   return (
-    <div className="min-h-screen flex flex-col items-center bg-base px-4 pt-[15vh] sm:pt-[17vh] lg:pt-[19vh] pb-24 relative overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.12),transparent)] dark:before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.20),transparent)] before:pointer-events-none after:content-[''] after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.03)_100%)] dark:after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.45)_100%)] after:pointer-events-none">
+    <div
+      className={cn(
+        // Base layout - use dvh for mobile keyboard handling, fall back to vh
+        'min-h-[100dvh] supports-[height:100dvh]:min-h-[100dvh] flex flex-col items-center bg-base relative overflow-x-hidden',
+        // Horizontal padding with safe area support for notched devices
+        'px-4 sm:px-6',
+        // Vertical padding - reduced on mobile, increases on larger screens
+        // Use smaller top padding when keyboard is visible
+        isKeyboardVisible
+          ? 'pt-8 pb-4'
+          : 'pt-[12vh] sm:pt-[15vh] lg:pt-[19vh] pb-24',
+        // Safe area insets for notched devices (iPhone X+, Android with notches)
+        'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
+        'pl-[max(1rem,env(safe-area-inset-left))]',
+        'pr-[max(1rem,env(safe-area-inset-right))]',
+        // Smooth transition when keyboard appears/disappears
+        'transition-[padding] duration-200 ease-out',
+        // Background gradients
+        "before:content-[''] before:absolute before:inset-0 before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.12),transparent)] dark:before:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.20),transparent)] before:pointer-events-none",
+        "after:content-[''] after:absolute after:inset-0 after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.03)_100%)] dark:after:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.45)_100%)] after:pointer-events-none"
+      )}
+    >
       {/* Skip to main content link for keyboard users */}
       {showSkipLink && (
         <Link
@@ -133,13 +173,21 @@ export function AuthLayout({
         </div>
       ) : null}
 
-      {/* Logo */}
-      <div className='mb-4 h-11 w-11 flex items-center justify-center'>
+      {/* Logo - hide on mobile when keyboard is visible */}
+      <div
+        className={cn(
+          'mb-4 h-11 w-11 flex items-center justify-center',
+          'transition-all duration-200 ease-out',
+          isKeyboardVisible && 'opacity-0 h-0 mb-0 pointer-events-none'
+        )}
+        aria-hidden={isKeyboardVisible}
+      >
         {showLogo ? (
           <Link
             href='/'
             className={`block ${LINK_FOCUS_CLASSES}`}
             aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible ? -1 : undefined}
           >
             <span
               className={shouldSpinLogo ? 'logo-spin-trigger' : undefined}
@@ -153,21 +201,41 @@ export function AuthLayout({
         )}
       </div>
 
-      {/* Title */}
-      {showFormTitle && <h1 className={formTitleClassName}>{formTitle}</h1>}
+      {/* Title - hide when keyboard is visible on mobile */}
+      {showFormTitle && (
+        <h1
+          className={cn(
+            formTitleClassName,
+            'transition-all duration-200 ease-out',
+            isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
+          )}
+          aria-hidden={isKeyboardVisible}
+        >
+          {formTitle}
+        </h1>
+      )}
 
-      {/* Form content */}
+      {/* Form content - centered with mobile-optimized width */}
       <main
+        ref={formRef}
         id='auth-form'
-        className='w-full max-w-[20rem] relative z-10'
+        className={cn(
+          'w-full max-w-[20rem] sm:max-w-[22rem] relative z-10',
+          // Ensure touch targets are easily reachable
+          '[&_input]:text-base [&_input]:sm:text-sm',
+          // Prevent iOS zoom on input focus (requires 16px font)
+          '[&_input]:min-h-[48px]',
+          // Smooth scroll target
+          'scroll-mt-4'
+        )}
         role='main'
       >
         {children}
       </main>
 
-      {/* Footer */}
-      {showFooterPrompt && (
-        <p className='mt-8 text-sm text-secondary-token text-center relative z-10'>
+      {/* Footer - hide when keyboard is visible */}
+      {showFooterPrompt && !isKeyboardVisible && (
+        <p className='mt-8 text-sm text-secondary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
@@ -178,10 +246,15 @@ export function AuthLayout({
         </p>
       )}
 
-      {/* Legal links */}
-      {showLegalLinks && (
+      {/* Legal links - hide when keyboard is visible, with safe area support */}
+      {showLegalLinks && !isKeyboardVisible && (
         <nav
-          className='absolute bottom-4 flex gap-4 text-xs text-secondary-token'
+          className={cn(
+            'absolute flex gap-4 text-xs text-secondary-token',
+            // Position with safe area inset support
+            'bottom-[max(1rem,env(safe-area-inset-bottom))]',
+            'animate-in fade-in-0 duration-200'
+          )}
           aria-label='Legal'
         >
           <Link
