@@ -1209,11 +1209,174 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  # ============================================================================
+  # FAST LANE / GATED LANE SYSTEM
+  # ============================================================================
+  # Fast Lane: Opt-in auto-promotion to production for low-risk changes
+  # Gated Lane: Default - requires manual promotion for high-risk changes
+  # See agents.md section 5.6 for full documentation
+  # ============================================================================
+
+  fastlane-eligibility:
+    name: Fast Lane Eligibility
+    needs: [drizzle-migration-guard]
+    # Only run on push to main (staging deploy flow)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+      blockers: ${{ steps.check.outputs.blockers }}
+      has_statsig_gate: ${{ steps.check.outputs.has_statsig_gate }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check fast lane eligibility
+        id: check
+        uses: ./.github/actions/fastlane-eligibility
+
+      - name: Apply labels to promotion PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const blockers = JSON.parse('${{ steps.check.outputs.blockers }}' || '[]');
+            const hasStatsigGate = '${{ steps.check.outputs.has_statsig_gate }}' === 'true';
+
+            // Find the promotion PR (main -> production)
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length === 0) {
+              core.info('No promotion PR found yet - will be created by promote job');
+              return;
+            }
+
+            const pr = prs[0];
+            core.info(`Found promotion PR #${pr.number}`);
+
+            // Map blockers to labels
+            const labelMap = {
+              'migration': 'blocked:migration',
+              'auth': 'blocked:auth',
+              'core-flow': 'blocked:core-flow',
+              'payments': 'blocked:payments'
+            };
+
+            // Add blocking labels if any
+            const labelsToAdd = blockers.map(b => labelMap[b]).filter(Boolean);
+
+            // Add feature gate label if detected
+            if (hasStatsigGate) {
+              labelsToAdd.push('has-feature-gate');
+            }
+
+            if (labelsToAdd.length > 0) {
+              core.info(`Adding labels: ${labelsToAdd.join(', ')}`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: labelsToAdd
+              });
+            }
+
+            // Log eligibility status
+            if (blockers.length === 0) {
+              core.info('PR is ELIGIBLE for fast lane (no blocking patterns detected)');
+            } else {
+              core.info(`PR is NOT eligible for fast lane - blockers: ${blockers.join(', ')}`);
+            }
+
+  smoke-failure-alert:
+    name: Smoke Failure Alert
+    needs: [ci-public-profile-smoke]
+    # Alert when smoke tests fail after staging deploy
+    if: ${{ always() && needs.ci-public-profile-smoke.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Block promotion PR with smoke-failed label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Find the promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length > 0) {
+              const pr = prs[0];
+              core.info(`Blocking promotion PR #${pr.number} due to smoke test failure`);
+
+              // Add blocking label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['blocked:smoke-failed']
+              });
+
+              // Add comment explaining the block
+              const commentBody = [
+                '## Smoke Tests Failed',
+                '',
+                'Staging smoke tests failed after deploy to main.jov.ie. Production promotion is **blocked**.',
+                '',
+                '**Action Required:** Investigate and fix the smoke test failures before promoting to production.',
+                '',
+                `[View CI Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: commentBody
+              });
+            }
+
+      - name: Slack alert (smoke failure blocks production)
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Smoke Test'
+          custom_payload: |
+            {
+              "text": ":rotating_light: Staging smoke tests FAILED - Production promotion BLOCKED",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Environment", "value": "main.jov.ie (staging)", "short": true },
+                    { "title": "Status", "value": "Production blocked", "short": true },
+                    { "title": "Action", "value": "Investigate smoke test failures before promoting", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   promote:
-    name: Auto Promote to Production (Primary)
-    # PRIMARY: Automatic promotion path - creates/updates main → production PR
-    # Fallback: Manual promotion available via auto-promote.yml workflow
-    needs: [canary-health-gate]
+    name: Promote to Production
+    # Supports both Fast Lane (auto-promote) and Gated Lane (manual review)
+    # Fast Lane: Auto-enables auto-merge if 'fastlane' label + no blockers + smoke passed
+    # Gated Lane: Creates/updates PR with QA checklist for manual review
+    needs: [canary-health-gate, ci-public-profile-smoke, fastlane-eligibility]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

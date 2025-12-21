@@ -221,10 +221,7 @@ export async function GET(request: Request) {
     });
 
     // Handle rate limiting - still use constant time
-    if (
-      error instanceof Error &&
-      error.message.includes('RATE_LIMITED')
-    ) {
+    if (error instanceof Error && error.message.includes('RATE_LIMITED')) {
       return respondWithConstantTime(
         { available: false, error: 'Too many requests. Please wait.' },
         { status: 429 }
