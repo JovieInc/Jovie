@@ -12,24 +12,20 @@ export interface BlogPostPageProps {
 
 export function BlogPostPage({ post }: BlogPostPageProps) {
   return (
-    <Container size='lg' className='py-16 sm:py-20'>
-      <div className='mx-auto flex w-full max-w-3xl flex-col gap-12'>
-        <div className='space-y-6' data-testid='blog-post-page'>
-          <div className='flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-[0.2em] text-neutral-500'>
+    <Container size='lg' className='py-16 sm:py-24'>
+      <div className='mx-auto flex w-full max-w-3xl flex-col gap-16'>
+        <div className='space-y-8' data-testid='blog-post-page'>
+          <div className='flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.15em] text-neutral-400'>
             {post.category && (
-              <Badge
-                emphasis='subtle'
-                className='rounded-full px-3 py-1 text-[11px] tracking-[0.2em]'
-              >
+              <span className='rounded-md bg-neutral-950/5 px-2.5 py-1 text-[11px] tracking-[0.15em]'>
                 {post.category}
-              </Badge>
+              </span>
             )}
-            <span>Jovie Blog</span>
           </div>
-          <h1 className='text-3xl font-semibold tracking-tight text-neutral-950 sm:text-4xl lg:text-5xl'>
+          <h1 className='text-4xl font-bold tracking-tight text-neutral-950 sm:text-5xl lg:text-6xl'>
             {post.title}
           </h1>
-          <p className='text-lg leading-8 text-neutral-600 sm:text-xl'>
+          <p className='text-lg leading-8 text-neutral-600 sm:text-xl sm:leading-9'>
             {post.excerpt}
           </p>
           <div className='flex flex-wrap items-center gap-4 text-sm text-neutral-500'>
@@ -40,7 +36,7 @@ export function BlogPostPage({ post }: BlogPostPageProps) {
                 size='sm'
               />
               <div className='flex flex-col'>
-                <span className='font-medium text-neutral-900'>
+                <span className='font-semibold text-neutral-900'>
                   {post.author}
                 </span>
                 {post.authorTitle && (
@@ -54,7 +50,7 @@ export function BlogPostPage({ post }: BlogPostPageProps) {
               <Link
                 href={post.authorProfile}
                 className={cn(
-                  'text-sm font-medium text-neutral-900 underline underline-offset-4 decoration-neutral-300 transition hover:decoration-neutral-500'
+                  'text-sm font-semibold text-neutral-900 underline underline-offset-4 decoration-neutral-300 transition hover:decoration-neutral-600'
                 )}
               >
                 View profile
@@ -62,15 +58,15 @@ export function BlogPostPage({ post }: BlogPostPageProps) {
             )}
           </div>
         </div>
-        <div className='border-t border-neutral-200 pt-10'>
+        <div className='border-t border-neutral-950/5 pt-12'>
           <BlogMarkdownReader html={post.html} />
         </div>
-        <div className='border-t border-neutral-200 pt-8'>
+        <div className='border-t border-neutral-950/5 pt-10'>
           <Link
             href='/blog'
-            className='text-sm font-medium text-neutral-600 underline underline-offset-4 decoration-neutral-300 transition hover:text-neutral-900 hover:decoration-neutral-500'
+            className='text-sm font-semibold text-neutral-600 underline underline-offset-4 decoration-neutral-300 transition hover:text-neutral-900 hover:decoration-neutral-600'
           >
-            Back to the blog
+            ← Back to blog
           </Link>
         </div>
       </div>
