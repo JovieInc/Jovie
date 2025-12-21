@@ -7,10 +7,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Table, type Column } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
@@ -61,8 +60,6 @@ export function WaitlistTable({
   const [approveStatuses, setApproveStatuses] = useState<
     Record<string, 'idle' | 'loading' | 'success' | 'error'>
   >({});
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const tbodyRef = useRef<HTMLTableSectionElement | null>(null);
 
   useEffect(() => {
     setRows(entries);
@@ -87,15 +84,6 @@ export function WaitlistTable({
 
   const prevHref = canPrev ? buildHref(page - 1) : undefined;
   const nextHref = canNext ? buildHref(page + 1) : undefined;
-
-  // Virtualization for table rows
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollContainerRef.current,
-    estimateSize: () => 60, // Estimated row height in pixels
-    overscan: 5, // Render 5 extra rows above/below viewport
-  });
 
   const approveEntry = useCallback(async (entryId: string) => {
     setApproveStatuses(prev => ({ ...prev, [entryId]: 'loading' }));
@@ -139,266 +127,228 @@ export function WaitlistTable({
     }
   }, []);
 
-  return (
-    <AdminTableShell
-      scrollContainerRef={scrollContainerRef}
-      toolbar={
-        <div className='flex h-14 w-full items-center gap-3 px-4'>
-          <div className='text-xs text-secondary-token'>
-            Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-            {total.toLocaleString()} entries
-          </div>
-        </div>
-      }
-      footer={
-        <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
-          <div>
-            Page {page} of {totalPages}
-          </div>
-          <div className='flex items-center gap-2'>
-            <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-              <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                Previous
-              </Link>
-            </Button>
-            <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-              <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                Next
-              </Link>
-            </Button>
-          </div>
-        </div>
-      }
-    >
-      {({ stickyTopPx }) => (
-        <table className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'>
-          <thead className='text-left text-secondary-token'>
-            <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Name
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Email
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Primary goal
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Primary Social
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Spotify
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Heard About
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Status
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Created
-              </th>
-              <th
-                className='sticky z-20 border-b border-subtle bg-surface-1/80 px-3 py-3 backdrop-blur supports-backdrop-filter:bg-surface-1/70'
-                style={{ top: stickyTopPx }}
-              >
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody
-            ref={tbodyRef}
-            style={{
-              position: 'relative',
-              height:
-                rows.length > 0 ? `${rowVirtualizer.getTotalSize()}px` : 'auto',
-            }}
+  // Define table columns
+  const columns: Column<WaitlistEntryRow>[] = useMemo(
+    () => [
+      {
+        id: 'name',
+        header: 'Name',
+        cell: entry => (
+          <span className='font-medium text-primary-token'>
+            {entry.fullName}
+          </span>
+        ),
+        width: 'w-[180px]',
+      },
+      {
+        id: 'email',
+        header: 'Email',
+        cell: entry => (
+          <a
+            href={`mailto:${entry.email}`}
+            className='text-secondary-token hover:underline'
           >
-            {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={9}
-                  className='px-3 py-10 text-center text-sm text-secondary-token'
-                >
-                  No waitlist entries yet.
-                </td>
-              </tr>
+            {entry.email}
+          </a>
+        ),
+        width: 'w-[220px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'primaryGoal',
+        header: 'Primary goal',
+        cell: entry => {
+          const primaryGoalLabel = entry.primaryGoal
+            ? (PRIMARY_GOAL_LABELS[entry.primaryGoal] ?? entry.primaryGoal)
+            : null;
+          return primaryGoalLabel ? (
+            <Badge size='sm' variant='secondary'>
+              {primaryGoalLabel}
+            </Badge>
+          ) : (
+            <span className='text-tertiary-token'>—</span>
+          );
+        },
+        width: 'w-[140px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'primarySocial',
+        header: 'Primary Social',
+        cell: entry => {
+          const platformLabel =
+            PLATFORM_LABELS[entry.primarySocialPlatform] ??
+            entry.primarySocialPlatform;
+          return (
+            <div className='flex items-center gap-2'>
+              <Badge size='sm' variant='secondary'>
+                {platformLabel}
+              </Badge>
+              <a
+                href={entry.primarySocialUrlNormalized}
+                target='_blank'
+                rel='noopener noreferrer'
+                className='text-accent hover:underline text-xs truncate max-w-[220px]'
+              >
+                {entry.primarySocialUrlNormalized.replace(/^https?:\/\//, '')}
+              </a>
+            </div>
+          );
+        },
+        width: 'w-[280px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'spotify',
+        header: 'Spotify',
+        cell: entry =>
+          entry.spotifyUrlNormalized ? (
+            <a
+              href={entry.spotifyUrlNormalized}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-accent hover:underline text-xs truncate max-w-[220px] block'
+            >
+              {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
+            </a>
+          ) : (
+            <span className='text-tertiary-token'>—</span>
+          ),
+        width: 'w-[200px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'heardAbout',
+        header: 'Heard About',
+        cell: entry => {
+          const heardAboutTruncated =
+            entry.heardAbout && entry.heardAbout.length > 30
+              ? entry.heardAbout.slice(0, 30) + '…'
+              : entry.heardAbout;
+          return entry.heardAbout ? (
+            entry.heardAbout.length > 30 ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className='cursor-help text-secondary-token'>
+                    {heardAboutTruncated}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side='top' className='max-w-xs'>
+                  {entry.heardAbout}
+                </TooltipContent>
+              </Tooltip>
             ) : (
-              rowVirtualizer.getVirtualItems().map(virtualRow => {
-                const entry = rows[virtualRow.index];
-                const platformLabel =
-                  PLATFORM_LABELS[entry.primarySocialPlatform] ??
-                  entry.primarySocialPlatform;
-                const primaryGoalLabel = entry.primaryGoal
-                  ? (PRIMARY_GOAL_LABELS[entry.primaryGoal] ??
-                    entry.primaryGoal)
-                  : null;
-                const statusVariant =
-                  STATUS_VARIANTS[entry.status] ?? 'secondary';
-                const heardAboutTruncated =
-                  entry.heardAbout && entry.heardAbout.length > 30
-                    ? entry.heardAbout.slice(0, 30) + '…'
-                    : entry.heardAbout;
+              <span className='text-secondary-token'>{entry.heardAbout}</span>
+            )
+          ) : (
+            <span className='text-tertiary-token'>—</span>
+          );
+        },
+        width: 'w-[160px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        cell: entry => {
+          const statusVariant = STATUS_VARIANTS[entry.status] ?? 'secondary';
+          return (
+            <Badge size='sm' variant={statusVariant}>
+              {entry.status}
+            </Badge>
+          );
+        },
+        width: 'w-[110px]',
+      },
+      {
+        id: 'created',
+        header: 'Created',
+        cell: entry =>
+          entry.createdAt
+            ? new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              }).format(entry.createdAt)
+            : '—',
+        width: 'w-[160px]',
+        hideOnMobile: true,
+      },
+      {
+        id: 'actions',
+        header: 'Actions',
+        cell: entry => {
+          const isApproved =
+            entry.status === 'invited' || entry.status === 'claimed';
+          const approveStatus = approveStatuses[entry.id] ?? 'idle';
+          const isApproving = approveStatus === 'loading';
 
-                const isApproved =
-                  entry.status === 'invited' || entry.status === 'claimed';
-                const approveStatus = approveStatuses[entry.id] ?? 'idle';
-                const isApproving = approveStatus === 'loading';
+          return (
+            <div className='flex items-center justify-end gap-2'>
+              <Button
+                size='sm'
+                variant='secondary'
+                disabled={isApproved || isApproving}
+                onClick={() => {
+                  void approveEntry(entry.id);
+                }}
+              >
+                {isApproved
+                  ? 'Approved'
+                  : isApproving
+                    ? 'Approving…'
+                    : 'Approve'}
+              </Button>
+            </div>
+          );
+        },
+        align: 'right',
+        width: 'w-[120px]',
+      },
+    ],
+    [approveStatuses, approveEntry]
+  );
 
-                return (
-                  <tr
-                    key={entry.id}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2'
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      width: '100%',
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                  >
-                    <td className='px-3 py-3 font-medium text-primary-token'>
-                      {entry.fullName}
-                    </td>
-                    <td className='px-3 py-3 text-secondary-token'>
-                      <a
-                        href={`mailto:${entry.email}`}
-                        className='hover:underline'
-                      >
-                        {entry.email}
-                      </a>
-                    </td>
-                    <td className='px-3 py-3 text-secondary-token'>
-                      {primaryGoalLabel ? (
-                        <Badge size='sm' variant='secondary'>
-                          {primaryGoalLabel}
-                        </Badge>
-                      ) : (
-                        <span className='text-tertiary-token'>—</span>
-                      )}
-                    </td>
-                    <td className='px-3 py-3'>
-                      <div className='flex items-center gap-2'>
-                        <Badge size='sm' variant='secondary'>
-                          {platformLabel}
-                        </Badge>
-                        <a
-                          href={entry.primarySocialUrlNormalized}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='text-accent hover:underline text-xs truncate max-w-[220px]'
-                        >
-                          {entry.primarySocialUrlNormalized.replace(
-                            /^https?:\/\//,
-                            ''
-                          )}
-                        </a>
-                      </div>
-                    </td>
-                    <td className='px-3 py-3 text-secondary-token'>
-                      {entry.spotifyUrlNormalized ? (
-                        <a
-                          href={entry.spotifyUrlNormalized}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='text-accent hover:underline text-xs truncate max-w-[220px] block'
-                        >
-                          {entry.spotifyUrlNormalized.replace(
-                            /^https?:\/\//,
-                            ''
-                          )}
-                        </a>
-                      ) : (
-                        <span className='text-tertiary-token'>—</span>
-                      )}
-                    </td>
-                    <td className='px-3 py-3 text-secondary-token'>
-                      {entry.heardAbout ? (
-                        entry.heardAbout.length > 30 ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className='cursor-help'>
-                                {heardAboutTruncated}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side='top' className='max-w-xs'>
-                              {entry.heardAbout}
-                            </TooltipContent>
-                          </Tooltip>
-                        ) : (
-                          entry.heardAbout
-                        )
-                      ) : (
-                        <span className='text-tertiary-token'>—</span>
-                      )}
-                    </td>
-                    <td className='px-3 py-3'>
-                      <Badge size='sm' variant={statusVariant}>
-                        {entry.status}
-                      </Badge>
-                    </td>
-                    <td className='px-3 py-3 text-secondary-token whitespace-nowrap'>
-                      {entry.createdAt
-                        ? new Intl.DateTimeFormat('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          }).format(entry.createdAt)
-                        : '—'}
-                    </td>
-                    <td className='px-3 py-3'>
-                      <div className='flex items-center justify-end gap-2'>
-                        <Button
-                          size='sm'
-                          variant='secondary'
-                          disabled={isApproved || isApproving}
-                          onClick={() => {
-                            void approveEntry(entry.id);
-                          }}
-                        >
-                          {isApproved
-                            ? 'Approved'
-                            : isApproving
-                              ? 'Approving…'
-                              : 'Approve'}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      )}
-    </AdminTableShell>
+  return (
+    <div className='space-y-4'>
+      {/* Custom toolbar */}
+      <div className='flex h-14 w-full items-center gap-3 px-4 bg-surface-0 border border-subtle rounded-lg'>
+        <div className='text-xs text-secondary-token'>
+          Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+          {total.toLocaleString()} entries
+        </div>
+      </div>
+
+      {/* Table */}
+      <Table
+        data={rows}
+        columns={columns}
+        getRowId={entry => entry.id}
+        virtualizationThreshold={20}
+        rowHeight={60}
+        caption='Waitlist entries table'
+      />
+
+      {/* Custom footer with pagination */}
+      <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-secondary-token bg-surface-0 border border-subtle rounded-lg'>
+        <div>
+          Page {page} of {totalPages}
+        </div>
+        <div className='flex items-center gap-2'>
+          <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
+            <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+              Previous
+            </Link>
+          </Button>
+          <Button asChild size='sm' variant='ghost' disabled={!canNext}>
+            <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+              Next
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
