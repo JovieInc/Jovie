@@ -27,43 +27,119 @@ function getRequestBaseUrl(headersList: Headers): string {
   return publicEnv.NEXT_PUBLIC_APP_URL;
 }
 
+/**
+ * Upload a remote avatar with retry mechanism.
+ *
+ * Implements exponential backoff retry for reliability.
+ * Logs failures for monitoring and debugging.
+ *
+ * @returns Upload result or null if all retries fail
+ */
 async function uploadRemoteAvatar(params: {
   imageUrl: string;
   baseUrl: string;
   cookieHeader: string | null;
-}): Promise<{ blobUrl: string; photoId: string } | null> {
-  const source = await fetch(params.imageUrl);
-  if (!source.ok) return null;
+  maxRetries?: number;
+}): Promise<{
+  blobUrl: string;
+  photoId: string;
+  retriesUsed: number;
+} | null> {
+  const maxRetries = params.maxRetries ?? 3;
+  let lastError: Error | null = null;
 
-  const contentType =
-    source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ?? null;
-  if (!contentType || !contentType.startsWith('image/')) return null;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Exponential backoff: 0ms, 1000ms, 2000ms
+      if (attempt > 0) {
+        const delay = Math.min(1000 * attempt, 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
 
-  const buffer = await source.arrayBuffer();
-  const file = new File([buffer], 'oauth-avatar', { type: contentType });
+      const source = await fetch(params.imageUrl, {
+        signal: AbortSignal.timeout(10000), // 10s timeout for fetching image
+      });
 
-  const formData = new FormData();
-  formData.append('file', file);
+      if (!source.ok) {
+        lastError = new Error(`Failed to fetch avatar: ${source.status}`);
+        console.warn(
+          `[AVATAR_UPLOAD] Fetch failed (attempt ${attempt + 1}/${maxRetries}):`,
+          lastError.message
+        );
+        continue;
+      }
 
-  const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
-    method: 'POST',
-    body: formData,
-    headers: params.cookieHeader ? { cookie: params.cookieHeader } : undefined,
-  });
+      const contentType =
+        source.headers.get('content-type')?.split(';')[0]?.toLowerCase() ??
+        null;
+      if (!contentType || !contentType.startsWith('image/')) {
+        lastError = new Error(`Invalid content type: ${contentType}`);
+        console.warn('[AVATAR_UPLOAD] Invalid content type:', contentType);
+        // Don't retry for invalid content type - it won't change
+        break;
+      }
 
-  if (!upload.ok) return null;
+      const buffer = await source.arrayBuffer();
+      const file = new File([buffer], 'oauth-avatar', { type: contentType });
 
-  const data = (await upload.json()) as {
-    blobUrl?: string;
-    photoId?: string;
-    jobId?: string;
-  };
+      const formData = new FormData();
+      formData.append('file', file);
 
-  const blobUrl = data.blobUrl ?? null;
-  const photoId = data.photoId ?? data.jobId ?? null;
+      const upload = await fetch(`${params.baseUrl}/api/images/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: params.cookieHeader
+          ? { cookie: params.cookieHeader }
+          : undefined,
+        signal: AbortSignal.timeout(30000), // 30s timeout for upload
+      });
 
-  if (!blobUrl || !photoId) return null;
-  return { blobUrl, photoId };
+      if (!upload.ok) {
+        const errorBody = await upload.text().catch(() => 'Unknown error');
+        lastError = new Error(`Upload failed: ${upload.status} - ${errorBody}`);
+        console.warn(
+          `[AVATAR_UPLOAD] Upload failed (attempt ${attempt + 1}/${maxRetries}):`,
+          lastError.message
+        );
+        continue;
+      }
+
+      const data = (await upload.json()) as {
+        blobUrl?: string;
+        photoId?: string;
+        jobId?: string;
+      };
+
+      const blobUrl = data.blobUrl ?? null;
+      const photoId = data.photoId ?? data.jobId ?? null;
+
+      if (!blobUrl || !photoId) {
+        lastError = new Error('Upload response missing required fields');
+        console.warn('[AVATAR_UPLOAD] Invalid response:', data);
+        continue;
+      }
+
+      // Success - always log for monitoring
+      console.info(
+        `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
+      );
+      return { blobUrl, photoId, retriesUsed: attempt };
+    } catch (error) {
+      lastError =
+        error instanceof Error ? error : new Error('Unknown upload error');
+      console.warn(
+        `[AVATAR_UPLOAD] Exception (attempt ${attempt + 1}/${maxRetries}):`,
+        lastError.message
+      );
+    }
+  }
+
+  // All retries exhausted
+  console.error(
+    `[AVATAR_UPLOAD] Failed after ${maxRetries} attempts:`,
+    lastError?.message
+  );
+  return null;
 }
 
 function profileIsPublishable(
@@ -156,6 +232,10 @@ export async function completeOnboarding({
 
     const userEmail = email ?? null;
 
+    // CRITICAL: Use SERIALIZABLE isolation level to prevent race conditions
+    // where two users could claim the same handle simultaneously.
+    // This ensures that concurrent transactions will see a consistent view
+    // of the data and will fail if there's a conflict.
     const completion = await withDbSessionTx(
       async (tx, clerkUserId: string) => {
         type CompletionResult = {
@@ -311,16 +391,26 @@ export async function completeOnboarding({
         };
 
         return created;
-      }
+      },
+      { isolationLevel: 'serializable' }
     );
 
+    // Step 7: Avatar upload (non-blocking, with retry and logging)
+    // Avatar upload failures are logged but don't block onboarding completion
     const profileId = completion.profileId;
+    let avatarUploadResult: {
+      success: boolean;
+      error?: string;
+      retriesUsed?: number;
+    } = { success: false };
+
     if (profileId && oauthAvatarUrl) {
       try {
         const uploaded = await uploadRemoteAvatar({
           imageUrl: oauthAvatarUrl,
           baseUrl,
           cookieHeader,
+          maxRetries: 3,
         });
 
         if (uploaded) {
@@ -350,9 +440,34 @@ export async function completeOnboarding({
               })
               .where(eq(profilePhotos.id, uploaded.photoId));
           });
+
+          avatarUploadResult = {
+            success: true,
+            retriesUsed: uploaded.retriesUsed,
+          };
+        } else {
+          avatarUploadResult = {
+            success: false,
+            error: 'Upload failed after retries',
+          };
+          console.warn(
+            '[ONBOARDING] Avatar upload failed for profile:',
+            profileId
+          );
         }
-      } catch {
-        // ignore
+      } catch (avatarError) {
+        avatarUploadResult = {
+          success: false,
+          error:
+            avatarError instanceof Error
+              ? avatarError.message
+              : 'Unknown error',
+        };
+        console.error(
+          '[ONBOARDING] Avatar upload exception for profile:',
+          profileId,
+          avatarError
+        );
       }
     }
 
