@@ -1379,14 +1379,78 @@ jobs:
     needs: [canary-health-gate, ci-public-profile-smoke, fastlane-eligibility]
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      promotion_type: ${{ steps.determine-path.outputs.promotion_type }}
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 2 }
-      - name: Create/Update PR main → production (manual review required)
+
+      - name: Determine promotion path (Fast Lane vs Gated)
+        id: determine-path
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Get eligibility from fastlane-eligibility job
+            const eligible = '${{ needs.fastlane-eligibility.outputs.eligible }}' === 'true';
+            const smokesPassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            core.info(`Fast lane eligibility: ${eligible}`);
+            core.info(`Smoke tests passed: ${smokesPassed}`);
+            core.info(`Canary gate passed: ${canaryPassed}`);
+
+            // Find existing promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length === 0) {
+              core.info('No existing promotion PR - will create one');
+              core.setOutput('action', 'create_pr');
+              core.setOutput('promotion_type', 'gated');
+              return;
+            }
+
+            const pr = prs[0];
+            const labels = pr.labels.map(l => l.name);
+            core.info(`Found promotion PR #${pr.number} with labels: ${labels.join(', ')}`);
+
+            // Check for fast lane eligibility
+            const hasFastlane = labels.includes('fastlane');
+            const hasBlockers = labels.some(l => l.startsWith('blocked:'));
+            const hasGated = labels.includes('gated');
+
+            core.setOutput('pr_number', pr.number);
+
+            if (hasFastlane && !hasBlockers && !hasGated && eligible && smokesPassed && canaryPassed) {
+              core.info('FAST LANE: All conditions met - will enable auto-merge');
+              core.setOutput('action', 'auto_merge');
+              core.setOutput('promotion_type', 'fastlane');
+            } else {
+              // Log reason for gated lane
+              const reason = hasBlockers ? `Blocking labels: ${labels.filter(l => l.startsWith('blocked:')).join(', ')}` :
+                            hasGated ? 'Explicit gated label' :
+                            !hasFastlane ? 'No fastlane label (opt-in required)' :
+                            !eligible ? 'Path-based blocks detected' :
+                            !smokesPassed ? 'Smoke tests failed' :
+                            'Canary gate failed';
+              core.info(`GATED LANE: ${reason}`);
+              core.setOutput('action', 'update_pr');
+              core.setOutput('promotion_type', 'gated');
+              core.setOutput('gated_reason', reason);
+            }
+
+      - name: Create/Update promotion PR
+        id: create-pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -1394,11 +1458,21 @@ jobs:
           pr_body=$(cat <<'EOF'
           ## Release Promotion: main → production
 
-          **Manual Review Required**
+          **Manual Review Required** (unless fast lane eligible)
 
           This PR promotes changes from **main** to **production** for production release.
 
-          ### Pre-merge Checklist
+          ### Fast Lane Eligibility
+          Add the `fastlane` label if this PR:
+          - Has NO database migrations
+          - Has NO auth/Clerk changes
+          - Has NO core flow changes (onboarding, subscribe)
+          - Has NO payment changes
+          - Is behind a feature flag OR is purely cosmetic/copy
+
+          If any `blocked:*` labels are present, fast lane is not available.
+
+          ### Pre-merge Checklist (Gated Lane)
           - [ ] **Full CI passed** (ci-full job completed successfully)
           - [ ] **CodeQL security scan passed** (if applicable)
           - [ ] **Preview environment tested** and verified working
@@ -1420,7 +1494,7 @@ jobs:
           - [ ] **Feature documentation** updated (if applicable)
           - [ ] **API docs updated** (if API changes)
 
-          **Do not merge until all checks pass and manual QA is complete.**
+          **Do not merge until all checks pass and manual QA is complete (or use fast lane if eligible).**
           EOF
           )
 
@@ -1428,11 +1502,92 @@ jobs:
           existing_pr=$(gh pr list --head main --base production --json number --jq '.[0].number // empty')
           if [ -z "$existing_pr" ]; then
             echo "Creating new PR: main → production"
-            gh pr create --base production --head main --title "Release: Promote main to production" --body "$pr_body"
+            new_pr=$(gh pr create --base production --head main --title "Release: Promote main to production" --body "$pr_body")
+            pr_number=$(echo "$new_pr" | grep -oE '[0-9]+$' || gh pr list --head main --base production --json number --jq '.[0].number')
+            echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
           else
-            echo "PR already exists: #$existing_pr (updating with latest checklist)"
-            gh pr edit "$existing_pr" --title "Release: Promote main to production" --body "$pr_body"
+            echo "PR already exists: #$existing_pr"
+            echo "pr_number=$existing_pr" >> $GITHUB_OUTPUT
           fi
+
+      - name: Fast lane auto-merge
+        if: steps.determine-path.outputs.action == 'auto_merge'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.determine-path.outputs.pr_number }}');
+            core.info(`Enabling auto-merge for fast lane PR #${prNumber}`);
+
+            // Get PR details for GraphQL mutation
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            try {
+              // Enable auto-merge via GraphQL
+              await github.graphql(`
+                mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: SQUASH
+                  }) {
+                    pullRequest { number }
+                  }
+                }
+              `, { pullRequestId: pr.node_id });
+
+              core.info(`Fast lane: Auto-merge enabled for PR #${prNumber}`);
+
+              // Add comment indicating fast lane promotion
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## Fast Lane Auto-Promotion',
+                  '',
+                  'This PR has been automatically queued for merge via **Fast Lane**.',
+                  '',
+                  '**Conditions met:**',
+                  '- `fastlane` label present',
+                  '- No blocking labels (`blocked:*`)',
+                  '- Staging smoke tests passed',
+                  '- Canary health gate passed',
+                  '- No high-risk path changes detected',
+                  '',
+                  'The PR will merge automatically once all required checks pass.'
+                ].join('\n')
+              });
+            } catch (error) {
+              core.warning(`Failed to enable auto-merge: ${error.message}`);
+              core.warning('PR may need manual merge or auto-merge may not be enabled for this repo');
+            }
+
+      - name: Notify fast lane promotion
+        if: steps.determine-path.outputs.action == 'auto_merge' && env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#deployments'
+          author_name: 'Fast Lane'
+          custom_payload: |
+            {
+              "text": ":rocket: Fast Lane: Auto-promoting to production",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Promotion Type", "value": "Fast Lane (automated)", "short": true },
+                    { "title": "PR", "value": "#${{ steps.determine-path.outputs.pr_number }}", "short": true },
+                    { "title": "Status", "value": "Auto-merge enabled, awaiting checks", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   ai-review-gate:
     name: AI Review Gate
