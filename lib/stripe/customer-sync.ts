@@ -11,7 +11,7 @@
 
 import 'server-only';
 import { auth } from '@clerk/nextjs/server';
-import { and, eq, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';

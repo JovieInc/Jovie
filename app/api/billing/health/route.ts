@@ -11,10 +11,10 @@
  * 4. Pro user count roughly matches Stripe active subscriptions
  */
 
-import { and, eq, gte, isNull, sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gte, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { stripeWebhookEvents, users, billingAuditLog } from '@/lib/db/schema';
+import { billingAuditLog, stripeWebhookEvents, users } from '@/lib/db/schema';
 import { captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 

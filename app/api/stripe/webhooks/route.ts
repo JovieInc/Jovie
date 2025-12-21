@@ -31,8 +31,8 @@ import {
 import { stripe } from '@/lib/stripe/client';
 import { getPlanFromPriceId } from '@/lib/stripe/config';
 import {
-  updateUserBillingStatus,
   type BillingAuditEventType,
+  updateUserBillingStatus,
 } from '@/lib/stripe/customer-sync';
 
 // Force Node.js runtime for Stripe SDK compatibility

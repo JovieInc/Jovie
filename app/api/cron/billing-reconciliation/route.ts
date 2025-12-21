@@ -12,12 +12,12 @@
  * Schedule: Every hour (configured in vercel.json)
  */
 
-import { eq, isNotNull, sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
-import { captureWarning, captureCriticalError } from '@/lib/error-tracking';
+import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 

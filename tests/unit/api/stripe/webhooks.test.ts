@@ -9,17 +9,28 @@ const {
   mockRetrieve,
   mockUpdateBilling,
   mockGetPlanFromPriceId,
+  mockWithTransaction,
 } = vi.hoisted(() => {
   const mockGetPlan = vi.fn<(priceId: string) => string | null>(
     () => 'standard'
   );
 
+  const mockTx = vi.fn(async (callback: any) => {
+    return await callback({
+      insert: mockInsert,
+    });
+  });
+
   return {
     mockConstructEvent: vi.fn(),
-    mockInsert: vi.fn(),
+    mockInsert: vi.fn(() => ({
+      values: vi.fn().mockReturnThis(),
+      returning: vi.fn().mockResolvedValue([{ id: 'webhook-1' }]),
+    })),
     mockRetrieve: vi.fn(),
     mockUpdateBilling: vi.fn(),
     mockGetPlanFromPriceId: mockGetPlan,
+    mockWithTransaction: mockTx,
   };
 });
 
@@ -40,6 +51,7 @@ vi.mock('@/lib/db', () => ({
   },
   users: { clerkId: 'clerk_id_column' },
   stripeWebhookEvents: {},
+  withTransaction: mockWithTransaction,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
