@@ -11,7 +11,7 @@ export default function LegalLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className='flex min-h-screen flex-col bg-white dark:bg-[#0a0a0b]'>
+    <div className='flex h-full flex-col overflow-y-auto bg-white dark:bg-[#0a0a0b]'>
       <Header hideNav />
       <main className='flex-1 py-16 sm:py-20'>
         <Container size='lg'>{children}</Container>

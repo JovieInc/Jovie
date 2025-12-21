@@ -19,7 +19,8 @@
 html,
 body {
   height: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 /* Fallback colors before token CSS finishes loading */
