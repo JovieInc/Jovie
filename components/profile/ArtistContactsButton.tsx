@@ -195,7 +195,7 @@ export function ArtistContactsButton({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align='end'
-        className='w-72 rounded-xl border border-subtle bg-surface-0 p-2 shadow-lg backdrop-blur-xl'
+        className='w-[calc(100vw-32px)] max-w-72 rounded-xl border border-subtle bg-surface-0 p-2 shadow-lg backdrop-blur-xl sm:w-72'
       >
         <div className='px-2 pb-2 pt-1'>
           <p className='text-xs font-semibold text-primary-token'>Contacts</p>

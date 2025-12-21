@@ -251,9 +251,9 @@ export function ProfileShell({
             ) : null}
           </div>
 
-          <div className='relative z-10 flex min-h-screen flex-col py-12'>
+          <div className='relative z-10 flex min-h-screen flex-col py-6 sm:py-12'>
             <div className='flex flex-1 flex-col items-center justify-start px-4'>
-              <div className={`${maxWidthClass} space-y-8`}>
+              <div className={`${maxWidthClass} space-y-6 sm:space-y-8`}>
                 <ArtistInfo artist={artist} subtitle={subtitle} />
                 {children}
                 {(showSocialBar || showTipButton) && (

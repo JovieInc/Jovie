@@ -7,6 +7,7 @@ interface ArtistInfoProps {
   artist: Artist;
   subtitle?: string;
   avatarSize?: 'sm' | 'md' | 'lg' | 'xl';
+  mobileAvatarSize?: 'sm' | 'md' | 'lg' | 'xl';
   nameSize?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
 }
@@ -15,6 +16,7 @@ export function ArtistInfo({
   artist,
   subtitle,
   avatarSize = 'xl',
+  mobileAvatarSize = 'lg',
   nameSize = 'lg',
   className = '',
 }: ArtistInfoProps) {
@@ -36,7 +38,20 @@ export function ArtistInfo({
     <div
       className={`flex flex-col items-center space-y-3 sm:space-y-4 text-center ${className}`}
     >
-      <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
+      {/* Mobile avatar - shown on small screens */}
+      <div className='rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40 sm:hidden'>
+        <Avatar
+          src={artist.image_url || ''}
+          alt={artist.name}
+          name={artist.name}
+          size={avatarSizeMap[mobileAvatarSize]}
+          priority
+          verified={false}
+          className='ring-0 shadow-none bg-white/80 dark:bg-black/20'
+        />
+      </div>
+      {/* Desktop avatar - shown on larger screens */}
+      <div className='hidden sm:block rounded-full p-[2px] bg-white/60 dark:bg-white/5 ring-1 ring-black/5 dark:ring-white/10 shadow-lg shadow-black/10 dark:shadow-black/40'>
         <Avatar
           src={artist.image_url || ''}
           alt={artist.name}
