@@ -90,7 +90,8 @@ export default function DashboardLayoutClient({
     pathname?.startsWith('/app/admin/creators') ||
     pathname?.startsWith('/app/admin/users') ||
     pathname?.startsWith('/app/admin/waitlist') ||
-    pathname?.startsWith('/app/dashboard/audience');
+    pathname?.startsWith('/app/dashboard/audience') ||
+    pathname?.startsWith('/app/dashboard/releases');
   const isContactTableRoute =
     pathname?.startsWith('/app/admin/creators') ||
     pathname?.startsWith('/app/dashboard/audience');
