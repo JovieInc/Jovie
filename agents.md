@@ -613,6 +613,62 @@ Before merging any migration:
 - **Emergency:** Direct PR to production (bypass main)
 - **Backups:** Neon point-in-time recovery available
 
+## 5.6 Two-Lane Deployment Model
+
+Production promotion uses a two-lane system: **Fast Lane** for low-risk changes and **Gated Lane** for high-risk changes.
+
+### Fast Lane (Opt-in via `fastlane` label)
+
+Auto-promotes from staging to production when ALL conditions are met:
+
+1. **Opt-in required:** PR must have `fastlane` label
+2. **No blocking changes detected:**
+   - No database migrations (`drizzle/migrations/`)
+   - No auth/Clerk changes (`app/(auth)/`, `lib/auth/`, `middleware.ts`)
+   - No core flow changes (onboarding, signin, signup, subscribe)
+   - No payment/billing changes (`app/billing/`, `lib/stripe/`)
+3. **Staging smoke tests pass**
+4. **Canary health gate passes**
+
+**When to use Fast Lane:**
+
+- Cosmetic/copy changes
+- Bug fixes behind existing feature gates
+- Non-critical UI improvements
+- Changes to non-core features
+- New features behind Statsig flags
+
+### Gated Lane (Default)
+
+Manual promotion required. The system auto-applies blocking labels:
+
+| Label | Trigger |
+|-------|---------|
+| `blocked:migration` | Changes to `drizzle/migrations/` |
+| `blocked:auth` | Changes to auth routes, Clerk, middleware |
+| `blocked:core-flow` | Changes to onboarding, signin, signup, subscribe |
+| `blocked:payments` | Changes to billing, pricing, Stripe |
+| `blocked:smoke-failed` | Staging smoke tests failed |
+
+The `gated` label forces manual review even if otherwise eligible for fast lane.
+
+### Informational Labels
+
+| Label | Meaning |
+|-------|---------|
+| `has-feature-gate` | Changes use Statsig feature gates (safer for fast lane) |
+| `fastlane` | Opt-in for fast lane auto-promotion |
+
+### Release Windows (Team Practice)
+
+- **Pre-launch:** 1 production release window/day (end of day)
+- **Post-launch:** 2/day (midday + end of day)
+
+This is team practice, NOT CI-enforced:
+
+- Fast lane auto-promotes anytime (24/7)
+- Gated PRs accumulate and get reviewed in windows
+
 ## 6. Agent-Specific Notes
 
 - **Claude (feature work, refactors)**
