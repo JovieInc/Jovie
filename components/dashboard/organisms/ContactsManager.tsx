@@ -419,7 +419,7 @@ export function ContactsManager({
                             {territory}
                           </Button>
                         ))}
-                        <div className='flex items-center gap-2'>
+                        <div className='flex flex-col gap-2 w-full sm:flex-row sm:items-center sm:w-auto'>
                           <Input
                             placeholder='Add custom territory'
                             value={contact.customTerritory ?? ''}
@@ -428,11 +428,13 @@ export function ContactsManager({
                                 customTerritory: event.target.value,
                               })
                             }
+                            className='flex-1'
                           />
                           <Button
                             size='sm'
                             variant='ghost'
                             onClick={() => addCustomTerritory(contact.id)}
+                            className='w-full sm:w-auto min-h-[44px]'
                           >
                             Add
                           </Button>
@@ -515,11 +517,12 @@ export function ContactsManager({
                       <p className='text-sm text-red-600'>{contact.error}</p>
                     ) : null}
 
-                    <div className='flex flex-wrap gap-3'>
+                    <div className='flex flex-wrap gap-2 sm:gap-3'>
                       <Button
                         size='sm'
                         onClick={() => handleSave(contact)}
                         disabled={contact.isSaving}
+                        className='min-h-[44px] px-4'
                       >
                         {contact.isSaving ? 'Saving…' : 'Save'}
                       </Button>
@@ -528,6 +531,7 @@ export function ContactsManager({
                         variant='secondary'
                         onClick={() => handleCancel(contact)}
                         disabled={contact.isSaving}
+                        className='min-h-[44px] px-4'
                       >
                         Cancel
                       </Button>
@@ -536,6 +540,7 @@ export function ContactsManager({
                         variant='ghost'
                         onClick={() => handleDelete(contact)}
                         disabled={contact.isSaving}
+                        className='min-h-[44px] px-4'
                       >
                         Delete
                       </Button>
@@ -549,7 +554,11 @@ export function ContactsManager({
       )}
 
       <div>
-        <Button variant='primary' onClick={() => addContact()}>
+        <Button
+          variant='primary'
+          onClick={() => addContact()}
+          className='min-h-[44px] w-full sm:w-auto'
+        >
           Add contact
         </Button>
       </div>
