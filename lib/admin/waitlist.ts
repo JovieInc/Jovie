@@ -138,10 +138,6 @@ export interface GetAdminWaitlistResult {
   total: number;
 }
 
-/**
- * Fetch waitlist entries for admin panel
- * Sorted by createdAt DESC with pagination
- */
 export interface WaitlistMetrics {
   total: number;
   new: number;
@@ -194,6 +190,10 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
   }
 }
 
+/**
+ * Fetch waitlist entries for admin panel
+ * Sorted by createdAt DESC with pagination
+ */
 export async function getAdminWaitlistEntries(
   params: GetAdminWaitlistParams = {}
 ): Promise<GetAdminWaitlistResult> {
