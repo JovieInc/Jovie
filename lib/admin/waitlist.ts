@@ -142,6 +142,58 @@ export interface GetAdminWaitlistResult {
  * Fetch waitlist entries for admin panel
  * Sorted by createdAt DESC with pagination
  */
+export interface WaitlistMetrics {
+  total: number;
+  new: number;
+  invited: number;
+  claimed: number;
+  rejected: number;
+}
+
+/**
+ * Fetch waitlist metrics grouped by status
+ */
+export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
+  const hasWaitlistTable = await doesTableExist('waitlist_entries');
+  if (!hasWaitlistTable) {
+    return { total: 0, new: 0, invited: 0, claimed: 0, rejected: 0 };
+  }
+
+  try {
+    const result = await db
+      .select({
+        status: waitlistEntries.status,
+        count: drizzleSql<number>`count(*)::int`,
+      })
+      .from(waitlistEntries)
+      .groupBy(waitlistEntries.status);
+
+    const metrics: WaitlistMetrics = {
+      total: 0,
+      new: 0,
+      invited: 0,
+      claimed: 0,
+      rejected: 0,
+    };
+
+    for (const row of result) {
+      const count = row.count ?? 0;
+      metrics.total += count;
+      if (row.status === 'new') metrics.new = count;
+      else if (row.status === 'invited') metrics.invited = count;
+      else if (row.status === 'claimed') metrics.claimed = count;
+      else if (row.status === 'rejected') metrics.rejected = count;
+    }
+
+    return metrics;
+  } catch (error) {
+    if (isMissingWaitlistSchemaError(error)) {
+      return { total: 0, new: 0, invited: 0, claimed: 0, rejected: 0 };
+    }
+    throw error;
+  }
+}
+
 export async function getAdminWaitlistEntries(
   params: GetAdminWaitlistParams = {}
 ): Promise<GetAdminWaitlistResult> {
