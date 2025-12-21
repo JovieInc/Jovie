@@ -21,9 +21,31 @@ export const apiRateLimit = redis
     })
   : null;
 
+// Rate limiter for dashboard link management - 30 requests per minute per user
+// This is stricter to prevent abuse of link CRUD operations
+export const dashboardLinksRateLimit = redis
+  ? new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(30, '1 m'),
+      analytics: true,
+      prefix: 'dashboard_links',
+    })
+  : null;
+
 export type RateLimitResult = {
   success: boolean;
   limit: number;
   remaining: number;
   reset: Date;
 };
+
+/**
+ * Helper to create rate limit response headers
+ */
+export function createRateLimitHeaders(result: RateLimitResult): HeadersInit {
+  return {
+    'X-RateLimit-Limit': String(result.limit),
+    'X-RateLimit-Remaining': String(result.remaining),
+    'X-RateLimit-Reset': result.reset.toISOString(),
+  };
+}

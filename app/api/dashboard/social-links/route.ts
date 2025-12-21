@@ -1,9 +1,14 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withDbSession } from '@/lib/auth/session';
+import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { creatorProfiles, socialLinks, users } from '@/lib/db/schema';
+import {
+  creatorProfiles,
+  dashboardIdempotencyKeys,
+  socialLinks,
+  users,
+} from '@/lib/db/schema';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import {
   enqueueBeaconsIngestionJob,
@@ -19,17 +24,116 @@ import {
 import { isLayloUrl } from '@/lib/ingestion/strategies/laylo';
 import { isLinktreeUrl } from '@/lib/ingestion/strategies/linktree';
 import { validateYouTubeChannelUrl } from '@/lib/ingestion/strategies/youtube';
+import {
+  createRateLimitHeaders,
+  dashboardLinksRateLimit,
+} from '@/lib/rate-limit';
 import { detectPlatform } from '@/lib/utils/platform-detection';
+import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { isValidSocialPlatform } from '@/types';
-
-// flags import removed - pre-launch
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+// Idempotency key expiration (24 hours)
+const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Check and apply rate limiting for dashboard link operations
+ */
+async function checkRateLimit(
+  userId: string
+): Promise<{ allowed: boolean; headers: HeadersInit }> {
+  if (!dashboardLinksRateLimit) {
+    // Rate limiting not configured, allow request
+    return { allowed: true, headers: {} };
+  }
+
+  const result = await dashboardLinksRateLimit.limit(userId);
+  const headers = createRateLimitHeaders({
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: new Date(result.reset),
+  });
+
+  return { allowed: result.success, headers };
+}
+
+/**
+ * Check for existing idempotency key and return cached response if found
+ */
+async function checkIdempotencyKey(
+  key: string,
+  userId: string,
+  endpoint: string
+): Promise<{ cached: boolean; response?: NextResponse }> {
+  if (!key) {
+    return { cached: false };
+  }
+
+  const [existing] = await db
+    .select({
+      responseStatus: dashboardIdempotencyKeys.responseStatus,
+      responseBody: dashboardIdempotencyKeys.responseBody,
+      expiresAt: dashboardIdempotencyKeys.expiresAt,
+    })
+    .from(dashboardIdempotencyKeys)
+    .where(
+      and(
+        eq(dashboardIdempotencyKeys.key, key),
+        eq(dashboardIdempotencyKeys.userId, userId),
+        eq(dashboardIdempotencyKeys.endpoint, endpoint),
+        gt(dashboardIdempotencyKeys.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    return {
+      cached: true,
+      response: NextResponse.json(existing.responseBody ?? { ok: true }, {
+        status: existing.responseStatus,
+        headers: NO_STORE_HEADERS,
+      }),
+    };
+  }
+
+  return { cached: false };
+}
+
+/**
+ * Store idempotency key with response for future deduplication
+ */
+async function storeIdempotencyKey(
+  key: string,
+  userId: string,
+  endpoint: string,
+  responseStatus: number,
+  responseBody: Record<string, unknown>
+): Promise<void> {
+  if (!key) return;
+
+  try {
+    await db
+      .insert(dashboardIdempotencyKeys)
+      .values({
+        key,
+        userId,
+        endpoint,
+        responseStatus,
+        responseBody,
+        expiresAt: new Date(Date.now() + IDEMPOTENCY_KEY_TTL_MS),
+      })
+      .onConflictDoNothing();
+  } catch {
+    // Non-critical: idempotency key storage failure shouldn't fail the request
+    console.error('Failed to store idempotency key');
+  }
+}
+
 export async function GET(req: Request) {
-  // Feature flag check removed - social links enabled by default
   try {
     return await withDbSession(async clerkUserId => {
       const url = new URL(req.url);
@@ -75,6 +179,7 @@ export async function GET(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          version: socialLinks.version,
         })
         .from(creatorProfiles)
         .innerJoin(users, eq(users.id, creatorProfiles.userId))
@@ -115,12 +220,11 @@ export async function GET(req: Request) {
             isActive: state === 'active',
             displayText: r.displayText,
             state,
-            confidence: Number.isFinite(parsedConfidence)
-              ? parsedConfidence
-              : 0,
+            confidence: Number.isFinite(parsedConfidence) ? parsedConfidence : 0,
             sourcePlatform: r.sourcePlatform,
             sourceType: r.sourceType ?? 'manual',
             evidence: r.evidence,
+            version: r.version ?? 1,
           };
         })
         .filter((link): link is NonNullable<typeof link> => Boolean(link));
@@ -147,6 +251,8 @@ export async function GET(req: Request) {
 
 const updateSocialLinksSchema = z.object({
   profileId: z.string().min(1),
+  idempotencyKey: z.string().max(128).optional(),
+  expectedVersion: z.number().int().min(1).optional(),
   links: z
     .array(
       z.object({
@@ -179,17 +285,27 @@ const updateLinkStateSchema = z.object({
   profileId: z.string().min(1),
   linkId: z.string().min(1),
   action: z.enum(['accept', 'dismiss']),
+  expectedVersion: z.number().int().min(1).optional(),
 });
 
 export async function PUT(req: Request) {
-  // Feature flag check removed - social links enabled by default
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      // Apply rate limiting
+      const { allowed, headers: rateLimitHeaders } =
+        await checkRateLimit(clerkUserId);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded. Please try again later.' },
+          { status: 429, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
       const rawBody = await req.json().catch(() => null);
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
@@ -204,21 +320,39 @@ export async function PUT(req: Request) {
           : 'Invalid request body';
         return NextResponse.json(
           { error: message },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
-      const { profileId, links: parsedLinks } = parsed.data;
+      const {
+        profileId,
+        links: parsedLinks,
+        idempotencyKey,
+        expectedVersion,
+      } = parsed.data;
       const links = parsedLinks ?? [];
+
       if (!profileId) {
         return NextResponse.json(
           { error: 'Missing profileId' },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
+      // Check idempotency key
+      if (idempotencyKey) {
+        const { cached, response } = await checkIdempotencyKey(
+          idempotencyKey,
+          clerkUserId,
+          'PUT:/api/dashboard/social-links'
+        );
+        if (cached && response) {
+          return response;
+        }
+      }
+
       // Verify the profile belongs to the authenticated user
-      const [profile] = await db
+      const [profile] = await tx
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
@@ -234,64 +368,83 @@ export async function PUT(req: Request) {
         .limit(1);
 
       if (!profile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
+        const response = { error: 'Profile not found' };
+        await storeIdempotencyKey(
+          idempotencyKey ?? '',
+          clerkUserId,
+          'PUT:/api/dashboard/social-links',
+          404,
+          response
         );
+        return NextResponse.json(response, {
+          status: 404,
+          headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+        });
       }
 
-      // Validate URLs before proceeding
-      const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:'];
+      // Validate URLs with enhanced validation (blocks internal IPs)
       for (const link of links) {
-        try {
-          const url = new URL(link.url);
-          const protocol = url.protocol.toLowerCase();
-
-          if (dangerousProtocols.includes(protocol)) {
-            return NextResponse.json(
-              {
-                error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-              },
-              { status: 400, headers: NO_STORE_HEADERS }
-            );
-          }
-
-          if (protocol !== 'http:' && protocol !== 'https:') {
-            return NextResponse.json(
-              {
-                error: `Invalid URL protocol: ${protocol}. Only http: and https: are allowed.`,
-              },
-              { status: 400, headers: NO_STORE_HEADERS }
-            );
-          }
-        } catch {
-          return NextResponse.json(
-            { error: `Invalid URL format: ${link.url}` },
-            { status: 400, headers: NO_STORE_HEADERS }
+        const validation = validateSocialLinkUrl(link.url);
+        if (!validation.valid) {
+          const response = { error: validation.error };
+          await storeIdempotencyKey(
+            idempotencyKey ?? '',
+            clerkUserId,
+            'PUT:/api/dashboard/social-links',
+            400,
+            response
           );
+          return NextResponse.json(response, {
+            status: 400,
+            headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          });
         }
       }
 
-      // Delete only manual/admin links to preserve ingested suggestions
-      const existingLinks = await db
+      // Get existing links with their versions for optimistic locking
+      const existingLinks = await tx
         .select({
           id: socialLinks.id,
           sourceType: socialLinks.sourceType,
+          version: socialLinks.version,
         })
         .from(socialLinks)
         .where(eq(socialLinks.creatorProfileId, profileId));
 
+      // Check optimistic locking if expectedVersion is provided
+      if (expectedVersion !== undefined && existingLinks.length > 0) {
+        // Find the max version among existing links
+        const maxVersion = Math.max(...existingLinks.map(l => l.version ?? 1));
+        if (maxVersion !== expectedVersion) {
+          const response = {
+            error: 'Conflict: Links have been modified by another request',
+            code: 'VERSION_CONFLICT',
+            currentVersion: maxVersion,
+            expectedVersion,
+          };
+          return NextResponse.json(response, {
+            status: 409,
+            headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+          });
+        }
+      }
+
+      // Calculate next version (increment from max existing version)
+      const currentMaxVersion = existingLinks.length > 0
+        ? Math.max(...existingLinks.map(l => l.version ?? 1))
+        : 0;
+      const nextVersion = currentMaxVersion + 1;
+
+      // Delete only manual/admin links to preserve ingested suggestions
       const removableIds = existingLinks
         .filter(link => (link.sourceType ?? 'manual') !== 'ingested')
         .map(link => link.id);
 
       if (removableIds.length > 0) {
-        await db
-          .delete(socialLinks)
-          .where(inArray(socialLinks.id, removableIds));
+        await tx.delete(socialLinks).where(inArray(socialLinks.id, removableIds));
       }
 
-      // Insert new links
+      // Insert new links with new version
       if (links.length > 0) {
         const insertPayload: Array<typeof socialLinks.$inferInsert> = links.map(
           (l, idx) => {
@@ -328,8 +481,6 @@ export async function PUT(req: Request) {
               sortOrder: l.sortOrder ?? idx,
               state,
               isActive: state === 'active',
-              // Drizzle numeric columns use string representations; keep the
-              // computed numeric value only in memory.
               confidence: confidence.toFixed(2),
               sourcePlatform: l.sourcePlatform,
               sourceType: l.sourceType ?? 'manual',
@@ -339,114 +490,149 @@ export async function PUT(req: Request) {
                 signals: Array.from(new Set(evidence.signals)),
               },
               displayText: l.displayText || null,
+              version: nextVersion,
             };
           }
         );
 
-        await db.insert(socialLinks).values(insertPayload);
+        await tx.insert(socialLinks).values(insertPayload);
       }
 
-      // Magic profile enrichment: if the user has no profile photo yet, try to
-      // pull one from any newly-added link (Linktree/Beacons/Laylo/YouTube/OG image)
-      // and store it in our blob pipeline.
-      try {
-        if (links.length > 0) {
-          await maybeSetProfileAvatarFromLinks({
-            db,
-            clerkUserId,
-            profileId,
-            userId: profile.userId ?? null,
-            currentAvatarUrl: profile.avatarUrl ?? null,
-            avatarLockedByUser: profile.avatarLockedByUser ?? null,
-            links: links.map(link => link.url),
-          });
+      // Update version on any remaining ingested links to maintain consistency
+      if (existingLinks.length > removableIds.length) {
+        const ingestedIds = existingLinks
+          .filter(link => link.sourceType === 'ingested')
+          .map(link => link.id);
+        if (ingestedIds.length > 0) {
+          await tx
+            .update(socialLinks)
+            .set({ version: nextVersion, updatedAt: new Date() })
+            .where(inArray(socialLinks.id, ingestedIds));
         }
-      } catch {
-        // Non-blocking: link saving should succeed even if enrichment fails.
       }
 
-      const linktreeTargets = links.filter(
-        link => link.platform === 'linktree' || isLinktreeUrl(link.url)
+      // Store successful response in idempotency key
+      const successResponse = { ok: true, version: nextVersion };
+      await storeIdempotencyKey(
+        idempotencyKey ?? '',
+        clerkUserId,
+        'PUT:/api/dashboard/social-links',
+        200,
+        successResponse
       );
-      const beaconsTargets = links
-        .map(link => {
-          const validated = validateBeaconsUrl(link.url);
-          if (!validated) return null;
-          return link.platform === 'beacons' || isBeaconsUrl(validated)
-            ? { ...link, url: validated }
-            : null;
-        })
-        .filter((link): link is NonNullable<typeof link> => Boolean(link));
-      const layloTargets = links.filter(
-        link => link.platform === 'laylo' || isLayloUrl(link.url)
-      );
-      const youtubeTargets = links
-        .map(link => {
-          const validated = validateYouTubeChannelUrl(link.url);
-          return validated ? { ...link, url: validated } : null;
-        })
-        .filter((link): link is NonNullable<typeof link> => Boolean(link));
 
-      if (beaconsTargets.length > 0) {
-        await Promise.all(
-          beaconsTargets.map(link =>
-            enqueueBeaconsIngestionJob({
-              creatorProfileId: profileId,
-              sourceUrl: link.url,
-            }).catch(err => {
-              console.error('Failed to enqueue beacons ingestion job', err);
-              return null;
-            })
-          )
+      // Magic profile enrichment (non-blocking, outside transaction for safety)
+      // Note: We schedule this but don't await it inside the transaction
+      const enrichmentPromise = (async () => {
+        try {
+          if (links.length > 0) {
+            await maybeSetProfileAvatarFromLinks({
+              db,
+              clerkUserId,
+              profileId,
+              userId: profile.userId ?? null,
+              currentAvatarUrl: profile.avatarUrl ?? null,
+              avatarLockedByUser: profile.avatarLockedByUser ?? null,
+              links: links.map(link => link.url),
+            });
+          }
+        } catch {
+          // Non-blocking: link saving should succeed even if enrichment fails.
+        }
+      })();
+
+      // Schedule ingestion jobs (non-blocking)
+      const ingestionPromise = (async () => {
+        const linktreeTargets = links.filter(
+          link => link.platform === 'linktree' || isLinktreeUrl(link.url)
         );
-      }
-
-      if (linktreeTargets.length > 0) {
-        await Promise.all(
-          linktreeTargets.map(link =>
-            enqueueLinktreeIngestionJob({
-              creatorProfileId: profileId,
-              sourceUrl: link.url,
-            }).catch(err => {
-              console.error('Failed to enqueue linktree ingestion job', err);
-              return null;
-            })
-          )
+        const beaconsTargets = links
+          .map(link => {
+            const validated = validateBeaconsUrl(link.url);
+            if (!validated) return null;
+            return link.platform === 'beacons' || isBeaconsUrl(validated)
+              ? { ...link, url: validated }
+              : null;
+          })
+          .filter((link): link is NonNullable<typeof link> => Boolean(link));
+        const layloTargets = links.filter(
+          link => link.platform === 'laylo' || isLayloUrl(link.url)
         );
-      }
+        const youtubeTargets = links
+          .map(link => {
+            const validated = validateYouTubeChannelUrl(link.url);
+            return validated ? { ...link, url: validated } : null;
+          })
+          .filter((link): link is NonNullable<typeof link> => Boolean(link));
 
-      if (layloTargets.length > 0) {
-        await Promise.all(
-          layloTargets.map(link =>
-            enqueueLayloIngestionJob({
-              creatorProfileId: profileId,
-              sourceUrl: link.url,
-            }).catch(err => {
-              console.error('Failed to enqueue laylo ingestion job', err);
-              return null;
-            })
-          )
-        );
-      }
+        const jobs: Promise<unknown>[] = [];
 
-      if (youtubeTargets.length > 0) {
-        await Promise.all(
-          youtubeTargets.map(link =>
-            enqueueYouTubeIngestionJob({
-              creatorProfileId: profileId,
-              sourceUrl: link.url,
-            }).catch(err => {
-              console.error('Failed to enqueue youtube ingestion job', err);
-              return null;
-            })
-          )
-        );
-      }
+        if (beaconsTargets.length > 0) {
+          jobs.push(
+            ...beaconsTargets.map(link =>
+              enqueueBeaconsIngestionJob({
+                creatorProfileId: profileId,
+                sourceUrl: link.url,
+              }).catch(err => {
+                console.error('Failed to enqueue beacons ingestion job', err);
+                return null;
+              })
+            )
+          );
+        }
 
-      return NextResponse.json(
-        { ok: true },
-        { status: 200, headers: NO_STORE_HEADERS }
-      );
+        if (linktreeTargets.length > 0) {
+          jobs.push(
+            ...linktreeTargets.map(link =>
+              enqueueLinktreeIngestionJob({
+                creatorProfileId: profileId,
+                sourceUrl: link.url,
+              }).catch(err => {
+                console.error('Failed to enqueue linktree ingestion job', err);
+                return null;
+              })
+            )
+          );
+        }
+
+        if (layloTargets.length > 0) {
+          jobs.push(
+            ...layloTargets.map(link =>
+              enqueueLayloIngestionJob({
+                creatorProfileId: profileId,
+                sourceUrl: link.url,
+              }).catch(err => {
+                console.error('Failed to enqueue laylo ingestion job', err);
+                return null;
+              })
+            )
+          );
+        }
+
+        if (youtubeTargets.length > 0) {
+          jobs.push(
+            ...youtubeTargets.map(link =>
+              enqueueYouTubeIngestionJob({
+                creatorProfileId: profileId,
+                sourceUrl: link.url,
+              }).catch(err => {
+                console.error('Failed to enqueue youtube ingestion job', err);
+                return null;
+              })
+            )
+          );
+        }
+
+        await Promise.all(jobs);
+      })();
+
+      // Wait for background tasks but don't let failures affect the response
+      Promise.all([enrichmentPromise, ingestionPromise]).catch(() => {});
+
+      return NextResponse.json(successResponse, {
+        status: 200,
+        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+      });
     });
   } catch (error) {
     console.error('Error updating social links:', error);
@@ -465,12 +651,22 @@ export async function PUT(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    return await withDbSession(async clerkUserId => {
+    return await withDbSessionTx(async (tx, clerkUserId) => {
+      // Apply rate limiting
+      const { allowed, headers: rateLimitHeaders } =
+        await checkRateLimit(clerkUserId);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Rate limit exceeded. Please try again later.' },
+          { status: 429, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
       const rawBody = await req.json().catch(() => null);
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
@@ -478,13 +674,13 @@ export async function PATCH(req: Request) {
       if (!parsed.success) {
         return NextResponse.json(
           { error: 'Invalid request body' },
-          { status: 400, headers: NO_STORE_HEADERS }
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
-      const { profileId, linkId, action } = parsed.data;
+      const { profileId, linkId, action, expectedVersion } = parsed.data;
 
-      const [profile] = await db
+      const [profile] = await tx
         .select({
           id: creatorProfiles.id,
           usernameNormalized: creatorProfiles.usernameNormalized,
@@ -499,11 +695,11 @@ export async function PATCH(req: Request) {
       if (!profile) {
         return NextResponse.json(
           { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
+          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
-      const [link] = await db
+      const [link] = await tx
         .select({
           id: socialLinks.id,
           creatorProfileId: socialLinks.creatorProfileId,
@@ -518,6 +714,7 @@ export async function PATCH(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          version: socialLinks.version,
         })
         .from(socialLinks)
         .where(
@@ -531,7 +728,34 @@ export async function PATCH(req: Request) {
       if (!link) {
         return NextResponse.json(
           { error: 'Link not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
+          { status: 404, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // PATCH state validation: only allow transitions from 'suggested' state
+      const currentState = link.state as 'active' | 'suggested' | 'rejected';
+      if (currentState !== 'suggested') {
+        return NextResponse.json(
+          {
+            error: `Cannot ${action} link: only suggested links can be accepted or dismissed`,
+            code: 'INVALID_STATE_TRANSITION',
+            currentState,
+          },
+          { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
+
+      // Check optimistic locking
+      const currentVersion = link.version ?? 1;
+      if (expectedVersion !== undefined && currentVersion !== expectedVersion) {
+        return NextResponse.json(
+          {
+            error: 'Conflict: Link has been modified by another request',
+            code: 'VERSION_CONFLICT',
+            currentVersion,
+            expectedVersion,
+          },
+          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
 
@@ -568,18 +792,25 @@ export async function PATCH(req: Request) {
       const nextState = action === 'accept' ? 'active' : 'rejected';
       const nextConfidence =
         action === 'accept' ? Math.max(scored.confidence, 0.7) : 0;
+      const nextVersion = currentVersion + 1;
 
-      const [updated] = await db
+      const [updated] = await tx
         .update(socialLinks)
         .set({
           state: nextState,
           isActive: action === 'accept',
-          // Persist confidence as a fixed-point string to match the numeric column type
           confidence: nextConfidence.toFixed(2),
           evidence: nextEvidence,
+          version: nextVersion,
           updatedAt: new Date(),
         })
-        .where(eq(socialLinks.id, link.id))
+        .where(
+          and(
+            eq(socialLinks.id, link.id),
+            // Double-check version in WHERE for extra safety
+            eq(socialLinks.version, currentVersion)
+          )
+        )
         .returning({
           id: socialLinks.id,
           platform: socialLinks.platform,
@@ -593,11 +824,23 @@ export async function PATCH(req: Request) {
           sourcePlatform: socialLinks.sourcePlatform,
           sourceType: socialLinks.sourceType,
           evidence: socialLinks.evidence,
+          version: socialLinks.version,
         });
+
+      // If no rows updated, version changed between SELECT and UPDATE
+      if (!updated) {
+        return NextResponse.json(
+          {
+            error: 'Conflict: Link was modified during the update',
+            code: 'VERSION_CONFLICT',
+          },
+          { status: 409, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
+        );
+      }
 
       return NextResponse.json(
         { ok: true, link: updated },
-        { status: 200, headers: NO_STORE_HEADERS }
+        { status: 200, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
       );
     });
   } catch (error) {
