@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 
+import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
 import { WaitlistTable } from '@/components/admin/WaitlistTable';
-import { getAdminWaitlistEntries } from '@/lib/admin/waitlist';
+import {
+  getAdminWaitlistEntries,
+  getWaitlistMetrics,
+} from '@/lib/admin/waitlist';
 
 export const metadata: Metadata = {
   title: 'Waitlist | Admin',
@@ -30,35 +34,48 @@ export default async function AdminWaitlistPage({
       ? pageSizeParam
       : 20;
 
-  const {
-    entries,
-    page: currentPage,
-    pageSize: resolvedPageSize,
-    total,
-  } = await getAdminWaitlistEntries({ page, pageSize });
+  const [
+    { entries, page: currentPage, pageSize: resolvedPageSize, total },
+    metrics,
+  ] = await Promise.all([
+    getAdminWaitlistEntries({ page, pageSize }),
+    getWaitlistMetrics(),
+  ]);
 
   return (
-    <div className='flex h-full min-h-0 flex-col gap-4 sm:gap-6 lg:gap-8'>
-      <header className='space-y-1 sm:space-y-2'>
-        <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
-          Internal
-        </p>
-        <h1 className='text-2xl sm:text-3xl font-semibold text-primary-token'>
-          Waitlist
-        </h1>
-        <p className='text-xs sm:text-sm text-secondary-token'>
-          Review waitlist submissions for early access.
-        </p>
-      </header>
+    <div className='flex h-full min-h-0 flex-col'>
+      {/* Scrollable container for entire page content */}
+      <div className='flex-1 min-h-0 overflow-auto -mx-4 sm:-mx-6 lg:-mx-8'>
+        <div className='px-4 sm:px-6 lg:px-8'>
+          {/* Header - scrolls out of view */}
+          <header className='space-y-1 sm:space-y-2 py-4 sm:py-6'>
+            <p className='text-[10px] sm:text-xs uppercase tracking-wide text-tertiary-token'>
+              Internal
+            </p>
+            <h1 className='text-2xl sm:text-3xl font-semibold text-primary-token'>
+              Waitlist
+            </h1>
+            <p className='text-xs sm:text-sm text-secondary-token'>
+              Review waitlist submissions for early access.
+            </p>
+          </header>
 
-      <section className='-mx-4 flex-1 min-h-0 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8'>
-        <WaitlistTable
-          entries={entries}
-          page={currentPage}
-          pageSize={resolvedPageSize}
-          total={total}
-        />
-      </section>
+          {/* Metrics cards - scroll out of view */}
+          <section className='pb-4 sm:pb-6'>
+            <WaitlistMetrics metrics={metrics} />
+          </section>
+        </div>
+
+        {/* Table section with sticky header */}
+        <section className='px-4 sm:px-6 lg:px-8 pb-4 sm:pb-6'>
+          <WaitlistTable
+            entries={entries}
+            page={currentPage}
+            pageSize={resolvedPageSize}
+            total={total}
+          />
+        </section>
+      </div>
     </div>
   );
 }

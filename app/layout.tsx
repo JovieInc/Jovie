@@ -95,15 +95,44 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    google: 'your-google-verification-code',
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   other: {
     'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
+    'msapplication-TileImage': '/android-chrome-192x192.png',
+    'msapplication-config': 'none',
     'theme-color': '#ffffff',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: APP_NAME,
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+    other: [
+      {
+        rel: 'mask-icon',
+        url: '/favicon.svg',
+        color: '#6366f1',
+      },
+    ],
+  },
+  manifest: '/site.webmanifest',
 };
 
 export default async function RootLayout({
@@ -135,22 +164,7 @@ export default async function RootLayout({
 `,
         }}
       />
-      {/* Favicon and Icons */}
-      <link
-        rel='icon'
-        type='image/png'
-        href='/favicon-96x96.png'
-        sizes='96x96'
-      />
-      <link rel='icon' type='image/svg+xml' href='/favicon.svg' />
-      <link rel='shortcut icon' href='/favicon.ico' />
-      <link
-        rel='apple-touch-icon'
-        sizes='180x180'
-        href='/apple-touch-icon.png'
-      />
-      <meta name='apple-mobile-web-app-title' content='Jovie' />
-      <link rel='manifest' href='/site.webmanifest' />
+      {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch for critical external resources */}
       <link rel='dns-prefetch' href='https://i.scdn.co' />

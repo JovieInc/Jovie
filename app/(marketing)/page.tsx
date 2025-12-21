@@ -7,22 +7,33 @@ import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} — The AI link-in-bio built for artists`;
+  const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
   const description =
-    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.';
+    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube. Free to start.';
   const keywords = [
+    'link in bio',
+    'linktree alternative',
+    'artist link in bio',
+    'music link in bio',
     'creator profile',
     'music artist',
-    'spotify',
-    'social media',
+    'spotify link',
+    'apple music link',
+    'youtube music link',
+    'social media links',
     'music promotion',
     'artist profile',
     'music marketing',
-    'streaming',
+    'streaming links',
     'music links',
     'artist bio',
     'music discovery',
     'fan engagement',
+    'email subscribers',
+    'sms marketing',
+    'fan conversion',
+    'smart links',
+    'pre-save links',
   ];
 
   return {
@@ -37,6 +48,8 @@ export async function generateMetadata(): Promise<Metadata> {
     ],
     creator: APP_NAME,
     publisher: APP_NAME,
+    category: 'Music',
+    classification: 'Business',
     formatDetection: {
       email: false,
       address: false,
@@ -44,7 +57,10 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     metadataBase: new URL(APP_URL),
     alternates: {
-      canonical: APP_URL,
+      canonical: '/',
+      languages: {
+        'en-US': '/',
+      },
     },
     openGraph: {
       type: 'website',
@@ -55,10 +71,11 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: APP_NAME,
       images: [
         {
-          url: '/og/default.png',
+          url: `${APP_URL}/og/default.png`,
+          secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Claim your @handle`,
+          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
           type: 'image/png',
         },
       ],
@@ -67,16 +84,25 @@ export async function generateMetadata(): Promise<Metadata> {
       card: 'summary_large_image',
       title,
       description,
-      images: ['/og/default.png'],
+      images: [
+        {
+          url: `${APP_URL}/og/default.png`,
+          alt: `${APP_NAME} - The AI Link-in-Bio Built for Artists`,
+          width: 1200,
+          height: 630,
+        },
+      ],
       creator: '@jovie',
       site: '@jovie',
     },
     robots: {
       index: true,
       follow: true,
+      nocache: false,
       googleBot: {
         index: true,
         follow: true,
+        noimageindex: false,
         'max-video-preview': -1,
         'max-image-preview': 'large',
         'max-snippet': -1,
@@ -86,8 +112,10 @@ export async function generateMetadata(): Promise<Metadata> {
       google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
     },
     other: {
-      'music:musician': APP_URL,
-      'music:album': APP_URL,
+      'msvalidate.01': process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION || '',
+      'yandex-verification':
+        process.env.NEXT_PUBLIC_YANDEX_SITE_VERIFICATION || '',
+      'p:domain_verify': process.env.NEXT_PUBLIC_PINTEREST_VERIFICATION || '',
     },
   };
 }
@@ -95,7 +123,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default function HomePage() {
   return (
     <>
-      {/* Structured Data */}
+      {/* Structured Data - WebSite */}
       <script
         type='application/ld+json'
         dangerouslySetInnerHTML={{
@@ -103,14 +131,16 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: APP_NAME,
+            alternateName: 'Jovie Link in Bio',
             description:
               'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.',
             url: APP_URL,
+            inLanguage: 'en-US',
             potentialAction: {
               '@type': 'SearchAction',
               target: {
                 '@type': 'EntryPoint',
-                urlTemplate: `${APP_URL}/?q={search_term_string}`,
+                urlTemplate: `${APP_URL}/search?q={search_term_string}`,
               },
               'query-input': 'required name=search_term_string',
             },
@@ -121,12 +151,77 @@ export default function HomePage() {
               logo: {
                 '@type': 'ImageObject',
                 url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+                width: 512,
+                height: 512,
               },
             },
+          }),
+        }}
+      />
+
+      {/* Structured Data - SoftwareApplication */}
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'SoftwareApplication',
+            name: APP_NAME,
+            description:
+              'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
+            url: APP_URL,
+            applicationCategory: 'BusinessApplication',
+            operatingSystem: 'Web',
+            offers: {
+              '@type': 'Offer',
+              price: '0',
+              priceCurrency: 'USD',
+              description: 'Free to start',
+            },
+            aggregateRating: {
+              '@type': 'AggregateRating',
+              ratingValue: '5',
+              ratingCount: '1',
+              bestRating: '5',
+              worstRating: '1',
+            },
+            author: {
+              '@type': 'Organization',
+              name: APP_NAME,
+              url: APP_URL,
+            },
+          }),
+        }}
+      />
+
+      {/* Structured Data - Organization */}
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'Organization',
+            name: APP_NAME,
+            legalName: 'Jovie Inc',
+            url: APP_URL,
+            logo: {
+              '@type': 'ImageObject',
+              url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+              width: 512,
+              height: 512,
+            },
+            image: `${APP_URL}/og/default.png`,
+            description:
+              'The AI link-in-bio built for artists. Turn casual listeners into email and SMS subscribers.',
             sameAs: [
               'https://twitter.com/jovie',
               'https://instagram.com/jovie',
             ],
+            contactPoint: {
+              '@type': 'ContactPoint',
+              contactType: 'customer support',
+              url: `${APP_URL}/support`,
+            },
           }),
         }}
       />
