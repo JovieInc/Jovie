@@ -274,6 +274,7 @@ export function AppleStyleOnboardingForm({
 
   const handleStepCtaDisabledReason = useMemo(() => {
     if (state.isSubmitting) return 'Saving…';
+    if (state.error) return state.error;
     if (!handleInput) return 'Enter a handle to continue';
     if (!handleValidation.clientValid) {
       return handleValidation.error || 'Handle is invalid';
@@ -283,7 +284,7 @@ export function AppleStyleOnboardingForm({
       return handleValidation.error || 'Handle is taken';
     }
     return null;
-  }, [handleInput, handleValidation, state.isSubmitting]);
+  }, [handleInput, handleValidation, state.error, state.isSubmitting]);
 
   useEffect(() => {
     if (!handleInput) {
@@ -313,9 +314,13 @@ export function AppleStyleOnboardingForm({
 
       const resolvedHandle = (handle || handleInput).trim().toLowerCase();
 
+      const redirectUrl = `/onboarding?handle=${encodeURIComponent(resolvedHandle)}`;
+
       if (
         state.isSubmitting ||
+        Boolean(state.error) ||
         !handleValidation.clientValid ||
+        handleValidation.checking ||
         !handleValidation.available ||
         !resolvedHandle
       ) {
@@ -337,7 +342,6 @@ export function AppleStyleOnboardingForm({
         ...prev,
         error: null,
         step: 'validating',
-        progress: 0,
         isSubmitting: true,
       }));
 
@@ -393,6 +397,10 @@ export function AppleStyleOnboardingForm({
         } else if (message.includes('EMAIL_IN_USE')) {
           userMessage =
             'This email is already in use. Please sign in with the original account or use a different email.';
+          router.push(
+            `/signin?redirect_url=${encodeURIComponent(redirectUrl)}`
+          );
+          return;
         } else if (
           message.includes('RATE_LIMITED') ||
           message.includes('TOO_MANY_ATTEMPTS')
@@ -433,7 +441,10 @@ export function AppleStyleOnboardingForm({
       handle,
       handleInput,
       handleValidation.available,
+      handleValidation.checking,
       handleValidation.clientValid,
+      router,
+      state.error,
       state.isSubmitting,
       userEmail,
       userId,
@@ -573,24 +584,73 @@ export function AppleStyleOnboardingForm({
                     spellCheck={false}
                     aria-invalid={handleValidation.error ? 'true' : undefined}
                     className={[
-                      'pl-10',
-                      handleValidation.error
+                      'pl-10 pr-10',
+                      state.error || handleValidation.error
                         ? 'border-red-500'
-                        : handleValidation.available
+                        : !state.error && handleValidation.available
                           ? 'border-green-500'
                           : undefined,
                     ]
                       .filter(Boolean)
                       .join(' ')}
                   />
-                  {handleValidation.checking && (
-                    <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                  <div className='absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 flex items-center justify-center'>
+                    {handleValidation.checking ? (
                       <LoadingSpinner
                         size='sm'
                         className='text-secondary-token'
                       />
-                    </div>
-                  )}
+                    ) : state.error || handleValidation.error ? (
+                      <svg
+                        viewBox='0 0 20 20'
+                        fill='none'
+                        aria-hidden='true'
+                        className='h-5 w-5'
+                      >
+                        <circle
+                          cx='10'
+                          cy='10'
+                          r='9'
+                          stroke='currentColor'
+                          className='text-red-500'
+                          strokeWidth='2'
+                        />
+                        <path
+                          d='M6.6 6.6l6.8 6.8M13.4 6.6l-6.8 6.8'
+                          stroke='currentColor'
+                          className='text-red-500'
+                          strokeWidth='2'
+                          strokeLinecap='round'
+                        />
+                      </svg>
+                    ) : handleInput &&
+                      handleValidation.clientValid &&
+                      handleValidation.available ? (
+                      <svg
+                        viewBox='0 0 20 20'
+                        fill='none'
+                        aria-hidden='true'
+                        className='h-5 w-5'
+                      >
+                        <circle
+                          cx='10'
+                          cy='10'
+                          r='9'
+                          stroke='currentColor'
+                          className='text-green-600'
+                          strokeWidth='2'
+                        />
+                        <path
+                          d='M6 10.2l2.6 2.6L14 7.4'
+                          stroke='currentColor'
+                          className='text-green-600'
+                          strokeWidth='2'
+                          strokeLinecap='round'
+                          strokeLinejoin='round'
+                        />
+                      </svg>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div
@@ -598,7 +658,7 @@ export function AppleStyleOnboardingForm({
                   role='status'
                   aria-live='polite'
                 >
-                  {handleInput ? (
+                  {handleInput && !state.error ? (
                     handleValidation.checking ? (
                       <div className='text-sm text-[#6b6f76] animate-in fade-in slide-in-from-bottom-1 duration-300'>
                         Checking…
@@ -633,11 +693,13 @@ export function AppleStyleOnboardingForm({
                   )}
                 </AuthButton>
 
-                {state.error ? (
-                  <div className='text-center text-xs text-[#6b6f76]'>
-                    {state.error}
-                  </div>
-                ) : null}
+                <div
+                  className='min-h-[40px] flex items-center justify-center text-center text-xs text-[#6b6f76]'
+                  role='status'
+                  aria-live='polite'
+                >
+                  {state.error ?? null}
+                </div>
               </form>
             </div>
           </div>
@@ -684,29 +746,16 @@ export function AppleStyleOnboardingForm({
     }
   };
 
-  const ProgressIndicator = () => (
-    <div className='w-full h-1 bg-[#1f1f22] rounded-full overflow-hidden'>
-      <div
-        className='h-full bg-white transition-all duration-500 ease-in-out'
-        style={{
-          width: `${((currentStepIndex + 1) / ONBOARDING_STEPS.length) * 100}%`,
-        }}
-      />
-    </div>
-  );
-
   return (
     <div className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'>
       <button
         type='button'
         onClick={goBack}
         aria-label='Go back'
-        className='fixed top-4 left-4 md:top-6 md:left-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-(--fg) hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)'
+        className='fixed top-4 right-4 md:top-6 md:right-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-(--fg) hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)'
       >
         <ArrowLeft className='h-5 w-5' />
       </button>
-
-      <ProgressIndicator />
 
       <Link
         href='#main-content'

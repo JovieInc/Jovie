@@ -59,6 +59,7 @@ export function OtpSignInForm() {
   const clerk = useClerk();
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
+  const [otpCode, setOtpCode] = useState('');
   const emailFocusAttemptRef = useRef(0);
 
   useEffect(() => {
@@ -239,8 +240,8 @@ export function OtpSignInForm() {
           </div>
           <SignIn.Step name='start' aria-label='Choose a sign-in method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              <h1 className='text-[18px] leading-6 font-medium text-primary-token mb-0 text-center'>
-                {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
+              <h1 className='text-[18px] leading-6 font-medium text-white/70 mb-0 text-center'>
+                {isEmailOpen ? "What's your email?" : 'Log in to Jovie'}
               </h1>
 
               {isEmailOpen ? (
@@ -255,15 +256,11 @@ export function OtpSignInForm() {
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 
-                  <p className='text-sm text-[#6b6f76] text-center'>
-                    We&apos;ll email a 6-digit code to keep your account secure.
-                  </p>
-
                   <Clerk.Loading>
                     {isLoading => (
                       <SignIn.Action
                         submit
-                        className={secondaryButtonClassName}
+                        className={submitButtonClassName}
                         disabled={isLoading}
                         aria-busy={isLoading}
                         onClick={() => setLastUsedAuthMethod('email')}
@@ -279,6 +276,10 @@ export function OtpSignInForm() {
                       </SignIn.Action>
                     )}
                   </Clerk.Loading>
+
+                  <p className='text-sm text-[#6b6f76] text-center'>
+                    We&apos;ll email a 6-digit code to keep your account secure.
+                  </p>
 
                   <AuthButton
                     variant='link'
@@ -331,7 +332,7 @@ export function OtpSignInForm() {
           >
             <SignIn.Strategy name='email_code'>
               <div className={STEP_TRANSITION_CLASSES}>
-                <h1 className='text-lg font-medium text-primary-token mb-0 text-center'>
+                <h1 className='text-lg font-medium text-white/70 mb-0 text-center'>
                   Check your email
                 </h1>
 
@@ -349,10 +350,28 @@ export function OtpSignInForm() {
                     <Clerk.Label className='sr-only'>
                       Verification code
                     </Clerk.Label>
-                    <OtpInput
-                      autoSubmit
-                      aria-label='Enter 6-digit verification code'
-                    />
+                    <div>
+                      <Clerk.Input
+                        type='text'
+                        maxLength={6}
+                        pattern='[0-9]{6}'
+                        inputMode='numeric'
+                        autoComplete='one-time-code'
+                        className='sr-only'
+                        value={otpCode}
+                        onChange={e => {
+                          const digits = e.target.value
+                            .replace(/\D/g, '')
+                            .slice(0, 6);
+                          setOtpCode(digits);
+                        }}
+                        aria-label='Enter 6-digit verification code'
+                      />
+                      <OtpInput
+                        autoSubmit
+                        aria-label='Enter 6-digit verification code'
+                      />
+                    </div>
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 
@@ -361,7 +380,7 @@ export function OtpSignInForm() {
                       <SignIn.Action
                         submit
                         className={submitButtonClassName}
-                        disabled={isLoading}
+                        disabled={isLoading || otpCode.length !== 6}
                         aria-busy={isLoading}
                       >
                         {isLoading ? (
