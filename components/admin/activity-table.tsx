@@ -1,4 +1,6 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
+import { useMemo } from 'react';
+import { Table, type Column } from '@/components/admin/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
@@ -15,11 +17,71 @@ const statusVariant: Record<
   error: 'error',
 };
 
+const statusLabel: Record<AdminActivityStatus, string> = {
+  success: 'Success',
+  warning: 'Needs review',
+  error: 'Error',
+};
+
 interface ActivityTableProps {
   items: AdminActivityItem[];
 }
 
 export function ActivityTable({ items }: ActivityTableProps) {
+  // Define table columns
+  const columns: Column<AdminActivityItem>[] = useMemo(
+    () => [
+      {
+        id: 'user',
+        header: 'User',
+        cell: item => (
+          <span className='font-medium text-primary-token whitespace-nowrap'>
+            {item.user}
+          </span>
+        ),
+        width: 'w-[200px]',
+      },
+      {
+        id: 'action',
+        header: 'Action',
+        cell: item => (
+          <div>
+            <span className='block truncate text-secondary-token'>
+              {item.action}
+            </span>
+            <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
+              {item.timestamp}
+            </span>
+          </div>
+        ),
+        width: 'w-auto',
+      },
+      {
+        id: 'timestamp',
+        header: 'Timestamp',
+        cell: item => (
+          <span className='whitespace-nowrap text-secondary-token'>
+            {item.timestamp}
+          </span>
+        ),
+        hideOnMobile: true,
+        width: 'w-[180px]',
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        cell: item => (
+          <Badge variant={statusVariant[item.status]} size='sm'>
+            {statusLabel[item.status]}
+          </Badge>
+        ),
+        align: 'right',
+        width: 'w-[140px]',
+      },
+    ],
+    []
+  );
+
   return (
     <Card className='h-full border-subtle bg-surface-1/80'>
       <CardHeader className='space-y-1'>
@@ -28,63 +90,15 @@ export function ActivityTable({ items }: ActivityTableProps) {
       </CardHeader>
       <CardContent className='px-0 pt-0'>
         <div className='overflow-x-auto'>
-          <table className='w-full border-collapse text-sm'>
-            <thead className='text-left text-secondary-token'>
-              <tr className='border-b border-subtle text-xs uppercase tracking-wide text-tertiary-token'>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3'>
-                  User
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3'>
-                  Action
-                </th>
-                <th className='sticky top-0 z-10 hidden bg-surface-1/80 px-4 py-3 md:table-cell'>
-                  Timestamp
-                </th>
-                <th className='sticky top-0 z-10 bg-surface-1/80 px-4 py-3 text-right'>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className='px-4 py-10 text-center text-sm text-secondary-token'
-                  >
-                    No recent activity found.
-                  </td>
-                </tr>
-              ) : (
-                items.map(item => (
-                  <tr
-                    key={item.id}
-                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2/60 transition-colors'
-                  >
-                    <td className='px-4 py-3 font-medium text-primary-token whitespace-nowrap'>
-                      {item.user}
-                    </td>
-                    <td className='px-4 py-3 text-secondary-token'>
-                      <span className='block truncate'>{item.action}</span>
-                      <span className='mt-0.5 block text-xs text-tertiary-token md:hidden'>
-                        {item.timestamp}
-                      </span>
-                    </td>
-                    <td className='hidden px-4 py-3 text-secondary-token md:table-cell whitespace-nowrap'>
-                      {item.timestamp}
-                    </td>
-                    <td className='px-4 py-3 text-right whitespace-nowrap'>
-                      <Badge variant={statusVariant[item.status]} size='sm'>
-                        {item.status === 'success' && 'Success'}
-                        {item.status === 'warning' && 'Needs review'}
-                        {item.status === 'error' && 'Error'}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <Table
+            data={items}
+            columns={columns}
+            getRowId={item => item.id}
+            virtualizationThreshold={50}
+            rowHeight={60}
+            caption='Recent activity in the last 7 days'
+            className='border-0'
+          />
         </div>
       </CardContent>
     </Card>

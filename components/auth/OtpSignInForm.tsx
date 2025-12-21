@@ -7,6 +7,7 @@ import { Card, CardContent } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AuthBackButton,
   AuthButton,
   AuthGoogleIcon,
   AuthInput,
@@ -25,7 +26,6 @@ const FOOTER_LINK_CLASSES =
 
 const submitButtonClassName = authButtonVariants({ variant: 'primary' });
 const secondaryButtonClassName = authButtonVariants({ variant: 'secondary' });
-const linkButtonClassName = authButtonVariants({ variant: 'link' });
 
 type AuthMethod = 'email' | 'google' | 'spotify';
 
@@ -59,7 +59,6 @@ export function OtpSignInForm() {
   const clerk = useClerk();
   const [isEmailOpen, setIsEmailOpen] = useState(false);
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
-  const [otpCode, setOtpCode] = useState('');
   const [userEmail, setUserEmail] = useState<string>('');
   const emailFocusAttemptRef = useRef(0);
 
@@ -241,8 +240,8 @@ export function OtpSignInForm() {
           </div>
           <SignIn.Step name='start' aria-label='Choose a sign-in method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              <h1 className='text-[18px] leading-6 font-medium text-white/70 mb-0 text-center'>
-                {isEmailOpen ? "What's your email?" : 'Log in to Jovie'}
+              <h1 className='text-[20px] leading-6 font-medium text-primary-token mb-0 text-center'>
+                {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
               </h1>
 
               {isEmailOpen ? (
@@ -257,6 +256,10 @@ export function OtpSignInForm() {
                     />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
+
+                  <p className='text-[15px] leading-relaxed text-secondary-token text-center'>
+                    We&apos;ll email a 6-digit code to keep your account secure.
+                  </p>
 
                   <Clerk.Loading>
                     {isLoading => (
@@ -279,17 +282,10 @@ export function OtpSignInForm() {
                     )}
                   </Clerk.Loading>
 
-                  <p className='text-sm text-[#6b6f76] text-center'>
-                    We&apos;ll email a 6-digit code to keep your account secure.
-                  </p>
-
-                  <AuthButton
-                    variant='link'
-                    className='text-center'
+                  <AuthBackButton
                     onClick={() => setIsEmailOpen(false)}
-                  >
-                    ← Back to sign-in
-                  </AuthButton>
+                    ariaLabel='Back to sign-in'
+                  />
                 </div>
               ) : (
                 <div className='pt-6 space-y-3'>
@@ -334,7 +330,7 @@ export function OtpSignInForm() {
           >
             <SignIn.Strategy name='email_code'>
               <div className={STEP_TRANSITION_CLASSES}>
-                <h1 className='text-lg font-medium text-white/70 mb-0 text-center'>
+                <h1 className='text-[20px] leading-6 font-medium text-primary-token mb-0 text-center'>
                   Check your email
                 </h1>
 
@@ -349,6 +345,7 @@ export function OtpSignInForm() {
                       <span className='text-primary-token'>{userEmail}</span>.
                     </>
                   )}
+                  {!userEmail && <>Codes expire after 10 minutes.</>}
                 </p>
 
                 <div className='space-y-4'>
@@ -401,12 +398,23 @@ export function OtpSignInForm() {
                     )}
                   </Clerk.Loading>
 
-                  <SignIn.Action
-                    navigate='start'
-                    className={`${linkButtonClassName} text-center`}
-                  >
-                    ← Use a different email
-                  </SignIn.Action>
+                  <div className='relative'>
+                    <SignIn.Action
+                      navigate='start'
+                      className='sr-only'
+                      id='signin-navigate-start'
+                    >
+                      Use a different email
+                    </SignIn.Action>
+                    <AuthBackButton
+                      onClick={() => {
+                        document
+                          .getElementById('signin-navigate-start')
+                          ?.click();
+                      }}
+                      ariaLabel='Use a different email'
+                    />
+                  </div>
                 </div>
               </div>
             </SignIn.Strategy>
