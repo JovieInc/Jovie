@@ -187,12 +187,12 @@ describe('OtpSignUpForm', () => {
     expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Verify Code" button in verifications step', () => {
+  it('displays "Continue with email" button in verifications step', () => {
     renderSignUp();
 
     const buttons = screen.getAllByTestId('signup-action');
     expect(
-      buttons.some(button => button.textContent?.includes('Verify Code'))
+      buttons.some(button => button.textContent?.includes('Continue with email'))
     ).toBe(true);
   });
 
