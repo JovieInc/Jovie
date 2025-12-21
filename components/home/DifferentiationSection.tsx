@@ -6,7 +6,7 @@ export function DifferentiationSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center mb-12'>
           <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
-            Not another list of links.
+            Not another link list
           </h2>
         </div>
 
@@ -27,13 +27,13 @@ export function DifferentiationSection() {
           {/* Right Column - This platform */}
           <div className='space-y-4'>
             <h3 className='text-xl font-medium text-primary-token mb-6'>
-              This platform
+              Jovie
             </h3>
             <ul className='space-y-3 text-base text-secondary-token'>
               <li>One guided action</li>
               <li>Adapts per fan</li>
               <li>Improves automatically</li>
-              <li>Own your fan list</li>
+              <li>You own your fan list</li>
             </ul>
           </div>
         </div>

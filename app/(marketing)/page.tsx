@@ -3,16 +3,13 @@ import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { InsightSection } from '@/components/home/InsightSection';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
-import { DifferentiationSection } from '@/components/home/DifferentiationSection';
-import { TrustSection } from '@/components/home/TrustSection';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { HomepageFooter } from '@/components/home/HomepageFooter';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} - AI-Powered Link-in-Bio for Artists`;
+  const title = `${APP_NAME} — The AI link-in-bio built for artists`;
   const description =
-    "An AI-powered link-in-bio that guides every fan to the action they're most likely to take — and gets better automatically.";
+    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.';
   const keywords = [
     'creator profile',
     'music artist',
@@ -107,7 +104,7 @@ export default function HomePage() {
             '@type': 'WebSite',
             name: APP_NAME,
             description:
-              "An AI-powered link-in-bio that guides every fan to the action they're most likely to take.",
+              'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.',
             url: APP_URL,
             potentialAction: {
               '@type': 'SearchAction',
@@ -148,17 +145,8 @@ export default function HomePage() {
         {/* 4. What You Get Section */}
         <WhatYouGetSection />
 
-        {/* 5. Differentiation Section */}
-        <DifferentiationSection />
-
-        {/* 6. Trust/Signaling Section */}
-        <TrustSection />
-
-        {/* 7. Final CTA Section */}
+        {/* 5. Final CTA Section */}
         <FinalCTASection />
-
-        {/* 8. Footer */}
-        <HomepageFooter />
       </div>
     </>
   );

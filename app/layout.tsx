@@ -16,9 +16,11 @@ import { logger } from '@/lib/utils/logger';
 // Configure Inter font
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['400', '500', '538', '600', '700'], // Add 538 for Linear's exact weight
   display: 'swap',
   variable: '--font-inter',
+  adjustFontFallback: true,
+  preload: true,
 });
 
 export const metadata: Metadata = {

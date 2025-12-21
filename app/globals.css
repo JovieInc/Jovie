@@ -29,8 +29,8 @@ body {
 }
 
 .dark body {
-  background: #0f0f12;
-  color: #fff;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary-token);
 }
 
 @layer base {
@@ -256,6 +256,131 @@ body {
   font-variation-settings: "opsz" 28;
   letter-spacing: -0.011em;
   line-height: 1.6;
+}
+
+@utility marketing-h1-linear {
+  font-size: clamp(2.5rem, 5vw + 1rem, 5rem); /* 40px → 80px */
+  font-weight: 538; /* Linear's exact weight */
+  letter-spacing: -0.0325em;
+  line-height: 1.1;
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  font-variation-settings: "opsz" 28; /* Optical sizing */
+  text-wrap: balance;
+}
+
+@utility marketing-h2-linear {
+  font-size: clamp(2rem, 3vw + 1rem, 3.5rem); /* 32px → 56px */
+  font-weight: 538;
+  letter-spacing: -0.028em;
+  line-height: 1.2;
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  font-variation-settings: "opsz" 28;
+  text-wrap: balance;
+}
+
+@utility marketing-lead-linear {
+  font-size: clamp(1rem, 1.5vw + 0.5rem, 1.25rem); /* 16px → 20px */
+  font-feature-settings:
+    "cv01",
+    "ss03",
+    "rlig" 1,
+    "calt" 1;
+  font-variation-settings: "opsz" 28;
+  letter-spacing: -0.011em;
+  line-height: 1.6;
+}
+
+@utility marketing-body {
+  @apply text-linear text-base sm:text-lg;
+}
+
+@utility marketing-card {
+  @apply relative p-6 rounded-2xl border border-subtle transition-colors;
+}
+
+@utility marketing-cta {
+  @apply relative inline-flex items-center justify-center rounded-md bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors;
+}
+
+@layer base {
+  .marketing-mono {
+    /* Linear's dark-8a equivalent */
+    --color-bg-base: #0a0a0f; /* Warmer off-black */
+    --color-bg-surface-0: #0f0f12;
+    --color-bg-surface-1: #141419;
+    --color-bg-surface-2: #18181f;
+    --color-bg-surface-3: #1e1e27;
+
+    /* Linear's text hierarchy */
+    --color-text-primary-token: #f4f4f5;
+    --color-text-secondary-token: #c6c6cc;
+    --color-text-tertiary-token: #9a9aa2;
+    --color-text-quaternary-token: #737378;
+
+    /* Subtle borders */
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-border-default: rgba(255, 255, 255, 0.1);
+    --color-border-strong: rgba(255, 255, 255, 0.18);
+
+    /* Buttons */
+    --color-btn-primary-bg: #ffffff;
+    --color-btn-primary-fg: #0a0a0f;
+  }
+}
+
+/* Linear Button Utilities */
+@utility btn-linear-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.5rem; /* 40px */
+  padding: 0 1.5rem;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.011em;
+  background-color: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+  border: 1px solid var(--color-border-subtle);
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  &:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+  }
+}
+
+/* Linear Spacing System */
+@utility section-spacing-linear {
+  padding-top: 4rem; /* 64px */
+  padding-bottom: 4rem;
+
+  @media (min-width: 640px) {
+    padding-top: 5rem; /* 80px */
+    padding-bottom: 5rem;
+  }
+
+  @media (min-width: 1024px) {
+    padding-top: 6rem; /* 96px */
+    padding-bottom: 6rem;
+  }
+}
+
+@utility section-gap-linear {
+  gap: 2rem; /* 32px Linear rhythm */
+}
+
+@utility text-quaternary-token {
+  color: var(--color-text-quaternary-token);
 }
 
 @utility text-destructive {

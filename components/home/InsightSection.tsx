@@ -2,28 +2,18 @@ import { Container } from '@/components/site/Container';
 
 export function InsightSection() {
   return (
-    <section className='py-16 sm:py-20 lg:py-24 bg-base border-t border-subtle'>
+    <section className='pt-12 pb-20 sm:pt-14 sm:pb-24 lg:pt-16 lg:pb-28 bg-base border-t border-subtle'>
       <Container size='homepage'>
-        <div className='max-w-3xl mx-auto text-center space-y-6'>
-          <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
-            Fans don't want options. They want direction.
+        <div className='max-w-3xl mx-auto text-center'>
+          <h2 className='marketing-h2 text-primary-token mb-8'>
+            One action. The right one.
           </h2>
 
-          <div className='space-y-4 text-base sm:text-lg text-secondary-token leading-relaxed'>
-            <p>
-              Instead of showing every link at once, this page shows one clear
-              action — based on the fan and the moment.
-            </p>
-
-            <p>New fans are guided to subscribe.</p>
-
-            <p>Returning fans are guided to listen.</p>
-
-            <p>
-              Every interaction feeds the system so the page continuously
-              optimizes itself.
-            </p>
-          </div>
+          <p className='marketing-lead text-secondary-token max-w-2xl mx-auto'>
+            Jovie shows each fan the single best next step—subscribe, listen, or
+            tip—based on who they are and how they got here. Every click teaches
+            the page to convert better.
+          </p>
         </div>
       </Container>
     </section>

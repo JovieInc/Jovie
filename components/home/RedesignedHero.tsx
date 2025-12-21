@@ -1,43 +1,52 @@
-import Link from 'next/link';
+'use client';
+
 import { Container } from '@/components/site/Container';
-import { ProductScreenshotPlaceholder } from './ProductScreenshotPlaceholder';
+import { LinearButton } from '@/components/atoms/LinearButton';
+import { ArrowRight } from 'lucide-react';
 
 export function RedesignedHero() {
   return (
-    <section className='relative py-16 sm:py-20 lg:py-24 bg-base'>
-      <Container size='homepage' className='relative'>
-        <div className='grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center'>
-          {/* Left: Copy + CTA */}
-          <div className='order-2 lg:order-1'>
-            <h1 className='text-4xl sm:text-5xl lg:text-6xl font-medium tracking-tight text-primary-token leading-tight'>
-              Stop sending fans to a page of links.
+    <section className='relative min-h-[85vh] flex items-center justify-center overflow-hidden'>
+      {/* Background with subtle vignette */}
+      <div className='absolute inset-0 bg-base'>
+        <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_100%)]' />
+      </div>
+
+      <Container size='homepage' className='relative z-10'>
+        <div className='max-w-4xl mx-auto'>
+          <div className='max-w-2xl text-left space-y-8'>
+            {/* H1 - Linear Typography */}
+            <h1 className='marketing-h1-linear text-primary-token'>
+              Turn fans into subscribers.
             </h1>
 
-            <p className='mt-6 text-lg sm:text-xl text-secondary-token leading-relaxed max-w-xl'>
-              An AI-powered link-in-bio that guides every fan to the action
-              they're most likely to take — and gets better automatically.
+            {/* Lead - Secondary color hierarchy */}
+            <p className='marketing-lead-linear text-secondary-token'>
+              Replace your link stack with an AI-driven profile that converts
+              more fans and improves automatically.
             </p>
 
-            <div className='mt-8 flex flex-col gap-4'>
-              <Link
-                href='/waitlist'
-                className='inline-flex items-center justify-center h-12 px-6 rounded-lg bg-btn-primary text-btn-primary-foreground text-base font-medium hover:opacity-90 transition-opacity focus-ring-themed'
-              >
-                Request Early Access
-              </Link>
-
-              <p className='text-sm text-secondary-token'>
-                Built for artists. Private waitlist.
-              </p>
+            {/* CTAs - Linear button treatment */}
+            <div className='flex flex-col sm:flex-row items-start gap-3'>
+              <LinearButton variant='primary' href='/waitlist'>
+                Request early access
+                <ArrowRight className='h-4 w-4 ml-1' />
+              </LinearButton>
+              <LinearButton variant='secondary' href='#how-it-works'>
+                See how it works ↓
+              </LinearButton>
             </div>
-          </div>
 
-          {/* Right: Product visual */}
-          <div className='order-1 lg:order-2'>
-            <ProductScreenshotPlaceholder />
+            {/* Supporting text - Tertiary */}
+            <p className='text-sm text-tertiary-token'>
+              Limited access. Zero setup.
+            </p>
           </div>
         </div>
       </Container>
+
+      {/* Bottom border - Linear style */}
+      <div className='absolute bottom-0 left-0 right-0 h-px bg-border-subtle' />
     </section>
   );
 }

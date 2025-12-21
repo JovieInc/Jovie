@@ -10,8 +10,9 @@ export function TrustSection() {
           </div>
 
           <p className='text-base sm:text-lg text-secondary-token leading-relaxed'>
-            Built alongside working artists during private alpha. Access is
-            limited while we onboard manually to ensure quality.
+            We&apos;re onboarding artists manually to make sure it works before
+            we scale. Releasing music in the next 60 days? You&apos;ll get
+            priority.
           </p>
         </div>
       </Container>

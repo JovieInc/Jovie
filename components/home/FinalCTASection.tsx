@@ -1,25 +1,35 @@
-import Link from 'next/link';
 import { Container } from '@/components/site/Container';
+import { LinearButton } from '@/components/atoms/LinearButton';
+import { Spacer } from '@/components/atoms/Spacer';
+import { ArrowRight } from 'lucide-react';
 
 export function FinalCTASection() {
   return (
-    <section className='py-16 sm:py-20 lg:py-24 bg-base'>
+    <section className='section-spacing-linear bg-base relative overflow-hidden'>
       <Container size='homepage'>
-        <div className='max-w-2xl mx-auto text-center space-y-8'>
-          <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
-            Turn casual listeners into real fans.
+        <div className='max-w-3xl mx-auto text-center space-y-6'>
+          <h2 className='marketing-h2-linear text-primary-token'>
+            Stop sending fans to{' '}
+            <span className='text-transparent bg-clip-text bg-linear-to-r from-primary-token to-tertiary-token'>
+              a stack of links
+            </span>
           </h2>
 
-          <div className='flex flex-col items-center gap-4'>
-            <Link
-              href='/waitlist'
-              className='inline-flex items-center justify-center h-12 px-6 rounded-lg bg-btn-primary text-btn-primary-foreground text-base font-medium hover:opacity-90 transition-opacity focus-ring-themed'
-            >
-              Request Early Access
-            </Link>
+          <p className='marketing-lead-linear text-secondary-token'>
+            Give every visit a purpose: subscribe first, listen next.
+          </p>
 
-            <p className='text-sm text-secondary-token'>Waitlist only.</p>
-          </div>
+          <Spacer size='sm' />
+
+          <LinearButton variant='primary' href='/waitlist'>
+            Request early access
+            <ArrowRight className='h-4 w-4 ml-1' />
+          </LinearButton>
+
+          {/* Zero setup emphasis */}
+          <p className='text-sm text-tertiary-token'>
+            Zero setup. Start instantly.
+          </p>
         </div>
       </Container>
     </section>
