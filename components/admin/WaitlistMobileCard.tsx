@@ -7,9 +7,9 @@ import {
   ChevronUp,
   ExternalLink,
   Mail,
+  MessageSquare,
   Music,
   Target,
-  MessageSquare,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
