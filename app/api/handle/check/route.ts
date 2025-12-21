@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
+import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 const NO_STORE_HEADERS = {
@@ -16,22 +16,38 @@ const NO_STORE_HEADERS = {
 /**
  * Handle Availability Check API
  *
- * Rate Limiting Status: NOT IMPLEMENTED
- * Following YC principle: "do things that don't scale until you have to"
- * Will add rate limiting when:
- * - Handle checks exceed ~100k/day
- * - Enumeration abuse becomes measurable problem
+ * Security Measures Implemented:
+ * 1. Rate limiting: 30 checks per IP per minute (Redis-backed with in-memory fallback)
+ * 2. Constant-time responses: All responses padded to ~100ms to prevent timing attacks
+ * 3. Random delay injection: ±10ms jitter to prevent statistical analysis
  *
- * Known Security Issue: Username Enumeration
- * This endpoint allows checking if a handle exists, which could enable enumeration attacks.
- * Mitigation strategies for future:
- * - Add rate limiting (per IP and per session)
- * - Add small random delay to responses
- * - Return same response time for available/unavailable
- * - Implement CAPTCHA after N failed checks
- *
- * For now: Basic input validation prevents most abuse. Monitor PostHog events for patterns.
+ * This prevents:
+ * - Username enumeration attacks
+ * - Timing-based username discovery
+ * - Brute-force handle checking
  */
+
+// Target response time in ms (with ±10ms jitter)
+const TARGET_RESPONSE_TIME_MS = 100;
+const RESPONSE_JITTER_MS = 10;
+
+/**
+ * Calculate delay needed to reach constant response time.
+ * Adds random jitter to prevent statistical analysis.
+ */
+function calculateConstantTimeDelay(startTime: number): number {
+  const elapsed = Date.now() - startTime;
+  const jitter = Math.random() * RESPONSE_JITTER_MS * 2 - RESPONSE_JITTER_MS;
+  const targetTime = TARGET_RESPONSE_TIME_MS + jitter;
+  return Math.max(0, targetTime - elapsed);
+}
+
+/**
+ * Sleep for the specified number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // In-memory cache for mock responses to reduce server load during testing
 // Cache expires after 10 seconds to balance performance with realistic behavior
@@ -99,51 +115,62 @@ function createMockResponse(handle: string) {
   });
 }
 export async function GET(request: Request) {
+  const startTime = Date.now();
   const { searchParams } = new URL(request.url);
   const handle = searchParams.get('handle');
 
+  // Helper to return response with constant timing
+  const respondWithConstantTime = async (
+    body: object,
+    options?: { status?: number }
+  ) => {
+    const delay = calculateConstantTimeDelay(startTime);
+    if (delay > 0) {
+      await sleep(delay);
+    }
+    return NextResponse.json(body, {
+      status: options?.status ?? 200,
+      headers: NO_STORE_HEADERS,
+    });
+  };
+
   if (!handle) {
-    return NextResponse.json(
+    return respondWithConstantTime(
       { available: false, error: 'Handle is required' },
-      { status: 400, headers: NO_STORE_HEADERS }
+      { status: 400 }
     );
   }
 
   // Validate handle format
   if (handle.length < 3) {
-    return NextResponse.json(
+    return respondWithConstantTime(
       { available: false, error: 'Handle must be at least 3 characters' },
-      { status: 400, headers: NO_STORE_HEADERS }
+      { status: 400 }
     );
   }
 
   if (handle.length > 30) {
-    return NextResponse.json(
+    return respondWithConstantTime(
       { available: false, error: 'Handle must be less than 30 characters' },
-      { status: 400, headers: NO_STORE_HEADERS }
+      { status: 400 }
     );
   }
 
   if (!/^[a-zA-Z0-9-]+$/.test(handle)) {
-    return NextResponse.json(
+    return respondWithConstantTime(
       {
         available: false,
         error: 'Handle can only contain letters, numbers, and hyphens',
       },
-      { status: 400, headers: NO_STORE_HEADERS }
+      { status: 400 }
     );
   }
 
   try {
-    // Lightweight rate limit to reduce enumeration; uses same buckets as onboarding
+    // Rate limit check using Redis-backed limiter
     const headersList = await headers();
     const ip = extractClientIP(headersList);
-    // We don't have a Clerk userId here; namespace per-IP to avoid a global shared bucket
-    await enforceOnboardingRateLimit({
-      userId: `handle-check:${ip}`,
-      ip,
-      checkIP: true,
-    });
+    await enforceHandleCheckRateLimit(ip);
 
     const handleLower = handle.toLowerCase();
 
@@ -161,17 +188,25 @@ export async function GET(request: Request) {
       timeoutPromise,
     ]);
 
-    return NextResponse.json(
-      { available: !data || data.length === 0 },
-      {
-        headers: NO_STORE_HEADERS,
-      }
-    );
+    // SECURITY: Return with constant timing to prevent timing attacks
+    // An attacker cannot determine if a handle exists based on response time
+    return respondWithConstantTime({ available: !data || data.length === 0 });
   } catch (error: unknown) {
     await captureError('Error checking handle availability', error, {
       handle,
       route: '/api/handle/check',
     });
+
+    // Handle rate limiting - still use constant time
+    if (
+      error instanceof Error &&
+      error.message.includes('RATE_LIMITED')
+    ) {
+      return respondWithConstantTime(
+        { available: false, error: 'Too many requests. Please wait.' },
+        { status: 429 }
+      );
+    }
 
     // Handle timeout and provide mock response
     if (
@@ -184,12 +219,17 @@ export async function GET(request: Request) {
         { handle }
       );
 
+      // Still maintain constant timing even for mock responses
+      const delay = calculateConstantTimeDelay(startTime);
+      if (delay > 0) {
+        await sleep(delay);
+      }
       return createMockResponse(handle.toLowerCase());
     }
 
-    return NextResponse.json(
+    return respondWithConstantTime(
       { available: false, error: 'Database connection failed' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500 }
     );
   }
 }

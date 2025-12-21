@@ -274,6 +274,11 @@ export const creatorProfiles = pgTable(
       .where(
         drizzleSql`is_public = true AND is_featured = true AND marketing_opt_out = false`
       ),
+    // CRITICAL: Unique constraint on normalized username to prevent race conditions
+    // during onboarding where two users could claim the same handle simultaneously
+    usernameNormalizedUnique: uniqueIndex('creator_profiles_username_normalized_unique')
+      .on(table.usernameNormalized)
+      .where(drizzleSql`username_normalized IS NOT NULL`),
   })
 );
 
