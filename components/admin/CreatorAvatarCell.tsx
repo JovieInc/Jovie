@@ -16,6 +16,7 @@ export interface CreatorAvatarCellProps {
   avatarUrl: string | null;
   verified?: boolean;
   isFeatured?: boolean;
+  size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 export function CreatorAvatarCell({
@@ -24,6 +25,7 @@ export function CreatorAvatarCell({
   avatarUrl,
   verified = false,
   isFeatured = false,
+  size = 'sm',
 }: CreatorAvatarCellProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(
     avatarUrl ?? null
@@ -79,7 +81,7 @@ export function CreatorAvatarCell({
           src={previewUrl}
           alt={`Avatar for @${username}`}
           name={username}
-          size='sm'
+          size={size}
           uploadable
           onUpload={handleUpload}
           onError={message => {

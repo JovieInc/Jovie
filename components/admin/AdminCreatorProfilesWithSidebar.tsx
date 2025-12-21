@@ -9,8 +9,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   Input,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
 } from '@jovie/ui';
-import { Check, Star } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Star } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -18,6 +23,7 @@ import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
+import { CreatorMobileCard } from '@/components/admin/CreatorMobileCard';
 import {
   getNextSort,
   getSortDirection,
@@ -406,436 +412,636 @@ export function AdminCreatorProfilesWithSidebar({
     effectiveContact,
   ]);
 
+  // Mobile-specific handler for opening the sheet
+  const handleMobileCardClick = useCallback((id: string) => {
+    setSelectedId(id);
+    setSidebarOpen(true);
+    setDraftContact(null);
+  }, []);
+
   return (
     <div className='flex h-full min-h-0 flex-col md:flex-row md:items-stretch'>
       <div className='flex-1 min-h-0 overflow-hidden'>
-        <AdminTableShell
-          scrollContainerProps={{
-            tabIndex: 0,
-            onKeyDown: handleKeyDown,
-          }}
-          toolbar={
-            <div className='flex h-14 w-full items-center gap-3 px-4'>
-              <div className='hidden sm:block text-xs text-secondary-token'>
-                Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                {total.toLocaleString()} profiles
-              </div>
-              <div className='ml-auto flex items-center gap-3'>
-                <form
-                  action={basePath}
-                  method='get'
-                  className='relative isolate flex items-center gap-2'
-                >
-                  <input type='hidden' name='sort' value={sort} />
-                  <input type='hidden' name='pageSize' value={pageSize} />
-                  <Input
-                    name='q'
-                    placeholder='Search by handle'
-                    value={searchTerm}
-                    onChange={event => setSearchTerm(event.target.value)}
-                    className='w-[240px]'
-                  />
-                  <input type='hidden' name='page' value='1' />
-                  <Button type='submit' size='sm' variant='secondary'>
-                    Search
-                  </Button>
-                  {search && search.length > 0 && (
-                    <Button asChild size='sm' variant='ghost'>
-                      <Link href={clearHref}>Clear</Link>
+        {/* Mobile Toolbar */}
+        <div className='md:hidden flex flex-col gap-3 p-3 bg-surface-0 border-b border-subtle'>
+          <div className='flex items-center justify-between'>
+            <div className='text-xs text-secondary-token'>
+              {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+              {total.toLocaleString()}
+            </div>
+            <IngestProfileDropdown />
+          </div>
+          <form
+            action={basePath}
+            method='get'
+            className='flex items-center gap-2'
+          >
+            <input type='hidden' name='sort' value={sort} />
+            <input type='hidden' name='pageSize' value={pageSize} />
+            <Input
+              name='q'
+              placeholder='Search by handle'
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              className='flex-1'
+            />
+            <input type='hidden' name='page' value='1' />
+            <Button type='submit' size='sm' variant='secondary'>
+              Search
+            </Button>
+            {search && search.length > 0 && (
+              <Button asChild size='sm' variant='ghost'>
+                <Link href={clearHref}>Clear</Link>
+              </Button>
+            )}
+          </form>
+        </div>
+
+        {/* Mobile Card List */}
+        <div className='md:hidden flex-1 overflow-auto p-3 space-y-3'>
+          {profilesWithActions.length === 0 ? (
+            <div className='text-center py-12 text-secondary-token'>
+              No creator profiles found.
+            </div>
+          ) : (
+            profilesWithActions.map(profile => (
+              <CreatorMobileCard
+                key={profile.id}
+                profile={profile}
+                isSelected={profile.id === selectedId}
+                verificationStatus={verificationStatuses[profile.id] ?? 'idle'}
+                ingestRefreshStatus={
+                  ingestRefreshStatuses[profile.id] ?? 'idle'
+                }
+                menuOpen={openMenuProfileId === profile.id}
+                onMenuOpenChange={open =>
+                  setOpenMenuProfileId(open ? profile.id : null)
+                }
+                onCardClick={() => handleMobileCardClick(profile.id)}
+                onRefreshIngest={() => refreshIngest(profile.id)}
+                onToggleVerification={async () => {
+                  const result = await toggleVerification(
+                    profile.id,
+                    !profile.isVerified
+                  );
+                  if (!result.success) {
+                    console.error(
+                      'Failed to toggle verification',
+                      result.error
+                    );
+                  }
+                }}
+                onToggleFeatured={async () => {
+                  const result = await toggleFeatured(
+                    profile.id,
+                    !profile.isFeatured
+                  );
+                  if (!result.success) {
+                    console.error('Failed to toggle featured', result.error);
+                  }
+                }}
+                onToggleMarketing={async () => {
+                  const result = await toggleMarketing(
+                    profile.id,
+                    !profile.marketingOptOut
+                  );
+                  if (!result.success) {
+                    console.error('Failed to toggle marketing', result.error);
+                  }
+                }}
+                onDelete={() => {
+                  setProfileToDelete(profile);
+                  setDeleteDialogOpen(true);
+                }}
+              />
+            ))
+          )}
+        </div>
+
+        {/* Mobile Pagination Footer */}
+        <div className='md:hidden flex items-center justify-between gap-2 px-3 py-2.5 text-xs text-secondary-token bg-surface-0 border-t border-subtle'>
+          <div className='flex items-center gap-1'>
+            <span className='font-medium text-primary-token'>{page}</span>
+            <span> / {totalPages}</span>
+          </div>
+          <div className='flex items-center gap-1'>
+            <Button
+              asChild
+              size='sm'
+              variant='ghost'
+              disabled={!canPrev}
+              className='h-9 w-9 p-0'
+            >
+              <Link
+                href={prevHref ?? '#'}
+                aria-disabled={!canPrev}
+                aria-label='Previous page'
+              >
+                <ChevronLeft className='h-4 w-4' />
+              </Link>
+            </Button>
+            <Button
+              asChild
+              size='sm'
+              variant='ghost'
+              disabled={!canNext}
+              className='h-9 w-9 p-0'
+            >
+              <Link
+                href={nextHref ?? '#'}
+                aria-disabled={!canNext}
+                aria-label='Next page'
+              >
+                <ChevronRight className='h-4 w-4' />
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop Table */}
+        <div className='hidden md:block h-full'>
+          <AdminTableShell
+            scrollContainerProps={{
+              tabIndex: 0,
+              onKeyDown: handleKeyDown,
+            }}
+            toolbar={
+              <div className='flex h-14 w-full items-center gap-3 px-4'>
+                <div className='hidden sm:block text-xs text-secondary-token'>
+                  Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                  {total.toLocaleString()} profiles
+                </div>
+                <div className='ml-auto flex items-center gap-3'>
+                  <form
+                    action={basePath}
+                    method='get'
+                    className='relative isolate flex items-center gap-2'
+                  >
+                    <input type='hidden' name='sort' value={sort} />
+                    <input type='hidden' name='pageSize' value={pageSize} />
+                    <Input
+                      name='q'
+                      placeholder='Search by handle'
+                      value={searchTerm}
+                      onChange={event => setSearchTerm(event.target.value)}
+                      className='w-[240px]'
+                    />
+                    <input type='hidden' name='page' value='1' />
+                    <Button type='submit' size='sm' variant='secondary'>
+                      Search
                     </Button>
-                  )}
-                </form>
-                <div
-                  className='hidden h-6 w-px bg-border sm:block'
-                  aria-hidden='true'
-                />
-                <IngestProfileDropdown />
-              </div>
-            </div>
-          }
-          footer={
-            <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
-              <div className='flex items-center gap-2'>
-                <span>
-                  Page {page} of {totalPages}
-                </span>
-                <span className='text-tertiary-token'>
-                  {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-                  {total.toLocaleString()}
-                </span>
-              </div>
-              <div className='flex items-center gap-3'>
-                <div className='flex items-center gap-2'>
-                  <span>Rows per page</span>
-                  <AdminCreatorFilters initialPageSize={pageSize} />
-                </div>
-                <div className='flex items-center gap-2'>
-                  <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-                    <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-                      Previous
-                    </Link>
-                  </Button>
-                  <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-                    <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-                      Next
-                    </Link>
-                  </Button>
+                    {search && search.length > 0 && (
+                      <Button asChild size='sm' variant='ghost'>
+                        <Link href={clearHref}>Clear</Link>
+                      </Button>
+                    )}
+                  </form>
+                  <div
+                    className='hidden h-6 w-px bg-border sm:block'
+                    aria-hidden='true'
+                  />
+                  <IngestProfileDropdown />
                 </div>
               </div>
-            </div>
-          }
-        >
-          {({ headerElevated, stickyTopPx }) => (
-            <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
-              <colgroup>
-                <col className='w-14' />
-                <col className='w-[320px]' />
-                <col className='w-[160px]' />
-                <col className='w-[160px]' />
-                <col className='w-[160px]' />
-                <col className='w-[140px]' />
-              </colgroup>
-              <thead className='text-left text-secondary-token'>
-                <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                  <th
-                    className={cn(
-                      'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <Checkbox
-                      aria-label='Select all creators'
-                      checked={headerCheckboxState}
-                      onCheckedChange={toggleSelectAll}
-                      className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <span className='sr-only'>Creator</span>
-                    <div
+            }
+            footer={
+              <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
+                <div className='flex items-center gap-2'>
+                  <span>
+                    Page {page} of {totalPages}
+                  </span>
+                  <span className='text-tertiary-token'>
+                    {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()}
+                  </span>
+                </div>
+                <div className='flex items-center gap-3'>
+                  <div className='flex items-center gap-2'>
+                    <span>Rows per page</span>
+                    <AdminCreatorFilters initialPageSize={pageSize} />
+                  </div>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      asChild
+                      size='sm'
+                      variant='ghost'
+                      disabled={!canPrev}
+                    >
+                      <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+                        Previous
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      size='sm'
+                      variant='ghost'
+                      disabled={!canNext}
+                    >
+                      <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+                        Next
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            }
+          >
+            {({ headerElevated, stickyTopPx }) => (
+              <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
+                <colgroup>
+                  <col className='w-14' />
+                  <col className='w-[320px]' />
+                  <col className='w-[160px]' />
+                  <col className='w-[160px]' />
+                  <col className='w-[160px]' />
+                  <col className='w-[140px]' />
+                </colgroup>
+                <thead className='text-left text-secondary-token'>
+                  <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
+                    <th
                       className={cn(
-                        'inline-flex items-center transition-all duration-150',
-                        selectedCount > 0
-                          ? 'opacity-100 translate-y-0'
-                          : 'pointer-events-none opacity-0 -translate-y-0.5'
+                        'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
                       )}
+                      style={{ top: stickyTopPx }}
                     >
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant='secondary'
-                            size='sm'
-                            className='normal-case'
-                          >
-                            Bulk actions
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align='start'>
-                          <DropdownMenuItem disabled>
-                            Feature selected (coming soon)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled>
-                            Unverify selected (coming soon)
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            disabled
-                            className='text-destructive'
-                          >
-                            Delete selected (coming soon)
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.created.label}
-                      direction={getSortDirection(sort, 'created')}
-                      onClick={() => router.push(createSortHref('created'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.claimed.label}
-                      direction={getSortDirection(sort, 'claimed')}
-                      onClick={() => router.push(createSortHref('claimed'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <SortableHeaderButton
-                      label={SORTABLE_COLUMNS.verified.label}
-                      direction={getSortDirection(sort, 'verified')}
-                      onClick={() => router.push(createSortHref('verified'))}
-                    />
-                  </th>
-                  <th
-                    className={cn(
-                      'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
-                      headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
-                    )}
-                    style={{ top: stickyTopPx }}
-                  >
-                    <span className='sr-only'>Action</span>
-                    <div className='flex items-center justify-end' />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {profilesWithActions.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      className='px-4 py-10 text-center text-sm text-secondary-token'
+                      <Checkbox
+                        aria-label='Select all creators'
+                        checked={headerCheckboxState}
+                        onCheckedChange={toggleSelectAll}
+                        className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+                      />
+                    </th>
+                    <th
+                      className={cn(
+                        'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      )}
+                      style={{ top: stickyTopPx }}
                     >
-                      No creator profiles found.
-                    </td>
-                  </tr>
-                ) : (
-                  profilesWithActions.map((profile, index) => {
-                    const isSelected = profile.id === selectedId;
-                    const isChecked = selectedIds.has(profile.id);
-                    const rowNumber = (page - 1) * pageSize + index + 1;
-                    const displayName =
-                      'displayName' in profile
-                        ? (profile.displayName ?? null)
-                        : null;
-                    return (
-                      <tr
-                        key={profile.id}
+                      <span className='sr-only'>Creator</span>
+                      <div
                         className={cn(
-                          'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
-                          isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
+                          'inline-flex items-center transition-all duration-150',
+                          selectedCount > 0
+                            ? 'opacity-100 translate-y-0'
+                            : 'pointer-events-none opacity-0 -translate-y-0.5'
                         )}
-                        onClick={() => handleRowClick(profile.id)}
-                        onContextMenu={event => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setOpenMenuProfileId(profile.id);
-                        }}
-                        aria-selected={isSelected}
                       >
-                        <td className='w-14 px-4 py-3 align-middle'>
-                          <div
-                            className='relative flex h-7 w-7 items-center justify-center'
-                            onClick={event => event.stopPropagation()}
-                          >
-                            <span
-                              className={cn(
-                                'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
-                                isChecked
-                                  ? 'opacity-0'
-                                  : 'opacity-100 group-hover:opacity-0'
-                              )}
-                              aria-hidden='true'
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant='secondary'
+                              size='sm'
+                              className='normal-case'
                             >
-                              {rowNumber}
-                            </span>
+                              Bulk actions
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align='start'>
+                            <DropdownMenuItem disabled>
+                              Feature selected (coming soon)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem disabled>
+                              Unverify selected (coming soon)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled
+                              className='text-destructive'
+                            >
+                              Delete selected (coming soon)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </th>
+                    <th
+                      className={cn(
+                        'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      )}
+                      style={{ top: stickyTopPx }}
+                    >
+                      <SortableHeaderButton
+                        label={SORTABLE_COLUMNS.created.label}
+                        direction={getSortDirection(sort, 'created')}
+                        onClick={() => router.push(createSortHref('created'))}
+                      />
+                    </th>
+                    <th
+                      className={cn(
+                        'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      )}
+                      style={{ top: stickyTopPx }}
+                    >
+                      <SortableHeaderButton
+                        label={SORTABLE_COLUMNS.claimed.label}
+                        direction={getSortDirection(sort, 'claimed')}
+                        onClick={() => router.push(createSortHref('claimed'))}
+                      />
+                    </th>
+                    <th
+                      className={cn(
+                        'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      )}
+                      style={{ top: stickyTopPx }}
+                    >
+                      <SortableHeaderButton
+                        label={SORTABLE_COLUMNS.verified.label}
+                        direction={getSortDirection(sort, 'verified')}
+                        onClick={() => router.push(createSortHref('verified'))}
+                      />
+                    </th>
+                    <th
+                      className={cn(
+                        'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
+                        headerElevated &&
+                          'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      )}
+                      style={{ top: stickyTopPx }}
+                    >
+                      <span className='sr-only'>Action</span>
+                      <div className='flex items-center justify-end' />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profilesWithActions.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        className='px-4 py-10 text-center text-sm text-secondary-token'
+                      >
+                        No creator profiles found.
+                      </td>
+                    </tr>
+                  ) : (
+                    profilesWithActions.map((profile, index) => {
+                      const isSelected = profile.id === selectedId;
+                      const isChecked = selectedIds.has(profile.id);
+                      const rowNumber = (page - 1) * pageSize + index + 1;
+                      const displayName =
+                        'displayName' in profile
+                          ? (profile.displayName ?? null)
+                          : null;
+                      return (
+                        <tr
+                          key={profile.id}
+                          className={cn(
+                            'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0',
+                            isSelected ? 'bg-surface-2' : 'hover:bg-surface-2'
+                          )}
+                          onClick={() => handleRowClick(profile.id)}
+                          onContextMenu={event => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setOpenMenuProfileId(profile.id);
+                          }}
+                          aria-selected={isSelected}
+                        >
+                          <td className='w-14 px-4 py-3 align-middle'>
+                            <div
+                              className='relative flex h-7 w-7 items-center justify-center'
+                              onClick={event => event.stopPropagation()}
+                            >
+                              <span
+                                className={cn(
+                                  'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
+                                  isChecked
+                                    ? 'opacity-0'
+                                    : 'opacity-100 group-hover:opacity-0'
+                                )}
+                                aria-hidden='true'
+                              >
+                                {rowNumber}
+                              </span>
+                              <div
+                                className={cn(
+                                  'absolute inset-0 transition-opacity',
+                                  isChecked
+                                    ? 'opacity-100'
+                                    : 'opacity-0 group-hover:opacity-100'
+                                )}
+                              >
+                                <Checkbox
+                                  aria-label={`Select ${profile.username}`}
+                                  checked={isChecked}
+                                  onCheckedChange={() =>
+                                    toggleSelect(profile.id)
+                                  }
+                                  className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+                                />
+                              </div>
+                            </div>
+                          </td>
+                          <td
+                            className={cn(
+                              'px-4 py-3 align-middle',
+                              isSelected && 'bg-surface-2'
+                            )}
+                          >
+                            <div className='flex items-center gap-3'>
+                              <CreatorAvatarCell
+                                profileId={profile.id}
+                                username={profile.username}
+                                avatarUrl={profile.avatarUrl}
+                                verified={profile.isVerified}
+                                isFeatured={profile.isFeatured}
+                              />
+                              <div className='min-w-0'>
+                                {displayName ? (
+                                  <div className='truncate font-medium text-primary-token'>
+                                    {displayName}
+                                  </div>
+                                ) : null}
+                                <Link
+                                  href={`/${profile.username}`}
+                                  className={cn(
+                                    'truncate text-secondary-token transition-colors hover:text-primary-token',
+                                    displayName
+                                      ? 'text-xs'
+                                      : 'font-medium text-primary-token'
+                                  )}
+                                  onClick={event => event.stopPropagation()}
+                                >
+                                  @{profile.username}
+                                </Link>
+                              </div>
+                            </div>
+                          </td>
+                          <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
+                            {profile.createdAt
+                              ? new Intl.DateTimeFormat('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                }).format(profile.createdAt)
+                              : '—'}
+                          </td>
+                          <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
+                            <Badge
+                              size='sm'
+                              variant={
+                                profile.isClaimed ? 'success' : 'secondary'
+                              }
+                            >
+                              {profile.isClaimed ? (
+                                <>
+                                  <Star
+                                    className='h-3 w-3 fill-current'
+                                    aria-hidden='true'
+                                  />
+                                  <span>Claimed</span>
+                                </>
+                              ) : (
+                                <span>Unclaimed</span>
+                              )}
+                            </Badge>
+                          </td>
+                          <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
+                            <Badge
+                              size='sm'
+                              variant={
+                                profile.isVerified ? 'primary' : 'secondary'
+                              }
+                            >
+                              {profile.isVerified ? (
+                                <>
+                                  <Check
+                                    className='h-3 w-3'
+                                    aria-hidden='true'
+                                  />
+                                  <span>Verified</span>
+                                </>
+                              ) : (
+                                <span>Not verified</span>
+                              )}
+                            </Badge>
+                          </td>
+                          <td
+                            className='px-4 py-3 align-middle text-right'
+                            onClick={e => e.stopPropagation()}
+                          >
                             <div
                               className={cn(
-                                'absolute inset-0 transition-opacity',
-                                isChecked
-                                  ? 'opacity-100'
-                                  : 'opacity-0 group-hover:opacity-100'
+                                'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
+                                openMenuProfileId === profile.id &&
+                                  'opacity-100 pointer-events-auto'
                               )}
                             >
-                              <Checkbox
-                                aria-label={`Select ${profile.username}`}
-                                checked={isChecked}
-                                onCheckedChange={() => toggleSelect(profile.id)}
-                                className='border-sidebar-border data-[state=checked]:bg-sidebar-accent data-[state=checked]:text-sidebar-accent-foreground'
+                              <CreatorActionsMenu
+                                profile={profile}
+                                isMobile={isMobile}
+                                status={
+                                  verificationStatuses[profile.id] ?? 'idle'
+                                }
+                                refreshIngestStatus={
+                                  ingestRefreshStatuses[profile.id] ?? 'idle'
+                                }
+                                open={openMenuProfileId === profile.id}
+                                onOpenChange={open =>
+                                  setOpenMenuProfileId(open ? profile.id : null)
+                                }
+                                onRefreshIngest={() =>
+                                  refreshIngest(profile.id)
+                                }
+                                onToggleVerification={async () => {
+                                  const result = await toggleVerification(
+                                    profile.id,
+                                    !profile.isVerified
+                                  );
+                                  if (!result.success) {
+                                    console.error(
+                                      'Failed to toggle verification',
+                                      result.error
+                                    );
+                                  }
+                                }}
+                                onToggleFeatured={async () => {
+                                  const result = await toggleFeatured(
+                                    profile.id,
+                                    !profile.isFeatured
+                                  );
+                                  if (!result.success) {
+                                    console.error(
+                                      'Failed to toggle featured',
+                                      result.error
+                                    );
+                                  }
+                                }}
+                                onToggleMarketing={async () => {
+                                  const result = await toggleMarketing(
+                                    profile.id,
+                                    !profile.marketingOptOut
+                                  );
+                                  if (!result.success) {
+                                    console.error(
+                                      'Failed to toggle marketing',
+                                      result.error
+                                    );
+                                  }
+                                }}
+                                onDelete={() => {
+                                  setProfileToDelete(profile);
+                                  setDeleteDialogOpen(true);
+                                }}
                               />
                             </div>
-                          </div>
-                        </td>
-                        <td
-                          className={cn(
-                            'px-4 py-3 align-middle',
-                            isSelected && 'bg-surface-2'
-                          )}
-                        >
-                          <div className='flex items-center gap-3'>
-                            <CreatorAvatarCell
-                              profileId={profile.id}
-                              username={profile.username}
-                              avatarUrl={profile.avatarUrl}
-                              verified={profile.isVerified}
-                              isFeatured={profile.isFeatured}
-                            />
-                            <div className='min-w-0'>
-                              {displayName ? (
-                                <div className='truncate font-medium text-primary-token'>
-                                  {displayName}
-                                </div>
-                              ) : null}
-                              <Link
-                                href={`/${profile.username}`}
-                                className={cn(
-                                  'truncate text-secondary-token transition-colors hover:text-primary-token',
-                                  displayName
-                                    ? 'text-xs'
-                                    : 'font-medium text-primary-token'
-                                )}
-                                onClick={event => event.stopPropagation()}
-                              >
-                                @{profile.username}
-                              </Link>
-                            </div>
-                          </div>
-                        </td>
-                        <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
-                          {profile.createdAt
-                            ? new Intl.DateTimeFormat('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              }).format(profile.createdAt)
-                            : '—'}
-                        </td>
-                        <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
-                          <Badge
-                            size='sm'
-                            variant={
-                              profile.isClaimed ? 'success' : 'secondary'
-                            }
-                          >
-                            {profile.isClaimed ? (
-                              <>
-                                <Star
-                                  className='h-3 w-3 fill-current'
-                                  aria-hidden='true'
-                                />
-                                <span>Claimed</span>
-                              </>
-                            ) : (
-                              <span>Unclaimed</span>
-                            )}
-                          </Badge>
-                        </td>
-                        <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
-                          <Badge
-                            size='sm'
-                            variant={
-                              profile.isVerified ? 'primary' : 'secondary'
-                            }
-                          >
-                            {profile.isVerified ? (
-                              <>
-                                <Check className='h-3 w-3' aria-hidden='true' />
-                                <span>Verified</span>
-                              </>
-                            ) : (
-                              <span>Not verified</span>
-                            )}
-                          </Badge>
-                        </td>
-                        <td
-                          className='px-4 py-3 align-middle text-right'
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <div
-                            className={cn(
-                              'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-                              openMenuProfileId === profile.id &&
-                                'opacity-100 pointer-events-auto'
-                            )}
-                          >
-                            <CreatorActionsMenu
-                              profile={profile}
-                              isMobile={isMobile}
-                              status={
-                                verificationStatuses[profile.id] ?? 'idle'
-                              }
-                              refreshIngestStatus={
-                                ingestRefreshStatuses[profile.id] ?? 'idle'
-                              }
-                              open={openMenuProfileId === profile.id}
-                              onOpenChange={open =>
-                                setOpenMenuProfileId(open ? profile.id : null)
-                              }
-                              onRefreshIngest={() => refreshIngest(profile.id)}
-                              onToggleVerification={async () => {
-                                const result = await toggleVerification(
-                                  profile.id,
-                                  !profile.isVerified
-                                );
-                                if (!result.success) {
-                                  console.error(
-                                    'Failed to toggle verification',
-                                    result.error
-                                  );
-                                }
-                              }}
-                              onToggleFeatured={async () => {
-                                const result = await toggleFeatured(
-                                  profile.id,
-                                  !profile.isFeatured
-                                );
-                                if (!result.success) {
-                                  console.error(
-                                    'Failed to toggle featured',
-                                    result.error
-                                  );
-                                }
-                              }}
-                              onToggleMarketing={async () => {
-                                const result = await toggleMarketing(
-                                  profile.id,
-                                  !profile.marketingOptOut
-                                );
-                                if (!result.success) {
-                                  console.error(
-                                    'Failed to toggle marketing',
-                                    result.error
-                                  );
-                                }
-                              }}
-                              onDelete={() => {
-                                setProfileToDelete(profile);
-                                setDeleteDialogOpen(true);
-                              }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          )}
-        </AdminTableShell>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            )}
+          </AdminTableShell>
+        </div>
       </div>
+
+      {/* Mobile Sheet for Creator Details */}
+      <Sheet
+        open={isMobile && sidebarOpen && Boolean(effectiveContact)}
+        onOpenChange={open => {
+          if (!open) {
+            handleSidebarClose();
+          }
+        }}
+      >
+        <SheetContent side='bottom' className='h-[85vh] rounded-t-2xl p-0'>
+          <SheetHeader className='sr-only'>
+            <SheetTitle>Creator Details</SheetTitle>
+            <SheetDescription>
+              View and edit creator profile details
+            </SheetDescription>
+          </SheetHeader>
+          <div className='h-full overflow-auto'>
+            <ContactSidebar
+              contact={effectiveContact}
+              mode={mode}
+              isOpen={sidebarOpen && Boolean(effectiveContact)}
+              onClose={handleSidebarClose}
+              onRefresh={() => {
+                router.refresh();
+                if (selectedId) {
+                  void hydrateContactSocialLinks(selectedId);
+                }
+              }}
+              onContactChange={handleContactChange}
+              onAvatarUpload={handleAvatarUpload}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop Right Drawer */}
       <RightDrawer
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         width={CONTACT_PANEL_WIDTH}
