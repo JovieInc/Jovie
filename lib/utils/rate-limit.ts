@@ -1,10 +1,12 @@
 /**
- * Simple in-memory rate limiter for health endpoints
+ * Simple in-memory rate limiter for health and public endpoints
  * Note: This is not persistent across server restarts and doesn't scale across multiple instances.
  * For production use, consider implementing with Redis/Upstash.
  */
 
-import { RATE_LIMIT_CONFIG } from '@/lib/db/config';
+import { PUBLIC_RATE_LIMIT_CONFIG, RATE_LIMIT_CONFIG } from '@/lib/db/config';
+
+export type PublicEndpointType = 'profile' | 'click' | 'visit';
 
 interface RateLimitEntry {
   count: number;
@@ -176,5 +178,95 @@ export function createRateLimitHeaders(status: {
     'X-RateLimit-Remaining': status.remaining.toString(),
     'X-RateLimit-Reset': Math.ceil(status.resetTime / 1000).toString(),
     'Retry-After': Math.ceil((status.resetTime - Date.now()) / 1000).toString(),
+  };
+}
+
+/**
+ * Check if a request to a public endpoint should be rate limited
+ * @param identifier - Usually IP address
+ * @param endpointType - Type of public endpoint (profile, click, visit)
+ * @returns true if rate limited, false if allowed
+ */
+export function checkPublicRateLimit(
+  identifier: string,
+  endpointType: PublicEndpointType
+): boolean {
+  const now = Date.now();
+  const config = PUBLIC_RATE_LIMIT_CONFIG[endpointType];
+  const windowMs = config.windowSeconds * 1000;
+
+  const key = `${identifier}:public:${endpointType}`;
+  const existing = rateLimitStore.get(key);
+
+  // Clean up expired entries periodically (simple cleanup)
+  if (Math.random() < 0.1) {
+    cleanupExpiredEntries();
+  }
+
+  if (!existing || now > existing.resetTime) {
+    // First request or window has expired
+    rateLimitStore.set(key, {
+      count: 1,
+      resetTime: now + windowMs,
+    });
+    return false; // Not rate limited
+  }
+
+  if (existing.count >= config.requests) {
+    // Rate limit exceeded
+    return true;
+  }
+
+  // Increment counter
+  rateLimitStore.set(key, {
+    ...existing,
+    count: existing.count + 1,
+  });
+
+  return false; // Not rate limited
+}
+
+/**
+ * Get rate limit status for a public endpoint
+ */
+export function getPublicRateLimitStatus(
+  identifier: string,
+  endpointType: PublicEndpointType
+): {
+  limit: number;
+  remaining: number;
+  resetTime: number;
+  blocked: boolean;
+  retryAfterSeconds: number;
+} {
+  const now = Date.now();
+  const config = PUBLIC_RATE_LIMIT_CONFIG[endpointType];
+  const windowMs = config.windowSeconds * 1000;
+
+  const key = `${identifier}:public:${endpointType}`;
+  const existing = rateLimitStore.get(key);
+
+  if (!existing || now > existing.resetTime) {
+    return {
+      limit: config.requests,
+      remaining: config.requests,
+      resetTime: now + windowMs,
+      blocked: false,
+      retryAfterSeconds: 0,
+    };
+  }
+
+  const remaining = Math.max(0, config.requests - existing.count);
+  const blocked = existing.count >= config.requests;
+  const retryAfterSeconds = blocked
+    ? Math.ceil((existing.resetTime - now) / 1000)
+    : 0;
+
+  return {
+    limit: config.requests,
+    remaining,
+    resetTime: existing.resetTime,
+    blocked,
+    retryAfterSeconds,
   };
 }

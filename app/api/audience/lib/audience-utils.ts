@@ -54,3 +54,18 @@ export function getActionWeight(linkType?: string) {
 export function trimHistory<T>(items: T[], maxItems = 3) {
   return items.slice(0, maxItems);
 }
+
+/**
+ * Hash an IP address for privacy-compliant storage.
+ * Uses SHA-256 with a daily salt to prevent rainbow table attacks
+ * while still allowing same-day deduplication.
+ */
+export function hashIpAddress(ip?: string | null): string | null {
+  if (!ip) return null;
+
+  // Daily salt based on UTC date - allows same-day deduplication
+  const dailySalt = new Date().toISOString().split('T')[0];
+  const hash = createHash('sha256');
+  hash.update(`${dailySalt}:${ip}`);
+  return hash.digest('hex');
+}

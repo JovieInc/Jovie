@@ -7,10 +7,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Column, Table } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import { WaitlistMobileCard } from './WaitlistMobileCard';
 
 /** Map platform ID to display name */
 const PLATFORM_LABELS: Record<string, string> = {
@@ -313,38 +315,84 @@ export function WaitlistTable({
 
   return (
     <div className='space-y-4'>
-      {/* Custom toolbar */}
-      <div className='flex h-14 w-full items-center gap-3 px-4 bg-surface-0 border border-subtle rounded-lg'>
+      {/* Custom toolbar - responsive */}
+      <div className='flex h-12 sm:h-14 w-full items-center gap-3 px-3 sm:px-4 bg-surface-0 border border-subtle rounded-lg'>
         <div className='text-xs text-secondary-token'>
-          Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
-          {total.toLocaleString()} entries
+          <span className='hidden sm:inline'>Showing </span>
+          {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+          {total.toLocaleString()}
+          <span className='hidden sm:inline'> entries</span>
         </div>
       </div>
 
-      {/* Table */}
-      <Table
-        data={rows}
-        columns={columns}
-        getRowId={entry => entry.id}
-        virtualizationThreshold={20}
-        rowHeight={60}
-        caption='Waitlist entries table'
-      />
+      {/* Desktop Table - hidden on mobile */}
+      <div className='hidden md:block'>
+        <Table
+          data={rows}
+          columns={columns}
+          getRowId={entry => entry.id}
+          virtualizationThreshold={20}
+          rowHeight={60}
+          caption='Waitlist entries table'
+        />
+      </div>
 
-      {/* Custom footer with pagination */}
-      <div className='flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs text-secondary-token bg-surface-0 border border-subtle rounded-lg'>
-        <div>
-          Page {page} of {totalPages}
+      {/* Mobile Card List - shown only on mobile */}
+      <div className='md:hidden space-y-3'>
+        {rows.length === 0 ? (
+          <div className='text-center py-12 text-secondary-token'>
+            No waitlist entries found.
+          </div>
+        ) : (
+          rows.map(entry => (
+            <WaitlistMobileCard
+              key={entry.id}
+              entry={entry}
+              approveStatus={approveStatuses[entry.id] ?? 'idle'}
+              onApprove={() => void approveEntry(entry.id)}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Custom footer with pagination - responsive */}
+      <div className='flex items-center justify-between gap-2 px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-secondary-token bg-surface-0 border border-subtle rounded-lg'>
+        <div className='flex items-center gap-1'>
+          <span className='hidden sm:inline'>Page </span>
+          <span className='font-medium text-primary-token'>{page}</span>
+          <span> / {totalPages}</span>
         </div>
-        <div className='flex items-center gap-2'>
-          <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-            <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
-              Previous
+        <div className='flex items-center gap-1 sm:gap-2'>
+          <Button
+            asChild
+            size='sm'
+            variant='ghost'
+            disabled={!canPrev}
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
+          >
+            <Link
+              href={prevHref ?? '#'}
+              aria-disabled={!canPrev}
+              aria-label='Previous page'
+            >
+              <ChevronLeft className='h-4 w-4 sm:hidden' />
+              <span className='hidden sm:inline'>Previous</span>
             </Link>
           </Button>
-          <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-            <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
-              Next
+          <Button
+            asChild
+            size='sm'
+            variant='ghost'
+            disabled={!canNext}
+            className='h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5'
+          >
+            <Link
+              href={nextHref ?? '#'}
+              aria-disabled={!canNext}
+              aria-label='Next page'
+            >
+              <ChevronRight className='h-4 w-4 sm:hidden' />
+              <span className='hidden sm:inline'>Next</span>
             </Link>
           </Button>
         </div>

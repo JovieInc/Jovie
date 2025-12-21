@@ -8,6 +8,10 @@ import {
   users,
 } from './schema';
 
+// Bounded data retrieval limits to prevent OOM on profiles with many links
+const MAX_SOCIAL_LINKS = 100;
+const MAX_CONTACTS = 50;
+
 export async function getUserByClerkId(clerkId: string) {
   const [user] = await db
     .select()
@@ -63,6 +67,7 @@ export async function getCreatorProfileWithLinks(username: string) {
   if (!profile) return null;
 
   // Fetch socials and contacts in parallel to reduce tail latency
+  // Both queries are bounded to prevent OOM on profiles with many links
   const socialsPromise = db
     .select({
       id: socialLinks.id,
@@ -79,7 +84,8 @@ export async function getCreatorProfileWithLinks(username: string) {
     })
     .from(socialLinks)
     .where(eq(socialLinks.creatorProfileId, profile.id))
-    .orderBy(socialLinks.sortOrder);
+    .orderBy(socialLinks.sortOrder)
+    .limit(MAX_SOCIAL_LINKS);
 
   const contactsPromise: Promise<CreatorContact[]> = (async () => {
     try {
@@ -107,7 +113,8 @@ export async function getCreatorProfileWithLinks(username: string) {
             eq(creatorContacts.isActive, true)
           )
         )
-        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt);
+        .orderBy(creatorContacts.sortOrder, creatorContacts.createdAt)
+        .limit(MAX_CONTACTS);
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -211,20 +218,65 @@ export async function deleteSocialLink(linkId: string) {
 }
 
 /**
- * Increment profile view count atomically
+ * Increment profile view count atomically with retry logic
  * Used for analytics tracking on public profile pages
+ *
+ * @param username - The username to increment views for
+ * @param maxRetries - Maximum number of retry attempts (default: 3)
  */
-export async function incrementProfileViews(username: string) {
-  try {
-    await db
-      .update(creatorProfiles)
-      .set({
-        profileViews: drizzleSql`${creatorProfiles.profileViews} + 1`,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()));
-  } catch (error) {
-    // Fail silently to avoid blocking page load
-    console.error('Failed to increment profile views:', error);
+export async function incrementProfileViews(
+  username: string,
+  maxRetries = 3
+): Promise<void> {
+  const normalizedUsername = username.toLowerCase();
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await db
+        .update(creatorProfiles)
+        .set({
+          profileViews: drizzleSql`${creatorProfiles.profileViews} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(creatorProfiles.usernameNormalized, normalizedUsername));
+
+      // Success - exit the retry loop
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Log retry attempt
+      console.warn(
+        `[Profile Views] Retry ${attempt}/${maxRetries} for ${normalizedUsername}:`,
+        lastError.message
+      );
+
+      // If not the last attempt, wait before retrying (exponential backoff)
+      if (attempt < maxRetries) {
+        await new Promise(resolve =>
+          setTimeout(resolve, Math.pow(2, attempt) * 100)
+        );
+      }
+    }
   }
+
+  // All retries exhausted - log error and report to Sentry
+  console.error(
+    `[Profile Views] Failed after ${maxRetries} attempts for ${normalizedUsername}:`,
+    lastError
+  );
+
+  // Report to Sentry for monitoring (fire-and-forget)
+  // Use dynamic import to avoid blocking and circular dependencies
+  import('@/lib/error-tracking')
+    .then(({ captureError }) => {
+      captureError('Profile view increment failed after retries', lastError, {
+        username: normalizedUsername,
+        maxRetries,
+      });
+    })
+    .catch(() => {
+      // Silently ignore if error tracking fails
+    });
 }
