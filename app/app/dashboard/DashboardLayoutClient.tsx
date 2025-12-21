@@ -287,12 +287,12 @@ function DashboardLayoutInner({
       onClick={toggleSidebar}
       aria-label={openMobile ? 'Close menu' : 'Open menu'}
       aria-expanded={openMobile}
-      className='h-9 w-9'
+      className='h-11 w-11'
     >
       {openMobile ? (
-        <XMarkIcon className='h-5 w-5' />
+        <XMarkIcon className='h-6 w-6' />
       ) : (
-        <Bars3Icon className='h-5 w-5' />
+        <Bars3Icon className='h-6 w-6' />
       )}
     </Button>
   ) : null;

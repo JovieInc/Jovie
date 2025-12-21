@@ -185,7 +185,12 @@ export function ReleaseProviderMatrix({
         </div>
       </header>
 
-      <div className='overflow-auto rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
+      {/* Mobile scroll hint */}
+      <p className='mb-2 text-xs text-secondary-token sm:hidden'>
+        ← Swipe to see more →
+      </p>
+      <div className='overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-thin scrollbar-thumb-subtle scrollbar-track-transparent'>
+        <div className='min-w-[700px] rounded-2xl border border-subtle bg-surface-1 shadow-sm'>
         <table className='min-w-full divide-y divide-subtle'>
           <thead className='bg-surface-2/50'>
             <tr>
@@ -363,6 +368,7 @@ export function ReleaseProviderMatrix({
             })}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Dialog open={Boolean(editingRelease)} onClose={closeEditor} size='3xl'>

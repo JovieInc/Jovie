@@ -164,13 +164,13 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         onClick={isInteractive ? onClick : undefined}
         onKeyDown={handleKeyDown}
         className={cn(
-          'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-3 py-1 text-xs font-medium',
+          'group relative inline-flex max-w-full items-center gap-1.5 overflow-hidden rounded-full border px-3 py-2 min-h-[44px] text-xs font-medium',
           'border-(--pill-border) hover:border-(--pill-border-hover)',
           'bg-surface-1 dark:bg-surface-1/60 dark:backdrop-blur-sm',
           'text-secondary-token hover:text-primary-token',
           'transform-gpu transition-all hover:bg-surface-2 dark:hover:bg-surface-2/60 hover:-translate-y-px hover:shadow-sm hover:shadow-black/10 dark:hover:shadow-black/40',
           isInteractive
-            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.98]'
+            ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-[0.98] active:bg-surface-2'
             : 'cursor-default',
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
