@@ -71,14 +71,30 @@ export async function withDbSession<T>(
 }
 
 /**
+ * Transaction isolation levels supported by PostgreSQL
+ */
+export type IsolationLevel =
+  | 'read_committed'
+  | 'repeatable_read'
+  | 'serializable';
+
+/**
  * Run DB operations inside a transaction with RLS session set.
  * Ensures SET LOCAL app.clerk_user_id is applied within the transaction scope.
+ *
+ * @param operation - The database operation to execute within the transaction
+ * @param options.clerkUserId - Optional explicit Clerk user ID (uses auth() if not provided)
+ * @param options.isolationLevel - Transaction isolation level (default: read_committed)
+ *   - 'read_committed': Default, allows phantom reads between SELECT and INSERT
+ *   - 'repeatable_read': Prevents non-repeatable reads
+ *   - 'serializable': Strictest, prevents all concurrency anomalies (use for critical operations like profile creation)
  */
 export async function withDbSessionTx<T>(
   operation: (tx: DbType, userId: string) => Promise<T>,
-  options?: { clerkUserId?: string }
+  options?: { clerkUserId?: string; isolationLevel?: IsolationLevel }
 ): Promise<T> {
   const userId = await resolveClerkUserId(options?.clerkUserId);
+  const isolationLevel = options?.isolationLevel ?? 'read_committed';
 
   // In tests, db may be a lightweight mock without transaction support.
   if (typeof (db as DbType).transaction !== 'function') {
@@ -87,6 +103,17 @@ export async function withDbSessionTx<T>(
   }
 
   return await db.transaction(async tx => {
+    // Set transaction isolation level if not default
+    // CRITICAL: For onboarding, use SERIALIZABLE to prevent race conditions
+    // where two users claim the same handle simultaneously
+    if (isolationLevel !== 'read_committed') {
+      const isolationSql =
+        isolationLevel === 'serializable'
+          ? drizzleSql`SET TRANSACTION ISOLATION LEVEL SERIALIZABLE`
+          : drizzleSql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ`;
+      await tx.execute(isolationSql);
+    }
+
     // Important: SET LOCAL must be inside the transaction to take effect.
     // In unit tests, drizzleSql may be mocked without .raw; guard accordingly.
     await tx.execute(
