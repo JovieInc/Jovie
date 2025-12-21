@@ -353,28 +353,10 @@ export function OtpSignInForm() {
                     <Clerk.Label className='sr-only'>
                       Verification code
                     </Clerk.Label>
-                    <div>
-                      <Clerk.Input
-                        type='text'
-                        maxLength={6}
-                        pattern='[0-9]{6}'
-                        inputMode='numeric'
-                        autoComplete='one-time-code'
-                        className='sr-only'
-                        value={otpCode}
-                        onChange={e => {
-                          const digits = e.target.value
-                            .replace(/\D/g, '')
-                            .slice(0, 6);
-                          setOtpCode(digits);
-                        }}
-                        aria-label='Enter 6-digit verification code'
-                      />
-                      <OtpInput
-                        autoSubmit
-                        aria-label='Enter 6-digit verification code'
-                      />
-                    </div>
+                    <OtpInput
+                      autoSubmit
+                      aria-label='Enter 6-digit verification code'
+                    />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 
@@ -383,7 +365,7 @@ export function OtpSignInForm() {
                       <SignIn.Action
                         submit
                         className={submitButtonClassName}
-                        disabled={isLoading || otpCode.length !== 6}
+                        disabled={isLoading}
                         aria-busy={isLoading}
                       >
                         {isLoading ? (
