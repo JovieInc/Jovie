@@ -1237,70 +1237,19 @@ jobs:
         id: check
         uses: ./.github/actions/fastlane-eligibility
 
-      - name: Apply labels to promotion PR
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const blockers = JSON.parse('${{ steps.check.outputs.blockers }}' || '[]');
-            const hasStatsigGate = '${{ steps.check.outputs.has_statsig_gate }}' === 'true';
-
-            // Find the promotion PR (main -> production)
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:main`,
-              base: 'production'
-            });
-
-            if (prs.length === 0) {
-              core.info('No promotion PR found yet - will be created by promote job');
-              return;
-            }
-
-            const pr = prs[0];
-            core.info(`Found promotion PR #${pr.number}`);
-
-            // Map blockers to labels
-            const labelMap = {
-              'migration': 'blocked:migration',
-              'auth': 'blocked:auth',
-              'core-flow': 'blocked:core-flow',
-              'payments': 'blocked:payments'
-            };
-
-            // Add blocking labels if any
-            const labelsToAdd = blockers.map(b => labelMap[b]).filter(Boolean);
-
-            // Add feature gate label if detected
-            if (hasStatsigGate) {
-              labelsToAdd.push('has-feature-gate');
-            }
-
-            if (labelsToAdd.length > 0) {
-              core.info(`Adding labels: ${labelsToAdd.join(', ')}`);
-              await github.rest.issues.addLabels({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: pr.number,
-                labels: labelsToAdd
-              });
-            }
-
-            // Log eligibility status
-            if (blockers.length === 0) {
-              core.info('PR is ELIGIBLE for fast lane (no blocking patterns detected)');
-            } else {
-              core.info(`PR is NOT eligible for fast lane - blockers: ${blockers.join(', ')}`);
-            }
+      # Note: Label application moved to promote job to avoid race condition
+      # The promote job creates/updates the PR first, then applies labels
 
   smoke-failure-alert:
     name: Smoke Failure Alert
-    needs: [ci-public-profile-smoke]
+    needs: [ci-public-profile-smoke, promote]
     # Alert when smoke tests fail after staging deploy
+    # Depends on promote to ensure PR exists before trying to add labels
     if: ${{ always() && needs.ci-public-profile-smoke.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      pull-requests: write
     steps:
       - name: Block promotion PR with smoke-failed label
         uses: actions/github-script@v8
@@ -1509,6 +1458,58 @@ jobs:
             echo "PR already exists: #$existing_pr"
             echo "pr_number=$existing_pr" >> $GITHUB_OUTPUT
           fi
+
+      - name: Apply blocking labels to promotion PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const blockers = JSON.parse('${{ needs.fastlane-eligibility.outputs.blockers }}' || '[]');
+            const hasStatsigGate = '${{ needs.fastlane-eligibility.outputs.has_statsig_gate }}' === 'true';
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+
+            if (!prNumber) {
+              core.warning('No PR number available - skipping label application');
+              return;
+            }
+
+            core.info(`Applying labels to PR #${prNumber}`);
+
+            // Map blockers to labels
+            const labelMap = {
+              'migration': 'blocked:migration',
+              'auth': 'blocked:auth',
+              'core-flow': 'blocked:core-flow',
+              'payments': 'blocked:payments'
+            };
+
+            // Build list of labels to add
+            const labelsToAdd = blockers.map(b => labelMap[b]).filter(Boolean);
+
+            // Add feature gate label if detected
+            if (hasStatsigGate) {
+              labelsToAdd.push('has-feature-gate');
+            }
+
+            if (labelsToAdd.length > 0) {
+              core.info(`Adding labels: ${labelsToAdd.join(', ')}`);
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: labelsToAdd
+                });
+              } catch (error) {
+                core.warning(`Failed to add labels: ${error.message}`);
+              }
+            }
+
+            // Log eligibility status
+            if (blockers.length === 0) {
+              core.info('PR is ELIGIBLE for fast lane (no blocking patterns detected)');
+            } else {
+              core.info(`PR is NOT eligible for fast lane - blockers: ${blockers.join(', ')}`);
+            }
 
       - name: Fast lane auto-merge
         if: steps.determine-path.outputs.action == 'auto_merge'
