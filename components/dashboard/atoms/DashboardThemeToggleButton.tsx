@@ -2,54 +2,39 @@
 
 import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import { useTheme } from 'next-themes';
-import { useState } from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 
 export function DashboardThemeToggleButton() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [isUpdating, setIsUpdating] = useState(false);
 
   const isDark = resolvedTheme === 'dark';
   const nextTheme = isDark ? 'light' : 'dark';
 
-  const handleThemeChange = async () => {
-    setIsUpdating(true);
+  const handleThemeChange = () => {
+    // Update theme immediately for responsive feedback (optimistic update)
+    setTheme(nextTheme);
 
-    try {
-      // Save theme preference to database for signed-in users
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
+    // Persist to API in background - don't block UI
+    fetch('/api/dashboard/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        updates: {
+          theme: { preference: nextTheme },
         },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: nextTheme },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
-        // Don't update local theme if API call failed
-        return;
-      }
-
-      // Only update local theme after successful API call
-      setTheme(nextTheme);
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-      // Don't update local theme if API call failed
-    } finally {
-      setIsUpdating(false);
-    }
+      }),
+    }).catch(error => {
+      // Log error but don't revert - local theme change is still valid
+      console.error('Failed to persist theme preference:', error);
+    });
   };
 
   return (
     <DashboardHeaderActionButton
       ariaLabel={`Switch to ${nextTheme} mode`}
       pressed={isDark}
-      disabled={isUpdating}
       onClick={handleThemeChange}
       icon={
         isDark ? (
