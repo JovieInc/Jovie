@@ -14,10 +14,10 @@ const PRIVATE_IP_PATTERNS = [
   /^0\./, // Current network
   // IPv6 patterns (simplified matching)
   /^::1$/, // Loopback
-  /^fc[0-9a-f]{2}:/, // Unique local
-  /^fd[0-9a-f]{2}:/, // Unique local
-  /^fe80:/, // Link-local
-  /^::ffff:(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/, // IPv4-mapped
+  /^fc[0-9a-f]{2}:/i, // Unique local
+  /^fd[0-9a-f]{2}:/i, // Unique local
+  /^fe80:/i, // Link-local
+  /^::ffff:(127\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|192\.168\.)/i, // IPv4-mapped
 ];
 
 // Blocked hostnames
@@ -41,12 +41,45 @@ const DANGEROUS_PROTOCOLS = [
   'blob:',
 ];
 
-// Max URL length to prevent DoS attacks
+/**
+ * Maximum URL length to prevent DoS attacks via extremely long URLs.
+ * 2048 is the practical limit for most browsers and servers.
+ */
 const MAX_URL_LENGTH = 2048;
 
 export interface UrlValidationResult {
   valid: boolean;
   error?: string;
+}
+
+/**
+ * Convert a decimal IP representation to dotted-quad format.
+ * Example: 2130706433 -> "127.0.0.1"
+ * Returns null if the input is not a valid decimal IP.
+ */
+function decimalToIp(decimal: string): string | null {
+  const num = parseInt(decimal, 10);
+  if (isNaN(num) || num < 0 || num > 4294967295) {
+    return null;
+  }
+  return [
+    (num >>> 24) & 255,
+    (num >>> 16) & 255,
+    (num >>> 8) & 255,
+    num & 255,
+  ].join('.');
+}
+
+/**
+ * Extract IPv6 address from bracket notation.
+ * Example: "[::1]" -> "::1"
+ * Returns null if not bracket notation.
+ */
+function extractBracketedIpv6(hostname: string): string | null {
+  if (hostname.startsWith('[') && hostname.endsWith(']')) {
+    return hostname.slice(1, -1);
+  }
+  return null;
 }
 
 /**
@@ -58,6 +91,20 @@ function isPrivateHostname(hostname: string): boolean {
   // Check blocked hostnames
   if (BLOCKED_HOSTNAMES.includes(lower)) {
     return true;
+  }
+
+  // Check for IPv6 bracket notation (e.g., [::1])
+  const bracketedIpv6 = extractBracketedIpv6(lower);
+  if (bracketedIpv6 && isPrivateIp(bracketedIpv6)) {
+    return true;
+  }
+
+  // Check if hostname is a decimal IP representation (e.g., 2130706433 = 127.0.0.1)
+  if (/^\d+$/.test(lower)) {
+    const dottedQuad = decimalToIp(lower);
+    if (dottedQuad && isPrivateIp(dottedQuad)) {
+      return true;
+    }
   }
 
   // Check if hostname looks like an IP address

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { and, eq, gt, inArray, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -36,11 +37,26 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Idempotency key expiration (24 hours)
+/**
+ * Idempotency key expiration time (24 hours).
+ * This duration balances between:
+ * - Long enough to catch retries from network failures and user refreshes
+ * - Short enough to not consume excessive storage
+ *
+ * NOTE: Expired keys should be cleaned up periodically via a background job
+ * or Postgres TTL extension (pg_cron). See dashboard_idempotency_keys table.
+ */
 const IDEMPOTENCY_KEY_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
- * Check and apply rate limiting for dashboard link operations
+ * Check and apply rate limiting for dashboard link operations.
+ *
+ * Rate limiting is applied per-user (via clerkUserId) rather than per-profile.
+ * This means a user with multiple profiles shares the same rate limit bucket
+ * across all their profiles (30 requests per minute total).
+ *
+ * Rationale: Per-user limiting is simpler and prevents abuse where a malicious
+ * user creates many profiles to bypass per-profile limits.
  */
 async function checkRateLimit(
   userId: string
@@ -140,7 +156,7 @@ export async function GET(req: Request) {
       const profileId = url.searchParams.get('profileId');
       if (!profileId) {
         return NextResponse.json(
-          { error: 'Missing profileId' },
+          { error: 'Profile ID is required' },
           { status: 400, headers: NO_STORE_HEADERS }
         );
       }
@@ -334,7 +350,7 @@ export async function PUT(req: Request) {
 
       if (!profileId) {
         return NextResponse.json(
-          { error: 'Missing profileId' },
+          { error: 'Profile ID is required' },
           { status: 400, headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders } }
         );
       }
@@ -412,14 +428,16 @@ export async function PUT(req: Request) {
         .where(eq(socialLinks.creatorProfileId, profileId));
 
       // Check optimistic locking if expectedVersion is provided
-      if (expectedVersion !== undefined && existingLinks.length > 0) {
-        // Find the max version among existing links
-        const maxVersion = Math.max(...existingLinks.map(l => l.version ?? 1));
-        if (maxVersion !== expectedVersion) {
+      // Empty state is treated as version 0 to ensure new links start from known state
+      if (expectedVersion !== undefined) {
+        const currentVersion = existingLinks.length > 0
+          ? Math.max(...existingLinks.map(l => l.version ?? 1))
+          : 0;
+        if (currentVersion !== expectedVersion) {
           const response = {
             error: 'Conflict: Links have been modified by another request',
             code: 'VERSION_CONFLICT',
-            currentVersion: maxVersion,
+            currentVersion,
             expectedVersion,
           };
           return NextResponse.json(response, {
@@ -536,8 +554,13 @@ export async function PUT(req: Request) {
               links: links.map(link => link.url),
             });
           }
-        } catch {
+        } catch (error) {
           // Non-blocking: link saving should succeed even if enrichment fails.
+          // Log to Sentry for observability
+          Sentry.captureException(error, {
+            tags: { operation: 'profile_enrichment' },
+            extra: { profileId, clerkUserId },
+          });
         }
       })();
 

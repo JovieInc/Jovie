@@ -456,6 +456,110 @@ describe('PUT /api/dashboard/social-links', () => {
     expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
     expect(response.headers.get('X-RateLimit-Remaining')).toBeDefined();
   });
+
+  it('returns 409 when expectedVersion does not match current version', async () => {
+    // Configure select to return existing links with version 5
+    hoisted.select.mockImplementation(() => {
+      const where = vi.fn().mockResolvedValue([
+        { id: 'link_1', sourceType: 'manual', version: 5 },
+      ]);
+      const innerJoin = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin,
+          where,
+        }),
+      };
+    });
+
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/social-links',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: 'profile_123',
+          expectedVersion: 3, // Outdated version
+          links: [
+            {
+              platform: 'website',
+              url: 'https://example.com',
+            },
+          ],
+        }),
+      }
+    );
+
+    const response = await PUT(request as unknown as Request);
+
+    expect(response.status).toBe(409);
+    const data = (await response.json()) as {
+      error?: string;
+      code?: string;
+      currentVersion?: number;
+      expectedVersion?: number;
+    };
+    expect(data.code).toBe('VERSION_CONFLICT');
+    expect(data.currentVersion).toBe(5);
+    expect(data.expectedVersion).toBe(3);
+  });
+
+  it('returns 409 when expectedVersion is provided but no links exist (empty state)', async () => {
+    // Configure select to return no existing links (empty state = version 0)
+    hoisted.select.mockImplementation(() => {
+      const where = vi.fn().mockResolvedValue([]); // No existing links
+      const innerJoin = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin,
+          where,
+        }),
+      };
+    });
+
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/social-links',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: 'profile_123',
+          expectedVersion: 1, // Client thinks version is 1, but no links exist (version 0)
+          links: [
+            {
+              platform: 'website',
+              url: 'https://example.com',
+            },
+          ],
+        }),
+      }
+    );
+
+    const response = await PUT(request as unknown as Request);
+
+    expect(response.status).toBe(409);
+    const data = (await response.json()) as {
+      error?: string;
+      code?: string;
+      currentVersion?: number;
+    };
+    expect(data.code).toBe('VERSION_CONFLICT');
+    expect(data.currentVersion).toBe(0);
+  });
 });
 
 describe('PATCH /api/dashboard/social-links', () => {
@@ -567,6 +671,104 @@ describe('PATCH /api/dashboard/social-links', () => {
     const response = await PATCH(request as unknown as Request);
 
     expect(response.headers.get('X-RateLimit-Limit')).toBeDefined();
+  });
+
+  it('returns 400 with INVALID_STATE_TRANSITION when link is not in suggested state', async () => {
+    // Configure select to return an active link (not suggested)
+    hoisted.select.mockImplementation(() => {
+      const where = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(hoisted.activeLinkResult), // state: 'active'
+      });
+      const innerJoin = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin,
+          where,
+        }),
+      };
+    });
+
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/social-links',
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: 'profile_123',
+          linkId: 'link_active',
+          action: 'accept', // Trying to accept an already-active link
+        }),
+      }
+    );
+
+    const response = await PATCH(request as unknown as Request);
+
+    expect(response.status).toBe(400);
+    const data = (await response.json()) as {
+      error?: string;
+      code?: string;
+      currentState?: string;
+    };
+    expect(data.code).toBe('INVALID_STATE_TRANSITION');
+    expect(data.currentState).toBe('active');
+    expect(data.error).toContain('only suggested links');
+  });
+
+  it('returns 409 when expectedVersion does not match for PATCH', async () => {
+    // Configure select to return suggested link with different version
+    hoisted.select.mockImplementation(() => {
+      const where = vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue([
+          { ...hoisted.suggestedLinkResult[0], version: 5 },
+        ]),
+      });
+      const innerJoin = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin,
+          where,
+        }),
+      };
+    });
+
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/social-links',
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: 'profile_123',
+          linkId: 'link_suggested',
+          action: 'accept',
+          expectedVersion: 2, // Outdated version
+        }),
+      }
+    );
+
+    const response = await PATCH(request as unknown as Request);
+
+    expect(response.status).toBe(409);
+    const data = (await response.json()) as {
+      error?: string;
+      code?: string;
+      currentVersion?: number;
+    };
+    expect(data.code).toBe('VERSION_CONFLICT');
+    expect(data.currentVersion).toBe(5);
   });
 });
 
