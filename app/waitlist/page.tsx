@@ -20,7 +20,7 @@ type PrimaryGoal = 'streams' | 'merch' | 'tickets';
 type SocialPlatform = 'instagram' | 'tiktok' | 'youtube' | 'other';
 
 const BUTTON_CLASSES =
-  'w-full rounded-xl border border-subtle bg-surface-1 px-4 py-3 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
+  'w-full h-12 rounded-xl border border-subtle bg-surface-1 px-4 text-[15px] leading-5 font-medium text-primary-token hover:bg-surface-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-ring-themed';
 
 const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
 
@@ -522,7 +522,7 @@ export default function WaitlistPage() {
                       tabIndex={isTabStop ? 0 : -1}
                       onClick={() => handlePrimaryGoalSelect(option.value)}
                       variant={isSelected ? 'primary' : 'secondary'}
-                      className='w-full justify-center rounded-xl py-3 text-[15px] leading-5'
+                      className='w-full h-12 justify-center rounded-xl text-[15px] leading-5'
                       disabled={isSubmitting}
                     >
                       {option.label}
@@ -735,13 +735,13 @@ export default function WaitlistPage() {
           <div className='flex items-center justify-center pt-2'>
             <AuthBackButton
               onClick={() => {
+                if (isSubmitting) return;
                 if (step === 0) {
                   router.push('/');
                   return;
                 }
                 handleBack();
               }}
-              disabled={isSubmitting}
               className='text-center'
             />
           </div>

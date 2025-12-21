@@ -1,11 +1,11 @@
 'use client';
 
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { completeOnboarding } from '@/app/onboarding/actions';
 import {
+  AuthBackButton,
   AuthButton,
   AuthLinkPreviewCard,
   AuthTextInput,
@@ -697,14 +697,7 @@ export function AppleStyleOnboardingForm({
 
   return (
     <div className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'>
-      <button
-        type='button'
-        onClick={goBack}
-        aria-label='Go back'
-        className='fixed top-4 left-4 md:top-6 md:left-6 z-50 inline-flex items-center justify-center rounded-full p-2 text-(--fg) hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-(--bg)'
-      >
-        <ArrowLeft className='h-5 w-5' />
-      </button>
+      <AuthBackButton onClick={goBack} ariaLabel='Go back' />
 
       <ProgressIndicator />
 
