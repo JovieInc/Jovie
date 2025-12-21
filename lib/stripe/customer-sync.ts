@@ -472,11 +472,23 @@ export async function updateUserBillingStatus(
 }
 
 /**
+ * Small delay utility for retry backoff
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Retry billing update with fresh data after optimistic lock failure
+ * Includes exponential backoff to prevent thundering herd
  */
 async function retryUpdateWithFreshData(
-  options: UpdateBillingStatusOptions
+  options: UpdateBillingStatusOptions,
+  retryCount = 0
 ): Promise<UpdateBillingStatusResult> {
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 50; // Start with 50ms delay
+
   const {
     clerkUserId,
     isPro,
@@ -490,6 +502,12 @@ async function retryUpdateWithFreshData(
   } = options;
 
   try {
+    // Add jittered exponential backoff before retry
+    if (retryCount > 0) {
+      const backoffMs = BASE_DELAY_MS * Math.pow(2, retryCount - 1);
+      const jitter = Math.random() * backoffMs * 0.5; // Add up to 50% jitter
+      await delay(backoffMs + jitter);
+    }
     // Get fresh user state
     const [freshUser] = await db
       .select({
@@ -553,15 +571,20 @@ async function retryUpdateWithFreshData(
       .returning({ id: users.id, billingVersion: users.billingVersion });
 
     if (result.length === 0) {
-      // Still failing - log and continue (don't infinite retry)
+      // Still failing - retry with backoff up to MAX_RETRIES
+      if (retryCount < MAX_RETRIES) {
+        return retryUpdateWithFreshData(options, retryCount + 1);
+      }
+
+      // Max retries exceeded - log and fail
       await captureWarning(
-        'Optimistic lock failed twice - possible high contention',
+        `Optimistic lock failed after ${MAX_RETRIES + 1} attempts - high contention`,
         undefined,
-        { clerkUserId, stripeEventId }
+        { clerkUserId, stripeEventId, retryCount }
       );
       return {
         success: false,
-        error: 'Concurrent update conflict - please retry',
+        error: 'Concurrent update conflict - max retries exceeded',
       };
     }
 
@@ -590,6 +613,7 @@ async function retryUpdateWithFreshData(
           clerkUserId,
           billingVersion: result[0].billingVersion,
           retried: true,
+          retryCount: retryCount + 1,
         },
       });
     } catch (auditError) {

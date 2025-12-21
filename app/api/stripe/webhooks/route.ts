@@ -20,7 +20,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { db } from '@/lib/db';
+import { db, withTransaction } from '@/lib/db';
 import { stripeWebhookEvents, users } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
 import {
@@ -67,6 +67,19 @@ function getStripeObjectId(event: Stripe.Event): string | null {
  */
 function stripeTimestampToDate(timestamp: number): Date {
   return new Date(timestamp * 1000);
+}
+
+/**
+ * Safely extract customer ID from Stripe objects
+ * Handles both string IDs and expanded customer objects
+ */
+function getCustomerId(
+  customer: string | Stripe.Customer | Stripe.DeletedCustomer | null
+): string | null {
+  if (!customer) return null;
+  if (typeof customer === 'string') return customer;
+  if ('id' in customer && typeof customer.id === 'string') return customer.id;
+  return null;
 }
 
 /**
@@ -140,90 +153,77 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Record the event for auditing and idempotency. If an event with the same
-    // Stripe event ID already exists, we skip further processing to keep
-    // handlers idempotent under Stripe retries.
     const stripeCreatedAt = stripeTimestampToDate(event.created);
-    const [webhookRecord] = await db
-      .insert(stripeWebhookEvents)
-      .values({
-        stripeEventId: event.id,
-        type: event.type,
-        stripeObjectId: getStripeObjectId(event),
-        stripeCreatedAt,
-        payload: event as unknown as Record<string, unknown>,
-      })
-      .onConflictDoNothing()
-      .returning({ id: stripeWebhookEvents.id });
 
-    if (!webhookRecord) {
-      // Duplicate event - skip processing (this is expected behavior)
+    // Use a transaction for atomic webhook processing:
+    // 1. Insert or get existing webhook record
+    // 2. Check if already processed (idempotency)
+    // 3. Process the event
+    // 4. Mark as processed
+    // If any step fails, the transaction rolls back for clean retry
+    const { error: txError } = await withTransaction(async tx => {
+      // Check if event already exists
+      const [existingEvent] = await tx
+        .select({
+          id: stripeWebhookEvents.id,
+          processedAt: stripeWebhookEvents.processedAt,
+        })
+        .from(stripeWebhookEvents)
+        .where(eq(stripeWebhookEvents.stripeEventId, event.id))
+        .limit(1);
+
+      if (existingEvent?.processedAt) {
+        // Already processed - skip (idempotent)
+        return { skipped: true, reason: 'already_processed' };
+      }
+
+      let webhookRecordId: string;
+
+      if (existingEvent) {
+        // Event exists but wasn't processed (previous failure) - retry processing
+        webhookRecordId = existingEvent.id;
+      } else {
+        // New event - insert record
+        const [newRecord] = await tx
+          .insert(stripeWebhookEvents)
+          .values({
+            stripeEventId: event.id,
+            type: event.type,
+            stripeObjectId: getStripeObjectId(event),
+            stripeCreatedAt,
+            payload: event as unknown as Record<string, unknown>,
+          })
+          .returning({ id: stripeWebhookEvents.id });
+
+        if (!newRecord) {
+          throw new Error('Failed to insert webhook event record');
+        }
+        webhookRecordId = newRecord.id;
+      }
+
+      // Process the event (handlers throw on failure)
+      await processWebhookEvent(event, stripeCreatedAt);
+
+      // Mark event as processed atomically within the transaction
+      await tx
+        .update(stripeWebhookEvents)
+        .set({ processedAt: new Date() })
+        .where(eq(stripeWebhookEvents.id, webhookRecordId));
+
+      return { skipped: false, processed: true };
+    });
+
+    if (txError) {
+      await captureCriticalError('Stripe webhook transaction failed', txError, {
+        route: '/api/stripe/webhooks',
+        eventId: event.id,
+        eventType: event.type,
+      });
       return NextResponse.json(
-        { received: true },
-        { headers: NO_STORE_HEADERS }
+        { error: 'Webhook processing failed' },
+        { status: 500, headers: NO_STORE_HEADERS }
       );
     }
-
-    // Handle the event
-    switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutCompleted(
-          event.data.object as Stripe.Checkout.Session,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      case 'customer.subscription.created':
-        await handleSubscriptionCreated(
-          event.data.object as Stripe.Subscription,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(
-          event.data.object as Stripe.Subscription,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(
-          event.data.object as Stripe.Subscription,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(
-          event.data.object as Stripe.Invoice,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      case 'invoice.payment_failed':
-        await handlePaymentFailed(
-          event.data.object as Stripe.Invoice,
-          event.id,
-          stripeCreatedAt
-        );
-        break;
-
-      default:
-        // Unhandled event types are expected - Stripe sends many event types
-        break;
-    }
-
-    // Mark event as processed
-    await db
-      .update(stripeWebhookEvents)
-      .set({ processedAt: new Date() })
-      .where(eq(stripeWebhookEvents.id, webhookRecord.id));
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
@@ -234,6 +234,69 @@ export async function POST(request: NextRequest) {
       { error: 'Webhook processing failed' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
+  }
+}
+
+/**
+ * Process a webhook event based on its type
+ * Extracted for use within transaction context
+ */
+async function processWebhookEvent(
+  event: Stripe.Event,
+  stripeCreatedAt: Date
+): Promise<void> {
+  switch (event.type) {
+    case 'checkout.session.completed':
+      await handleCheckoutCompleted(
+        event.data.object as Stripe.Checkout.Session,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    case 'customer.subscription.created':
+      await handleSubscriptionCreated(
+        event.data.object as Stripe.Subscription,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    case 'customer.subscription.updated':
+      await handleSubscriptionUpdated(
+        event.data.object as Stripe.Subscription,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    case 'customer.subscription.deleted':
+      await handleSubscriptionDeleted(
+        event.data.object as Stripe.Subscription,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    case 'invoice.payment_succeeded':
+      await handlePaymentSucceeded(
+        event.data.object as Stripe.Invoice,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    case 'invoice.payment_failed':
+      await handlePaymentFailed(
+        event.data.object as Stripe.Invoice,
+        event.id,
+        stripeCreatedAt
+      );
+      break;
+
+    default:
+      // Unhandled event types are expected - Stripe sends many event types
+      break;
   }
 }
 
@@ -515,10 +578,11 @@ async function handlePaymentFailed(
       ];
 
       if (failureStatuses.includes(subscription.status)) {
+        const customerId = getCustomerId(subscription.customer);
         const result = await updateUserBillingStatus({
           clerkUserId: userId,
           isPro: false,
-          stripeCustomerId: subscription.customer as string,
+          stripeCustomerId: customerId ?? undefined,
           stripeSubscriptionId: null,
           stripeEventId,
           stripeEventTimestamp,
@@ -571,10 +635,11 @@ async function processSubscription(
         ? 'payment_failed'
         : 'subscription_downgraded';
 
+    const customerId = getCustomerId(subscription.customer);
     const result = await updateUserBillingStatus({
       clerkUserId: userId,
       isPro: false,
-      stripeCustomerId: subscription.customer as string,
+      stripeCustomerId: customerId ?? undefined,
       stripeSubscriptionId: null,
       stripeEventId,
       stripeEventTimestamp,
@@ -629,10 +694,11 @@ async function processSubscription(
   }
 
   // Update user's billing status
+  const customerId = getCustomerId(subscription.customer);
   const result = await updateUserBillingStatus({
     clerkUserId: userId,
     isPro: true,
-    stripeCustomerId: subscription.customer as string,
+    stripeCustomerId: customerId ?? undefined,
     stripeSubscriptionId: subscription.id,
     stripeEventId,
     stripeEventTimestamp,

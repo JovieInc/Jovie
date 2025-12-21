@@ -24,6 +24,8 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Health check thresholds
 const PRO_COUNT_TOLERANCE_PERCENT = 10; // Allow 10% variance between DB and Stripe
+const MAX_STRIPE_PAGES = 10; // Limit pagination to prevent slow health checks (1000 subscriptions max)
+const STRIPE_TIMEOUT_MS = 10000; // 10 second timeout for Stripe API calls
 
 interface HealthCheckResult {
   healthy: boolean;
@@ -217,7 +219,23 @@ async function getStripeActiveSubscriptionCount(): Promise<number> {
 }
 
 /**
+ * Wrap a promise with a timeout
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Operation timed out after ${ms}ms`)),
+        ms
+      )
+    ),
+  ]);
+}
+
+/**
  * Count subscriptions with a specific status, handling pagination
+ * Includes pagination limit and timeout for health check efficiency
  */
 async function countSubscriptionsWithStatus(
   status: 'active' | 'trialing'
@@ -225,13 +243,19 @@ async function countSubscriptionsWithStatus(
   let count = 0;
   let hasMore = true;
   let startingAfter: string | undefined;
+  let pageCount = 0;
 
-  while (hasMore) {
-    const result = await stripe.subscriptions.list({
-      status,
-      limit: 100,
-      starting_after: startingAfter,
-    });
+  while (hasMore && pageCount < MAX_STRIPE_PAGES) {
+    pageCount++;
+
+    const result = await withTimeout(
+      stripe.subscriptions.list({
+        status,
+        limit: 100,
+        starting_after: startingAfter,
+      }),
+      STRIPE_TIMEOUT_MS
+    );
 
     count += result.data.length;
     hasMore = result.has_more;
@@ -239,6 +263,13 @@ async function countSubscriptionsWithStatus(
     if (result.data.length > 0) {
       startingAfter = result.data[result.data.length - 1].id;
     }
+  }
+
+  // If we hit the page limit, log a warning but return the count we have
+  if (hasMore && pageCount >= MAX_STRIPE_PAGES) {
+    console.warn(
+      `[billing-health] Hit pagination limit for ${status} subscriptions. Count may be incomplete.`
+    );
   }
 
   return count;

@@ -14,11 +14,29 @@
 
 import { eq, isNotNull, sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureWarning, captureCriticalError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
+
+// Pagination settings
+const BATCH_SIZE = 100;
+const MAX_BATCHES = 50; // Safety limit: process max 5000 users per run
+
+/**
+ * Safely extract customer ID from Stripe objects
+ * Handles both string IDs and expanded customer objects
+ */
+function getCustomerId(
+  customer: string | Stripe.Customer | Stripe.DeletedCustomer | null
+): string | null {
+  if (!customer) return null;
+  if (typeof customer === 'string') return customer;
+  if ('id' in customer && typeof customer.id === 'string') return customer.id;
+  return null;
+}
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
@@ -124,128 +142,161 @@ export async function GET(request: Request) {
 
 /**
  * Reconcile users who have a subscription ID stored in DB
+ * Uses cursor-based pagination to handle >100 users
  */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
   errors: string[]
 ): Promise<void> {
-  // Get all users with subscription IDs (batch to avoid memory issues)
-  const usersWithSubscriptions = await db
-    .select({
-      id: users.id,
-      clerkId: users.clerkId,
-      isPro: users.isPro,
-      stripeSubscriptionId: users.stripeSubscriptionId,
-      stripeCustomerId: users.stripeCustomerId,
-    })
-    .from(users)
-    .where(isNotNull(users.stripeSubscriptionId))
-    .limit(100); // Process in batches
+  let lastUserId: string | null = null;
+  let batchCount = 0;
 
-  for (const user of usersWithSubscriptions) {
-    stats.usersChecked++;
+  // Process users in batches with cursor-based pagination
+  while (batchCount < MAX_BATCHES) {
+    batchCount++;
 
-    try {
-      if (!user.stripeSubscriptionId) continue;
+    // Build query with cursor
+    const usersWithSubscriptions = await db
+      .select({
+        id: users.id,
+        clerkId: users.clerkId,
+        isPro: users.isPro,
+        stripeSubscriptionId: users.stripeSubscriptionId,
+        stripeCustomerId: users.stripeCustomerId,
+      })
+      .from(users)
+      .where(
+        lastUserId
+          ? drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
+          : isNotNull(users.stripeSubscriptionId)
+      )
+      .orderBy(users.id)
+      .limit(BATCH_SIZE);
 
-      // Fetch subscription from Stripe
-      let subscription;
+    if (usersWithSubscriptions.length === 0) {
+      break; // No more users to process
+    }
+
+    for (const user of usersWithSubscriptions) {
+      stats.usersChecked++;
+      lastUserId = user.id;
+
       try {
-        subscription = await stripe.subscriptions.retrieve(
-          user.stripeSubscriptionId
-        );
-      } catch (stripeError) {
-        // Subscription not found in Stripe - might be deleted
-        const errorMessage =
-          stripeError instanceof Error
-            ? stripeError.message
-            : String(stripeError);
+        if (!user.stripeSubscriptionId) continue;
 
-        if (errorMessage.includes('No such subscription')) {
-          // Subscription was deleted in Stripe but DB still has it
-          stats.orphanedSubscriptions++;
-          stats.mismatches++;
+        // Fetch subscription from Stripe
+        let subscription;
+        try {
+          subscription = await stripe.subscriptions.retrieve(
+            user.stripeSubscriptionId
+          );
+        } catch (stripeError) {
+          // Subscription not found in Stripe - might be deleted
+          const errorMessage =
+            stripeError instanceof Error
+              ? stripeError.message
+              : String(stripeError);
 
-          if (user.isPro) {
-            // User is marked as Pro but subscription is gone - downgrade
-            const result = await updateUserBillingStatus({
-              clerkUserId: user.clerkId,
-              isPro: false,
-              stripeSubscriptionId: null,
-              eventType: 'reconciliation_fix',
-              source: 'reconciliation',
-              metadata: {
-                reason: 'subscription_not_found_in_stripe',
-                previousSubscriptionId: user.stripeSubscriptionId,
-              },
-            });
+          if (errorMessage.includes('No such subscription')) {
+            // Subscription was deleted in Stripe but DB still has it
+            stats.orphanedSubscriptions++;
+            stats.mismatches++;
 
-            if (result.success) {
-              stats.fixed++;
-            } else {
-              stats.errors++;
-              errors.push(`Failed to fix user ${user.id}: ${result.error}`);
-            }
-          } else {
-            // Just clear the orphaned subscription ID
-            await db
-              .update(users)
-              .set({
+            if (user.isPro) {
+              // User is marked as Pro but subscription is gone - downgrade
+              const result = await updateUserBillingStatus({
+                clerkUserId: user.clerkId,
+                isPro: false,
                 stripeSubscriptionId: null,
-                billingUpdatedAt: new Date(),
-                billingVersion: drizzleSql`${users.billingVersion} + 1`,
-              })
-              .where(eq(users.id, user.id));
-            stats.fixed++;
+                eventType: 'reconciliation_fix',
+                source: 'reconciliation',
+                metadata: {
+                  reason: 'subscription_not_found_in_stripe',
+                  previousSubscriptionId: user.stripeSubscriptionId,
+                },
+              });
+
+              if (result.success) {
+                stats.fixed++;
+              } else {
+                stats.errors++;
+                errors.push(`Failed to fix user ${user.id}: ${result.error}`);
+              }
+            } else {
+              // Just clear the orphaned subscription ID
+              await db
+                .update(users)
+                .set({
+                  stripeSubscriptionId: null,
+                  billingUpdatedAt: new Date(),
+                  billingVersion: drizzleSql`${users.billingVersion} + 1`,
+                })
+                .where(eq(users.id, user.id));
+              stats.fixed++;
+            }
+            continue;
           }
+
+          // Other Stripe error - log and continue
+          stats.errors++;
+          errors.push(`Stripe error for user ${user.id}: ${errorMessage}`);
           continue;
         }
 
-        // Other Stripe error - log and continue
-        stats.errors++;
-        errors.push(`Stripe error for user ${user.id}: ${errorMessage}`);
-        continue;
-      }
+        // Determine expected Pro status from Stripe
+        const shouldBePro =
+          subscription.status === 'active' ||
+          subscription.status === 'trialing';
 
-      // Determine expected Pro status from Stripe
-      const shouldBePro =
-        subscription.status === 'active' || subscription.status === 'trialing';
+        // Check for mismatch
+        if (user.isPro !== shouldBePro) {
+          stats.mismatches++;
 
-      // Check for mismatch
-      if (user.isPro !== shouldBePro) {
-        stats.mismatches++;
+          // Fix the mismatch
+          const customerId = getCustomerId(subscription.customer);
+          const result = await updateUserBillingStatus({
+            clerkUserId: user.clerkId,
+            isPro: shouldBePro,
+            stripeSubscriptionId: shouldBePro ? subscription.id : null,
+            stripeCustomerId: customerId ?? undefined,
+            eventType: 'reconciliation_fix',
+            source: 'reconciliation',
+            metadata: {
+              reason: 'status_mismatch',
+              dbIsPro: user.isPro,
+              stripeStatus: subscription.status,
+              expectedIsPro: shouldBePro,
+            },
+          });
 
-        // Fix the mismatch
-        const result = await updateUserBillingStatus({
-          clerkUserId: user.clerkId,
-          isPro: shouldBePro,
-          stripeSubscriptionId: shouldBePro ? subscription.id : null,
-          stripeCustomerId: subscription.customer as string,
-          eventType: 'reconciliation_fix',
-          source: 'reconciliation',
-          metadata: {
-            reason: 'status_mismatch',
-            dbIsPro: user.isPro,
-            stripeStatus: subscription.status,
-            expectedIsPro: shouldBePro,
-          },
-        });
-
-        if (result.success) {
-          stats.fixed++;
-          console.log(
-            `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${shouldBePro}`
-          );
-        } else {
-          stats.errors++;
-          errors.push(`Failed to fix user ${user.id}: ${result.error}`);
+          if (result.success) {
+            stats.fixed++;
+            console.log(
+              `[billing-reconciliation] Fixed user ${user.id}: isPro ${user.isPro} -> ${shouldBePro}`
+            );
+          } else {
+            stats.errors++;
+            errors.push(`Failed to fix user ${user.id}: ${result.error}`);
+          }
         }
+      } catch (error) {
+        stats.errors++;
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`Error processing user ${user.id}: ${message}`);
       }
-    } catch (error) {
-      stats.errors++;
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`Error processing user ${user.id}: ${message}`);
     }
+
+    // If we got fewer than BATCH_SIZE, we're done
+    if (usersWithSubscriptions.length < BATCH_SIZE) {
+      break;
+    }
+  }
+
+  if (batchCount >= MAX_BATCHES) {
+    await captureWarning('Billing reconciliation hit batch limit', undefined, {
+      batchCount,
+      usersChecked: stats.usersChecked,
+    });
   }
 }
 
