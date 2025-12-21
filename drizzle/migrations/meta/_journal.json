@@ -176,6 +176,13 @@
       "when": 1766175862054,
       "tag": "0024_misty_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1766340308186,
+      "tag": "0025_quiet_master_chief",
+      "breakpoints": true
     }
   ]
 }

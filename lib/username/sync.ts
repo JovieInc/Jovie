@@ -9,6 +9,29 @@ import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export type UsernameValidationErrorCode = 'INVALID_USERNAME' | 'USERNAME_TAKEN';
 
+/**
+ * Check if an error is a unique constraint violation on username_normalized
+ */
+function isUsernameUniqueConstraintViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const record = error as unknown as Record<string, unknown>;
+  const code = record?.code as string | undefined;
+  const message = (record?.message as string | undefined)?.toLowerCase() ?? '';
+  const constraint = (record?.constraint as string | undefined)?.toLowerCase();
+
+  // PostgreSQL unique violation code is 23505
+  if (code === '23505') {
+    return (
+      constraint === 'creator_profiles_username_normalized_unique' ||
+      message.includes('username_normalized') ||
+      message.includes('creator_profiles_username_normalized_unique')
+    );
+  }
+
+  return false;
+}
+
 export class UsernameValidationError extends Error {
   public readonly code: UsernameValidationErrorCode;
 
@@ -92,21 +115,37 @@ async function updateCanonicalUsernameInternal(
         };
       }
 
-      await tx
-        .update(creatorProfiles)
-        .set({
-          username: rawUsername,
-          usernameNormalized: normalized,
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profile.id));
+      // Wrap update in try-catch to handle race condition where another
+      // request claims the username between the check and the update.
+      // The unique constraint on username_normalized will catch this.
+      try {
+        await tx
+          .update(creatorProfiles)
+          .set({
+            username: rawUsername,
+            usernameNormalized: normalized,
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, profile.id));
 
-      return {
-        normalized,
-        changed: true,
-        conflict: false,
-        canonicalUsername: normalized,
-      };
+        return {
+          normalized,
+          changed: true,
+          conflict: false,
+          canonicalUsername: normalized,
+        };
+      } catch (error) {
+        // If unique constraint violation, treat as conflict (race condition)
+        if (isUsernameUniqueConstraintViolation(error)) {
+          return {
+            normalized,
+            changed: false,
+            conflict: true,
+            canonicalUsername,
+          };
+        }
+        throw error;
+      }
     },
     { clerkUserId }
   );

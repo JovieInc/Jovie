@@ -264,6 +264,9 @@ export const creatorProfiles = pgTable(
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   table => ({
+    usernameNormalizedUnique: uniqueIndex(
+      'creator_profiles_username_normalized_unique'
+    ).on(table.usernameNormalized),
     featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_with_name')
       .on(
         table.isPublic,

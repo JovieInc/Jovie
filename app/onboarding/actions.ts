@@ -20,6 +20,31 @@ import { syncCanonicalUsernameFromApp } from '@/lib/username/sync';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
+/**
+ * Check if an error is a unique constraint violation on username_normalized.
+ * Used to handle race conditions where the username is claimed between
+ * the availability check and the insert/update.
+ */
+function isUsernameUniqueConstraintViolation(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const record = error as unknown as Record<string, unknown>;
+  const code = record?.code as string | undefined;
+  const message = (record?.message as string | undefined)?.toLowerCase() ?? '';
+  const constraint = (record?.constraint as string | undefined)?.toLowerCase();
+
+  // PostgreSQL unique violation code is 23505
+  if (code === '23505') {
+    return (
+      constraint === 'creator_profiles_username_normalized_unique' ||
+      message.includes('username_normalized') ||
+      message.includes('creator_profiles_username_normalized_unique')
+    );
+  }
+
+  return false;
+}
+
 function getRequestBaseUrl(headersList: Headers): string {
   const host = headersList.get('x-forwarded-host') ?? headersList.get('host');
   const proto = headersList.get('x-forwarded-proto') ?? 'https';
@@ -209,16 +234,32 @@ export async function completeOnboarding({
         if (!existingUser) {
           await ensureEmailAvailable();
           await ensureHandleAvailable(null);
-          const result = await tx.execute(
-            drizzleSql<{ profile_id: string }>`
-              SELECT create_profile_with_user(
-                ${clerkUserId},
-                ${userEmail ?? null},
-                ${normalizedUsername},
-                ${trimmedDisplayName}
-              ) AS profile_id
-            `
-          );
+
+          // Wrap in try-catch to handle race conditions where username is
+          // claimed between the availability check and the insert
+          let result: { rows?: Array<{ profile_id?: string }> };
+          try {
+            result = await tx.execute(
+              drizzleSql<{ profile_id: string }>`
+                SELECT create_profile_with_user(
+                  ${clerkUserId},
+                  ${userEmail ?? null},
+                  ${normalizedUsername},
+                  ${trimmedDisplayName}
+                ) AS profile_id
+              `
+            );
+          } catch (error) {
+            if (isUsernameUniqueConstraintViolation(error)) {
+              throw onboardingErrorToError(
+                createOnboardingError(
+                  OnboardingErrorCode.USERNAME_TAKEN,
+                  'Handle already taken'
+                )
+              );
+            }
+            throw error;
+          }
 
           const profileId = result.rows?.[0]?.profile_id
             ? String(result.rows[0].profile_id)
@@ -253,19 +294,34 @@ export async function completeOnboarding({
           const nextDisplayName =
             trimmedDisplayName || existingProfile.displayName || username;
 
-          const [updated] = await tx
-            .update(creatorProfiles)
-            .set({
-              username: normalizedUsername,
-              usernameNormalized: normalizedUsername,
-              displayName: nextDisplayName,
-              onboardingCompletedAt:
-                existingProfile.onboardingCompletedAt ?? new Date(),
-              isPublic: true,
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, existingProfile.id))
-            .returning();
+          // Wrap in try-catch to handle race conditions where username is
+          // claimed between the availability check and the update
+          let updated: typeof existingProfile | undefined;
+          try {
+            [updated] = await tx
+              .update(creatorProfiles)
+              .set({
+                username: normalizedUsername,
+                usernameNormalized: normalizedUsername,
+                displayName: nextDisplayName,
+                onboardingCompletedAt:
+                  existingProfile.onboardingCompletedAt ?? new Date(),
+                isPublic: true,
+                updatedAt: new Date(),
+              })
+              .where(eq(creatorProfiles.id, existingProfile.id))
+              .returning();
+          } catch (error) {
+            if (isUsernameUniqueConstraintViolation(error)) {
+              throw onboardingErrorToError(
+                createOnboardingError(
+                  OnboardingErrorCode.USERNAME_TAKEN,
+                  'Handle already taken'
+                )
+              );
+            }
+            throw error;
+          }
 
           const updatedResult: CompletionResult = {
             username: updated?.usernameNormalized || normalizedUsername,
@@ -289,19 +345,35 @@ export async function completeOnboarding({
         // Fallback: user exists but no profile yet
         await ensureEmailAvailable();
         await ensureHandleAvailable(null);
-        const result = await tx.execute(
-          drizzleSql<{ profile_id: string }>`
-            SELECT create_profile_with_user(
-              ${clerkUserId},
-              ${userEmail ?? null},
-              ${normalizedUsername},
-              ${trimmedDisplayName}
-            ) AS profile_id
-          `
-        );
 
-        const profileId = result.rows?.[0]?.profile_id
-          ? String(result.rows[0].profile_id)
+        // Wrap in try-catch to handle race conditions where username is
+        // claimed between the availability check and the insert
+        let fallbackResult: { rows?: Array<{ profile_id?: string }> };
+        try {
+          fallbackResult = await tx.execute(
+            drizzleSql<{ profile_id: string }>`
+              SELECT create_profile_with_user(
+                ${clerkUserId},
+                ${userEmail ?? null},
+                ${normalizedUsername},
+                ${trimmedDisplayName}
+              ) AS profile_id
+            `
+          );
+        } catch (error) {
+          if (isUsernameUniqueConstraintViolation(error)) {
+            throw onboardingErrorToError(
+              createOnboardingError(
+                OnboardingErrorCode.USERNAME_TAKEN,
+                'Handle already taken'
+              )
+            );
+          }
+          throw error;
+        }
+
+        const profileId = fallbackResult.rows?.[0]?.profile_id
+          ? String(fallbackResult.rows[0].profile_id)
           : null;
 
         const created: CompletionResult = {

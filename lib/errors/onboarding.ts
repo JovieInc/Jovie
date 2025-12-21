@@ -110,7 +110,8 @@ export function mapDatabaseError(error: unknown): OnboardingError {
     if (
       errorMessage.includes('username') ||
       errorMessage.includes('username_normalized') ||
-      errorMessage.includes('creator_profiles_username_normalized_unique_idx')
+      constraint === 'creator_profiles_username_normalized_unique' ||
+      errorMessage.includes('creator_profiles_username_normalized_unique')
     ) {
       return createOnboardingError(
         OnboardingErrorCode.USERNAME_TAKEN,
