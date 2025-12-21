@@ -51,11 +51,13 @@ function sleep(ms: number): Promise<void> {
 
 // In-memory cache for mock responses to reduce server load during testing
 // Cache expires after 10 seconds to balance performance with realistic behavior
+// Max size of 1000 entries to prevent memory exhaustion during load testing
 const mockResponseCache = new Map<
   string,
   { result: { available: boolean }; expiry: number }
 >();
 const MOCK_CACHE_TTL = 10 * 1000; // 10 seconds
+const MOCK_CACHE_MAX_SIZE = 1000; // Max entries to prevent memory exhaustion
 
 // Helper function to get cached mock response
 function getCachedMockResponse(handle: string) {
@@ -66,8 +68,29 @@ function getCachedMockResponse(handle: string) {
   return null;
 }
 
-// Helper function to cache mock response
+// Helper function to cache mock response with LRU-style eviction
 function cacheMockResponse(handle: string, result: { available: boolean }) {
+  // Evict oldest entries if cache is full
+  if (mockResponseCache.size >= MOCK_CACHE_MAX_SIZE) {
+    const now = Date.now();
+    // First, remove expired entries
+    for (const [key, value] of mockResponseCache.entries()) {
+      if (value.expiry < now) {
+        mockResponseCache.delete(key);
+      }
+    }
+    // If still too full, remove oldest 10%
+    if (mockResponseCache.size >= MOCK_CACHE_MAX_SIZE) {
+      const keysToDelete = Array.from(mockResponseCache.keys()).slice(
+        0,
+        Math.ceil(MOCK_CACHE_MAX_SIZE * 0.1)
+      );
+      for (const key of keysToDelete) {
+        mockResponseCache.delete(key);
+      }
+    }
+  }
+
   mockResponseCache.set(handle, {
     result,
     expiry: Date.now() + MOCK_CACHE_TTL,

@@ -21,8 +21,12 @@ BEGIN
   IF duplicate_count > 0 THEN
     RAISE NOTICE 'Found % duplicate username_normalized values. Resolving by keeping oldest profile...', duplicate_count;
 
-    -- For each duplicate set, keep the oldest (first created) and null out the rest
-    -- This preserves data while allowing the unique constraint to be added
+    -- For each duplicate set, keep the oldest (first created) and rename duplicates
+    -- NOTE: This modifies BOTH username_normalized AND username (user-facing handle)
+    -- This is intentional because:
+    -- 1. Duplicates should only exist for unclaimed/legacy profiles from data imports
+    -- 2. If a profile is claimed, the user can change their handle via settings
+    -- 3. Keeping username in sync with username_normalized maintains data consistency
     UPDATE creator_profiles cp
     SET username_normalized = username_normalized || '-duplicate-' || id::text,
         username = username || '-duplicate-' || id::text

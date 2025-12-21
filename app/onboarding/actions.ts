@@ -119,12 +119,10 @@ async function uploadRemoteAvatar(params: {
         continue;
       }
 
-      // Success!
-      if (attempt > 0) {
-        console.info(
-          `[AVATAR_UPLOAD] Succeeded after ${attempt + 1} attempts`
-        );
-      }
+      // Success - always log for monitoring
+      console.info(
+        `[AVATAR_UPLOAD] Succeeded (${attempt + 1} attempt${attempt === 0 ? '' : 's'})`
+      );
       return { blobUrl, photoId, retriesUsed: attempt };
     } catch (error) {
       lastError =

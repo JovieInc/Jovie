@@ -22,8 +22,8 @@ function checkInMemoryOnboardingLimit(key: string): boolean {
   const now = Date.now();
   const entry = inMemoryOnboardingAttempts.get(key);
 
-  // Clean up expired entries periodically (10% chance)
-  if (Math.random() < 0.1) {
+  // Clean up expired entries periodically (25% chance for more predictable memory usage)
+  if (Math.random() < 0.25) {
     for (const [k, v] of inMemoryOnboardingAttempts.entries()) {
       if (now > v.resetTime) {
         inMemoryOnboardingAttempts.delete(k);
