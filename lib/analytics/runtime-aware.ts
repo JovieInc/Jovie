@@ -3,6 +3,8 @@
  * This module provides analytics tracking that works in both Node.js and Edge runtime
  */
 
+import * as Sentry from '@sentry/nextjs';
+
 /**
  * Detect the current runtime environment
  */
@@ -52,12 +54,18 @@ export async function trackEvent(
       console.log(`[Analytics ${runtime}] ${event}`, eventProperties);
     }
 
-    // In production, server analytics are currently disabled (no external calls).
-    if (process.env.NODE_ENV !== 'development') {
-      return;
+    // In production, send critical events to Sentry for observability
+    if (
+      process.env.NODE_ENV === 'production' &&
+      (event.startsWith('$exception') || event.startsWith('error'))
+    ) {
+      Sentry.addBreadcrumb({
+        category: 'analytics',
+        message: event,
+        data: eventProperties,
+        level: event.includes('critical') ? 'fatal' : 'error',
+      });
     }
-
-    // In development, we already logged above; no further action.
   } catch (error) {
     // Log error but don't throw - analytics should never break the application
     console.error('[Analytics] Error tracking event:', error);
