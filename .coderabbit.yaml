@@ -1,0 +1,82 @@
+# CodeRabbit Configuration for Jovie
+# See: https://docs.coderabbit.ai/reference/configuration
+
+language: en-US
+early_access: true
+
+reviews:
+  profile: balanced
+  request_changes_workflow: true
+  high_level_summary: true
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    drafts: true
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "[skip ci]"
+
+  path_instructions:
+    - path: "drizzle/migrations/**"
+      instructions: |
+        CRITICAL: Database migrations require extra scrutiny.
+        - Check for CONCURRENTLY keyword (forbidden in Drizzle migrations)
+        - Verify IF NOT EXISTS/IF EXISTS for idempotency
+        - Ensure migration is registered in _journal.json
+        - Validate no destructive operations without data migration plan
+
+    - path: "lib/db/schema.ts"
+      instructions: |
+        Schema changes trigger blocking migration review.
+        - Verify corresponding migrations exist
+        - Check for proper types (jsonb over json, text over varchar)
+        - Ensure RLS-compatible patterns are followed
+
+    - path: "app/(auth)/**"
+      instructions: |
+        Authentication code is high-risk.
+        - Verify Clerk integration follows best practices
+        - Check for proper session handling
+        - Ensure no hardcoded credentials or tokens
+
+    - path: "app/api/stripe/**"
+      instructions: |
+        Payment code is high-risk.
+        - Verify webhook signature validation
+        - Check for proper error handling and idempotency
+        - Confirm Node runtime (not Edge)
+
+    - path: "middleware.ts"
+      instructions: |
+        Middleware affects all routes.
+        - Verify route matching is correct
+        - Check for performance implications
+        - Ensure proper Clerk middleware usage
+
+    - path: "app/onboarding/**"
+      instructions: |
+        Onboarding is a core user flow.
+        - Ensure flow completeness (name -> handle -> done)
+        - Verify proper error states and validation
+        - Check for proper Clerk user sync
+
+    - path: ".github/workflows/**"
+      instructions: |
+        CI/CD changes can break the deployment pipeline.
+        - Verify job dependencies are correct
+        - Check for proper secret handling
+        - Ensure timeout values are appropriate
+        - Validate concurrency settings
+
+chat:
+  auto_reply: true
+
+tools:
+  shellcheck:
+    enabled: true
+  eslint:
+    enabled: true
+  actionlint:
+    enabled: true
