@@ -1,28 +1,15 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
-import { Suspense } from 'react';
-import { ActionDrivenProfileSection } from '@/components/home/ActionDrivenProfileSection';
-import { FeaturedArtistsClient } from '@/components/home/FeaturedArtistsClient';
-import { NewHomeHero } from '@/components/home/NewHomeHero';
-import { NewSocialProofSection } from '@/components/home/NewSocialProofSection';
-import { ProfileFeatureCardsModal } from '@/components/home/ProfileFeatureCardsModal';
-import { DeferredSection } from '@/components/organisms/DeferredSection';
-import { Container } from '@/components/site/Container';
+import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { InsightSection } from '@/components/home/InsightSection';
+import { ProblemSection } from '@/components/home/ProblemSection';
+import { RedesignedHero } from '@/components/home/RedesignedHero';
+import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
 
-// Use a client wrapper for the Featured Artists carousel to avoid ssr:false in a Server Component
-const NewHowItWorks = dynamic(() =>
-  import('@/components/home/NewHowItWorks').then(m => m.NewHowItWorks)
-);
-
-// Note: revalidate removed for cacheComponents compatibility
-// Use 'use cache' directive with cacheLife() for caching instead
-
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} - Claim your @handle`;
+  const title = `${APP_NAME} — The AI link-in-bio built for artists`;
   const description =
-    "Secure your name. Share a profile that's fast, beautiful, and optimized to convert.";
+    'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.';
   const keywords = [
     'creator profile',
     'music artist',
@@ -116,7 +103,8 @@ export default function HomePage() {
             '@context': 'https://schema.org',
             '@type': 'WebSite',
             name: APP_NAME,
-            description: 'Claim your @handle',
+            description:
+              'Turn casual listeners into email and SMS subscribers. New fans subscribe first. Returning fans go straight to Spotify, Apple Music, or YouTube.',
             url: APP_URL,
             potentialAction: {
               '@type': 'SearchAction',
@@ -144,133 +132,21 @@ export default function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-base text-primary-token dark:[--color-bg-base:#08090a]'>
-        {/* 1. Hero Section (above the fold) */}
-        <NewHomeHero />
+      <div className='relative min-h-screen bg-base text-primary-token'>
+        {/* 1. Hero Section */}
+        <RedesignedHero />
 
-        {/* 2. Social proof (team credibility) */}
-        <NewSocialProofSection />
+        {/* 2. Problem Section */}
+        <ProblemSection />
 
-        <Suspense
-          fallback={
-            <section className='py-10 bg-base'>
-              <Container size='md'>
-                <div className='text-center py-8'>
-                  <p className='text-sm font-medium text-secondary-token'>
-                    Explore example Jovie profiles
-                  </p>
-                </div>
-              </Container>
-            </section>
-          }
-        >
-          <FeaturedArtistsClient showFades={false} />
-        </Suspense>
+        {/* 3. Insight Section */}
+        <InsightSection />
 
-        <section className='relative py-14 sm:py-16 bg-base overflow-hidden'>
-          <div className='absolute inset-0 -z-10'>
-            <div className='absolute inset-0 grid-bg opacity-60' />
-            <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.10),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.20),transparent)]' />
-            <div className='pointer-events-none absolute inset-x-0 top-0 h-24 bg-linear-to-b from-base to-transparent dark:from-base' />
-            <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
-          </div>
+        {/* 4. What You Get Section */}
+        <WhatYouGetSection />
 
-          <Container size='md'>
-            <div className='mx-auto max-w-5xl'>
-              <div className='flex flex-col gap-6 md:flex-row md:items-start md:justify-between'>
-                <div className='md:max-w-xl'>
-                  <h2 className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
-                    <span className='block'>Purpose-built for</span>
-                    <span className='block'>music creators</span>
-                  </h2>
-                </div>
-                <div className='md:text-right'>
-                  <div className='flex items-baseline gap-2 md:justify-end'>
-                    <div className='text-4xl sm:text-5xl font-medium tracking-tight text-primary-token'>
-                      90M+
-                    </div>
-                    <div className='text-sm sm:text-base font-medium text-secondary-token'>
-                      streams
-                    </div>
-                  </div>
-                  <p className='mt-2 ml-auto max-w-[26ch] text-xs sm:text-sm text-secondary-token leading-snug'>
-                    Driven to emerging acts by the team behind Jovie.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Container>
-        </section>
-        <DeferredSection
-          testId='deferred-action-driven'
-          placeholderHeight={720}
-          rootMargin='240px 0px'
-        >
-          <ActionDrivenProfileSection />
-        </DeferredSection>
-
-        <DeferredSection
-          testId='deferred-profile-features'
-          placeholderHeight={560}
-          rootMargin='240px 0px'
-        >
-          <section className='relative pb-14 sm:pb-16 bg-base overflow-hidden'>
-            <div className='absolute inset-0 -z-10'>
-              <div className='absolute inset-0 grid-bg opacity-60' />
-              <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.08),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.18),transparent)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-base to-transparent dark:from-base' />
-            </div>
-
-            <Container size='md'>
-              <div className='mx-auto max-w-5xl'>
-                <ProfileFeatureCardsModal />
-              </div>
-            </Container>
-          </section>
-        </DeferredSection>
-
-        {/* 4. How it works (3 steps) */}
-        <DeferredSection
-          testId='deferred-how-it-works'
-          placeholderHeight={520}
-          rootMargin='240px 0px'
-        >
-          <NewHowItWorks />
-        </DeferredSection>
-
-        {/* 6. Conversion CTA */}
-        <DeferredSection
-          testId='deferred-cta'
-          placeholderHeight={260}
-          rootMargin='240px 0px'
-        >
-          <section className='relative py-14 sm:py-16 bg-base overflow-hidden border-t border-subtle'>
-            <div className='absolute inset-0 -z-10'>
-              <div className='absolute inset-0 grid-bg opacity-60' />
-              <div className='absolute inset-0 bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_55%_at_50%_-10%,rgba(120,119,198,0.22),transparent)]' />
-            </div>
-            <Container size='md'>
-              <div className='mx-auto max-w-5xl'>
-                <div className='flex flex-col gap-6 md:flex-row md:items-center md:justify-between'>
-                  <div className='min-w-0'>
-                    <h2 className='text-2xl sm:text-3xl font-medium tracking-tight text-primary-token'>
-                      Claim your @handle. Build your audience.
-                    </h2>
-                  </div>
-
-                  <div className='flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end'>
-                    <Link
-                      href='/waitlist'
-                      className='inline-flex h-11 items-center justify-center rounded-lg bg-btn-primary px-5 text-sm font-medium text-btn-primary-foreground hover:bg-btn-primary/90 focus-ring-themed'
-                    >
-                      Request early access
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </Container>
-          </section>
-        </DeferredSection>
+        {/* 5. Final CTA Section */}
+        <FinalCTASection />
       </div>
     </>
   );

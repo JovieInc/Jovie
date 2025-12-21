@@ -1,11 +1,11 @@
 'use client';
 
 import { Badge, Button, Input } from '@jovie/ui';
+import { Copy, UserCog } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { Copy, UserCog } from 'lucide-react';
-import { Table, type Column } from '@/components/admin/table';
+import { type Column, Table } from '@/components/admin/table';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
 import { useAdminTablePaginationLinks } from '@/components/admin/table/useAdminTablePaginationLinks';
 import { UserActionsMenu } from '@/components/admin/UserActionsMenu';

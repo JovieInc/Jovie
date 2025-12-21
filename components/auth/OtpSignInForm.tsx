@@ -276,7 +276,7 @@ export function OtpSignInForm() {
                             <span>Sending code...</span>
                           </>
                         ) : (
-                          'Send code'
+                          'Continue with email'
                         )}
                       </SignIn.Action>
                     )}

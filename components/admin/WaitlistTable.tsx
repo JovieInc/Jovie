@@ -9,7 +9,7 @@ import {
 } from '@jovie/ui';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Table, type Column } from '@/components/admin/table';
+import { type Column, Table } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 
 /** Map platform ID to display name */
