@@ -6,7 +6,7 @@ import { cardTokens } from '../tokens/card-tokens';
 interface AnalyticsCardProps {
   title: string;
   value: number | string;
-  metadata?: string;
+  metadata?: ReactNode;
   order?: string;
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   iconClassName?: string;
