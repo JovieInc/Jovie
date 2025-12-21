@@ -188,6 +188,12 @@ export function ArtistNotificationsCTA({
     if (isSubmitting) return;
     setChannel(next);
     setError(null);
+    // Clear inputs when switching channels to prevent stale data
+    if (next === 'email') {
+      setPhoneInput('');
+    } else {
+      setEmailInput('');
+    }
   };
 
   const handlePhoneChange = (value: string) => {
@@ -487,7 +493,7 @@ export function ArtistNotificationsCTA({
                   onClick={() => handleChannelChange('email')}
                   disabled={isSubmitting}
                 >
-                  <Phone className='w-4 h-4' aria-hidden='true' />
+                  <Mail className='w-4 h-4' aria-hidden='true' />
                 </button>
               )
             ) : (
@@ -498,7 +504,7 @@ export function ArtistNotificationsCTA({
                 onClick={() => handleChannelChange('sms')}
                 disabled={isSubmitting}
               >
-                <Mail className='w-4 h-4' aria-hidden='true' />
+                <Phone className='w-4 h-4' aria-hidden='true' />
               </button>
             )}
 
