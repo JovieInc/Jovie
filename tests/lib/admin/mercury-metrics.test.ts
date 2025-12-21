@@ -29,6 +29,10 @@ describe('getAdminMercuryMetrics', () => {
       balanceUsd: 0,
       burnRateUsd: 0,
       burnWindowDays: 30,
+      isConfigured: false,
+      isAvailable: false,
+      errorMessage:
+        'Mercury credentials not configured (MERCURY_API_TOKEN and MERCURY_CHECKING_ACCOUNT_ID required)',
     });
   });
 
@@ -59,5 +63,23 @@ describe('getAdminMercuryMetrics', () => {
     expect(metrics.balanceUsd).toBe(2500);
     expect(metrics.burnRateUsd).toBe(75);
     expect(metrics.burnWindowDays).toBe(30);
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(true);
+    expect(metrics.errorMessage).toBeUndefined();
+  });
+
+  it('returns isAvailable false when Mercury API fails', async () => {
+    process.env.MERCURY_API_TOKEN = 'token';
+    process.env.MERCURY_CHECKING_ACCOUNT_ID = 'acct_123';
+
+    fetchMock.mockRejectedValueOnce(new Error('Network error'));
+
+    const metrics = await getAdminMercuryMetrics();
+
+    expect(metrics.balanceUsd).toBe(0);
+    expect(metrics.burnRateUsd).toBe(0);
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.errorMessage).toContain('Mercury API error');
   });
 });
