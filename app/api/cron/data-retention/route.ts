@@ -8,25 +8,44 @@
  * Authorization: Requires CRON_SECRET header
  */
 
+import crypto from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for cleanup
 
-const CRON_SECRET = process.env.CRON_SECRET;
+/**
+ * Timing-safe comparison of cron secret to prevent timing attacks
+ */
+function verifyCronSecret(provided: string | undefined): boolean {
+  const expected = process.env.CRON_SECRET;
+  if (!expected || !provided) {
+    return false;
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
 
 export async function GET(request: NextRequest) {
   // Verify cron authorization
   const authHeader = request.headers.get('authorization');
   const cronSecret = authHeader?.replace('Bearer ', '');
 
-  if (!CRON_SECRET) {
+  if (!process.env.CRON_SECRET) {
     console.error('[Data Retention Cron] CRON_SECRET not configured');
     return NextResponse.json({ error: 'Cron not configured' }, { status: 500 });
   }
 
-  if (cronSecret !== CRON_SECRET) {
+  if (!verifyCronSecret(cronSecret)) {
     console.warn('[Data Retention Cron] Unauthorized access attempt');
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
