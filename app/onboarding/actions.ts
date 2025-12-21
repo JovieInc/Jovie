@@ -398,11 +398,6 @@ export async function completeOnboarding({
     // Step 7: Avatar upload (non-blocking, with retry and logging)
     // Avatar upload failures are logged but don't block onboarding completion
     const profileId = completion.profileId;
-    let avatarUploadResult: {
-      success: boolean;
-      error?: string;
-      retriesUsed?: number;
-    } = { success: false };
 
     if (profileId && oauthAvatarUrl) {
       try {
@@ -441,28 +436,14 @@ export async function completeOnboarding({
               .where(eq(profilePhotos.id, uploaded.photoId));
           });
 
-          avatarUploadResult = {
-            success: true,
-            retriesUsed: uploaded.retriesUsed,
-          };
+          // Upload successful
         } else {
-          avatarUploadResult = {
-            success: false,
-            error: 'Upload failed after retries',
-          };
           console.warn(
             '[ONBOARDING] Avatar upload failed for profile:',
             profileId
           );
         }
       } catch (avatarError) {
-        avatarUploadResult = {
-          success: false,
-          error:
-            avatarError instanceof Error
-              ? avatarError.message
-              : 'Unknown error',
-        };
         console.error(
           '[ONBOARDING] Avatar upload exception for profile:',
           profileId,

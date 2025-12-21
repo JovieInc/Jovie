@@ -93,6 +93,8 @@ export function AudienceMemberSidebar({
       width={AUDIENCE_MEMBER_SIDEBAR_WIDTH}
       ariaLabel='Audience member details'
       className='bg-sidebar-surface border-sidebar-border'
+      mobileFullScreen
+      onBackdropClick={onClose}
     >
       <div
         className='flex h-12 items-center justify-between border-b border-subtle px-4 shrink-0'
