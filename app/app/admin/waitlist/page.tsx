@@ -34,11 +34,13 @@ export default async function AdminWaitlistPage({
       ? pageSizeParam
       : 20;
 
-  const [{ entries, page: currentPage, pageSize: resolvedPageSize, total }, metrics] =
-    await Promise.all([
-      getAdminWaitlistEntries({ page, pageSize }),
-      getWaitlistMetrics(),
-    ]);
+  const [
+    { entries, page: currentPage, pageSize: resolvedPageSize, total },
+    metrics,
+  ] = await Promise.all([
+    getAdminWaitlistEntries({ page, pageSize }),
+    getWaitlistMetrics(),
+  ]);
 
   return (
     <div className='flex h-full min-h-0 flex-col'>
