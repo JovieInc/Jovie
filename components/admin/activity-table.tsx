@@ -1,3 +1,5 @@
+'use client';
+
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { useMemo } from 'react';
 import { type Column, Table } from '@/components/admin/table';
