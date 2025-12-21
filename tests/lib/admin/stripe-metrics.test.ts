@@ -12,6 +12,12 @@ vi.mock('@/lib/stripe/client', () => ({
   },
 }));
 
+vi.mock('@/lib/env-server', () => ({
+  env: {
+    STRIPE_SECRET_KEY: 'sk_test_mock',
+  },
+}));
+
 function makeSubscription(
   overrides: Partial<Stripe.Subscription> & {
     items: Stripe.Subscription['items'];
@@ -116,5 +122,20 @@ describe('getAdminStripeOverviewMetrics', () => {
     expect(metrics.mrrUsd30dAgo).toBe(10);
     expect(metrics.mrrGrowth30dUsd).toBe(20);
     expect(metrics.activeSubscribers).toBe(2);
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(true);
+    expect(metrics.errorMessage).toBeUndefined();
+  });
+
+  it('returns isAvailable false when Stripe API fails', async () => {
+    listMock.mockRejectedValueOnce(new Error('Stripe API error'));
+
+    const metrics = await getAdminStripeOverviewMetrics();
+
+    expect(metrics.mrrUsd).toBe(0);
+    expect(metrics.activeSubscribers).toBe(0);
+    expect(metrics.isConfigured).toBe(true);
+    expect(metrics.isAvailable).toBe(false);
+    expect(metrics.errorMessage).toContain('Stripe API error');
   });
 });

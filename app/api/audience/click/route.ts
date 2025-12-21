@@ -4,10 +4,17 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { detectBot } from '@/lib/utils/bot-detection';
+import { extractClientIP } from '@/lib/utils/ip-extraction';
+import {
+  checkPublicRateLimit,
+  getPublicRateLimitStatus,
+} from '@/lib/utils/rate-limit';
 import {
   createFingerprint,
   deriveIntentLevel,
   getActionWeight,
+  hashIpAddress,
   trimHistory,
 } from '../lib/audience-utils';
 
@@ -110,6 +117,36 @@ async function findAudienceMember(
 
 export async function POST(request: NextRequest) {
   try {
+    // Extract client IP for rate limiting
+    const clientIP = extractClientIP(request.headers);
+
+    // Rate limiting check
+    if (checkPublicRateLimit(clientIP, 'click')) {
+      const status = getPublicRateLimitStatus(clientIP, 'click');
+      return NextResponse.json(
+        { error: 'Rate limit exceeded' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            'Retry-After': String(status.retryAfterSeconds),
+            'X-RateLimit-Limit': String(status.limit),
+            'X-RateLimit-Remaining': String(status.remaining),
+          },
+        }
+      );
+    }
+
+    // Bot detection - silently skip recording for bots
+    const botResult = detectBot(request, '/api/audience/click');
+    if (botResult.isBot) {
+      // Return success but don't record - prevents metric inflation
+      return NextResponse.json(
+        { success: true, fingerprint: 'bot-filtered' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = await request.json();
     const parsed = clickSchema.safeParse(body);
 
@@ -138,8 +175,12 @@ export async function POST(request: NextRequest) {
       audienceMemberId,
     } = parsed.data;
 
+    // Resolve IP address from body or headers
+    const resolvedIpAddress = ipAddress ?? clientIP ?? undefined;
+
+    // Validate profile exists AND is public before recording
     const [profile] = await db
-      .select({ id: creatorProfiles.id })
+      .select({ id: creatorProfiles.id, isPublic: creatorProfiles.isPublic })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
       .limit(1);
@@ -151,7 +192,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const fingerprint = createFingerprint(ipAddress, userAgent);
+    // Only record clicks for public profiles
+    if (!profile.isPublic) {
+      return NextResponse.json(
+        { error: 'Profile is not public' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const fingerprint = createFingerprint(resolvedIpAddress, userAgent);
+    // Hash IP before storage for privacy compliance
+    const hashedIp = hashIpAddress(resolvedIpAddress);
     const normalizedDevice = deviceType ?? 'unknown';
     const now = new Date();
 
@@ -231,7 +282,7 @@ export async function POST(request: NextRequest) {
         creatorProfileId: profileId,
         linkId,
         linkType,
-        ipAddress,
+        ipAddress: hashedIp, // Store hashed IP for privacy compliance
         userAgent,
         referrer,
         country,

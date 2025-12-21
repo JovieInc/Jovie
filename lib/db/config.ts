@@ -51,6 +51,25 @@ export const RATE_LIMIT_CONFIG = {
   healthWindow: 60,
 } as const;
 
+// Rate limiting configuration for public profile routes
+export const PUBLIC_RATE_LIMIT_CONFIG = {
+  // Profile page: 100 requests/minute per IP
+  profile: {
+    requests: 100,
+    windowSeconds: 60,
+  },
+  // Click endpoint: 50 requests/minute per IP
+  click: {
+    requests: 50,
+    windowSeconds: 60,
+  },
+  // Visit endpoint: 50 requests/minute per IP
+  visit: {
+    requests: 50,
+    windowSeconds: 60,
+  },
+} as const;
+
 // Database operation contexts for better error tracking
 export const DB_CONTEXTS = {
   connection: 'connection',
