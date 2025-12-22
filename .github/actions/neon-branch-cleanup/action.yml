@@ -79,24 +79,6 @@ runs:
         # Convert protected branches to array for checking
         IFS=',' read -ra PROTECTED_ARRAY <<< "$PROTECTED_BRANCHES"
 
-        # Function to check if a branch is protected
-        is_protected() {
-          local branch_name="$1"
-          for protected in "${PROTECTED_ARRAY[@]}"; do
-            # Trim whitespace
-            protected=$(echo "$protected" | xargs)
-            if [[ "$branch_name" == "$protected" ]]; then
-              return 0
-            fi
-            # Also protect if it starts with the protected name (e.g., br-main-xxx)
-            if [[ "$branch_name" == "$protected"* && "$protected" =~ ^(main|production)$ ]]; then
-              # Only exact matches for main/production
-              continue
-            fi
-          done
-          return 1
-        }
-
         # Get branches sorted by creation time (oldest first), excluding protected ones
         DELETABLE_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r '
           sort_by(.created_at) |
@@ -104,7 +86,11 @@ runs:
         ')
 
         DELETED_COUNT=0
-        TARGET_COUNT=$((BRANCH_LIMIT - 3))  # Keep 3 slots free for new branches
+        # Keep 3 slots free for new branches, but ensure TARGET_COUNT is at least 1
+        TARGET_COUNT=$((BRANCH_LIMIT - 3))
+        if [ "$TARGET_COUNT" -lt 1 ]; then
+          TARGET_COUNT=1
+        fi
 
         while IFS= read -r branch_name; do
           [ -z "$branch_name" ] && continue

@@ -486,12 +486,15 @@
         }, timeout);
       }
 
-      function _openSocial(platform, url) {
+      // These functions are called from inline onclick handlers in the HTML
+      // biome-ignore lint/correctness/noUnusedVariables: used by onclick handlers
+      function openSocial(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);
       }
 
-      function _openDSP(platform, url) {
+      // biome-ignore lint/correctness/noUnusedVariables: used by onclick handlers
+      function openDSP(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);
       }
