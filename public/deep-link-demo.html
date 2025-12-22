@@ -462,7 +462,7 @@
             setTimeout(() => {
               try {
                 document.body.removeChild(iframe);
-              } catch (e) {
+              } catch (_e) {
                 // Iframe might already be removed
               }
             }, 100);
@@ -486,12 +486,12 @@
         }, timeout);
       }
 
-      function openSocial(platform, url) {
+      function _openSocial(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);
       }
 
-      function openDSP(platform, url) {
+      function _openDSP(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);
       }

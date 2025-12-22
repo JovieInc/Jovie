@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import React from 'react';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
 
 // Create a mock version of the component for Storybook

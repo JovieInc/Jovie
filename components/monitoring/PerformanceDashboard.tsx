@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Metric } from 'web-vitals';
 
 interface PerformanceMetric {

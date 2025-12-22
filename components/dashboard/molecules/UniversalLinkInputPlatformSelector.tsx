@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import React from 'react';
 
 import { getPlatformIcon, SocialIcon } from '@/components/atoms/SocialIcon';
 import { isBrandDark } from '@/lib/utils/color';

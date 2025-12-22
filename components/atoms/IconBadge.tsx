@@ -1,4 +1,3 @@
-import React from 'react';
 import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 

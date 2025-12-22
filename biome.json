@@ -18,9 +18,39 @@
     "lineEnding": "lf"
   },
   "linter": {
-    "enabled": false
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "warn",
+        "noConstAssign": "error",
+        "noUndeclaredVariables": "error",
+        "noUnreachable": "error",
+        "noInvalidConstructorSuper": "error"
+      },
+      "suspicious": {
+        "noDuplicateObjectKeys": "error",
+        "noDebugger": "error",
+        "noFallthroughSwitchClause": "error"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
+      }
+    }
   },
   "javascript": {
+    "globals": [
+      "describe",
+      "it",
+      "expect",
+      "beforeEach",
+      "afterEach",
+      "beforeAll",
+      "afterAll",
+      "vi",
+      "test"
+    ],
     "formatter": {
       "quoteStyle": "single",
       "jsxQuoteStyle": "single",

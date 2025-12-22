@@ -1,4 +1,3 @@
-import React from 'react';
 import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';

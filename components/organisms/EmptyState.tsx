@@ -6,7 +6,6 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
-import React from 'react';
 
 interface EmptyStateProps {
   type: 'music' | 'social' | 'links' | 'analytics' | 'general';

@@ -2,7 +2,6 @@
 
 import { Button } from '@jovie/ui';
 import type { ComponentType } from 'react';
-import * as React from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 
 export interface SettingsProGateCardProps {

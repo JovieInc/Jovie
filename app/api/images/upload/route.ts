@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { db, profilePhotos, users } from '@/lib/db';
+import { profilePhotos, users } from '@/lib/db';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,

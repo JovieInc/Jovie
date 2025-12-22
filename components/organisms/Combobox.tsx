@@ -7,7 +7,7 @@ import {
 } from '@heroicons/react/20/solid';
 import { clsx } from 'clsx';
 import Image from 'next/image';
-import React, {
+import {
   forwardRef,
   KeyboardEvent,
   useCallback,

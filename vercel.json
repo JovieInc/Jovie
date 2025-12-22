@@ -5,6 +5,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/cleanup-idempotency-keys",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/billing-reconciliation",
       "schedule": "0 * * * *"
     }
