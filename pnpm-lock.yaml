@@ -177,8 +177,8 @@ importers:
         specifier: ^3.30.0
         version: 3.30.2
       '@statsig/web-analytics':
-        specifier: ^3.30.0
-        version: 3.30.2
+        specifier: ^3.31.0
+        version: 3.31.0
       '@stripe/stripe-js':
         specifier: ^7.8.0
         version: 7.9.0
@@ -3104,8 +3104,14 @@ packages:
   '@statsig/client-core@3.30.2':
     resolution: {integrity: sha512-F3u1+LDml6IFz/tMbSYI0pEOMR13OHM71lLJ3RuoWpK2KpCwfsHpt7kBmUKJxUXZ05CP/jWgmhG/ROj7eqDCPQ==}
 
+  '@statsig/client-core@3.31.0':
+    resolution: {integrity: sha512-SuxQD6TmVszPG7FoMKwTk/uyBuVFk7XnxI3T/E0uyb7PL7GNjONtfsoh+NqBBVUJVse0CUeSFfgJPoZy1ZOslQ==}
+
   '@statsig/js-client@3.30.2':
     resolution: {integrity: sha512-Cjs4uzyAxt1sw44oa6qSNWuZdO11jmgrpOVBC2NajtpA55GBmAfjZ3vQdXizUffUZMRmFiEpGwxi9zmjFEG7Sw==}
+
+  '@statsig/js-client@3.31.0':
+    resolution: {integrity: sha512-LFa5E0LjT6sTfZv3sNGoyRLSZ1078+agdgOA+Vm1ecjG+KbSOfBLTW7hMwimrJ29slRwbYDzbtKaPJo/R37N2g==}
 
   '@statsig/react-bindings@3.30.2':
     resolution: {integrity: sha512-tICFOSpKXaZBiuR+nJrI17hCVOFm0d//dXt41auw9Mhkbn43GwwEdBR8LjUiwxvQ6zVvWshjRUkYi13miBnh4g==}
@@ -3115,8 +3121,8 @@ packages:
   '@statsig/session-replay@3.30.2':
     resolution: {integrity: sha512-GTWFAnT6NqQzbFpqj9ojvBn42R8VlFXadwqP40fxOjwqboPIJrJ1NAAD+BzehTXoUnMi2vGviqsStgHNGrJ3TA==}
 
-  '@statsig/web-analytics@3.30.2':
-    resolution: {integrity: sha512-KfrBtUp7xsXTosdeLuzK63R/cXOZBE/BOLX8Z2+XcnMZO8rZycG89anN/zVGgGQpqKAoaCQFD9nEoMot3KcGXQ==}
+  '@statsig/web-analytics@3.31.0':
+    resolution: {integrity: sha512-CmDzhKWuEWOkPmok6RC0K8Gq0C9SUTwYuIpExAxbHuf+GD+YAOHhWDnKnWKFaN9mBaTRcIvciX0hT/W+cGD0ug==}
 
   '@storybook/addon-a11y@10.1.4':
     resolution: {integrity: sha512-go7SshAyu+pnK7Prq3UnCBCB7DxAQkPMnebsv3fnboeTZHnDXQqfmHdZ15o+pH0JsCedC05RYsdbjd2rMHMvFQ==}
@@ -12419,9 +12425,15 @@ snapshots:
 
   '@statsig/client-core@3.30.2': {}
 
+  '@statsig/client-core@3.31.0': {}
+
   '@statsig/js-client@3.30.2':
     dependencies:
       '@statsig/client-core': 3.30.2
+
+  '@statsig/js-client@3.31.0':
+    dependencies:
+      '@statsig/client-core': 3.31.0
 
   '@statsig/react-bindings@3.30.2(react@18.3.1)':
     dependencies:
@@ -12435,10 +12447,10 @@ snapshots:
       '@statsig/client-core': 3.30.2
       rrweb: 2.0.0-alpha.17
 
-  '@statsig/web-analytics@3.30.2':
+  '@statsig/web-analytics@3.31.0':
     dependencies:
-      '@statsig/client-core': 3.30.2
-      '@statsig/js-client': 3.30.2
+      '@statsig/client-core': 3.31.0
+      '@statsig/js-client': 3.31.0
       web-vitals: 5.0.3
 
   '@storybook/addon-a11y@10.1.4(storybook@10.1.10(@testing-library/dom@10.4.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))':
