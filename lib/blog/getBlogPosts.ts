@@ -9,6 +9,7 @@ const BLOG_DIRECTORY = path.join(process.cwd(), 'content', 'blog');
 
 export interface BlogPostMetadata {
   title: string;
+  date: string;
   author: string;
   authorTitle?: string;
   authorProfile?: string;
@@ -68,6 +69,7 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
   return {
     slug,
     title: data.title ?? formatTitleFromSlug(slug),
+    date: data.date ?? new Date().toISOString().split('T')[0],
     author: data.author ?? DEFAULT_AUTHOR,
     authorTitle: data.authorTitle,
     authorProfile: data.authorProfile,
@@ -94,6 +96,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
       return {
         slug,
         title: data.title ?? formatTitleFromSlug(slug),
+        date: data.date ?? new Date().toISOString().split('T')[0],
         author: data.author ?? DEFAULT_AUTHOR,
         authorTitle: data.authorTitle,
         authorProfile: data.authorProfile,
@@ -103,7 +106,10 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
     })
   );
 
-  return posts.sort((a, b) => a.title.localeCompare(b.title));
+  // Sort by date descending (newest first)
+  return posts.sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
 });
 
 export const getBlogPostSlugs = cache(async (): Promise<string[]> => {
