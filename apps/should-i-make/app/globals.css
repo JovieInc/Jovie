@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #ffffff;
+  --color-foreground: #000000;
+  --color-border: #000000;
+  --color-input-bg: #ffffff;
+  --color-input-border: #e5e5e5;
+  --color-input-border-focus: #000000;
+  --color-muted: #666666;
+  --font-family-sans: "Inter", system-ui, sans-serif;
+}
+
+html {
+  font-family: var(--font-family-sans);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.btn-primary {
+  background-color: white;
+  border: 2px solid black;
+  color: black;
+  padding: 1rem 2rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  font-size: 1.125rem;
+  transition: all 150ms;
+}
+
+.btn-primary:hover {
+  background-color: black;
+  color: white;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary:disabled:hover {
+  background-color: white;
+  color: black;
+}
+
+.input-field {
+  width: 100%;
+  border: 1px solid var(--color-input-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+}
+
+.input-field:focus {
+  border-color: black;
+  outline: none;
+}

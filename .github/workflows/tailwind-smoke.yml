@@ -4,11 +4,11 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'styles/**'
-      - 'app/**'
-      - 'components/**'
-      - 'postcss.config.js'
-      - 'package.json'
+      - 'apps/web/styles/**'
+      - 'apps/web/app/**'
+      - 'apps/web/components/**'
+      - 'apps/web/postcss.config.js'
+      - 'apps/web/package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/tailwind-smoke.yml'
   workflow_dispatch:
@@ -27,7 +27,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Build (Next.js)
-        run: pnpm run build
+        run: pnpm run build:web
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PREVIEW }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PREVIEW }}
@@ -38,10 +38,10 @@ jobs:
         run: |
           set -e
           # Find the largest CSS file (Tailwind CSS will be in the larger file, not the font file)
-          css_file=$(find .next/static -type f -name "*.css" -exec ls -l {} \; | sort -k5 -nr | head -n 1 | awk '{print $NF}' || true)
+          css_file=$(find apps/web/.next/static -type f -name "*.css" -exec ls -l {} \; | sort -k5 -nr | head -n 1 | awk '{print $NF}' || true)
 
           if [ -z "$css_file" ]; then
-            echo "❌ No built CSS found under .next/static. Failing." >&2
+            echo "❌ No built CSS found under apps/web/.next/static. Failing." >&2
             exit 1
           fi
 

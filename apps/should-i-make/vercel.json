@@ -1,0 +1,4 @@
+{
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@jovie/should-i-make",
+  "outputDirectory": ".next"
+}
