@@ -494,7 +494,7 @@ jobs:
             ${{ runner.os }}-playwright-chromium-
 
       - name: Install Playwright (Chromium only)
-        run: npx playwright install chromium --with-deps
+        run: pnpm exec playwright install chromium --with-deps
 
       - name: Run Public Profile Smoke Test against staging
         run: |
@@ -761,7 +761,7 @@ jobs:
 
       - name: Install Playwright
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        run: npx playwright install chromium firefox --with-deps
+        run: pnpm exec playwright install chromium firefox --with-deps
 
       - name: Load quarantined E2E specs
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
