@@ -192,7 +192,9 @@ describe('OtpSignUpForm', () => {
 
     const buttons = screen.getAllByTestId('signup-action');
     expect(
-      buttons.some(button => button.textContent?.includes('Continue with email'))
+      buttons.some(button =>
+        button.textContent?.includes('Continue with email')
+      )
     ).toBe(true);
   });
 
