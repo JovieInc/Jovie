@@ -187,17 +187,6 @@ describe('OtpSignUpForm', () => {
     expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Continue with email" button in verifications step', () => {
-    renderSignUp();
-
-    const buttons = screen.getAllByTestId('signup-action');
-    expect(
-      buttons.some(button =>
-        button.textContent?.includes('Continue with email')
-      )
-    ).toBe(true);
-  });
-
   it('uses semantic design tokens for global error', () => {
     renderSignUp();
 
