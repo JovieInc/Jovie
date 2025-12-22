@@ -163,18 +163,34 @@ export function Footer({
       { href: '/legal/terms', label: 'Terms of Service' },
     ];
 
-    const footerLinkClassName =
-      'inline-flex rounded-md px-2 py-1 -mx-2 -my-1 text-[13px] leading-5 font-medium tracking-tight text-secondary-token hover:text-primary-token transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent';
+    // Linear-inspired link styling with smooth transitions and accessible focus states
+    const footerLinkClassName = cn(
+      'inline-flex rounded-md px-2 py-1.5 -mx-2 -my-1.5',
+      'text-[13px] leading-5 font-medium tracking-[-0.01em]',
+      'text-secondary-token hover:text-primary-token',
+      'transition-all duration-150 ease-out',
+      'hover:bg-surface-1',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent'
+    );
+
+    // Linear-style section heading - uppercase, small, muted
+    const sectionHeadingClassName =
+      'text-[11px] leading-4 font-semibold tracking-[0.04em] uppercase text-tertiary-token mb-4';
 
     return (
-      <footer className={`border-t border-subtle bg-base ${className}`}>
+      <footer
+        className={cn('border-t border-subtle bg-base', className)}
+        role='contentinfo'
+        aria-label='Site footer'
+      >
         <div
           className={cn(
-            'mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-6',
+            'mx-auto px-5 sm:px-6 lg:px-8 pt-12 pb-8 sm:pt-10 sm:pb-6',
             maxWidthClass
           )}
         >
-          <div className='grid gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
+          {/* Mobile: centered single column, Desktop: two column grid */}
+          <div className='flex flex-col items-center gap-10 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] sm:items-start sm:gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
             {/* Brand */}
             <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
               <FooterBranding
@@ -188,13 +204,17 @@ export function Footer({
               />
             </div>
 
-            <div className='grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3'>
+            {/* Links grid - centered on mobile, responsive grid on larger screens */}
+            <div className='grid w-full grid-cols-2 gap-8 text-center sm:grid-cols-2 sm:gap-6 sm:text-left lg:grid-cols-3'>
               {/* Product */}
-              <div>
-                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+              <nav aria-labelledby='footer-product-heading'>
+                <h3
+                  id='footer-product-heading'
+                  className={sectionHeadingClassName}
+                >
                   Product
                 </h3>
-                <ul className='space-y-2'>
+                <ul className='space-y-1' role='list'>
                   {productLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>
@@ -203,14 +223,17 @@ export function Footer({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </nav>
 
               {/* Company */}
-              <div>
-                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+              <nav aria-labelledby='footer-company-heading'>
+                <h3
+                  id='footer-company-heading'
+                  className={sectionHeadingClassName}
+                >
                   Company
                 </h3>
-                <ul className='space-y-2'>
+                <ul className='space-y-1' role='list'>
                   {companyLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>
@@ -219,14 +242,20 @@ export function Footer({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </nav>
 
               {/* Legal */}
-              <div>
-                <h3 className='text-[12px] leading-4 font-medium tracking-tight text-primary-token mb-3'>
+              <nav
+                aria-labelledby='footer-legal-heading'
+                className='col-span-2 sm:col-span-1'
+              >
+                <h3
+                  id='footer-legal-heading'
+                  className={sectionHeadingClassName}
+                >
                   Legal
                 </h3>
-                <ul className='space-y-2'>
+                <ul className='space-y-1' role='list'>
                   {legalLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>
@@ -235,24 +264,27 @@ export function Footer({
                     </li>
                   ))}
                 </ul>
-              </div>
+              </nav>
             </div>
           </div>
 
-          <div className='mt-8 border-t border-subtle pt-5'>
-            <div className='grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center'>
+          {/* Bottom bar with copyright and theme toggle */}
+          <div className='mt-10 sm:mt-8 border-t border-subtle pt-6 sm:pt-5'>
+            <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[11px] leading-4 font-medium tracking-tight text-tertiary-token'
+                className='text-[11px] leading-4 font-medium tracking-[-0.01em] text-tertiary-token order-2 sm:order-1'
               />
               {showThemeToggle && (
-                <div className='flex items-center gap-3 justify-self-start sm:justify-self-end'>
+                <div className='flex items-center gap-3 order-1 sm:order-2'>
+                  {/* Mobile: icon toggle */}
                   <div className='flex items-center sm:hidden'>
                     <ThemeToggle
                       appearance='icon'
                       shortcutKey={themeShortcutKey}
                     />
                   </div>
+                  {/* Desktop: segmented toggle */}
                   <div className='hidden sm:flex items-center'>
                     <ThemeToggle
                       appearance='segmented'
