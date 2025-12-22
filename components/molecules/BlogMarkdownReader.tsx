@@ -13,26 +13,66 @@ export function BlogMarkdownReader({
     <article className={cn('relative', className)}>
       <div
         className={cn(
-          'max-w-none text-lg leading-8 text-neutral-700 dark:text-neutral-200',
-          // Headings
-          '[&_h1]:scroll-mt-24 [&_h1]:text-4xl [&_h1]:font-bold [&_h1]:tracking-tight [&_h1]:mb-6 [&_h1]:text-neutral-950 dark:[&_h1]:text-white',
-          '[&_h2]:scroll-mt-24 [&_h2]:text-3xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h2]:mt-16 [&_h2]:mb-6 [&_h2]:text-neutral-950 dark:[&_h2]:text-white',
-          '[&_h3]:scroll-mt-24 [&_h3]:text-2xl [&_h3]:font-bold [&_h3]:tracking-tight [&_h3]:mt-12 [&_h3]:mb-4 [&_h3]:text-neutral-950 dark:[&_h3]:text-white',
+          // Base text styles using design tokens
+          'max-w-none text-lg leading-relaxed text-secondary-token',
+          'text-linear',
+
+          // First paragraph styling (drop cap effect area)
+          '[&>p:first-of-type]:text-xl [&>p:first-of-type]:leading-relaxed [&>p:first-of-type]:text-primary-token',
+
+          // Headings with proper hierarchy
+          '[&_h1]:scroll-mt-24 [&_h1]:marketing-h2-linear [&_h1]:text-primary-token [&_h1]:mb-6 [&_h1]:mt-0',
+          '[&_h2]:scroll-mt-24 [&_h2]:text-2xl [&_h2]:sm:text-3xl [&_h2]:font-semibold [&_h2]:tracking-tight [&_h2]:text-primary-token [&_h2]:mt-16 [&_h2]:mb-6',
+          '[&_h3]:scroll-mt-24 [&_h3]:text-xl [&_h3]:sm:text-2xl [&_h3]:font-semibold [&_h3]:tracking-tight [&_h3]:text-primary-token [&_h3]:mt-12 [&_h3]:mb-4',
+          '[&_h4]:scroll-mt-24 [&_h4]:text-lg [&_h4]:sm:text-xl [&_h4]:font-semibold [&_h4]:tracking-tight [&_h4]:text-primary-token [&_h4]:mt-10 [&_h4]:mb-4',
+
           // Paragraphs
-          '[&_p]:text-lg [&_p]:leading-8 [&_p]:text-neutral-700 dark:[&_p]:text-neutral-200 [&_p]:mb-6',
-          // Blockquotes
-          '[&_blockquote]:my-10 [&_blockquote]:rounded-lg [&_blockquote]:border-l-[3px] [&_blockquote]:border-neutral-950 dark:[&_blockquote]:border-white [&_blockquote]:bg-neutral-950/5 dark:[&_blockquote]:bg-white/5 [&_blockquote]:px-6 [&_blockquote]:py-5',
-          '[&_blockquote_p]:mb-2 [&_blockquote_p]:text-neutral-800 dark:[&_blockquote_p]:text-neutral-200',
-          '[&_blockquote_p:last-child]:mb-0 [&_blockquote_p:last-child]:text-sm [&_blockquote_p:last-child]:text-neutral-500 dark:[&_blockquote_p:last-child]:text-neutral-400',
-          // Lists
-          '[&_ul]:my-8 [&_ul]:pl-6 [&_ul]:list-disc [&_ul]:space-y-4',
+          '[&_p]:text-lg [&_p]:leading-relaxed [&_p]:text-secondary-token [&_p]:mb-6',
+
+          // Blockquotes with subtle styling
+          '[&_blockquote]:my-10 [&_blockquote]:relative [&_blockquote]:pl-6',
+          '[&_blockquote]:before:absolute [&_blockquote]:before:left-0 [&_blockquote]:before:top-0 [&_blockquote]:before:bottom-0 [&_blockquote]:before:w-[3px] [&_blockquote]:before:rounded-full [&_blockquote]:before:bg-border-strong',
+          '[&_blockquote_p]:text-lg [&_blockquote_p]:text-secondary-token [&_blockquote_p]:italic [&_blockquote_p]:mb-0',
+
+          // Lists with proper spacing
+          '[&_ul]:my-8 [&_ul]:pl-0 [&_ul]:list-none [&_ul]:space-y-4',
           '[&_ol]:my-8 [&_ol]:pl-6 [&_ol]:list-decimal [&_ol]:space-y-4',
-          '[&_li]:text-lg [&_li]:leading-8 [&_li]:text-neutral-700 dark:[&_li]:text-neutral-200 [&_li]:pl-2',
-          '[&_li::marker]:text-neutral-400 dark:[&_li::marker]:text-neutral-500',
-          // Links
-          '[&_a]:text-neutral-950 dark:[&_a]:text-white [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-neutral-300 dark:[&_a]:decoration-neutral-600 [&_a]:font-semibold hover:[&_a]:decoration-neutral-600',
-          // Strong
-          '[&_strong]:text-neutral-950 dark:[&_strong]:text-white [&_strong]:font-bold'
+          '[&_li]:text-lg [&_li]:leading-relaxed [&_li]:text-secondary-token [&_li]:relative',
+
+          // Custom bullet points for unordered lists
+          '[&_ul>li]:pl-6',
+          '[&_ul>li]:before:absolute [&_ul>li]:before:left-0 [&_ul>li]:before:top-[0.6em] [&_ul>li]:before:w-1.5 [&_ul>li]:before:h-1.5 [&_ul>li]:before:rounded-full [&_ul>li]:before:bg-tertiary-token',
+
+          // Ordered list markers
+          '[&_ol>li::marker]:text-tertiary-token [&_ol>li::marker]:font-medium',
+
+          // Links with subtle underline
+          '[&_a]:text-primary-token [&_a]:font-medium [&_a]:underline [&_a]:underline-offset-4 [&_a]:decoration-border-default [&_a]:transition-colors [&_a]:duration-200',
+          'hover:[&_a]:decoration-primary-token',
+
+          // Strong/bold text
+          '[&_strong]:text-primary-token [&_strong]:font-semibold',
+
+          // Emphasis/italic
+          '[&_em]:text-primary-token',
+
+          // Code inline
+          '[&_code]:text-sm [&_code]:font-mono [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-surface-2 [&_code]:text-primary-token',
+
+          // Code blocks
+          '[&_pre]:my-8 [&_pre]:p-6 [&_pre]:rounded-xl [&_pre]:bg-surface-1 [&_pre]:border [&_pre]:border-border-subtle [&_pre]:overflow-x-auto',
+          '[&_pre_code]:p-0 [&_pre_code]:bg-transparent [&_pre_code]:text-secondary-token',
+
+          // Horizontal rules
+          '[&_hr]:my-12 [&_hr]:border-0 [&_hr]:h-px [&_hr]:bg-border-subtle',
+
+          // Images
+          '[&_img]:my-10 [&_img]:rounded-xl [&_img]:w-full',
+
+          // Tables
+          '[&_table]:my-8 [&_table]:w-full [&_table]:text-left [&_table]:border-collapse',
+          '[&_th]:pb-3 [&_th]:text-sm [&_th]:font-semibold [&_th]:text-tertiary-token [&_th]:border-b [&_th]:border-border-default',
+          '[&_td]:py-3 [&_td]:text-secondary-token [&_td]:border-b [&_td]:border-border-subtle'
         )}
         dangerouslySetInnerHTML={{ __html: html }}
       />
