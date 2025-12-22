@@ -62,6 +62,7 @@ function authMethodFromClerkLastStrategy(
 export function OtpSignInForm() {
   const clerk = useClerk();
   const [isEmailOpen, setIsEmailOpen] = useState(false);
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
   const [userEmail, setUserEmail] = useState<string>('');
   const emailFocusAttemptRef = useRef(0);
@@ -238,7 +239,8 @@ export function OtpSignInForm() {
   return (
     <>
       {/* Back button rendered outside nested containers to ensure fixed positioning works */}
-      {isEmailOpen && (
+      {/* Only show during email input step, not during verifications (where inner back button shows) */}
+      {isEmailOpen && !emailSubmitted && (
         <AuthBackButton
           onClick={() => setIsEmailOpen(false)}
           ariaLabel='Back to sign-in'
@@ -287,7 +289,10 @@ export function OtpSignInForm() {
                           className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
                           disabled={isLoading}
                           aria-busy={isLoading}
-                          onClick={() => setLastUsedAuthMethod('email')}
+                          onClick={() => {
+                            setLastUsedAuthMethod('email');
+                            setEmailSubmitted(true);
+                          }}
                         >
                           {isLoading ? (
                             <>
@@ -409,6 +414,7 @@ export function OtpSignInForm() {
                       </SignIn.Action>
                       <AuthBackButton
                         onClick={() => {
+                          setEmailSubmitted(false);
                           document
                             .getElementById('signin-navigate-start')
                             ?.click();
