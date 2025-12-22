@@ -1,5 +1,6 @@
 ---
 title: The MySpace Problem
+date: 2025-02-03
 author: Tim White
 authorTitle: Founder at Jovie
 authorProfile: https://jov.ie/tim

@@ -312,6 +312,32 @@ body {
 
 @layer base {
   .marketing-mono {
+    /* Light mode - Linear-inspired minimal aesthetic */
+    --color-bg-base: #ffffff;
+    --color-bg-surface-0: #fafbfc;
+    --color-bg-surface-1: #f6f7f8;
+    --color-bg-surface-2: #eef0f2;
+    --color-bg-surface-3: #e5e7eb;
+
+    /* Light mode text hierarchy */
+    --color-text-primary-token: #0c0c0c;
+    --color-text-secondary-token: #52525b;
+    --color-text-tertiary-token: #71717a;
+    --color-text-quaternary-token: #a1a1aa;
+
+    /* Light mode borders */
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-border-default: rgba(0, 0, 0, 0.1);
+    --color-border-strong: rgba(0, 0, 0, 0.18);
+
+    /* Light mode buttons */
+    --color-btn-primary-bg: #0c0c0c;
+    --color-btn-primary-fg: #ffffff;
+  }
+
+  /* Dark mode variant */
+  :root.dark .marketing-mono,
+  .dark .marketing-mono {
     /* Linear's dark-8a equivalent */
     --color-bg-base: #0a0a0f; /* Warmer off-black */
     --color-bg-surface-0: #0f0f12;
@@ -319,18 +345,18 @@ body {
     --color-bg-surface-2: #18181f;
     --color-bg-surface-3: #1e1e27;
 
-    /* Linear's text hierarchy */
+    /* Dark mode text hierarchy */
     --color-text-primary-token: #f4f4f5;
     --color-text-secondary-token: #c6c6cc;
     --color-text-tertiary-token: #9a9aa2;
     --color-text-quaternary-token: #737378;
 
-    /* Subtle borders */
+    /* Dark mode borders */
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-border-default: rgba(255, 255, 255, 0.1);
     --color-border-strong: rgba(255, 255, 255, 0.18);
 
-    /* Buttons */
+    /* Dark mode buttons */
     --color-btn-primary-bg: #ffffff;
     --color-btn-primary-fg: #0a0a0f;
   }

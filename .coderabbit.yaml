@@ -5,7 +5,7 @@ language: en-US
 early_access: true
 
 reviews:
-  profile: balanced
+  profile: chill
   request_changes_workflow: true
   high_level_summary: true
   collapse_walkthrough: true
@@ -164,3 +164,27 @@ tools:
     enabled: true
   actionlint:
     enabled: true
+
+# On-demand unit test generation
+# Usage: Comment "@coderabbitai generate unit tests" on any PR
+code_generation:
+  unit_tests:
+    enabled: true
+    path_instructions:
+      - path: "**/*.ts"
+        instructions: |
+          Use vitest for testing framework.
+          Follow existing patterns in tests/ directory.
+          Use @testing-library/react for React component tests.
+          Mock external services with vi.mock().
+          Include edge cases and error scenarios.
+          Place tests in tests/ mirroring the source structure.
+      - path: "app/api/**"
+        instructions: |
+          Test API routes with proper request/response mocking.
+          Include auth scenarios (authenticated, unauthenticated, wrong user).
+          Test error handling and edge cases.
+      - path: "lib/db/**"
+        instructions: |
+          Mock database with vi.mock() for unit tests.
+          Test query builders and business logic separately.

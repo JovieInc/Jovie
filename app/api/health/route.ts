@@ -5,10 +5,36 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
+import {
+  checkRateLimit,
+  createRateLimitHeaders,
+  getClientIP,
+  getRateLimitStatus,
+} from '@/lib/utils/rate-limit';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Rate limit check (30 req/60s for health endpoints)
+  const clientIP = getClientIP(request);
+  const isRateLimited = checkRateLimit(clientIP, true);
+
+  if (isRateLimited) {
+    const status = getRateLimitStatus(clientIP, true);
+    return NextResponse.json(
+      {
+        error: 'Too many requests',
+        retryAfter: Math.ceil((status.resetTime - Date.now()) / 1000),
+      },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(status),
+        },
+      }
+    );
+  }
   const summary: Record<string, unknown> = {
     time: new Date().toISOString(),
     env: process.env.VERCEL_ENV || 'local',
