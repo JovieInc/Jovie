@@ -140,6 +140,7 @@ interface LinkItem {
   sourcePlatform?: string | null;
   sourceType?: 'manual' | 'admin' | 'ingested' | null;
   evidence?: { sources?: string[]; signals?: string[] } | null;
+  version?: number;
 }
 
 interface SuggestedLink extends DetectedLink {
@@ -589,6 +590,14 @@ export function EnhancedDashboardLinks({
     return convertDbLinksToLinkItems(activeInitialLinks || []);
   });
 
+  // Track the current version for optimistic locking
+  const [linksVersion, setLinksVersion] = useState<number>(() => {
+    const versions = (activeInitialLinks || [])
+      .map(l => l.version ?? 1)
+      .filter(v => typeof v === 'number');
+    return versions.length > 0 ? Math.max(...versions) : 1;
+  });
+
   const linksRef = useRef<LinkItem[]>(links);
   useEffect(() => {
     linksRef.current = links;
@@ -630,6 +639,16 @@ export function EnhancedDashboardLinks({
       } | null;
 
       if (!data?.links) return;
+
+      // Update version from server response
+      const serverVersions = data.links
+        .map(l => l.version ?? 1)
+        .filter(v => typeof v === 'number');
+      if (serverVersions.length > 0) {
+        const serverVersion = Math.max(...serverVersions);
+        setLinksVersion(prev => Math.max(prev, serverVersion));
+      }
+
       const nextSuggestions = convertDbLinksToSuggestions(
         data.links.filter(link => link.state === 'suggested')
       );
@@ -742,8 +761,40 @@ export function EnhancedDashboardLinks({
         const response = await fetch('/api/dashboard/social-links', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ profileId, links: payload }),
+          body: JSON.stringify({
+            profileId,
+            links: payload,
+            expectedVersion: linksVersion,
+          }),
         });
+
+        // Handle 409 Conflict - links were modified elsewhere
+        if (response.status === 409) {
+          const conflictData = (await response.json().catch(() => null)) as {
+            error?: string;
+            code?: string;
+            currentVersion?: number;
+          } | null;
+
+          // Update version from conflict response
+          if (
+            conflictData?.currentVersion &&
+            typeof conflictData.currentVersion === 'number'
+          ) {
+            setLinksVersion(conflictData.currentVersion);
+          }
+
+          // Show conflict message and trigger refresh
+          toast.error(
+            'Your links were updated in another tab. Refreshing to show the latest version.',
+            { duration: 5000 }
+          );
+
+          // Sync from server to get the latest state
+          await syncSuggestionsFromServer();
+          return;
+        }
+
         if (!response.ok) {
           let message = 'Failed to save links';
           try {
@@ -757,6 +808,15 @@ export function EnhancedDashboardLinks({
             // swallow JSON parse errors and fall back to default message
           }
           throw new Error(message);
+        }
+
+        // Parse success response and update version
+        const successData = (await response.json().catch(() => null)) as {
+          ok?: boolean;
+          version?: number;
+        } | null;
+        if (successData?.version && typeof successData.version === 'number') {
+          setLinksVersion(successData.version);
         }
 
         // Keep normalized links locally; server IDs will be applied on next load
@@ -786,7 +846,7 @@ export function EnhancedDashboardLinks({
         toast.error(message || 'Failed to save links. Please try again.');
       }
     },
-    [profileId, suggestionsEnabled, syncSuggestionsFromServer]
+    [profileId, suggestionsEnabled, syncSuggestionsFromServer, linksVersion]
   );
 
   const enqueueSave = useCallback(
