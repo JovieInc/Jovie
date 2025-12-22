@@ -1661,6 +1661,108 @@ jobs:
               core.info(`PR is NOT eligible for fast lane - blockers: ${blockers.join(', ')}`);
             }
 
+      - name: Auto-apply fastlane label if eligible
+        id: auto-fastlane
+        if: steps.create-pr.outputs.pr_number
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+            const eligible = '${{ needs.fastlane-eligibility.outputs.eligible }}' === 'true';
+            const smokePassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            if (!prNumber) {
+              core.info('No PR number - skipping fastlane label');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            // Get current labels
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const labels = pr.labels.map(l => l.name);
+            const hasBlockers = labels.some(l => l.startsWith('blocked:'));
+            const hasGated = labels.includes('gated');
+            const hasFastlane = labels.includes('fastlane');
+
+            // Skip if already has fastlane or explicitly gated
+            if (hasFastlane) {
+              core.info('PR already has fastlane label');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            if (hasGated) {
+              core.info('PR has explicit gated label - skipping fastlane');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            // Auto-apply fastlane if all conditions met
+            if (eligible && !hasBlockers && smokePassed && canaryPassed) {
+              core.info('All conditions met - applying fastlane label and enabling auto-merge');
+
+              // Apply the fastlane label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['fastlane']
+              });
+
+              // Enable auto-merge via GraphQL
+              try {
+                await github.graphql(`
+                  mutation($pullRequestId: ID!) {
+                    enablePullRequestAutoMerge(input: {
+                      pullRequestId: $pullRequestId,
+                      mergeMethod: SQUASH
+                    }) {
+                      pullRequest { number }
+                    }
+                  }
+                `, { pullRequestId: pr.node_id });
+                core.info(`Auto-merge enabled for PR #${prNumber}`);
+              } catch (error) {
+                core.warning(`Failed to enable auto-merge: ${error.message}`);
+              }
+
+              // Add comment explaining the auto-fastlane
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## 🚀 Fast Lane Auto-Enabled',
+                  '',
+                  'This PR has been automatically labeled for fast lane promotion:',
+                  '- ✅ No blocking file patterns detected',
+                  '- ✅ Smoke tests passed',
+                  '- ✅ Canary health gate passed',
+                  '',
+                  'Auto-merge has been enabled. The PR will merge once all checks pass.',
+                  '',
+                  '_Add the `gated` label to require manual review instead._'
+                ].join('\n')
+              });
+
+              core.setOutput('applied', 'true');
+              core.setOutput('pr_number', prNumber.toString());
+            } else {
+              const reasons = [];
+              if (!eligible) reasons.push('Blocking patterns detected');
+              if (hasBlockers) reasons.push(`Has blocking labels: ${labels.filter(l => l.startsWith('blocked:')).join(', ')}`);
+              if (!smokePassed) reasons.push('Smoke tests did not pass');
+              if (!canaryPassed) reasons.push('Canary gate did not pass');
+              core.info(`Fastlane not auto-applied: ${reasons.join(', ')}`);
+              core.setOutput('applied', 'false');
+            }
+
       - name: Fast lane auto-merge
         if: steps.determine-path.outputs.action == 'auto_merge'
         uses: actions/github-script@v8
@@ -1717,7 +1819,7 @@ jobs:
             }
 
       - name: Notify fast lane promotion
-        if: steps.determine-path.outputs.action == 'auto_merge' && env.SLACK_WEBHOOK_URL != ''
+        if: (steps.determine-path.outputs.action == 'auto_merge' || steps.auto-fastlane.outputs.applied == 'true') && env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@v3
         with:
           status: custom
@@ -1731,7 +1833,7 @@ jobs:
                   "color": "good",
                   "fields": [
                     { "title": "Promotion Type", "value": "Fast Lane (automated)", "short": true },
-                    { "title": "PR", "value": "#${{ steps.determine-path.outputs.pr_number }}", "short": true },
+                    { "title": "PR", "value": "#${{ steps.auto-fastlane.outputs.pr_number || steps.determine-path.outputs.pr_number }}", "short": true },
                     { "title": "Status", "value": "Auto-merge enabled, awaiting checks", "short": false }
                   ]
                 }
