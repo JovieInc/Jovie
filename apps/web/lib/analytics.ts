@@ -106,7 +106,6 @@ declare global {
   interface Window {
     __JOVIE_ANALYTICS_ENABLED__?: boolean;
     __JOVIE_ANALYTICS_READY__?: boolean;
-    va?: (event: string, data: Record<string, unknown>) => void;
     gtag?: (
       command: string,
       event: string,

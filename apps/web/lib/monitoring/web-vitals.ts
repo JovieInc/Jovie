@@ -75,6 +75,12 @@ function getRating(
         : value <= 300
           ? 'needs-improvement'
           : 'poor';
+    case 'inp':
+      return value <= 200
+        ? 'good'
+        : value <= 500
+          ? 'needs-improvement'
+          : 'poor';
     case 'lcp':
       return value <= 2500
         ? 'good'
