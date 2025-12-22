@@ -16,6 +16,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -63,14 +64,24 @@ async function copyToClipboard(text: string): Promise<boolean> {
 function ProviderStatusDot({
   status,
   accent,
+  size = 'sm',
 }: {
   status: 'available' | 'manual' | 'missing';
   accent: string;
+  size?: 'sm' | 'md';
 }) {
+  const sizeClasses = size === 'md' ? 'h-3 w-3' : 'h-2.5 w-2.5';
+  const innerSize = size === 'md' ? 'h-1.5 w-1.5' : 'h-1 w-1';
+
   if (status === 'missing') {
     return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-2'>
-        <span className='h-1 w-1 rounded-full bg-tertiary-token' />
+      <span
+        className={cn(
+          'flex items-center justify-center rounded-full border border-subtle bg-surface-2',
+          sizeClasses
+        )}
+      >
+        <span className={cn('rounded-full bg-tertiary-token', innerSize)} />
       </span>
     );
   }
@@ -78,8 +89,9 @@ function ProviderStatusDot({
   return (
     <span
       className={cn(
-        'relative flex h-2.5 w-2.5 items-center justify-center rounded-full',
-        status === 'manual' && 'ring-2 ring-amber-400/30'
+        'relative flex items-center justify-center rounded-full transition-transform duration-150',
+        status === 'manual' && 'ring-2 ring-amber-400/30',
+        sizeClasses
       )}
       style={{ backgroundColor: accent }}
     >
@@ -90,11 +102,178 @@ function ProviderStatusDot({
   );
 }
 
+// Mobile release card component with Linear-style aesthetics
+function ReleaseCard({
+  release,
+  providerConfig,
+  primaryProviders,
+  onCopy,
+  onEdit,
+}: {
+  release: ReleaseViewModel;
+  providerConfig: Record<ProviderKey, { label: string; accent: string }>;
+  primaryProviders: ProviderKey[];
+  onCopy: (path: string, label: string, testId: string) => Promise<string>;
+  onEdit: (release: ReleaseViewModel) => void;
+}) {
+  const [isPressed, setIsPressed] = useState(false);
+  const manualOverrideCount = release.providers.filter(
+    p => p.source === 'manual'
+  ).length;
+
+  return (
+    <div
+      className={cn(
+        'group relative rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-lg',
+        'shadow-sm transition-all duration-200 ease-out',
+        'hover:shadow-md hover:border-border',
+        isPressed && 'scale-[0.98] shadow-none'
+      )}
+      onTouchStart={() => setIsPressed(true)}
+      onTouchEnd={() => setIsPressed(false)}
+      onTouchCancel={() => setIsPressed(false)}
+    >
+      {/* Card content */}
+      <div className='flex gap-4 p-4'>
+        {/* Artwork */}
+        <div className='relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-2 shadow-sm'>
+          {release.artworkUrl ? (
+            <Image
+              src={release.artworkUrl}
+              alt={`${release.title} artwork`}
+              fill
+              className='object-cover'
+              sizes='80px'
+            />
+          ) : (
+            <div className='flex h-full w-full items-center justify-center'>
+              <Icon
+                name='Disc3'
+                className='h-8 w-8 text-tertiary-token'
+                aria-hidden='true'
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-start justify-between gap-2'>
+            <div className='min-w-0 flex-1'>
+              <h3 className='truncate text-base font-semibold text-primary-token'>
+                {release.title}
+              </h3>
+              <p className='mt-0.5 text-sm text-secondary-token'>
+                {release.releaseDate
+                  ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })
+                  : 'Release date TBD'}
+              </p>
+            </div>
+            {manualOverrideCount > 0 && (
+              <Badge
+                variant='secondary'
+                className='shrink-0 border border-amber-200 bg-amber-50 text-[10px] text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'
+              >
+                {manualOverrideCount} edited
+              </Badge>
+            )}
+          </div>
+
+          {/* Provider status row */}
+          <div className='mt-3 flex items-center gap-3'>
+            {primaryProviders.map(providerKey => {
+              const provider = release.providers.find(
+                p => p.key === providerKey
+              );
+              const available = Boolean(provider?.url);
+              const isManual = provider?.source === 'manual';
+              const status = isManual
+                ? 'manual'
+                : available
+                  ? 'available'
+                  : 'missing';
+
+              return (
+                <button
+                  key={providerKey}
+                  type='button'
+                  disabled={!available}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition-all duration-150',
+                    'min-h-[36px] min-w-[36px]',
+                    available
+                      ? 'active:scale-95 hover:bg-surface-2'
+                      : 'cursor-not-allowed opacity-50'
+                  )}
+                  onClick={() => {
+                    if (provider?.path) {
+                      void onCopy(
+                        provider.path,
+                        `${release.title} – ${providerConfig[providerKey].label}`,
+                        `provider-copy-${release.id}-${providerKey}`
+                      );
+                    }
+                  }}
+                  title={`${providerConfig[providerKey].label}${available ? ' – Tap to copy' : ' – Not available'}`}
+                >
+                  <ProviderStatusDot
+                    status={status}
+                    accent={providerConfig[providerKey].accent}
+                    size='md'
+                  />
+                  <span className='text-xs text-secondary-token hidden xs:inline'>
+                    {providerConfig[providerKey].label.split(' ')[0]}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Action bar */}
+      <div className='flex items-center gap-2 border-t border-subtle/50 px-4 py-3'>
+        <Button
+          variant='secondary'
+          size='sm'
+          className='flex-1 gap-2'
+          data-testid={`smart-link-copy-${release.id}`}
+          onClick={() =>
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            )
+          }
+        >
+          <Icon name='Link' className='h-4 w-4' aria-hidden='true' />
+          Copy Smart Link
+        </Button>
+        <Button
+          variant='ghost'
+          size='sm'
+          className='gap-1.5'
+          data-testid={`edit-links-${release.id}`}
+          onClick={() => onEdit(release)}
+        >
+          <Icon name='PencilLine' className='h-4 w-4' aria-hidden='true' />
+          Edit
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function ReleaseProviderMatrix({
   releases,
   providerConfig,
   primaryProviders,
 }: ReleaseProviderMatrixProps) {
+  const isMobile = useIsMobile();
   const [rows, setRows] = useState<ReleaseViewModel[]>(releases);
   const [editingRelease, setEditingRelease] = useState<ReleaseViewModel | null>(
     null
@@ -219,47 +398,46 @@ export function ReleaseProviderMatrix({
   );
 
   return (
-    <div
-      className='flex h-full min-h-0 flex-col'
-      data-testid='releases-matrix'
-    >
-      {/* Header */}
-      <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
+    <div className='flex h-full min-h-0 flex-col' data-testid='releases-matrix'>
+      {/* Header - Linear style with frosted glass */}
+      <div className='shrink-0 border-b border-subtle bg-surface-1/80 backdrop-blur-xl'>
         <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
           <div>
-            <p className='text-sm font-semibold uppercase tracking-[0.12em] text-secondary-token'>
+            <p className='text-xs font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
               Discography
             </p>
-            <h1 className='text-2xl font-semibold tracking-tight text-primary-token'>
+            <h1 className='mt-0.5 text-xl font-semibold tracking-tight text-primary-token sm:text-2xl'>
               Releases
             </h1>
-            <p className='mt-1 max-w-2xl text-sm leading-6 text-secondary-token'>
+            <p className='mt-1 hidden max-w-2xl text-sm leading-6 text-secondary-token sm:block'>
               Share one smart link per release and keep provider URLs pristine.
-              Copy-ready variants for each DSP make sure fans land in the right
-              app every time.
             </p>
           </div>
-          <div className='flex items-center gap-3'>
-            <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token'>
+          <div className='flex items-center gap-2'>
+            <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/60 px-2.5 py-1 text-xs font-medium text-secondary-token backdrop-blur-sm'>
               {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
             </span>
             {totalOverrides > 0 && (
               <span className='inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'>
-                <Icon name='PencilLine' className='h-3 w-3' aria-hidden='true' />
-                {totalOverrides} {totalOverrides === 1 ? 'override' : 'overrides'}
+                <Icon
+                  name='PencilLine'
+                  className='h-3 w-3'
+                  aria-hidden='true'
+                />
+                {totalOverrides}
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Table container */}
+      {/* Content area */}
       <div className='flex-1 min-h-0 overflow-hidden'>
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
           <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
             {rows.length === 0 ? (
               <div className='flex flex-col items-center justify-center px-4 py-16 text-center sm:px-6'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-2/80 backdrop-blur-sm'>
                   <Icon
                     name='Disc3'
                     className='h-8 w-8 text-tertiary-token'
@@ -274,7 +452,22 @@ export function ReleaseProviderMatrix({
                   generating smart links.
                 </p>
               </div>
+            ) : isMobile ? (
+              /* Mobile: Card layout with Linear aesthetics */
+              <div className='space-y-3 p-4'>
+                {rows.map(release => (
+                  <ReleaseCard
+                    key={release.slug}
+                    release={release}
+                    providerConfig={providerConfig}
+                    primaryProviders={primaryProviders}
+                    onCopy={handleCopy}
+                    onEdit={openEditor}
+                  />
+                ))}
+              </div>
             ) : (
+              /* Desktop: Full-width table */
               <table
                 className='w-full min-w-[1000px] border-separate border-spacing-0 text-[13px]'
                 aria-label='Releases table'
@@ -285,9 +478,9 @@ export function ReleaseProviderMatrix({
                 </caption>
                 <thead
                   className={cn(
-                    'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
+                    'sticky top-0 z-20 bg-surface-1/80 backdrop-blur-xl',
                     headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/5 dark:shadow-black/20'
                   )}
                 >
                   <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
@@ -329,7 +522,7 @@ export function ReleaseProviderMatrix({
                       <tr
                         key={release.slug}
                         className={cn(
-                          'group transition-colors duration-200 hover:bg-surface-2/50',
+                          'group transition-colors duration-150 hover:bg-surface-2/50',
                           index !== rows.length - 1 && 'border-b border-subtle'
                         )}
                       >
@@ -337,7 +530,7 @@ export function ReleaseProviderMatrix({
                         <td className='px-4 py-4 align-middle sm:px-6'>
                           <div className='flex items-center gap-3'>
                             {/* Artwork thumbnail */}
-                            <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+                            <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm transition-transform duration-150 group-hover:scale-105'>
                               {release.artworkUrl ? (
                                 <Image
                                   src={release.artworkUrl}
@@ -400,7 +593,7 @@ export function ReleaseProviderMatrix({
                                 `smart-link-copy-${release.id}`
                               )
                             }
-                            className='inline-flex items-center gap-2 text-xs'
+                            className='inline-flex items-center gap-2 text-xs transition-transform duration-150 active:scale-95'
                           >
                             <Icon
                               name='Link'
@@ -452,7 +645,7 @@ export function ReleaseProviderMatrix({
                                         testId
                                       );
                                     }}
-                                    className='group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                                    className='group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-secondary-token transition-all duration-150 hover:bg-surface-2 hover:text-primary-token active:scale-95'
                                   >
                                     <Icon
                                       name='Copy'
@@ -478,7 +671,7 @@ export function ReleaseProviderMatrix({
                           <Button
                             variant='ghost'
                             size='sm'
-                            className='inline-flex items-center gap-1.5 text-xs opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100'
+                            className='inline-flex items-center gap-1.5 text-xs opacity-0 transition-all duration-150 group-hover:opacity-100 focus:opacity-100 active:scale-95'
                             data-testid={`edit-links-${release.id}`}
                             onClick={() => openEditor(release)}
                           >
@@ -498,9 +691,9 @@ export function ReleaseProviderMatrix({
             )}
           </div>
 
-          {/* Footer */}
+          {/* Footer - Linear style */}
           {rows.length > 0 && (
-            <div className='sticky bottom-0 z-20 flex items-center justify-between border-t border-subtle bg-surface-1/75 px-4 py-3 text-xs text-secondary-token backdrop-blur-md sm:px-6'>
+            <div className='sticky bottom-0 z-20 flex items-center justify-between border-t border-subtle bg-surface-1/80 px-4 py-3 text-xs text-secondary-token backdrop-blur-xl sm:px-6'>
               <span>
                 {totalReleases} {totalReleases === 1 ? 'release' : 'releases'}
                 {totalOverrides > 0 && (
@@ -510,7 +703,7 @@ export function ReleaseProviderMatrix({
                   </span>
                 )}
               </span>
-              <div className='flex items-center gap-2'>
+              <div className='hidden items-center gap-2 sm:flex'>
                 <span className='text-tertiary-token'>
                   Showing {primaryProviders.length} of{' '}
                   {Object.keys(providerConfig).length} providers
@@ -521,9 +714,9 @@ export function ReleaseProviderMatrix({
         </div>
       </div>
 
-      {/* Edit dialog */}
+      {/* Edit dialog - Enhanced for mobile */}
       <Dialog open={Boolean(editingRelease)} onClose={closeEditor} size='3xl'>
-        <DialogTitle className='flex items-center gap-3 text-xl font-semibold text-primary-token'>
+        <DialogTitle className='flex items-center gap-3 text-lg font-semibold text-primary-token sm:text-xl'>
           <Icon
             name='Link'
             className='h-5 w-5 text-secondary-token'
@@ -532,16 +725,15 @@ export function ReleaseProviderMatrix({
           Edit release links
         </DialogTitle>
         <DialogDescription className='text-sm text-secondary-token'>
-          Swap in a preferred DSP link or revert back to our detected URL. All
-          changes are live for your smart link immediately.
+          Swap in a preferred DSP link or revert back to our detected URL.
         </DialogDescription>
         <DialogBody className='space-y-4'>
           {editingRelease ? (
             <div className='space-y-4'>
               {/* Release info header */}
-              <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4'>
+              <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4 backdrop-blur-sm'>
                 {/* Artwork */}
-                <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm'>
+                <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-sm sm:h-16 sm:w-16'>
                   {editingRelease.artworkUrl ? (
                     <Image
                       src={editingRelease.artworkUrl}
@@ -554,32 +746,34 @@ export function ReleaseProviderMatrix({
                     <div className='flex h-full w-full items-center justify-center'>
                       <Icon
                         name='Disc3'
-                        className='h-8 w-8 text-tertiary-token'
+                        className='h-7 w-7 text-tertiary-token sm:h-8 sm:w-8'
                         aria-hidden='true'
                       />
                     </div>
                   )}
                 </div>
                 <div className='min-w-0 flex-1'>
-                  <p className='text-base font-semibold text-primary-token'>
+                  <p className='truncate text-base font-semibold text-primary-token'>
                     {editingRelease.title}
                   </p>
-                  <p className='mt-0.5 text-xs text-secondary-token'>
-                    Smart link: {editingRelease.smartLinkPath}
+                  <p className='mt-0.5 truncate text-xs text-secondary-token'>
+                    {editingRelease.smartLinkPath}
                   </p>
                   <Badge
                     variant='secondary'
                     className='mt-2 border border-subtle bg-transparent text-xs text-secondary-token'
                   >
                     {editingRelease.releaseDate
-                      ? new Date(editingRelease.releaseDate).toLocaleDateString()
+                      ? new Date(
+                          editingRelease.releaseDate
+                        ).toLocaleDateString()
                       : 'Date TBD'}
                   </Badge>
                 </div>
               </div>
 
               {/* Provider inputs grid */}
-              <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+              <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
                 {providerList.map(provider => {
                   const value = drafts[provider.key] ?? '';
                   const existing = editingRelease.providers.find(
@@ -595,7 +789,7 @@ export function ReleaseProviderMatrix({
                   return (
                     <div
                       key={`${editingRelease.id}-${provider.key}`}
-                      className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-sm'
+                      className='rounded-xl border border-subtle bg-surface-1 p-3 shadow-sm transition-shadow duration-150 hover:shadow-md'
                     >
                       <div className='flex items-center justify-between gap-2'>
                         <div className='flex items-center gap-2'>
@@ -639,6 +833,7 @@ export function ReleaseProviderMatrix({
                             disabled={isSaving || !value.trim()}
                             data-testid={`save-provider-${editingRelease.id}-${provider.key}`}
                             onClick={() => handleSave(provider.key)}
+                            className='transition-transform duration-150 active:scale-95'
                           >
                             Save
                           </Button>
@@ -648,6 +843,7 @@ export function ReleaseProviderMatrix({
                             disabled={isSaving}
                             data-testid={`reset-provider-${editingRelease.id}-${provider.key}`}
                             onClick={() => handleReset(provider.key)}
+                            className='transition-transform duration-150 active:scale-95'
                           >
                             Reset
                           </Button>
@@ -661,7 +857,12 @@ export function ReleaseProviderMatrix({
           ) : null}
         </DialogBody>
         <DialogActions className='justify-end'>
-          <Button variant='secondary' size='sm' onClick={closeEditor}>
+          <Button
+            variant='secondary'
+            size='sm'
+            onClick={closeEditor}
+            className='transition-transform duration-150 active:scale-95'
+          >
             Done
           </Button>
         </DialogActions>
