@@ -85,23 +85,23 @@ runs:
           exit 0
         fi
 
-        # Define path patterns based on job type
+        # Define path patterns based on job type (monorepo aware - apps/web/ prefix)
         case "${{ inputs.job-type }}" in
           "build")
-            PATTERN='^(app/|components/|lib/|hooks/|types/|constants/|package.*\.json|next\.config\.js|tailwind\.config\.|postcss\.config\.)'
+            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|apps/web/tailwind\.config\.|apps/web/postcss\.config\.|package.*\.json|turbo\.json)'
             ;;
           "test")
-            PATTERN='^(app/|components/|lib/|hooks/|types/|tests/unit/|__tests__/|.*\.test\.|.*\.spec\.|package.*\.json|vitest\.config\.)'
+            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/tests/unit/|apps/web/__tests__/|.*\.test\.|.*\.spec\.|apps/web/package.*\.json|apps/web/vitest\.config\.|package.*\.json)'
             ;;
           "e2e")
-            PATTERN='^(app/|components/|tests/e2e/|tests/smoke/|playwright\.config\.|package.*\.json)'
+            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/tests/e2e/|apps/web/tests/smoke/|apps/web/playwright\.config\.|apps/web/package.*\.json|package.*\.json)'
             ;;
           "drizzle")
-            PATTERN='^(drizzle/|lib/db/|lib/db/schema|drizzle\.config\.ts|drizzle/config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+            PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/lib/db/schema|apps/web/drizzle\.config\.ts|apps/web/drizzle/config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
             ;;
           *)
             # Default pattern
-            PATTERN='^(app/|components/|lib/|hooks/|types/|constants/|package.*\.json|next\.config\.js)'
+            PATTERN='^(apps/web/app/|apps/web/components/|apps/web/lib/|apps/web/hooks/|apps/web/types/|apps/web/constants/|apps/web/package.*\.json|apps/web/next\.config\.js|package.*\.json)'
             ;;
         esac
 

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": ["**/.env.*local"],
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**", "dist/**"],
+      "env": [
+        "NODE_ENV",
+        "NEXT_PUBLIC_*",
+        "VERCEL_*",
+        "CLERK_*",
+        "STRIPE_*",
+        "SENTRY_*",
+        "STATSIG_*",
+        "NEON_*",
+        "DATABASE_URL"
+      ]
+    },
+    "lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
+    },
+    "lint:fix": {
+      "dependsOn": ["^lint:fix"],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "outputs": [".cache/tsbuildinfo"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"],
+      "env": ["NODE_ENV", "CI"]
+    },
+    "test:fast": {
+      "dependsOn": [],
+      "outputs": [],
+      "env": ["NODE_ENV", "CI"]
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*"]
+    },
+    "format": {
+      "outputs": []
+    },
+    "format:check": {
+      "outputs": []
+    }
+  }
+}

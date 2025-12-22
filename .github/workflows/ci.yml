@@ -79,7 +79,7 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
-        run: pnpm run next:proxy-guard
+        run: pnpm --filter=@jovie/web run next:proxy-guard
       - name: Format check (Biome)
         run: pnpm run format:check
 
@@ -134,9 +134,9 @@ jobs:
       - name: Run fast/lint check
         run: |
           if [[ "${{ matrix.check }}" == "typecheck" ]]; then
-            pnpm run typecheck
+            pnpm --filter=@jovie/web run typecheck
           else
-            pnpm run lint
+            pnpm --filter=@jovie/web run lint
           fi
 
   ci-cache-warm:
@@ -174,7 +174,7 @@ jobs:
             ${{ runner.os }}-next-
       - name: Warm Next build cache
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false }}
-        run: pnpm run build
+        run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN || 'https://placeholder.supabase.co' }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN || 'placeholder' }}
@@ -281,14 +281,14 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         run: |
           # Make script executable
-          chmod +x scripts/check-migrations.sh
-          chmod +x scripts/validate-migrations.sh
-          
+          chmod +x apps/web/scripts/check-migrations.sh
+          chmod +x apps/web/scripts/validate-migrations.sh
+
           # Run migration guard
-          ./scripts/check-migrations.sh
-          
+          cd apps/web && ./scripts/check-migrations.sh
+
           # Validate that every migration is registered in _journal.json
-          ./scripts/validate-migrations.sh
+          cd apps/web && ./scripts/validate-migrations.sh
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
 
@@ -359,7 +359,7 @@ jobs:
 
       - name: Run Drizzle Check
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm run drizzle:check
+        run: pnpm --filter=@jovie/web run drizzle:check
 
   ci-fast:
     name: ci-fast
@@ -446,7 +446,7 @@ jobs:
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm run drizzle:migrate
+        run: pnpm --filter=@jovie/web run drizzle:migrate
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -482,11 +482,11 @@ jobs:
 
       - name: Run Public Profile Smoke Test against staging
         run: |
-          CI=true BASE_URL=https://main.jov.ie pnpm run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://main.jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
 
       - name: Run Performance Budget Guard against staging
         run: |
-          CI=true BASE_URL=https://main.jov.ie pnpm run test:budgets
+          CI=true BASE_URL=https://main.jov.ie pnpm --filter=@jovie/web run test:budgets
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
@@ -547,7 +547,7 @@ jobs:
 
       - name: Build
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm run build
+        run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
@@ -599,7 +599,7 @@ jobs:
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: quarantine
         run: |
-          FILE="tests/quarantine.json"
+          FILE="apps/web/tests/quarantine.json"
           UNIT_FILES=""
           UNIT_EXCLUDES=""
 
@@ -619,7 +619,7 @@ jobs:
 
       - name: Run unit tests
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm test -- ${{ steps.quarantine.outputs.unit_excludes }}
+        run: pnpm --filter=@jovie/web run test -- ${{ steps.quarantine.outputs.unit_excludes }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -627,7 +627,7 @@ jobs:
       - name: Run quarantined unit tests (retries)
         if: steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_unit == 'true'
         continue-on-error: true
-        run: pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
+        run: cd apps/web && pnpm vitest run --config=vitest.config.mts --retry=2 ${{ steps.quarantine.outputs.unit_files }}
         env:
           UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
           UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
@@ -644,7 +644,7 @@ jobs:
           fetch-depth: 2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Build (smoke)
-        run: pnpm run build
+        run: pnpm --filter=@jovie/web run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
@@ -727,7 +727,7 @@ jobs:
 
       - name: Run migrations for E2E DB
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm run drizzle:migrate
+        run: pnpm --filter=@jovie/web run drizzle:migrate
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test
@@ -735,7 +735,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
@@ -744,21 +744,21 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: npx playwright install chromium firefox --with-deps
 
       - name: Load quarantined E2E specs
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         id: quarantine
         run: |
-          FILE="tests/quarantine.json"
+          FILE="apps/web/tests/quarantine.json"
           QUARANTINED=()
 
           if [ -f "$FILE" ]; then
             mapfile -t QUARANTINED < <(jq -r '.e2e // [] | .[]' "$FILE")
           fi
 
-          mapfile -t ALL_SPECS < <(git ls-files "tests/e2e/**/*.spec.ts" "tests/smoke/**/*.spec.ts")
+          mapfile -t ALL_SPECS < <(git ls-files "apps/web/tests/e2e/**/*.spec.ts" "apps/web/tests/smoke/**/*.spec.ts")
 
           ALLOWED_SPECS=()
           for spec in "${ALL_SPECS[@]}"; do
@@ -784,43 +784,43 @@ jobs:
           fi
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          pnpm playwright test -g @smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test -g @smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
         continue-on-error: ${{ github.event_name == 'pull_request' }}
 
       - name: E2E Full (Main Branch)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
+          cd apps/web && pnpm playwright test --reporter=line ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Quarantine (retries)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && steps.quarantine.outputs.has_quarantine == 'true' }}
         continue-on-error: true
-        run: pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
+        run: cd apps/web && pnpm playwright test --reporter=line --retries=2 ${{ steps.quarantine.outputs.quarantined_specs }}
 
       - name: Upload Playwright Report on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@v6
         with:
           name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
-          path: playwright-report/
+          path: apps/web/playwright-report/
           retention-days: 7
 
       - name: Upload Playwright Test Results on Failure
-        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('tests/e2e/**') != '' || hashFiles('tests/smoke/**') != '') }}
+        if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         uses: actions/upload-artifact@v6
         with:
           name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
-          path: test-results/
+          path: apps/web/test-results/
           retention-days: 7
 
   ci-pr-vercel-preview:
@@ -1095,18 +1095,18 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
       - name: DB safety check (main - preflight)
-        run: pnpm run drizzle:migrate:preflight
+        run: pnpm --filter=@jovie/web run drizzle:migrate:preflight
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
       - name: DB migrate (main - Drizzle)
-        run: pnpm run drizzle:migrate
+        run: pnpm --filter=@jovie/web run drizzle:migrate
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'  # Allow automated migrations on main (staging environment)
       - name: DB seed (main)
-        run: pnpm run db:seed
+        run: pnpm --filter=@jovie/web run db:seed
         env:
           DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
@@ -1882,13 +1882,13 @@ jobs:
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
       - name: DB safety check (production - preflight)
-        run: pnpm run drizzle:migrate:preflight
+        run: pnpm --filter=@jovie/web run drizzle:migrate:preflight
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           GIT_BRANCH: production
           ALLOW_PROD_MIGRATIONS: 'true'
       - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
-        run: pnpm run drizzle:migrate:prod
+        run: pnpm --filter=@jovie/web run drizzle:migrate:prod
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           GIT_BRANCH: production
