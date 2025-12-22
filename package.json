@@ -42,7 +42,7 @@
     "clean": "turbo clean && rm -rf node_modules",
     "prepare": "husky",
     "next:proxy-guard": "pnpm --filter=@jovie/web run next:proxy-guard",
-    "pre-push": "pnpm --filter=@jovie/web run pre-push",
+    "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check"
   },
   "devDependencies": {

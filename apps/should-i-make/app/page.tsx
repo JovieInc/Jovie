@@ -1,7 +1,7 @@
 'use client';
 
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Suspense, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useState } from 'react';
 
 type Step = 'start' | 'budget' | 'released' | 'streams' | 'marketing';
 type Result =
