@@ -1,5 +1,3 @@
-import * as React from 'react';
-
 export interface AuthGoogleIconProps {
   className?: string;
 }

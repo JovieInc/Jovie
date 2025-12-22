@@ -2,7 +2,6 @@
 
 import { Button, type ButtonProps } from '@jovie/ui';
 import DOMPurify from 'isomorphic-dompurify';
-import React from 'react';
 import { cn } from '@/lib/utils';
 
 const sizeMap = { sm: 'sm', md: 'default', lg: 'lg' } as const;

@@ -7,7 +7,7 @@ import {
   type Variants,
 } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   LISTEN_COOKIE,

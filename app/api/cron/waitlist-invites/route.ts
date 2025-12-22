@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
-import { env } from '@/lib/env-server';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
@@ -14,17 +13,12 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 function isAuthorized(request: NextRequest): boolean {
-  const secret = env.INGESTION_CRON_SECRET ?? CRON_SECRET;
-  if (!secret) {
+  if (!CRON_SECRET) {
     return false;
   }
 
   const authHeader = request.headers.get('authorization');
-  if (authHeader && authHeader === `Bearer ${secret}`) {
-    return true;
-  }
-
-  return request.headers.get('x-ingestion-secret') === secret;
+  return authHeader === `Bearer ${CRON_SECRET}`;
 }
 
 const sendWindowSchema = z.object({

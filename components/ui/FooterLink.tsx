@@ -18,13 +18,16 @@ export const FooterLink = React.forwardRef<HTMLAnchorElement, FooterLinkProps>(
     ref
   ) => {
     const isExternal = external ?? /^https?:\/\//.test(href);
+    // Use semantic tokens for proper dark mode support
     const palette =
       tone === 'light'
-        ? 'text-secondary-token hover:text-primary-token'
-        : 'text-white/70 hover:text-white';
+        ? 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
+        : 'text-white/70 hover:text-white hover:bg-white/5';
 
     const linkClassName = cn(
-      'inline-flex items-center rounded-md px-0 py-0 text-[13px] leading-5 font-medium tracking-tight transition-colors',
+      'inline-flex items-center rounded-md px-2 py-1 -mx-2 -my-1',
+      'text-[13px] leading-5 font-medium tracking-[-0.01em]',
+      'transition-all duration-150 ease-out',
       'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-transparent',
       palette,
       className

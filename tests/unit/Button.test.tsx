@@ -1,7 +1,6 @@
 import { Button } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import Link from 'next/link';
-import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 describe('Button', () => {

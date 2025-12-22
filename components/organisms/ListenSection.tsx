@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { DSPButtonGroup } from '@/components/molecules/DSPButtonGroup';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { track } from '@/lib/analytics';

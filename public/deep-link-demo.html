@@ -462,7 +462,7 @@
             setTimeout(() => {
               try {
                 document.body.removeChild(iframe);
-              } catch (e) {
+              } catch (_e) {
                 // Iframe might already be removed
               }
             }, 100);
@@ -486,11 +486,14 @@
         }, timeout);
       }
 
+      // These functions are called from inline onclick handlers in the HTML
+      // biome-ignore lint/correctness/noUnusedVariables: used by onclick handlers
       function openSocial(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);
       }
 
+      // biome-ignore lint/correctness/noUnusedVariables: used by onclick handlers
       function openDSP(platform, url) {
         const config = deepLinkConfigs[platform];
         openDeepLink(url, config);

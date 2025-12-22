@@ -193,6 +193,8 @@ export const users = pgTable('users', {
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   billingUpdatedAt: timestamp('billing_updated_at'),
+  billingVersion: integer('billing_version').default(1).notNull(),
+  lastBillingEventAt: timestamp('last_billing_event_at'),
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -705,8 +707,37 @@ export const stripeWebhookEvents = pgTable('stripe_webhook_events', {
   stripeObjectId: text('stripe_object_id'),
   userClerkId: text('user_clerk_id'),
   payload: jsonb('payload').$type<Record<string, unknown>>().default({}),
+  processedAt: timestamp('processed_at'),
+  stripeCreatedAt: timestamp('stripe_created_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+// Billing audit log for tracking subscription state changes
+export const billingAuditLog = pgTable(
+  'billing_audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    previousState: jsonb('previous_state')
+      .$type<Record<string, unknown>>()
+      .default({}),
+    newState: jsonb('new_state').$type<Record<string, unknown>>().default({}),
+    stripeEventId: text('stripe_event_id'),
+    source: text('source').notNull().default('webhook'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    userIdIdx: index('billing_audit_log_user_id_idx').on(table.userId),
+    stripeEventIdIdx: index('billing_audit_log_stripe_event_id_idx').on(
+      table.stripeEventId
+    ),
+    createdAtIdx: index('billing_audit_log_created_at_idx').on(table.createdAt),
+  })
+);
 
 export const signedLinkAccess = pgTable('signed_link_access', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -930,6 +961,9 @@ export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
 export const insertWaitlistInviteSchema = createInsertSchema(waitlistInvites);
 export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
 
+export const insertBillingAuditLogSchema = createInsertSchema(billingAuditLog);
+export const selectBillingAuditLogSchema = createSelectSchema(billingAuditLog);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1003,3 +1037,6 @@ export type DashboardIdempotencyKey =
   typeof dashboardIdempotencyKeys.$inferSelect;
 export type NewDashboardIdempotencyKey =
   typeof dashboardIdempotencyKeys.$inferInsert;
+
+export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
+export type NewBillingAuditLog = typeof billingAuditLog.$inferInsert;

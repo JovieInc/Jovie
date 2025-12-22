@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
 
 interface OptimizedAvatarProps {

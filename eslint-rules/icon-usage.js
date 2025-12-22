@@ -196,45 +196,6 @@ module.exports = {
       },
 
       // Check JSX elements for inline SVGs
-      JSXElement(node) {
-        if (node.openingElement.name.name === 'svg') {
-          // Allow SVGs in approved components and server-side templates
-          const allowedComponents = ['SocialIcon.tsx', 'IconBadge.tsx'];
-          const allowedFiles = ['footer.ts']; // Server-side templates with brand logos
-          if (
-            allowedComponents.some(comp => filename.includes(comp)) ||
-            allowedFiles.some(file => filename.includes(file))
-          ) {
-            return;
-          }
-
-          // Check if it's likely a social icon based on context
-          const jsxText = sourceCode.getText(node);
-          if (containsSocialPlatform(jsxText)) {
-            context.report({
-              node,
-              messageId: 'useSocialIcon',
-              data: { platform: 'detected-platform' },
-            });
-            return;
-          }
-
-          // Check if it's likely a UI icon
-          if (containsUIIcon(jsxText)) {
-            context.report({
-              node,
-              messageId: 'useHeroicons',
-            });
-            return;
-          }
-
-          // Generic inline SVG warning
-          context.report({
-            node,
-            messageId: 'inlineSvg',
-          });
-        }
-      },
 
       // Check for img elements with SVG sources
       JSXElement(node) {

@@ -2,7 +2,7 @@
 
 import { Badge, Button, Input } from '@jovie/ui';
 import Image from 'next/image';
-import { useMemo, useRef, useState, useTransition, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   resetProviderOverride,
@@ -219,10 +219,7 @@ export function ReleaseProviderMatrix({
   );
 
   return (
-    <div
-      className='flex h-full min-h-0 flex-col'
-      data-testid='releases-matrix'
-    >
+    <div className='flex h-full min-h-0 flex-col' data-testid='releases-matrix'>
       {/* Header */}
       <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
         <div className='flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:px-6'>
@@ -245,8 +242,13 @@ export function ReleaseProviderMatrix({
             </span>
             {totalOverrides > 0 && (
               <span className='inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200'>
-                <Icon name='PencilLine' className='h-3 w-3' aria-hidden='true' />
-                {totalOverrides} {totalOverrides === 1 ? 'override' : 'overrides'}
+                <Icon
+                  name='PencilLine'
+                  className='h-3 w-3'
+                  aria-hidden='true'
+                />
+                {totalOverrides}{' '}
+                {totalOverrides === 1 ? 'override' : 'overrides'}
               </span>
             )}
           </div>
@@ -572,7 +574,9 @@ export function ReleaseProviderMatrix({
                     className='mt-2 border border-subtle bg-transparent text-xs text-secondary-token'
                   >
                     {editingRelease.releaseDate
-                      ? new Date(editingRelease.releaseDate).toLocaleDateString()
+                      ? new Date(
+                          editingRelease.releaseDate
+                        ).toLocaleDateString()
                       : 'Date TBD'}
                   </Badge>
                 </div>

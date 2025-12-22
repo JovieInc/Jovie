@@ -1,4 +1,3 @@
-import { NeonQueryFunction } from '@neondatabase/serverless';
 import { NeonDatabase } from 'drizzle-orm/neon-http';
 
 declare global {

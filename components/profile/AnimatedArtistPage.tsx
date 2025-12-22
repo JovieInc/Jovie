@@ -4,7 +4,7 @@ import { useFeatureGate } from '@statsig/react-bindings';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
