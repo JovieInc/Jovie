@@ -17,9 +17,13 @@ import {
 import { ButtonSpinner } from './ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
-  'mt-2 text-sm text-destructive text-center animate-in fade-in-0 duration-200';
+  'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200';
 const STEP_TRANSITION_CLASSES =
   'animate-in fade-in-0 slide-in-from-bottom-2 duration-300 ease-out';
+
+// Mobile-optimized OAuth button classes with proper touch targets
+const OAUTH_BUTTON_MOBILE_CLASSES =
+  'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150';
 
 const submitButtonClassName = authButtonVariants({ variant: 'primary' });
 const secondaryButtonClassName = authButtonVariants({ variant: 'secondary' });
@@ -178,7 +182,7 @@ export function OtpSignUpForm() {
           {isLoading => (
             <Clerk.Connection
               name='google'
-              className={className}
+              className={`${className} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
               disabled={isLoading}
               aria-busy={isLoading}
               onClickCapture={() => persistLastUsedAuthMethod('google')}
@@ -205,7 +209,7 @@ export function OtpSignUpForm() {
         {isLoading => (
           <Clerk.Connection
             name='spotify'
-            className={className}
+            className={`${className} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
             disabled={isLoading}
             aria-busy={isLoading}
             onClickCapture={() => persistLastUsedAuthMethod('spotify')}
@@ -239,19 +243,20 @@ export function OtpSignUpForm() {
           <SignUp.Step name='start' aria-label='Choose a sign-up method'>
             <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
               {isEmailOpen ? (
-                <>
+                <div className='space-y-5 sm:space-y-4'>
                   <Clerk.Field name='emailAddress'>
                     <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
                     <AuthInput
                       type='email'
-                      placeholder='Email Address'
+                      placeholder='Enter your email address'
                       autoComplete='email'
+                      enterKeyHint='send'
                       onChange={e => setUserEmail(e.target.value)}
                     />
                     <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
                   </Clerk.Field>
 
-                  <p className='text-[15px] leading-relaxed text-secondary-token text-center'>
+                  <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
                     We&apos;ll send a 6-digit code to verify your email.
                   </p>
 
@@ -259,7 +264,7 @@ export function OtpSignUpForm() {
                     {isLoading => (
                       <SignUp.Action
                         submit
-                        className={secondaryButtonClassName}
+                        className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
                         disabled={isLoading}
                         aria-busy={isLoading}
                         onClick={() => setLastUsedAuthMethod('email')}
@@ -280,12 +285,12 @@ export function OtpSignUpForm() {
                     onClick={() => setIsEmailOpen(false)}
                     ariaLabel='Back to sign-up'
                   />
-                </>
+                </div>
               ) : (
-                <div className='pt-6 space-y-3'>
+                <div className='pt-6 space-y-3 sm:space-y-3'>
                   {renderMethodButton(orderedMethods[0], true)}
                   {orderedMethods.length > 1 ? (
-                    <div className='mt-8 space-y-3'>
+                    <div className='mt-6 sm:mt-8 space-y-3'>
                       {orderedMethods.slice(1).map(method => (
                         <div key={method}>
                           {renderMethodButton(method, false)}
@@ -303,70 +308,79 @@ export function OtpSignUpForm() {
             aria-label='Verify your email with code'
           >
             <SignUp.Strategy name='email_code'>
-              <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-                <h1 className='text-[20px] leading-6 font-medium text-primary-token mb-0 text-center'>
+              <div className={STEP_TRANSITION_CLASSES}>
+                {/* Mobile-optimized heading */}
+                <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
                   Check your email
                 </h1>
 
                 <p
-                  className='mt-6 mb-12 text-[15px] leading-relaxed text-secondary-token text-center'
+                  className='mt-6 mb-10 sm:mb-12 text-[15px] leading-relaxed text-secondary-token text-center px-2'
                   id='otp-description'
                 >
-                  We&apos;ve sent you a 6-digit login code.{' '}
+                  We&apos;ve sent you a 6-digit verification code.{' '}
                   {userEmail && (
                     <>
                       Please check your inbox at{' '}
-                      <span className='text-primary-token'>{userEmail}</span>.
+                      <span className='text-primary-token font-medium break-all'>
+                        {userEmail}
+                      </span>
+                      .
                     </>
                   )}
                   {!userEmail && <>Codes expire after 10 minutes.</>}
                 </p>
 
-                <Clerk.Field name='code'>
-                  <Clerk.Label className='sr-only'>
-                    Verification code
-                  </Clerk.Label>
-                  <OtpInput
-                    autoSubmit
-                    aria-label='Enter 6-digit verification code'
-                  />
-                  <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
-                </Clerk.Field>
+                {/* OTP input with extra top margin for progress dots */}
+                <div className='space-y-5 sm:space-y-4 pt-4 sm:pt-0'>
+                  <Clerk.Field name='code'>
+                    <Clerk.Label className='sr-only'>
+                      Verification code
+                    </Clerk.Label>
+                    <OtpInput
+                      autoSubmit
+                      aria-label='Enter 6-digit verification code'
+                    />
+                    <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
+                  </Clerk.Field>
 
-                <Clerk.Loading>
-                  {isLoading => (
+                  <Clerk.Loading>
+                    {isLoading => (
+                      <SignUp.Action
+                        submit
+                        className={`${submitButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+                        disabled={isLoading}
+                        aria-busy={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <ButtonSpinner />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          'Verify code'
+                        )}
+                      </SignUp.Action>
+                    )}
+                  </Clerk.Loading>
+
+                  <div className='relative'>
                     <SignUp.Action
-                      submit
-                      className={submitButtonClassName}
-                      disabled={isLoading}
-                      aria-busy={isLoading}
+                      navigate='start'
+                      className='sr-only'
+                      id='signup-navigate-start'
                     >
-                      {isLoading ? (
-                        <>
-                          <ButtonSpinner />
-                          <span>Verifying...</span>
-                        </>
-                      ) : (
-                        'Verify Code'
-                      )}
+                      Use a different email
                     </SignUp.Action>
-                  )}
-                </Clerk.Loading>
-
-                <div className='relative'>
-                  <SignUp.Action
-                    navigate='start'
-                    className='sr-only'
-                    id='signup-navigate-start'
-                  >
-                    Use a different email
-                  </SignUp.Action>
-                  <AuthBackButton
-                    onClick={() => {
-                      document.getElementById('signup-navigate-start')?.click();
-                    }}
-                    ariaLabel='Use a different email'
-                  />
+                    <AuthBackButton
+                      onClick={() => {
+                        document
+                          .getElementById('signup-navigate-start')
+                          ?.click();
+                      }}
+                      ariaLabel='Use a different email'
+                    />
+                  </div>
                 </div>
               </div>
             </SignUp.Strategy>

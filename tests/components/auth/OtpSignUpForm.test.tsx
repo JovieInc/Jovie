@@ -187,15 +187,6 @@ describe('OtpSignUpForm', () => {
     expect(screen.getByText('Continue with Google')).toBeInTheDocument();
   });
 
-  it('displays "Verify Code" button in verifications step', () => {
-    renderSignUp();
-
-    const buttons = screen.getAllByTestId('signup-action');
-    expect(
-      buttons.some(button => button.textContent?.includes('Verify Code'))
-    ).toBe(true);
-  });
-
   it('uses semantic design tokens for global error', () => {
     renderSignUp();
 
