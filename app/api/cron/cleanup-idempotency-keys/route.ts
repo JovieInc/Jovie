@@ -1,6 +1,6 @@
 import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { db, dashboardIdempotencyKeys } from '@/lib/db';
+import { dashboardIdempotencyKeys, db } from '@/lib/db';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
