@@ -140,13 +140,8 @@ export function track(event: string, properties?: Record<string, unknown>) {
       }
     })();
 
-    // Track with Vercel Analytics (if available)
-    if (analyticsWindow.va) {
-      analyticsWindow.va('event', {
-        name: event,
-        properties: { ...(properties || {}), env: envTag },
-      });
-    }
+    // NOTE: Removed window.va() calls - was causing 4M events/day ($100+/day)
+    // <VercelAnalytics /> handles pageviews, we don't need custom events there
 
     // Track with Google Analytics (if available)
     if (analyticsWindow.gtag) {
@@ -160,51 +155,18 @@ export function track(event: string, properties?: Record<string, unknown>) {
 
 export function page(name?: string, properties?: Record<string, unknown>) {
   withAnalyticsGuard('page', name, () => {
-    const analyticsWindow = getAnalyticsWindow();
-    if (!analyticsWindow) return;
-
-    const envTag = (() => {
-      try {
-        const prodHost = new URL(publicEnv.NEXT_PUBLIC_APP_URL).hostname;
-        const host = analyticsWindow.location.hostname;
-        if (
-          host === 'localhost' ||
-          host === '127.0.0.1' ||
-          host.endsWith('.local')
-        ) {
-          return 'dev';
-        }
-        if (host === prodHost || host === `www.${prodHost}`) {
-          return 'prod';
-        }
-        return 'preview';
-      } catch {
-        return process.env.NODE_ENV === 'development' ? 'dev' : 'prod';
-      }
-    })();
-
-    // Track with Vercel Analytics (if available)
-    if (analyticsWindow.va) {
-      analyticsWindow.va('page_view', {
-        name,
-        properties: { ...(properties || {}), env: envTag },
-      });
-    }
+    // NOTE: Removed window.va() calls - <VercelAnalytics /> handles pageviews automatically
+    // This was causing excessive events and costs
+    void name;
+    void properties;
   });
 }
 
 export function identify(userId: string, traits?: Record<string, unknown>) {
   withAnalyticsGuard('identify', userId, () => {
-    const analyticsWindow = getAnalyticsWindow();
-    if (!analyticsWindow) return;
-
-    // Track with Vercel Analytics (if available)
-    if (analyticsWindow.va) {
-      analyticsWindow.va('identify', {
-        userId,
-        traits,
-      });
-    }
+    // NOTE: Removed window.va() calls - was causing excessive events and costs
+    void userId;
+    void traits;
   });
 }
 
