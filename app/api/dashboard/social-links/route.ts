@@ -236,7 +236,9 @@ export async function GET(req: Request) {
             isActive: state === 'active',
             displayText: r.displayText,
             state,
-            confidence: Number.isFinite(parsedConfidence) ? parsedConfidence : 0,
+            confidence: Number.isFinite(parsedConfidence)
+              ? parsedConfidence
+              : 0,
             sourcePlatform: r.sourcePlatform,
             sourceType: r.sourceType ?? 'manual',
             evidence: r.evidence,
@@ -430,9 +432,10 @@ export async function PUT(req: Request) {
       // Check optimistic locking if expectedVersion is provided
       // Empty state is treated as version 0 to ensure new links start from known state
       if (expectedVersion !== undefined) {
-        const currentVersion = existingLinks.length > 0
-          ? Math.max(...existingLinks.map(l => l.version ?? 1))
-          : 0;
+        const currentVersion =
+          existingLinks.length > 0
+            ? Math.max(...existingLinks.map(l => l.version ?? 1))
+            : 0;
         if (currentVersion !== expectedVersion) {
           const response = {
             error: 'Conflict: Links have been modified by another request',
@@ -448,9 +451,10 @@ export async function PUT(req: Request) {
       }
 
       // Calculate next version (increment from max existing version)
-      const currentMaxVersion = existingLinks.length > 0
-        ? Math.max(...existingLinks.map(l => l.version ?? 1))
-        : 0;
+      const currentMaxVersion =
+        existingLinks.length > 0
+          ? Math.max(...existingLinks.map(l => l.version ?? 1))
+          : 0;
       const nextVersion = currentMaxVersion + 1;
 
       // Delete only manual/admin links to preserve ingested suggestions
@@ -459,7 +463,9 @@ export async function PUT(req: Request) {
         .map(link => link.id);
 
       if (removableIds.length > 0) {
-        await tx.delete(socialLinks).where(inArray(socialLinks.id, removableIds));
+        await tx
+          .delete(socialLinks)
+          .where(inArray(socialLinks.id, removableIds));
       }
 
       // Insert new links with new version

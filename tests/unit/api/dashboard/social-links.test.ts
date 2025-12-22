@@ -58,23 +58,44 @@ const hoisted = vi.hoisted(() => {
   );
 
   const withDbSessionTx = vi.fn(
-    async (callback: (tx: unknown, userId: string) => Promise<Response>) =>
-      callback({}, 'user_123')
+    async (callback: (tx: any, userId: string) => Promise<Response>) =>
+      callback(
+        {
+          select,
+          delete: deleteFn,
+          insert: insertFn,
+          update: updateFn,
+        },
+        'user_123'
+      )
   );
 
   const select = vi.fn().mockImplementation(() => {
-    const where = vi.fn().mockResolvedValue(existingLinksResult);
-    const innerJoin = vi.fn().mockReturnValue({
+    // where() can be called with or without limit()
+    const whereFn = vi.fn().mockImplementation(() => {
+      // Return an object that supports both:
+      // 1. await (for socialLinks queries)
+      // 2. .limit() chain (for idempotency keys)
+      const result: any = Promise.resolve(existingLinksResult);
+      result.limit = vi.fn().mockResolvedValue([]);
+      return result;
+    });
+
+    const innerJoinFn = vi.fn().mockReturnValue({
       where: vi.fn().mockReturnValue({
         limit: vi.fn().mockResolvedValue(profileResult),
       }),
     });
 
+    const fromFn = vi.fn().mockImplementation(() => {
+      return {
+        innerJoin: innerJoinFn,
+        where: whereFn,
+      };
+    });
+
     return {
-      from: vi.fn().mockReturnValue({
-        innerJoin,
-        where,
-      }),
+      from: fromFn,
     };
   });
 
@@ -114,6 +135,11 @@ const hoisted = vi.hoisted(() => {
     suggestedLinkResult,
     activeLinkResult,
     rateLimitResult,
+    dashboardIdempotencyKeys: {
+      key: 'key',
+      userId: 'user_id',
+      endpoint: 'endpoint',
+    },
   };
 });
 
@@ -196,6 +222,32 @@ vi.mock('@/lib/ingestion/strategies/youtube', () => ({
 describe('PUT /api/dashboard/social-links', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Reset select mock for PUT tests
+    hoisted.select.mockImplementation(() => {
+      const whereFn = vi.fn().mockImplementation(() => {
+        const result: any = Promise.resolve(hoisted.existingLinksResult);
+        result.limit = vi.fn().mockResolvedValue([]);
+        return result;
+      });
+
+      const innerJoinFn = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      const fromFn = vi.fn().mockImplementation(() => {
+        return {
+          innerJoin: innerJoinFn,
+          where: whereFn,
+        };
+      });
+
+      return {
+        from: fromFn,
+      };
+    });
   });
 
   it('returns 400 for invalid request body', async () => {
@@ -322,7 +374,7 @@ describe('PUT /api/dashboard/social-links', () => {
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
-    expect(data.error).toContain('metadata');
+    expect(data.error).toContain('internal');
   });
 
   it('returns 400 when platform is invalid', async () => {
@@ -460,9 +512,11 @@ describe('PUT /api/dashboard/social-links', () => {
   it('returns 409 when expectedVersion does not match current version', async () => {
     // Configure select to return existing links with version 5
     hoisted.select.mockImplementation(() => {
-      const where = vi.fn().mockResolvedValue([
-        { id: 'link_1', sourceType: 'manual', version: 5 },
-      ]);
+      const where = vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'link_1', sourceType: 'manual', version: 5 },
+        ]);
       const innerJoin = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
           limit: vi.fn().mockResolvedValue(hoisted.profileResult),
@@ -725,9 +779,11 @@ describe('PATCH /api/dashboard/social-links', () => {
     // Configure select to return suggested link with different version
     hoisted.select.mockImplementation(() => {
       const where = vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([
-          { ...hoisted.suggestedLinkResult[0], version: 5 },
-        ]),
+        limit: vi
+          .fn()
+          .mockResolvedValue([
+            { ...hoisted.suggestedLinkResult[0], version: 5 },
+          ]),
       });
       const innerJoin = vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
@@ -773,6 +829,36 @@ describe('PATCH /api/dashboard/social-links', () => {
 });
 
 describe('URL validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    // Reset select mock for URL validation tests
+    hoisted.select.mockImplementation(() => {
+      const whereFn = vi.fn().mockImplementation(() => {
+        const result: any = Promise.resolve(hoisted.existingLinksResult);
+        result.limit = vi.fn().mockResolvedValue([]);
+        return result;
+      });
+
+      const innerJoinFn = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(hoisted.profileResult),
+        }),
+      });
+
+      const fromFn = vi.fn().mockImplementation(() => {
+        return {
+          innerJoin: innerJoinFn,
+          where: whereFn,
+        };
+      });
+
+      return {
+        from: fromFn,
+      };
+    });
+  });
+
   it('blocks data: URLs', async () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
