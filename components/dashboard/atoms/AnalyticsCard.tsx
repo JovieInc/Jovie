@@ -47,13 +47,13 @@ export function AnalyticsCard({
             {headerRight ? <div className='shrink-0'>{headerRight}</div> : null}
           </div>
 
-          <div className='mt-4 flex items-end justify-between gap-4'>
-            <dd className='text-[2.4rem] font-semibold tracking-tight text-primary-token tabular-nums leading-none dark:text-primary-token/90'>
+          <div className='mt-3 flex items-end justify-between gap-4'>
+            <dd className='text-[2.25rem] font-semibold tracking-tight text-primary-token tabular-nums leading-none'>
               {value}
             </dd>
             <div
               className={cn(
-                'shrink-0 rounded-full border border-subtle/80 bg-surface-2/70 p-2.5 ring-1 ring-inset ring-white/10 shadow-sm shadow-black/5 dark:shadow-black/30',
+                'shrink-0 flex h-10 w-10 items-center justify-center rounded-full',
                 iconChipClassName
               )}
               aria-hidden='true'
@@ -65,7 +65,7 @@ export function AnalyticsCard({
           </div>
 
           <div
-            className='mt-4 h-px w-full bg-white/5 dark:bg-white/10'
+            className='mt-4 h-px w-full bg-foreground/6'
             aria-hidden='true'
           />
 
