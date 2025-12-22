@@ -232,61 +232,64 @@ export function OtpSignUpForm() {
   };
 
   return (
-    <SignUp.Root routing='path' path='/signup'>
-      <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-3 p-0'>
-          {/* Fixed height container to prevent layout shift when error appears */}
-          <div className='min-h-[24px]' role='alert' aria-live='polite'>
-            <Clerk.GlobalError className='text-sm text-destructive text-center' />
-          </div>
+    <>
+      {/* Back button rendered outside nested containers to ensure fixed positioning works */}
+      {isEmailOpen && (
+        <AuthBackButton
+          onClick={() => setIsEmailOpen(false)}
+          ariaLabel='Back to sign-up'
+        />
+      )}
+      <SignUp.Root routing='path' path='/signup'>
+        <Card className='shadow-none border-0 bg-transparent p-0'>
+          <CardContent className='space-y-3 p-0'>
+            {/* Fixed height container to prevent layout shift when error appears */}
+            <div className='min-h-[24px]' role='alert' aria-live='polite'>
+              <Clerk.GlobalError className='text-sm text-destructive text-center' />
+            </div>
 
-          <SignUp.Step name='start' aria-label='Choose a sign-up method'>
-            <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              {isEmailOpen ? (
-                <div className='space-y-5 sm:space-y-4'>
-                  <Clerk.Field name='emailAddress'>
-                    <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
-                    <AuthInput
-                      type='email'
-                      placeholder='Enter your email address'
-                      autoComplete='email'
-                      enterKeyHint='send'
-                      onChange={e => setUserEmail(e.target.value)}
-                    />
-                    <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
-                  </Clerk.Field>
+            <SignUp.Step name='start' aria-label='Choose a sign-up method'>
+              <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
+                {isEmailOpen ? (
+                  <div className='space-y-5 sm:space-y-4'>
+                    <Clerk.Field name='emailAddress'>
+                      <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
+                      <AuthInput
+                        type='email'
+                        placeholder='Enter your email address'
+                        autoComplete='email'
+                        enterKeyHint='send'
+                        onChange={e => setUserEmail(e.target.value)}
+                      />
+                      <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
+                    </Clerk.Field>
 
-                  <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
-                    We&apos;ll send a 6-digit code to verify your email.
-                  </p>
+                    <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
+                      We&apos;ll send a 6-digit code to verify your email.
+                    </p>
 
-                  <Clerk.Loading>
-                    {isLoading => (
-                      <SignUp.Action
-                        submit
-                        className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
-                        disabled={isLoading}
-                        aria-busy={isLoading}
-                        onClick={() => setLastUsedAuthMethod('email')}
-                      >
-                        {isLoading ? (
-                          <>
-                            <ButtonSpinner />
-                            <span>Sending code...</span>
-                          </>
-                        ) : (
-                          'Continue with email'
-                        )}
-                      </SignUp.Action>
-                    )}
-                  </Clerk.Loading>
-
-                  <AuthBackButton
-                    onClick={() => setIsEmailOpen(false)}
-                    ariaLabel='Back to sign-up'
-                  />
-                </div>
-              ) : (
+                    <Clerk.Loading>
+                      {isLoading => (
+                        <SignUp.Action
+                          submit
+                          className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+                          disabled={isLoading}
+                          aria-busy={isLoading}
+                          onClick={() => setLastUsedAuthMethod('email')}
+                        >
+                          {isLoading ? (
+                            <>
+                              <ButtonSpinner />
+                              <span>Sending code...</span>
+                            </>
+                          ) : (
+                            'Continue with email'
+                          )}
+                        </SignUp.Action>
+                      )}
+                    </Clerk.Loading>
+                  </div>
+                ) : (
                 <div className='pt-6 space-y-3 sm:space-y-3'>
                   {renderMethodButton(orderedMethods[0], true)}
                   {orderedMethods.length > 1 ? (
@@ -385,8 +388,9 @@ export function OtpSignUpForm() {
               </div>
             </SignUp.Strategy>
           </SignUp.Step>
-        </CardContent>
-      </Card>
-    </SignUp.Root>
+          </CardContent>
+        </Card>
+      </SignUp.Root>
+    </>
   );
 }

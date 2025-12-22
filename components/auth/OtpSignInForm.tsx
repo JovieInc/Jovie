@@ -236,64 +236,67 @@ export function OtpSignInForm() {
   };
 
   return (
-    <SignIn.Root routing='path' path='/signin'>
-      <Card className='shadow-none border-0 bg-transparent p-0'>
-        <CardContent className='space-y-3 p-0'>
-          <div className='min-h-[24px]' role='alert' aria-live='polite'>
-            <Clerk.GlobalError className='text-destructive' />
-          </div>
-          <SignIn.Step name='start' aria-label='Choose a sign-in method'>
-            <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
-              {/* Mobile-optimized heading with responsive font size */}
-              <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
-                {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
-              </h1>
+    <>
+      {/* Back button rendered outside nested containers to ensure fixed positioning works */}
+      {isEmailOpen && (
+        <AuthBackButton
+          onClick={() => setIsEmailOpen(false)}
+          ariaLabel='Back to sign-in'
+        />
+      )}
+      <SignIn.Root routing='path' path='/signin'>
+        <Card className='shadow-none border-0 bg-transparent p-0'>
+          <CardContent className='space-y-3 p-0'>
+            <div className='min-h-[24px]' role='alert' aria-live='polite'>
+              <Clerk.GlobalError className='text-destructive' />
+            </div>
+            <SignIn.Step name='start' aria-label='Choose a sign-in method'>
+              <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
+                {/* Mobile-optimized heading with responsive font size */}
+                <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+                  {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
+                </h1>
 
-              {isEmailOpen ? (
-                <div className='pt-4 space-y-5 sm:space-y-4'>
-                  <Clerk.Field name='identifier'>
-                    <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
-                    <AuthInput
-                      type='email'
-                      placeholder='Enter your email address'
-                      autoComplete='email'
-                      enterKeyHint='send'
-                      onChange={e => setUserEmail(e.target.value)}
-                    />
-                    <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
-                  </Clerk.Field>
+                {isEmailOpen ? (
+                  <div className='pt-4 space-y-5 sm:space-y-4'>
+                    <Clerk.Field name='identifier'>
+                      <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
+                      <AuthInput
+                        type='email'
+                        placeholder='Enter your email address'
+                        autoComplete='email'
+                        enterKeyHint='send'
+                        onChange={e => setUserEmail(e.target.value)}
+                      />
+                      <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
+                    </Clerk.Field>
 
-                  <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
-                    We&apos;ll email a 6-digit code to keep your account secure.
-                  </p>
+                    <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
+                      We&apos;ll email a 6-digit code to keep your account secure.
+                    </p>
 
-                  <Clerk.Loading>
-                    {isLoading => (
-                      <SignIn.Action
-                        submit
-                        className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
-                        disabled={isLoading}
-                        aria-busy={isLoading}
-                        onClick={() => setLastUsedAuthMethod('email')}
-                      >
-                        {isLoading ? (
-                          <>
-                            <ButtonSpinner />
-                            <span>Sending code...</span>
-                          </>
-                        ) : (
-                          'Continue with email'
-                        )}
-                      </SignIn.Action>
-                    )}
-                  </Clerk.Loading>
-
-                  <AuthBackButton
-                    onClick={() => setIsEmailOpen(false)}
-                    ariaLabel='Back to sign-in'
-                  />
-                </div>
-              ) : (
+                    <Clerk.Loading>
+                      {isLoading => (
+                        <SignIn.Action
+                          submit
+                          className={`${secondaryButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+                          disabled={isLoading}
+                          aria-busy={isLoading}
+                          onClick={() => setLastUsedAuthMethod('email')}
+                        >
+                          {isLoading ? (
+                            <>
+                              <ButtonSpinner />
+                              <span>Sending code...</span>
+                            </>
+                          ) : (
+                            'Continue with email'
+                          )}
+                        </SignIn.Action>
+                      )}
+                    </Clerk.Loading>
+                  </div>
+                ) : (
                 <div className='pt-6 space-y-3 sm:space-y-3'>
                   {renderMethodButton(orderedMethods[0], true)}
 
@@ -412,8 +415,9 @@ export function OtpSignInForm() {
               </div>
             </SignIn.Strategy>
           </SignIn.Step>
-        </CardContent>
-      </Card>
-    </SignIn.Root>
+          </CardContent>
+        </Card>
+      </SignIn.Root>
+    </>
   );
 }
