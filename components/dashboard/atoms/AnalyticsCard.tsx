@@ -65,7 +65,7 @@ export function AnalyticsCard({
           </div>
 
           <div
-            className='mt-4 h-px w-full bg-white/[0.06]'
+            className='mt-4 h-px w-full bg-foreground/6'
             aria-hidden='true'
           />
 
