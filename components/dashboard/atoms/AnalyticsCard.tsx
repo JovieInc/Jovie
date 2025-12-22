@@ -53,7 +53,7 @@ export function AnalyticsCard({
             </dd>
             <div
               className={cn(
-                'shrink-0 rounded-full border border-subtle/80 bg-surface-2/70 p-2.5 ring-1 ring-inset ring-white/10 shadow-sm shadow-black/5 dark:shadow-black/30',
+                'shrink-0 rounded-full border border-subtle/80 bg-surface-2/70 p-2.5 ring-1 ring-inset ring-black/5 dark:ring-white/10 shadow-sm shadow-black/5 dark:shadow-black/30',
                 iconChipClassName
               )}
               aria-hidden='true'
@@ -65,7 +65,7 @@ export function AnalyticsCard({
           </div>
 
           <div
-            className='mt-4 h-px w-full bg-white/5 dark:bg-white/10'
+            className='mt-4 h-px w-full bg-border-subtle'
             aria-hidden='true'
           />
 
