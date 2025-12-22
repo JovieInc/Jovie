@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import * as React from 'react';
 import type { DashboardData } from '@/app/app/dashboard/actions';
 import { DashboardDataProvider } from '@/app/app/dashboard/DashboardDataContext';
 import DashboardLayoutClient from '@/app/app/dashboard/DashboardLayoutClient';

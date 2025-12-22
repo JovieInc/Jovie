@@ -197,6 +197,16 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
+
+      - name: Cleanup old Neon branches (prevent limit errors)
+        uses: ./.github/actions/neon-branch-cleanup
+        with:
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
+          neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_limit: '10'
+          protected_branches: 'main,production,br-main,br-production'
+          cleanup_threshold: '7'
+
       - name: Determine sanitized branch name
         id: sanitize-branch
         run: |
@@ -373,6 +383,15 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 2
+
+      - name: Cleanup old Neon branches (prevent limit errors)
+        uses: ./.github/actions/neon-branch-cleanup
+        with:
+          neon_api_key: ${{ secrets.NEON_API_KEY }}
+          neon_project_id: ${{ vars.NEON_PROJECT_ID }}
+          branch_limit: '10'
+          protected_branches: 'main,production,br-main,br-production'
+          cleanup_threshold: '7'
 
       - name: Check for relevant changes
         id: check_changes

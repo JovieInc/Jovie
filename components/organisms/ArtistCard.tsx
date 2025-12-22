@@ -2,7 +2,6 @@
 
 import { type MotionProps, motion, useReducedMotion } from 'framer-motion';
 import Image from 'next/image';
-import React from 'react';
 
 // import { Button } from './Button'; // Not used in current implementation
 

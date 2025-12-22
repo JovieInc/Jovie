@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { cn } from '@/lib/utils';
 
 export type LoadingSpinnerTone = 'primary' | 'muted' | 'inverse';

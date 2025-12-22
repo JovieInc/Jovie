@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, type ButtonProps } from '@jovie/ui';
-import React from 'react';
 import { cn } from '@/lib/utils';
 
 /**

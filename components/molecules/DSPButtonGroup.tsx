@@ -1,6 +1,5 @@
 'use client';
 
-import React from 'react';
 import { DSPButton } from '@/components/atoms/DSPButton';
 import type { AvailableDSP } from '@/lib/dsp';
 

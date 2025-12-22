@@ -2,7 +2,6 @@
 
 import { motion, type Variants } from 'framer-motion';
 import Image from 'next/image';
-import React from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 type EmptyStateType = 'no-venmo' | 'pending-metrics';

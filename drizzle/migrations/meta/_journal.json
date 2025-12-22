@@ -183,6 +183,13 @@
       "when": 1766358319000,
       "tag": "0025_dashboard_links_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1766362262054,
+      "tag": "0026_billing_hardening",
+      "breakpoints": true
     }
   ]
 }

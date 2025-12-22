@@ -26,7 +26,7 @@ function getLuminance(r: number, g: number, b: number) {
   return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
 }
 
-function getContrastRatio(fg: string, bg: string) {
+function _getContrastRatio(fg: string, bg: string) {
   const parseColor = (c: string) => {
     const match = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
     if (!match) return null;
@@ -47,7 +47,7 @@ function getContrastRatio(fg: string, bg: string) {
   return (l1 + 0.05) / (l2 + 0.05);
 }
 
-function getSeverity(ratio: number, isLargeText: boolean) {
+function _getSeverity(ratio: number, isLargeText: boolean) {
   const required = isLargeText ? 3 : 4.5;
   if (ratio >= required) return 'pass';
   if (ratio < 1.5) return 'major';
@@ -217,7 +217,7 @@ test.describe('Accessibility Audit', () => {
     const publicRoutes = ['/', '/signin', '/signup', '/pricing'];
 
     // Dashboard/admin pages (require auth - will be skipped if not signed in)
-    const authRoutes = [
+    const _authRoutes = [
       '/app/dashboard',
       '/app/settings',
       '/app/dashboard/links',

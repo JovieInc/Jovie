@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { TipSelector } from '@/components/molecules/TipSelector';
 
 type VenmoTipSelectorProps = {

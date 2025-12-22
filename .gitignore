@@ -24,6 +24,7 @@
 # misc
 .DS_Store
 *.pem
+.eslintcache
 
 # local env files
 .env*.local
@@ -50,3 +51,6 @@ public/sitemap*.xml.gz
 # Sentry Config File
 .env.sentry-build-plugin
 storybook-static/
+
+# Claude Code local settings
+.claude/

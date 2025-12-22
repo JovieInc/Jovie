@@ -1,0 +1,135 @@
+name: 'Neon Branch Cleanup'
+description: 'Cleans up old ephemeral Neon branches when approaching the branch limit, protecting long-lived branches'
+
+inputs:
+  neon_api_key:
+    description: 'Neon API key'
+    required: true
+  neon_project_id:
+    description: 'Neon project ID'
+    required: true
+  branch_limit:
+    description: 'Maximum number of branches allowed (Neon plan limit)'
+    required: false
+    default: '10'
+  protected_branches:
+    description: 'Comma-separated list of branch names to never delete'
+    required: false
+    default: 'main,production,br-main,br-production'
+  cleanup_threshold:
+    description: 'Start cleanup when this many branches exist (should be less than limit)'
+    required: false
+    default: '7'
+
+outputs:
+  branches_deleted:
+    description: 'Number of branches deleted'
+    value: ${{ steps.cleanup.outputs.deleted_count }}
+  branches_remaining:
+    description: 'Number of branches remaining after cleanup'
+    value: ${{ steps.cleanup.outputs.remaining_count }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      id: validate
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.neon_api_key }}" ] || [ -z "${{ inputs.neon_project_id }}" ]; then
+          echo "Neon API credentials missing; skipping cleanup."
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+
+    - name: Cleanup old Neon branches
+      id: cleanup
+      if: steps.validate.outputs.skip != 'true'
+      shell: bash
+      env:
+        NEON_API_KEY: ${{ inputs.neon_api_key }}
+        NEON_PROJECT_ID: ${{ inputs.neon_project_id }}
+        BRANCH_LIMIT: ${{ inputs.branch_limit }}
+        PROTECTED_BRANCHES: ${{ inputs.protected_branches }}
+        CLEANUP_THRESHOLD: ${{ inputs.cleanup_threshold }}
+      run: |
+        set -euo pipefail
+
+        echo "Checking Neon branch count for project $NEON_PROJECT_ID..."
+
+        # List all branches with their creation time
+        # Use npx to avoid pnpm version conflicts with main workflow
+        BRANCHES_JSON=$(npx neonctl branches list \
+          --project-id "$NEON_PROJECT_ID" \
+          --output json 2>/dev/null || echo "[]")
+
+        BRANCH_COUNT=$(echo "$BRANCHES_JSON" | jq 'length')
+        echo "Current branch count: $BRANCH_COUNT / $BRANCH_LIMIT"
+
+        if [ "$BRANCH_COUNT" -lt "$CLEANUP_THRESHOLD" ]; then
+          echo "Branch count ($BRANCH_COUNT) is below threshold ($CLEANUP_THRESHOLD). No cleanup needed."
+          echo "deleted_count=0" >> "$GITHUB_OUTPUT"
+          echo "remaining_count=$BRANCH_COUNT" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "Branch count ($BRANCH_COUNT) is at or above threshold ($CLEANUP_THRESHOLD). Starting cleanup..."
+
+        # Convert protected branches to array for checking
+        IFS=',' read -ra PROTECTED_ARRAY <<< "$PROTECTED_BRANCHES"
+
+        # Get branches sorted by creation time (oldest first), excluding protected ones
+        DELETABLE_BRANCHES=$(echo "$BRANCHES_JSON" | jq -r '
+          sort_by(.created_at) |
+          .[].name
+        ')
+
+        DELETED_COUNT=0
+        # Keep 3 slots free for new branches, but ensure TARGET_COUNT is at least 1
+        TARGET_COUNT=$((BRANCH_LIMIT - 3))
+        if [ "$TARGET_COUNT" -lt 1 ]; then
+          TARGET_COUNT=1
+        fi
+
+        while IFS= read -r branch_name; do
+          [ -z "$branch_name" ] && continue
+
+          # Skip protected branches
+          is_protected_branch=false
+          for protected in "${PROTECTED_ARRAY[@]}"; do
+            protected=$(echo "$protected" | xargs)
+            if [[ "$branch_name" == "$protected" ]]; then
+              is_protected_branch=true
+              break
+            fi
+          done
+
+          if [ "$is_protected_branch" = true ]; then
+            echo "Skipping protected branch: $branch_name"
+            continue
+          fi
+
+          # Check if we've deleted enough
+          CURRENT_COUNT=$((BRANCH_COUNT - DELETED_COUNT))
+          if [ "$CURRENT_COUNT" -le "$TARGET_COUNT" ]; then
+            echo "Reached target branch count ($TARGET_COUNT). Stopping cleanup."
+            break
+          fi
+
+          echo "Deleting old ephemeral branch: $branch_name"
+          if npx neonctl branches delete "$branch_name" \
+            --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
+            DELETED_COUNT=$((DELETED_COUNT + 1))
+            echo "  Deleted successfully"
+          else
+            echo "  Failed to delete (may already be deleted)"
+          fi
+
+        done <<< "$DELETABLE_BRANCHES"
+
+        REMAINING=$((BRANCH_COUNT - DELETED_COUNT))
+        echo ""
+        echo "Cleanup complete: deleted $DELETED_COUNT branches, $REMAINING remaining"
+        echo "deleted_count=$DELETED_COUNT" >> "$GITHUB_OUTPUT"
+        echo "remaining_count=$REMAINING" >> "$GITHUB_OUTPUT"

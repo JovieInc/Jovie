@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatorProfile } from '@/components/creator/CreatorProfile';
 import { MAX_SOCIAL_LINKS } from '@/constants/app';
