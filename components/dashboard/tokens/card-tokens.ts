@@ -74,7 +74,7 @@ export const cardTokens = {
       'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 transition-all duration-300 ease-out',
 
     analytics:
-      'relative overflow-hidden rounded-2xl border border-subtle/80 bg-surface-1/90 backdrop-blur-sm p-6 shadow-[0_1px_1px_rgba(0,0,0,0.04)] dark:shadow-[0_1px_1px_rgba(0,0,0,0.2)] ring-1 ring-inset ring-white/5 dark:ring-white/10 before:pointer-events-none before:absolute before:inset-0 before:bg-gradient-to-br before:from-white/60 before:via-white/0 before:to-transparent dark:before:from-white/10 hover:bg-surface-1 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] dark:hover:shadow-[0_6px_16px_rgba(0,0,0,0.35)] transition-all duration-300 ease-out',
+      'rounded-xl border border-foreground/8 bg-surface-1 p-5 hover:border-foreground/12 transition-colors duration-150 ease-out',
 
     'empty-state':
       'bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden shadow-sm shadow-black/5 dark:shadow-black/20',
