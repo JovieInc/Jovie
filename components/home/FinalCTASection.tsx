@@ -1,4 +1,5 @@
 import { ArrowRight } from 'lucide-react';
+import { GradientText } from '@/components/atoms/GradientText';
 import { LinearButton } from '@/components/atoms/LinearButton';
 import { Spacer } from '@/components/atoms/Spacer';
 import { Container } from '@/components/site/Container';
@@ -10,9 +11,7 @@ export function FinalCTASection() {
         <div className='max-w-3xl mx-auto text-center space-y-6'>
           <h2 className='marketing-h2-linear text-primary-token'>
             Stop sending fans to{' '}
-            <span className='text-transparent bg-clip-text bg-linear-to-r from-primary-token to-tertiary-token'>
-              a stack of links
-            </span>
+            <GradientText variant='secondary'>a stack of links</GradientText>
           </h2>
 
           <p className='marketing-lead-linear text-secondary-token'>
