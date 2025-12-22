@@ -113,13 +113,13 @@ describe('/api/stripe/webhooks', () => {
     } as any;
 
     mockConstructEvent.mockReturnValue(event);
-    mockInsert.mockReturnValue({
-      values: () => ({
-        onConflictDoNothing: () => ({
-          returning: () => Promise.resolve([{ id: 'webhook_row_id' }]),
+    mockInsert.mockReturnValueOnce({
+      values: vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'webhook_row_id' }]),
         }),
       }),
-    });
+    } as any);
 
     mockRetrieve.mockResolvedValue({
       id: 'sub_123',
@@ -169,13 +169,13 @@ describe('/api/stripe/webhooks', () => {
     } as any;
 
     mockConstructEvent.mockReturnValue(event);
-    mockInsert.mockReturnValue({
-      values: () => ({
-        onConflictDoNothing: () => ({
-          returning: () => Promise.resolve([{ id: 'webhook_row_id' }]),
+    mockInsert.mockReturnValueOnce({
+      values: vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([{ id: 'webhook_row_id' }]),
         }),
       }),
-    });
+    } as any);
 
     mockRetrieve.mockResolvedValue({
       id: 'sub_unknown',
@@ -218,13 +218,13 @@ describe('/api/stripe/webhooks', () => {
     } as any;
 
     mockConstructEvent.mockReturnValue(event);
-    mockInsert.mockReturnValue({
-      values: () => ({
-        onConflictDoNothing: () => ({
-          returning: () => Promise.resolve([]),
+    mockInsert.mockReturnValueOnce({
+      values: vi.fn().mockReturnValue({
+        onConflictDoNothing: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
         }),
       }),
-    });
+    } as any);
 
     const request = new NextRequest(
       'http://localhost:3000/api/stripe/webhooks',
