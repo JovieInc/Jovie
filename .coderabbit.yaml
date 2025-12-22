@@ -10,6 +10,16 @@ reviews:
   high_level_summary: true
   collapse_walkthrough: true
 
+  tools:
+    biome:
+      enabled: true
+    eslint:
+      enabled: false
+    shellcheck:
+      enabled: true
+    actionlint:
+      enabled: true
+
   auto_review:
     enabled: true
     drafts: true
@@ -156,14 +166,6 @@ reviews:
 
 chat:
   auto_reply: true
-
-tools:
-  shellcheck:
-    enabled: true
-  eslint:
-    enabled: true
-  actionlint:
-    enabled: true
 
 # On-demand unit test generation
 # Usage: Comment "@coderabbitai generate unit tests" on any PR
