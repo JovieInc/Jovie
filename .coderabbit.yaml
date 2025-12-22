@@ -19,13 +19,40 @@ reviews:
       - "[skip ci]"
 
   path_instructions:
+    # === DRIZZLE MIGRATION RULES (Enhanced) ===
     - path: "drizzle/migrations/**"
       instructions: |
-        CRITICAL: Database migrations require extra scrutiny.
-        - Check for CONCURRENTLY keyword (forbidden in Drizzle migrations)
-        - Verify IF NOT EXISTS/IF EXISTS for idempotency
-        - Ensure migration is registered in _journal.json
-        - Validate no destructive operations without data migration plan
+        CRITICAL: Database migrations are IMMUTABLE. Review with extreme care.
+
+        **BLOCKING Issues (must fix):**
+        - CONCURRENTLY keyword is FORBIDDEN (Drizzle doesn't support it)
+        - Missing IF NOT EXISTS for CREATE TABLE/INDEX
+        - Missing IF EXISTS for DROP operations
+        - Migration not registered in drizzle/migrations/_journal.json
+        - Destructive operations (DROP TABLE, DROP COLUMN) without data backup plan
+        - Renaming columns/tables (use add+migrate+drop pattern instead)
+
+        **Required Patterns:**
+        - All CREATE TABLE must use `IF NOT EXISTS`
+        - All CREATE INDEX must use `IF NOT EXISTS`
+        - Column additions should have DEFAULT values for non-nullable columns
+        - Enum changes must use proper migration pattern (create new, migrate, drop old)
+
+        **Naming Convention:**
+        - File format: NNNN_description.sql (4-digit prefix)
+        - Description should be kebab-case, max 50 chars
+
+        **Journal Check:**
+        - Verify _journal.json includes this migration with correct hash
+        - Migrations must be append-only, never modify existing entries
+
+    - path: "drizzle/migrations/_journal.json"
+      instructions: |
+        Migration journal is the source of truth.
+        - Entries must be append-only - NEVER modify or remove existing entries
+        - Each entry needs: idx, version, when, tag, breakpoints
+        - Hash in 'tag' must match the actual migration file content
+        - Indices must be sequential with no gaps
 
     - path: "lib/db/schema.ts"
       instructions: |
@@ -34,6 +61,59 @@ reviews:
         - Check for proper types (jsonb over json, text over varchar)
         - Ensure RLS-compatible patterns are followed
 
+    # === SECURITY RULES ===
+    - path: "**/*.ts"
+      instructions: |
+        Security review checklist:
+
+        **Hardcoded Secrets (BLOCKING):**
+        - No API keys, tokens, or passwords in code
+        - No hardcoded URLs with credentials
+        - Environment variables must use process.env or publicEnv/serverEnv wrappers
+
+        **Input Validation:**
+        - User input must be validated before use
+        - SQL queries must use parameterized queries (Drizzle handles this)
+        - File paths from user input must be sanitized
+
+        **Auth Checks:**
+        - API routes must verify authentication
+        - Server actions must check user permissions
+        - Sensitive operations should have rate limiting
+
+    - path: "app/api/**"
+      instructions: |
+        API Route Security:
+
+        **Authentication (BLOCKING if missing):**
+        - Must call auth() or getAuth() at route start
+        - Must verify userId exists before processing
+        - Must return 401/403 for unauthorized access
+
+        **Input Handling:**
+        - Validate request body with zod schema
+        - Check Content-Type header for POST/PUT/PATCH
+        - Sanitize any user-provided strings used in responses
+
+        **Error Handling:**
+        - Never expose internal error details to clients
+        - Log errors with context but return generic messages
+        - Use try/catch for async operations
+
+    - path: "lib/db/**"
+      instructions: |
+        Database Security:
+
+        **Query Safety:**
+        - Never use raw SQL with string interpolation
+        - Use Drizzle's query builder for all queries
+        - Avoid sql.raw() unless absolutely necessary
+
+        **Connection Security:**
+        - Database URLs must come from environment variables
+        - Never log connection strings or credentials
+
+    # === AUTH/CLERK RULES ===
     - path: "app/(auth)/**"
       instructions: |
         Authentication code is high-risk.
@@ -41,6 +121,7 @@ reviews:
         - Check for proper session handling
         - Ensure no hardcoded credentials or tokens
 
+    # === PAYMENT RULES ===
     - path: "app/api/stripe/**"
       instructions: |
         Payment code is high-risk.
@@ -48,6 +129,7 @@ reviews:
         - Check for proper error handling and idempotency
         - Confirm Node runtime (not Edge)
 
+    # === MIDDLEWARE ===
     - path: "middleware.ts"
       instructions: |
         Middleware affects all routes.
@@ -55,6 +137,7 @@ reviews:
         - Check for performance implications
         - Ensure proper Clerk middleware usage
 
+    # === CORE FLOWS ===
     - path: "app/onboarding/**"
       instructions: |
         Onboarding is a core user flow.
@@ -62,6 +145,7 @@ reviews:
         - Verify proper error states and validation
         - Check for proper Clerk user sync
 
+    # === CI/CD ===
     - path: ".github/workflows/**"
       instructions: |
         CI/CD changes can break the deployment pipeline.
