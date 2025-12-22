@@ -649,8 +649,17 @@ Manual promotion required. The system auto-applies blocking labels:
 | `blocked:core-flow` | Changes to onboarding, signin, signup, subscribe |
 | `blocked:payments` | Changes to billing, pricing, Stripe |
 | `blocked:smoke-failed` | Staging smoke tests failed |
+| `blocked:canary-failed` | Canary health gate failed |
 
 The `gated` label forces manual review even if otherwise eligible for fast lane.
+
+### Label Lifecycle
+
+Blocking labels are automatically managed:
+
+- **Auto-applied**: When blocking conditions are detected (path patterns, test failures)
+- **Auto-removed**: `blocked:smoke-failed` and `blocked:canary-failed` are removed when tests pass on retry
+- **Manual removal**: Path-based labels (`blocked:migration`, etc.) persist and require human review after addressing the underlying changes
 
 ### Informational Labels
 
@@ -668,6 +677,11 @@ This is team practice, NOT CI-enforced:
 
 - Fast lane auto-promotes anytime (24/7)
 - Gated PRs accumulate and get reviewed in windows
+
+### AI Code Reviews
+
+- **CodeRabbit**: Automatic PR reviews on all pull requests. Configuration in `.coderabbit.yaml`. Provides comprehensive code review with path-specific instructions for high-risk areas.
+- **Claude Code** (`@claude`): On-demand assistance via `.github/workflows/claude.yml`. Mention `@claude` in PR comments or issues for help.
 
 ## 6. Agent-Specific Notes
 

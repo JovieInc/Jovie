@@ -1320,6 +1320,86 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
+  canary-failure-alert:
+    name: Canary Failure Alert
+    needs: [canary-health-gate, promote]
+    # Alert when canary gate fails after staging deploy
+    # Depends on promote to ensure PR exists before trying to add labels
+    if: ${{ always() && needs.canary-health-gate.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Block promotion PR with canary-failed label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Find the promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length > 0) {
+              const pr = prs[0];
+              core.info(`Blocking promotion PR #${pr.number} due to canary gate failure`);
+
+              // Add blocking label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['blocked:canary-failed']
+              });
+
+              // Add comment explaining the block
+              const commentBody = [
+                '## Canary Health Gate Failed',
+                '',
+                'The canary health gate failed after deploy to main.jov.ie. Production promotion is **blocked**.',
+                '',
+                '**Action Required:** Investigate the health check failures before promoting to production.',
+                '',
+                `[View CI Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: commentBody
+              });
+            }
+
+      - name: Slack alert (canary failure blocks production)
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Canary Gate'
+          custom_payload: |
+            {
+              "text": ":rotating_light: Canary health gate FAILED - Production promotion BLOCKED",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Environment", "value": "main.jov.ie (staging)", "short": true },
+                    { "title": "Status", "value": "Production blocked", "short": true },
+                    { "title": "Action", "value": "Investigate health check failures before promoting", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
   promote:
     name: Promote to Production
     # Supports both Fast Lane (auto-promote) and Gated Lane (manual review)
@@ -1458,6 +1538,75 @@ jobs:
             echo "PR already exists: #$existing_pr"
             echo "pr_number=$existing_pr" >> $GITHUB_OUTPUT
           fi
+
+      - name: Clean up stale blocking labels
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+
+            if (!prNumber) {
+              core.info('No PR number available - skipping label cleanup');
+              return;
+            }
+
+            const smokePassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            // Get current labels on PR
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const currentLabels = pr.labels.map(l => l.name);
+            const labelsToRemove = [];
+
+            // Remove smoke-failed label if smoke tests now pass
+            if (smokePassed && currentLabels.includes('blocked:smoke-failed')) {
+              labelsToRemove.push('blocked:smoke-failed');
+            }
+
+            // Remove canary-failed label if canary gate now passes
+            if (canaryPassed && currentLabels.includes('blocked:canary-failed')) {
+              labelsToRemove.push('blocked:canary-failed');
+            }
+
+            // Remove stale labels
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label
+                });
+                core.info(`Removed stale label: ${label}`);
+              } catch (error) {
+                // Label might already be removed - that's OK
+                if (error.status !== 404) {
+                  core.warning(`Failed to remove label ${label}: ${error.message}`);
+                }
+              }
+            }
+
+            // Add comment if labels were removed
+            if (labelsToRemove.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## Blocking Labels Removed',
+                  '',
+                  'The following blocking labels have been removed because conditions have improved:',
+                  labelsToRemove.map(l => `- \`${l}\``).join('\n'),
+                  '',
+                  'Re-evaluate fast lane eligibility for this PR.'
+                ].join('\n')
+              });
+            }
 
       - name: Apply blocking labels to promotion PR
         uses: actions/github-script@v8
