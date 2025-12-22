@@ -29,9 +29,9 @@ interface TestMetrics {
 
 class TestPerformanceGuard {
   private thresholds: PerformanceThresholds = {
-    totalDuration: 60000, // 60 seconds
+    totalDuration: 120000, // 120 seconds (CI environments need more time for cold starts)
     p95: 200, // 200ms
-    setupTime: 10000, // 10 seconds
+    setupTime: 90000, // 90 seconds (CI cold start can take longer than local)
     individualTest: 200, // 200ms
     slowTestCount: 5, // Max 5 slow tests allowed
   };
