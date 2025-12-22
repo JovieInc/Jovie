@@ -8,7 +8,7 @@
   "files": {
     "ignoreUnknown": false,
     "maxSize": 3000000,
-    "includes": ["**/*", "!!**/storybook-static/**"]
+    "includes": ["**/*", "!!.claude", "!!storybook-static"]
   },
   "formatter": {
     "enabled": true,
