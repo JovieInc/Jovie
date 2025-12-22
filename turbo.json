@@ -2,6 +2,9 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
   "ui": "tui",
+  "remoteCache": {
+    "enabled": true
+  },
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
