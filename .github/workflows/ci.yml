@@ -284,11 +284,10 @@ jobs:
           chmod +x apps/web/scripts/check-migrations.sh
           chmod +x apps/web/scripts/validate-migrations.sh
 
-          # Run migration guard
-          cd apps/web && ./scripts/check-migrations.sh
-
-          # Validate that every migration is registered in _journal.json
-          cd apps/web && ./scripts/validate-migrations.sh
+          # Run migration guard and validation from apps/web directory
+          cd apps/web
+          ./scripts/check-migrations.sh
+          ./scripts/validate-migrations.sh
         env:
           GITHUB_EVENT_PATH: ${{ github.event_path }}
 
