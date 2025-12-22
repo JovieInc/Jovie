@@ -32,7 +32,7 @@ export function FooterBranding({
   return (
     <div
       className={cn(
-        'group flex flex-col items-center justify-center space-y-1.5',
+        'group flex flex-col items-center justify-center space-y-2',
         className
       )}
     >
@@ -40,20 +40,20 @@ export function FooterBranding({
         <Link
           href={logoHref}
           aria-label='Jovie home'
-          className='rounded-sm focus-ring-themed opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+          className='rounded-md p-1 -m-1 focus-ring-themed opacity-50 transition-all duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-surface-1'
         >
-          <BrandLogo size={size === 'sm' ? 20 : 24} tone='auto' />
+          <BrandLogo size={size === 'sm' ? 20 : 28} tone='auto' />
         </Link>
       ) : (
         <Link
           href={logoHref}
           aria-label='Jovie home'
-          className='rounded-sm focus-ring-themed opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+          className='rounded-md p-1 -m-1 focus-ring-themed transition-all duration-150 ease-out hover:bg-surface-1'
         >
           <Logo
             size={size === 'sm' ? 'xs' : 'sm'}
             variant='wordAlt'
-            className='opacity-60 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+            className='opacity-50 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100'
           />
         </Link>
       )}
@@ -61,7 +61,13 @@ export function FooterBranding({
       {showCTA && (
         <Link
           href={signUpLink}
-          className='text-[10px] leading-snug uppercase font-medium tracking-tight text-gray-400 dark:text-gray-500 transition-[color,opacity] text-center opacity-60 group-hover:opacity-100 group-focus-within:opacity-100 hover:text-gray-600 dark:hover:text-gray-300'
+          className={cn(
+            'text-[10px] leading-snug uppercase font-semibold tracking-[0.04em]',
+            'text-tertiary-token hover:text-secondary-token',
+            'transition-all duration-150 ease-out text-center',
+            'opacity-60 group-hover:opacity-100 group-focus-within:opacity-100',
+            'rounded-md px-2 py-1 -mx-2 -my-1 hover:bg-surface-1'
+          )}
         >
           Join the waitlist
         </Link>

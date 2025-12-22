@@ -8,8 +8,9 @@ interface CopyrightProps {
 }
 
 const baseStyles = 'text-sm font-medium tracking-tight';
+// Use semantic tokens for proper dark mode support
 const variantStyles = {
-  light: 'text-gray-500 dark:text-gray-400',
+  light: 'text-tertiary-token',
   dark: 'text-white/70',
 } as const;
 
@@ -19,8 +20,8 @@ export function Copyright({
   year,
 }: CopyrightProps) {
   return (
-    <div className={cn(baseStyles, variantStyles[variant], className)}>
+    <p className={cn(baseStyles, variantStyles[variant], className)}>
       {getCopyrightText(year)}
-    </div>
+    </p>
   );
 }
