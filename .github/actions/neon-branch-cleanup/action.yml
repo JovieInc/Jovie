@@ -43,12 +43,6 @@ runs:
         fi
         echo "skip=false" >> "$GITHUB_OUTPUT"
 
-    - name: Setup pnpm for neonctl
-      if: steps.validate.outputs.skip != 'true'
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9
-
     - name: Cleanup old Neon branches
       id: cleanup
       if: steps.validate.outputs.skip != 'true'
@@ -65,7 +59,8 @@ runs:
         echo "Checking Neon branch count for project $NEON_PROJECT_ID..."
 
         # List all branches with their creation time
-        BRANCHES_JSON=$(pnpm dlx neonctl branches list \
+        # Use npx to avoid pnpm version conflicts with main workflow
+        BRANCHES_JSON=$(npx neonctl branches list \
           --project-id "$NEON_PROJECT_ID" \
           --output json 2>/dev/null || echo "[]")
 
@@ -137,7 +132,7 @@ runs:
           fi
 
           echo "Deleting old ephemeral branch: $branch_name"
-          if pnpm dlx neonctl branches delete "$branch_name" \
+          if npx neonctl branches delete "$branch_name" \
             --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
             DELETED_COUNT=$((DELETED_COUNT + 1))
             echo "  Deleted successfully"
