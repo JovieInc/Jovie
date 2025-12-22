@@ -72,11 +72,11 @@ export default defineConfig({
       },
       {
         find: /^@jovie\/ui\//,
-        replacement: `${path.resolve(__dirname, './packages/ui')}/`,
+        replacement: `${path.resolve(__dirname, '../../packages/ui')}/`,
       },
       {
         find: /^@jovie\/ui$/,
-        replacement: path.resolve(__dirname, './packages/ui'),
+        replacement: path.resolve(__dirname, '../../packages/ui'),
       },
     ],
   },

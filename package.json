@@ -38,6 +38,7 @@
     "test:e2e": "turbo test:e2e",
     "test:guard": "pnpm --filter=@jovie/web run test:guard",
     "test:profile": "pnpm --filter=@jovie/web run test:profile",
+    "test:flaky": "pnpm --filter=@jovie/web run test:flaky",
     "format": "biome format --write .",
     "format:check": "biome check .",
     "commit": "cz",
