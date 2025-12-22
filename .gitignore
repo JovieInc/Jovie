@@ -59,3 +59,6 @@ apps/should-i-make/node_modules
 apps/should-i-make/.next
 packages/ui/node_modules
 .auto-claude
+
+# Turborepo
+.turbo

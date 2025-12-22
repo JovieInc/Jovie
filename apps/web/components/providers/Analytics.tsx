@@ -2,39 +2,16 @@
 
 import { useFeatureGate } from '@statsig/react-bindings';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
-import { computeRoute, SpeedInsights } from '@vercel/speed-insights/react';
-import { useParams, usePathname } from 'next/navigation';
-import { useEffect, useMemo } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 import { page, setAnalyticsEnabled } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 export function Analytics() {
   const pathname = usePathname();
-  const params = useParams();
   const analyticsGate = useFeatureGate(STATSIG_FLAGS.ANALYTICS);
   const hasStatsigKey = Boolean(publicEnv.NEXT_PUBLIC_STATSIG_CLIENT_KEY);
-
-  const normalizedParams = useMemo(() => {
-    const entries = Object.entries(params ?? {});
-    if (!entries.length) return null;
-    const filtered = entries.filter(([, value]) => value !== undefined);
-    if (!filtered.length) return null;
-    return filtered.reduce<Record<string, string | string[]>>(
-      (acc, [key, value]) => {
-        if (value !== undefined) {
-          acc[key] = value as string | string[];
-        }
-        return acc;
-      },
-      {}
-    );
-  }, [params]);
-
-  const canonicalRoute = useMemo(() => {
-    if (!pathname) return null;
-    return computeRoute(pathname, normalizedParams);
-  }, [normalizedParams, pathname]);
 
   const shouldLoadAnalytics = hasStatsigKey && analyticsGate.value;
 
@@ -61,10 +38,5 @@ export function Analytics() {
     return null;
   }
 
-  return (
-    <>
-      <VercelAnalytics />
-      <SpeedInsights route={canonicalRoute ?? pathname ?? null} />
-    </>
-  );
+  return <VercelAnalytics />;
 }

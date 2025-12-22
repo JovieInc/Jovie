@@ -31,13 +31,15 @@ export function initWebVitals(onMetric?: MetricHandler) {
 }
 
 /**
- * Send Web Vitals metrics to multiple analytics providers
+ * Send Web Vitals metrics to analytics
+ * Note: We only send to Statsig via track() - Vercel Analytics SpeedInsights
+ * was removed to reduce analytics costs. Do NOT add duplicate sending here.
  */
 function sendToAnalytics(metric: Metric) {
   // Normalize the metric name to lowercase for consistency
   const name = metric.name.toLowerCase();
 
-  // Create a standardized payload for all providers
+  // Create a standardized payload
   const payload = {
     name,
     value: metric.value,
@@ -47,16 +49,8 @@ function sendToAnalytics(metric: Metric) {
     rating: getRating(name, metric.value),
   };
 
-  // Send to PostHog via our analytics utility
+  // Send to Statsig via our analytics utility (single destination)
   track(`web_vital_${name}`, payload);
-
-  // Send to Vercel Analytics if available
-  if (typeof window !== 'undefined' && window.va) {
-    window.va('event', {
-      name: `web_vital_${name}`,
-      properties: payload,
-    });
-  }
 }
 
 /**
@@ -79,6 +73,12 @@ function getRating(
       return value <= 100
         ? 'good'
         : value <= 300
+          ? 'needs-improvement'
+          : 'poor';
+    case 'inp':
+      return value <= 200
+        ? 'good'
+        : value <= 500
           ? 'needs-improvement'
           : 'poor';
     case 'lcp':

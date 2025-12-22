@@ -1,6 +1,7 @@
 {
   "buildCommand": "cd ../.. && pnpm turbo build --filter=@jovie/web",
   "installCommand": "cd ../.. && pnpm install",
+  "ignoreCommand": "cd ../.. && npx turbo-ignore @jovie/web",
   "crons": [
     {
       "path": "/api/cron/cleanup-photos",
