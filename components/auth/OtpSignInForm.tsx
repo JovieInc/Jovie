@@ -254,13 +254,17 @@ export function OtpSignInForm() {
               <div className={`space-y-4 ${STEP_TRANSITION_CLASSES}`}>
                 {/* Mobile-optimized heading with responsive font size */}
                 <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
-                  {isEmailOpen ? "What's your email address?" : 'Log in to Jovie'}
+                  {isEmailOpen
+                    ? "What's your email address?"
+                    : 'Log in to Jovie'}
                 </h1>
 
                 {isEmailOpen ? (
                   <div className='pt-4 space-y-5 sm:space-y-4'>
                     <Clerk.Field name='identifier'>
-                      <Clerk.Label className='sr-only'>Email Address</Clerk.Label>
+                      <Clerk.Label className='sr-only'>
+                        Email Address
+                      </Clerk.Label>
                       <AuthInput
                         type='email'
                         placeholder='Enter your email address'
@@ -272,7 +276,8 @@ export function OtpSignInForm() {
                     </Clerk.Field>
 
                     <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
-                      We&apos;ll email a 6-digit code to keep your account secure.
+                      We&apos;ll email a 6-digit code to keep your account
+                      secure.
                     </p>
 
                     <Clerk.Loading>
@@ -297,124 +302,124 @@ export function OtpSignInForm() {
                     </Clerk.Loading>
                   </div>
                 ) : (
-                <div className='pt-6 space-y-3 sm:space-y-3'>
-                  {renderMethodButton(orderedMethods[0], true)}
+                  <div className='pt-6 space-y-3 sm:space-y-3'>
+                    {renderMethodButton(orderedMethods[0], true)}
 
-                  {lastAuthMethod ? (
-                    <p className='-mt-1 text-xs text-secondary-token text-center animate-in fade-in-0 duration-300'>
-                      You used{' '}
-                      {lastAuthMethod === 'google'
-                        ? 'Google'
-                        : lastAuthMethod === 'spotify'
-                          ? 'Spotify'
-                          : 'email'}{' '}
-                      last time
+                    {lastAuthMethod ? (
+                      <p className='-mt-1 text-xs text-secondary-token text-center animate-in fade-in-0 duration-300'>
+                        You used{' '}
+                        {lastAuthMethod === 'google'
+                          ? 'Google'
+                          : lastAuthMethod === 'spotify'
+                            ? 'Spotify'
+                            : 'email'}{' '}
+                        last time
+                      </p>
+                    ) : null}
+
+                    {orderedMethods.length > 1 ? (
+                      <div className='mt-6 sm:mt-8 space-y-3'>
+                        {orderedMethods.slice(1).map(method => (
+                          <div key={method}>
+                            {renderMethodButton(method, false)}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <p className='mt-8 sm:mt-10 text-sm text-secondary-token text-center'>
+                      Don&apos;t have access?{' '}
+                      <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
+                        Join the waitlist
+                      </Link>
                     </p>
-                  ) : null}
+                  </div>
+                )}
+              </div>
+            </SignIn.Step>
 
-                  {orderedMethods.length > 1 ? (
-                    <div className='mt-6 sm:mt-8 space-y-3'>
-                      {orderedMethods.slice(1).map(method => (
-                        <div key={method}>
-                          {renderMethodButton(method, false)}
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
+            <SignIn.Step
+              name='verifications'
+              aria-label='Verify your email with code'
+            >
+              <SignIn.Strategy name='email_code'>
+                <div className={STEP_TRANSITION_CLASSES}>
+                  {/* Mobile-optimized heading */}
+                  <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+                    Check your email
+                  </h1>
 
-                  <p className='mt-8 sm:mt-10 text-sm text-secondary-token text-center'>
-                    Don&apos;t have access?{' '}
-                    <Link href='/waitlist' className={FOOTER_LINK_CLASSES}>
-                      Join the waitlist
-                    </Link>
-                  </p>
-                </div>
-              )}
-            </div>
-          </SignIn.Step>
-
-          <SignIn.Step
-            name='verifications'
-            aria-label='Verify your email with code'
-          >
-            <SignIn.Strategy name='email_code'>
-              <div className={STEP_TRANSITION_CLASSES}>
-                {/* Mobile-optimized heading */}
-                <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
-                  Check your email
-                </h1>
-
-                <p
-                  className='mt-6 mb-10 sm:mb-12 text-[15px] leading-relaxed text-secondary-token text-center px-2'
-                  id='otp-description'
-                >
-                  We&apos;ve sent you a 6-digit login code.{' '}
-                  {userEmail && (
-                    <>
-                      Please check your inbox at{' '}
-                      <span className='text-primary-token font-medium break-all'>
-                        {userEmail}
-                      </span>
-                      .
-                    </>
-                  )}
-                  {!userEmail && <>Codes expire after 10 minutes.</>}
-                </p>
-
-                {/* OTP input with extra top margin for progress dots */}
-                <div className='space-y-5 sm:space-y-4 pt-4 sm:pt-0'>
-                  <Clerk.Field name='code'>
-                    <Clerk.Label className='sr-only'>
-                      Verification code
-                    </Clerk.Label>
-                    <OtpInput
-                      autoSubmit
-                      aria-label='Enter 6-digit verification code'
-                    />
-                    <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
-                  </Clerk.Field>
-
-                  <Clerk.Loading>
-                    {isLoading => (
-                      <SignIn.Action
-                        submit
-                        className={`${submitButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
-                        disabled={isLoading}
-                        aria-busy={isLoading}
-                      >
-                        {isLoading ? (
-                          <>
-                            <ButtonSpinner />
-                            <span>Verifying...</span>
-                          </>
-                        ) : (
-                          'Verify code'
-                        )}
-                      </SignIn.Action>
+                  <p
+                    className='mt-6 mb-10 sm:mb-12 text-[15px] leading-relaxed text-secondary-token text-center px-2'
+                    id='otp-description'
+                  >
+                    We&apos;ve sent you a 6-digit login code.{' '}
+                    {userEmail && (
+                      <>
+                        Please check your inbox at{' '}
+                        <span className='text-primary-token font-medium break-all'>
+                          {userEmail}
+                        </span>
+                        .
+                      </>
                     )}
-                  </Clerk.Loading>
+                    {!userEmail && <>Codes expire after 10 minutes.</>}
+                  </p>
 
-                  <div className='relative'>
-                    <SignIn.Action
-                      navigate='start'
-                      className='sr-only'
-                      id='signin-navigate-start'
-                    >
-                      Use a different email
-                    </SignIn.Action>
-                    <AuthBackButton
-                      onClick={() => {
-                        document
-                          .getElementById('signin-navigate-start')
-                          ?.click();
-                      }}
-                      ariaLabel='Use a different email'
-                    />
+                  {/* OTP input with extra top margin for progress dots */}
+                  <div className='space-y-5 sm:space-y-4 pt-4 sm:pt-0'>
+                    <Clerk.Field name='code'>
+                      <Clerk.Label className='sr-only'>
+                        Verification code
+                      </Clerk.Label>
+                      <OtpInput
+                        autoSubmit
+                        aria-label='Enter 6-digit verification code'
+                      />
+                      <Clerk.FieldError className={FIELD_ERROR_CLASSES} />
+                    </Clerk.Field>
+
+                    <Clerk.Loading>
+                      {isLoading => (
+                        <SignIn.Action
+                          submit
+                          className={`${submitButtonClassName} ${OAUTH_BUTTON_MOBILE_CLASSES}`}
+                          disabled={isLoading}
+                          aria-busy={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <ButtonSpinner />
+                              <span>Verifying...</span>
+                            </>
+                          ) : (
+                            'Verify code'
+                          )}
+                        </SignIn.Action>
+                      )}
+                    </Clerk.Loading>
+
+                    <div className='relative'>
+                      <SignIn.Action
+                        navigate='start'
+                        className='sr-only'
+                        id='signin-navigate-start'
+                      >
+                        Use a different email
+                      </SignIn.Action>
+                      <AuthBackButton
+                        onClick={() => {
+                          document
+                            .getElementById('signin-navigate-start')
+                            ?.click();
+                        }}
+                        ariaLabel='Use a different email'
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </SignIn.Strategy>
-          </SignIn.Step>
+              </SignIn.Strategy>
+            </SignIn.Step>
           </CardContent>
         </Card>
       </SignIn.Root>
