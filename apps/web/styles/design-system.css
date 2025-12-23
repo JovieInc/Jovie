@@ -15,19 +15,19 @@
    ============================================ */
 :root {
   /* Core Theme Inputs */
-  --theme-base-hue: 240;        /* Neutral foundation hue (blue-gray) */
-  --theme-base-chroma: 0.015;   /* Very low chroma for neutrals */
-  --theme-accent-hue: 271;      /* Brand accent hue (purple) */
-  --theme-accent-chroma: 0.18;  /* Vibrant accent saturation */
-  --theme-contrast: 65;         /* Contrast level (0-100) */
+  --theme-base-hue: 240; /* Neutral foundation hue (blue-gray) */
+  --theme-base-chroma: 0.015; /* Very low chroma for neutrals */
+  --theme-accent-hue: 271; /* Brand accent hue (purple) */
+  --theme-accent-chroma: 0.18; /* Vibrant accent saturation */
+  --theme-contrast: 65; /* Contrast level (0-100) */
 
   /* Derived base lightness for light mode */
-  --theme-base-l: 99%;          /* Near white for light mode */
+  --theme-base-l: 99%; /* Near white for light mode */
 }
 
 :root.dark {
   /* Dark mode only changes base lightness */
-  --theme-base-l: 12%;          /* Deep dark for dark mode */
+  --theme-base-l: 12%; /* Deep dark for dark mode */
 }
 
 /* ============================================
@@ -45,17 +45,33 @@
 :root {
   /* Light mode surfaces - progressively darker */
   --color-bg-base: oklch(99% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-0: oklch(97.5% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-1: oklch(96% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-2: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-3: oklch(90% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-0: oklch(
+    97.5% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-1: oklch(
+    96% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-2: oklch(
+    93% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-3: oklch(
+    90% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: oklch(10% 0 0);
-  --color-text-secondary-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-tertiary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-quaternary-token: oklch(60% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-disabled-token: oklch(70% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-secondary-token: oklch(
+    40% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    50% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    60% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    70% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Border system - semi-transparent for flexibility */
   --color-border-subtle: oklch(0% 0 0 / 6%);
@@ -64,9 +80,15 @@
 
   /* Accent colors - derived from theme inputs */
   --color-accent: oklch(55% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-hover: oklch(50% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-active: oklch(45% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-subtle: oklch(95% calc(var(--theme-accent-chroma) * 0.5) var(--theme-accent-hue));
+  --color-accent-hover: oklch(
+    50% var(--theme-accent-chroma) var(--theme-accent-hue)
+  );
+  --color-accent-active: oklch(
+    45% var(--theme-accent-chroma) var(--theme-accent-hue)
+  );
+  --color-accent-subtle: oklch(
+    95% calc(var(--theme-accent-chroma) * 0.5) var(--theme-accent-hue)
+  );
   --color-accent-foreground: oklch(100% 0 0);
 
   /* Primary button - high contrast */
@@ -75,9 +97,13 @@
   --color-btn-primary-hover: oklch(20% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    93% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(20% 0 0);
-  --color-btn-secondary-hover: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    88% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Interactive states */
   --color-interactive-hover: oklch(0% 0 0 / 4%);
@@ -85,21 +111,15 @@
 
   /* Shadows - subtle in light mode */
   --shadow-color: 240 10% 3.9%;
-  --shadow-sm:
-    0 1px 2px oklch(0% 0 0 / 3%),
-    0 1px 3px oklch(0% 0 0 / 6%);
-  --shadow-md:
-    0 4px 6px oklch(0% 0 0 / 4%),
-    0 2px 4px oklch(0% 0 0 / 6%);
-  --shadow-lg:
-    0 10px 20px oklch(0% 0 0 / 5%),
-    0 6px 6px oklch(0% 0 0 / 6%);
-  --shadow-xl:
-    0 20px 40px oklch(0% 0 0 / 8%),
-    0 12px 12px oklch(0% 0 0 / 6%);
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 3%), 0 1px 3px oklch(0% 0 0 / 6%);
+  --shadow-md: 0 4px 6px oklch(0% 0 0 / 4%), 0 2px 4px oklch(0% 0 0 / 6%);
+  --shadow-lg: 0 10px 20px oklch(0% 0 0 / 5%), 0 6px 6px oklch(0% 0 0 / 6%);
+  --shadow-xl: 0 20px 40px oklch(0% 0 0 / 8%), 0 12px 12px oklch(0% 0 0 / 6%);
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(95% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-base: oklch(
+    95% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
   /* Focus ring */
@@ -112,17 +132,33 @@
 :root.dark {
   /* Dark mode surfaces - progressively lighter */
   --color-bg-base: oklch(12% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-0: oklch(14% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-1: oklch(16% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-2: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-bg-surface-3: oklch(22% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-0: oklch(
+    14% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-1: oklch(
+    16% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-2: oklch(
+    19% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-bg-surface-3: oklch(
+    22% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Text hierarchy - inverted for dark mode */
   --color-text-primary-token: oklch(96% 0 0);
-  --color-text-secondary-token: oklch(75% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-tertiary-token: oklch(62% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-quaternary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-text-disabled-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-secondary-token: oklch(
+    75% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-tertiary-token: oklch(
+    62% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-quaternary-token: oklch(
+    50% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-text-disabled-token: oklch(
+    40% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Border system - white-based for dark mode */
   --color-border-subtle: oklch(100% 0 0 / 6%);
@@ -131,9 +167,15 @@
 
   /* Accent - slightly brighter in dark mode */
   --color-accent: oklch(65% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-hover: oklch(70% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-active: oklch(60% var(--theme-accent-chroma) var(--theme-accent-hue));
-  --color-accent-subtle: oklch(20% calc(var(--theme-accent-chroma) * 0.6) var(--theme-accent-hue));
+  --color-accent-hover: oklch(
+    70% var(--theme-accent-chroma) var(--theme-accent-hue)
+  );
+  --color-accent-active: oklch(
+    60% var(--theme-accent-chroma) var(--theme-accent-hue)
+  );
+  --color-accent-subtle: oklch(
+    20% calc(var(--theme-accent-chroma) * 0.6) var(--theme-accent-hue)
+  );
 
   /* Primary button - inverted for dark mode */
   --color-btn-primary-bg: oklch(100% 0 0);
@@ -141,31 +183,31 @@
   --color-btn-primary-hover: oklch(92% 0 0);
 
   /* Secondary button */
-  --color-btn-secondary-bg: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-bg: oklch(
+    19% var(--theme-base-chroma) var(--theme-base-hue)
+  );
   --color-btn-secondary-fg: oklch(90% 0 0);
-  --color-btn-secondary-hover: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-hover: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 
   /* Interactive states - white-based */
   --color-interactive-hover: oklch(100% 0 0 / 5%);
   --color-interactive-active: oklch(100% 0 0 / 10%);
 
   /* Shadows - deeper in dark mode */
-  --shadow-sm:
-    0 1px 2px oklch(0% 0 0 / 20%),
-    0 1px 3px oklch(0% 0 0 / 25%);
-  --shadow-md:
-    0 4px 8px oklch(0% 0 0 / 30%),
-    0 2px 4px oklch(0% 0 0 / 25%);
-  --shadow-lg:
-    0 12px 24px oklch(0% 0 0 / 40%),
-    0 6px 8px oklch(0% 0 0 / 30%);
-  --shadow-xl:
-    0 24px 48px oklch(0% 0 0 / 50%),
-    0 12px 16px oklch(0% 0 0 / 35%);
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 20%), 0 1px 3px oklch(0% 0 0 / 25%);
+  --shadow-md: 0 4px 8px oklch(0% 0 0 / 30%), 0 2px 4px oklch(0% 0 0 / 25%);
+  --shadow-lg: 0 12px 24px oklch(0% 0 0 / 40%), 0 6px 8px oklch(0% 0 0 / 30%);
+  --shadow-xl: 0 24px 48px oklch(0% 0 0 / 50%), 0 12px 16px oklch(0% 0 0 / 35%);
 
   /* Skeleton/loading states */
-  --color-skeleton-base: oklch(18% var(--theme-base-chroma) var(--theme-base-hue));
-  --color-skeleton-shimmer: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-base: oklch(
+    18% var(--theme-base-chroma) var(--theme-base-hue)
+  );
+  --color-skeleton-shimmer: oklch(
+    24% var(--theme-base-chroma) var(--theme-base-hue)
+  );
 }
 
 /* ============================================
@@ -183,7 +225,9 @@
 
     /* Increase text contrast */
     --color-text-primary-token: oklch(5% 0 0);
-    --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      25% var(--theme-base-chroma) var(--theme-base-hue)
+    );
 
     /* Stronger borders */
     --color-border-subtle: oklch(0% 0 0 / 15%);
@@ -193,7 +237,9 @@
 
   :root.dark {
     --color-text-primary-token: oklch(100% 0 0);
-    --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      85% var(--theme-base-chroma) var(--theme-base-hue)
+    );
 
     --color-border-subtle: oklch(100% 0 0 / 15%);
     --color-border-default: oklch(100% 0 0 / 25%);
@@ -208,12 +254,16 @@
 
     /* Softer text contrast */
     --color-text-primary-token: oklch(20% 0 0);
-    --color-text-secondary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      45% var(--theme-base-chroma) var(--theme-base-hue)
+    );
   }
 
   :root.dark {
     --color-text-primary-token: oklch(85% 0 0);
-    --color-text-secondary-token: oklch(65% var(--theme-base-chroma) var(--theme-base-hue));
+    --color-text-secondary-token: oklch(
+      65% var(--theme-base-chroma) var(--theme-base-hue)
+    );
   }
 }
 
@@ -268,13 +318,13 @@
    All have ~same perceived brightness
 */
 :root {
-  --accent-conv: oklch(55% 0.2 285);       /* Conversion - purple */
+  --accent-conv: oklch(55% 0.2 285); /* Conversion - purple */
   --accent-analytics: oklch(65% 0.15 230); /* Analytics - blue */
-  --accent-speed: oklch(65% 0.2 145);      /* Speed - green */
-  --accent-beauty: oklch(75% 0.15 70);     /* Beauty - amber */
-  --accent-seo: oklch(60% 0.2 25);         /* SEO - red */
-  --accent-links: oklch(60% 0.2 300);      /* Links - violet */
-  --accent-pro: oklch(65% 0.15 180);       /* Pro - teal */
+  --accent-speed: oklch(65% 0.2 145); /* Speed - green */
+  --accent-beauty: oklch(75% 0.15 70); /* Beauty - amber */
+  --accent-seo: oklch(60% 0.2 25); /* SEO - red */
+  --accent-links: oklch(60% 0.2 300); /* Links - violet */
+  --accent-pro: oklch(65% 0.15 180); /* Pro - teal */
 }
 
 /* ============================================
@@ -282,25 +332,27 @@
    ============================================ */
 :root {
   /* Font stack */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
-               'SF Pro Display', 'Segoe UI', Roboto, Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco,
-               Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --font-sans:
+    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 
   /* Linear-style font features */
-  --font-features: 'cv01', 'ss03', 'rlig' 1, 'calt' 1;
+  --font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
   --font-optical-sizing: 28;
 
   /* Type scale - based on 16px base */
-  --text-xs: 0.75rem;     /* 12px */
-  --text-sm: 0.875rem;    /* 14px */
-  --text-base: 1rem;      /* 16px */
-  --text-lg: 1.125rem;    /* 18px */
-  --text-xl: 1.25rem;     /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;   /* 30px */
-  --text-4xl: 2.25rem;    /* 36px */
-  --text-5xl: 3rem;       /* 48px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --text-3xl: 1.875rem; /* 30px */
+  --text-4xl: 2.25rem; /* 36px */
+  --text-5xl: 3rem; /* 48px */
 
   /* Line heights */
   --leading-none: 1;
@@ -310,9 +362,9 @@
   --leading-relaxed: 1.625;
 
   /* Letter spacing */
-  --tracking-tighter: -0.0325em;  /* Headlines */
+  --tracking-tighter: -0.0325em; /* Headlines */
   --tracking-tight: -0.02em;
-  --tracking-normal: -0.011em;    /* Body text */
+  --tracking-normal: -0.011em; /* Body text */
   --tracking-wide: 0.01em;
 }
 
@@ -322,21 +374,21 @@
 :root {
   --space-0: 0;
   --space-px: 1px;
-  --space-0-5: 0.125rem;  /* 2px */
-  --space-1: 0.25rem;     /* 4px */
-  --space-1-5: 0.375rem;  /* 6px */
-  --space-2: 0.5rem;      /* 8px */
-  --space-2-5: 0.625rem;  /* 10px */
-  --space-3: 0.75rem;     /* 12px */
-  --space-4: 1rem;        /* 16px */
-  --space-5: 1.25rem;     /* 20px */
-  --space-6: 1.5rem;      /* 24px */
-  --space-8: 2rem;        /* 32px */
-  --space-10: 2.5rem;     /* 40px */
-  --space-12: 3rem;       /* 48px */
-  --space-16: 4rem;       /* 64px */
-  --space-20: 5rem;       /* 80px */
-  --space-24: 6rem;       /* 96px */
+  --space-0-5: 0.125rem; /* 2px */
+  --space-1: 0.25rem; /* 4px */
+  --space-1-5: 0.375rem; /* 6px */
+  --space-2: 0.5rem; /* 8px */
+  --space-2-5: 0.625rem; /* 10px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+  --space-20: 5rem; /* 80px */
+  --space-24: 6rem; /* 96px */
 }
 
 /* ============================================

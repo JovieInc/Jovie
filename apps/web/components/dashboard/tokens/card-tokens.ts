@@ -27,20 +27,20 @@ export const cardTokens = {
   // Padding variations (8px grid system)
   padding: {
     none: 'p-0',
-    micro: 'p-3',     // 12px
-    compact: 'p-4',   // 16px
-    default: 'p-6',   // 24px
-    large: 'p-8',     // 32px
+    micro: 'p-3', // 12px
+    compact: 'p-4', // 16px
+    default: 'p-6', // 24px
+    large: 'p-8', // 32px
     spacious: 'p-10', // 40px
   },
 
   // Border radius variations - Linear-style precision
   radius: {
     none: 'rounded-none',
-    minimal: 'rounded-md',   // 6px
-    small: 'rounded-lg',     // 8px
-    default: 'rounded-xl',   // 12px
-    large: 'rounded-2xl',    // 16px
+    minimal: 'rounded-md', // 6px
+    small: 'rounded-lg', // 8px
+    default: 'rounded-xl', // 12px
+    large: 'rounded-2xl', // 16px
     full: 'rounded-full',
   },
 
@@ -71,14 +71,18 @@ export const cardTokens = {
       hover:shadow-[var(--shadow-lg)]
       hover:-translate-y-0.5
       transition-all ${timing.normal} ${timing.easing}
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     active: `
       active:bg-[var(--color-bg-surface-3)]
       active:shadow-[var(--shadow-sm)]
       active:translate-y-0
       active:scale-[0.99]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     focus: `
       focus-visible:outline-none
@@ -86,7 +90,9 @@ export const cardTokens = {
       focus-visible:ring-[var(--color-accent)]
       focus-visible:ring-offset-2
       focus-visible:ring-offset-[var(--color-bg-base)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
   },
 
   // Glass effects for modern UI depth
@@ -114,7 +120,9 @@ export const cardTokens = {
       p-6
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Interactive clickable card - full hover effects
     interactive: `
@@ -135,7 +143,9 @@ export const cardTokens = {
       focus-visible:ring-2
       focus-visible:ring-[var(--color-accent)]
       focus-visible:ring-offset-2
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Settings card - subtle hover
     settings: `
@@ -146,7 +156,9 @@ export const cardTokens = {
       shadow-[var(--shadow-sm)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Analytics/metric card - minimal, data-focused
     analytics: `
@@ -156,7 +168,9 @@ export const cardTokens = {
       p-5
       transition-colors ${timing.fast} ${timing.easing}
       hover:border-[var(--color-border-default)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Empty state card - centered content
     'empty-state': `
@@ -166,7 +180,9 @@ export const cardTokens = {
       p-8
       text-center
       shadow-[var(--shadow-sm)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Elevated card - stands out from background
     elevated: `
@@ -177,7 +193,9 @@ export const cardTokens = {
       shadow-[var(--shadow-md)]
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-lg)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Floating card - modal-like presence
     floating: `
@@ -188,7 +206,9 @@ export const cardTokens = {
       shadow-[var(--shadow-xl)]
       backdrop-blur-lg
       transition-all ${timing.slow} ${timing.easing}
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Onboarding card - gradient border effect
     onboarding: `
@@ -200,7 +220,9 @@ export const cardTokens = {
       ring-1
       ring-[var(--color-border-subtle)]
       transition-all ${timing.slow} ${timing.easing}
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Feature card - for showcasing features
     feature: `
@@ -212,7 +234,9 @@ export const cardTokens = {
       transition-all ${timing.slow} ${timing.easing}
       hover:shadow-[var(--shadow-md)]
       hover:border-[var(--color-accent-subtle)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Compact card - for dense layouts
     compact: `
@@ -221,7 +245,9 @@ export const cardTokens = {
       rounded-lg
       p-4
       transition-all ${timing.fast} ${timing.easing}
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
 
     // Ghost card - minimal, no background
     ghost: `
@@ -229,7 +255,9 @@ export const cardTokens = {
       p-6
       transition-all ${timing.normal} ${timing.easing}
       hover:bg-[var(--color-interactive-hover)]
-    `.replace(/\s+/g, ' ').trim(),
+    `
+      .replace(/\s+/g, ' ')
+      .trim(),
   },
 } as const;
 
