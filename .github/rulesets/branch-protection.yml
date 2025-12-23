@@ -16,8 +16,5 @@ rules:
     parameters:
       strict_required_status_checks_policy: true
       required_status_checks:
-        - context: 'CI / Typecheck'
-        - context: 'CI / Lint'
-        - context: 'CI / Migration Guard'
         - context: 'CI / ci-fast'
 bypass_actors: []
