@@ -682,6 +682,20 @@ This is team practice, NOT CI-enforced:
 - **CodeRabbit**: Automatic PR reviews on all pull requests. Configuration in `.coderabbit.yaml`. Provides comprehensive code review with path-specific instructions for high-risk areas.
 - **Claude Code** (`@claude`): On-demand assistance via `.github/workflows/claude.yml`. Mention `@claude` in PR comments or issues for help.
 
+#### Running the CodeRabbit CLI
+
+CodeRabbit is already installed in the terminal. Run it as a way to review your code. Run the command: `cr -h` for details on commands available. In general, I want you to run CodeRabbit with the `--prompt-only` flag. To review uncommitted changes (this is what we'll use most of the time) run: `coderabbit review --prompt-only -t uncommitted` or `cr review --prompt-only -t uncommitted`.
+
+**IMPORTANT:** When running CodeRabbit to review code changes, don't run it more than 3 times in a given set of changes.
+
+**Slash Command:** Use `/coderabbit-review` to trigger an automated review and fix cycle that will:
+1. Run CodeRabbit CLI with `--prompt-only` on uncommitted changes
+2. Analyze all issues found
+3. Fix each issue systematically
+4. Re-run to verify fixes
+5. Continue until clean (max 3 iterations)
+6. Let it run as long as needed - do not stop until complete
+
 ## 6. Agent-Specific Notes
 
 - **Claude (feature work, refactors)**
