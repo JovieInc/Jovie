@@ -454,8 +454,8 @@ async function resolveDashboardData(): Promise<DashboardData> {
 
 const loadDashboardData = cache(resolveDashboardData);
 
-export function prefetchDashboardData(): void {
-  void loadDashboardData();
+export async function prefetchDashboardData(): Promise<void> {
+  await loadDashboardData();
 }
 
 export async function getDashboardData(): Promise<DashboardData> {
