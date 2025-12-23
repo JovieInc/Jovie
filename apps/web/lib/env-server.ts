@@ -54,6 +54,12 @@ const ServerEnvSchema = z.object({
 
   // Statsig server-side
   STATSIG_SERVER_API_KEY: z.string().optional(),
+
+  // URL encryption (required in production/preview)
+  URL_ENCRYPTION_KEY: z.string().optional(),
+
+  // Cron job authentication
+  CRON_SECRET: z.string().optional(),
 });
 
 const rawServerEnv = {
@@ -78,6 +84,8 @@ const rawServerEnv = {
   STRIPE_PRICE_STANDARD_YEARLY: process.env.STRIPE_PRICE_STANDARD_YEARLY,
   INGESTION_CRON_SECRET: process.env.INGESTION_CRON_SECRET,
   STATSIG_SERVER_API_KEY: process.env.STATSIG_SERVER_API_KEY,
+  URL_ENCRYPTION_KEY: process.env.URL_ENCRYPTION_KEY,
+  CRON_SECRET: process.env.CRON_SECRET,
 };
 
 const parsed = ServerEnvSchema.safeParse(rawServerEnv);
@@ -154,6 +162,12 @@ export const env = {
   STATSIG_SERVER_API_KEY: parsed.success
     ? parsed.data.STATSIG_SERVER_API_KEY
     : process.env.STATSIG_SERVER_API_KEY,
+  URL_ENCRYPTION_KEY: parsed.success
+    ? parsed.data.URL_ENCRYPTION_KEY
+    : process.env.URL_ENCRYPTION_KEY,
+  CRON_SECRET: parsed.success
+    ? parsed.data.CRON_SECRET
+    : process.env.CRON_SECRET,
 } as const;
 
 // Environment validation utilities
@@ -254,6 +268,23 @@ export function validateEnvironment(
         'Incomplete Cloudinary configuration - need all of API_KEY, API_SECRET, and CLOUD_NAME'
       );
     }
+
+    // Check for URL encryption key in production/preview
+    const vercelEnv =
+      process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    if (vercelEnv === 'production' || vercelEnv === 'preview') {
+      if (!env.URL_ENCRYPTION_KEY) {
+        critical.push(
+          'URL_ENCRYPTION_KEY is required in production/preview for secure link wrapping. Generate with: openssl rand -base64 32'
+        );
+      } else if (
+        env.URL_ENCRYPTION_KEY === 'default-key-change-in-production-32-chars'
+      ) {
+        critical.push(
+          'URL_ENCRYPTION_KEY is using the default value. Generate a secure key with: openssl rand -base64 32'
+        );
+      }
+    }
   }
 
   return {
@@ -350,6 +381,20 @@ export function validateAndLogEnvironment(
       console.error(
         '[ENV] Application may not function correctly due to critical missing environment variables'
       );
+
+      // Fail-fast in production/preview environments
+      const vercelEnv =
+        process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+      if (vercelEnv === 'production' || vercelEnv === 'preview') {
+        console.error(
+          '[ENV] FATAL: Cannot start application with critical environment validation errors in production/preview'
+        );
+        console.error('[ENV] Please fix the following critical issues:');
+        validation.critical.forEach(issue => console.error(`  - ${issue}`));
+        throw new Error(
+          'Environment validation failed with critical errors. Application cannot start in production/preview without required environment variables.'
+        );
+      }
     }
   }
 

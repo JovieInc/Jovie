@@ -5,7 +5,7 @@ Disallow: /out/
 Disallow: /api/
 
 # Host
-Host: https://jov.ie
+Host: https://your-domain.com
 
 # Sitemaps
-Sitemap: https://jov.ie/sitemap.xml
+Sitemap: https://your-domain.com/sitemap.xml

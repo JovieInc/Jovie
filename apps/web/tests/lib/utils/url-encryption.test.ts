@@ -98,6 +98,7 @@ describe('URL Encryption', () => {
         encrypted: Buffer.from(url).toString('base64'),
         iv: '',
         authTag: '',
+        salt: '',
       };
 
       const decrypted = decryptUrl(base64Result);

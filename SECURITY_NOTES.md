@@ -26,11 +26,16 @@ _Last reviewed: 2025-11-29_
     - Do **not** add new real secrets under `env-backup/`.
     - If examples are needed, commit **redacted sample files** only, and keep real values in Vercel / 1Password / secret manager.
 
-- **URL encryption**
-  - Link wrapping currently uses `simpleEncryptUrl` (base64) in `lib/utils/url-encryption.ts` as an obfuscation layer, not strong encryption.
-  - `encryptUrl` / `decryptUrl` exist and reference `URL_ENCRYPTION_KEY`, but that key is not configured yet and the strong path is not wired into link creation.
-  - **Assumption:** until `URL_ENCRYPTION_KEY` is defined and enforced and the strong path is used, a DB compromise reveals wrapped target URLs.
-  - Future hardening: require a 32-byte `URL_ENCRYPTION_KEY` in all non-local envs and fail fast when the default placeholder is used.
+- **URL encryption** ✅ **UPDATED 2025-12-22**
+  - Link wrapping now enforces strong encryption via `URL_ENCRYPTION_KEY` in `lib/utils/url-encryption.ts`.
+  - **Production/preview environments**: Application will fail to start if `URL_ENCRYPTION_KEY` is missing or using the default value.
+  - **Development environment**: Falls back to base64 encoding with a warning if the key is not set.
+  - **Key generation**: Generate a secure key with `openssl rand -base64 32` and add to your environment variables.
+  - **Implementation**:
+    - `encryptUrl()` uses AES-256-GCM encryption when a valid key is present
+    - `decryptUrl()` handles both encrypted and legacy base64-encoded URLs
+    - Module-level validation ensures production deployments never use weak encryption
+  - **Validation**: Runtime validation in `lib/env-server.ts` checks for the presence and security of `URL_ENCRYPTION_KEY` in production/preview environments.
 
 ## 2. Input handling & validation
 
