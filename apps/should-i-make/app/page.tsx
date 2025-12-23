@@ -35,6 +35,25 @@ function QuizContent() {
     [router, searchParams]
   );
 
+  const goBack = useCallback(() => {
+    const stepOrder: Step[] = [
+      'start',
+      'budget',
+      'released',
+      'streams',
+      'marketing',
+    ];
+    const currentIndex = stepOrder.indexOf(step);
+    if (currentIndex > 0) {
+      const prevStep = stepOrder[currentIndex - 1];
+      if (prevStep === 'start') {
+        router.push('/');
+      } else {
+        navigate({ step: prevStep });
+      }
+    }
+  }, [step, router, navigate]);
+
   // Result screens
   if (result) {
     return <ResultScreen result={result} />;
@@ -62,7 +81,8 @@ function QuizContent() {
 
   // Budget question
   if (step === 'budget') {
-    const handleSubmit = () => {
+    const handleSubmit = (e?: React.FormEvent) => {
+      e?.preventDefault();
       const budgetNum = Number.parseInt(budget, 10);
       if (budgetNum < 10000) {
         navigate({ result: 'no-budget' });
@@ -72,28 +92,38 @@ function QuizContent() {
     };
 
     return (
-      <Question question="What's your total music budget?">
-        <div className='relative'>
-          <span className='absolute left-4 top-1/2 -translate-y-1/2 text-lg'>
-            $
-          </span>
-          <input
-            type='number'
-            className='input-field pl-8'
-            placeholder='e.g. 5000'
-            value={budget}
-            onChange={e => setBudget(e.target.value)}
-            min='0'
-          />
-        </div>
-        <button
-          type='button'
-          className='btn-primary w-full mt-6'
-          onClick={handleSubmit}
-          disabled={!budget || Number.parseInt(budget, 10) <= 0}
-        >
-          Next
-        </button>
+      <Question question="What's your total music budget?" onBack={goBack}>
+        <form onSubmit={handleSubmit}>
+          <label htmlFor='budget-input' className='sr-only'>
+            Budget amount in dollars
+          </label>
+          <div className='relative'>
+            <span
+              className='absolute left-4 top-1/2 -translate-y-1/2 text-lg'
+              aria-hidden='true'
+            >
+              $
+            </span>
+            <input
+              id='budget-input'
+              type='number'
+              inputMode='numeric'
+              className='input-field pl-8'
+              placeholder='e.g. 5000'
+              value={budget}
+              onChange={e => setBudget(e.target.value)}
+              min='0'
+              aria-label='Budget amount in dollars'
+            />
+          </div>
+          <button
+            type='submit'
+            className='btn-primary w-full mt-6'
+            disabled={!budget || Number.parseInt(budget, 10) <= 0}
+          >
+            Next
+          </button>
+        </form>
       </Question>
     );
   }
@@ -101,7 +131,7 @@ function QuizContent() {
   // Released question
   if (step === 'released') {
     return (
-      <Question question='Is the song already released?'>
+      <Question question='Is the song already released?' onBack={goBack}>
         <div className='flex flex-col sm:flex-row gap-4'>
           <button
             type='button'
@@ -126,7 +156,8 @@ function QuizContent() {
 
   // Streams question
   if (step === 'streams') {
-    const handleSubmit = () => {
+    const handleSubmit = (e?: React.FormEvent) => {
+      e?.preventDefault();
       const streamsNum = Number.parseInt(streams, 10);
       if (streamsNum < 1000000) {
         navigate({ result: 'no-streams' });
@@ -136,31 +167,41 @@ function QuizContent() {
     };
 
     return (
-      <Question question='How many streams does it have?'>
-        <input
-          type='number'
-          className='input-field'
-          placeholder='e.g. 250000'
-          value={streams}
-          onChange={e => setStreams(e.target.value)}
-          min='0'
-        />
-        <p className='text-sm text-muted mt-2'>Total across all platforms</p>
-        <button
-          type='button'
-          className='btn-primary w-full mt-6'
-          onClick={handleSubmit}
-          disabled={!streams || Number.parseInt(streams, 10) <= 0}
-        >
-          Next
-        </button>
+      <Question question='How many streams does it have?' onBack={goBack}>
+        <form onSubmit={handleSubmit}>
+          <label htmlFor='streams-input' className='sr-only'>
+            Number of streams
+          </label>
+          <input
+            id='streams-input'
+            type='number'
+            inputMode='numeric'
+            className='input-field'
+            placeholder='e.g. 250000'
+            value={streams}
+            onChange={e => setStreams(e.target.value)}
+            min='0'
+            aria-describedby='streams-hint'
+          />
+          <p id='streams-hint' className='text-sm text-muted mt-2'>
+            Total across all platforms
+          </p>
+          <button
+            type='submit'
+            className='btn-primary w-full mt-6'
+            disabled={!streams || Number.parseInt(streams, 10) <= 0}
+          >
+            Next
+          </button>
+        </form>
       </Question>
     );
   }
 
   // Marketing question
   if (step === 'marketing') {
-    const handleSubmit = () => {
+    const handleSubmit = (e?: React.FormEvent) => {
+      e?.preventDefault();
       const marketingNum = Number.parseInt(marketing, 10);
       if (marketingNum < 1000) {
         navigate({ result: 'no-marketing' });
@@ -170,31 +211,45 @@ function QuizContent() {
     };
 
     return (
-      <Question question='How much will you spend MARKETING this video?'>
-        <div className='relative'>
-          <span className='absolute left-4 top-1/2 -translate-y-1/2 text-lg'>
-            $
-          </span>
-          <input
-            type='number'
-            className='input-field pl-8'
-            placeholder='e.g. 2000'
-            value={marketing}
-            onChange={e => setMarketing(e.target.value)}
-            min='0'
-          />
-        </div>
-        <p className='text-sm text-muted mt-2'>
-          TikTok ads, influencer seeding, PR, etc.
-        </p>
-        <button
-          type='button'
-          className='btn-primary w-full mt-6'
-          onClick={handleSubmit}
-          disabled={!marketing || Number.parseInt(marketing, 10) <= 0}
-        >
-          Next
-        </button>
+      <Question
+        question='How much will you spend marketing this video?'
+        onBack={goBack}
+      >
+        <form onSubmit={handleSubmit}>
+          <label htmlFor='marketing-input' className='sr-only'>
+            Marketing budget in dollars
+          </label>
+          <div className='relative'>
+            <span
+              className='absolute left-4 top-1/2 -translate-y-1/2 text-lg'
+              aria-hidden='true'
+            >
+              $
+            </span>
+            <input
+              id='marketing-input'
+              type='number'
+              inputMode='numeric'
+              className='input-field pl-8'
+              placeholder='e.g. 2000'
+              value={marketing}
+              onChange={e => setMarketing(e.target.value)}
+              min='0'
+              aria-label='Marketing budget in dollars'
+              aria-describedby='marketing-hint'
+            />
+          </div>
+          <p id='marketing-hint' className='text-sm text-muted mt-2'>
+            TikTok ads, influencer seeding, PR, etc.
+          </p>
+          <button
+            type='submit'
+            className='btn-primary w-full mt-6'
+            disabled={!marketing || Number.parseInt(marketing, 10) <= 0}
+          >
+            Next
+          </button>
+        </form>
       </Question>
     );
   }
@@ -205,13 +260,25 @@ function QuizContent() {
 function Question({
   question,
   children,
+  onBack,
 }: {
   question: string;
   children: React.ReactNode;
+  onBack?: () => void;
 }) {
   return (
     <div className='min-h-screen flex items-center justify-center p-6'>
       <div className='w-full max-w-xl'>
+        {onBack && (
+          <button
+            type='button'
+            onClick={onBack}
+            className='mb-6 text-sm text-muted underline hover:no-underline flex items-center gap-1'
+            aria-label='Go back to previous question'
+          >
+            <span aria-hidden='true'>←</span> Back
+          </button>
+        )}
         <h2 className='text-2xl md:text-3xl font-semibold mb-8 text-center'>
           {question}
         </h2>
@@ -222,6 +289,12 @@ function Question({
 }
 
 function ResultScreen({ result }: { result: Result }) {
+  const router = useRouter();
+
+  const handleRestart = () => {
+    router.push('/');
+  };
+
   const results: Record<
     Result,
     { title: string; body: React.ReactNode; cta: string }
@@ -324,15 +397,30 @@ function ResultScreen({ result }: { result: Result }) {
     <div className='min-h-screen flex items-center justify-center p-6'>
       <div className='w-full max-w-xl text-center'>
         <h1 className='text-5xl md:text-6xl font-bold mb-8'>{content.title}</h1>
-        <div className='text-left mb-8'>{content.body}</div>
-        <a
-          href='https://jov.ie'
-          className='inline-block text-lg underline hover:no-underline'
-          target='_blank'
-          rel='noopener noreferrer'
+        <div
+          className='text-left mb-8'
+          role='region'
+          aria-label='Result details'
         >
-          {content.cta}
-        </a>
+          {content.body}
+        </div>
+        <div className='flex flex-col gap-4'>
+          <a
+            href='https://jov.ie'
+            className='inline-block text-lg underline hover:no-underline'
+            target='_blank'
+            rel='noopener noreferrer'
+          >
+            {content.cta}
+          </a>
+          <button
+            type='button'
+            onClick={handleRestart}
+            className='text-sm text-muted underline hover:no-underline'
+          >
+            Start over
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -342,8 +430,12 @@ export default function Home() {
   return (
     <Suspense
       fallback={
-        <div className='min-h-screen flex items-center justify-center'>
-          <div className='text-xl'>Loading...</div>
+        <div className='min-h-screen flex items-center justify-center p-6'>
+          <div className='w-full max-w-xl text-center'>
+            <div className='text-xl' role='status' aria-label='Loading quiz'>
+              Loading...
+            </div>
+          </div>
         </div>
       }
     >
