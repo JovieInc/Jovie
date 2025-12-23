@@ -4,6 +4,7 @@ import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
   clickEvents,
+  creatorProfiles,
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
@@ -285,32 +286,35 @@ export async function getUserDashboardAnalytics(
   range: AnalyticsRange,
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
-  const found = await db
-    .select({ id: users.id, isPro: users.isPro })
-    .from(users)
-    .where(eq(users.clerkId, clerkUserId))
-    .limit(1);
+  const [userRow, dynamicOverrideEnabled, creatorProfile] = await Promise.all([
+    db
+      .select({ id: users.id, isPro: users.isPro })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1)
+      .then(results => results[0]),
+    checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+      userID: clerkUserId,
+    }),
+    db
+      .select({
+        id: creatorProfiles.id,
+        profileViews: creatorProfiles.profileViews,
+      })
+      .from(creatorProfiles)
+      .innerJoin(users, eq(users.id, creatorProfiles.userId))
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1)
+      .then(results => results[0]),
+  ]);
 
-  const appUserId = found?.[0]?.id;
-  const userIsPro = Boolean(found?.[0]?.isPro);
+  const appUserId = userRow?.id;
+  const userIsPro = Boolean(userRow?.isPro);
   if (!appUserId) {
     throw new Error('User not found for Clerk ID');
   }
 
-  const dynamicOverrideEnabled = await checkStatsigGateForUser(
-    STATSIG_FLAGS.DYNAMIC_ENGAGEMENT,
-    { userID: clerkUserId }
-  );
-
   const dynamicEnabled = userIsPro || dynamicOverrideEnabled;
-
-  const creatorProfile = await db.query.creatorProfiles.findFirst({
-    columns: {
-      id: true,
-      profileViews: true,
-    },
-    where: (profiles, { eq }) => eq(profiles.userId, appUserId),
-  });
 
   if (!creatorProfile) {
     throw new Error('Creator profile not found');
