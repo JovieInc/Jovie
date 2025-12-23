@@ -10,6 +10,7 @@ import './globals.css';
 import { headers } from 'next/headers';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
+import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { logger } from '@/lib/utils/logger';
 
@@ -142,12 +143,14 @@ export default async function RootLayout({
   // Check if cookie banner should be shown
   const headersList = await headers();
   const showCookieBanner = headersList.get('x-show-cookie-banner') === '1';
+  const nonce = headersList.get(SCRIPT_NONCE_HEADER) ?? undefined;
   const shouldInjectToolbar = process.env.NODE_ENV === 'development';
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   const headContent = (
     <head>
       <script
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: `
 (function() {
@@ -178,6 +181,7 @@ export default async function RootLayout({
       {/* Structured Data for Organization */}
       <script
         type='application/ld+json'
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
