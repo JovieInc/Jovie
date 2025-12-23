@@ -188,9 +188,94 @@ Configuration location: `.claude.json` (project-specific)
     - Base is `main`.
     - PR has `auto-merge` label.
     - CI checks configured for `main` are green.
-    - No blocking labels: `blocked`, `human-review`, `no-auto-merge`, `claude:needs-fixes`, `needs-human`.
+    - No blocking labels: `blocked`, `human-review`, `no-auto-merge`, `claude:needs-fixes`, `needs-human`, `ai:fixing`, `ci:healing`.
   - **Dependabot:** auto-merge for patch/minor + security, subject to policy checks.
   - **Codegen/automation PRs:** auto-merge when labeled appropriately (e.g. `codegen`).
+
+### 4.1 AI Automation Label Taxonomy
+
+CodeRabbit automatically labels PRs based on review findings to trigger GitHub Actions workflows that automate fixes and CI healing. This keeps developers in flow state while maintaining code quality.
+
+#### AI Automation Labels (Workflow Triggers)
+
+**`ai:auto-fix`** - AI should attempt automatic fixes
+- **Applied when**: CodeRabbit finds <10 minor issues (severity: info/style)
+- **Triggers**: `.github/workflows/ai-auto-fix.yml`
+- **Safe fixes only**: formatting, linting, simple type errors, unused imports
+- **Protected paths excluded**: migrations, auth, payments (auto-labeled `ai:opt-out`)
+
+**`ai:needs-review`** - Human review required (no auto-fix)
+- **Applied when**: CodeRabbit finds warnings/errors that need human judgment
+- **Examples**: logic errors, security issues, performance concerns
+- **Action**: PR author notified, no automated changes
+
+**`ai:fixing`** - AI is currently working (prevents loops)
+- **Applied by**: AI auto-fix workflow when executing
+- **Purpose**: Blocks other workflows/auto-merge while AI is working
+- **Removed**: After fix succeeds or fails
+
+**`ai:fixed`** - AI completed fixes successfully
+- **Applied by**: AI auto-fix workflow on success
+- **Indicates**: Safe fixes applied, ready for re-review
+- **Next step**: CodeRabbit re-reviews, may auto-merge if clean
+
+**`ai:failed`** - AI could not fix, human needed
+- **Applied by**: AI auto-fix workflow on failure
+- **Triggers**: PR comment explaining failure
+- **Circuit breaker**: Max 3 auto-fix attempts per PR
+
+**`ai:opt-out`** - Disable all AI automation for this PR
+- **Applied when**: PR modifies protected paths (migrations, auth, payments, billing)
+- **Also applies to**: Manual label addition by PR author
+- **Effect**: Blocks ai-auto-fix and ci-auto-heal workflows
+
+#### CI Auto-Heal Labels (Informational)
+
+**`ci:auto-heal`** - Enable automatic CI failure recovery
+- **Applied manually**: PR author opts into CI auto-heal
+- **Default**: Auto-heal enabled for all PRs unless `ai:opt-out`
+
+**`ci:healing`** - CI auto-heal in progress
+- **Applied by**: CI auto-heal workflow when executing
+- **Blocks**: Auto-merge while healing
+- **Removed**: After heal succeeds or fails
+
+**`ci:healed`** - CI auto-heal succeeded
+- **Applied by**: CI auto-heal workflow on success
+- **Examples**: Fixed cache corruption, re-ran flaky test, cleared node_modules
+
+**`ci:manual`** - CI failure requires human intervention
+- **Applied by**: CI auto-heal workflow when failure is not auto-healable
+- **Examples**: Test logic failures, build errors, migration failures
+- **Action**: PR author notified, manual fix required
+
+#### Label Interaction Rules
+
+**Auto-merge blocking labels** (updated):
+- `blocked`, `human-review`, `no-auto-merge`, `claude:needs-fixes`, `needs-human`
+- **New**: `ai:fixing`, `ci:healing` - blocks while automation in progress
+
+**Protected path detection** (auto-labeled `ai:opt-out`):
+- `drizzle/migrations/**`
+- `**/auth/**`, `**/payment/**`, `**/billing/**`
+- `.github/workflows/**`
+
+**Circuit breakers** (prevents runaway automation):
+- Max 3 `ai:auto-fix` attempts per PR
+- Max 2 `ci:auto-heal` attempts per PR
+- Exponential backoff between retries
+
+#### Workflow Integration
+
+```yaml
+# Example: Auto-merge now respects AI automation state
+if: |
+  contains(github.event.pull_request.labels.*.name, 'automerge') &&
+  !contains(github.event.pull_request.labels.*.name, 'ai:fixing') &&
+  !contains(github.event.pull_request.labels.*.name, 'ci:healing')
+```
+
+See `.coderabbit.yaml` for full auto-labeling configuration and label-specific instructions.
 
 ## 5. Neon & Migrations
 

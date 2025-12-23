@@ -137,6 +137,15 @@ jobs:
               skipReasons.push('needs-human label');
             }
 
+            // AI automation labels (block while AI is working)
+            if (labels.has('ai:fixing')) {
+              skipReasons.push('ai:fixing label - AI auto-fix in progress');
+            }
+
+            if (labels.has('ci:healing')) {
+              skipReasons.push('ci:healing label - CI auto-heal in progress');
+            }
+
             if (skipReasons.length > 0) {
               core.info(`Skipping auto-merge: ${skipReasons.join(', ')}`);
               return { should_merge: false, reason: skipReasons.join(', ') };

@@ -84,7 +84,7 @@ jobs:
   ci-typecheck:
     name: Typecheck
     # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
-    needs: [ci-cache-warm]
+    # Note: Runs in parallel with lint for speed (no dependency on cache-warm)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -122,7 +122,7 @@ jobs:
           path: |
             .cache/tsbuildinfo
             apps/web/.cache/tsbuildinfo
-          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig.json', '**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-tsc-${{ github.ref }}-${{ hashFiles('**/tsconfig.json', '**/pnpm-lock.yaml', '**/package.json') }}
           restore-keys: |
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
@@ -135,7 +135,7 @@ jobs:
   ci-lint:
     name: Lint
     # Draft PRs skip; ready PRs + pushes + merge queue run lint
-    needs: [ci-cache-warm]
+    # Note: Runs in parallel with typecheck for speed (no dependency on cache-warm)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -212,9 +212,9 @@ jobs:
           path: |
             apps/web/.next/cache
             .turbo
-          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ github.sha }}
+          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml', '**/package.json') }}-
             ${{ runner.os }}-next-
           save-always: true
       - name: Warm Next build cache
@@ -245,7 +245,27 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Check for backend changes
+        id: check-backend
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          # Check if any backend-related files changed (migrations, lib/db, API routes, etc.)
+          if echo "$CHANGED_FILES" | grep -E '^(drizzle/migrations/|apps/web/lib/db/|apps/web/app/api/)' > /dev/null; then
+            echo "Backend changes detected, Neon DB required"
+            echo "needs_db=true" >> $GITHUB_OUTPUT
+          else
+            echo "No backend changes detected, skipping Neon DB creation"
+            echo "needs_db=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
       - name: Cleanup old Neon branches (prevent limit errors)
+        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: ./.github/actions/neon-branch-cleanup
         with:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
@@ -256,6 +276,7 @@ jobs:
 
       - name: Determine sanitized branch name
         id: sanitize-branch
+        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           RAW="${{ github.head_ref || github.ref_name }}"
 
@@ -274,6 +295,7 @@ jobs:
           echo "name=$FINAL" >> $GITHUB_OUTPUT
       - name: Create or reuse Neon branch
         id: create-branch
+        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: neondatabase/create-branch-action@v6
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
@@ -282,6 +304,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
       - name: Finalize Neon DB URLs
         id: finalize-urls
+        if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
         run: |
           DB_URL="${{ steps.create-branch.outputs.db_url }}"
           DB_URL_POOLED="${{ steps.create-branch.outputs.db_url_pooled }}"
@@ -519,7 +542,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
@@ -591,7 +614,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .next/cache
-          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
           restore-keys: |
             ${{ runner.os }}-next-
 
@@ -789,7 +812,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'playwright.config*.ts') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
