@@ -66,6 +66,11 @@
       "outputs": ["playwright-report/**", "test-results/**"],
       "env": ["NODE_ENV", "CI", "PLAYWRIGHT_*"]
     },
+    "e2e:smoke": {
+      "dependsOn": ["build"],
+      "outputs": ["playwright-report/**", "test-results/**"],
+      "env": ["NODE_ENV", "CI", "SMOKE_ONLY", "BASE_URL", "PLAYWRIGHT_*"]
+    },
     "format": {
       "outputs": []
     },

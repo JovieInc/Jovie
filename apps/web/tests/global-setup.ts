@@ -1,6 +1,7 @@
 import { clerkSetup } from '@clerk/testing/playwright';
 import { chromium } from '@playwright/test';
 import { config } from 'dotenv';
+import { seedTestData } from './seed-test-data';
 
 // Load environment variables from .env.development.local
 config({ path: '.env.development.local' });
@@ -81,6 +82,17 @@ async function globalSetup() {
     NEXT_PUBLIC_APP_URL:
       process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3100',
   });
+
+  // Seed test database with required profiles for smoke tests
+  // Only seed if DATABASE_URL is available and not in CI with external BASE_URL
+  if (process.env.DATABASE_URL && !(process.env.CI && process.env.BASE_URL)) {
+    try {
+      await seedTestData();
+    } catch (error) {
+      console.warn('⚠ Failed to seed test data:', error);
+      console.log('  Tests may fail if required profiles are missing');
+    }
+  }
 
   // OPTIMIZATION: Skip browser warmup for smoke tests
   if (process.env.SMOKE_ONLY === '1') {

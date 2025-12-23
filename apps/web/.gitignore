@@ -1,3 +1,7 @@
 .vercel
 .env*.local
 .next/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
