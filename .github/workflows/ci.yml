@@ -2,14 +2,12 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, production]
+    branches: [main]
   push:
-    branches: [main, production, 'codegen-bot/**']
+    branches: [main, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
-  merge_group:
-    branches: [main, production]
   workflow_dispatch:
 
 permissions: read-all
@@ -1129,7 +1127,7 @@ jobs:
               });
             }
   deploy:
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20

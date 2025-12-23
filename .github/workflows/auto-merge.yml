@@ -6,7 +6,7 @@ name: Smart Auto-Merge
 "on":
   pull_request_target:
     types: [opened, edited, synchronize, labeled, unlabeled, ready_for_review]
-    branches: [main, production]
+    branches: [main]
   workflow_run:
     workflows: ['CI']
     types: [completed]

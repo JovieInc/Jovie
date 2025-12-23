@@ -2,11 +2,9 @@ name: Test Performance Monitoring
 
 on:
   push:
-    branches: [main, production]
+    branches: [main]
   pull_request:
-    branches: [main, production]
-  merge_group:
-    branches: [main, production]
+    branches: [main]
 
 jobs:
   performance-guard:
