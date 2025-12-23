@@ -509,11 +509,13 @@ body {
     /* interactive/hover */
     --color-bg-surface-3: #242430;
     /* pressed/active */
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    /* subtle borders */
-    --color-border-default: rgba(255, 255, 255, 0.1);
-    /* default borders */
-    --color-border-strong: rgba(255, 255, 255, 0.18);
+    /* Linear-style borders: tinted grays matching surface hues, not pure white */
+    --color-border-subtle: #27272f;
+    /* subtle dividers - barely visible */
+    --color-border-default: #32323e;
+    /* default borders - components, cards */
+    --color-border-strong: #3f3f4d;
+    /* selected/focus state borders */
 
     --color-text-primary-token: #f4f4f5;
     --color-text-secondary-token: #c6c6cc;

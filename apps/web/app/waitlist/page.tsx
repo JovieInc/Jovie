@@ -577,8 +577,8 @@ export default function WaitlistPage() {
                     }}
                     className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-ring-themed ${
                       socialPlatform === option.value
-                        ? 'bg-surface-2 text-primary-token border-border'
-                        : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1'
+                        ? 'bg-surface-2 text-primary-token border-strong'
+                        : 'bg-transparent text-secondary-token border-subtle hover:bg-surface-1 hover:border-default'
                     }`}
                     disabled={isSubmitting}
                   >
@@ -616,7 +616,7 @@ export default function WaitlistPage() {
                   />
                 </>
               ) : (
-                <div className='w-full flex items-center gap-2 rounded-lg border border-border bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
+                <div className='w-full flex items-center gap-2 rounded-lg border border-default bg-surface-0 px-4 py-3 focus-within:border-strong focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))] focus-within:ring-offset-2 focus-within:ring-offset-(--bg)'>
                   <span className='text-sm text-secondary-token whitespace-nowrap'>
                     {getSocialPlatformPrefix(socialPlatform).display}
                   </span>

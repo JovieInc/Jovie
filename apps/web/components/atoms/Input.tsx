@@ -159,8 +159,8 @@ export const Input = forwardRef(function Input(
           ],
           // Typography colors
           'text-zinc-950 placeholder:text-zinc-500 dark:text-white',
-          // Border
-          'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-white/10 dark:data-hover:border-white/20',
+          // Border - uses CSS variables for Linear-style tinted borders in dark mode
+          'border border-zinc-950/10 data-hover:border-zinc-950/20 dark:border-[var(--color-border-default)] dark:data-hover:border-[var(--color-border-strong)]',
           // Background color
           'bg-transparent dark:bg-white/5',
           // Hide default focus styles
@@ -171,7 +171,7 @@ export const Input = forwardRef(function Input(
           isValid &&
             'border-green-500 data-hover:border-green-500 dark:border-green-500 dark:data-hover:border-green-500',
           // Disabled state
-          'data-disabled:border-zinc-950/20 dark:data-disabled:border-white/15 dark:data-disabled:bg-white/2.5 dark:data-hover:data-disabled:border-white/15',
+          'data-disabled:border-zinc-950/20 dark:data-disabled:border-[var(--color-border-subtle)] dark:data-disabled:bg-white/2.5 dark:data-hover:data-disabled:border-[var(--color-border-subtle)]',
           // System icons
           'dark:scheme-dark',
           // Error state for legacy support

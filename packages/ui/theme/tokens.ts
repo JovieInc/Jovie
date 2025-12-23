@@ -9,6 +9,7 @@ export const colors = {
   'tertiary-token': 'var(--color-text-tertiary-token)',
   'border-subtle': 'var(--color-border-subtle)',
   border: 'var(--color-border-default)',
+  'border-strong': 'var(--color-border-strong)',
   accent: 'var(--color-accent)',
   'accent-foreground': 'var(--color-accent-foreground)',
   'btn-primary': 'var(--color-btn-primary-bg)',
