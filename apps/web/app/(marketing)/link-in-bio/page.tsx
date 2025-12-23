@@ -71,8 +71,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function LinkInBioPage() {
-  const nonce = headers().get(SCRIPT_NONCE_HEADER) ?? undefined;
+export default async function LinkInBioPage() {
+  const nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
 
   return (
     <>
