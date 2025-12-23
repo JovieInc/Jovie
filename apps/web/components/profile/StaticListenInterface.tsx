@@ -71,7 +71,12 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
       }
       try {
         localStorage.setItem(LISTEN_COOKIE, dsp.key);
-      } catch {}
+      } catch (error) {
+        console.error(
+          '[StaticListenInterface] Failed to set localStorage:',
+          error
+        );
+      }
 
       // Track click (non-blocking)
       try {
@@ -80,7 +85,9 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
           linkType: 'listen',
           target: dsp.key,
         });
-      } catch {}
+      } catch (error) {
+        console.error('[StaticListenInterface] Failed to track click:', error);
+      }
 
       // Try deep linking with lazy import
       try {

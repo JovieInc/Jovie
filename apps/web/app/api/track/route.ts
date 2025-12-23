@@ -333,7 +333,12 @@ export async function POST(request: NextRequest) {
               updatedAt: new Date(),
             })
             .where(eq(socialLinks.id, linkId))
-            .catch(() => {})
+            .catch(error => {
+              console.error(
+                '[track] Failed to update social link click count:',
+                error
+              );
+            })
         : null;
 
     if (socialLinkUpdate) {
