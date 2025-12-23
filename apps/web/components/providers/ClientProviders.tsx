@@ -8,6 +8,7 @@ import { MyStatsig } from '@/app/my-statsig';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
+import { SessionTimeoutProvider } from './SessionTimeoutProvider';
 
 type LazyProvidersLoadingProps = LazyProvidersProps &
   DynamicOptionsLoadingProps;
@@ -127,7 +128,9 @@ function ClientProvidersInnerBase({
       >
         <ThemeKeyboardShortcut />
         <MyStatsig userId={userId}>
-          <LazyProviders>{children}</LazyProviders>
+          <SessionTimeoutProvider>
+            <LazyProviders>{children}</LazyProviders>
+          </SessionTimeoutProvider>
         </MyStatsig>
       </ThemeProvider>
     </React.StrictMode>

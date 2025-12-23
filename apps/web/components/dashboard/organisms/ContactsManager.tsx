@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { useFeatureGate } from '@statsig/react-bindings';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
   deleteContact,
@@ -18,7 +18,9 @@ import {
   summarizeTerritories,
 } from '@/lib/contacts/constants';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
+import { useSessionDraft } from '@/lib/hooks/useSessionTimeout';
 import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { formatRelativeTimeFromNow } from '@/lib/utils/time';
 import type {
   ContactRole,
   DashboardContact,
@@ -80,6 +82,25 @@ export function ContactsManager({
         {}
       )
   );
+
+  const serializeContactsDraft = useCallback(() => contacts, [contacts]);
+
+  const hydrateContactsDraft = useCallback((draft: EditableContact[]) => {
+    if (!Array.isArray(draft)) return;
+    setContacts(draft);
+  }, []);
+
+  const contactsDirty = useCallback(
+    () => contactsChanged(contacts, baseline),
+    [contacts, baseline]
+  );
+
+  const contactsDraft = useSessionDraft<EditableContact[]>({
+    key: `contacts:${profileId}`,
+    serialize: serializeContactsDraft,
+    hydrate: hydrateContactsDraft,
+    isDirty: contactsDirty,
+  });
 
   const hasContacts = contacts.length > 0;
 
@@ -268,6 +289,38 @@ export function ContactsManager({
           who to reach for {artistName}.
         </p>
       </div>
+
+      {contactsDraft.hasPendingDraft && (
+        <div className='rounded-xl border border-dashed border-accent/40 bg-accent/5 p-4'>
+          <p className='text-sm font-medium text-primary-token'>
+            Unsaved contacts draft found
+          </p>
+          <p className='text-xs text-secondary-token'>
+            Saved{' '}
+            {contactsDraft.pendingDraft?.savedAt
+              ? formatRelativeTimeFromNow(contactsDraft.pendingDraft.savedAt)
+              : 'earlier'}
+            .
+          </p>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            <Button
+              type='button'
+              size='sm'
+              onClick={contactsDraft.restoreDraft}
+            >
+              Restore draft
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              onClick={contactsDraft.discardDraft}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {!hasContacts && (
         <DashboardCard variant='empty-state'>
@@ -564,4 +617,69 @@ export function ContactsManager({
       </div>
     </div>
   );
+}
+
+type ComparableContact = {
+  id: string;
+  role: ContactRole;
+  customLabel: string | null;
+  personName: string;
+  companyName: string;
+  territories: string[];
+  email: string | null;
+  phone: string | null;
+  preferredChannel: string | null;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+function normalizeContactForComparison(
+  contact: EditableContact | DashboardContact
+): ComparableContact {
+  return {
+    id: contact.id ?? '',
+    role: contact.role,
+    customLabel: contact.customLabel ?? null,
+    personName: contact.personName ?? '',
+    companyName: contact.companyName ?? '',
+    territories: [...(contact.territories ?? [])].sort(),
+    email: contact.email ?? '',
+    phone: contact.phone ?? '',
+    preferredChannel: contact.preferredChannel ?? null,
+    isActive: contact.isActive ?? true,
+    sortOrder: contact.sortOrder ?? 0,
+  };
+}
+
+function contactsChanged(
+  contacts: EditableContact[],
+  baseline: Record<string, DashboardContact>
+): boolean {
+  const normalizedCurrent = contacts
+    .map(normalizeContactForComparison)
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const normalizedBaseline = Object.values(baseline)
+    .map(normalizeContactForComparison)
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  if (normalizedCurrent.length !== normalizedBaseline.length) {
+    return true;
+  }
+
+  return normalizedCurrent.some((contact, index) => {
+    const base = normalizedBaseline[index];
+    if (!base) return true;
+    return (
+      contact.role !== base.role ||
+      contact.customLabel !== base.customLabel ||
+      contact.personName !== base.personName ||
+      contact.companyName !== base.companyName ||
+      contact.email !== base.email ||
+      contact.phone !== base.phone ||
+      contact.preferredChannel !== base.preferredChannel ||
+      contact.isActive !== base.isActive ||
+      contact.sortOrder !== base.sortOrder ||
+      contact.territories.join('|') !== base.territories.join('|')
+    );
+  });
 }

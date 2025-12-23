@@ -2,10 +2,12 @@
 
 import { useAuth } from '@clerk/nextjs';
 import { Button } from '@jovie/ui';
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
+import { useSessionDraft } from '@/lib/hooks/useSessionTimeout';
+import { formatRelativeTimeFromNow } from '@/lib/utils/time';
 // flags import removed - pre-launch
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -13,6 +15,13 @@ interface ProfileFormProps {
   artist: Artist;
   onUpdate: (artist: Artist) => void;
 }
+
+type ProfileDraftPayload = {
+  name: string;
+  tagline: string;
+  image_url: string;
+  hide_branding: boolean;
+};
 
 export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
   const { has } = useAuth();
@@ -31,11 +40,52 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
   const hasRemoveBrandingFeature =
     has?.({ feature: 'remove_branding' }) ?? false;
 
-  const [formData, setFormData] = useState({
-    name: artist.name || '',
-    tagline: artist.tagline || '',
-    image_url: artist.image_url || '',
-    hide_branding: artist.settings?.hide_branding ?? false,
+  const initialFormValues = useMemo<ProfileDraftPayload>(
+    () => ({
+      name: artist.name || '',
+      tagline: artist.tagline || '',
+      image_url: artist.image_url || '',
+      hide_branding: artist.settings?.hide_branding ?? false,
+    }),
+    [
+      artist.image_url,
+      artist.name,
+      artist.settings?.hide_branding,
+      artist.tagline,
+    ]
+  );
+  const [formData, setFormData] =
+    useState<ProfileDraftPayload>(initialFormValues);
+  const initialValuesRef = useRef(initialFormValues);
+
+  useEffect(() => {
+    setFormData(initialFormValues);
+    initialValuesRef.current = initialFormValues;
+  }, [initialFormValues]);
+
+  const serializeProfileDraft = useCallback(() => formData, [formData]);
+
+  const hydrateProfileDraft = useCallback((draft: ProfileDraftPayload) => {
+    setFormData(prev => ({ ...prev, ...draft }));
+    setFormSubmitted(false);
+    setValidationErrors({});
+  }, []);
+
+  const profileIsDirty = useCallback(() => {
+    const baseline = initialValuesRef.current;
+    return (
+      formData.name !== baseline.name ||
+      formData.tagline !== baseline.tagline ||
+      formData.image_url !== baseline.image_url ||
+      formData.hide_branding !== baseline.hide_branding
+    );
+  }, [formData]);
+
+  const profileDraft = useSessionDraft<ProfileDraftPayload>({
+    key: artist.id ? `profile:${artist.id}` : 'profile:current',
+    serialize: serializeProfileDraft,
+    hydrate: hydrateProfileDraft,
+    isDirty: profileIsDirty,
   });
 
   // Validate form data
@@ -104,6 +154,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       );
       onUpdate(updatedArtist);
       setSuccess(true);
+      profileDraft.discardDraft();
 
       // Announce success to screen readers
       const successMessage = document.getElementById('success-message');
@@ -152,6 +203,34 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         aria-atomic='true'
         id='success-message'
       ></div>
+
+      {profileDraft.hasPendingDraft && (
+        <div className='mb-4 rounded-xl border border-dashed border-accent/40 bg-accent/5 p-4'>
+          <p className='text-sm font-medium text-primary-token'>
+            Unsaved profile draft found
+          </p>
+          <p className='text-xs text-secondary-token'>
+            Saved{' '}
+            {profileDraft.pendingDraft?.savedAt
+              ? formatRelativeTimeFromNow(profileDraft.pendingDraft.savedAt)
+              : 'earlier'}
+            .
+          </p>
+          <div className='mt-3 flex flex-wrap gap-2'>
+            <Button type='button' size='sm' onClick={profileDraft.restoreDraft}>
+              Restore draft
+            </Button>
+            <Button
+              type='button'
+              size='sm'
+              variant='secondary'
+              onClick={profileDraft.discardDraft}
+            >
+              Dismiss
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Error summary for screen readers */}
       <ErrorSummary
