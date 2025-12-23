@@ -1,4 +1,5 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
@@ -6,6 +7,7 @@ import { db, waitlistEntries } from '@/lib/db';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
+  prefetchDashboardData,
   setSidebarCollapsed,
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
@@ -13,6 +15,57 @@ import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+async function ensureWaitlistAccess(): Promise<void> {
+  return Sentry.startSpan(
+    { op: 'waitlist', name: 'app.waitlistAccess' },
+    async () => {
+      try {
+        const user = await currentUser();
+        const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+
+        if (!emailRaw) {
+          redirect('/waitlist');
+        }
+
+        const email = normalizeEmail(emailRaw);
+        const [entry] = await db
+          .select({ id: waitlistEntries.id, status: waitlistEntries.status })
+          .from(waitlistEntries)
+          .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+          .limit(1);
+
+        const status = entry?.status ?? null;
+        const isApproved = status === 'invited' || status === 'claimed';
+        if (!isApproved) {
+          redirect('/waitlist');
+        }
+
+        if (status === 'invited' && entry?.id) {
+          try {
+            await db
+              .update(waitlistEntries)
+              .set({ status: 'claimed', updatedAt: new Date() })
+              .where(eq(waitlistEntries.id, entry.id));
+          } catch (error) {
+            // Non-blocking; log in development for easier debugging.
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('Failed to mark waitlist entry as claimed', error);
+            }
+          }
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+          throw error;
+        }
+
+        Sentry.captureException(error, {
+          tags: { context: 'waitlist_gate' },
+        });
+      }
+    }
+  );
 }
 
 export default async function AppShellLayout({
@@ -26,48 +79,14 @@ export default async function AppShellLayout({
     redirect('/signin?redirect_url=/app/dashboard');
   }
 
-  // Waitlist gate: authenticated users must be invited/claimed (per-email) to access /app.
-  // Users can still sign in, but they are redirected to /waitlist until approved.
-  try {
-    const user = await currentUser();
-    const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
-
-    if (!emailRaw) {
-      redirect('/waitlist');
-    }
-
-    const email = normalizeEmail(emailRaw);
-    const [entry] = await db
-      .select({ id: waitlistEntries.id, status: waitlistEntries.status })
-      .from(waitlistEntries)
-      .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-      .limit(1);
-
-    const status = entry?.status ?? null;
-    const isApproved = status === 'invited' || status === 'claimed';
-    if (!isApproved) {
-      redirect('/waitlist');
-    }
-
-    if (status === 'invited' && entry?.id) {
-      try {
-        await db
-          .update(waitlistEntries)
-          .set({ status: 'claimed', updatedAt: new Date() })
-          .where(eq(waitlistEntries.id, entry.id));
-      } catch {
-        // Non-blocking: user already has access via invited status.
-      }
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-      throw error;
-    }
-    // If the waitlist query fails (e.g., during migrations), do not hard-block access.
-  }
+  const waitlistPromise = ensureWaitlistAccess();
+  prefetchDashboardData();
 
   try {
-    const dashboardData = await getDashboardDataCached();
+    const [dashboardData] = await Promise.all([
+      getDashboardDataCached(),
+      waitlistPromise,
+    ]);
 
     if (dashboardData.needsOnboarding) {
       redirect('/onboarding');

@@ -16,6 +16,7 @@ import {
   revalidateTag,
   updateTag,
 } from 'next/cache';
+import { cache } from 'react';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
@@ -308,43 +309,48 @@ async function fetchDashboardDataWithSession(
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
 
-    const [tipTotalsRaw] = await dbClient
-      .select({
-        totalReceived: drizzleSql`
-          COALESCE(SUM(${tips.amountCents}), 0)
-        `,
-        monthReceived: drizzleSql`
-          COALESCE(
-            SUM(
-              CASE
-                WHEN ${tips.createdAt} >= ${startOfMonth}
-                THEN ${tips.amountCents}
-                ELSE 0
-              END
-            ),
-            0
+    const [tipTotalsRawResult, clickStatsResult] = await Promise.all([
+      dbClient
+        .select({
+          totalReceived: drizzleSql`
+            COALESCE(SUM(${tips.amountCents}), 0)
+          `,
+          monthReceived: drizzleSql`
+            COALESCE(
+              SUM(
+                CASE
+                  WHEN ${tips.createdAt} >= ${startOfMonth}
+                  THEN ${tips.amountCents}
+                  ELSE 0
+                END
+              ),
+              0
+            )
           )
         `,
-        tipsSubmitted: drizzleSql`
-          COALESCE(COUNT(${tips.id}), 0)
-        `,
-      })
-      .from(tips)
-      .where(eq(tips.creatorProfileId, selected.id));
+          tipsSubmitted: drizzleSql`
+            COALESCE(COUNT(${tips.id}), 0)
+          `,
+        })
+        .from(tips)
+        .where(eq(tips.creatorProfileId, selected.id)),
+      dbClient
+        .select({
+          total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
+          qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
+          link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
+        })
+        .from(clickEvents)
+        .where(
+          and(
+            eq(clickEvents.creatorProfileId, selected.id),
+            eq(clickEvents.linkType, 'tip')
+          )
+        ),
+    ]);
 
-    const [clickStats] = await dbClient
-      .select({
-        total: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') in ('qr', 'link'))`,
-        qr: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'qr')`,
-        link: drizzleSql<number>`count(*) filter (where ${clickEvents.metadata}->>'source' = 'link')`,
-      })
-      .from(clickEvents)
-      .where(
-        and(
-          eq(clickEvents.creatorProfileId, selected.id),
-          eq(clickEvents.linkType, 'tip')
-        )
-      );
+    const tipTotalsRaw = tipTotalsRawResult?.[0];
+    const clickStats = clickStatsResult?.[0];
 
     const tippingStats = {
       tipClicks: Number(clickStats?.total ?? 0),
@@ -389,14 +395,13 @@ async function fetchDashboardDataWithSession(
   }
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
+async function resolveDashboardData(): Promise<DashboardData> {
   // Prevent caching of user-specific data
   noStore();
 
   const entitlements = await getCurrentUserEntitlements();
   const isAdmin = entitlements.isAdmin;
-
-  const { userId } = await auth();
+  const userId = entitlements.userId;
 
   if (!userId) {
     return {
@@ -413,9 +418,16 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 
   try {
-    const base = await withDbSessionTx(async (tx, clerkUserId) => {
-      return fetchDashboardDataWithSession(tx, clerkUserId);
-    });
+    const base = await Sentry.startSpan(
+      { op: 'task', name: 'dashboard.getDashboardData' },
+      async () => {
+        return withDbSessionTx(
+          async (tx, clerkUserId) =>
+            fetchDashboardDataWithSession(tx, clerkUserId),
+          { clerkUserId: userId }
+        );
+      }
+    );
 
     return {
       ...base,
@@ -440,10 +452,22 @@ export async function getDashboardData(): Promise<DashboardData> {
   }
 }
 
+const loadDashboardData = cache(resolveDashboardData);
+
+export async function prefetchDashboardData(): Promise<void> {
+  await loadDashboardData();
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  return loadDashboardData();
+}
+
+export async function getDashboardDataFresh(): Promise<DashboardData> {
+  return resolveDashboardData();
+}
+
 export async function getDashboardDataCached(): Promise<DashboardData> {
-  // Disable caching for now to follow YC "do things that don't scale" principle
-  // The unstable_cache API was causing issues with server components and auth()
-  // We'll add proper caching (e.g., Redis) when performance becomes a bottleneck
+  // Backwards-compatible alias; now shares the deduped loader.
   return getDashboardData();
 }
 
