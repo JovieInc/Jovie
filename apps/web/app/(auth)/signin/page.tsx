@@ -9,7 +9,6 @@ export default function SignInPage() {
       <ClerkLoading>
         <AuthPageSkeleton
           formTitle="What's your email?"
-          formTitleClassName='text-lg font-medium text-white/70 mb-4'
           showFormTitle={false}
           showFooterPrompt={false}
         />
@@ -17,7 +16,6 @@ export default function SignInPage() {
       <ClerkLoaded>
         <AuthLayout
           formTitle="What's your email?"
-          formTitleClassName='text-lg font-medium text-white/70 mb-4'
           showFormTitle={false}
           showFooterPrompt={false}
         >
