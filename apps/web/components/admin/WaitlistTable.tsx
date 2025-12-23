@@ -7,9 +7,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@jovie/ui';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { TableEmptyState } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from './WaitlistMobileCard';
 
@@ -353,14 +354,12 @@ export function WaitlistTable({
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={columns.length}
-                  className='py-12 text-center text-secondary-token'
-                >
-                  No waitlist entries found.
-                </td>
-              </tr>
+              <TableEmptyState
+                colSpan={columns.length}
+                icon={<ClipboardList className='h-6 w-6' />}
+                title='No waitlist entries'
+                description='New waitlist signups will appear here.'
+              />
             ) : (
               rows.map((row, index) => (
                 <tr
@@ -385,9 +384,11 @@ export function WaitlistTable({
       {/* Mobile Card List - shown only on mobile */}
       <div className='md:hidden p-3 space-y-3'>
         {rows.length === 0 ? (
-          <div className='text-center py-12 text-secondary-token'>
-            No waitlist entries found.
-          </div>
+          <TableEmptyState
+            icon={<ClipboardList className='h-6 w-6' />}
+            title='No waitlist entries'
+            description='New waitlist signups will appear here.'
+          />
         ) : (
           rows.map(entry => (
             <WaitlistMobileCard

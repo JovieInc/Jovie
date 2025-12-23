@@ -34,6 +34,7 @@ export default function RootLayout({
   return (
     <html lang='en'>
       <head>
+        <meta name='viewport' content='width=device-width, initial-scale=1' />
         <link
           rel='preconnect'
           href='https://fonts.googleapis.com'
@@ -50,7 +51,13 @@ export default function RootLayout({
         />
       </head>
       <body className='antialiased'>
-        {children}
+        <a
+          href='#main-content'
+          className='sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:border-2 focus:border-black focus:rounded'
+        >
+          Skip to main content
+        </a>
+        <main id='main-content'>{children}</main>
         <Analytics />
       </body>
     </html>
