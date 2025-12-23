@@ -82,17 +82,18 @@ _Last reviewed: 2025-11-29_
       - Other `/api/*`: `Cache-Control: public, max-age=300, s-maxage=300`.
       - All other routes (except `.well-known/vercel/flags`): `Cache-Control: public, max-age=0, must-revalidate`.
     - `next/image` is configured with a very strict per-image CSP (`default-src 'self'; script-src 'none'; sandbox;`) via `images.contentSecurityPolicy`. This applies only to the image optimizer, not as a global app CSP.
-  - `middleware.ts`:
-    - Bot detection for sensitive link APIs, including a 204 anti-cloaking response for `/api/link/*` when appropriate.
-    - Geo-based cookie banner hint via the `x-show-cookie-banner` header.
-    - For `/go/*`, `/out/*`, and `/api/*`:
-      - `X-Robots-Tag: noindex, nofollow, nosnippet, noarchive`.
-      - Strong no-cache headers and `Referrer-Policy: no-referrer`.
-    - Adds `Server-Timing` and `X-API-Response-Time` for observability.
+- `proxy.ts`:
+  - Bot detection for sensitive link APIs, including a 204 anti-cloaking response for `/api/link/*` when appropriate.
+  - Geo-based cookie banner hint via the `x-show-cookie-banner` header.
+  - For `/go/*`, `/out/*`, and `/api/*`:
+    - `X-Robots-Tag: noindex, nofollow, nosnippet, noarchive`.
+    - Strong no-cache headers and `Referrer-Policy: no-referrer`.
+  - Adds `Server-Timing` and `X-API-Response-Time` for observability.
+  - Generates per-request CSP nonces and injects the full Content Security Policy header.
 
 - **CSP status (now enforced)**
-  - `next.config.js` sets a global **Content-Security-Policy** header with an explicit allowlist to preserve current behavior.
-  - Inline scripts are allowed (`'unsafe-inline'`) to support the inline theme bootstrapping snippet and JSON-LD metadata in `app/layout.tsx`.
+  - `proxy.ts` builds the global **Content-Security-Policy** header per request.
+  - Inline scripts use per-request nonces (`script-src 'nonce-...'`) for theme bootstrapping and JSON-LD metadata.
   - `frame-ancestors 'none'` is included to match `X-Frame-Options: DENY`.
 
 - **HSTS (non-local only)**
@@ -111,7 +112,7 @@ _Last reviewed: 2025-11-29_
 
 - **CSP allowlist guidance**
   - **script-src**
-    - Self + inline scripts.
+    - Self + per-request nonces.
     - `https://va.vercel-scripts.com` (Vercel Analytics).
     - `https://vitals.vercel-insights.com` (Speed Insights).
     - `https://*.clerk.com` + `https://*.clerk.accounts.dev` (Clerk).

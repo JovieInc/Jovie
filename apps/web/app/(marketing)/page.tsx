@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
 import { InsightSection } from '@/components/home/InsightSection';
 import { ProblemSection } from '@/components/home/ProblemSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
 import { WhatYouGetSection } from '@/components/home/WhatYouGetSection';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — The AI Link-in-Bio Built for Artists`;
@@ -121,11 +123,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function HomePage() {
+  const nonce = headers().get(SCRIPT_NONCE_HEADER) ?? undefined;
+
   return (
     <>
       {/* Structured Data - WebSite */}
       <script
         type='application/ld+json'
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
@@ -162,6 +167,7 @@ export default function HomePage() {
       {/* Structured Data - SoftwareApplication */}
       <script
         type='application/ld+json'
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
@@ -197,6 +203,7 @@ export default function HomePage() {
       {/* Structured Data - Organization */}
       <script
         type='application/ld+json'
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
