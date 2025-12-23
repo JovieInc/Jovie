@@ -23,32 +23,63 @@ The following tables exist and are migrated:
 
 ---
 
+## V1 Scope
+
+**No manual release creation.** Releases are imported exclusively via Spotify artist profile discovery.
+
+---
+
 ## Remaining Work Items
 
-### Phase 1: Database Persistence (Critical)
+### Phase 1: Spotify Discovery & Import (Critical)
 
-Replace in-memory store with Drizzle queries to enable data persistence.
+Import releases from the artist's connected Spotify profile.
 
-#### 1.1 Create database query layer
+#### 1.1 Spotify Artist API Integration
+**Location:** `apps/web/lib/spotify/`
+
+- [ ] Use existing Spotify OAuth connection from artist profile
+- [ ] Fetch artist's discography via Spotify Web API (`/artists/{id}/albums`)
+- [ ] Parse album/single/EP metadata (title, release_date, artwork, tracks)
+- [ ] Extract Spotify URLs for each release
+
+#### 1.2 Release ingestion flow
+- [ ] Trigger import when user connects Spotify OR on-demand "Sync" button
+- [ ] Create `importReleasesFromSpotify(profileId, spotifyArtistId)` function
+- [ ] Map Spotify albums → `discog_releases` records
+- [ ] Map Spotify tracks → `discog_tracks` records
+- [ ] Create `provider_links` entries with Spotify URLs (`source: 'ingested'`)
+
+#### 1.3 Cross-platform link discovery
+- [ ] Use release metadata (title, artist, UPC/ISRC) to find on other platforms
+- [ ] Integrate with Odesli/Songlink API or similar for cross-platform matching
+- [ ] Auto-populate Apple Music, YouTube Music, etc. links where found
+
+---
+
+### Phase 2: Database Persistence (Critical)
+
+Replace in-memory store with Drizzle queries.
+
+#### 2.1 Create database query layer
 **Location:** `apps/web/lib/discog/queries.ts`
 
 - [ ] `getReleasesForProfile(profileId)` - Fetch releases with provider links
 - [ ] `getReleaseBySlug(profileId, slug)` - Single release lookup
-- [ ] `createRelease(profileId, data)` - Insert new release
-- [ ] `updateRelease(releaseId, data)` - Update release metadata
-- [ ] `deleteRelease(releaseId)` - Soft/hard delete
-- [ ] `upsertProviderLink(releaseId, providerId, url)` - Save provider override
-- [ ] `resetProviderLink(releaseId, providerId)` - Reset to detected
+- [ ] `upsertRelease(profileId, data)` - Insert/update from Spotify import
+- [ ] `upsertProviderLink(releaseId, providerId, url, source)` - Save provider link
+- [ ] `resetProviderLink(releaseId, providerId)` - Reset manual override to ingested
 
-#### 1.2 Update server actions
+#### 2.2 Update server actions
 **Location:** `apps/web/app/app/dashboard/releases/actions.ts`
 
 - [ ] Replace `getReleasesForProfile()` (in-memory) with DB query
 - [ ] Replace `updateProviderLink()` with DB mutation
 - [ ] Update `saveProviderOverride()` to use DB
 - [ ] Update `resetProviderOverride()` to use DB
+- [ ] Add `syncReleasesFromSpotify()` action
 
-#### 1.3 Update smart link redirect
+#### 2.3 Update smart link redirect
 **Location:** `apps/web/app/r/[slug]/route.ts`
 
 - [ ] Replace `resolveReleaseBySlug()` with DB query
@@ -56,116 +87,76 @@ Replace in-memory store with Drizzle queries to enable data persistence.
 
 ---
 
-### Phase 2: Add Release Functionality
+### Phase 3: Sync & Refresh UI
 
-Users need to be able to add their own releases.
+#### 3.1 Sync controls
+- [ ] Add "Sync from Spotify" button in releases page header
+- [ ] Show last sync timestamp
+- [ ] Loading state during sync
+- [ ] Success/error toast feedback
 
-#### 2.1 Manual release creation
-- [ ] Create "Add Release" button in releases page header
-- [ ] Create `AddReleaseDialog` component with form:
-  - Title (required)
-  - Release date (optional)
-  - Artwork URL (optional, later: upload)
-  - Release type (single/EP/album)
-- [ ] Create `createRelease` server action
-- [ ] Add validation (Zod schema)
+#### 3.2 Empty state
+- [ ] Update empty state to prompt Spotify connection
+- [ ] Link to profile settings if Spotify not connected
+- [ ] "Connect Spotify to import your releases"
 
-#### 2.2 Provider link detection (future)
-- [ ] Integrate with music metadata APIs (Spotify, MusicBrainz)
-- [ ] Auto-populate provider links when release is found
-- [ ] Mark detected links with `source: 'ingested'`
-
----
-
-### Phase 3: Edit & Delete Release
-
-#### 3.1 Edit release metadata
-- [ ] Add "Edit" action to release row (separate from provider links)
-- [ ] Create `EditReleaseDialog` component
-- [ ] Allow editing: title, release date, artwork URL, release type
-- [ ] Create `updateRelease` server action
-
-#### 3.2 Delete release
-- [ ] Add "Delete" action (with confirmation dialog)
-- [ ] Create `deleteRelease` server action
-- [ ] Handle cascade deletion of provider links
+#### 3.3 New release detection
+- [ ] Compare Spotify discography on sync
+- [ ] Highlight newly imported releases
+- [ ] Optional: webhook/polling for new releases (future)
 
 ---
 
-### Phase 4: Smart Link Landing Page
+### Phase 4: Provider Link Overrides (Existing UI)
 
-Currently `/r/[slug]` auto-redirects. Add optional landing page.
+The UI already supports this - ensure it works with DB persistence.
 
-#### 4.1 Landing page UI
-**Location:** `apps/web/app/r/[slug]/page.tsx`
-
-- [ ] Create landing page with:
-  - Release artwork (large)
-  - Release title and artist
-  - List of streaming platform buttons
-  - "Listen now" CTAs per provider
-- [ ] Add device detection for smart default provider
-
-#### 4.2 User preference
-- [ ] Allow users to choose between auto-redirect and landing page
-- [ ] Store preference in `smart_link_targets` or release metadata
+#### 4.1 Manual override flow
+- [ ] User edits provider URL → saves as `source: 'manual'`
+- [ ] Reset button → reverts to `source: 'ingested'` URL (or removes if none)
+- [ ] Visual badge for manual overrides (already implemented)
 
 ---
 
-### Phase 5: Track-Level Management (Future)
+### Phase 5: Feature Gate & Analytics
 
-The schema supports tracks but UI doesn't expose them.
-
-#### 5.1 Track listing
-- [ ] Show track count on release row
-- [ ] Expand release to see track list
-- [ ] Track-level smart links
-
-#### 5.2 Track provider links
-- [ ] Edit provider links per track
-- [ ] Track-specific smart links (`/r/[slug]/[trackSlug]`)
-
----
-
-### Phase 6: Import & Sync (Future)
-
-Connect to external services for release ingestion.
-
-#### 6.1 Distributor integration
-- [ ] Connect to DistroKid, TuneCore, CD Baby APIs
-- [ ] Sync releases automatically
-- [ ] Handle new release notifications
-
-#### 6.2 Music service APIs
-- [ ] Spotify Artist API integration
-- [ ] Apple Music API integration
-- [ ] Auto-update provider links
-
----
-
-### Phase 7: Feature Gate & Analytics
-
-#### 7.1 Feature gate
+#### 5.1 Feature gate
 - [ ] Ensure `feature_discog_smart_links` gate exists in Statsig
 - [ ] Gate the releases page behind this flag
 - [ ] Add gradual rollout rules
 
-#### 7.2 Analytics events
+#### 5.2 Analytics events
+- [ ] `releases_synced` - When user syncs from Spotify
 - [ ] `smart_link_copied` - When user copies a smart link
 - [ ] `smart_link_clicked` - When fan clicks a smart link
 - [ ] `provider_override_saved` - When user customizes a link
-- [ ] `release_created` / `release_deleted`
+
+---
+
+### Future (Post-V1)
+
+#### Smart Link Landing Page
+- [ ] Optional landing page vs auto-redirect
+- [ ] Release artwork, title, platform buttons
+
+#### Track-Level Management
+- [ ] Track listing per release
+- [ ] Track-specific smart links
+
+#### Additional Import Sources
+- [ ] Apple Music artist profile import
+- [ ] DistroKid/TuneCore API integration
+- [ ] Manual release creation (if needed)
 
 ---
 
 ## Recommended Implementation Order
 
-1. **Phase 1** (Database) - Critical foundation
-2. **Phase 2.1** (Manual add) - Basic CRUD complete
-3. **Phase 3** (Edit/Delete) - Full CRUD
-4. **Phase 7** (Analytics) - Measure usage
-5. **Phase 4** (Landing page) - Better UX
-6. **Phase 5-6** (Tracks, Import) - Advanced features
+1. **Phase 2** (Database) - Foundation for persistence
+2. **Phase 1** (Spotify Import) - Core V1 feature
+3. **Phase 3** (Sync UI) - User-facing controls
+4. **Phase 4** (Overrides) - Already built, verify with DB
+5. **Phase 5** (Analytics) - Measure usage
 
 ---
 
@@ -173,22 +164,31 @@ Connect to external services for release ingestion.
 
 ### New Files
 - `apps/web/lib/discog/queries.ts` - Database query functions
-- `apps/web/components/dashboard/organisms/AddReleaseDialog.tsx`
-- `apps/web/components/dashboard/organisms/EditReleaseDialog.tsx`
-- `apps/web/app/r/[slug]/page.tsx` - Landing page (optional)
+- `apps/web/lib/spotify/discography.ts` - Spotify import logic
+- `apps/web/lib/discog/cross-platform.ts` - Odesli/Songlink integration
 
 ### Files to Modify
-- `apps/web/app/app/dashboard/releases/actions.ts` - Use DB queries
-- `apps/web/app/app/dashboard/releases/page.tsx` - Add "Add Release" button
+- `apps/web/app/app/dashboard/releases/actions.ts` - Use DB queries, add sync action
+- `apps/web/app/app/dashboard/releases/page.tsx` - Add sync button, update empty state
 - `apps/web/app/r/[slug]/route.ts` - Use DB queries + analytics
-- `apps/web/components/dashboard/organisms/ReleaseProviderMatrix.tsx` - Add edit/delete actions
+- `apps/web/components/dashboard/organisms/ReleaseProviderMatrix.tsx` - Add sync UI
 - `apps/web/lib/discography/store.ts` - Delete (replaced by queries.ts)
 
 ---
 
 ## Testing Requirements
 
+- [ ] Unit tests for Spotify API parsing
 - [ ] Unit tests for database query functions
-- [ ] E2E test: Create release → copy smart link → verify redirect
+- [ ] E2E test: Connect Spotify → sync releases → verify in table
+- [ ] E2E test: Copy smart link → verify redirect works
 - [ ] E2E test: Edit provider link → verify override persists
-- [ ] E2E test: Delete release → verify cascade deletion
+- [ ] E2E test: Reset override → verify reverts to ingested URL
+
+---
+
+## Dependencies
+
+- Spotify OAuth already connected via artist profile
+- Spotify Web API access token available
+- Odesli/Songlink API key (for cross-platform discovery)
