@@ -191,7 +191,13 @@ type TrackSeed = {
 };
 
 type ContactSeed = {
-  role: 'bookings' | 'management' | 'press_pr' | 'brand_partnerships' | 'fan_general' | 'other';
+  role:
+    | 'bookings'
+    | 'management'
+    | 'press_pr'
+    | 'brand_partnerships'
+    | 'fan_general'
+    | 'other';
   personName?: string;
   companyName?: string;
   territories?: string[];
@@ -322,14 +328,62 @@ const timWhiteDiscography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/midnight/500/500',
     tracks: [
-      { title: 'Intro', slug: 'intro', durationMs: 90000, trackNumber: 1, isrc: 'USRC12400001' },
-      { title: 'Neon Lights', slug: 'neon-lights', durationMs: 234000, trackNumber: 2, isrc: 'USRC12400002' },
-      { title: 'City Dreams', slug: 'city-dreams', durationMs: 198000, trackNumber: 3, isrc: 'USRC12400003' },
-      { title: 'Lost in Time', slug: 'lost-in-time', durationMs: 256000, trackNumber: 4, isrc: 'USRC12400004' },
-      { title: 'Echoes', slug: 'echoes', durationMs: 312000, trackNumber: 5, isrc: 'USRC12400005' },
-      { title: 'Midnight Drive', slug: 'midnight-drive', durationMs: 245000, trackNumber: 6, isrc: 'USRC12400006' },
-      { title: 'Fading Away', slug: 'fading-away', durationMs: 287000, trackNumber: 7, isrc: 'USRC12400007' },
-      { title: 'New Horizons', slug: 'new-horizons', durationMs: 334000, trackNumber: 8, isrc: 'USRC12400008' },
+      {
+        title: 'Intro',
+        slug: 'intro',
+        durationMs: 90000,
+        trackNumber: 1,
+        isrc: 'USRC12400001',
+      },
+      {
+        title: 'Neon Lights',
+        slug: 'neon-lights',
+        durationMs: 234000,
+        trackNumber: 2,
+        isrc: 'USRC12400002',
+      },
+      {
+        title: 'City Dreams',
+        slug: 'city-dreams',
+        durationMs: 198000,
+        trackNumber: 3,
+        isrc: 'USRC12400003',
+      },
+      {
+        title: 'Lost in Time',
+        slug: 'lost-in-time',
+        durationMs: 256000,
+        trackNumber: 4,
+        isrc: 'USRC12400004',
+      },
+      {
+        title: 'Echoes',
+        slug: 'echoes',
+        durationMs: 312000,
+        trackNumber: 5,
+        isrc: 'USRC12400005',
+      },
+      {
+        title: 'Midnight Drive',
+        slug: 'midnight-drive',
+        durationMs: 245000,
+        trackNumber: 6,
+        isrc: 'USRC12400006',
+      },
+      {
+        title: 'Fading Away',
+        slug: 'fading-away',
+        durationMs: 287000,
+        trackNumber: 7,
+        isrc: 'USRC12400007',
+      },
+      {
+        title: 'New Horizons',
+        slug: 'new-horizons',
+        durationMs: 334000,
+        trackNumber: 8,
+        isrc: 'USRC12400008',
+      },
     ],
   },
   {
@@ -342,10 +396,34 @@ const timWhiteDiscography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/summer/500/500',
     tracks: [
-      { title: 'Beach Day', slug: 'beach-day', durationMs: 198000, trackNumber: 1, isrc: 'USRC12400009' },
-      { title: 'Sunset Boulevard', slug: 'sunset-boulevard', durationMs: 223000, trackNumber: 2, isrc: 'USRC12400010' },
-      { title: 'Ocean Breeze', slug: 'ocean-breeze', durationMs: 267000, trackNumber: 3, isrc: 'USRC12400011' },
-      { title: 'Golden Hour', slug: 'golden-hour', durationMs: 245000, trackNumber: 4, isrc: 'USRC12400012' },
+      {
+        title: 'Beach Day',
+        slug: 'beach-day',
+        durationMs: 198000,
+        trackNumber: 1,
+        isrc: 'USRC12400009',
+      },
+      {
+        title: 'Sunset Boulevard',
+        slug: 'sunset-boulevard',
+        durationMs: 223000,
+        trackNumber: 2,
+        isrc: 'USRC12400010',
+      },
+      {
+        title: 'Ocean Breeze',
+        slug: 'ocean-breeze',
+        durationMs: 267000,
+        trackNumber: 3,
+        isrc: 'USRC12400011',
+      },
+      {
+        title: 'Golden Hour',
+        slug: 'golden-hour',
+        durationMs: 245000,
+        trackNumber: 4,
+        isrc: 'USRC12400012',
+      },
     ],
   },
   {
@@ -358,7 +436,13 @@ const timWhiteDiscography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/electric/500/500',
     tracks: [
-      { title: 'Electric Dreams', slug: 'electric-dreams', durationMs: 212000, trackNumber: 1, isrc: 'USRC12400013' },
+      {
+        title: 'Electric Dreams',
+        slug: 'electric-dreams',
+        durationMs: 212000,
+        trackNumber: 1,
+        isrc: 'USRC12400013',
+      },
     ],
   },
 ];
@@ -374,11 +458,42 @@ const the1975Discography: DiscographySeed[] = [
     isExplicit: true,
     artworkUrl: 'https://picsum.photos/seed/notes/500/500',
     tracks: [
-      { title: 'The 1975', slug: 'the-1975', durationMs: 275000, trackNumber: 1, isrc: 'GBUM72000001' },
-      { title: 'People', slug: 'people', durationMs: 203000, trackNumber: 2, isExplicit: true, isrc: 'GBUM72000002' },
-      { title: 'The End', slug: 'the-end', durationMs: 223000, trackNumber: 3, isrc: 'GBUM72000003' },
-      { title: 'Frail State of Mind', slug: 'frail-state-of-mind', durationMs: 248000, trackNumber: 4, isrc: 'GBUM72000004' },
-      { title: 'Streaming', slug: 'streaming', durationMs: 178000, trackNumber: 5, isrc: 'GBUM72000005' },
+      {
+        title: 'The 1975',
+        slug: 'the-1975',
+        durationMs: 275000,
+        trackNumber: 1,
+        isrc: 'GBUM72000001',
+      },
+      {
+        title: 'People',
+        slug: 'people',
+        durationMs: 203000,
+        trackNumber: 2,
+        isExplicit: true,
+        isrc: 'GBUM72000002',
+      },
+      {
+        title: 'The End',
+        slug: 'the-end',
+        durationMs: 223000,
+        trackNumber: 3,
+        isrc: 'GBUM72000003',
+      },
+      {
+        title: 'Frail State of Mind',
+        slug: 'frail-state-of-mind',
+        durationMs: 248000,
+        trackNumber: 4,
+        isrc: 'GBUM72000004',
+      },
+      {
+        title: 'Streaming',
+        slug: 'streaming',
+        durationMs: 178000,
+        trackNumber: 5,
+        isrc: 'GBUM72000005',
+      },
     ],
   },
   {
@@ -391,7 +506,13 @@ const the1975Discography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/meyou/500/500',
     tracks: [
-      { title: 'Me & You Together Song', slug: 'me-you-together-song', durationMs: 238000, trackNumber: 1, isrc: 'GBUM72000006' },
+      {
+        title: 'Me & You Together Song',
+        slug: 'me-you-together-song',
+        durationMs: 238000,
+        trackNumber: 1,
+        isrc: 'GBUM72000006',
+      },
     ],
   },
 ];
@@ -407,11 +528,41 @@ const coldplayDiscography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/spheres/500/500',
     tracks: [
-      { title: 'Music of the Spheres', slug: 'music-of-the-spheres', durationMs: 315000, trackNumber: 1, isrc: 'GBAYE2100001' },
-      { title: 'Higher Power', slug: 'higher-power', durationMs: 205000, trackNumber: 2, isrc: 'GBAYE2100002' },
-      { title: 'Humankind', slug: 'humankind', durationMs: 276000, trackNumber: 3, isrc: 'GBAYE2100003' },
-      { title: 'Let Somebody Go', slug: 'let-somebody-go', durationMs: 244000, trackNumber: 4, isrc: 'GBAYE2100004' },
-      { title: 'My Universe', slug: 'my-universe', durationMs: 229000, trackNumber: 5, isrc: 'GBAYE2100005' },
+      {
+        title: 'Music of the Spheres',
+        slug: 'music-of-the-spheres',
+        durationMs: 315000,
+        trackNumber: 1,
+        isrc: 'GBAYE2100001',
+      },
+      {
+        title: 'Higher Power',
+        slug: 'higher-power',
+        durationMs: 205000,
+        trackNumber: 2,
+        isrc: 'GBAYE2100002',
+      },
+      {
+        title: 'Humankind',
+        slug: 'humankind',
+        durationMs: 276000,
+        trackNumber: 3,
+        isrc: 'GBAYE2100003',
+      },
+      {
+        title: 'Let Somebody Go',
+        slug: 'let-somebody-go',
+        durationMs: 244000,
+        trackNumber: 4,
+        isrc: 'GBAYE2100004',
+      },
+      {
+        title: 'My Universe',
+        slug: 'my-universe',
+        durationMs: 229000,
+        trackNumber: 5,
+        isrc: 'GBAYE2100005',
+      },
     ],
   },
 ];
@@ -427,11 +578,42 @@ const billieDiscography: DiscographySeed[] = [
     isExplicit: true,
     artworkUrl: 'https://picsum.photos/seed/happier/500/500',
     tracks: [
-      { title: 'Getting Older', slug: 'getting-older', durationMs: 244000, trackNumber: 1, isrc: 'USUM72100001' },
-      { title: 'I Didnt Change My Number', slug: 'i-didnt-change-my-number', durationMs: 157000, trackNumber: 2, isExplicit: true, isrc: 'USUM72100002' },
-      { title: 'Billie Bossa Nova', slug: 'billie-bossa-nova', durationMs: 196000, trackNumber: 3, isrc: 'USUM72100003' },
-      { title: 'my future', slug: 'my-future', durationMs: 210000, trackNumber: 4, isrc: 'USUM72100004' },
-      { title: 'Happier Than Ever', slug: 'happier-than-ever', durationMs: 298000, trackNumber: 5, isrc: 'USUM72100005' },
+      {
+        title: 'Getting Older',
+        slug: 'getting-older',
+        durationMs: 244000,
+        trackNumber: 1,
+        isrc: 'USUM72100001',
+      },
+      {
+        title: 'I Didnt Change My Number',
+        slug: 'i-didnt-change-my-number',
+        durationMs: 157000,
+        trackNumber: 2,
+        isExplicit: true,
+        isrc: 'USUM72100002',
+      },
+      {
+        title: 'Billie Bossa Nova',
+        slug: 'billie-bossa-nova',
+        durationMs: 196000,
+        trackNumber: 3,
+        isrc: 'USUM72100003',
+      },
+      {
+        title: 'my future',
+        slug: 'my-future',
+        durationMs: 210000,
+        trackNumber: 4,
+        isrc: 'USUM72100004',
+      },
+      {
+        title: 'Happier Than Ever',
+        slug: 'happier-than-ever',
+        durationMs: 298000,
+        trackNumber: 5,
+        isrc: 'USUM72100005',
+      },
     ],
   },
 ];
@@ -447,11 +629,41 @@ const duaLipaDiscography: DiscographySeed[] = [
     isExplicit: false,
     artworkUrl: 'https://picsum.photos/seed/future/500/500',
     tracks: [
-      { title: 'Future Nostalgia', slug: 'future-nostalgia', durationMs: 188000, trackNumber: 1, isrc: 'GBAHT2000001' },
-      { title: 'Dont Start Now', slug: 'dont-start-now', durationMs: 183000, trackNumber: 2, isrc: 'GBAHT2000002' },
-      { title: 'Cool', slug: 'cool', durationMs: 209000, trackNumber: 3, isrc: 'GBAHT2000003' },
-      { title: 'Physical', slug: 'physical', durationMs: 194000, trackNumber: 4, isrc: 'GBAHT2000004' },
-      { title: 'Levitating', slug: 'levitating', durationMs: 203000, trackNumber: 5, isrc: 'GBAHT2000005' },
+      {
+        title: 'Future Nostalgia',
+        slug: 'future-nostalgia',
+        durationMs: 188000,
+        trackNumber: 1,
+        isrc: 'GBAHT2000001',
+      },
+      {
+        title: 'Dont Start Now',
+        slug: 'dont-start-now',
+        durationMs: 183000,
+        trackNumber: 2,
+        isrc: 'GBAHT2000002',
+      },
+      {
+        title: 'Cool',
+        slug: 'cool',
+        durationMs: 209000,
+        trackNumber: 3,
+        isrc: 'GBAHT2000003',
+      },
+      {
+        title: 'Physical',
+        slug: 'physical',
+        durationMs: 194000,
+        trackNumber: 4,
+        isrc: 'GBAHT2000004',
+      },
+      {
+        title: 'Levitating',
+        slug: 'levitating',
+        durationMs: 203000,
+        trackNumber: 5,
+        isrc: 'GBAHT2000005',
+      },
     ],
   },
 ];
@@ -639,14 +851,62 @@ const PROVIDER_SEED: NewProvider[] = [
 // =============================================================================
 
 const SCRAPER_CONFIGS_SEED = [
-  { network: 'spotify', strategy: 'api' as const, maxConcurrency: 5, maxJobsPerMinute: 60, enabled: true },
-  { network: 'apple_music', strategy: 'api' as const, maxConcurrency: 3, maxJobsPerMinute: 30, enabled: true },
-  { network: 'youtube', strategy: 'api' as const, maxConcurrency: 5, maxJobsPerMinute: 100, enabled: true },
-  { network: 'instagram', strategy: 'browser' as const, maxConcurrency: 2, maxJobsPerMinute: 10, enabled: true },
-  { network: 'twitter', strategy: 'api' as const, maxConcurrency: 3, maxJobsPerMinute: 30, enabled: true },
-  { network: 'tiktok', strategy: 'browser' as const, maxConcurrency: 2, maxJobsPerMinute: 10, enabled: true },
-  { network: 'soundcloud', strategy: 'http' as const, maxConcurrency: 3, maxJobsPerMinute: 20, enabled: true },
-  { network: 'bandcamp', strategy: 'http' as const, maxConcurrency: 2, maxJobsPerMinute: 15, enabled: false },
+  {
+    network: 'spotify',
+    strategy: 'api' as const,
+    maxConcurrency: 5,
+    maxJobsPerMinute: 60,
+    enabled: true,
+  },
+  {
+    network: 'apple_music',
+    strategy: 'api' as const,
+    maxConcurrency: 3,
+    maxJobsPerMinute: 30,
+    enabled: true,
+  },
+  {
+    network: 'youtube',
+    strategy: 'api' as const,
+    maxConcurrency: 5,
+    maxJobsPerMinute: 100,
+    enabled: true,
+  },
+  {
+    network: 'instagram',
+    strategy: 'browser' as const,
+    maxConcurrency: 2,
+    maxJobsPerMinute: 10,
+    enabled: true,
+  },
+  {
+    network: 'twitter',
+    strategy: 'api' as const,
+    maxConcurrency: 3,
+    maxJobsPerMinute: 30,
+    enabled: true,
+  },
+  {
+    network: 'tiktok',
+    strategy: 'browser' as const,
+    maxConcurrency: 2,
+    maxJobsPerMinute: 10,
+    enabled: true,
+  },
+  {
+    network: 'soundcloud',
+    strategy: 'http' as const,
+    maxConcurrency: 3,
+    maxJobsPerMinute: 20,
+    enabled: true,
+  },
+  {
+    network: 'bandcamp',
+    strategy: 'http' as const,
+    maxConcurrency: 2,
+    maxJobsPerMinute: 15,
+    enabled: false,
+  },
 ];
 
 // =============================================================================
@@ -684,10 +944,7 @@ async function seedScraperConfigs() {
   console.log('🕷️  Seeding scraper configs...');
 
   for (const config of SCRAPER_CONFIGS_SEED) {
-    await db
-      .insert(scraperConfigs)
-      .values(config)
-      .onConflictDoNothing();
+    await db.insert(scraperConfigs).values(config).onConflictDoNothing();
   }
 
   const configCount = await db.select().from(scraperConfigs);
@@ -826,13 +1083,19 @@ async function ensureSeedFunction() {
   await db.execute(drizzleSql.raw(fnSql));
 }
 
-async function seedDiscography(profileId: string, discography: DiscographySeed[], username: string) {
+async function seedDiscography(
+  profileId: string,
+  discography: DiscographySeed[],
+  username: string
+) {
   for (const release of discography) {
     // Check if release already exists
     const existingRelease = await db
       .select()
       .from(discogReleases)
-      .where(drizzleSql`creator_profile_id = ${profileId} AND slug = ${release.slug}`)
+      .where(
+        drizzleSql`creator_profile_id = ${profileId} AND slug = ${release.slug}`
+      )
       .limit(1);
 
     let releaseId: string;
@@ -932,8 +1195,18 @@ async function seedDiscography(profileId: string, discography: DiscographySeed[]
   }
 }
 
-async function seedProviderLinksForRelease(releaseId: string, slug: string, username: string) {
-  const activeProviders = ['spotify', 'apple_music', 'youtube_music', 'amazon_music', 'deezer'];
+async function seedProviderLinksForRelease(
+  releaseId: string,
+  slug: string,
+  username: string
+) {
+  const activeProviders = [
+    'spotify',
+    'apple_music',
+    'youtube_music',
+    'amazon_music',
+    'deezer',
+  ];
 
   for (const providerId of activeProviders) {
     const url = `https://${providerId.replace('_', '.')}.com/album/${username}-${slug}`;
@@ -954,7 +1227,11 @@ async function seedProviderLinksForRelease(releaseId: string, slug: string, user
   }
 }
 
-async function seedProviderLinksForTrack(trackId: string, slug: string, username: string) {
+async function seedProviderLinksForTrack(
+  trackId: string,
+  slug: string,
+  username: string
+) {
   const activeProviders = ['spotify', 'apple_music', 'youtube_music'];
 
   for (const providerId of activeProviders) {
@@ -976,8 +1253,19 @@ async function seedProviderLinksForTrack(trackId: string, slug: string, username
   }
 }
 
-async function seedSmartLinkTargets(profileId: string, releaseId: string, slug: string, username: string) {
-  const activeProviders = ['spotify', 'apple_music', 'youtube_music', 'amazon_music', 'deezer'];
+async function seedSmartLinkTargets(
+  profileId: string,
+  releaseId: string,
+  slug: string,
+  username: string
+) {
+  const activeProviders = [
+    'spotify',
+    'apple_music',
+    'youtube_music',
+    'amazon_music',
+    'deezer',
+  ];
 
   for (let i = 0; i < activeProviders.length; i++) {
     const providerId = activeProviders[i];
@@ -1000,7 +1288,9 @@ async function seedSmartLinkTargets(profileId: string, releaseId: string, slug: 
 
 async function seedContacts(profileId: string, contacts: ContactSeed[]) {
   // Delete existing contacts for this profile
-  await db.delete(creatorContacts).where(drizzleSql`creator_profile_id = ${profileId}`);
+  await db
+    .delete(creatorContacts)
+    .where(drizzleSql`creator_profile_id = ${profileId}`);
 
   for (let i = 0; i < contacts.length; i++) {
     const contact = contacts[i];
@@ -1021,11 +1311,36 @@ async function seedContacts(profileId: string, contacts: ContactSeed[]) {
 
 async function seedSocialAccounts(profileId: string, username: string) {
   const platforms = [
-    { platform: 'instagram', handle: username, status: 'confirmed' as const, isVerified: true },
-    { platform: 'twitter', handle: username, status: 'confirmed' as const, isVerified: false },
-    { platform: 'tiktok', handle: username, status: 'suspected' as const, isVerified: false },
-    { platform: 'youtube', handle: username, status: 'confirmed' as const, isVerified: true },
-    { platform: 'spotify', handle: username, status: 'confirmed' as const, isVerified: true },
+    {
+      platform: 'instagram',
+      handle: username,
+      status: 'confirmed' as const,
+      isVerified: true,
+    },
+    {
+      platform: 'twitter',
+      handle: username,
+      status: 'confirmed' as const,
+      isVerified: false,
+    },
+    {
+      platform: 'tiktok',
+      handle: username,
+      status: 'suspected' as const,
+      isVerified: false,
+    },
+    {
+      platform: 'youtube',
+      handle: username,
+      status: 'confirmed' as const,
+      isVerified: true,
+    },
+    {
+      platform: 'spotify',
+      handle: username,
+      status: 'confirmed' as const,
+      isVerified: true,
+    },
   ];
 
   for (const platform of platforms) {
@@ -1052,17 +1367,48 @@ async function seedUserSettings(userId: string) {
     .insert(userSettings)
     .values({
       userId,
-      themeMode: ['system', 'light', 'dark'][Math.floor(Math.random() * 3)] as 'system' | 'light' | 'dark',
+      themeMode: ['system', 'light', 'dark'][Math.floor(Math.random() * 3)] as
+        | 'system'
+        | 'light'
+        | 'dark',
       sidebarCollapsed: Math.random() > 0.5,
     })
     .onConflictDoNothing();
 }
 
 async function seedAudienceMembers(profileId: string, displayName: string) {
-  const countries = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'MX', 'ES'];
-  const cities = ['New York', 'Los Angeles', 'London', 'Toronto', 'Sydney', 'Berlin', 'Paris', 'Tokyo', 'Sao Paulo', 'Mexico City'];
+  const countries = [
+    'US',
+    'GB',
+    'CA',
+    'AU',
+    'DE',
+    'FR',
+    'JP',
+    'BR',
+    'MX',
+    'ES',
+  ];
+  const cities = [
+    'New York',
+    'Los Angeles',
+    'London',
+    'Toronto',
+    'Sydney',
+    'Berlin',
+    'Paris',
+    'Tokyo',
+    'Sao Paulo',
+    'Mexico City',
+  ];
   const deviceTypes = ['mobile', 'desktop', 'tablet', 'unknown'] as const;
-  const memberTypes = ['anonymous', 'email', 'sms', 'spotify', 'customer'] as const;
+  const memberTypes = [
+    'anonymous',
+    'email',
+    'sms',
+    'spotify',
+    'customer',
+  ] as const;
   const intentLevels = ['high', 'medium', 'low'] as const;
 
   // Generate 20-50 audience members per profile
@@ -1070,7 +1416,8 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
 
   for (let i = 0; i < memberCount; i++) {
     const countryIdx = Math.floor(Math.random() * countries.length);
-    const memberType = memberTypes[Math.floor(Math.random() * memberTypes.length)];
+    const memberType =
+      memberTypes[Math.floor(Math.random() * memberTypes.length)];
     const firstSeen = randomDate(new Date('2024-01-01'), new Date());
     const lastSeen = randomDate(firstSeen, new Date());
     const visits = 1 + Math.floor(Math.random() * 50);
@@ -1086,16 +1433,26 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
         lastSeenAt: lastSeen,
         visits,
         engagementScore,
-        intentLevel: intentLevels[Math.floor(Math.random() * intentLevels.length)],
+        intentLevel:
+          intentLevels[Math.floor(Math.random() * intentLevels.length)],
         geoCity: cities[countryIdx],
         geoCountry: countries[countryIdx],
         deviceType: deviceTypes[Math.floor(Math.random() * deviceTypes.length)],
-        referrerHistory: [{ source: 'instagram', timestamp: firstSeen.toISOString() }],
-        latestActions: [{ action: 'profile_view', timestamp: lastSeen.toISOString() }],
-        email: memberType === 'email' || memberType === 'customer' ? `fan${i}@example.com` : null,
-        phone: memberType === 'sms' ? `+1555${String(i).padStart(7, '0')}` : null,
+        referrerHistory: [
+          { source: 'instagram', timestamp: firstSeen.toISOString() },
+        ],
+        latestActions: [
+          { action: 'profile_view', timestamp: lastSeen.toISOString() },
+        ],
+        email:
+          memberType === 'email' || memberType === 'customer'
+            ? `fan${i}@example.com`
+            : null,
+        phone:
+          memberType === 'sms' ? `+1555${String(i).padStart(7, '0')}` : null,
         spotifyConnected: memberType === 'spotify',
-        purchaseCount: memberType === 'customer' ? 1 + Math.floor(Math.random() * 5) : 0,
+        purchaseCount:
+          memberType === 'customer' ? 1 + Math.floor(Math.random() * 5) : 0,
         tags: engagementScore > 70 ? ['superfan'] : [],
         fingerprint: `fp_${profileId.slice(0, 8)}_${i}`,
       })
@@ -1104,13 +1461,41 @@ async function seedAudienceMembers(profileId: string, displayName: string) {
 }
 
 async function seedClickEvents(profileId: string, linkIds: string[]) {
-  const countries = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'JP', 'BR', 'MX', 'ES'];
-  const cities = ['New York', 'Los Angeles', 'London', 'Toronto', 'Sydney', 'Berlin', 'Paris', 'Tokyo', 'Sao Paulo', 'Mexico City'];
+  const countries = [
+    'US',
+    'GB',
+    'CA',
+    'AU',
+    'DE',
+    'FR',
+    'JP',
+    'BR',
+    'MX',
+    'ES',
+  ];
+  const cities = [
+    'New York',
+    'Los Angeles',
+    'London',
+    'Toronto',
+    'Sydney',
+    'Berlin',
+    'Paris',
+    'Tokyo',
+    'Sao Paulo',
+    'Mexico City',
+  ];
   const devices = ['mobile', 'desktop', 'tablet'];
   const browsers = ['Chrome', 'Safari', 'Firefox', 'Edge'];
   const oses = ['iOS', 'Android', 'Windows', 'macOS', 'Linux'];
   const linkTypes = ['listen', 'social', 'tip', 'other'] as const;
-  const referrers = ['https://instagram.com', 'https://twitter.com', 'https://google.com', 'direct', null];
+  const referrers = [
+    'https://instagram.com',
+    'https://twitter.com',
+    'https://google.com',
+    'direct',
+    null,
+  ];
 
   // Generate 50-150 click events per profile
   const clickCount = 50 + Math.floor(Math.random() * 100);
@@ -1121,7 +1506,10 @@ async function seedClickEvents(profileId: string, linkIds: string[]) {
 
     await db.insert(clickEvents).values({
       creatorProfileId: profileId,
-      linkId: linkIds.length > 0 ? linkIds[Math.floor(Math.random() * linkIds.length)] : null,
+      linkId:
+        linkIds.length > 0
+          ? linkIds[Math.floor(Math.random() * linkIds.length)]
+          : null,
       linkType: linkTypes[Math.floor(Math.random() * linkTypes.length)],
       ipAddress: `192.168.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
       userAgent: `Mozilla/5.0 (${oses[Math.floor(Math.random() * oses.length)]}) ${browsers[Math.floor(Math.random() * browsers.length)]}`,
@@ -1153,7 +1541,9 @@ async function seedTips(profileId: string) {
   const tipCount = 5 + Math.floor(Math.random() * 15);
 
   for (let i = 0; i < tipCount; i++) {
-    const amount = [500, 1000, 2000, 2500, 5000, 10000][Math.floor(Math.random() * 6)];
+    const amount = [500, 1000, 2000, 2500, 5000, 10000][
+      Math.floor(Math.random() * 6)
+    ];
     const tipDate = randomDate(new Date('2024-01-01'), new Date());
     const isAnonymous = Math.random() < 0.3;
 
@@ -1242,7 +1632,8 @@ async function seedDatabase() {
           ) AS profile_id
         `);
 
-        const profileId = (result as { rows: Array<{ profile_id: string }> }).rows[0]?.profile_id;
+        const profileId = (result as { rows: Array<{ profile_id: string }> })
+          .rows[0]?.profile_id;
 
         // Get user ID for this profile
         const userResult = await db
@@ -1252,7 +1643,10 @@ async function seedDatabase() {
           .limit(1);
 
         if (profileId && userResult.length > 0) {
-          profileMap.set(artist.profile.username, { profileId, userId: userResult[0].id });
+          profileMap.set(artist.profile.username, {
+            profileId,
+            userId: userResult[0].id,
+          });
         }
 
         console.log(
@@ -1280,13 +1674,21 @@ async function seedDatabase() {
 
       // Seed discography if present
       if (artist.discography && artist.discography.length > 0) {
-        console.log(`  📀 Seeding discography for ${artist.profile.displayName}...`);
-        await seedDiscography(profileId, artist.discography, artist.profile.username);
+        console.log(
+          `  📀 Seeding discography for ${artist.profile.displayName}...`
+        );
+        await seedDiscography(
+          profileId,
+          artist.discography,
+          artist.profile.username
+        );
       }
 
       // Seed contacts if present
       if (artist.contacts && artist.contacts.length > 0) {
-        console.log(`  📇 Seeding contacts for ${artist.profile.displayName}...`);
+        console.log(
+          `  📇 Seeding contacts for ${artist.profile.displayName}...`
+        );
         await seedContacts(profileId, artist.contacts);
       }
 
@@ -1302,7 +1704,9 @@ async function seedDatabase() {
 
       // Seed analytics data for featured/verified profiles
       if (artist.profile.isFeatured || artist.profile.isVerified) {
-        console.log(`  📊 Seeding analytics for ${artist.profile.displayName}...`);
+        console.log(
+          `  📊 Seeding analytics for ${artist.profile.displayName}...`
+        );
         await seedAudienceMembers(profileId, artist.profile.displayName);
         await seedClickEvents(profileId, linkIds);
         await seedTips(profileId);
