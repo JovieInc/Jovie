@@ -656,7 +656,10 @@ export async function PUT(req: Request) {
       })();
 
       // Wait for background tasks but don't let failures affect the response
-      Promise.all([enrichmentPromise, ingestionPromise]).catch(() => {});
+      Promise.all([enrichmentPromise, ingestionPromise]).catch(error => {
+        console.error('[social-links] Background task failed:', error);
+        // Note: Error is logged but doesn't affect the response
+      });
 
       return NextResponse.json(successResponse, {
         status: 200,
