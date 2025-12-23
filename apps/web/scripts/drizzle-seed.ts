@@ -215,7 +215,7 @@ function slugify(name: string): string {
     .replace(/-/g, ''); // compact for socials (e.g., the1975)
 }
 
-function slugifyWithDashes(name: string): string {
+function _slugifyWithDashes(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFKD')
@@ -1632,10 +1632,9 @@ async function seedDatabase() {
           ) AS profile_id
         `);
 
-        const typedResult = result as unknown as {
-          rows: Array<{ profile_id: string }>;
-        };
-        const profileId = typedResult.rows[0]?.profile_id;
+        const profileId = (
+          result as unknown as { rows: Array<{ profile_id: string }> }
+        ).rows[0]?.profile_id;
 
         // Get user ID for this profile
         const userResult = await db

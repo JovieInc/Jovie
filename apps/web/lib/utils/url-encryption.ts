@@ -4,24 +4,62 @@
  */
 
 import crypto from 'crypto';
+import { env } from '@/lib/env-server';
 
-const ENCRYPTION_KEY =
-  process.env.URL_ENCRYPTION_KEY || 'default-key-change-in-production-32-chars';
+const DEFAULT_KEY = 'default-key-change-in-production-32-chars';
+const ENCRYPTION_KEY = env.URL_ENCRYPTION_KEY;
 const ALGORITHM = 'aes-256-gcm';
+
+// Validate encryption key at module load time
+// Skip validation during build (CI=true or NEXT_PHASE=phase-production-build)
+const isBuildTime =
+  process.env.CI === 'true' ||
+  process.env.NEXT_PHASE === 'phase-production-build';
+if (!isBuildTime && (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY)) {
+  const vercelEnv =
+    process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+  if (vercelEnv === 'production' || vercelEnv === 'preview') {
+    throw new Error(
+      '[url-encryption] URL_ENCRYPTION_KEY must be set to a secure value in production/preview environments. ' +
+        'Generate a key with: openssl rand -base64 32'
+    );
+  }
+  if (vercelEnv === 'development') {
+    console.warn(
+      '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set or using default value. ' +
+        'URL encryption will use a weak default key. Generate a secure key with: openssl rand -base64 32'
+    );
+  }
+}
 
 export interface EncryptionResult {
   encrypted: string;
   iv: string;
   authTag: string;
+  salt: string;
 }
 
 /**
  * Encrypts a URL for secure storage
  */
 export function encryptUrl(url: string): EncryptionResult {
+  if (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY) {
+    // In development, fall back to simple base64 encoding
+    console.warn(
+      '[url-encryption] Using base64 fallback due to missing encryption key'
+    );
+    return {
+      encrypted: Buffer.from(url).toString('base64'),
+      iv: '',
+      authTag: '',
+      salt: '',
+    };
+  }
+
   try {
     const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+    const salt = crypto.randomBytes(16);
+    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
     const encryptedBuffer = Buffer.concat([
@@ -34,15 +72,11 @@ export function encryptUrl(url: string): EncryptionResult {
       encrypted: encryptedBuffer.toString('hex'),
       iv: iv.toString('hex'),
       authTag: authTag.toString('hex'),
+      salt: salt.toString('hex'),
     };
   } catch (error) {
-    console.error('URL encryption failed:', error);
-    // Fallback to base64 for demo purposes
-    return {
-      encrypted: Buffer.from(url).toString('base64'),
-      iv: '',
-      authTag: '',
-    };
+    console.error('[url-encryption] Encryption failed:', error);
+    throw new Error('Failed to encrypt URL');
   }
 }
 
@@ -51,12 +85,24 @@ export function encryptUrl(url: string): EncryptionResult {
  */
 export function decryptUrl(encryptionResult: EncryptionResult): string {
   try {
-    if (!encryptionResult.iv || !encryptionResult.authTag) {
-      // Fallback for base64 encoded URLs
+    // Handle base64 fallback (development mode or legacy data without salt)
+    if (
+      !encryptionResult.iv ||
+      !encryptionResult.authTag ||
+      !encryptionResult.salt
+    ) {
       return Buffer.from(encryptionResult.encrypted, 'base64').toString('utf8');
     }
 
-    const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
+    // Require encryption key for AES-GCM decryption
+    if (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY) {
+      throw new Error(
+        '[url-encryption] Cannot decrypt AES-GCM encrypted URL without valid encryption key'
+      );
+    }
+
+    const salt = Buffer.from(encryptionResult.salt, 'hex');
+    const key = crypto.scryptSync(ENCRYPTION_KEY, salt, 32);
     const iv = Buffer.from(encryptionResult.iv, 'hex');
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     const authTag = Buffer.from(encryptionResult.authTag, 'hex');
@@ -69,7 +115,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 
     return decryptedBuffer.toString('utf8');
   } catch (error) {
-    console.error('URL decryption failed:', error);
+    console.error('[url-encryption] Decryption failed:', error);
     throw new Error('Failed to decrypt URL');
   }
 }
