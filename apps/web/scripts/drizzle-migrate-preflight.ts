@@ -67,19 +67,16 @@ function validateEnvironment(): void {
   const branch = process.env.GIT_BRANCH;
   if (!branch) {
     errors.push('Missing required environment variable: GIT_BRANCH');
-  } else if (branch !== 'main' && branch !== 'production') {
+  } else if (branch !== 'main') {
     errors.push(
-      `Unsupported GIT_BRANCH "${branch}". Preflight only runs on main or production.`
+      `Unsupported GIT_BRANCH "${branch}". Preflight only runs on main branch.`
     );
   }
 
-  // Treat 'main' as production in trunk-based development
-  if (
-    (branch === 'main' || branch === 'production') &&
-    process.env.ALLOW_PROD_MIGRATIONS !== 'true'
-  ) {
+  // Main branch deploys to production in trunk-based development
+  if (branch === 'main' && process.env.ALLOW_PROD_MIGRATIONS !== 'true') {
     errors.push(
-      'ALLOW_PROD_MIGRATIONS=true is required for production migrations.'
+      'ALLOW_PROD_MIGRATIONS=true is required for production migrations on main branch.'
     );
   }
 

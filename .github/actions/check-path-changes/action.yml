@@ -47,34 +47,13 @@ runs:
           exit 0
         fi
 
-        # For PRs to production, always run full CI (skip path guards)
-        if [[ "${{ inputs.event-name }}" == "pull_request" && "${{ inputs.base-ref }}" == "production" ]]; then
-          echo "Running full CI for PR to production branch"
-          echo "run_full_ci=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        # For merge queue events, always run full CI
-        if [[ "${{ inputs.event-name }}" == "merge_group" ]]; then
-          echo "Running full CI for merge queue"
-          echo "run_full_ci=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
-        # For push events to production/preview, always run full CI
-        if [[ "${{ inputs.event-name }}" == "push" && ("$GITHUB_REF" == "refs/heads/production" || "$GITHUB_REF" == "refs/heads/preview") ]]; then
-          echo "Running full CI for push to production/preview branch"
-          echo "run_full_ci=true" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-
         # Determine changed files depending on event type
         if [[ "${{ inputs.event-name }}" == "pull_request" ]]; then
           # For PRs, compare against the base ref from origin
           git fetch origin "${{ inputs.base-ref }}"
           CHANGED_FILES=$(git diff --name-only "origin/${{ inputs.base-ref }}" HEAD)
         else
-          # For push/merge_group, compare with previous commit
+          # For push, compare with previous commit
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
         fi
 
