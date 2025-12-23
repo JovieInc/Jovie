@@ -1,10 +1,18 @@
 # GitHub Workflows
 
+## Deployment Model
+
+This repository uses trunk-based development with a single long-lived branch:
+
+- **`main`** → deploys directly to **jov.ie** (production)
+- PRs run fast checks (typecheck, lint) - ~30 seconds
+- Push to main runs full CI (build, tests, E2E) then deploys to production
+
 ## Vercel Preview Deployments
 
 ### Preview Deployment Workflow
 
-Vercel preview deployments for pull requests and feature branches are handled by the `ci.yml` workflow via the `ci-pr-vercel-preview` and `deploy` jobs.
+Vercel preview deployments for pull requests and feature branches are handled by the `ci.yml` workflow via the `ci-pr-vercel-preview` job.
 
 #### Features:
 
@@ -16,7 +24,7 @@ Vercel preview deployments for pull requests and feature branches are handled by
 #### Triggers:
 
 - Pull request events (opened, reopened, synchronize)
-- Push events to non-production, non-main branches
+- Push events to non-main branches
 - Manual workflow dispatch with PR number input
 
 #### Secrets:
@@ -26,6 +34,28 @@ Vercel preview deployments for pull requests and feature branches are handled by
 - `VERCEL_PROJECT_ID` - Vercel project ID
 - `GITHUB_TOKEN` - Automatically provided by GitHub Actions
 
-## CI and Merge Queue
+## CI Workflow
 
-The main CI workflow `ci.yml` is the gatekeeper for PRs to `main` and `production`. It includes fast checks (typecheck, lint) and full CI (build, unit, E2E). To support GitHub Merge Queue, `ci.yml` listens to the `merge_group` event so required status checks re-run in-queue before merging.
+The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
+
+- **Fast checks** (typecheck, lint) - runs on all PRs, required for merge
+- **Full CI** (build, unit tests, E2E) - runs on push to main before deploy
+- **Merge queue support** - `ci.yml` listens to `merge_group` event for in-queue validation
+
+## Auto-Merge
+
+The `auto-merge.yml` workflow handles automatic merging for:
+
+- Dependabot PRs (patch/minor updates)
+- Codegen PRs
+- PRs with `auto-merge` label (after CI passes)
+
+## Synthetic Monitoring
+
+The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on a schedule to catch production issues.
+
+## Neon Database
+
+- **Ephemeral branches** - Created per PR for isolated testing
+- **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close
+- **Protected branch** - `main` (production) is protected from deletion
