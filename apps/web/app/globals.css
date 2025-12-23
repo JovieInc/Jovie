@@ -10,6 +10,7 @@
  */
 
 @import "tailwindcss";
+@import "../styles/design-system.css";
 @import "../styles/theme.css";
 /* @import "tw-animate-css"; */
 
@@ -312,54 +313,13 @@ body {
 }
 
 @layer base {
+  /**
+   * Marketing theme variant - inherits from design-system.css OKLCH tokens.
+   * Uses slightly different base hue for marketing pages.
+   */
   .marketing-mono {
-    /* Light mode - Linear-inspired minimal aesthetic */
-    --color-bg-base: #ffffff;
-    --color-bg-surface-0: #fafbfc;
-    --color-bg-surface-1: #f6f7f8;
-    --color-bg-surface-2: #eef0f2;
-    --color-bg-surface-3: #e5e7eb;
-
-    /* Light mode text hierarchy */
-    --color-text-primary-token: #0c0c0c;
-    --color-text-secondary-token: #52525b;
-    --color-text-tertiary-token: #71717a;
-    --color-text-quaternary-token: #a1a1aa;
-
-    /* Light mode borders */
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-border-default: rgba(0, 0, 0, 0.1);
-    --color-border-strong: rgba(0, 0, 0, 0.18);
-
-    /* Light mode buttons */
-    --color-btn-primary-bg: #0c0c0c;
-    --color-btn-primary-fg: #ffffff;
-  }
-
-  /* Dark mode variant */
-  :root.dark .marketing-mono,
-  .dark .marketing-mono {
-    /* Linear's dark-8a equivalent */
-    --color-bg-base: #0a0a0f; /* Warmer off-black */
-    --color-bg-surface-0: #0f0f12;
-    --color-bg-surface-1: #141419;
-    --color-bg-surface-2: #18181f;
-    --color-bg-surface-3: #1e1e27;
-
-    /* Dark mode text hierarchy */
-    --color-text-primary-token: #f4f4f5;
-    --color-text-secondary-token: #c6c6cc;
-    --color-text-tertiary-token: #9a9aa2;
-    --color-text-quaternary-token: #737378;
-
-    /* Dark mode borders */
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-border-default: rgba(255, 255, 255, 0.1);
-    --color-border-strong: rgba(255, 255, 255, 0.18);
-
-    /* Dark mode buttons */
-    --color-btn-primary-bg: #ffffff;
-    --color-btn-primary-fg: #0a0a0f;
+    --theme-base-hue: 240;
+    --theme-base-chroma: 0.01;
   }
 }
 
@@ -454,90 +414,16 @@ body {
 }
 
 @layer base {
-  /* Enhanced Linear-style dashboard tokens (light) */
+  /**
+   * Dashboard tokens are now defined in design-system.css using OKLCH.
+   * This section provides fallback values and focus ring triplets.
+   */
   :root {
-    --color-bg-base: #ffffff;
-    /* app background */
-    --color-bg-surface-0: #fafbfc;
-    /* elevated backgrounds */
-    --color-bg-surface-1: #f6f7f8;
-    /* cards/panels */
-    --color-bg-surface-2: #eef0f2;
-    /* interactive/hover */
-    --color-bg-surface-3: #e5e7eb;
-    /* pressed/active */
-    --color-border-subtle: #e5e7eb;
-    --color-border-default: #d1d5db;
-    --color-text-primary-token: #0c0c0c;
-    --color-text-secondary-token: #6b7280;
-    --color-text-tertiary-token: #71717a;
-    /* Improved contrast from #9ca3af for WCAG AA */
-    --color-accent: #7c3aed;
-    /* accent */
-    --color-accent-foreground: #fff;
-    /* accent text */
-    --color-btn-primary-bg: #000;
-    /* primary button background */
-    --color-btn-primary-fg: #fff;
-    /* primary button text */
-
-    /* Loading/skeleton colors */
-    --color-skeleton-base: #f3f4f6;
-    --color-skeleton-shimmer: #ffffff;
-
-    --shadow-sm:
-      0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-    --shadow-md:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-    --shadow-lg:
-      0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-
     /* Focus ring RGB triplet used by `@utility focus-ring-themed` */
     --focus-ring: 124 58 237;
-    /* approx. #7c3aed */
   }
 
-  /* Dark mode overrides — ensure this block comes AFTER light tokens */
   :root.dark {
-    /* Enhanced Linear-style dashboard tokens (dark) */
-    --color-bg-base: #0f0f12;
-    /* deepest app background */
-    --color-bg-surface-0: #141419;
-    /* elevated backgrounds (sidebars) */
-    --color-bg-surface-1: #18181f;
-    /* cards/panels */
-    --color-bg-surface-2: #1e1e27;
-    /* interactive/hover */
-    --color-bg-surface-3: #242430;
-    /* pressed/active */
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    /* subtle borders */
-    --color-border-default: rgba(255, 255, 255, 0.1);
-    /* default borders */
-    --color-border-strong: rgba(255, 255, 255, 0.18);
-
-    --color-text-primary-token: #f4f4f5;
-    --color-text-secondary-token: #c6c6cc;
-    --color-text-tertiary-token: #9a9aa2;
-    --color-text-disabled-token: #6f6f78;
-    /* Improved contrast from #737373 */
-    --color-accent: #7c3aed;
-    /* accent */
-    --color-accent-foreground: #fff;
-    /* accent text */
-    --color-btn-primary-bg: #fff;
-    /* primary button background */
-    --color-btn-primary-fg: #000;
-    /* primary button text */
-
-    /* Loading/skeleton colors for dark mode */
-    --color-skeleton-base: #1a1a1a;
-    --color-skeleton-shimmer: #2a2a2a;
-
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 6px 16px rgba(0, 0, 0, 0.45);
-    --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-
     --focus-ring: 109 119 230 / 0.55;
   }
 
@@ -738,6 +624,205 @@ body {
   }
 }
 
+/* ============================================
+   LINEAR-STYLE UTILITY CLASSES (OKLCH)
+   ============================================ */
+
+/* Text utilities using semantic OKLCH tokens */
+@utility text-primary-oklch {
+  color: var(--color-text-primary-token);
+}
+
+@utility text-secondary-oklch {
+  color: var(--color-text-secondary-token);
+}
+
+@utility text-tertiary-oklch {
+  color: var(--color-text-tertiary-token);
+}
+
+@utility text-quaternary-oklch {
+  color: var(--color-text-quaternary-token);
+}
+
+@utility text-disabled-oklch {
+  color: var(--color-text-disabled-token);
+}
+
+/* Surface utilities */
+@utility bg-base-oklch {
+  background-color: var(--color-bg-base);
+}
+
+@utility bg-surface-0-oklch {
+  background-color: var(--color-bg-surface-0);
+}
+
+@utility bg-surface-1-oklch {
+  background-color: var(--color-bg-surface-1);
+}
+
+@utility bg-surface-2-oklch {
+  background-color: var(--color-bg-surface-2);
+}
+
+@utility bg-surface-3-oklch {
+  background-color: var(--color-bg-surface-3);
+}
+
+/* Interactive background utilities */
+@utility bg-interactive-hover {
+  background-color: var(--color-interactive-hover);
+}
+
+@utility bg-interactive-active {
+  background-color: var(--color-interactive-active);
+}
+
+/* Accent utilities */
+@utility bg-accent-oklch {
+  background-color: var(--color-accent);
+}
+
+@utility bg-accent-subtle-oklch {
+  background-color: var(--color-accent-subtle);
+}
+
+@utility text-accent-oklch {
+  color: var(--color-accent);
+}
+
+/* Status utilities */
+@utility bg-success-oklch {
+  background-color: var(--color-success);
+}
+
+@utility bg-success-subtle-oklch {
+  background-color: var(--color-success-subtle);
+}
+
+@utility text-success-oklch {
+  color: var(--color-success);
+}
+
+@utility bg-warning-oklch {
+  background-color: var(--color-warning);
+}
+
+@utility bg-warning-subtle-oklch {
+  background-color: var(--color-warning-subtle);
+}
+
+@utility text-warning-oklch {
+  color: var(--color-warning);
+}
+
+@utility bg-error-oklch {
+  background-color: var(--color-error);
+}
+
+@utility bg-error-subtle-oklch {
+  background-color: var(--color-error-subtle);
+}
+
+@utility text-error-oklch {
+  color: var(--color-error);
+}
+
+@utility bg-info-oklch {
+  background-color: var(--color-info);
+}
+
+@utility bg-info-subtle-oklch {
+  background-color: var(--color-info-subtle);
+}
+
+@utility text-info-oklch {
+  color: var(--color-info);
+}
+
+/* Border utilities */
+@utility border-subtle-oklch {
+  border-color: var(--color-border-subtle);
+}
+
+@utility border-default-oklch {
+  border-color: var(--color-border-default);
+}
+
+@utility border-strong-oklch {
+  border-color: var(--color-border-strong);
+}
+
+@utility border-accent-oklch {
+  border-color: var(--color-accent);
+}
+
+/* Shadow utilities using semantic tokens */
+@utility shadow-sm-oklch {
+  box-shadow: var(--shadow-sm);
+}
+
+@utility shadow-md-oklch {
+  box-shadow: var(--shadow-md);
+}
+
+@utility shadow-lg-oklch {
+  box-shadow: var(--shadow-lg);
+}
+
+@utility shadow-xl-oklch {
+  box-shadow: var(--shadow-xl);
+}
+
+/* Linear-style animation utilities */
+@utility ease-linear-out {
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility ease-linear-in-out {
+  transition-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+@utility ease-linear-spring {
+  transition-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Card interaction utilities */
+@utility card-interactive {
+  @apply transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)];
+  @apply hover:-translate-y-1 hover:shadow-lg;
+  @apply active:translate-y-0 active:shadow-md;
+}
+
+@utility card-subtle-hover {
+  @apply transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)];
+  @apply hover:shadow-md;
+}
+
+/* Button interaction utilities */
+@utility btn-interactive {
+  @apply transition-all duration-150 ease-[cubic-bezier(0.16,1,0.3,1)];
+  @apply hover:opacity-90 hover:-translate-y-px;
+  @apply active:translate-y-0 active:opacity-100;
+}
+
+/* Linear-style text rendering */
+@utility text-render-optimized {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ring utilities using accent */
+@utility ring-accent-oklch {
+  --tw-ring-color: var(--color-accent);
+}
+
+@utility ring-offset-base {
+  --tw-ring-offset-color: var(--color-bg-base);
+}
+
 @theme inline {
   --color-sidebar: rgb(var(--sidebar-background));
   --color-sidebar-foreground: rgb(var(--sidebar-foreground));
@@ -758,4 +843,14 @@ body {
   /* Additional semantic tokens for shadcn components */
   --color-foreground: var(--color-text-primary-token);
   --color-muted-foreground: var(--color-text-secondary-token);
+
+  /* OKLCH-based theme tokens for Tailwind */
+  --color-success: var(--color-success);
+  --color-success-subtle: var(--color-success-subtle);
+  --color-warning: var(--color-warning);
+  --color-warning-subtle: var(--color-warning-subtle);
+  --color-error: var(--color-error);
+  --color-error-subtle: var(--color-error-subtle);
+  --color-info: var(--color-info);
+  --color-info-subtle: var(--color-info-subtle);
 }
