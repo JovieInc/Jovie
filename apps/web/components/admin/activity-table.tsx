@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
+import { Activity } from 'lucide-react';
 import { useMemo } from 'react';
 import { type Column, Table } from '@/components/admin/table';
 import type {
@@ -100,6 +101,11 @@ export function ActivityTable({ items }: ActivityTableProps) {
             rowHeight={60}
             caption='Recent activity in the last 7 days'
             className='border-0'
+            emptyState={{
+              icon: <Activity className='h-6 w-6' />,
+              title: 'No recent activity',
+              description: 'Activity from the last 7 days will appear here.',
+            }}
           />
         </div>
       </CardContent>

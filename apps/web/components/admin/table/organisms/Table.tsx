@@ -3,7 +3,13 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useMemo, useRef } from 'react';
 import { AdminTableShell } from '../AdminTableShell';
-import { TableCell, TableCheckboxCell, TableHeaderCell } from '../atoms';
+import {
+  TableCell,
+  TableCheckboxCell,
+  TableEmptyState,
+  type TableEmptyStateProps,
+  TableHeaderCell,
+} from '../atoms';
 import {
   type BulkAction,
   TableBulkActionsToolbar,
@@ -68,6 +74,9 @@ export interface TableProps<T> {
   // Layout
   className?: string;
   caption?: string;
+
+  // Empty state
+  emptyState?: Omit<TableEmptyStateProps, 'colSpan'>;
 }
 
 export function Table<T>({
@@ -91,6 +100,7 @@ export function Table<T>({
   overscan = 5,
   className,
   caption,
+  emptyState,
 }: TableProps<T>) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -247,7 +257,7 @@ export function Table<T>({
 
           <tbody
             style={
-              useVirtualization
+              useVirtualization && data.length > 0
                 ? {
                     height: `${totalHeight}px`,
                     position: 'relative',
@@ -255,70 +265,77 @@ export function Table<T>({
                 : undefined
             }
           >
-            {useVirtualization && virtualRows
-              ? // Virtualized rendering
-                virtualRows.map(virtualRow => {
-                  const row = data[virtualRow.index];
-                  const rowId = getRowId(row);
-                  const isSelected = selectedIds.has(rowId);
+            {data.length === 0 && emptyState ? (
+              <TableEmptyState
+                {...emptyState}
+                colSpan={columns.length + (selectable ? 1 : 0)}
+              />
+            ) : useVirtualization && virtualRows ? (
+              // Virtualized rendering
+              virtualRows.map(virtualRow => {
+                const row = data[virtualRow.index];
+                const rowId = getRowId(row);
+                const isSelected = selectedIds.has(rowId);
 
-                  return (
-                    <TableRow
-                      key={rowId}
-                      selected={isSelected}
-                      virtualRow={{ start: virtualRow.start }}
-                    >
-                      {selectable && (
-                        <TableCheckboxCell
-                          checked={isSelected}
-                          onChange={() => toggleSelect(rowId)}
-                          rowNumber={virtualRow.index + 1}
-                          ariaLabel={`Select row ${virtualRow.index + 1}`}
-                        />
-                      )}
+                return (
+                  <TableRow
+                    key={rowId}
+                    selected={isSelected}
+                    virtualRow={{ start: virtualRow.start }}
+                  >
+                    {selectable && (
+                      <TableCheckboxCell
+                        checked={isSelected}
+                        onChange={() => toggleSelect(rowId)}
+                        rowNumber={virtualRow.index + 1}
+                        ariaLabel={`Select row ${virtualRow.index + 1}`}
+                      />
+                    )}
 
-                      {columns.map(column => (
-                        <TableCell
-                          key={column.id}
-                          width={column.width}
-                          align={column.align}
-                          hideOnMobile={column.hideOnMobile}
-                        >
-                          {column.cell(row, virtualRow.index)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })
-              : // Standard rendering
-                data.map((row, index) => {
-                  const rowId = getRowId(row);
-                  const isSelected = selectedIds.has(rowId);
+                    {columns.map(column => (
+                      <TableCell
+                        key={column.id}
+                        width={column.width}
+                        align={column.align}
+                        hideOnMobile={column.hideOnMobile}
+                      >
+                        {column.cell(row, virtualRow.index)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
+            ) : (
+              // Standard rendering
+              data.map((row, index) => {
+                const rowId = getRowId(row);
+                const isSelected = selectedIds.has(rowId);
 
-                  return (
-                    <TableRow key={rowId} selected={isSelected}>
-                      {selectable && (
-                        <TableCheckboxCell
-                          checked={isSelected}
-                          onChange={() => toggleSelect(rowId)}
-                          rowNumber={index + 1}
-                          ariaLabel={`Select row ${index + 1}`}
-                        />
-                      )}
+                return (
+                  <TableRow key={rowId} selected={isSelected}>
+                    {selectable && (
+                      <TableCheckboxCell
+                        checked={isSelected}
+                        onChange={() => toggleSelect(rowId)}
+                        rowNumber={index + 1}
+                        ariaLabel={`Select row ${index + 1}`}
+                      />
+                    )}
 
-                      {columns.map(column => (
-                        <TableCell
-                          key={column.id}
-                          width={column.width}
-                          align={column.align}
-                          hideOnMobile={column.hideOnMobile}
-                        >
-                          {column.cell(row, index)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  );
-                })}
+                    {columns.map(column => (
+                      <TableCell
+                        key={column.id}
+                        width={column.width}
+                        align={column.align}
+                        hideOnMobile={column.hideOnMobile}
+                      >
+                        {column.cell(row, index)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
+            )}
           </tbody>
         </table>
       )}

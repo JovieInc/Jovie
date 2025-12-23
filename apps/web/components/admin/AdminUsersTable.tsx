@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Input } from '@jovie/ui';
-import { Copy, UserCog } from 'lucide-react';
+import { Copy, UserCog, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -284,6 +284,13 @@ export function AdminUsersTable({
         virtualizationThreshold={20}
         rowHeight={60}
         caption='Admin users table'
+        emptyState={{
+          icon: <Users className='h-6 w-6' />,
+          title: 'No users found',
+          description: search
+            ? 'Try adjusting your search terms or clearing the filter.'
+            : 'Users will appear here once they sign up.',
+        }}
       />
 
       {/* Custom footer with pagination */}
