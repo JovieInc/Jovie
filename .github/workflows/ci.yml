@@ -83,15 +83,12 @@ jobs:
       - name: Format check (Biome)
         run: pnpm run format:check
 
-  ci-fast-checks:
-    name: Fast checks (typecheck + lint)
-    # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
+  ci-typecheck:
+    name: Typecheck
+    # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     needs: [ci-cache-warm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      matrix:
-        check: [typecheck, lint]
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
@@ -104,13 +101,13 @@ jobs:
           CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
 
           if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping fast checks."
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping typecheck."
             exit 0
           fi
 
           # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
           if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping fast checks."
+            echo "Docs-only change. Skipping typecheck."
             exit 0
           fi
       - uses: ./.github/actions/setup-node-pnpm
@@ -122,7 +119,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        if: ${{ matrix.check == 'typecheck' }}
         uses: actions/cache@v5
         with:
           path: |
@@ -132,13 +128,49 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
-      - name: Run fast/lint check
+      - name: Run typecheck
+        run: pnpm turbo typecheck --filter=@jovie/web
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+  ci-lint:
+    name: Lint
+    # Draft PRs skip; ready PRs + pushes + merge queue run lint
+    needs: [ci-cache-warm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          if [[ "${{ matrix.check }}" == "typecheck" ]]; then
-            pnpm turbo typecheck --filter=@jovie/web
-          else
-            pnpm turbo lint --filter=@jovie/web
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping lint."
+            exit 0
           fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping lint."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache Turbo
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+      - name: Run lint
+        run: pnpm turbo lint --filter=@jovie/web
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -380,7 +412,7 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-fast-checks, ci-guardrails]
+    needs: [ci-typecheck, ci-lint, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -520,7 +552,7 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [ci-fast-checks]
+    needs: [ci-fast]
     # Build is NOT required for merge queue (main) - only run on push or PRs to production/testing
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
@@ -579,7 +611,7 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    needs: [ci-fast-checks]
+    needs: [ci-fast]
     # Unit tests are NOT required for merge queue (main) - only run on push or PRs to production/testing
     if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
@@ -655,7 +687,7 @@ jobs:
   ci-merge-smoke:
     name: Merge Group Smoke
     if: ${{ github.event_name == 'merge_group' }}
-    needs: [ci-fast-checks]
+    needs: [ci-fast]
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
@@ -915,7 +947,8 @@ jobs:
     needs:
       - ci-env-example-guard
       - ci-guardrails
-      - ci-fast-checks
+      - ci-typecheck
+      - ci-lint
       - neon-db
       - drizzle-migration-guard
       - ci-drizzle-check
@@ -1885,7 +1918,7 @@ jobs:
   # and non-existent copilot-pr-review.yml. CodeRabbit now handles AI reviews via .coderabbit.yaml
 
   deploy-prod:
-    needs: [ci-fast-checks, ci-build, ci-unit-tests, ci-e2e-tests]
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests]
     if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
