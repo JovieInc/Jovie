@@ -3,7 +3,7 @@
  * Tests for the user journey tracking system
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the analytics module
 vi.mock('@/lib/analytics', () => ({
