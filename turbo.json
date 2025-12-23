@@ -5,6 +5,7 @@
   "remoteCache": {
     "enabled": true
   },
+  "globalPassThroughEnv": ["SENTRY_AUTH_TOKEN"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
