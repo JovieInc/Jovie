@@ -63,7 +63,7 @@ describe('URL Encryption', () => {
       expect(decrypted).toBe(url);
     });
 
-    it('should fall back to base64 when cipher creation fails', () => {
+    it('should throw error when cipher creation fails', () => {
       const url = 'https://example.com/fallback';
       const cipherSpy = vi
         .spyOn(crypto, 'createCipheriv')
@@ -71,14 +71,8 @@ describe('URL Encryption', () => {
           throw new Error('cipher failure');
         });
 
-      const result = encryptUrl(url);
-
+      expect(() => encryptUrl(url)).toThrow('Failed to encrypt URL');
       expect(cipherSpy).toHaveBeenCalled();
-      expect(result.iv).toBe('');
-      expect(result.authTag).toBe('');
-      expect(Buffer.from(result.encrypted, 'base64').toString('utf8')).toBe(
-        url
-      );
     });
   });
 
