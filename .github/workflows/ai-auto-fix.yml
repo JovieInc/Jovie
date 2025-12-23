@@ -1,0 +1,283 @@
+name: AI Auto-Fix
+
+on:
+  pull_request:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: ai-auto-fix-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false  # Don't cancel in-progress fixes
+
+jobs:
+  auto-fix:
+    name: Apply Automatic Fixes
+    if: |
+      (github.event.label.name == 'ai:auto-fix') ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       contains(github.event.comment.body, '@claude fix-review'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Get PR number
+        id: pr-number
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+          else
+            echo "number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get PR details
+        id: pr-details
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_DATA=$(gh pr view ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} --json headRefName,labels,files)
+          echo "branch=$(echo "$PR_DATA" | jq -r '.headRefName')" >> $GITHUB_OUTPUT
+          echo "labels=$(echo "$PR_DATA" | jq -r '.labels[].name' | tr '\n' ',')" >> $GITHUB_OUTPUT
+          echo "files=$(echo "$PR_DATA" | jq -r '.files[].path' | tr '\n' ',')" >> $GITHUB_OUTPUT
+
+      - name: Check opt-out label
+        if: contains(steps.pr-details.outputs.labels, 'ai:opt-out')
+        run: |
+          echo "❌ PR has ai:opt-out label. Skipping auto-fix."
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "🔒 AI automation is disabled for this PR (ai:opt-out label). Manual fixes required."
+          exit 0
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check circuit breaker
+        id: check-attempts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Count previous ai-auto-fix workflow runs for this PR
+          RUNS=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow=ai-auto-fix.yml \
+            --json conclusion,headBranch \
+            --jq "[.[] | select(.headBranch == \"${{ steps.pr-details.outputs.branch }}\") | select(.conclusion != null)] | length")
+
+          echo "Previous attempts: $RUNS"
+
+          if [ "$RUNS" -ge 3 ]; then
+            echo "❌ Circuit breaker triggered: $RUNS attempts already made"
+            echo "breaker=true" >> $GITHUB_OUTPUT
+
+            gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --remove-label "ai:auto-fix" \
+              --remove-label "ai:fixing" \
+              --add-label "ai:failed"
+
+            gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --body "❌ **AI Auto-Fix Circuit Breaker Triggered**
+
+Maximum retry limit reached ($RUNS attempts). This PR requires manual fixes.
+
+**What happened:**
+- AI attempted to fix review findings $RUNS times
+- Fixes either failed or introduced new issues
+- Circuit breaker prevents infinite retry loops
+
+**Next steps:**
+1. Review CodeRabbit comments for specific issues
+2. Apply fixes manually
+3. Once fixed, remove \`ai:failed\` label to reset circuit breaker"
+
+            exit 1
+          else
+            echo "breaker=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check protected paths
+        id: check-paths
+        run: |
+          PROTECTED_PATHS="drizzle/migrations/ auth/ payment/ billing/ .github/workflows/"
+          FILES="${{ steps.pr-details.outputs.files }}"
+
+          for path in $PROTECTED_PATHS; do
+            if echo "$FILES" | grep -q "$path"; then
+              echo "❌ Protected path detected: $path"
+              echo "protected=true" >> $GITHUB_OUTPUT
+
+              gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+                --add-label "ai:opt-out"
+
+              gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+                --body "🔒 **Protected Path Detected**
+
+This PR modifies protected code paths that require human review:
+- $path
+
+**AI automation has been disabled** for safety. Manual review and fixes required."
+
+              exit 1
+            fi
+          done
+
+          echo "protected=false" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Add "ai:fixing" label
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --add-label "ai:fixing"
+
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr-details.outputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run format fixes (Biome)
+        id: format-fix
+        continue-on-error: true
+        run: |
+          echo "Running Biome format fix..."
+          pnpm run format
+
+          if git diff --quiet; then
+            echo "No format changes needed"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Format changes applied"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run lint fixes
+        id: lint-fix
+        continue-on-error: true
+        run: |
+          echo "Running lint fix..."
+          pnpm --filter=@jovie/web run lint:fix || true
+
+          if git diff --quiet; then
+            echo "No lint changes needed"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "Lint changes applied"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if any fixes applied
+        id: check-changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes applied by auto-fix"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changes applied, proceeding to verification"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            git status --short
+          fi
+
+      - name: Verify fixes (typecheck)
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          echo "Running typecheck to verify fixes..."
+          pnpm --filter=@jovie/web run typecheck
+
+      - name: Verify fixes (lint)
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          echo "Running lint to verify fixes..."
+          pnpm --filter=@jovie/web run lint
+
+      - name: Verify fixes (format check)
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          echo "Running format check to verify fixes..."
+          pnpm run format:check
+
+      - name: Commit and push fixes
+        if: steps.check-changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add .
+          git commit -m "fix: auto-fix review findings
+
+🤖 Generated with Claude Code
+
+Applied automatic fixes:
+- Code formatting (Biome)
+- Linting issues
+- Import organization
+
+All changes verified with typecheck + lint.
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+          git push origin ${{ steps.pr-details.outputs.branch }}
+
+      - name: Update labels on success
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --remove-label "ai:fixing" \
+            --remove-label "ai:auto-fix" \
+            --add-label "ai:fixed"
+
+          if [ "${{ steps.check-changes.outputs.has_changes }}" == "true" ]; then
+            gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --body "✅ **AI Auto-Fix Succeeded**
+
+Automatic fixes have been applied and verified:
+- ✓ Code formatting (Biome)
+- ✓ Linting issues
+- ✓ Typecheck passed
+- ✓ Lint check passed
+
+CodeRabbit will re-review the changes. If clean, PR may auto-merge (if labeled)."
+          else
+            gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --body "✅ **AI Auto-Fix Completed**
+
+No automatic fixes were needed - code is already compliant with formatting and linting rules."
+          fi
+
+      - name: Update labels on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --remove-label "ai:fixing" \
+            --remove-label "ai:auto-fix" \
+            --add-label "ai:failed"
+
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "❌ **AI Auto-Fix Failed**
+
+Automatic fixes could not be applied. Manual intervention required.
+
+**Possible reasons:**
+- Fixes introduced type errors
+- Lint rules could not be auto-fixed
+- Protected path detected
+- Verification checks failed
+
+**Next steps:**
+1. Review the workflow logs above for details
+2. Review CodeRabbit comments
+3. Apply fixes manually
+4. Push changes to trigger CI again"

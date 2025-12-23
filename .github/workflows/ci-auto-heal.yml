@@ -1,0 +1,287 @@
+name: CI Auto-Heal
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+jobs:
+  auto-heal:
+    name: Heal CI Failures
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Get PR number from workflow run
+        id: pr-number
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER=$(gh api /repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }} \
+            --jq '.pull_requests[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No PR associated with this workflow run. Skipping."
+            exit 0
+          fi
+
+          echo "number=$PR_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Get PR details
+        id: pr-details
+        if: steps.pr-number.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_DATA=$(gh pr view ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} --json headRefName,labels)
+          echo "branch=$(echo "$PR_DATA" | jq -r '.headRefName')" >> $GITHUB_OUTPUT
+          echo "labels=$(echo "$PR_DATA" | jq -r '.labels[].name' | tr '\n' ',')" >> $GITHUB_OUTPUT
+
+      - name: Check opt-out label
+        if: contains(steps.pr-details.outputs.labels, 'ai:opt-out')
+        run: |
+          echo "❌ PR has ai:opt-out label. Skipping CI auto-heal."
+          exit 0
+
+      - name: Check circuit breaker
+        id: check-attempts
+        if: steps.pr-number.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Count previous ci-auto-heal workflow runs for this PR's branch
+          RUNS=$(gh run list \
+            --repo ${{ github.repository }} \
+            --workflow=ci-auto-heal.yml \
+            --json conclusion,headBranch \
+            --jq "[.[] | select(.headBranch == \"${{ steps.pr-details.outputs.branch }}\") | select(.conclusion != null)] | length")
+
+          echo "Previous heal attempts: $RUNS"
+
+          if [ "$RUNS" -ge 2 ]; then
+            echo "❌ Circuit breaker triggered: $RUNS heal attempts already made"
+            echo "breaker=true" >> $GITHUB_OUTPUT
+
+            gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --add-label "ci:manual"
+
+            gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+              --body "❌ **CI Auto-Heal Circuit Breaker Triggered**
+
+Maximum retry limit reached ($RUNS attempts). This CI failure requires manual intervention.
+
+**What happened:**
+- CI auto-heal attempted to fix the failure $RUNS times
+- Failures persisted or are not auto-healable
+- Circuit breaker prevents infinite retry loops
+
+**Next steps:**
+1. Review CI logs to identify the root cause
+2. Apply manual fixes
+3. Remove \`ci:manual\` label to reset circuit breaker"
+
+            exit 1
+          else
+            echo "breaker=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download workflow logs
+        if: steps.pr-number.outputs.number != '' && steps.check-attempts.outputs.breaker == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p logs
+          gh run view ${{ github.event.workflow_run.id }} --repo ${{ github.repository }} --log > logs/ci-failure.log || true
+
+      - name: Analyze failure type
+        id: analyze
+        if: steps.pr-number.outputs.number != '' && steps.check-attempts.outputs.breaker == 'false'
+        run: |
+          LOGS="logs/ci-failure.log"
+
+          # Check for cache corruption
+          if grep -qi "cache.*corrupt\|cache.*invalid\|EINTEGRITY" "$LOGS"; then
+            echo "Failure type: Cache corruption"
+            echo "healable=true" >> $GITHUB_OUTPUT
+            echo "strategy=clear-cache" >> $GITHUB_OUTPUT
+            echo "reason=Cache corruption detected" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check for Biome formatting issues
+          if grep -qi "biome.*format\|Format check failed\|Run 'pnpm.*format'" "$LOGS"; then
+            echo "Failure type: Formatting"
+            echo "healable=true" >> $GITHUB_OUTPUT
+            echo "strategy=format-fix" >> $GITHUB_OUTPUT
+            echo "reason=Formatting issues detected" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check for flaky test (known patterns)
+          if grep -qi "timeout.*exceeded\|ETIMEDOUT\|test.*flaky" "$LOGS"; then
+            echo "Failure type: Flaky test"
+            echo "healable=true" >> $GITHUB_OUTPUT
+            echo "strategy=retry" >> $GITHUB_OUTPUT
+            echo "reason=Flaky test detected (timeout)" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check for dependency resolution issues
+          if grep -qi "ERESOLVE\|peer.*dependency\|cannot resolve dependency" "$LOGS"; then
+            echo "Failure type: Dependency resolution"
+            echo "healable=true" >> $GITHUB_OUTPUT
+            echo "strategy=clear-node-modules" >> $GITHUB_OUTPUT
+            echo "reason=Dependency resolution failure" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Not auto-healable
+          echo "Failure type: Unknown or requires manual intervention"
+          echo "healable=false" >> $GITHUB_OUTPUT
+          echo "reason=Not auto-healable - manual review required" >> $GITHUB_OUTPUT
+
+      - name: Skip if not healable
+        if: steps.analyze.outputs.healable != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "❌ CI failure is not auto-healable: ${{ steps.analyze.outputs.reason }}"
+
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --add-label "ci:manual"
+
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "⚠️ **CI Failure Requires Manual Intervention**
+
+CI auto-heal analyzed the failure but determined it requires human review.
+
+**Failure analysis:**
+${{ steps.analyze.outputs.reason }}
+
+**Next steps:**
+1. Review the [CI logs](${{ github.event.workflow_run.html_url }})
+2. Identify and fix the root cause
+3. Push fixes to trigger CI again"
+
+          exit 0
+
+      - name: Add "ci:healing" label
+        if: steps.analyze.outputs.healable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --add-label "ci:healing"
+
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "🔧 **CI Auto-Heal In Progress**
+
+Detected: ${{ steps.analyze.outputs.reason }}
+Strategy: ${{ steps.analyze.outputs.strategy }}
+
+Auto-heal is attempting to fix this issue automatically..."
+
+      - name: Checkout PR branch
+        if: steps.analyze.outputs.healable == 'true' && steps.analyze.outputs.strategy == 'format-fix'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.pr-details.outputs.branch }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Apply format fix strategy
+        if: steps.analyze.outputs.healable == 'true' && steps.analyze.outputs.strategy == 'format-fix'
+        run: |
+          # Setup pnpm
+          corepack enable pnpm
+          pnpm install --frozen-lockfile
+
+          # Run format fix
+          pnpm run format
+
+          # Commit if changes
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "fix: auto-heal CI formatting issues
+
+🔧 CI Auto-Heal applied formatting fixes
+
+Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+            git push origin ${{ steps.pr-details.outputs.branch }}
+          fi
+
+      - name: Apply retry strategy
+        if: steps.analyze.outputs.healable == 'true' && steps.analyze.outputs.strategy == 'retry'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Re-triggering CI workflow..."
+          # Re-run the failed workflow
+          gh workflow run ci.yml --repo ${{ github.repository }} --ref ${{ steps.pr-details.outputs.branch }}
+
+      - name: Apply clear-cache strategy
+        if: steps.analyze.outputs.healable == 'true' && steps.analyze.outputs.strategy == 'clear-cache'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Clearing caches and re-triggering CI..."
+
+          # Clear GitHub Actions caches for this branch
+          CACHE_KEYS=$(gh cache list --repo ${{ github.repository }} --ref ${{ steps.pr-details.outputs.branch }} --json key --jq '.[].key' || echo "")
+
+          if [ -n "$CACHE_KEYS" ]; then
+            echo "$CACHE_KEYS" | while read key; do
+              gh cache delete "$key" --repo ${{ github.repository }} --confirm || true
+            done
+            echo "Cleared caches, re-triggering CI..."
+          fi
+
+          # Re-run CI
+          gh workflow run ci.yml --repo ${{ github.repository }} --ref ${{ steps.pr-details.outputs.branch }}
+
+      - name: Update labels on success
+        if: success() && steps.analyze.outputs.healable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --remove-label "ci:healing" \
+            --add-label "ci:healed"
+
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "✅ **CI Auto-Heal Succeeded**
+
+Successfully applied healing strategy: ${{ steps.analyze.outputs.strategy }}
+Reason: ${{ steps.analyze.outputs.reason }}
+
+CI has been re-triggered. Monitor the [latest run](${{ github.event.workflow_run.html_url }}) to verify the fix."
+
+      - name: Update labels on failure
+        if: failure() && steps.analyze.outputs.healable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr edit ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --remove-label "ci:healing" \
+            --add-label "ci:manual"
+
+          gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
+            --body "❌ **CI Auto-Heal Failed**
+
+Attempted strategy: ${{ steps.analyze.outputs.strategy }}
+Reason: ${{ steps.analyze.outputs.reason }}
+
+Auto-heal was unable to fix the CI failure. Manual intervention required.
+
+**Next steps:**
+1. Review the [workflow logs](${{ github.event.workflow_run.html_url }})
+2. Apply manual fixes
+3. Push changes to trigger CI again"

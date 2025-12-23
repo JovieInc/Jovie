@@ -167,6 +167,93 @@ reviews:
 chat:
   auto_reply: true
 
+# === AI AUTOMATION LABELS ===
+# Auto-label PRs based on review findings to trigger GitHub Actions workflows
+auto_labeling:
+  # Auto-fix candidates (safe, mechanical fixes)
+  - condition: "review.issues.severity in ['info', 'style'] and review.issues.count < 10"
+    labels: ["ai:auto-fix"]
+    comment: "🤖 This PR has minor review findings that can be auto-fixed. Adding `ai:auto-fix` label to trigger automatic fixes."
+
+  # Needs manual review (complex issues)
+  - condition: "review.issues.severity in ['warning', 'error']"
+    labels: ["ai:needs-review"]
+    comment: "⚠️ This PR has important review findings that need human attention."
+
+  # Protected paths - no auto-fix (migrations, auth, payments)
+  - condition: "files.any(f => f.path.startsWith('drizzle/migrations/') || f.path.includes('auth') || f.path.includes('payment') || f.path.includes('billing'))"
+    labels: ["ai:opt-out"]
+    comment: "🔒 This PR modifies protected paths (migrations/auth/payments). AI automation disabled for safety."
+
+  # Clean PRs eligible for auto-merge
+  - condition: "pull_request.user.login in ['dependabot[bot]', 'github-actions[bot]'] || (review.issues.count == 0 && !files.any(f => f.path.startsWith('drizzle/migrations/')))"
+    labels: ["automerge"]
+    comment: "✅ PR eligible for auto-merge. Will merge once all checks pass."
+
+# Label-specific instructions for AI agents
+label_instructions:
+  "ai:auto-fix":
+    instructions: |
+      Focus on safe, mechanical fixes ONLY. These changes should be zero-risk:
+
+      **ALLOWED AUTO-FIXES:**
+      - Code formatting (Biome/Prettier)
+      - Linting issues (ESLint rules)
+      - Simple type errors (TypeScript)
+      - Import organization and unused imports
+      - Unused variable removal
+      - Missing return types
+      - Consistent quote styles
+
+      **NEVER AUTO-FIX:**
+      - Logic errors or algorithmic changes
+      - Security issues (flag for human review)
+      - Database migrations
+      - Authentication/authorization code
+      - Payment processing code
+      - API contracts (breaking changes)
+      - Performance optimizations requiring testing
+
+      **VERIFICATION REQUIRED:**
+      - Run full typecheck after fixes
+      - Run linting after fixes
+      - Run affected unit tests
+      - Verify no new CodeRabbit issues introduced
+
+  "ai:needs-review":
+    instructions: |
+      Provide detailed review focusing on correctness and safety:
+
+      **REVIEW CHECKLIST:**
+      - Logic correctness and edge cases
+      - Security vulnerabilities (OWASP Top 10)
+      - Performance implications (N+1 queries, memory leaks)
+      - Error handling completeness
+      - Test coverage gaps
+      - Breaking changes and migration paths
+      - Accessibility compliance (WCAG)
+
+      **HIGHLIGHT:**
+      - Any suspicious patterns
+      - Missing validation
+      - Potential race conditions
+      - Unclear naming or documentation needs
+
+  "ai:opt-out":
+    instructions: |
+      This PR touches protected code paths that require expert human review.
+
+      **NO AUTOMATION ALLOWED:**
+      - Do not attempt auto-fixes
+      - Do not auto-merge
+      - Escalate complex issues to senior developers
+
+      **EXTRA SCRUTINY:**
+      - Database migrations must follow strict patterns
+      - Auth changes must maintain security guarantees
+      - Payment code must preserve idempotency
+      - All changes must have explicit human approval
+
 # On-demand unit test generation
 # Usage: Comment "@coderabbitai generate unit tests" on any PR
 code_generation:
