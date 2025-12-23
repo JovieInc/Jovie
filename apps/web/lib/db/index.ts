@@ -246,21 +246,18 @@ function initializeDb(): DbType {
       !global.dbCleanupRegistered
     ) {
       global.dbCleanupRegistered = true;
-      const cleanup = () => {
+      const cleanup = (reason: 'beforeExit' | 'SIGINT' | 'SIGTERM') => {
         if (_pool) {
           _pool.end().catch(error => {
-            console.error(
-              '[db] Failed to close connection pool during cleanup:',
-              error
-            );
+            logDbError('pool_cleanup_failed', error, { reason });
           });
           _pool = undefined;
         }
       };
 
-      process.once('beforeExit', cleanup);
+      process.once('beforeExit', () => cleanup('beforeExit'));
       process.once('SIGINT', () => {
-        cleanup();
+        cleanup('SIGINT');
         // Safe exit for Node environment, cast to avoid Edge build static analysis error
         if (typeof process !== 'undefined' && 'exit' in process) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -268,7 +265,7 @@ function initializeDb(): DbType {
         }
       });
       process.once('SIGTERM', () => {
-        cleanup();
+        cleanup('SIGTERM');
         // Safe exit for Node environment, cast to avoid Edge build static analysis error
         if (typeof process !== 'undefined' && 'exit' in process) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any

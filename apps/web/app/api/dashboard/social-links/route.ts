@@ -10,6 +10,7 @@ import {
   socialLinks,
   users,
 } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import {
@@ -663,11 +664,15 @@ export async function PUT(req: Request) {
         await Promise.all(jobs);
       })();
 
-      // Wait for background tasks but don't let failures affect the response
-      Promise.all([enrichmentPromise, ingestionPromise]).catch(error => {
-        console.error('[social-links] Background task failed:', error);
-        // Note: Error is logged but doesn't affect the response
-      });
+      // Wait for background tasks but don't let failures affect the response.
+      // Failures are logged for follow-up but shouldn't block the user.
+      Promise.all([enrichmentPromise, ingestionPromise]).catch(error =>
+        captureError('Social links enrichment or ingestion failed', error, {
+          route: '/api/dashboard/social-links',
+          profileId,
+          action: 'background_processing',
+        })
+      );
 
       return NextResponse.json(successResponse, {
         status: 200,
