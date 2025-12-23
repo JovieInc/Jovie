@@ -70,7 +70,12 @@ export function AnimatedListenInterface({
       }
       try {
         localStorage.setItem(LISTEN_COOKIE, dsp.key);
-      } catch {}
+      } catch (error) {
+        console.error(
+          '[AnimatedListenInterface] Failed to set localStorage:',
+          error
+        );
+      }
 
       // Track click
       try {
@@ -80,7 +85,12 @@ export function AnimatedListenInterface({
           body: JSON.stringify({ handle, linkType: 'listen', target: dsp.key }),
           keepalive: true,
         }).catch(() => {});
-      } catch {}
+      } catch (error) {
+        console.error(
+          '[AnimatedListenInterface] Failed to track click:',
+          error
+        );
+      }
 
       // Try deep linking
       const deepLinkConfig = getDSPDeepLinkConfig(dsp.key);

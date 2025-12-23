@@ -248,7 +248,12 @@ function initializeDb(): DbType {
       global.dbCleanupRegistered = true;
       const cleanup = () => {
         if (_pool) {
-          _pool.end().catch(() => {});
+          _pool.end().catch(error => {
+            console.error(
+              '[db] Failed to close connection pool during cleanup:',
+              error
+            );
+          });
           _pool = undefined;
         }
       };

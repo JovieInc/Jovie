@@ -17,6 +17,14 @@ export default defineConfig({
     // Optimized environment settings
     environment: 'jsdom',
 
+    // Environment variables for tests
+    env: {
+      // Set a test encryption key to enable proper encryption tests
+      URL_ENCRYPTION_KEY: 'test-encryption-key-32-chars!!',
+      // Ensure tests run in test mode
+      NODE_ENV: 'test',
+    },
+
     // Exclude slow test categories
     exclude: [
       'tests/e2e/**',
