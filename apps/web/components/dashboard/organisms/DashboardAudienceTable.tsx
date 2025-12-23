@@ -9,9 +9,11 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { Bell, Users } from 'lucide-react';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
+import { TableEmptyState } from '@/components/admin/table/atoms/TableEmptyState';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { Icon } from '@/components/atoms/Icon';
@@ -285,9 +287,23 @@ export function DashboardAudienceTable({
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
           <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
             {rows.length === 0 ? (
-              <div className='px-4 py-10 text-sm text-secondary-token sm:px-6'>
-                {paginationLabel()}
-              </div>
+              <TableEmptyState
+                icon={
+                  mode === 'members' ? (
+                    <Users className='h-6 w-6' />
+                  ) : (
+                    <Bell className='h-6 w-6' />
+                  )
+                }
+                title={
+                  mode === 'members' ? 'No audience yet' : 'No signups yet'
+                }
+                description={
+                  mode === 'members'
+                    ? 'Share your profile to invite visitors. They will appear here once they visit.'
+                    : 'Invite fans to tap the bell on your profile to receive notifications.'
+                }
+              />
             ) : (
               <table
                 className='w-full min-w-[960px] border-separate border-spacing-0 text-[13px]'
