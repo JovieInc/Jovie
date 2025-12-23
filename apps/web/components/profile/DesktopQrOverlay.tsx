@@ -135,7 +135,9 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
     setMode('open');
     try {
       setUrl(`${window.location.origin}/${handle}`);
-    } catch {}
+    } catch (error) {
+      console.error('[DesktopQrOverlay] Failed to set URL:', error);
+    }
   };
 
   if (mode === 'hidden') return null;

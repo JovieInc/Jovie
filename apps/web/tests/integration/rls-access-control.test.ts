@@ -1,9 +1,13 @@
 import { sql as drizzleSql } from 'drizzle-orm';
+import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { beforeAll, describe, expect, it } from 'vitest';
+import * as schema from '@/lib/db/schema';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 
 // Use the global test database connection provisioned in tests/setup.ts
-const db = (globalThis as typeof globalThis & { db?: any }).db;
+const db = (
+  globalThis as typeof globalThis & { db?: NeonDatabase<typeof schema> }
+).db;
 
 if (!db) {
   describe.skip('RLS access control (database)', () => {
@@ -86,7 +90,7 @@ if (!db) {
     });
 
     it("prevents a user from reading another user's private profile", async () => {
-      const rows = await db.transaction(async (tx: any) => {
+      const rows = await db.transaction(async tx => {
         await tx.execute(
           drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
         );
@@ -104,7 +108,7 @@ if (!db) {
     });
 
     it('allows the owner to read their own private profile', async () => {
-      const rows = await db.transaction(async (tx: any) => {
+      const rows = await db.transaction(async tx => {
         await tx.execute(
           drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userBClerkId}'`)
         );
@@ -120,7 +124,7 @@ if (!db) {
     });
 
     it("prevents a user from updating another user's profile", async () => {
-      const updated = await db.transaction(async (tx: any) => {
+      const updated = await db.transaction(async tx => {
         await tx.execute(
           drizzleSql.raw(`SET LOCAL app.clerk_user_id = '${userAClerkId}'`)
         );
@@ -137,23 +141,21 @@ if (!db) {
     });
 
     it('allows anonymous reads of public profiles only', async () => {
-      const [publicRows, privateRows] = await db.transaction(
-        async (tx: any) => {
-          const pub = await tx.execute(
-            drizzleSql.raw(
-              `SELECT id FROM creator_profiles WHERE id = '${publicProfileId}'`
-            )
-          );
+      const [publicRows, privateRows] = await db.transaction(async tx => {
+        const pub = await tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM creator_profiles WHERE id = '${publicProfileId}'`
+          )
+        );
 
-          const priv = await tx.execute(
-            drizzleSql.raw(
-              `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
-            )
-          );
+        const priv = await tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM creator_profiles WHERE id = '${privateProfileId}'`
+          )
+        );
 
-          return [pub, priv] as const;
-        }
-      );
+        return [pub, priv] as const;
+      });
 
       expect(publicRows.rows.length).toBe(1);
       expect(publicRows.rows[0]?.id).toBe(publicProfileId);
@@ -163,24 +165,22 @@ if (!db) {
     });
 
     it('allows anonymous reads of public profile photos only', async () => {
-      const [publicRows, privateRows] = await db.transaction(
-        async (tx: any) => {
-          // Anonymous: app.user_id stays null
-          const pub = await tx.execute(
-            drizzleSql.raw(
-              `SELECT id FROM profile_photos WHERE id = '${publicPhotoId}'`
-            )
-          );
+      const [publicRows, privateRows] = await db.transaction(async tx => {
+        // Anonymous: app.user_id stays null
+        const pub = await tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM profile_photos WHERE id = '${publicPhotoId}'`
+          )
+        );
 
-          const priv = await tx.execute(
-            drizzleSql.raw(
-              `SELECT id FROM profile_photos WHERE id = '${privatePhotoId}'`
-            )
-          );
+        const priv = await tx.execute(
+          drizzleSql.raw(
+            `SELECT id FROM profile_photos WHERE id = '${privatePhotoId}'`
+          )
+        );
 
-          return [pub, priv] as const;
-        }
-      );
+        return [pub, priv] as const;
+      });
 
       expect(publicRows.rows.length).toBe(1);
       expect(publicRows.rows[0]?.id).toBe(publicPhotoId);

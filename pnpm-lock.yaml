@@ -51,7 +51,7 @@ importers:
     dependencies:
       '@vercel/analytics':
         specifier: ^1.5.0
-        version: 1.6.1(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+        version: 1.6.1(next@16.1.1(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       next:
         specifier: ^16.1.1
         version: 16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -90,8 +90,8 @@ importers:
         specifier: 0.24.0
         version: 0.24.0(@types/react-dom@18.3.7(@types/react@18.3.27))(@types/react@18.3.27)(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@clerk/nextjs':
-        specifier: ^6.36.5
-        version: 6.36.5(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+        specifier: 7.0.0-snapshot.v20251218183643
+        version: 7.0.0-snapshot.v20251218183643(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@dnd-kit/core':
         specifier: ^6.3.1
         version: 6.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -199,7 +199,7 @@ importers:
         version: 1.35.8
       '@vercel/analytics':
         specifier: ^1.5.0
-        version: 1.6.1(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+        version: 1.6.1(next@16.1.1(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       '@vercel/blob':
         specifier: ^1.1.1
         version: 1.1.1
@@ -910,9 +910,9 @@ packages:
     resolution: {integrity: sha512-L5JeWWuMAxBfxip6RKglBhKVywykJwMaSo2NkW8pfjM9INQ/JtpXTlVl5SKSv5v43vSkKxYeqKXkXyNgtxRPaQ==}
     engines: {node: '>=18.17.0'}
 
-  '@clerk/backend@2.29.0':
-    resolution: {integrity: sha512-cw4CK6ZHgeFROirlIOawelqRBxZAyH6v3GPSYZEEzYAL0WWUHx7cMXzoQcTMruH7w6UM7s3Ox+uUcINESWkQPA==}
-    engines: {node: '>=18.17.0'}
+  '@clerk/backend@3.0.0-snapshot.v20251218183643':
+    resolution: {integrity: sha512-LY2fYIHv3BrLXqwh2OMfrVjpt0CZsPUlSCGwyvpEO2DdNEvo8ClZOgcqBr6R324JaBm1GrVMzazSPBp2BUCIKw==}
+    engines: {node: '>=20.9.0'}
 
   '@clerk/clerk-js@5.117.0':
     resolution: {integrity: sha512-tN6bOsutb8KzpuB8SdZUwpYPfNKvQWGUyYiUltyhWRDNZ29on1Xl3d1EoAJXvKKytFJQ8rVrVtm53W1Yuupuwg==}
@@ -927,13 +927,6 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ^19.0.0 || ^19.0.0-0
       react-dom: ^18.0.0 || ^19.0.0 || ^19.0.0-0
-
-  '@clerk/clerk-react@5.59.2':
-    resolution: {integrity: sha512-vFZ4LWPenbNnui4GqGGkicH/3SL7KhS9egTMv/m0Dj/sS7mUgmLqAFpqWkhbzN8s8/rybuvJsMyIU7M0kx8+Cw==}
-    engines: {node: '>=18.17.0'}
-    peerDependencies:
-      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
 
   '@clerk/dev-cli@0.0.12':
     resolution: {integrity: sha512-BtBuvwYPzIX15aN3FBhDLOSpMzgaZy9PbGtFwbSG+MX7HBNHpy8ncVQ2F52hQ33FGRb73yE33mthE/fDI7IcNQ==}
@@ -955,13 +948,20 @@ packages:
     resolution: {integrity: sha512-D562+BWOy3s/a3XzzZ0SE4iVpqJJ0/xCrPq+okF/u6FSUX9NM6ehvMTLIc0axlLI0wubzyiK8cx7Fpffc3Isxw==}
     engines: {node: '>=18.17.0'}
 
-  '@clerk/nextjs@6.36.5':
-    resolution: {integrity: sha512-qHNNbxhAZMHanv47DKc08Xc+y0gbsoQBFVYA+WRzwii5OWOoWmLlydTGKaqukqNw9km9IN9b2KWSAvs1oklp2g==}
-    engines: {node: '>=18.17.0'}
+  '@clerk/nextjs@7.0.0-snapshot.v20251218183643':
+    resolution: {integrity: sha512-AYhBDpXtvqwzTgdH+gx8oc4AC5UbcBW+lHNSeobfyaxaGD5X4EzVOOc3B0QYfpFVcspkXjtM8xX91dzQx6pbAw==}
+    engines: {node: '>=20.9.0'}
     peerDependencies:
-      next: ^13.5.7 || ^14.2.25 || ^15.2.3 || ^16
-      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
-      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+      next: ^15.2.8 || ^15.3.8 || ^15.4.10 || ^15.5.9 || ^15.6.0-0 || ^16.0.10 || ^16.1.0-0
+      react: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
+      react-dom: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
+
+  '@clerk/react@6.0.0-snapshot.v20251218183643':
+    resolution: {integrity: sha512-l2l9tqPaJS/vSo0/Cco16nlnvP5XXZ2kdZVB4VAMbLqFiAO6b2eERT/mejkzB4zSm0+VuFGlmdGmcgAzIDAdXw==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
+      react-dom: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
 
   '@clerk/shared@3.40.0':
     resolution: {integrity: sha512-gj06vVj5xIYjArpidyt+ej45svGpsnK+ogwdgYL1+3KdeM5RS31VohIWL0f07v6f2onqwMjvwkdOyPj1D3vO7w==}
@@ -981,6 +981,18 @@ packages:
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
       react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
+  '@clerk/shared@4.0.0-snapshot.v20251218183643':
+    resolution: {integrity: sha512-pPYdiez5Ky7xRz2XUugZgPMIIEGg7E0k2bOemmkzXxkLGk40tw+ALG7ogIVZKbFPQ1gpaIvJQHYnU1r6EjxEDg==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      react: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
+      react-dom: ^18.0.0 || ^19.0.3 || ^19.1.4 || ^19.2.3 || ^19.3.0-0
     peerDependenciesMeta:
       react:
         optional: true
@@ -10818,10 +10830,9 @@ snapshots:
       - react
       - react-dom
 
-  '@clerk/backend@2.29.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@clerk/backend@3.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@clerk/shared': 3.41.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@clerk/types': 4.101.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@clerk/shared': 4.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       cookie: 1.1.1
       standardwebhooks: 1.0.0
       tslib: 2.8.1
@@ -10881,13 +10892,6 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
       tslib: 2.8.1
 
-  '@clerk/clerk-react@5.59.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@clerk/shared': 3.41.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
-      tslib: 2.8.1
-
   '@clerk/dev-cli@0.0.12':
     dependencies:
       commander: 12.1.0
@@ -10927,16 +10931,22 @@ snapshots:
       - react
       - react-dom
 
-  '@clerk/nextjs@6.36.5(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+  '@clerk/nextjs@7.0.0-snapshot.v20251218183643(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
-      '@clerk/backend': 2.29.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@clerk/clerk-react': 5.59.2(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@clerk/shared': 3.41.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      '@clerk/types': 4.101.9(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@clerk/backend': 3.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@clerk/react': 6.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      '@clerk/shared': 4.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       next: 16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
       server-only: 0.0.1
+      tslib: 2.8.1
+
+  '@clerk/react@6.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@clerk/shared': 4.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
       tslib: 2.8.1
 
   '@clerk/shared@3.40.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
@@ -10954,6 +10964,17 @@ snapshots:
   '@clerk/shared@3.41.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       csstype: 3.1.3
+      dequal: 2.0.3
+      glob-to-regexp: 0.4.1
+      js-cookie: 3.0.5
+      std-env: 3.10.0
+      swr: 2.3.4(react@18.3.1)
+    optionalDependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@clerk/shared@4.0.0-snapshot.v20251218183643(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
       dequal: 2.0.3
       glob-to-regexp: 0.4.1
       js-cookie: 3.0.5
@@ -14736,7 +14757,7 @@ snapshots:
     dependencies:
       uncrypto: 0.1.3
 
-  '@vercel/analytics@1.6.1(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)':
+  '@vercel/analytics@1.6.1(next@16.1.1(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)':
     optionalDependencies:
       next: 16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1
@@ -14770,7 +14791,7 @@ snapshots:
       nanoid: 3.3.11
       path-to-regexp: 8.3.0
     optionalDependencies:
-      '@vercel/analytics': 1.6.1(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
+      '@vercel/analytics': 1.6.1(next@16.1.1(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       '@vercel/speed-insights': 1.3.1(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)
       next: 16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       react: 18.3.1

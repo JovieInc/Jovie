@@ -16,14 +16,18 @@ export function CompletionBanner(): JSX.Element | null {
       if (stored === '1') {
         setDismissed(true);
       }
-    } catch {}
+    } catch (error) {
+      console.error('[CompletionBanner] Failed to read localStorage:', error);
+    }
   }, []);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
     try {
       localStorage.setItem(COMPLETION_BANNER_STORAGE_KEY, '1');
-    } catch {}
+    } catch (error) {
+      console.error('[CompletionBanner] Failed to set localStorage:', error);
+    }
   }, []);
 
   if (dismissed) {

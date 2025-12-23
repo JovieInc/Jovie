@@ -140,6 +140,21 @@ export async function getCreatorProfileWithLinks(username: string) {
     contactsPromise,
   ]);
 
+  // Log if query limits are hit (possible data truncation)
+  if (profileSocialLinks.length === MAX_SOCIAL_LINKS) {
+    console.warn(
+      '[db-queries] MAX_SOCIAL_LINKS limit hit - possible data truncation',
+      { profileId: profile.id, count: profileSocialLinks.length }
+    );
+  }
+
+  if (profileContacts.length === MAX_CONTACTS) {
+    console.warn(
+      '[db-queries] MAX_CONTACTS limit hit - possible data truncation',
+      { profileId: profile.id, count: profileContacts.length }
+    );
+  }
+
   return {
     ...profile,
     socialLinks: profileSocialLinks,

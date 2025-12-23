@@ -1,4 +1,5 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
+import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import path from 'path';
@@ -10,9 +11,7 @@ import * as schema from '@/lib/db/schema';
 neonConfig.webSocketConstructor = ws;
 
 let dbSetupComplete = false;
-// biome-ignore lint/suspicious/noExplicitAny: Database type from Drizzle is complex and varies
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let db: any = null;
+let db: NeonDatabase<typeof schema> | null = null;
 
 /**
  * Setup database for integration tests.
