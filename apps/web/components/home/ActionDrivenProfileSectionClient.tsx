@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { useId, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Container } from '@/components/site/Container';
 
 type PillarId = 'streams' | 'merch' | 'tickets';
@@ -37,6 +38,7 @@ export function ActionDrivenProfileSectionClient({
   profileArtist,
 }: ActionDrivenProfileSectionClientProps) {
   const tabsBaseId = useId();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [activePillarId, setActivePillarId] = useState<PillarId>(
     pillars[0]?.id ?? 'streams'
   );
@@ -59,6 +61,50 @@ export function ActionDrivenProfileSectionClient({
 
   const getPanelId = (pillarId: PillarId): string =>
     `${tabsBaseId}-panel-${pillarId}`;
+
+  const focusTabByIndex = (targetIndex: number) => {
+    if (!pillars.length) {
+      return;
+    }
+
+    const normalizedIndex = (targetIndex + pillars.length) % pillars.length;
+    const targetPillar = pillars[normalizedIndex];
+
+    if (!targetPillar) {
+      return;
+    }
+
+    setActivePillarId(targetPillar.id);
+    tabRefs.current[normalizedIndex]?.focus();
+  };
+
+  const handleTabKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    currentIndex: number
+  ) => {
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        event.preventDefault();
+        focusTabByIndex(currentIndex + 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        event.preventDefault();
+        focusTabByIndex(currentIndex - 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        focusTabByIndex(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        focusTabByIndex(pillars.length - 1);
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <section className='relative py-16 sm:py-20 bg-base overflow-hidden'>
@@ -99,7 +145,7 @@ export function ActionDrivenProfileSectionClient({
                       transform: `translateX(${activePillarIndex * 100}%)`,
                     }}
                   />
-                  {pillars.map(pillar => {
+                  {pillars.map((pillar, index) => {
                     const isActive = pillar.id === activePillarId;
                     const tabId = getTabId(pillar.id);
                     const panelId = getPanelId(pillar.id);
@@ -112,12 +158,17 @@ export function ActionDrivenProfileSectionClient({
                         id={tabId}
                         aria-selected={isActive}
                         aria-controls={panelId}
+                        tabIndex={isActive ? 0 : -1}
                         className={`relative z-10 inline-flex items-center justify-center rounded-lg px-4 py-2 text-xs font-medium transition-colors duration-200 focus-ring-themed motion-reduce:transition-none ${
                           isActive
                             ? 'text-primary-token'
                             : 'text-secondary-token hover:text-primary-token'
                         }`}
+                        ref={node => {
+                          tabRefs.current[index] = node;
+                        }}
                         onClick={() => setActivePillarId(pillar.id)}
+                        onKeyDown={event => handleTabKeyDown(event, index)}
                       >
                         {pillar.tabLabel}
                       </button>
