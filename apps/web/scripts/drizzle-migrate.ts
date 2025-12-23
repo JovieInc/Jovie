@@ -76,11 +76,9 @@ function getEnvironment(): 'main' | 'production' | 'development' {
   const gitBranch = getCurrentBranch();
   const branch = envBranch || gitBranch;
 
-  if (branch === 'production') {
+  // Treat both 'main' and 'production' as production in trunk-based development
+  if (branch === 'main' || branch === 'production') {
     return 'production';
-  }
-  if (branch === 'main') {
-    return 'main';
   }
   return 'development';
 }

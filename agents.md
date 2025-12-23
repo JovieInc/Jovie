@@ -116,11 +116,11 @@ Configuration location: `.claude.json` (project-specific)
 
   - **Base:** always branch from `main`.
   - **Naming:** `feat/<slug>`, `fix/<slug>`, `chore/<slug>` (3–6 word kebab-case slug).
-  - **Never** push directly to `main` or `production`.
+  - **Never** push directly to `main`.
 
-- **Long-lived branches**
+- **Long-lived branch**
 
-  - **`main`**
+  - **`main`** (trunk-based development)
     - Source of truth for all day-to-day development.
     - Must always be **green** on: `pnpm typecheck`, `pnpm lint`, `pnpm test`, basic E2E smoke.
     - Deploys to [main.jov.ie](https://main.jov.ie) (Main Staging Vercel environment) automatically on push.
@@ -191,13 +191,12 @@ Configuration location: `.claude.json` (project-specific)
     - No blocking labels: `blocked`, `human-review`, `no-auto-merge`, `claude:needs-fixes`, `needs-human`.
   - **Dependabot:** auto-merge for patch/minor + security, subject to policy checks.
   - **Codegen/automation PRs:** auto-merge when labeled appropriately (e.g. `codegen`).
-  - **Production promotion PRs:** **never** auto-merged; must be manually approved.
 
 ## 5. Neon & Migrations
 
 - **Do not** run Drizzle migrations manually in ad-hoc ways.
 - **Do not** make direct DDL changes to the database - use Drizzle migrations only.
-- **Long-lived branches:** Only `main` and `production` (no preview branch).
+- **Long-lived branch:** Only `main` (trunk-based development).
 
 ### Database-Level Migration Protection
 
@@ -589,7 +588,7 @@ Before merging any migration:
 
 - **Auto-run:** Migrations run automatically on Vercel deploy via `drizzle:migrate` script
 - **Ephemeral Neon branches:** Auto-created per PR with unique name, auto-deleted on PR close
-- **Long-lived branches:** Only `main` and `production` (NO preview branch)
+- **Long-lived branch:** Only `main` (trunk-based development)
 - **Migration strategy:** Linear append-only (no squashing, no editing existing migrations)
 - **Testing:** Each PR gets isolated ephemeral database for safe schema testing
 

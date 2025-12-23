@@ -86,16 +86,8 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const pr = JSON.parse('${{ steps.get_pr.outputs.result }}');
-            const base = pr.base_ref;
-            let re;
-            if (base === 'production') {
-              // Full checks on production PRs
-              re = '^(Build|Unit Tests|E2E Tests|Drizzle Check)$';
-            } else {
-              // Fast checks on main PRs
-              re = '^(ci-fast)$';
-            }
+            // Fast checks for all PRs to main (no production branch in trunk-based development)
+            const re = '^(ci-fast)$';
             core.setOutput('check_re', re);
 
       - name: Set promotion flag
