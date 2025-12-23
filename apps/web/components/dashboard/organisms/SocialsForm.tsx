@@ -1,5 +1,6 @@
 'use client';
 
+import { ShareIcon } from '@heroicons/react/24/outline';
 import {
   Button,
   Select,
@@ -11,7 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { track } from '@/lib/analytics';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';
@@ -177,13 +178,14 @@ export function SocialsForm({ artist }: SocialsFormProps) {
 
       {socialLinks.length === 0 ? (
         <EmptyState
-          type='social'
-          title='📱 No social links yet'
-          description='Connect your Instagram, TikTok, Twitter, and other social platforms to build your fan community.'
-          actionLabel='Add First Social Link'
-          onAction={() =>
-            setSocialLinks([{ id: '', platform: 'instagram', url: '' }])
-          }
+          icon={<ShareIcon className='h-6 w-6' aria-hidden='true' />}
+          heading='No social links yet'
+          description='Connect Instagram, TikTok, Twitter, and other platforms to build your fan community.'
+          action={{
+            label: 'Add first link',
+            onClick: () =>
+              setSocialLinks([{ id: '', platform: 'instagram', url: '' }]),
+          }}
         />
       ) : (
         <div className='space-y-4'>

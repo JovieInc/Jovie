@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
+import { APP_URL } from '@/constants/app';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
 import {
@@ -33,6 +34,11 @@ export default async function AudiencePage({
       ? convertDrizzleCreatorProfileToArtist(dashboardData.selectedProfile)
       : null;
 
+    const profileUrl =
+      artist?.handle && artist.handle.length > 0
+        ? `${APP_URL.replace(/\/+$/, '')}/${artist.handle.replace(/^\/+/, '')}`
+        : undefined;
+
     const audienceData = await getAudienceServerData({
       userId,
       selectedProfileId: artist?.id ?? null,
@@ -48,6 +54,7 @@ export default async function AudiencePage({
         pageSize={audienceData.pageSize}
         sort={audienceData.sort}
         direction={audienceData.direction}
+        profileUrl={profileUrl}
       />
     );
   } catch (error) {
