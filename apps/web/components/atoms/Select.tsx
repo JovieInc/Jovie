@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface SelectOption {
@@ -24,13 +24,27 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       error,
       required = false,
       className,
-      ...props
+      id,
+      ...rest
     },
     ref
   ) => {
+    const {
+      'aria-describedby': ariaDescribedByProp,
+      'aria-invalid': ariaInvalidProp,
+      ...selectProps
+    } = rest;
+
+    const selectId = id ?? useId();
+    const errorId = error ? `${selectId}-error` : undefined;
+    const ariaDescribedBy =
+      [ariaDescribedByProp, errorId].filter(Boolean).join(' ') || undefined;
+    const ariaInvalid = error ? 'true' : ariaInvalidProp;
+
     const selectElement = (
       <select
         ref={ref}
+        id={selectId}
         className={cn(
           'block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
           'focus-visible:border-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-500',
@@ -40,7 +54,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             'border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500',
           className
         )}
-        {...props}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        required={required}
+        {...selectProps}
       >
         <option value=''>{placeholder}</option>
         {options.map(option => (
@@ -59,14 +76,31 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       return (
         <div className='space-y-2'>
           {label && (
-            <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
+            <label
+              htmlFor={selectId}
+              className='text-sm font-medium text-gray-700 dark:text-gray-300'
+            >
               {label}
-              {required && <span className='text-red-500 ml-1'>*</span>}
+              {required && (
+                <>
+                  <span aria-hidden='true' className='text-red-500 ml-1'>
+                    *
+                  </span>
+                  <span className='sr-only'> (required)</span>
+                </>
+              )}
             </label>
           )}
           {selectElement}
           {error && (
-            <p className='text-sm text-red-600 dark:text-red-400'>{error}</p>
+            <p
+              id={errorId}
+              role='alert'
+              aria-live='polite'
+              className='text-sm text-red-600 dark:text-red-400'
+            >
+              {error}
+            </p>
           )}
         </div>
       );
