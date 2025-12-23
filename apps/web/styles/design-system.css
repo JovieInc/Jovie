@@ -1,0 +1,437 @@
+/**
+ * Jovie Design System - Linear-inspired OKLCH Theme Generation
+ *
+ * Core Principles (from Linear's redesign):
+ * 1. OKLCH color space for perceptual uniformity
+ * 2. Only 3 theme inputs generate ALL colors
+ * 3. Light/dark modes use identical generation logic
+ * 4. Contrast is a continuous variable (0-100)
+ *
+ * @see https://linear.app/now/how-we-redesigned-the-linear-ui
+ */
+
+/* ============================================
+   THEME INPUTS - The only 3 variables needed
+   ============================================ */
+:root {
+  /* Core Theme Inputs */
+  --theme-base-hue: 240;        /* Neutral foundation hue (blue-gray) */
+  --theme-base-chroma: 0.015;   /* Very low chroma for neutrals */
+  --theme-accent-hue: 271;      /* Brand accent hue (purple) */
+  --theme-accent-chroma: 0.18;  /* Vibrant accent saturation */
+  --theme-contrast: 65;         /* Contrast level (0-100) */
+
+  /* Derived base lightness for light mode */
+  --theme-base-l: 99%;          /* Near white for light mode */
+}
+
+:root.dark {
+  /* Dark mode only changes base lightness */
+  --theme-base-l: 12%;          /* Deep dark for dark mode */
+}
+
+/* ============================================
+   SURFACE SYSTEM - Layered elevation
+   ============================================
+
+   Linear uses 5 surface levels for depth:
+   - base: App background
+   - surface-0: Elevated (sidebars)
+   - surface-1: Cards/panels
+   - surface-2: Interactive/hover
+   - surface-3: Pressed/active
+*/
+
+:root {
+  /* Light mode surfaces - progressively darker */
+  --color-bg-base: oklch(99% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-0: oklch(97.5% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-1: oklch(96% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-2: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-3: oklch(90% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Text hierarchy - contrast-aware */
+  --color-text-primary-token: oklch(10% 0 0);
+  --color-text-secondary-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-tertiary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-quaternary-token: oklch(60% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-disabled-token: oklch(70% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Border system - semi-transparent for flexibility */
+  --color-border-subtle: oklch(0% 0 0 / 6%);
+  --color-border-default: oklch(0% 0 0 / 10%);
+  --color-border-strong: oklch(0% 0 0 / 18%);
+
+  /* Accent colors - derived from theme inputs */
+  --color-accent: oklch(55% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-hover: oklch(50% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-active: oklch(45% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-subtle: oklch(95% calc(var(--theme-accent-chroma) * 0.5) var(--theme-accent-hue));
+  --color-accent-foreground: oklch(100% 0 0);
+
+  /* Primary button - high contrast */
+  --color-btn-primary-bg: oklch(10% 0 0);
+  --color-btn-primary-fg: oklch(100% 0 0);
+  --color-btn-primary-hover: oklch(20% 0 0);
+
+  /* Secondary button */
+  --color-btn-secondary-bg: oklch(93% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-fg: oklch(20% 0 0);
+  --color-btn-secondary-hover: oklch(88% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Interactive states */
+  --color-interactive-hover: oklch(0% 0 0 / 4%);
+  --color-interactive-active: oklch(0% 0 0 / 8%);
+
+  /* Shadows - subtle in light mode */
+  --shadow-color: 240 10% 3.9%;
+  --shadow-sm:
+    0 1px 2px oklch(0% 0 0 / 3%),
+    0 1px 3px oklch(0% 0 0 / 6%);
+  --shadow-md:
+    0 4px 6px oklch(0% 0 0 / 4%),
+    0 2px 4px oklch(0% 0 0 / 6%);
+  --shadow-lg:
+    0 10px 20px oklch(0% 0 0 / 5%),
+    0 6px 6px oklch(0% 0 0 / 6%);
+  --shadow-xl:
+    0 20px 40px oklch(0% 0 0 / 8%),
+    0 12px 12px oklch(0% 0 0 / 6%);
+
+  /* Skeleton/loading states */
+  --color-skeleton-base: oklch(95% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-shimmer: oklch(100% 0 0);
+
+  /* Focus ring */
+  --color-focus-ring: var(--color-accent);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}
+
+/* Dark mode - same generation logic, inverted lightness */
+:root.dark {
+  /* Dark mode surfaces - progressively lighter */
+  --color-bg-base: oklch(12% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-0: oklch(14% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-1: oklch(16% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-2: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-bg-surface-3: oklch(22% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Text hierarchy - inverted for dark mode */
+  --color-text-primary-token: oklch(96% 0 0);
+  --color-text-secondary-token: oklch(75% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-tertiary-token: oklch(62% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-quaternary-token: oklch(50% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-text-disabled-token: oklch(40% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Border system - white-based for dark mode */
+  --color-border-subtle: oklch(100% 0 0 / 6%);
+  --color-border-default: oklch(100% 0 0 / 10%);
+  --color-border-strong: oklch(100% 0 0 / 18%);
+
+  /* Accent - slightly brighter in dark mode */
+  --color-accent: oklch(65% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-hover: oklch(70% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-active: oklch(60% var(--theme-accent-chroma) var(--theme-accent-hue));
+  --color-accent-subtle: oklch(20% calc(var(--theme-accent-chroma) * 0.6) var(--theme-accent-hue));
+
+  /* Primary button - inverted for dark mode */
+  --color-btn-primary-bg: oklch(100% 0 0);
+  --color-btn-primary-fg: oklch(10% 0 0);
+  --color-btn-primary-hover: oklch(92% 0 0);
+
+  /* Secondary button */
+  --color-btn-secondary-bg: oklch(19% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-btn-secondary-fg: oklch(90% 0 0);
+  --color-btn-secondary-hover: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+
+  /* Interactive states - white-based */
+  --color-interactive-hover: oklch(100% 0 0 / 5%);
+  --color-interactive-active: oklch(100% 0 0 / 10%);
+
+  /* Shadows - deeper in dark mode */
+  --shadow-sm:
+    0 1px 2px oklch(0% 0 0 / 20%),
+    0 1px 3px oklch(0% 0 0 / 25%);
+  --shadow-md:
+    0 4px 8px oklch(0% 0 0 / 30%),
+    0 2px 4px oklch(0% 0 0 / 25%);
+  --shadow-lg:
+    0 12px 24px oklch(0% 0 0 / 40%),
+    0 6px 8px oklch(0% 0 0 / 30%);
+  --shadow-xl:
+    0 24px 48px oklch(0% 0 0 / 50%),
+    0 12px 16px oklch(0% 0 0 / 35%);
+
+  /* Skeleton/loading states */
+  --color-skeleton-base: oklch(18% var(--theme-base-chroma) var(--theme-base-hue));
+  --color-skeleton-shimmer: oklch(24% var(--theme-base-chroma) var(--theme-base-hue));
+}
+
+/* ============================================
+   CONTRAST SCALING SYSTEM
+   ============================================
+
+   CSS custom property math for accessibility.
+   Higher contrast = more separation between levels.
+*/
+
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root {
+    --theme-contrast: 90;
+
+    /* Increase text contrast */
+    --color-text-primary-token: oklch(5% 0 0);
+    --color-text-secondary-token: oklch(25% var(--theme-base-chroma) var(--theme-base-hue));
+
+    /* Stronger borders */
+    --color-border-subtle: oklch(0% 0 0 / 15%);
+    --color-border-default: oklch(0% 0 0 / 25%);
+    --color-border-strong: oklch(0% 0 0 / 40%);
+  }
+
+  :root.dark {
+    --color-text-primary-token: oklch(100% 0 0);
+    --color-text-secondary-token: oklch(85% var(--theme-base-chroma) var(--theme-base-hue));
+
+    --color-border-subtle: oklch(100% 0 0 / 15%);
+    --color-border-default: oklch(100% 0 0 / 25%);
+    --color-border-strong: oklch(100% 0 0 / 40%);
+  }
+}
+
+/* Reduced contrast mode (for eye comfort) */
+@media (prefers-contrast: less) {
+  :root {
+    --theme-contrast: 40;
+
+    /* Softer text contrast */
+    --color-text-primary-token: oklch(20% 0 0);
+    --color-text-secondary-token: oklch(45% var(--theme-base-chroma) var(--theme-base-hue));
+  }
+
+  :root.dark {
+    --color-text-primary-token: oklch(85% 0 0);
+    --color-text-secondary-token: oklch(65% var(--theme-base-chroma) var(--theme-base-hue));
+  }
+}
+
+/* ============================================
+   SEMANTIC STATUS COLORS (OKLCH)
+   ============================================ */
+:root {
+  /* Success */
+  --color-success: oklch(65% 0.18 145);
+  --color-success-subtle: oklch(95% 0.05 145);
+  --color-success-foreground: oklch(100% 0 0);
+
+  /* Warning */
+  --color-warning: oklch(75% 0.15 80);
+  --color-warning-subtle: oklch(95% 0.05 80);
+  --color-warning-foreground: oklch(20% 0 0);
+
+  /* Error/Destructive */
+  --color-error: oklch(60% 0.2 25);
+  --color-error-subtle: oklch(95% 0.05 25);
+  --color-error-foreground: oklch(100% 0 0);
+
+  /* Info */
+  --color-info: oklch(60% 0.15 240);
+  --color-info-subtle: oklch(95% 0.05 240);
+  --color-info-foreground: oklch(100% 0 0);
+}
+
+:root.dark {
+  /* Success - brighter in dark mode */
+  --color-success: oklch(70% 0.18 145);
+  --color-success-subtle: oklch(20% 0.08 145);
+
+  /* Warning */
+  --color-warning: oklch(80% 0.15 80);
+  --color-warning-subtle: oklch(20% 0.08 80);
+
+  /* Error */
+  --color-error: oklch(70% 0.2 25);
+  --color-error-subtle: oklch(20% 0.08 25);
+
+  /* Info */
+  --color-info: oklch(70% 0.15 240);
+  --color-info-subtle: oklch(20% 0.08 240);
+}
+
+/* ============================================
+   FEATURE ACCENT COLORS (OKLCH)
+   ============================================
+
+   Perceptually uniform feature colors
+   All have ~same perceived brightness
+*/
+:root {
+  --accent-conv: oklch(55% 0.2 285);       /* Conversion - purple */
+  --accent-analytics: oklch(65% 0.15 230); /* Analytics - blue */
+  --accent-speed: oklch(65% 0.2 145);      /* Speed - green */
+  --accent-beauty: oklch(75% 0.15 70);     /* Beauty - amber */
+  --accent-seo: oklch(60% 0.2 25);         /* SEO - red */
+  --accent-links: oklch(60% 0.2 300);      /* Links - violet */
+  --accent-pro: oklch(65% 0.15 180);       /* Pro - teal */
+}
+
+/* ============================================
+   TYPOGRAPHY SYSTEM
+   ============================================ */
+:root {
+  /* Font stack */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+               'SF Pro Display', 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco,
+               Consolas, 'Liberation Mono', 'Courier New', monospace;
+
+  /* Linear-style font features */
+  --font-features: 'cv01', 'ss03', 'rlig' 1, 'calt' 1;
+  --font-optical-sizing: 28;
+
+  /* Type scale - based on 16px base */
+  --text-xs: 0.75rem;     /* 12px */
+  --text-sm: 0.875rem;    /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg: 1.125rem;    /* 18px */
+  --text-xl: 1.25rem;     /* 20px */
+  --text-2xl: 1.5rem;     /* 24px */
+  --text-3xl: 1.875rem;   /* 30px */
+  --text-4xl: 2.25rem;    /* 36px */
+  --text-5xl: 3rem;       /* 48px */
+
+  /* Line heights */
+  --leading-none: 1;
+  --leading-tight: 1.1;
+  --leading-snug: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Letter spacing */
+  --tracking-tighter: -0.0325em;  /* Headlines */
+  --tracking-tight: -0.02em;
+  --tracking-normal: -0.011em;    /* Body text */
+  --tracking-wide: 0.01em;
+}
+
+/* ============================================
+   SPACING SYSTEM (8px grid)
+   ============================================ */
+:root {
+  --space-0: 0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;  /* 2px */
+  --space-1: 0.25rem;     /* 4px */
+  --space-1-5: 0.375rem;  /* 6px */
+  --space-2: 0.5rem;      /* 8px */
+  --space-2-5: 0.625rem;  /* 10px */
+  --space-3: 0.75rem;     /* 12px */
+  --space-4: 1rem;        /* 16px */
+  --space-5: 1.25rem;     /* 20px */
+  --space-6: 1.5rem;      /* 24px */
+  --space-8: 2rem;        /* 32px */
+  --space-10: 2.5rem;     /* 40px */
+  --space-12: 3rem;       /* 48px */
+  --space-16: 4rem;       /* 64px */
+  --space-20: 5rem;       /* 80px */
+  --space-24: 6rem;       /* 96px */
+}
+
+/* ============================================
+   RADIUS SYSTEM
+   ============================================ */
+:root {
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+}
+
+/* ============================================
+   ANIMATION SYSTEM
+   ============================================ */
+:root {
+  /* Durations */
+  --duration-fast: 100ms;
+  --duration-normal: 150ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  /* Easings - Linear uses cubic-bezier for smooth feel */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 0ms;
+    --duration-normal: 0ms;
+    --duration-slow: 0ms;
+    --duration-slower: 0ms;
+  }
+}
+
+/* ============================================
+   SIDEBAR TOKENS (RGB triplets for alpha)
+   ============================================ */
+:root {
+  --sidebar-background: 255 255 255;
+  --sidebar-foreground: 12 12 12;
+  --sidebar-primary: 12 12 12;
+  --sidebar-primary-foreground: 255 255 255;
+  --sidebar-accent: 245 246 248;
+  --sidebar-accent-foreground: 12 12 12;
+  --sidebar-border: 229 231 235;
+  --sidebar-ring: 124 58 237;
+  --sidebar-muted: 107 114 128;
+  --sidebar-muted-foreground: 113 113 122;
+  --sidebar-surface: 250 251 252;
+  --sidebar-surface-hover: 245 246 248;
+  --sidebar-input-background: 255 255 255;
+  --sidebar-input-border: 229 231 235;
+}
+
+:root.dark {
+  --sidebar-background: 20 20 25;
+  --sidebar-foreground: 244 244 245;
+  --sidebar-primary: 244 244 245;
+  --sidebar-primary-foreground: 12 12 12;
+  --sidebar-accent: 24 24 31;
+  --sidebar-accent-foreground: 244 244 245;
+  --sidebar-border: 255 255 255 / 0.1;
+  --sidebar-ring: 109 119 230 / 0.55;
+  --sidebar-muted: 161 161 170;
+  --sidebar-muted-foreground: 148 150 156;
+  --sidebar-surface: 20 20 25;
+  --sidebar-surface-hover: 24 24 31;
+  --sidebar-input-background: 24 24 31;
+  --sidebar-input-border: 255 255 255 / 0.1;
+}
+
+/* ============================================
+   MENU/DROPDOWN TOKENS
+   ============================================ */
+:root {
+  --menu-background: 255 255 255;
+  --menu-foreground: 12 12 12;
+  --menu-border: 229 231 235;
+  --menu-shadow: 0 0 0 / 0.1;
+  --menu-item-hover: 245 246 248;
+  --menu-separator: 229 231 235;
+}
+
+:root.dark {
+  --menu-background: 24 24 31;
+  --menu-foreground: 244 244 245;
+  --menu-border: 255 255 255 / 0.1;
+  --menu-shadow: 0 0 0 / 0.4;
+  --menu-item-hover: 30 30 39;
+  --menu-separator: 255 255 255 / 0.08;
+}

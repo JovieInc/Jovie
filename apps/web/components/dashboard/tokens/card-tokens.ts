@@ -1,91 +1,242 @@
 /**
  * Dashboard Card System Tokens
  *
- * This file defines the standardized tokens for dashboard card components
- * across the application. These tokens ensure consistent styling for
- * surfaces, borders, radii, shadows, and padding.
+ * Linear-inspired card system using OKLCH design tokens.
+ * These tokens ensure consistent styling for surfaces, borders,
+ * radii, shadows, and padding across all dashboard components.
+ *
+ * Design principles (from Linear):
+ * 1. Surface hierarchy for depth (0-3 levels)
+ * 2. Subtle shadows that respect light/dark modes
+ * 3. Smooth micro-interactions with spring easing
+ * 4. Perceptually uniform colors via OKLCH
  */
+
+// Animation tokens - Linear-style timing
+const timing = {
+  fast: 'duration-150',
+  normal: 'duration-200',
+  slow: 'duration-300',
+  easing: 'ease-[cubic-bezier(0.16,1,0.3,1)]', // Linear's signature easing
+} as const;
 
 export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
-  base: 'bg-surface-1 border border-subtle rounded-xl transition-all duration-300 ease-out',
+  base: `bg-surface-1 border border-subtle rounded-xl transition-all ${timing.slow} ${timing.easing}`,
 
-  // Padding variations with mathematical consistency
+  // Padding variations (8px grid system)
   padding: {
-    default: 'p-6',
-    large: 'p-8',
-    compact: 'p-4',
-    micro: 'p-3',
+    none: 'p-0',
+    micro: 'p-3',     // 12px
+    compact: 'p-4',   // 16px
+    default: 'p-6',   // 24px
+    large: 'p-8',     // 32px
+    spacious: 'p-10', // 40px
   },
 
   // Border radius variations - Linear-style precision
   radius: {
-    default: 'rounded-xl',
-    small: 'rounded-lg',
-    large: 'rounded-2xl',
-    minimal: 'rounded-md',
+    none: 'rounded-none',
+    minimal: 'rounded-md',   // 6px
+    small: 'rounded-lg',     // 8px
+    default: 'rounded-xl',   // 12px
+    large: 'rounded-2xl',    // 16px
+    full: 'rounded-full',
   },
 
-  // Enhanced shadow system for dark mode depth
+  // Enhanced shadow system - respects OKLCH-based dark mode
+  // Using semantic shadow variables defined in design-system.css
   shadow: {
     none: 'shadow-none',
-    subtle: 'shadow-sm shadow-black/5 dark:shadow-black/20',
-    default: 'shadow-md shadow-black/8 dark:shadow-black/25',
-    medium: 'shadow-lg shadow-black/10 dark:shadow-black/30',
-    large: 'shadow-xl shadow-black/12 dark:shadow-black/35',
-    floating: 'shadow-2xl shadow-black/15 dark:shadow-black/40',
+    subtle: 'shadow-[var(--shadow-sm)]',
+    default: 'shadow-[var(--shadow-md)]',
+    medium: 'shadow-[var(--shadow-lg)]',
+    large: 'shadow-[var(--shadow-xl)]',
   },
 
-  // Sophisticated border system
+  // Sophisticated border system using design tokens
   border: {
     none: 'border-0',
-    subtle: 'border border-subtle',
-    default: 'border border-default',
-    strong: 'border border-strong',
-    interactive: 'border border-interactive',
+    subtle: 'border border-[var(--color-border-subtle)]',
+    default: 'border border-[var(--color-border-default)]',
+    strong: 'border border-[var(--color-border-strong)]',
+    accent: 'border border-[var(--color-accent)]',
   },
 
   // Interactive states - Linear-inspired responsiveness
   interactive: {
-    hover:
-      'hover:bg-surface-2 hover:border-interactive hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 hover:ring-1 hover:ring-interactive/20 transform hover:-translate-y-0.5',
-    active:
-      'active:bg-surface-3 active:shadow-inner active:transform active:translate-y-0',
-    focus:
-      'focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base',
+    hover: `
+      hover:bg-[var(--color-bg-surface-2)]
+      hover:border-[var(--color-border-default)]
+      hover:shadow-[var(--shadow-lg)]
+      hover:-translate-y-0.5
+      transition-all ${timing.normal} ${timing.easing}
+    `.replace(/\s+/g, ' ').trim(),
+
+    active: `
+      active:bg-[var(--color-bg-surface-3)]
+      active:shadow-[var(--shadow-sm)]
+      active:translate-y-0
+      active:scale-[0.99]
+    `.replace(/\s+/g, ' ').trim(),
+
+    focus: `
+      focus-visible:outline-none
+      focus-visible:ring-2
+      focus-visible:ring-[var(--color-accent)]
+      focus-visible:ring-offset-2
+      focus-visible:ring-offset-[var(--color-bg-base)]
+    `.replace(/\s+/g, ' ').trim(),
   },
 
   // Glass effects for modern UI depth
   glass: {
-    subtle: 'backdrop-blur-sm bg-glass-subtle',
-    medium: 'backdrop-blur-md bg-glass-medium',
-    strong: 'backdrop-blur-lg bg-glass-strong',
+    subtle: 'backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80',
+    medium: 'backdrop-blur-md bg-[var(--color-bg-surface-1)]/70',
+    strong: 'backdrop-blur-lg bg-[var(--color-bg-surface-1)]/60',
+  },
+
+  // Status variants for feedback
+  status: {
+    success: 'border-[var(--color-success)] bg-[var(--color-success-subtle)]',
+    warning: 'border-[var(--color-warning)] bg-[var(--color-warning-subtle)]',
+    error: 'border-[var(--color-error)] bg-[var(--color-error-subtle)]',
+    info: 'border-[var(--color-info)] bg-[var(--color-info-subtle)]',
   },
 
   // Enhanced variant compositions with Linear-level sophistication
   variants: {
-    default:
-      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 transition-all duration-300 ease-out',
+    // Default static card
+    default: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-xl
+      p-6
+      shadow-[var(--shadow-sm)]
+      transition-all ${timing.slow} ${timing.easing}
+    `.replace(/\s+/g, ' ').trim(),
 
-    interactive:
-      'bg-surface-1 backdrop-blur-sm rounded-xl border border-subtle p-6 text-left shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-xl hover:shadow-black/12 dark:hover:shadow-black/35 hover:ring-1 hover:ring-interactive/20 hover:border-interactive hover:bg-surface-2 transition-all duration-300 ease-out group transform hover:-translate-y-1 cursor-pointer',
+    // Interactive clickable card - full hover effects
+    interactive: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-xl
+      p-6
+      shadow-[var(--shadow-sm)]
+      cursor-pointer
+      transition-all ${timing.normal} ${timing.easing}
+      hover:bg-[var(--color-bg-surface-2)]
+      hover:border-[var(--color-border-default)]
+      hover:shadow-[var(--shadow-lg)]
+      hover:-translate-y-1
+      active:translate-y-0
+      active:shadow-[var(--shadow-md)]
+      focus-visible:outline-none
+      focus-visible:ring-2
+      focus-visible:ring-[var(--color-accent)]
+      focus-visible:ring-offset-2
+    `.replace(/\s+/g, ' ').trim(),
 
-    settings:
-      'bg-surface-1 border border-subtle rounded-xl p-6 shadow-sm shadow-black/5 dark:shadow-black/20 hover:shadow-md hover:shadow-black/8 dark:hover:shadow-black/25 transition-all duration-300 ease-out',
+    // Settings card - subtle hover
+    settings: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-xl
+      p-6
+      shadow-[var(--shadow-sm)]
+      transition-all ${timing.slow} ${timing.easing}
+      hover:shadow-[var(--shadow-md)]
+    `.replace(/\s+/g, ' ').trim(),
 
-    analytics:
-      'rounded-xl border border-foreground/8 bg-surface-1 p-5 hover:border-foreground/12 transition-colors duration-150 ease-out',
+    // Analytics/metric card - minimal, data-focused
+    analytics: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-xl
+      p-5
+      transition-colors ${timing.fast} ${timing.easing}
+      hover:border-[var(--color-border-default)]
+    `.replace(/\s+/g, ' ').trim(),
 
-    'empty-state':
-      'bg-surface-1 border border-subtle rounded-xl p-8 text-center relative overflow-hidden shadow-sm shadow-black/5 dark:shadow-black/20',
+    // Empty state card - centered content
+    'empty-state': `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-xl
+      p-8
+      text-center
+      shadow-[var(--shadow-sm)]
+    `.replace(/\s+/g, ' ').trim(),
 
-    elevated:
-      'bg-surface-2 border border-default rounded-xl p-6 shadow-md shadow-black/8 dark:shadow-black/25 hover:shadow-lg hover:shadow-black/10 dark:hover:shadow-black/30 transition-all duration-300 ease-out',
+    // Elevated card - stands out from background
+    elevated: `
+      bg-[var(--color-bg-surface-2)]
+      border border-[var(--color-border-default)]
+      rounded-xl
+      p-6
+      shadow-[var(--shadow-md)]
+      transition-all ${timing.slow} ${timing.easing}
+      hover:shadow-[var(--shadow-lg)]
+    `.replace(/\s+/g, ' ').trim(),
 
-    floating:
-      'bg-surface-1 backdrop-blur-lg border border-default rounded-xl p-6 shadow-xl shadow-black/12 dark:shadow-black/35 hover:shadow-2xl hover:shadow-black/15 dark:hover:shadow-black/40 transition-all duration-300 ease-out',
+    // Floating card - modal-like presence
+    floating: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-default)]
+      rounded-xl
+      p-6
+      shadow-[var(--shadow-xl)]
+      backdrop-blur-lg
+      transition-all ${timing.slow} ${timing.easing}
+    `.replace(/\s+/g, ' ').trim(),
 
-    onboarding:
-      'relative bg-surface-1 rounded-2xl p-6 shadow-lg shadow-black/8 dark:shadow-black/30 transition-all duration-300 ease-out before:absolute before:inset-0 before:rounded-2xl before:p-[1px] before:bg-gradient-to-br before:from-black/10 before:via-black/5 before:to-transparent dark:before:from-white/20 dark:before:via-white/5 before:-z-10 after:absolute after:inset-[1px] after:rounded-[15px] after:bg-surface-1 after:-z-10 ring-1 ring-black/10 dark:ring-white/5',
+    // Onboarding card - gradient border effect
+    onboarding: `
+      relative
+      bg-[var(--color-bg-surface-1)]
+      rounded-2xl
+      p-6
+      shadow-[var(--shadow-lg)]
+      ring-1
+      ring-[var(--color-border-subtle)]
+      transition-all ${timing.slow} ${timing.easing}
+    `.replace(/\s+/g, ' ').trim(),
+
+    // Feature card - for showcasing features
+    feature: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-2xl
+      p-8
+      shadow-[var(--shadow-sm)]
+      transition-all ${timing.slow} ${timing.easing}
+      hover:shadow-[var(--shadow-md)]
+      hover:border-[var(--color-accent-subtle)]
+    `.replace(/\s+/g, ' ').trim(),
+
+    // Compact card - for dense layouts
+    compact: `
+      bg-[var(--color-bg-surface-1)]
+      border border-[var(--color-border-subtle)]
+      rounded-lg
+      p-4
+      transition-all ${timing.fast} ${timing.easing}
+    `.replace(/\s+/g, ' ').trim(),
+
+    // Ghost card - minimal, no background
+    ghost: `
+      rounded-xl
+      p-6
+      transition-all ${timing.normal} ${timing.easing}
+      hover:bg-[var(--color-interactive-hover)]
+    `.replace(/\s+/g, ' ').trim(),
   },
-};
+} as const;
+
+// Type exports for TypeScript consumers
+export type CardPadding = keyof typeof cardTokens.padding;
+export type CardRadius = keyof typeof cardTokens.radius;
+export type CardShadow = keyof typeof cardTokens.shadow;
+export type CardBorder = keyof typeof cardTokens.border;
+export type CardVariant = keyof typeof cardTokens.variants;
+export type CardStatus = keyof typeof cardTokens.status;
