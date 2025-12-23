@@ -9,6 +9,7 @@ import {
   waitlistInvites,
 } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
@@ -105,7 +106,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json().catch(() => null);
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: 'POST /app/admin/waitlist/approve',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const body = parsedBody.data;
     const parsed = approveSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

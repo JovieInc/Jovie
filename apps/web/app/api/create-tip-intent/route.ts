@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
@@ -23,7 +24,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const json = (await req.json().catch(() => null)) as unknown;
+    const parsedBody = await parseJsonBody<unknown>(req, {
+      route: 'POST /api/create-tip-intent',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const json = parsedBody.data;
 
     const parsed = TipIntentSchema.safeParse(json);
 

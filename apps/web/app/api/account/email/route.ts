@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { parseJsonBody } from '@/lib/http/parse-json';
 
 export const runtime = 'nodejs';
 
@@ -16,7 +17,14 @@ const syncSchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.json().catch(() => null);
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: 'POST /api/account/email',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const payload = parsedBody.data;
     const result = syncSchema.safeParse(payload);
 
     if (!result.success) {

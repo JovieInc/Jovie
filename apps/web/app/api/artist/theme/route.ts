@@ -5,15 +5,23 @@ import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { parseJsonBody } from '@/lib/http/parse-json';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
   try {
-    const body = (await request.json().catch(() => null)) as {
+    const parsedBody = await parseJsonBody<{
       artistId?: string;
       theme?: ArtistTheme;
-    } | null;
+    } | null>(request, {
+      route: 'POST /api/artist/theme',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const body = parsedBody.data;
 
     const artistId = body?.artistId;
     const theme = body?.theme;
