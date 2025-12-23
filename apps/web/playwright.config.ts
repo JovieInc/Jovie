@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// Build extra HTTP headers for Vercel Deployment Protection bypass
+const extraHTTPHeaders: Record<string, string> = {};
+if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
+  extraHTTPHeaders['x-vercel-protection-bypass'] =
+    process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+}
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -11,6 +18,8 @@ export default defineConfig({
     baseURL: process.env.BASE_URL || 'http://localhost:3100',
     trace: 'on-first-retry',
     video: 'retain-on-failure',
+    // Add Vercel bypass header when secret is available (for staging/canary)
+    ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
   },
   projects: [
     {
