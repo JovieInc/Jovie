@@ -18,7 +18,15 @@
         "SENTRY_*",
         "STATSIG_*",
         "NEON_*",
-        "DATABASE_URL"
+        "DATABASE_URL",
+        "SPOTIFY_*",
+        "CLOUDINARY_*",
+        "RESEND_*",
+        "MERCURY_*",
+        "REVENUECAT_*",
+        "FLAGS_*",
+        "EXPERIMENTATION_*",
+        "BLOB_*"
       ]
     },
     "lint": {
