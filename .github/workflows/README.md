@@ -7,6 +7,7 @@ This repository uses trunk-based development with a single long-lived branch:
 - **`main`** → deploys directly to **jov.ie** (production)
 - PRs run fast checks (typecheck, lint) - ~30 seconds
 - Push to main runs full CI (build, tests, E2E) then deploys to production
+- Post-deploy: canary health gate + production smoke tests
 
 ## Vercel Preview Deployments
 
@@ -40,7 +41,10 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 
 - **Fast checks** (typecheck, lint) - runs on all PRs, required for merge
 - **Full CI** (build, unit tests, E2E) - runs on push to main before deploy
-- **Merge queue support** - `ci.yml` listens to `merge_group` event for in-queue validation
+- **Production deploy** - automatic deployment to jov.ie after CI passes
+- **Canary health gate** - verifies deployment health before declaring success
+- **Smoke tests** - validates critical paths after deploy
+- **Lighthouse CI** - performance metrics on each deploy
 
 ## Auto-Merge
 
@@ -58,4 +62,4 @@ The `synthetic-monitoring.yml` workflow runs golden path tests against jov.ie on
 
 - **Ephemeral branches** - Created per PR for isolated testing
 - **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close
-- **Protected branch** - `main` (production) is protected from deletion
+- **Protected branch** - `main` is the production database branch
