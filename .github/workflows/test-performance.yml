@@ -2,11 +2,9 @@ name: Test Performance Monitoring
 
 on:
   push:
-    branches: [main, production]
+    branches: [main]
   pull_request:
-    branches: [main, production]
-  merge_group:
-    branches: [main, production]
+    branches: [main]
 
 jobs:
   performance-guard:
@@ -64,7 +62,7 @@ jobs:
     name: Flaky Test Detection
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Only run on push to main (not PRs or merge queue)
+    # Only run on push to main (not PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -92,7 +90,7 @@ jobs:
     name: Performance Report
     runs-on: ubuntu-latest
     timeout-minutes: 8
-    # Only run on push to main (not PRs or merge queue)
+    # Only run on push to main (not PRs)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

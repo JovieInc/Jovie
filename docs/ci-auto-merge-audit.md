@@ -10,8 +10,7 @@ Consolidated 3 separate auto-merge workflows into one intelligent workflow that 
 
 1. **Multiple Competing Workflows**: 3 separate auto-merge workflows that interfered with each other
 2. **Strict Up-to-Date Requirements**: Branch rulesets require `strict_required_status_checks_policy: true`
-3. **No Merge Queue**: GitHub merge queue not available/configured - this would solve ordering automatically
-4. **Branch Update Race Conditions**: PRs go "BEHIND" when multiple PRs merge simultaneously
+3. **Branch Update Race Conditions**: PRs go "BEHIND" when multiple PRs merge simultaneously
 
 ### **Old Workflows (Removed)**
 
@@ -63,24 +62,22 @@ Updated `ci.yml` to be smarter about branch updates:
 
 ## Branch Ruleset Analysis
 
-**Current Configuration (Preview Branch):**
+**Current Configuration (Main Branch):**
 
 ```json
 {
   "strict_required_status_checks_policy": true,
   "required_status_checks": [
-    "PR Policy",
-    "Lint",
-    "Typecheck",
-    "Build",
-    "Unit Tests",
-    "E2E Tests"
+    "CI / Typecheck",
+    "CI / Lint",
+    "CI / Migration Guard",
+    "CI / ci-fast"
   ],
   "allowed_merge_methods": ["merge", "squash", "rebase"]
 }
 ```
 
-**Status:** ✅ Well configured, but **no merge queue available**
+**Status:** ✅ Well configured for trunk-based development with fast-lane CI
 
 ## Recommendations
 
@@ -93,22 +90,12 @@ Updated `ci.yml` to be smarter about branch updates:
 
 ### 🚀 **Future Improvements**
 
-1. **Enable GitHub Merge Queue** (when available):
-
-   ```bash
-  # Would eliminate need for branch updating entirely
-  gh api repos/JovieInc/Jovie/rulesets/7152953 \
-    --method PATCH \
-    --field rules[5].type=merge_queue \
-    --field rules[5].parameters.merge_method=squash
-  ```
-
-2. **Add Auto-merge Labels Automatically**:
+1. **Add Auto-merge Labels Automatically**:
    - Dependabot PRs: Auto-labeled
    - Codegen PRs: Auto-labeled
    - Regular dependency PRs: Could auto-label based on file patterns
 
-3. **Enhanced Monitoring**:
+2. **Enhanced Monitoring**:
    - Add workflow success/failure notifications
    - Track auto-merge rates and failure reasons
 

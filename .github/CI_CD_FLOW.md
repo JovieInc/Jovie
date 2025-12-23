@@ -5,13 +5,14 @@ This document explains the complete CI/CD pipeline flow from feature development
 ## 🔄 **Complete Flow Overview**
 
 ```
-main → production
- ↓         ↓
-Fast CI   Full CI + Manual Review
- ↓         ↓
-Auto Deploy  Auto Deploy (after approval)
-main.jov.ie  jov.ie
+Feature Branch → main (production environment)
+       ↓            ↓
+    Fast CI    Full CI + Deploy
+       ↓            ↓
+   Auto Merge   Production (jov.ie)
 ```
+
+**Trunk-Based Development:** Single long-lived branch (`main`) that deploys directly to production.
 
 ## 📋 **Step-by-Step Flow**
 
@@ -36,11 +37,11 @@ main.jov.ie  jov.ie
    - Code generation (e.g., Supabase types)
    - PRs with `automerge` label
 
-**Output:** Changes merged to `main` branch, deployed to [main.jov.ie](https://main.jov.ie)
+**Output:** Changes merged to `main` branch
 
 ---
 
-### **Step 2: Main Branch Deployment**
+### **Step 2: Production Deployment**
 
 **Trigger:** Push to `main` branch (after PR merge)
 
@@ -55,37 +56,18 @@ main.jov.ie  jov.ie
 
 2. ✅ **Database Migrations:**
    - Run the DB safety preflight (environment + migration list)
-   - Run `pnpm run drizzle:migrate` against main database
-   - Seed data if needed
+   - Run `pnpm run drizzle:migrate:prod` against production database
+   - Requires `ALLOW_PROD_MIGRATIONS=true` for safety
 
 3. ✅ **Vercel Deployment:**
-   - Deploy to main.jov.ie environment
-   - Run canary health check
+   - Deploy to jov.ie (production)
+   - Run post-deployment verification
    - Verify key content loads
 
-4. ✅ **Auto-Promotion:**
-   - Automatically creates PR: `main → production`
-   - Adds "needs-review" label
-   - **Manual approval required**
-
-**Output:**
-- Main environment updated at [main.jov.ie](https://main.jov.ie)
-- PR created for production promotion (requires review)
-
----
-
-### **Step 3: Production Deployment**
-
-**Trigger:** PR merge from `main → production` (manual approval)
-
-**Process:**
-
-1. ✅ **Production Deployment:**
-   - Run the DB safety preflight (environment + migration list)
-   - Deploy to production environment (jov.ie)
-   - Run database migrations on production
-   - Post-deployment verification
-   - Monitor for errors
+4. ✅ **Lighthouse CI:**
+   - Performance budget verification
+   - Accessibility checks
+   - Best practices validation
 
 **Output:** Changes live at [jov.ie](https://jov.ie)
 
@@ -93,30 +75,31 @@ main.jov.ie  jov.ie
 
 ## 🎯 **Key Features**
 
-### **Fast-Path Development (YC-Optimized):**
+### **Trunk-Based Development:**
 
 ✅ **Feature PRs → main:**
 - Lightning-fast CI (~10-15s for typecheck + lint)
 - Auto-merge for safe changes (dependabot, codegen)
-- Instant deployment to main.jov.ie
 - **Ship multiple times per day**
 
 ✅ **Main → production:**
 - Full CI suite with tests
-- Manual review for production safety
-- Automatic deployment after approval
+- Database migrations with safety gates
+- Automatic deployment after all checks pass
+- **Typical deploy time: ~2 minutes**
 
 ### **Safety Gates:**
 
 - ✅ **Feature PRs:** Typecheck + lint (fast feedback)
-- ✅ **Main deploys:** Full CI + E2E tests + manual review for production
-- ✅ **Production:** Manual approval + automated verification
+- ✅ **Production deploys:** Full CI + E2E tests before deployment
+- ✅ **Database migrations:** Preflight checks + `ALLOW_PROD_MIGRATIONS` flag
+- ✅ **Deployment verification:** Canary checks + Lighthouse CI
 
 ### **Database Strategy:**
 
-- ✅ **Migrations:** Run automatically on deployment via `drizzle:migrate`
-- ✅ **Preflight:** Environment and migration list validation before main/production migrations
-- ✅ **Long-lived branches:** Only `main` and `production` (no ephemeral preview)
+- ✅ **Migrations:** Run automatically on `main` push via `drizzle:migrate:prod`
+- ✅ **Preflight:** Environment and migration list validation before production migrations
+- ✅ **Long-lived database:** Single `main` branch database (production)
 - ✅ **PR branches:** Ephemeral Neon branches auto-created per PR
 - ✅ **Cleanup:** Ephemeral branches deleted when PR closes
 
@@ -147,13 +130,12 @@ This pipeline enables **multiple deployments per day** through:
 
 1. **Fast feedback loop:** 10-15s CI for feature PRs
 2. **Auto-merge:** Safe changes merge automatically
-3. **Instant staging:** Changes live on main.jov.ie within minutes
-4. **Manual production gate:** Quick review + auto-deploy
+3. **Direct production deploy:** Changes live on jov.ie within minutes
 
 **Typical timeline:**
-- Feature PR → main: **~2 minutes** (CI + merge + deploy)
-- Main → production: **~5 minutes** (review + CI + deploy)
-- **Total:** Ship to production in **< 10 minutes** from PR approval
+- Feature PR → main: **~15 seconds** (CI checks)
+- Main → production: **~2 minutes** (full CI + deploy)
+- **Total:** Ship to production in **< 3 minutes** from PR approval
 
 ---
 
@@ -164,11 +146,9 @@ This pipeline enables **multiple deployments per day** through:
 ```yaml
 on:
   pull_request:
-    branches: [main, production]
+    branches: [main]
   push:
-    branches: [main, production]
-  merge_group:
-    branches: [main, production]
+    branches: [main]
 ```
 
 ### **Fast vs Full CI:**
@@ -177,12 +157,13 @@ on:
 - `ci-typecheck`
 - `ci-lint`
 
-**Full CI** (main → production):
+**Full CI** (push to main):
 - All fast checks
 - `ci-drizzle-check`
 - `ci-build`
 - `ci-unit-tests`
 - `ci-e2e-tests`
+- `deploy-prod` (production deployment)
 
 ---
 
@@ -191,7 +172,7 @@ on:
 ### **Linear Append-Only:**
 
 ✅ **Always add new migrations** - never edit or squash existing ones
-✅ **Run migrations automatically** - via CI deployment jobs
+✅ **Run migrations automatically** - via CI deployment jobs on main push
 ✅ **Test migrations locally** - against ephemeral Neon branches
 
 ### **Migration Commands:**
@@ -200,12 +181,18 @@ on:
 # Create new migration
 pnpm run drizzle:generate
 
-# Apply migrations (auto-run by CI)
-pnpm run drizzle:migrate
+# Apply migrations to production (auto-run by CI on main push)
+pnpm run drizzle:migrate:prod
 
 # Check schema drift
-pnpm run drizzle:check
+pnpm run drizzle:check:main
 ```
+
+### **Production Migration Safety:**
+
+- Requires `ALLOW_PROD_MIGRATIONS=true` environment variable
+- Preflight check validates environment and migration list
+- `GIT_BRANCH=main` signals production environment
 
 ---
 
@@ -218,11 +205,13 @@ pnpm run drizzle:check
    git revert <commit-sha>
    git push origin main
    ```
+   This triggers automatic deployment of the revert.
 
 2. **Emergency hotfix:**
-   - Create fix branch from `production`
-   - PR directly to `production` (bypass main)
-   - Manual approval + deploy
+   - Create fix branch from `main`
+   - PR directly to `main`
+   - Fast CI checks + auto-merge if eligible
+   - Deploy within 3 minutes
 
 ### **Database Rollback:**
 
@@ -239,10 +228,10 @@ pnpm run drizzle:check
 
 ### **Deployment Verification:**
 
-- ✅ Canary health checks after every deploy
-- ✅ HTTP 200 response verification
-- ✅ Key content verification (homepage, dashboard)
-- ✅ Error rate monitoring (via logs)
+- ✅ Full test suite before deploy
+- ✅ Lighthouse CI after deploy
+- ✅ Key content verification
+- ✅ Slack notifications (#alerts-production)
 
 ### **Performance Budgets:**
 
@@ -265,13 +254,12 @@ pnpm run drizzle:check
 
 ### **For Reviews:**
 
-1. **Main → production PRs:**
-   - Verify all tests pass
-   - Check migration safety
-   - Review deployment plan
-   - Confirm rollback strategy
-
-2. **Feature PRs:**
+1. **Feature PRs:**
    - Fast approval for safe changes
    - Focus on business logic
    - Ensure tests cover new code
+
+2. **Database changes:**
+   - Verify migration safety
+   - Ensure backward compatibility
+   - Test against ephemeral branch

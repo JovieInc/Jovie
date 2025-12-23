@@ -71,16 +71,14 @@ function getCurrentBranch(): string {
 }
 
 // Get environment from GIT_BRANCH env variable or current git branch
-function getEnvironment(): 'main' | 'production' | 'development' {
+function getEnvironment(): 'production' | 'development' {
   const envBranch = process.env.GIT_BRANCH;
   const gitBranch = getCurrentBranch();
   const branch = envBranch || gitBranch;
 
-  if (branch === 'production') {
-    return 'production';
-  }
+  // Main branch is production in trunk-based development
   if (branch === 'main') {
-    return 'main';
+    return 'production';
   }
   return 'development';
 }

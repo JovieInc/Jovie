@@ -13,10 +13,7 @@ name: CodeQL Security Analysis
 
 on:
   push:
-    branches: ['production', 'main']
-  pull_request:
-    branches: ['production']
-    # Only run on PRs to production - main PRs use fast lane
+    branches: ['main']
   schedule:
     - cron: '36 13 * * 1' # Weekly on Monday at 13:36 UTC
 

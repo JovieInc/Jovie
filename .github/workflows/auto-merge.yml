@@ -6,7 +6,7 @@ name: Smart Auto-Merge
 "on":
   pull_request_target:
     types: [opened, edited, synchronize, labeled, unlabeled, ready_for_review]
-    branches: [main, production]
+    branches: [main]
   workflow_run:
     workflows: ['CI']
     types: [completed]
@@ -25,9 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Run for main and production PRs; for workflow_run events we'll resolve PR and skip if needed
+    # Run for main PRs; for workflow_run events we'll resolve PR and skip if needed
     if: >
-      (github.event_name == 'pull_request_target' && (github.event.pull_request.base.ref == 'main' || github.event.pull_request.base.ref == 'production'))
+      (github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main')
       || (github.event_name == 'workflow_run')
 
     steps:
@@ -58,8 +58,8 @@ jobs:
               return { skip: true };
             }
 
-            if (pr.base.ref !== 'main' && pr.base.ref !== 'production') {
-              core.info('PR is not targeting main or production branch, skipping');
+            if (pr.base.ref !== 'main') {
+              core.info('PR is not targeting main branch, skipping');
               core.setOutput('skip', 'true');
               return { skip: true };
             }
@@ -86,27 +86,10 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const pr = JSON.parse('${{ steps.get_pr.outputs.result }}');
-            const base = pr.base_ref;
-            let re;
-            if (base === 'production') {
-              // Full checks on production PRs
-              re = '^(Build|Unit Tests|E2E Tests|Drizzle Check)$';
-            } else {
-              // Fast checks on main PRs
-              re = '^(ci-fast)$';
-            }
+            // Fast checks for all PRs to main (trunk-based development)
+            const re = '^(ci-fast)$';
             core.setOutput('check_re', re);
 
-      - name: Set promotion flag
-        id: is_promotion
-        if: steps.get_pr.outputs.skip != 'true'
-        uses: actions/github-script@v8
-        with:
-          script: |
-            const pr = JSON.parse('${{ steps.get_pr.outputs.result }}');
-            const isPromotion = pr.base_ref === 'production' && pr.head_ref === 'main';
-            core.setOutput('promotion', isPromotion ? 'true' : 'false');
 
       - name: Check if PR should be auto-merged
         id: should_merge
@@ -154,12 +137,7 @@ jobs:
             let prType = 'regular';
             let eligible = false;
 
-            // Promotion PR: main -> production
-            if (pr.base_ref === 'production' && pr.head_ref === 'main') {
-              prType = 'promotion';
-              // Manual promotion only — do not auto-merge production promotion PRs
-              eligible = false;
-            } else if (pr.author === 'dependabot[bot]') {
+            if (pr.author === 'dependabot[bot]') {
               prType = 'dependabot';
               // For dependabot, check if it's patch/minor or security update
               eligible = true; // We'll validate update type in next step

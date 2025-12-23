@@ -7,27 +7,23 @@ This document outlines the organization and purpose of all GitHub workflows in t
 ### **Branch Strategy**
 
 ```
-main → production
- ↓         ↓
-Fast CI   Full CI + Manual Review
- ↓         ↓
-Auto Deploy  Auto Deploy (after approval)
-main.jov.ie  jov.ie
+Feature Branch → main (production environment)
+       ↓            ↓
+    Fast CI    Full CI + Deploy
+       ↓            ↓
+   Auto Merge   Production (jov.ie)
 ```
+
+**Trunk-Based Development:** Single long-lived branch (`main`) that deploys directly to production.
 
 ## Branch Structure
 
-- **main**: Default development branch
+- **main**: Production branch
   - All feature branches merge here
-  - Deploys to [main.jov.ie](https://main.jov.ie) automatically
-  - Requires: `ci-fast` (typecheck + lint)
+  - Deploys to [jov.ie](https://jov.ie) automatically after full CI
+  - **Fast CI required for PRs:** `ci-fast` (typecheck + lint ~10-15s)
+  - **Full CI runs after merge:** build + tests + E2E + deploy
   - **Auto-merge enabled** for safe changes (dependabot, codegen)
-
-- **production**: Live production environment
-  - Only accepts PRs from `main`
-  - Requires: Full CI (build + tests + E2E)
-  - **Manual approval required** for merge
-  - Deploys to [jov.ie](https://jov.ie) automatically
 
 ## 📋 **Active Workflows**
 
@@ -37,9 +33,8 @@ main.jov.ie  jov.ie
 
 **Triggers:**
 
-- Pull requests to `main` or `production`
-- Push to `main` or `production`
-- Merge queue events
+- Pull requests to `main`
+- Push to `main`
 - Manual dispatch
 
 **Key Jobs:**
@@ -50,24 +45,24 @@ main.jov.ie  jov.ie
 - `ci-lint`: ESLint with zero warnings (~5-10s)
 - **Total CI time:** ~10-15 seconds
 
-#### **Full CI (main → production):**
+#### **Full CI (push to main):**
 
 - `neon-db`: Create/reuse ephemeral Neon database branch
 - `ci-drizzle-check`: Validate database schema changes
 - `ci-build`: Build Next.js application
 - `ci-unit-tests`: Run unit test suite
 - `ci-e2e-tests`: End-to-end Playwright tests
-- `deploy`: Deploy to main.jov.ie with migrations
-- `promote`: Auto-create production PR
+- `deploy-prod`: Deploy to jov.ie with production migrations
+- `lighthouse-ci-production`: Performance and accessibility validation
 
 **Features:**
 
 - ✅ **Path-based job skipping** - Only run relevant jobs based on file changes
 - ✅ **Ephemeral Neon branches** - Auto-created per PR, auto-deleted on close
-- ✅ **Database migrations** - Run automatically on main deploys
-- ✅ **Canary health checks** - Verify deployment success
+- ✅ **Production migrations** - Run automatically on main push with `ALLOW_PROD_MIGRATIONS=true`
+- ✅ **Deployment verification** - Canary health checks + Lighthouse CI
 - ✅ **Auto-merge support** - Safe changes merge automatically
-- ✅ **Production promotion** - Auto-create PRs for production deployment
+- ✅ **Direct production deployment** - Main branch deploys to production
 
 ---
 
@@ -90,7 +85,7 @@ main.jov.ie  jov.ie
 - Dependabot PR (patch/minor versions)
 - Codegen PR (Supabase types, GraphQL codegen)
 - PR with "automerge" label
-- All required checks passing
+- All required checks passing (ci-fast)
 - No merge conflicts
 ```
 
@@ -116,14 +111,13 @@ main.jov.ie  jov.ie
 **Process:**
 
 1. Sanitize branch name (same logic as creation)
-2. Guard against deleting protected branches (`main`, `production`)
+2. Guard against deleting protected branch (`main`)
 3. Delete ephemeral Neon branch via API
 4. Verify deletion success
 
 **Protected Branches:**
 
-- ❌ `production` - Never deleted
-- ❌ `main` - Never deleted
+- ❌ `main` - Never deleted (production database)
 - ✅ All other branches - Eligible for cleanup
 
 ---
@@ -134,8 +128,7 @@ main.jov.ie  jov.ie
 
 **Triggers:**
 
-- Push to `main` or `production`
-- Pull requests to `main` or `production`
+- Push to `main`
 - Weekly scheduled scan (Monday 13:36 UTC)
 
 **Languages Analyzed:**
@@ -147,7 +140,6 @@ main.jov.ie  jov.ie
 
 - ✅ Automated security vulnerability detection
 - ✅ Weekly scheduled scans for drift
-- ✅ Pull request security analysis
 - ✅ GitHub Security tab integration
 
 ---
@@ -170,44 +162,25 @@ main.jov.ie  jov.ie
 
 ## 🔄 **Workflow Dependencies**
 
-### **Feature → Main Flow**
+### **Feature → Production Flow (Trunk-Based)**
 
 ```
 Feature PR → main
 ├── ci-typecheck (parallel)
 ├── ci-lint (parallel)
 └── Auto-merge (if eligible)
-    └── Deploy to main.jov.ie
-```
-
-### **Main → Production Flow**
-
-```
-Push to main
-├── Full CI Suite
-│   ├── neon-db (ephemeral branch)
-│   ├── ci-drizzle-check
-│   ├── ci-build
-│   ├── ci-unit-tests
-│   └── ci-e2e-tests
-├── deploy
-│   ├── Run migrations (drizzle:migrate)
-│   ├── Seed database
-│   ├── Deploy to main.jov.ie
-│   └── Canary health check
-└── promote
-    └── Create PR (main → production)
-        └── Manual review required
-```
-
-### **Production Deployment**
-
-```
-PR merge (main → production)
-└── CI runs (full suite)
-    └── Deploy to jov.ie
-        ├── Run migrations
-        └── Post-deployment verification
+    └── Push to main triggers:
+        ├── Full CI Suite
+        │   ├── neon-db (ephemeral branch for testing)
+        │   ├── ci-drizzle-check
+        │   ├── ci-build
+        │   ├── ci-unit-tests
+        │   └── ci-e2e-tests
+        └── deploy-prod
+            ├── Run migrations (drizzle:migrate:prod with ALLOW_PROD_MIGRATIONS=true)
+            ├── Deploy to jov.ie (production)
+            ├── Lighthouse CI verification
+            └── Slack notifications (#alerts-production)
 ```
 
 ---
@@ -223,14 +196,14 @@ PR merge (main → production)
 ### **Database Security:**
 
 - **Ephemeral branches:** Isolated per-PR databases prevent cross-contamination
-- **Protected branches:** `main` and `production` never deleted
-- **Migration safety:** Append-only migrations, no destructive changes allowed
+- **Protected branch:** `main` (production database) never deleted
+- **Migration safety:** Append-only migrations, production flag required
 
 ### **Compliance Features:**
 
 - ✅ Automated security scanning (CodeQL)
 - ✅ Dependency vulnerability management (Dependabot)
-- ✅ Migration guards (check-migrations.sh)
+- ✅ Migration guards (preflight checks + ALLOW_PROD_MIGRATIONS flag)
 - ✅ PR size limits (< 400 LOC)
 - ✅ Required status checks before merge
 
@@ -248,9 +221,9 @@ PR merge (main → production)
 
 ### **Deployment Metrics:**
 
-- Feature PR → main deploy: ~2 minutes
-- Main → production: ~5 minutes (with review)
-- **Total:** Ship to production in < 10 minutes
+- Feature PR → CI checks: ~15 seconds
+- Main push → production deploy: ~2 minutes
+- **Total:** Ship to production in **< 3 minutes** from PR merge
 
 ### **Quality Metrics:**
 
@@ -266,46 +239,52 @@ PR merge (main → production)
 ### **Environment Promotion:**
 
 1. **Feature branches:** Development and testing (ephemeral Neon DBs)
-2. **Main:** Staging and validation ([main.jov.ie](https://main.jov.ie))
-3. **Production:** Live application ([jov.ie](https://jov.ie))
+2. **Main:** Production environment ([jov.ie](https://jov.ie))
 
 ### **Deployment Triggers:**
 
 - **Automatic:** Feature PR → main (auto-merge eligible)
-- **Automatic:** Main push → deploy to main.jov.ie
-- **Manual:** Main → production (requires approval)
-- **Automatic:** Production merge → deploy to jov.ie
+- **Automatic:** Main push → deploy to jov.ie (production)
 
 ### **Database Strategy:**
 
-- **Long-lived branches:** `main`, `production` only
+- **Long-lived database:** `main` branch database (production)
 - **Ephemeral branches:** Auto-created per PR, deleted on close
-- **Migrations:** Linear append-only, auto-run on deploy
+- **Migrations:** Linear append-only, auto-run on production deploy
 - **Testing:** Each PR gets isolated database
 
 ### **Rollback Strategy:**
 
-- **Code:** `git revert` + push to main
+- **Code:** `git revert` + push to main (triggers automatic redeploy)
 - **Database:** Create reverse migration (append-only)
-- **Emergency:** Direct PR to production (bypass main)
 - **Backups:** Neon point-in-time recovery available
 
 ---
 
-## 🗑️ **Recently Removed Workflows**
+## 🗑️ **Recently Removed Workflows & Infrastructure**
 
-The following legacy workflows were removed during CI/CD modernization:
+The following legacy workflows and infrastructure were removed during migration to trunk-based development:
 
 ### ❌ **Removed Workflows:**
 
 1. `sync-preview-nightly.yml` - **DEPRECATED** (Preview branch no longer exists)
 2. `sync-preview-on-prod-promotion.yml` - **DEPRECATED** (Preview DB resync no longer needed)
+3. **Fast Lane system** - **REMOVED** (Automatic promotion from main → production)
+4. **Production deployment job** - **REPLACED** (Now deploys from main, not production branch)
+
+### ❌ **Removed Infrastructure:**
+
+1. **Production branch** - **ELIMINATED** (Main branch IS production)
+2. **Merge queue** - **REMOVED** (Infrastructure existed but never enabled)
+3. **Branch protection ruleset for production** - **DELETED** (No production branch)
+4. **Promotion PR automation** - **REMOVED** (No longer needed)
 
 ### **Removal Reasons:**
 
-- **Deprecated branch model:** Moved from develop → preview → production to main → production
-- **Reduced complexity:** Two-branch model simplifies workflow
-- **Faster iteration:** Removed unnecessary staging environment
+- **Simplified branching model:** Moved from main → production to pure trunk-based (main only)
+- **Reduced complexity:** Single branch model eliminates promotion overhead
+- **Faster iteration:** Direct deployment from main to production
+- **Aligned with modern practices:** Trunk-based development is industry standard
 
 ---
 
@@ -322,8 +301,8 @@ The following legacy workflows were removed during CI/CD modernization:
 ### **Troubleshooting:**
 
 - **CI failures:** Check workflow logs in GitHub Actions
-- **Migration issues:** Validate with `pnpm drizzle:check`
-- **Deploy failures:** Review canary health check logs
+- **Migration issues:** Validate with `pnpm drizzle:check:main`
+- **Deploy failures:** Review Lighthouse CI and Slack notifications
 - **Auto-merge stuck:** Verify all required checks passing
 
 ---
@@ -341,7 +320,7 @@ The following legacy workflows were removed during CI/CD modernization:
 
 - ✅ Aggressive caching (Next.js cache, pnpm store, TypeScript build info)
 - ✅ Minimal CI for feature PRs (fast path)
-- ✅ Full CI only for production-bound changes
+- ✅ Full CI only after merge to main
 - ✅ Timeout management (prevent hanging jobs)
 
 ### **Security:**
@@ -349,7 +328,8 @@ The following legacy workflows were removed during CI/CD modernization:
 - ✅ Minimal permissions (GITHUB_TOKEN with read-all by default)
 - ✅ Secret management (DATABASE_URL, VERCEL_TOKEN, etc.)
 - ✅ Automated vulnerability scanning (CodeQL, Dependabot)
-- ✅ Protected branch rules (main, production)
+- ✅ Protected branch rules (main)
+- ✅ Production migration safety flag (ALLOW_PROD_MIGRATIONS)
 
 ---
 
@@ -359,13 +339,12 @@ This workflow organization enables **multiple deployments per day** through:
 
 1. **Fast CI:** 10-15s for feature PRs
 2. **Auto-merge:** Safe changes merge without waiting
-3. **Instant staging:** Changes live on main.jov.ie within 2 minutes
-4. **Quick production:** Manual review + auto-deploy in ~5 minutes
+3. **Direct production deploy:** Changes live on jov.ie within 3 minutes
 
-**Total time:** Ship a feature to production in **< 10 minutes** from PR creation.
+**Total time:** Ship a feature to production in **< 3 minutes** from PR merge.
 
 ---
 
-**Status:** ✅ **Optimized for YC-Style Rapid Iteration**
+**Status:** ✅ **Optimized for Trunk-Based Rapid Deployment**
 
-All workflows are organized for maximum velocity while maintaining production safety through automated testing, manual production gates, and comprehensive monitoring.
+All workflows are organized for maximum velocity while maintaining production safety through automated testing, production migration gates, comprehensive monitoring, and direct deployment from main.

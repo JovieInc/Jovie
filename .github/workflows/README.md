@@ -26,6 +26,6 @@ Vercel preview deployments for pull requests and feature branches are handled by
 - `VERCEL_PROJECT_ID` - Vercel project ID
 - `GITHUB_TOKEN` - Automatically provided by GitHub Actions
 
-## CI and Merge Queue
+## CI and Trunk-Based Development
 
-The main CI workflow `ci.yml` is the gatekeeper for PRs to `main` and `production`. It includes fast checks (typecheck, lint) and full CI (build, unit, E2E). To support GitHub Merge Queue, `ci.yml` listens to the `merge_group` event so required status checks re-run in-queue before merging.
+The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes fast checks (typecheck, lint) for PR validation and full CI (build, unit, E2E) after merge to main for production deployment.

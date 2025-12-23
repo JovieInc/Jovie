@@ -1,0 +1,413 @@
+[01:09:07.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:09:08.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:09:08.685] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:09:08.685] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:12:57.723] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:13:03.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:20:34.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:20:39.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:20:45.686] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:20:52.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:03.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:12.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:19.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:27.699] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:34.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:21:41.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:22:04.682] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:22:13.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:22:37.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:22:49.685] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:22:55.683] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:23:24.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:23:51.684] Browser ERROR   ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js:70:10
+Ecmascript file had an error
+  68 |   }
+  69 | }
+> 70 | function formatMetadataHeaders(metadata) {
+     |          ^^^^^^^^^^^^^^^^^^^^^
+  71 |   const headers2 = new Headers();
+  72 |   if (metadata.nodeVersion) {
+  73 |     headers2.set("Clerk-Node-Version", metadata.nodeVersion);
+
+Server Actions must be async functions.
+
+Import trace:
+  Server Component:
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-custom-headers.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/server/keyless-node.js
+    ./node_modules/.pnpm/@clerk+nextjs@6.36.0_next@16.1.1_@babel+core@7.28.5_@opentelemetry+api@1.9.0_@playwright+test_vqcbb447bacq732n47w6u4a4re/node_modules/@clerk/nextjs/dist/esm/app-router/keyless-actions.js
+[01:39:33.032] Server  ERROR   TurbopackInternalError: Failed to write app endpoint /onboarding/page
+
+Caused by:
+- Failed to restore task data (corrupted database or bug): Meta for EcmascriptModuleFacadeModule::new (TaskId 631144))
+
+Debug info:
+- Execution of get_written_endpoint_with_issues_operation failed
+- Execution of endpoint_write_to_disk failed
+- Execution of <AppEndpoint as Endpoint>::output failed
+- Failed to write app endpoint /onboarding/page
+- Execution of AppEndpoint::output failed
+- Execution of get_app_page_entry failed
+- Execution of *ProcessResult::module failed
+- Execution of <ModuleAssetContext as AssetContext>::process failed
+- Failed to restore task data (corrupted database or bug): Meta for EcmascriptModuleFacadeModule::new (TaskId 631144))
+  
+  Caused by:
+      0: Looking up data for TaskId 631144 from database failed
+      1: Unable to open static sorted file referenced from 00000040.meta
+      2: Unable to open static sorted file 00000029.sst
+      3: No such file or directory (os error 2)
+[01:39:33.107] Server  ERROR   Error: ENOENT: no such file or directory, open '/Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/.next/dev/server/pages/_app/build-manifest.json'
