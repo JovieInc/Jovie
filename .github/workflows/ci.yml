@@ -2,14 +2,14 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, production]
   push:
-    branches: [main, 'codegen-bot/**']
+    branches: [main, production, 'codegen-bot/**']
     paths-ignore:
       - '**/*.md'
       - 'docs/**'
   merge_group:
-    branches: [main]
+    branches: [main, production]
   workflow_dispatch:
 
 permissions: read-all
@@ -83,15 +83,12 @@ jobs:
       - name: Format check (Biome)
         run: pnpm run format:check
 
-  ci-fast-checks:
-    name: Fast checks (typecheck + lint)
-    # Draft PRs skip; ready PRs + pushes + merge queue run fast checks in parallel
+  ci-typecheck:
+    name: Typecheck
+    # Draft PRs skip; ready PRs + pushes + merge queue run typecheck
     needs: [ci-cache-warm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      matrix:
-        check: [typecheck, lint]
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 1 }
@@ -104,13 +101,13 @@ jobs:
           CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
 
           if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping fast checks."
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping typecheck."
             exit 0
           fi
 
           # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
           if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping fast checks."
+            echo "Docs-only change. Skipping typecheck."
             exit 0
           fi
       - uses: ./.github/actions/setup-node-pnpm
@@ -122,7 +119,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        if: ${{ matrix.check == 'typecheck' }}
         uses: actions/cache@v5
         with:
           path: |
@@ -132,13 +128,49 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-tsc-${{ github.ref }}-
             ${{ runner.os }}-tsc-
-      - name: Run fast/lint check
+      - name: Run typecheck
+        run: pnpm turbo typecheck --filter=@jovie/web
+        env:
+          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
+  ci-lint:
+    name: Lint
+    # Draft PRs skip; ready PRs + pushes + merge queue run lint
+    needs: [ci-cache-warm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
         run: |
-          if [[ "${{ matrix.check }}" == "typecheck" ]]; then
-            pnpm turbo typecheck --filter=@jovie/web
-          else
-            pnpm turbo lint --filter=@jovie/web
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping lint."
+            exit 0
           fi
+
+          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping lint."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Cache Turbo
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+      - name: Run lint
+        run: pnpm turbo lint --filter=@jovie/web
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -203,9 +235,9 @@ jobs:
 
   neon-db:
     name: Neon DB
-    # Run for push to main or PRs with testing label
-    # Skip for merge queue and regular PRs to keep the fast lane fast
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # Only run for push and PRs to production (or testing label)
+    # Skip for merge queue and PRs to main to keep the fast lane truly fast
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -221,7 +253,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main'
+          protected_branches: 'main,production,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine sanitized branch name
@@ -230,8 +262,8 @@ jobs:
           RAW="${{ github.head_ref || github.ref_name }}"
 
           # Avoid collisions with protected long-lived branches in Neon.
-          # For push to main we reuse the long-lived Neon branch.
-          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
+          # For push to main/production we reuse the long-lived Neon branches.
+          if [[ "${{ github.event_name }}" == "push" && ("${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "production") ]]; then
             RAW="${{ github.ref_name }}"
           fi
 
@@ -311,8 +343,8 @@ jobs:
   ci-drizzle-check:
     name: Drizzle Check
     needs: [neon-db]  # Optimized: only needs DB, can run parallel with typecheck/lint
-    # Drizzle check runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # Drizzle check is NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -380,7 +412,7 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-fast-checks, ci-guardrails]
+    needs: [ci-typecheck, ci-lint, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -406,7 +438,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main'
+          protected_branches: 'main,production,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Check for relevant changes
@@ -469,7 +501,7 @@ jobs:
           GIT_BRANCH: pr-${{ github.event.pull_request.number }}
           ALLOW_PROD_MIGRATIONS: 'true'
 
-  # Public Profile Smoke Test - runs against jov.ie (production) to verify public profiles work
+  # Public Profile Smoke Test - runs against main.jov.ie (staging) to verify public profiles work
   # This test runs on pushes to main after deploy completes
   ci-public-profile-smoke:
     name: Public Profile Smoke
@@ -496,15 +528,15 @@ jobs:
       - name: Install Playwright (Chromium only)
         run: pnpm --filter=@jovie/web exec playwright install chromium --with-deps
 
-      - name: Run Public Profile Smoke Test against production
+      - name: Run Public Profile Smoke Test against staging
         run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
+          CI=true BASE_URL=https://main.jov.ie pnpm --filter=@jovie/web run test:e2e tests/e2e/public-profile-smoke.spec.ts --project=chromium --reporter=line
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-      - name: Run Performance Budget Guard against production
+      - name: Run Performance Budget Guard against staging
         run: |
-          CI=true BASE_URL=https://jov.ie pnpm --filter=@jovie/web run test:budgets
+          CI=true BASE_URL=https://main.jov.ie pnpm --filter=@jovie/web run test:budgets
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
@@ -520,9 +552,9 @@ jobs:
 
   ci-build:
     name: Build
-    needs: [ci-fast-checks]
-    # Build runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-fast]
+    # Build is NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -532,7 +564,7 @@ jobs:
         with:
           fetch-depth: 2
 
-      # Path guard: Check if changes affect critical files
+      # Path guard: Check if changes affect critical files (only for pushes and non-production PRs)
       - name: Check for relevant changes
         id: check_changes
         uses: ./.github/actions/check-path-changes
@@ -579,9 +611,9 @@ jobs:
 
   ci-unit-tests:
     name: Unit Tests
-    needs: [ci-fast-checks]
-    # Unit tests run on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    needs: [ci-fast]
+    # Unit tests are NOT required for merge queue (main) - only run on push or PRs to production/testing
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -655,7 +687,7 @@ jobs:
   ci-merge-smoke:
     name: Merge Group Smoke
     if: ${{ github.event_name == 'merge_group' }}
-    needs: [ci-fast-checks]
+    needs: [ci-fast]
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
@@ -677,8 +709,8 @@ jobs:
   ci-e2e-tests:
     name: E2E Tests
     needs: [ci-build, neon-db]
-    # E2E runs on push to main or PRs with testing label
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'testing')) }}
+    # E2E is NOT required for merge queue (main) - only run on push to main/production or PRs with testing label
+    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && (github.event.pull_request.base.ref == 'production' || contains(github.event.pull_request.labels.*.name, 'testing'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -804,7 +836,7 @@ jobs:
           fi
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -915,7 +947,8 @@ jobs:
     needs:
       - ci-env-example-guard
       - ci-guardrails
-      - ci-fast-checks
+      - ci-typecheck
+      - ci-lint
       - neon-db
       - drizzle-migration-guard
       - ci-drizzle-check
@@ -1096,67 +1129,78 @@ jobs:
               });
             }
   deploy:
-    name: Deploy to Production
-    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before production deploy
+    needs: [ci-build, ci-unit-tests, ci-e2e-tests] # Requires all CI jobs to pass before main deploy
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
       deployment_url: ${{ steps.deploy.outputs.deployment_url }}
     env:
+      # Main/staging must always use DATABASE_URL_MAIN; keep production secrets separate.
+      DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     environment:
-      name: Production
-      url: https://jov.ie
+      name: Main Staging
+      url: https://main.jov.ie
     steps:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
-      - name: DB safety check (production - preflight)
+      - name: DB safety check (main - preflight)
         run: pnpm --filter=@jovie/web run drizzle:migrate:preflight
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
-      - name: DB migrate (production - Drizzle)
+      - name: DB migrate (main - Drizzle)
         run: pnpm --filter=@jovie/web run drizzle:migrate
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
           GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
-      - name: Pull env (production)
-        run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+          ALLOW_PROD_MIGRATIONS: 'true'  # Allow automated migrations on main (staging environment)
+      - name: DB seed (main)
+        run: pnpm --filter=@jovie/web run db:seed
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL_MAIN }}
+          GIT_BRANCH: main
+          ALLOW_DB_SEED: '1'
+        continue-on-error: false
+      - name: Pull env (main)
+        run: vercel pull --yes --environment=preview --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-      - name: Build (production)
-        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Build
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_MAIN }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_MAIN }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-      - name: Deploy (production)
+      - name: Deploy (prebuilt)
         id: deploy
         run: |
-          deployment_url=$(vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }})
+          deployment_url=$(vercel deploy --prebuilt --token ${{ secrets.VERCEL_TOKEN }})
           echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
   canary-health-gate:
-    name: Canary Health Gate
+    name: Canary Health Gate (staging)
     needs: [deploy]
     if: ${{ needs.deploy.result == 'success' }}
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: ${{ needs.deploy.outputs.deployment_url }}
-      fallback_health_url: https://jov.ie/api/health
+      fallback_health_url: https://main.jov.ie/api/health
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
-  deploy-notify:
-    name: Notify production deploy
+  staging-deploy-notify:
+    name: Notify staging deploy
     needs: [deploy, canary-health-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
@@ -1189,7 +1233,7 @@ jobs:
           echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
-      - name: Slack notify (production deploy)
+      - name: Slack notify (staging deploy)
         if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
@@ -1198,7 +1242,7 @@ jobs:
           author_name: 'Deploy'
           custom_payload: |
             {
-              "text": "✅ Production deployed: jov.ie",
+              "text": "✅ Staging deployed: main.jov.ie",
               "attachments": [
                 {
                   "color": "good",
@@ -1213,7 +1257,7 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      - name: Slack notify (production deploy failed)
+      - name: Slack notify (staging deploy failed)
         if: ${{ (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
@@ -1222,7 +1266,7 @@ jobs:
           author_name: 'Deploy'
           custom_payload: |
             {
-              "text": "🚨 Production deploy failed: jov.ie",
+              "text": "🚨 Staging deploy failed: main.jov.ie",
               "attachments": [
                 {
                   "color": "danger",
@@ -1238,11 +1282,772 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
-  # Lighthouse CI runs after production deploy
-  lighthouse-ci:
-    name: Lighthouse CI
-    needs: [deploy, canary-health-gate]
-    if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' }}
+  # ============================================================================
+  # FAST LANE / GATED LANE SYSTEM
+  # ============================================================================
+  # Fast Lane: Opt-in auto-promotion to production for low-risk changes
+  # Gated Lane: Default - requires manual promotion for high-risk changes
+  # See agents.md section 5.6 for full documentation
+  # ============================================================================
+
+  fastlane-eligibility:
+    name: Fast Lane Eligibility
+    needs: [drizzle-migration-guard]
+    # Only run on push to main (staging deploy flow)
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+      blockers: ${{ steps.check.outputs.blockers }}
+      has_statsig_gate: ${{ steps.check.outputs.has_statsig_gate }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check fast lane eligibility
+        id: check
+        uses: ./.github/actions/fastlane-eligibility
+
+      # Note: Label application moved to promote job to avoid race condition
+      # The promote job creates/updates the PR first, then applies labels
+
+  smoke-failure-alert:
+    name: Smoke Failure Alert
+    needs: [ci-public-profile-smoke, promote]
+    # Alert when smoke tests fail after staging deploy
+    # Depends on promote to ensure PR exists before trying to add labels
+    if: ${{ always() && needs.ci-public-profile-smoke.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Block promotion PR with smoke-failed label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Find the promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length > 0) {
+              const pr = prs[0];
+              core.info(`Blocking promotion PR #${pr.number} due to smoke test failure`);
+
+              // Add blocking label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['blocked:smoke-failed']
+              });
+
+              // Add comment explaining the block
+              const commentBody = [
+                '## Smoke Tests Failed',
+                '',
+                'Staging smoke tests failed after deploy to main.jov.ie. Production promotion is **blocked**.',
+                '',
+                '**Action Required:** Investigate and fix the smoke test failures before promoting to production.',
+                '',
+                `[View CI Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: commentBody
+              });
+            }
+
+      - name: Slack alert (smoke failure blocks production)
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Smoke Test'
+          custom_payload: |
+            {
+              "text": ":rotating_light: Staging smoke tests FAILED - Production promotion BLOCKED",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Environment", "value": "main.jov.ie (staging)", "short": true },
+                    { "title": "Status", "value": "Production blocked", "short": true },
+                    { "title": "Action", "value": "Investigate smoke test failures before promoting", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  canary-failure-alert:
+    name: Canary Failure Alert
+    needs: [canary-health-gate, promote]
+    # Alert when canary gate fails after staging deploy
+    # Depends on promote to ensure PR exists before trying to add labels
+    if: ${{ always() && needs.canary-health-gate.result == 'failure' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Block promotion PR with canary-failed label
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Find the promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length > 0) {
+              const pr = prs[0];
+              core.info(`Blocking promotion PR #${pr.number} due to canary gate failure`);
+
+              // Add blocking label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: ['blocked:canary-failed']
+              });
+
+              // Add comment explaining the block
+              const commentBody = [
+                '## Canary Health Gate Failed',
+                '',
+                'The canary health gate failed after deploy to main.jov.ie. Production promotion is **blocked**.',
+                '',
+                '**Action Required:** Investigate the health check failures before promoting to production.',
+                '',
+                `[View CI Run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                body: commentBody
+              });
+            }
+
+      - name: Slack alert (canary failure blocks production)
+        if: ${{ env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Canary Gate'
+          custom_payload: |
+            {
+              "text": ":rotating_light: Canary health gate FAILED - Production promotion BLOCKED",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Environment", "value": "main.jov.ie (staging)", "short": true },
+                    { "title": "Status", "value": "Production blocked", "short": true },
+                    { "title": "Action", "value": "Investigate health check failures before promoting", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  promote:
+    name: Promote to Production
+    # Supports both Fast Lane (auto-promote) and Gated Lane (manual review)
+    # Fast Lane: Auto-enables auto-merge if 'fastlane' label + no blockers + smoke passed
+    # Gated Lane: Creates/updates PR with QA checklist for manual review
+    needs: [canary-health-gate, ci-public-profile-smoke, fastlane-eligibility]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      pr_number: ${{ steps.create-pr.outputs.pr_number }}
+      promotion_type: ${{ steps.determine-path.outputs.promotion_type }}
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 2 }
+
+      - name: Determine promotion path (Fast Lane vs Gated)
+        id: determine-path
+        uses: actions/github-script@v8
+        with:
+          script: |
+            // Get eligibility from fastlane-eligibility job
+            const eligible = '${{ needs.fastlane-eligibility.outputs.eligible }}' === 'true';
+            const smokesPassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            core.info(`Fast lane eligibility: ${eligible}`);
+            core.info(`Smoke tests passed: ${smokesPassed}`);
+            core.info(`Canary gate passed: ${canaryPassed}`);
+
+            // Find existing promotion PR
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:main`,
+              base: 'production'
+            });
+
+            if (prs.length === 0) {
+              core.info('No existing promotion PR - will create one');
+              core.setOutput('action', 'create_pr');
+              core.setOutput('promotion_type', 'gated');
+              return;
+            }
+
+            const pr = prs[0];
+            const labels = pr.labels.map(l => l.name);
+            core.info(`Found promotion PR #${pr.number} with labels: ${labels.join(', ')}`);
+
+            // Check for fast lane eligibility
+            const hasFastlane = labels.includes('fastlane');
+            const hasBlockers = labels.some(l => l.startsWith('blocked:'));
+            const hasGated = labels.includes('gated');
+
+            core.setOutput('pr_number', pr.number);
+
+            if (hasFastlane && !hasBlockers && !hasGated && eligible && smokesPassed && canaryPassed) {
+              core.info('FAST LANE: All conditions met - will enable auto-merge');
+              core.setOutput('action', 'auto_merge');
+              core.setOutput('promotion_type', 'fastlane');
+            } else {
+              // Log reason for gated lane
+              const reason = hasBlockers ? `Blocking labels: ${labels.filter(l => l.startsWith('blocked:')).join(', ')}` :
+                            hasGated ? 'Explicit gated label' :
+                            !hasFastlane ? 'No fastlane label (opt-in required)' :
+                            !eligible ? 'Path-based blocks detected' :
+                            !smokesPassed ? 'Smoke tests failed' :
+                            'Canary gate failed';
+              core.info(`GATED LANE: ${reason}`);
+              core.setOutput('action', 'update_pr');
+              core.setOutput('promotion_type', 'gated');
+              core.setOutput('gated_reason', reason);
+            }
+
+      - name: Create/Update promotion PR
+        id: create-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create PR body with QA checklist (using heredoc to avoid backtick issues)
+          pr_body=$(cat <<'EOF'
+          ## Release Promotion: main → production
+
+          **Manual Review Required** (unless fast lane eligible)
+
+          This PR promotes changes from **main** to **production** for production release.
+
+          ### Fast Lane Eligibility
+          Add the `fastlane` label if this PR:
+          - Has NO database migrations
+          - Has NO auth/Clerk changes
+          - Has NO core flow changes (onboarding, subscribe)
+          - Has NO payment changes
+          - Is behind a feature flag OR is purely cosmetic/copy
+
+          If any `blocked:*` labels are present, fast lane is not available.
+
+          ### Pre-merge Checklist (Gated Lane)
+          - [ ] **Full CI passed** (ci-full job completed successfully)
+          - [ ] **CodeQL security scan passed** (if applicable)
+          - [ ] **Preview environment tested** and verified working
+          - [ ] **Database migrations reviewed** (if any)
+          - [ ] **Feature flags configured** appropriately for production
+          - [ ] **Monitoring/alerts reviewed** for new features
+          - [ ] **Performance impact assessed** (no regressions)
+          - [ ] **Rollback plan documented** (feature flags, DB, etc.)
+
+          ### Release QA
+          - [ ] **Smoke tests passed** in main environment
+          - [ ] **Key user journeys verified** manually
+          - [ ] **Mobile/responsive tested** (if UI changes)
+          - [ ] **Cross-browser compatibility** verified (if applicable)
+          - [ ] **Error handling tested** (edge cases, failures)
+
+          ### Documentation
+          - [ ] **CHANGELOG updated** with user-facing changes
+          - [ ] **Feature documentation** updated (if applicable)
+          - [ ] **API docs updated** (if API changes)
+
+          **Do not merge until all checks pass and manual QA is complete (or use fast lane if eligible).**
+          EOF
+          )
+
+          # Check if PR already exists
+          existing_pr=$(gh pr list --head main --base production --json number --jq '.[0].number // empty')
+          if [ -z "$existing_pr" ]; then
+            echo "Creating new PR: main → production"
+            new_pr=$(gh pr create --base production --head main --title "Release: Promote main to production" --body "$pr_body")
+            pr_number=$(echo "$new_pr" | grep -oE '[0-9]+$' || gh pr list --head main --base production --json number --jq '.[0].number')
+            echo "pr_number=$pr_number" >> $GITHUB_OUTPUT
+          else
+            echo "PR already exists: #$existing_pr"
+            echo "pr_number=$existing_pr" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Clean up stale blocking labels
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+
+            if (!prNumber) {
+              core.info('No PR number available - skipping label cleanup');
+              return;
+            }
+
+            const smokePassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            // Get current labels on PR
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const currentLabels = pr.labels.map(l => l.name);
+            const labelsToRemove = [];
+
+            // Remove smoke-failed label if smoke tests now pass
+            if (smokePassed && currentLabels.includes('blocked:smoke-failed')) {
+              labelsToRemove.push('blocked:smoke-failed');
+            }
+
+            // Remove canary-failed label if canary gate now passes
+            if (canaryPassed && currentLabels.includes('blocked:canary-failed')) {
+              labelsToRemove.push('blocked:canary-failed');
+            }
+
+            // Remove stale labels
+            for (const label of labelsToRemove) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label
+                });
+                core.info(`Removed stale label: ${label}`);
+              } catch (error) {
+                // Label might already be removed - that's OK
+                if (error.status !== 404) {
+                  core.warning(`Failed to remove label ${label}: ${error.message}`);
+                }
+              }
+            }
+
+            // Add comment if labels were removed
+            if (labelsToRemove.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## Blocking Labels Removed',
+                  '',
+                  'The following blocking labels have been removed because conditions have improved:',
+                  labelsToRemove.map(l => `- \`${l}\``).join('\n'),
+                  '',
+                  'Re-evaluate fast lane eligibility for this PR.'
+                ].join('\n')
+              });
+            }
+
+      - name: Apply blocking labels to promotion PR
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const blockers = JSON.parse('${{ needs.fastlane-eligibility.outputs.blockers }}' || '[]');
+            const hasStatsigGate = '${{ needs.fastlane-eligibility.outputs.has_statsig_gate }}' === 'true';
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+
+            if (!prNumber) {
+              core.warning('No PR number available - skipping label application');
+              return;
+            }
+
+            core.info(`Applying labels to PR #${prNumber}`);
+
+            // Map blockers to labels
+            const labelMap = {
+              'migration': 'blocked:migration',
+              'auth': 'blocked:auth',
+              'core-flow': 'blocked:core-flow',
+              'payments': 'blocked:payments'
+            };
+
+            // Build list of labels to add
+            const labelsToAdd = blockers.map(b => labelMap[b]).filter(Boolean);
+
+            // Add feature gate label if detected
+            if (hasStatsigGate) {
+              labelsToAdd.push('has-feature-gate');
+            }
+
+            if (labelsToAdd.length > 0) {
+              core.info(`Adding labels: ${labelsToAdd.join(', ')}`);
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: labelsToAdd
+                });
+              } catch (error) {
+                core.warning(`Failed to add labels: ${error.message}`);
+              }
+            }
+
+            // Log eligibility status
+            if (blockers.length === 0) {
+              core.info('PR is ELIGIBLE for fast lane (no blocking patterns detected)');
+            } else {
+              core.info(`PR is NOT eligible for fast lane - blockers: ${blockers.join(', ')}`);
+            }
+
+      - name: Auto-apply fastlane label if eligible
+        id: auto-fastlane
+        if: steps.create-pr.outputs.pr_number
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.create-pr.outputs.pr_number }}');
+            const eligible = '${{ needs.fastlane-eligibility.outputs.eligible }}' === 'true';
+            const smokePassed = '${{ needs.ci-public-profile-smoke.result }}' === 'success';
+            const canaryPassed = '${{ needs.canary-health-gate.result }}' === 'success';
+
+            if (!prNumber) {
+              core.info('No PR number - skipping fastlane label');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            // Get current labels
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const labels = pr.labels.map(l => l.name);
+            const hasBlockers = labels.some(l => l.startsWith('blocked:'));
+            const hasGated = labels.includes('gated');
+            const hasFastlane = labels.includes('fastlane');
+
+            // Skip if already has fastlane or explicitly gated
+            if (hasFastlane) {
+              core.info('PR already has fastlane label');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            if (hasGated) {
+              core.info('PR has explicit gated label - skipping fastlane');
+              core.setOutput('applied', 'false');
+              return;
+            }
+
+            // Auto-apply fastlane if all conditions met
+            if (eligible && !hasBlockers && smokePassed && canaryPassed) {
+              core.info('All conditions met - applying fastlane label and enabling auto-merge');
+
+              // Apply the fastlane label
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['fastlane']
+              });
+
+              // Enable auto-merge via GraphQL
+              try {
+                await github.graphql(`
+                  mutation($pullRequestId: ID!) {
+                    enablePullRequestAutoMerge(input: {
+                      pullRequestId: $pullRequestId,
+                      mergeMethod: SQUASH
+                    }) {
+                      pullRequest { number }
+                    }
+                  }
+                `, { pullRequestId: pr.node_id });
+                core.info(`Auto-merge enabled for PR #${prNumber}`);
+              } catch (error) {
+                core.warning(`Failed to enable auto-merge: ${error.message}`);
+              }
+
+              // Add comment explaining the auto-fastlane
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## 🚀 Fast Lane Auto-Enabled',
+                  '',
+                  'This PR has been automatically labeled for fast lane promotion:',
+                  '- ✅ No blocking file patterns detected',
+                  '- ✅ Smoke tests passed',
+                  '- ✅ Canary health gate passed',
+                  '',
+                  'Auto-merge has been enabled. The PR will merge once all checks pass.',
+                  '',
+                  '_Add the `gated` label to require manual review instead._'
+                ].join('\n')
+              });
+
+              core.setOutput('applied', 'true');
+              core.setOutput('pr_number', prNumber.toString());
+            } else {
+              const reasons = [];
+              if (!eligible) reasons.push('Blocking patterns detected');
+              if (hasBlockers) reasons.push(`Has blocking labels: ${labels.filter(l => l.startsWith('blocked:')).join(', ')}`);
+              if (!smokePassed) reasons.push('Smoke tests did not pass');
+              if (!canaryPassed) reasons.push('Canary gate did not pass');
+              core.info(`Fastlane not auto-applied: ${reasons.join(', ')}`);
+              core.setOutput('applied', 'false');
+            }
+
+      - name: Fast lane auto-merge
+        if: steps.determine-path.outputs.action == 'auto_merge'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = parseInt('${{ steps.determine-path.outputs.pr_number }}');
+            core.info(`Enabling auto-merge for fast lane PR #${prNumber}`);
+
+            // Get PR details for GraphQL mutation
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            try {
+              // Enable auto-merge via GraphQL
+              await github.graphql(`
+                mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: SQUASH
+                  }) {
+                    pullRequest { number }
+                  }
+                }
+              `, { pullRequestId: pr.node_id });
+
+              core.info(`Fast lane: Auto-merge enabled for PR #${prNumber}`);
+
+              // Add comment indicating fast lane promotion
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  '## Fast Lane Auto-Promotion',
+                  '',
+                  'This PR has been automatically queued for merge via **Fast Lane**.',
+                  '',
+                  '**Conditions met:**',
+                  '- `fastlane` label present',
+                  '- No blocking labels (`blocked:*`)',
+                  '- Staging smoke tests passed',
+                  '- Canary health gate passed',
+                  '- No high-risk path changes detected',
+                  '',
+                  'The PR will merge automatically once all required checks pass.'
+                ].join('\n')
+              });
+            } catch (error) {
+              core.warning(`Failed to enable auto-merge: ${error.message}`);
+              core.warning('PR may need manual merge or auto-merge may not be enabled for this repo');
+            }
+
+      - name: Notify fast lane promotion
+        if: (steps.determine-path.outputs.action == 'auto_merge' || steps.auto-fastlane.outputs.applied == 'true') && env.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#deployments'
+          author_name: 'Fast Lane'
+          custom_payload: |
+            {
+              "text": ":rocket: Fast Lane: Auto-promoting to production",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Promotion Type", "value": "Fast Lane (automated)", "short": true },
+                    { "title": "PR", "value": "#${{ steps.auto-fastlane.outputs.pr_number || steps.determine-path.outputs.pr_number }}", "short": true },
+                    { "title": "Status", "value": "Auto-merge enabled, awaiting checks", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # NOTE: ai-review-gate job removed - was referencing deleted claude-code-review.yml
+  # and non-existent copilot-pr-review.yml. CodeRabbit now handles AI reviews via .coderabbit.yaml
+
+  deploy-prod:
+    needs: [ci-fast, ci-build, ci-unit-tests, ci-e2e-tests]
+    if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Production must always use DATABASE_URL; keep main/staging secrets separate.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      DATABASE_URL_MAIN: ${{ secrets.DATABASE_URL_MAIN }}
+    environment:
+      name: Production
+      url: https://jov.ie
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Install Vercel CLI
+        run: pnpm add -g vercel@latest
+      - name: DB safety check (production - preflight)
+        run: pnpm --filter=@jovie/web run drizzle:migrate:preflight
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          GIT_BRANCH: production
+          ALLOW_PROD_MIGRATIONS: 'true'
+      - name: DB migrate (production) — requires backup and ALLOW_PROD_MIGRATIONS=true
+        run: pnpm --filter=@jovie/web run drizzle:migrate:prod
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          GIT_BRANCH: production
+          ALLOW_PROD_MIGRATIONS: true
+        continue-on-error: false
+      - name: Pull env (production)
+        run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Build (production)
+        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL_PROD }}
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY_PROD }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      - name: Deploy (production, prebuilt)
+        run: vercel deploy --prebuilt --prod --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Resolve failure provenance
+        id: failure-provenance
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          api_url="${{ github.api_url }}/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100"
+          response=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" "$api_url")
+          job_url=$(RESPONSE="$response" JOB_NAME="${{ github.job }}" python - <<'PY'
+          import json
+          import os
+
+          data = json.loads(os.environ["RESPONSE"])
+          job_name = os.environ["JOB_NAME"]
+          job = next((item for item in data.get("jobs", []) if item.get("name") == job_name), None)
+          print(job.get("html_url", "") if job else "")
+          PY
+          )
+
+          if [ -z "$job_url" ]; then
+            job_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}?check_suite_focus=true"
+          fi
+
+          echo "job_name=${{ github.job }}" >> "$GITHUB_OUTPUT"
+          echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
+
+      - name: Slack notify (production deploy)
+        if: ${{ success() && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "✅ Production deployed: jov.ie",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Workflow", "value": "CI", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (production deploy failed)
+        if: ${{ failure() && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#alerts-critical'
+          author_name: 'Deploy'
+          custom_payload: |
+            {
+              "text": "🔥 Production deploy failed: jov.ie",
+              "attachments": [
+                {
+                  "color": "danger",
+                  "fields": [
+                    { "title": "Branch", "value": "production", "short": true },
+                    { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
+                    { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  lighthouse-ci-production:
+    name: Lighthouse CI (Production)
+    needs: [deploy-prod]
+    if: ${{ github.ref == 'refs/heads/production' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

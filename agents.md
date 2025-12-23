@@ -1,6 +1,6 @@
 # Agents Guide (Jovie)
 
-This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo so we ship fast while keeping `main` clean.
+This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo so we ship fast while keeping `main` and `production` clean.
 
 ## Quickstart for AI agents
 
@@ -9,18 +9,25 @@ This file defines how AI agents (Claude, Codex, Copilot, etc.) work in this repo
 - **Branches & PRs:** Always work on feature branches from `main` and follow sections 1–2 for branching and PR expectations.
 - **Guardrails:** Before making product changes, skim sections 8–13 for architecture, runtime/auth/DB rules, testing expectations, and CI/CD/landmine guidance.
 
-## ⛔ CRITICAL: Direct Push Prohibition
+## ⛔ CRITICAL: Production Merge Prohibition
 
-**AI agents must NEVER push directly to `main`.**
+**AI agents must NEVER merge PRs to the `production` branch.**
 
-All changes must go through PRs:
+This includes:
 
-- Create feature branches from `main`
-- Open PRs targeting `main`
-- Let CI validate changes before merge
-- Use auto-merge label for eligible PRs (after CI passes)
+- Running `gh pr merge` on any PR targeting `production`
+- Running `gh pr review --approve` on production PRs
+- Enabling auto-merge on production PRs
+- Any action that results in code being deployed to production
 
-**Merging to `main` deploys directly to production (jov.ie).** Ensure changes are ready before merging.
+**Production merges require explicit human approval and action.** AI agents may:
+
+- Create PRs targeting `main`
+- Merge PRs to `main` (with auto-merge label, after CI passes)
+- Create promotion PRs from `main` → `production` (via workflow trigger)
+- Monitor CI status on production PRs
+
+But **only the human operator** may approve and merge to `production`.
 
 ## ⛔ CRITICAL: Repository Settings & Branch Protection Prohibition
 
@@ -111,17 +118,23 @@ Configuration location: `.claude.json` (project-specific)
   - **Naming:** `feat/<slug>`, `fix/<slug>`, `chore/<slug>` (3–6 word kebab-case slug).
   - **Never** push directly to `main`.
 
-- **Long-lived branches**
+- **Long-lived branch**
 
-  - **`main`** (single long-lived branch)
-    - Source of truth for all development.
+  - **`main`** (trunk-based development)
+    - Source of truth for all day-to-day development.
     - Must always be **green** on: `pnpm typecheck`, `pnpm lint`, `pnpm test`, basic E2E smoke.
-    - **Deploys directly to production** at [jov.ie](https://jov.ie) on push.
+    - Deploys to [main.jov.ie](https://main.jov.ie) (Main Staging Vercel environment) automatically on push.
     - Full CI runs on push: build, unit tests, E2E smoke, Drizzle checks, database migrations.
-    - Use feature flags (Statsig) for staged rollouts.
+  - **`production`**
+    - Mirrors what users see at [jov.ie](https://jov.ie) in production.
+    - Only updated via **release PRs from `main` → `production`**, never by direct commits.
+    - Requires manual approval before merge (enforced by branch protection).
+    - Deploys automatically to production after PR merge.
 
 - **Neon Database Branches**
-  - **`main`** - Single production database branch.
+  - **`production`** - Primary production branch mapped to Git `production`.
+  - **`main`** - Staging branch mapped to Git `main` for rapid iteration.
+  - **NO preview branch** - Legacy preview environment removed (main is the staging environment now).
   - **Ephemeral branches** - Auto-created per PR for full CI, auto-deleted on PR close (see neon-ephemeral-branch-cleanup.yml).
 
 ## 2. PR Expectations (All Agents)
@@ -178,13 +191,12 @@ Configuration location: `.claude.json` (project-specific)
     - No blocking labels: `blocked`, `human-review`, `no-auto-merge`, `claude:needs-fixes`, `needs-human`.
   - **Dependabot:** auto-merge for patch/minor + security, subject to policy checks.
   - **Codegen/automation PRs:** auto-merge when labeled appropriately (e.g. `codegen`).
-  - **Production promotion PRs:** **never** auto-merged; must be manually approved.
 
 ## 5. Neon & Migrations
 
 - **Do not** run Drizzle migrations manually in ad-hoc ways.
 - **Do not** make direct DDL changes to the database - use Drizzle migrations only.
-- **Long-lived branches:** Only `main` and `production` (no preview branch).
+- **Long-lived branch:** Only `main` (trunk-based development).
 
 ### Database-Level Migration Protection
 
@@ -553,13 +565,14 @@ Before merging any migration:
 ### Fast Path (Feature PRs → main)
 
 - **Triggers:** PRs to `main` branch
-- **Checks:** TypeScript typecheck + ESLint (~30s total)
+- **Checks:** TypeScript typecheck + ESLint (~10-15s total)
 - **Auto-merge:** Enabled for dependabot, codegen, PRs with `auto-merge` label
-- **Timeline:** PR merge in ~2 minutes (if auto-merge eligible)
+- **Deployment:** Automatic to [main.jov.ie](https://main.jov.ie) on merge
+- **Timeline:** Feature → production in ~2 minutes (if auto-merge eligible)
 
-### Full CI (Push to main)
+### Full CI (main → production PRs)
 
-- **Triggers:** Push to `main`
+- **Triggers:** Push to `main` or PRs to `production`
 - **Checks:**
   - All fast checks (typecheck, lint)
   - Drizzle schema validation
@@ -567,53 +580,102 @@ Before merging any migration:
   - Unit tests
   - E2E smoke tests
 - **Database migrations:** Run automatically via `drizzle:migrate` on deployment
-- **Deployment:** Automatic to [jov.ie](https://jov.ie) after CI passes
-- **Timeline:** Feature → production in ~5 minutes
+- **Auto-merge:** Disabled (requires manual approval for production)
+- **Deployment:** Automatic to [jov.ie](https://jov.ie) after PR merge
+- **Timeline:** Main → production in ~5 minutes (with review)
 
 ### Database Migrations
 
 - **Auto-run:** Migrations run automatically on Vercel deploy via `drizzle:migrate` script
 - **Ephemeral Neon branches:** Auto-created per PR with unique name, auto-deleted on PR close
-- **Long-lived branch:** Only `main` (production database)
+- **Long-lived branch:** Only `main` (trunk-based development)
 - **Migration strategy:** Linear append-only (no squashing, no editing existing migrations)
 - **Testing:** Each PR gets isolated ephemeral database for safe schema testing
 
 ### Environment URLs
 
-- **Production:** [jov.ie](https://jov.ie) - Deployed from `main` branch
+- **Main staging:** [main.jov.ie](https://main.jov.ie) - Deployed from `main` branch
+- **Production:** [jov.ie](https://jov.ie) - Deployed from `production` branch
 - **PR previews:** Unique Vercel preview URLs per PR (ephemeral)
 
 ### YC-Optimized Velocity
 
 - **Ship multiple times per day:** Fast CI enables rapid iteration
-- **Feature → production:** ~5 minutes (fast PR checks + full CI on push)
+- **Feature → main:** ~2 minutes (auto-merge)
+- **Main → production:** ~5 minutes (manual review + auto-deploy)
 - **Total:** Ship to production in < 10 minutes from PR creation
 
 ### Rollback Strategy
 
 - **Code rollback:** `git revert` + push to main
 - **Database rollback:** Create reverse migration (append-only, no destructive rollback)
-- **Feature flag rollback:** Disable flag in Statsig (instant)
+- **Emergency:** Direct PR to production (bypass main)
 - **Backups:** Neon point-in-time recovery available
 
-## 5.6 CI Labels
+## 5.6 Two-Lane Deployment Model
 
-| Label | Effect |
-|-------|--------|
-| `auto-merge` | Auto-merge after CI passes |
-| `testing` | Run full CI (build, unit tests, E2E) on PR |
-| `blocked:migration` | Blocks auto-merge - has DB migrations |
+Production promotion uses a two-lane system: **Fast Lane** for low-risk changes and **Gated Lane** for high-risk changes.
+
+### Fast Lane (Opt-in via `fastlane` label)
+
+Auto-promotes from staging to production when ALL conditions are met:
+
+1. **Opt-in required:** PR must have `fastlane` label
+2. **No blocking changes detected:**
+   - No database migrations (`drizzle/migrations/`)
+   - No auth/Clerk changes (`app/(auth)/`, `lib/auth/`, `middleware.ts`)
+   - No core flow changes (onboarding, signin, signup, subscribe)
+   - No payment/billing changes (`app/billing/`, `lib/stripe/`)
+3. **Staging smoke tests pass**
+4. **Canary health gate passes**
+
+**When to use Fast Lane:**
+
+- Cosmetic/copy changes
+- Bug fixes behind existing feature gates
+- Non-critical UI improvements
+- Changes to non-core features
+- New features behind Statsig flags
+
+### Gated Lane (Default)
+
+Manual promotion required. The system auto-applies blocking labels:
+
+| Label | Trigger |
+|-------|---------|
+| `blocked:migration` | Changes to `drizzle/migrations/` |
 | `blocked:auth` | Changes to auth routes, Clerk, middleware |
 | `blocked:core-flow` | Changes to onboarding, signin, signup, subscribe |
 | `blocked:payments` | Changes to billing, pricing, Stripe |
-| `has-feature-gate` | Changes use Statsig feature gates (safer rollout) |
+| `blocked:smoke-failed` | Staging smoke tests failed |
+| `blocked:canary-failed` | Canary health gate failed |
+
+The `gated` label forces manual review even if otherwise eligible for fast lane.
 
 ### Label Lifecycle
 
 Blocking labels are automatically managed:
 
-- **Auto-applied**: When blocking conditions are detected (path patterns)
-- **Manual removal**: Blocking labels persist and require human review before removing
+- **Auto-applied**: When blocking conditions are detected (path patterns, test failures)
+- **Auto-removed**: `blocked:smoke-failed` and `blocked:canary-failed` are removed when tests pass on retry
+- **Manual removal**: Path-based labels (`blocked:migration`, etc.) persist and require human review after addressing the underlying changes
+
+### Informational Labels
+
+| Label | Meaning |
+|-------|---------|
+| `has-feature-gate` | Changes use Statsig feature gates (safer for fast lane) |
+| `fastlane` | Opt-in for fast lane auto-promotion |
+
+### Release Windows (Team Practice)
+
+- **Pre-launch:** 1 production release window/day (end of day)
+- **Post-launch:** 2/day (midday + end of day)
+
+This is team practice, NOT CI-enforced:
+
+- Fast lane auto-promotes anytime (24/7)
+- Gated PRs accumulate and get reviewed in windows
 
 ### AI Code Reviews
 
@@ -640,7 +702,7 @@ Blocking labels are automatically managed:
 
 - **No direct dependencies** on analytics/flags outside of the existing Statsig and analytics wrappers in `@/lib` and `@/lib/statsig`.
 - **No direct Neon branch management** from agents; always go through CI workflows.
-- **No direct pushes** to `main`.
+- **No direct pushes** to `main` or `production`.
 - **HARD GUARDRAIL – Drizzle migrations are immutable:** Treat everything under `drizzle/migrations` as append-only. Do **not** edit, delete, reorder, squash, or regenerate existing migration files for any reason; only add new migrations. If a past migration appears incorrect, stop and escalate to a human instead of attempting an automated fix.
 - New features ship **behind Statsig flags/experiments** and with **Statsig events** (or equivalent Statsig metrics) for primary actions.
 
@@ -731,7 +793,7 @@ Blocking labels are automatically managed:
 - The database client uses connection pooling (`Pool`) for production-ready performance.
 - Transaction support enables proper RLS with `SET LOCAL` session variables that persist within transaction scope.
 - Run Drizzle migrations only in Node (never from Edge code).
-- Keep Neon branches tidy: single `main` branch for production; ephemeral branches per PR created/destroyed via CI.
+- Keep Neon branches tidy: production parent + a primary child for preview; ephemeral branches per PR created/destroyed via CI.
 - Set `app.clerk_user_id` per request on the server before DB calls when RLS policies depend on it (use `withDbSession` or `withDbSessionTx` helpers).
 
 ### 9.4 Postgres RLS Pattern
@@ -918,7 +980,7 @@ All AI agents **MUST** commit their work at the end of every job/task. This ensu
 
 6. **Push policy:**
    - Commit locally at minimum.
-   - Push to remote only if on a feature branch (never push directly to `main`).
+   - Push to remote only if on a feature branch (never push directly to `main` or `production`).
    - Ask before pushing if uncertain about branch state.
 
 ### Example End-of-Job Flow

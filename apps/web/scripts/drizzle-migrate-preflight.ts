@@ -73,7 +73,11 @@ function validateEnvironment(): void {
     );
   }
 
-  if (branch === 'production' && process.env.ALLOW_PROD_MIGRATIONS !== 'true') {
+  // Treat 'main' as production in trunk-based development
+  if (
+    (branch === 'main' || branch === 'production') &&
+    process.env.ALLOW_PROD_MIGRATIONS !== 'true'
+  ) {
     errors.push(
       'ALLOW_PROD_MIGRATIONS=true is required for production migrations.'
     );
