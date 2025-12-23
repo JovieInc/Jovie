@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +14,22 @@ interface AdminAvatarPayload {
 
 export async function POST(request: NextRequest) {
   try {
+    const entitlements = await getCurrentUserEntitlements();
+
+    if (!entitlements.isAuthenticated) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (!entitlements.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403, headers: NO_STORE_HEADERS }
+      );
+    }
+
     const body = (await request
       .json()
       .catch(() => null)) as AdminAvatarPayload | null;
