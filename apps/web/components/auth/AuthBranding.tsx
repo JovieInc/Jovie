@@ -47,7 +47,11 @@ export function AuthBranding({
       <div className='relative mx-auto w-full max-w-[18rem] z-10'>
         <div className='text-center'>
           <div className='mb-8'>
-            <BrandLogo size={64} tone='white' className='mx-auto drop-shadow-lg' />
+            <BrandLogo
+              size={64}
+              tone='white'
+              className='mx-auto drop-shadow-lg'
+            />
           </div>
           {showText && (
             <>
