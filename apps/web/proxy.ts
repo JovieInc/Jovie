@@ -8,6 +8,10 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
+import {
+  buildContentSecurityPolicy,
+  SCRIPT_NONCE_HEADER,
+} from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 
@@ -70,11 +74,21 @@ function isMockOrMissingClerkConfig(): boolean {
   );
 }
 
+const generateNonce = () => {
+  const nonceBytes = new Uint8Array(16);
+  crypto.getRandomValues(nonceBytes);
+  return btoa(String.fromCharCode(...nonceBytes));
+};
+
 async function handleRequest(req: NextRequest, userId: string | null) {
   await ensureSentry();
   try {
     // Start performance timing
     const startTime = Date.now();
+    const nonce = generateNonce();
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set(SCRIPT_NONCE_HEADER, nonce);
+    const contentSecurityPolicy = buildContentSecurityPolicy({ nonce });
 
     // Conservative bot blocking - only on sensitive API endpoints
     const pathname = req.nextUrl.pathname;
@@ -86,12 +100,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       (pathname === '/sentry-example-page' ||
         pathname === '/api/sentry-example-api')
     ) {
-      return NextResponse.rewrite(new URL('/404', req.url));
+      return NextResponse.rewrite(new URL('/404', req.url), {
+        request: { headers: requestHeaders },
+      });
     }
 
     // Allow sidebar demo to bypass authentication
     if (pathname === '/sidebar-demo') {
-      return NextResponse.next();
+      return NextResponse.next({ request: { headers: requestHeaders } });
     }
 
     if (isSensitiveAPI) {
@@ -180,7 +196,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (req.nextUrl.pathname === '/') {
         res = NextResponse.redirect(new URL('/app/dashboard', req.url));
       } else {
-        res = NextResponse.next();
+        res = NextResponse.next({ request: { headers: requestHeaders } });
       }
     } else {
       // Handle unauthenticated users
@@ -198,7 +214,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         );
         res = NextResponse.redirect(signInUrl);
       } else {
-        res = NextResponse.next();
+        res = NextResponse.next({ request: { headers: requestHeaders } });
       }
     }
 
@@ -229,6 +245,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Add performance monitoring headers
     const duration = Date.now() - startTime;
     res.headers.set('Server-Timing', `middleware;dur=${duration}`);
+    res.headers.set('Content-Security-Policy', contentSecurityPolicy);
 
     // Add performance monitoring for API routes
     if (pathname.startsWith('/api/')) {
