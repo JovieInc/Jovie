@@ -1,5 +1,6 @@
 'use client';
 
+import { BellAlertIcon, UserGroupIcon } from '@heroicons/react/24/outline';
 import {
   Button,
   Checkbox,
@@ -9,11 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Bell, Users } from 'lucide-react';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
-import { TableEmptyState } from '@/components/admin/table/atoms/TableEmptyState';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { Icon } from '@/components/atoms/Icon';
@@ -23,6 +22,7 @@ import {
   AUDIENCE_MEMBER_SIDEBAR_WIDTH,
   AudienceMemberSidebar,
 } from '@/components/dashboard/organisms/AudienceMemberSidebar';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import {
@@ -107,6 +107,7 @@ export interface DashboardAudienceTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
   onSortChange: (sort: string) => void;
+  profileUrl?: string;
 }
 
 export function DashboardAudienceTable({
@@ -120,6 +121,7 @@ export function DashboardAudienceTable({
   onPageChange,
   onPageSizeChange,
   onSortChange,
+  profileUrl,
 }: DashboardAudienceTableProps) {
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
@@ -129,6 +131,8 @@ export function DashboardAudienceTable({
   const [openMenuRowId, setOpenMenuRowId] = React.useState<string | null>(null);
   const [selectedMember, setSelectedMember] =
     React.useState<AudienceRow | null>(null);
+  const [copiedProfileLink, setCopiedProfileLink] = React.useState(false);
+  const copyTimeoutRef = React.useRef<number | null>(null);
 
   const rowIds = React.useMemo(() => rows.map(row => row.id), [rows]);
   const {
@@ -260,6 +264,62 @@ export function DashboardAudienceTable({
     return `Showing ${start}–${end} of ${total} readers`;
   };
 
+  const handleCopyProfileLink = React.useCallback(async () => {
+    if (!profileUrl) return;
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      notifications.success('Profile link copied');
+      setCopiedProfileLink(true);
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+      copyTimeoutRef.current = window.setTimeout(() => {
+        setCopiedProfileLink(false);
+        copyTimeoutRef.current = null;
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy profile link', error);
+      notifications.error('Unable to copy profile link');
+    }
+  }, [notifications, profileUrl]);
+
+  React.useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) {
+        window.clearTimeout(copyTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const emptyStateHeading =
+    mode === 'members' ? 'No audience yet' : 'No signups yet';
+  const emptyStateDescription =
+    mode === 'members'
+      ? 'Share your profile to invite visitors. They will appear here as soon as they stop by.'
+      : 'Invite fans to tap the bell on your profile to receive notifications.';
+  const emptyStateIcon =
+    mode === 'members' ? (
+      <UserGroupIcon className='h-6 w-6' aria-hidden='true' />
+    ) : (
+      <BellAlertIcon className='h-6 w-6' aria-hidden='true' />
+    );
+  const emptyStatePrimaryAction = profileUrl
+    ? {
+        label: copiedProfileLink ? 'Link copied' : 'Copy profile link',
+        onClick: () => {
+          void handleCopyProfileLink();
+        },
+      }
+    : {
+        label: 'Open profile settings',
+        href: '/app/dashboard/profile',
+      };
+  const emptyStateSecondaryAction = {
+    label:
+      mode === 'members' ? 'Learn about audience' : 'Learn about subscribers',
+    href: '/support',
+  };
+
   return (
     <div
       className='flex h-full min-h-0 flex-col'
@@ -287,22 +347,12 @@ export function DashboardAudienceTable({
         <div className='flex h-full min-h-0 flex-col bg-surface-1'>
           <div className='flex-1 min-h-0 overflow-auto' ref={tableContainerRef}>
             {rows.length === 0 ? (
-              <TableEmptyState
-                icon={
-                  mode === 'members' ? (
-                    <Users className='h-6 w-6' />
-                  ) : (
-                    <Bell className='h-6 w-6' />
-                  )
-                }
-                title={
-                  mode === 'members' ? 'No audience yet' : 'No signups yet'
-                }
-                description={
-                  mode === 'members'
-                    ? 'Share your profile to invite visitors. They will appear here once they visit.'
-                    : 'Invite fans to tap the bell on your profile to receive notifications.'
-                }
+              <EmptyState
+                icon={emptyStateIcon}
+                heading={emptyStateHeading}
+                description={emptyStateDescription}
+                action={emptyStatePrimaryAction}
+                secondaryAction={emptyStateSecondaryAction}
               />
             ) : (
               <table

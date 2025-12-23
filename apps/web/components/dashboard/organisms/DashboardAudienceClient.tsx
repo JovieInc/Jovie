@@ -17,6 +17,7 @@ export interface DashboardAudienceClientProps {
   pageSize: number;
   sort: string;
   direction: 'asc' | 'desc';
+  profileUrl?: string;
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -47,6 +48,7 @@ export function DashboardAudienceClient({
   pageSize,
   sort,
   direction,
+  profileUrl,
 }: DashboardAudienceClientProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -102,6 +104,7 @@ export function DashboardAudienceClient({
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
         onSortChange={handleSortChange}
+        profileUrl={profileUrl}
       />
     </div>
   );

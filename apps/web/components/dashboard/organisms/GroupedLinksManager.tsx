@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { LinkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
@@ -19,12 +20,16 @@ import React, {
   useState,
 } from 'react';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
-import { UniversalLinkInput } from '@/components/dashboard/molecules/UniversalLinkInput';
+import {
+  UniversalLinkInput,
+  type UniversalLinkInputRef,
+} from '@/components/dashboard/molecules/UniversalLinkInput';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 // getBrandIconStyles reserved for future brand-colored icons
 import '@/lib/utils/color';
+import { EmptyState } from '@/components/ui/EmptyState';
 import {
   canonicalIdentity,
   type DetectedLink,
@@ -177,7 +182,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future collapse animation
   const [_collapsedInitialized, _setCollapsedInitialized] = useState(false);
   const [ytPrompt, setYtPrompt] = useState<{
@@ -780,6 +786,19 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
   const hasAnyLinks = links.length > 0;
 
+  const focusLinkInput = useCallback(() => {
+    const input = linkInputRef.current?.getInputElement();
+    if (input) {
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    containerRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  }, []);
+
   const buildSecondaryText = useCallback(
     (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
       return suggestionIdentity(link);
@@ -857,6 +876,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           )}
           {/* Combined search + add input */}
           <UniversalLinkInput
+            ref={linkInputRef}
             onAdd={handleAdd}
             existingPlatforms={links
               .filter(l => l.platform.id !== 'youtube')
@@ -949,15 +969,20 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
 
       <div className='mx-auto w-full max-w-3xl'>
         {!hasAnyLinks && (
-          <div className='mt-3 rounded-lg border border-dashed border-subtle bg-surface-1/40 px-4 py-5 text-center animate-pulse'>
-            <p className='text-sm font-medium text-primary-token'>
-              Add links to build your profile.
-            </p>
-            <p className='mt-1 text-xs text-secondary-token'>
-              Start with your most important link — music, socials, or a landing
-              page.
-            </p>
-          </div>
+          <EmptyState
+            icon={<LinkIcon className='h-6 w-6' aria-hidden='true' />}
+            heading='Add your first link'
+            description='Start with your most important link — music, socials, or a landing page.'
+            action={{
+              label: 'Add link',
+              onClick: focusLinkInput,
+            }}
+            secondaryAction={{
+              label: 'Learn about links',
+              href: '/support',
+            }}
+            className='mt-3 w-full rounded-2xl border border-dashed border-subtle bg-surface-1/40'
+          />
         )}
 
         {hasAnyLinks && (
