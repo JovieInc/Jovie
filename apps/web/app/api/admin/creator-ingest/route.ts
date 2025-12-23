@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { type DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   buildSeoFilename,
@@ -225,7 +226,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json().catch(() => null);
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: 'POST /api/admin/creator-ingest',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const body = parsedBody.data;
     const parsed = ingestSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

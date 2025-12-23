@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
@@ -57,7 +58,16 @@ export async function POST(request: NextRequest) {
 
   const now = new Date();
 
-  const body = await request.json().catch(() => ({}));
+  const parsedBody = await parseJsonBody<Record<string, unknown>>(request, {
+    route: 'POST /api/cron/waitlist-invites',
+    headers: NO_STORE_HEADERS,
+    allowEmptyBody: true,
+    emptyBodyValue: {},
+  });
+  if (!parsedBody.ok) {
+    return parsedBody.response;
+  }
+  const body = parsedBody.data;
   const parsed = sendWindowSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

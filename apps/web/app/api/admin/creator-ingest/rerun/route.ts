@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
@@ -32,7 +33,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json().catch(() => null);
+    const parsedBody = await parseJsonBody<unknown>(request, {
+      route: 'POST /api/admin/creator-ingest/rerun',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+    const body = parsedBody.data;
     const parsed = rerunSchema.safeParse(body);
 
     if (!parsed.success) {

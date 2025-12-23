@@ -8,6 +8,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { and, db, eq } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import {
   syncCanonicalUsernameFromApp,
   UsernameValidationError,
@@ -177,9 +178,16 @@ export async function GET() {
 export async function PUT(req: Request) {
   try {
     return await withDbSession(async clerkUserId => {
-      const body = (await req.json().catch(() => null)) as {
+      const parsedBody = await parseJsonBody<{
         updates?: Record<string, unknown>;
-      } | null;
+      } | null>(req, {
+        route: 'PUT /api/dashboard/profile',
+        headers: NO_STORE_HEADERS,
+      });
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+      const body = parsedBody.data;
 
       const updates = body?.updates ?? {};
       if (Object.keys(updates).length === 0) {

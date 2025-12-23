@@ -10,6 +10,7 @@ import {
   socialLinks,
   users,
 } from '@/lib/db/schema';
+import { parseJsonBody } from '@/lib/http/parse-json';
 import { computeLinkConfidence } from '@/lib/ingestion/confidence';
 import {
   enqueueBeaconsIngestionJob,
@@ -319,7 +320,14 @@ export async function PUT(req: Request) {
         );
       }
 
-      const rawBody = await req.json().catch(() => null);
+      const parsedBody = await parseJsonBody<unknown>(req, {
+        route: 'PUT /api/dashboard/social-links',
+        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+      });
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+      const rawBody = parsedBody.data;
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },
@@ -694,7 +702,14 @@ export async function PATCH(req: Request) {
         );
       }
 
-      const rawBody = await req.json().catch(() => null);
+      const parsedBody = await parseJsonBody<unknown>(req, {
+        route: 'PATCH /api/dashboard/social-links',
+        headers: { ...NO_STORE_HEADERS, ...rateLimitHeaders },
+      });
+      if (!parsedBody.ok) {
+        return parsedBody.response;
+      }
+      const rawBody = parsedBody.data;
       if (rawBody == null || typeof rawBody !== 'object') {
         return NextResponse.json(
           { error: 'Invalid request body' },

@@ -250,7 +250,7 @@ describe('PUT /api/dashboard/social-links', () => {
     });
   });
 
-  it('returns 400 for invalid request body', async () => {
+  it('returns 400 for invalid JSON request body', async () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
@@ -266,7 +266,7 @@ describe('PUT /api/dashboard/social-links', () => {
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
-    expect(data.error).toBe('Invalid request body');
+    expect(data.error).toBe('Invalid JSON in request body');
   });
 
   it('rejects dangerous URL protocols', async () => {
@@ -640,7 +640,7 @@ describe('PATCH /api/dashboard/social-links', () => {
     });
   });
 
-  it('returns 400 for invalid request body', async () => {
+  it('returns 400 for invalid JSON request body', async () => {
     const request = new NextRequest(
       'http://localhost/api/dashboard/social-links',
       {
@@ -656,7 +656,7 @@ describe('PATCH /api/dashboard/social-links', () => {
 
     expect(response.status).toBe(400);
     const data = (await response.json()) as { error?: string };
-    expect(data.error).toBe('Invalid request body');
+    expect(data.error).toBe('Invalid JSON in request body');
   });
 
   it('returns 400 when action is invalid', async () => {
