@@ -24,14 +24,16 @@ export function encryptUrl(url: string): EncryptionResult {
     const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
 
-    let encrypted = cipher.update(url, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+    const encryptedBuffer = Buffer.concat([
+      cipher.update(url, 'utf8'),
+      cipher.final(),
+    ]);
+    const authTag = cipher.getAuthTag();
 
-    // For GCM mode, we'd get authTag, but using simpler approach for demo
     return {
-      encrypted,
+      encrypted: encryptedBuffer.toString('hex'),
       iv: iv.toString('hex'),
-      authTag: '', // Would be cipher.getAuthTag().toString('hex') for GCM
+      authTag: authTag.toString('hex'),
     };
   } catch (error) {
     console.error('URL encryption failed:', error);
@@ -49,7 +51,7 @@ export function encryptUrl(url: string): EncryptionResult {
  */
 export function decryptUrl(encryptionResult: EncryptionResult): string {
   try {
-    if (!encryptionResult.iv) {
+    if (!encryptionResult.iv || !encryptionResult.authTag) {
       // Fallback for base64 encoded URLs
       return Buffer.from(encryptionResult.encrypted, 'base64').toString('utf8');
     }
@@ -57,11 +59,15 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
     const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
     const iv = Buffer.from(encryptionResult.iv, 'hex');
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    const authTag = Buffer.from(encryptionResult.authTag, 'hex');
+    decipher.setAuthTag(authTag);
 
-    let decrypted = decipher.update(encryptionResult.encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
+    const decryptedBuffer = Buffer.concat([
+      decipher.update(Buffer.from(encryptionResult.encrypted, 'hex')),
+      decipher.final(),
+    ]);
 
-    return decrypted;
+    return decryptedBuffer.toString('utf8');
   } catch (error) {
     console.error('URL decryption failed:', error);
     throw new Error('Failed to decrypt URL');
