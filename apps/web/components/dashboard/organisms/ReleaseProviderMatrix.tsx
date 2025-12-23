@@ -2,11 +2,13 @@
 
 import { Badge, Button, Input } from '@jovie/ui';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 import {
   resetProviderOverride,
   saveProviderOverride,
+  syncFromSpotify,
 } from '@/app/app/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -24,6 +26,7 @@ interface ReleaseProviderMatrixProps {
   releases: ReleaseViewModel[];
   providerConfig: Record<ProviderKey, { label: string; accent: string }>;
   primaryProviders: ProviderKey[];
+  spotifyConnected?: boolean;
 }
 
 type DraftState = Partial<Record<ProviderKey, string>>;
@@ -94,6 +97,7 @@ export function ReleaseProviderMatrix({
   releases,
   providerConfig,
   primaryProviders,
+  spotifyConnected = false,
 }: ReleaseProviderMatrixProps) {
   const [rows, setRows] = useState<ReleaseViewModel[]>(releases);
   const [editingRelease, setEditingRelease] = useState<ReleaseViewModel | null>(
@@ -101,6 +105,7 @@ export function ReleaseProviderMatrix({
   );
   const [drafts, setDrafts] = useState<DraftState>({});
   const [isSaving, startSaving] = useTransition();
+  const [isSyncing, startSyncing] = useTransition();
   const [headerElevated, setHeaderElevated] = useState(false);
   const tableContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -211,6 +216,24 @@ export function ReleaseProviderMatrix({
     });
   };
 
+  const handleSync = () => {
+    startSyncing(async () => {
+      try {
+        const result = await syncFromSpotify();
+        if (result.success) {
+          toast.success(result.message);
+          // Reload the page to get fresh data
+          window.location.reload();
+        } else {
+          toast.error(result.message);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error('Failed to sync from Spotify');
+      }
+    });
+  };
+
   const totalReleases = rows.length;
   const totalOverrides = rows.reduce(
     (count, release) =>
@@ -251,6 +274,23 @@ export function ReleaseProviderMatrix({
                 {totalOverrides === 1 ? 'override' : 'overrides'}
               </span>
             )}
+            {spotifyConnected && (
+              <Button
+                variant='secondary'
+                size='sm'
+                disabled={isSyncing}
+                onClick={handleSync}
+                data-testid='sync-spotify-button'
+                className='inline-flex items-center gap-2'
+              >
+                <Icon
+                  name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                  className={cn('h-4 w-4', isSyncing && 'animate-spin')}
+                  aria-hidden='true'
+                />
+                {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -271,10 +311,47 @@ export function ReleaseProviderMatrix({
                 <h3 className='mt-4 text-lg font-semibold text-primary-token'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-sm text-secondary-token'>
-                  Connect your distributor or add releases manually to start
-                  generating smart links.
-                </p>
+                {spotifyConnected ? (
+                  <>
+                    <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+                      Sync your discography from Spotify to start generating
+                      smart links for your releases.
+                    </p>
+                    <Button
+                      variant='primary'
+                      size='sm'
+                      disabled={isSyncing}
+                      onClick={handleSync}
+                      className='mt-4 inline-flex items-center gap-2'
+                      data-testid='sync-spotify-empty-state'
+                    >
+                      <Icon
+                        name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                        className={cn('h-4 w-4', isSyncing && 'animate-spin')}
+                        aria-hidden='true'
+                      />
+                      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className='mt-1 max-w-sm text-sm text-secondary-token'>
+                      Connect your Spotify artist profile to import your
+                      releases and generate smart links.
+                    </p>
+                    <Link
+                      href='/app/dashboard/settings'
+                      className='mt-4 inline-flex items-center gap-2 rounded-lg bg-[#1DB954] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1ed760]'
+                    >
+                      <Icon
+                        name='Music'
+                        className='h-4 w-4'
+                        aria-hidden='true'
+                      />
+                      Connect Spotify
+                    </Link>
+                  </>
+                )}
               </div>
             ) : (
               <table
