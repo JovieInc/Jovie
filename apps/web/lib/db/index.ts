@@ -31,9 +31,7 @@ if (webSocketConstructor) {
   neonConfig.webSocketConstructor = webSocketConstructor;
 }
 
-// Enable connection caching for better cold-start performance
-// This helps when Neon compute is auto-suspended
-neonConfig.fetchConnectionCache = true;
+// Note: fetchConnectionCache is now always enabled by default in @neondatabase/serverless
 
 // Note: Some production networks block outbound WebSockets; Neon will fall back to HTTPS fetch,
 // but ensure firewall rules allow it if WS performance is required.
