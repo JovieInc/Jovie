@@ -1632,8 +1632,8 @@ async function seedDatabase() {
           ) AS profile_id
         `);
 
-        const profileId = (result as { rows: Array<{ profile_id: string }> })
-          .rows[0]?.profile_id;
+        const profileId = ('rows' in result ? result.rows : result)[0]
+          ?.profile_id as string | undefined;
 
         // Get user ID for this profile
         const userResult = await db
