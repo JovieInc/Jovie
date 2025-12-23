@@ -30,6 +30,7 @@ const Analytics = dynamic(
 
 export interface LazyProvidersProps {
   children: React.ReactNode;
+  enableAnalytics?: boolean;
 }
 
 /**
@@ -41,12 +42,15 @@ export interface LazyProvidersProps {
  *
  * Critical providers (Clerk, ThemeProvider) remain in ClientProviders.
  */
-export function LazyProviders({ children }: LazyProvidersProps) {
+export function LazyProviders({
+  children,
+  enableAnalytics = true,
+}: LazyProvidersProps) {
   return (
     <TooltipProvider delayDuration={120}>
       <ToastProvider>
         {children}
-        <Analytics />
+        {enableAnalytics ? <Analytics /> : null}
       </ToastProvider>
     </TooltipProvider>
   );
