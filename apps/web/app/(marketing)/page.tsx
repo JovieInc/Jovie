@@ -122,8 +122,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function HomePage() {
-  const nonce = headers().get(SCRIPT_NONCE_HEADER) ?? undefined;
+export default async function HomePage() {
+  const nonce = (await headers()).get(SCRIPT_NONCE_HEADER) ?? undefined;
 
   return (
     <>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SkeletonCard } from '@/components/molecules/SkeletonCard';
-import { EmptyState } from '@/components/organisms/EmptyState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
 import type { AnalyticsRange } from '@/types/analytics';
 import { AnalyticsCard } from '../atoms/AnalyticsCard';
@@ -160,11 +160,24 @@ export function DashboardAnalyticsCards({
         ) : showEmpty ? (
           <div className='min-h-[196px]'>
             <EmptyState
-              type='analytics'
-              title='No profile views yet'
+              icon={<ChartBarIcon className='h-6 w-6' aria-hidden='true' />}
+              heading='No profile views yet'
               description='Share your profile link to start tracking clicks and engagement from your fans.'
-              actionLabel={copied ? 'Copied!' : 'Copy Profile Link'}
-              onAction={profileUrl ? handleCopy : undefined}
+              action={
+                profileUrl
+                  ? {
+                      label: copied ? 'Copied!' : 'Copy profile link',
+                      onClick: handleCopy,
+                    }
+                  : {
+                      label: 'Open profile settings',
+                      href: '/app/dashboard/profile',
+                    }
+              }
+              secondaryAction={{
+                label: 'See sharing tips',
+                href: '/support',
+              }}
             />
           </div>
         ) : (
