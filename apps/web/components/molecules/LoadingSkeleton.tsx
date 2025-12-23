@@ -211,7 +211,7 @@ export function AuthFormSkeleton() {
 
 export function CardSkeleton() {
   return (
-    <div className='w-full p-4 border border-gray-200 dark:border-gray-700 rounded-lg'>
+    <div className='w-full p-4 border border-subtle rounded-lg'>
       <div className='space-y-3'>
         <div className='flex items-center space-x-3'>
           <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
@@ -236,7 +236,7 @@ export function ListSkeleton({ items = 3 }: { items?: number }) {
       {Array.from({ length: items }).map((_, index) => (
         <div
           key={index}
-          className='flex items-center space-x-3 p-3 border border-gray-200 dark:border-gray-700 rounded-md'
+          className='flex items-center space-x-3 p-3 border border-subtle rounded-md'
         >
           <div className='h-10 w-10 rounded-full skeleton motion-reduce:animate-none' />
           <div className='space-y-1 flex-1'>
@@ -258,9 +258,9 @@ export function TableSkeleton({
   columns?: number;
 }) {
   return (
-    <div className='w-full overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg'>
+    <div className='w-full overflow-hidden border border-subtle rounded-lg'>
       {/* Header */}
-      <div className='flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'>
+      <div className='flex border-b border-subtle bg-surface-1'>
         {Array.from({ length: columns }).map((_, index) => (
           <div key={`header-${index}`} className='flex-1 p-3'>
             <div className='h-5 rounded-sm skeleton motion-reduce:animate-none' />
@@ -272,7 +272,7 @@ export function TableSkeleton({
       {Array.from({ length: rows }).map((_, rowIndex) => (
         <div
           key={`row-${rowIndex}`}
-          className='flex border-b border-gray-200 dark:border-gray-700 last:border-b-0'
+          className='flex border-b border-subtle last:border-b-0'
         >
           {Array.from({ length: columns }).map((_, colIndex) => (
             <div key={`cell-${rowIndex}-${colIndex}`} className='flex-1 p-3'>
