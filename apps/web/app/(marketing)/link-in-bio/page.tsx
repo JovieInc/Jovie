@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { BenefitsGrid } from '@/components/link-in-bio/BenefitsGrid';
 import { ComparisonSection } from '@/components/link-in-bio/ComparisonSection';
 import { LinkInBioCTA } from '@/components/link-in-bio/LinkInBioCTA';
 import { LinkInBioHero } from '@/components/link-in-bio/LinkInBioHero';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { SCRIPT_NONCE_HEADER } from '@/lib/security/content-security-policy';
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} - Built to Convert, Not to Decorate`;
@@ -70,11 +72,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function LinkInBioPage() {
+  const nonce = headers().get(SCRIPT_NONCE_HEADER) ?? undefined;
+
   return (
     <>
       {/* Structured Data */}
       <script
         type='application/ld+json'
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
