@@ -2,12 +2,13 @@
 
 import { ClerkProvider, useUser } from '@clerk/nextjs';
 import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect } from 'react';
-import { MyStatsig } from '@/app/my-statsig';
 import { logger } from '@/lib/utils/logger';
 import type { ThemeMode } from '@/types';
 import type { LazyProvidersProps } from './LazyProviders';
+import type { StatsigProvidersProps } from './StatsigProviders';
 
 type LazyProvidersLoadingProps = LazyProvidersProps &
   DynamicOptionsLoadingProps;
@@ -56,6 +57,23 @@ const LazyProviders = dynamic<LazyProvidersProps>(
   }
 );
 
+type StatsigLoadingProps = StatsigProvidersProps & DynamicOptionsLoadingProps;
+
+function StatsigProvidersSkeleton(props: DynamicOptionsLoadingProps) {
+  const { children } = props as StatsigLoadingProps;
+  return <>{children}</>;
+}
+
+const StatsigProviders = dynamic<StatsigProvidersProps>(
+  () =>
+    import('./StatsigProviders').then(mod => ({
+      default: mod.StatsigProviders,
+    })),
+  {
+    loading: StatsigProvidersSkeleton,
+  }
+);
+
 interface ClientProvidersProps {
   children: React.ReactNode;
   initialThemeMode?: ThemeMode;
@@ -65,6 +83,7 @@ interface ClientProvidersProps {
 interface ClientProvidersInnerBaseProps {
   children: React.ReactNode;
   initialThemeMode?: ThemeMode;
+  enableStatsig?: boolean;
   userId?: string;
 }
 
@@ -81,6 +100,7 @@ function isMockPublishableKey(publishableKey: string): boolean {
 function ClientProvidersInnerBase({
   children,
   initialThemeMode = 'system',
+  enableStatsig = true,
   userId,
 }: ClientProvidersInnerBaseProps) {
   useEffect(() => {
@@ -126,25 +146,39 @@ function ClientProvidersInnerBase({
         storageKey='jovie-theme'
       >
         <ThemeKeyboardShortcut />
-        <MyStatsig userId={userId}>
-          <LazyProviders>{children}</LazyProviders>
-        </MyStatsig>
+        {enableStatsig ? (
+          <StatsigProviders userId={userId}>
+            <LazyProviders enableAnalytics={enableStatsig}>
+              {children}
+            </LazyProviders>
+          </StatsigProviders>
+        ) : (
+          <LazyProviders enableAnalytics={false}>{children}</LazyProviders>
+        )}
       </ThemeProvider>
     </React.StrictMode>
   );
 }
 
 // Inner component that uses Clerk hooks (must be inside ClerkProvider)
+interface ClientProvidersInnerProps {
+  children: React.ReactNode;
+  initialThemeMode?: ThemeMode;
+  enableStatsig?: boolean;
+}
+
 function ClientProvidersInner({
   children,
   initialThemeMode = 'system',
-}: Omit<ClientProvidersProps, 'publishableKey'>) {
+  enableStatsig = true,
+}: ClientProvidersInnerProps) {
   const { user } = useUser();
 
   return (
     <ClientProvidersInnerBase
       userId={user?.id}
       initialThemeMode={initialThemeMode}
+      enableStatsig={enableStatsig}
     >
       {children}
     </ClientProvidersInnerBase>
@@ -227,13 +261,31 @@ export function ClientProviders({
   initialThemeMode = 'system',
   publishableKey,
 }: ClientProvidersProps) {
+  const pathname = usePathname();
+  const marketingPrefixes = [
+    '/blog',
+    '/changelog',
+    '/engagement-engine',
+    '/investors',
+    '/link-in-bio',
+    '/pricing',
+    '/support',
+  ];
+  const isMarketingRoute =
+    pathname === '/' ||
+    marketingPrefixes.some(prefix => pathname.startsWith(prefix));
+  const enableStatsig = !isMarketingRoute;
+
   const shouldBypassClerk =
     process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
     isMockPublishableKey(publishableKey);
 
   if (shouldBypassClerk) {
     return (
-      <ClientProvidersInnerBase initialThemeMode={initialThemeMode}>
+      <ClientProvidersInnerBase
+        initialThemeMode={initialThemeMode}
+        enableStatsig={enableStatsig}
+      >
         {children}
       </ClientProvidersInnerBase>
     );
@@ -241,7 +293,10 @@ export function ClientProviders({
 
   return (
     <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
-      <ClientProvidersInner initialThemeMode={initialThemeMode}>
+      <ClientProvidersInner
+        initialThemeMode={initialThemeMode}
+        enableStatsig={enableStatsig}
+      >
         {children}
       </ClientProvidersInner>
     </ClerkProvider>
