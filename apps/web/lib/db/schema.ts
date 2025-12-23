@@ -470,34 +470,45 @@ export const smartLinkTargets = pgTable(
   })
 );
 
-export const socialLinks = pgTable('social_links', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  creatorProfileId: uuid('creator_profile_id')
-    .notNull()
-    .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-  platform: text('platform').notNull(),
-  platformType: text('platform_type').notNull(),
-  url: text('url').notNull(),
-  displayText: text('display_text'),
-  sortOrder: integer('sort_order').default(0),
-  clicks: integer('clicks').default(0),
-  isActive: boolean('is_active').default(true),
-  state: socialLinkStateEnum('state').default('active').notNull(),
-  confidence: numeric('confidence', { precision: 3, scale: 2 })
-    .default('1.00')
-    .notNull(),
-  sourcePlatform: text('source_platform'),
-  sourceType: ingestionSourceTypeEnum('source_type')
-    .default('manual')
-    .notNull(),
-  evidence: jsonb('evidence')
-    .$type<{ sources?: string[]; signals?: string[] }>()
-    .default({}),
-  // Optimistic locking version for concurrent edit detection
-  version: integer('version').default(1).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const socialLinks = pgTable(
+  'social_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    platform: text('platform').notNull(),
+    platformType: text('platform_type').notNull(),
+    url: text('url').notNull(),
+    displayText: text('display_text'),
+    sortOrder: integer('sort_order').default(0),
+    clicks: integer('clicks').default(0),
+    isActive: boolean('is_active').default(true),
+    state: socialLinkStateEnum('state').default('active').notNull(),
+    confidence: numeric('confidence', { precision: 3, scale: 2 })
+      .default('1.00')
+      .notNull(),
+    sourcePlatform: text('source_platform'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    evidence: jsonb('evidence')
+      .$type<{ sources?: string[]; signals?: string[] }>()
+      .default({}),
+    // Optimistic locking version for concurrent edit detection
+    version: integer('version').default(1).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Composite index for dashboard social link filtering.
+    creatorProfileStateIdx: index('social_links_creator_profile_state_idx').on(
+      table.creatorProfileId,
+      table.state,
+      table.createdAt
+    ),
+  })
+);
 
 // Idempotency keys for dashboard API deduplication
 export const dashboardIdempotencyKeys = pgTable(
