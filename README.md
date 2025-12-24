@@ -149,7 +149,7 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 ### Monorepo Structure
 
-```
+```text
 Jovie/
 ├── apps/
 │   ├── web/              # Main Next.js application
