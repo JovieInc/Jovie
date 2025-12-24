@@ -14,6 +14,9 @@ import type {
   SubscriptionStatus,
 } from './db';
 
+// Import SOCIAL_PLATFORMS constant from canonical source
+import { SOCIAL_PLATFORMS } from '@/constants/platforms';
+
 export type {
   AudienceAction,
   AudienceIntentLevel,
@@ -147,68 +150,8 @@ export const CURRENCY_CODES: readonly CurrencyCode[] = [
   'DKK',
 ] as const;
 
-export const SOCIAL_PLATFORMS: readonly SocialPlatform[] = [
-  // Music Platforms
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'soundcloud',
-  'bandcamp',
-  'tidal',
-  'deezer',
-  'amazon_music',
-  'pandora',
-  // Social Media
-  'instagram',
-  'twitter',
-  'x',
-  'tiktok',
-  'youtube',
-  'facebook',
-  'linkedin',
-  'snapchat',
-  'pinterest',
-  'reddit',
-  // Creator/Content Platforms
-  'twitch',
-  'discord',
-  'patreon',
-  'onlyfans',
-  'substack',
-  'medium',
-  'github',
-  'behance',
-  'dribbble',
-  // Link Aggregators
-  'linktree',
-  'beacons',
-  'linkin_bio',
-  'allmylinks',
-  'linkfire',
-  'toneden',
-  // Payment/Tip Platforms
-  'venmo',
-  'paypal',
-  'cashapp',
-  'zelle',
-  'ko_fi',
-  'buymeacoffee',
-  'gofundme',
-  // Messaging/Communication
-  'whatsapp',
-  'telegram',
-  'signal',
-  'email',
-  'phone',
-  // Professional
-  'website',
-  'blog',
-  'portfolio',
-  'booking',
-  'press_kit',
-  // Other
-  'other',
-] as const;
+// Re-export SOCIAL_PLATFORMS from canonical source for backward compatibility
+export { SOCIAL_PLATFORMS };
 
 // =====================================
 // VALIDATION HELPERS
