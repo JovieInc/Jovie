@@ -1,10 +1,14 @@
-// @ts-nocheck
 import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { env } from '@/lib/env-server';
 
 type WebSocketConstructor = typeof WebSocket;
+
+/** Minimal process interface for safe exit calls in Node environments */
+interface ProcessWithExit {
+  exit(code?: number): never;
+}
 
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
@@ -260,16 +264,14 @@ function initializeDb(): DbType {
         cleanup('SIGINT');
         // Safe exit for Node environment, cast to avoid Edge build static analysis error
         if (typeof process !== 'undefined' && 'exit' in process) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (process as any).exit(0);
+          (process as ProcessWithExit).exit(0);
         }
       });
       process.once('SIGTERM', () => {
         cleanup('SIGTERM');
         // Safe exit for Node environment, cast to avoid Edge build static analysis error
         if (typeof process !== 'undefined' && 'exit' in process) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (process as any).exit(0);
+          (process as ProcessWithExit).exit(0);
         }
       });
     }
@@ -285,10 +287,10 @@ function initializeDb(): DbType {
       global.db = drizzle(_pool, {
         schema,
         logger: {
-          logQuery: (query, params) => {
+          logQuery: (query: string, params: unknown[]): void => {
             logDbInfo('query', 'Database query executed', {
               query: query.slice(0, 200) + (query.length > 200 ? '...' : ''),
-              paramsLength: params?.length || 0,
+              paramsLength: params.length,
             });
           },
         },
@@ -388,6 +390,11 @@ export async function withTransaction<T>(
   }
 }
 
+/** Row type for table existence check query */
+interface TableExistsRow {
+  table_exists: boolean;
+}
+
 export async function doesTableExist(tableName: string): Promise<boolean> {
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
     positiveTableExistenceCache.clear();
@@ -408,7 +415,7 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     }
 
     const result = await _db.execute(
-      drizzleSql<{ table_exists: boolean }>`
+      drizzleSql<TableExistsRow>`
         SELECT EXISTS (
           SELECT 1
           FROM information_schema.tables
@@ -418,7 +425,9 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
       `
     );
 
-    const exists = Boolean(result.rows?.[0]?.table_exists ?? false);
+    // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
+    const firstRow = result.rows[0] as TableExistsRow | undefined;
+    const exists = Boolean(firstRow?.table_exists ?? false);
 
     if (exists) {
       positiveTableExistenceCache.add(tableName);
@@ -458,24 +467,26 @@ export async function checkDbHealth(): Promise<{
       if (!_db) {
         _db = initializeDb();
       }
+      // Capture in local const for type narrowing in nested callbacks
+      const database = _db;
 
       // 1. Basic connection test
-      await _db.execute(drizzleSql`SELECT 1 as health_check`);
+      await database.execute(drizzleSql`SELECT 1 as health_check`);
       details.connection = true;
 
       // 2. Query test with current timestamp
-      await _db.execute(drizzleSql`SELECT NOW() as current_time`);
+      await database.execute(drizzleSql`SELECT NOW() as current_time`);
       details.query = true;
 
       // 3. Transaction test
-      await _db!.transaction(async () => {
-        await _db!.execute(drizzleSql`SELECT 'transaction_test' as test`);
+      await database.transaction(async tx => {
+        await tx.execute(drizzleSql`SELECT 'transaction_test' as test`);
       });
       details.transaction = true;
 
       // 4. Schema access test (try to query a table if it exists)
       try {
-        await _db.execute(
+        await database.execute(
           drizzleSql`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = ${TABLE_NAMES.creatorProfiles}) as table_exists`
         );
         details.schemaAccess = true;
@@ -561,6 +572,11 @@ export async function validateDbConnection(): Promise<{
   }
 }
 
+/** Row type for active connections query */
+interface ActiveConnectionsRow {
+  active_connections: string | number;
+}
+
 /**
  * Deep health check that includes performance metrics
  */
@@ -585,21 +601,23 @@ export async function checkDbPerformance(): Promise<{
     if (!_db) {
       _db = initializeDb();
     }
+    // Capture in local const for type narrowing in nested callbacks
+    const database = _db;
 
     // 1. Simple query performance
     const simpleStart = Date.now();
-    await _db.execute(drizzleSql`SELECT 1`);
+    await database.execute(drizzleSql`SELECT 1`);
     metrics.simpleQuery = Date.now() - simpleStart;
 
     // 2. Complex query performance (if schema exists)
     try {
       const complexStart = Date.now();
-      await _db.execute(drizzleSql`
-        SELECT 
+      await database.execute(drizzleSql`
+        SELECT
           schemaname,
           tablename,
           attname,
-          typename 
+          typename
         FROM pg_tables t
         LEFT JOIN pg_attribute a ON t.tablename = a.attrelid::regclass::text
         LEFT JOIN pg_type ty ON a.atttypid = ty.oid
@@ -618,28 +636,26 @@ export async function checkDbPerformance(): Promise<{
 
     // 3. Transaction performance
     const transactionStart = Date.now();
-    await _db!.transaction(async () => {
-      await _db!.execute(drizzleSql`SELECT 'transaction_test'`);
-      await _db!.execute(drizzleSql`SELECT NOW()`);
+    await database.transaction(async tx => {
+      await tx.execute(drizzleSql`SELECT 'transaction_test'`);
+      await tx.execute(drizzleSql`SELECT NOW()`);
     });
     metrics.transactionTime = Date.now() - transactionStart;
 
     // 4. Check concurrent connections (if available)
     try {
-      const result = await _db!.execute(drizzleSql`
-        SELECT count(*) as active_connections 
-        FROM pg_stat_activity 
-        WHERE state = 'active'
-      `);
-      // Handle the result - Neon HTTP returns a rows array
-      if (Array.isArray(result) && result.length > 0) {
-        const firstRow = result[0] as
-          | { active_connections: number }
-          | undefined;
-        metrics.concurrentConnections = firstRow
-          ? Number(firstRow.active_connections) || 0
-          : 0;
-      }
+      const result = await database.execute(
+        drizzleSql<ActiveConnectionsRow>`
+          SELECT count(*) as active_connections
+          FROM pg_stat_activity
+          WHERE state = 'active'
+        `
+      );
+      // result.rows is ActiveConnectionsRow[] - rows is always defined, first element may be undefined
+      const firstRow = result.rows[0] as ActiveConnectionsRow | undefined;
+      metrics.concurrentConnections = firstRow
+        ? Number(firstRow.active_connections) || 0
+        : 0;
     } catch {
       // Connection count query might fail due to permissions
       logDbInfo(

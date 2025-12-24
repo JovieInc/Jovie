@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "001-strengthen-and-secure-ci-pipeline",
+  "spec": "003-remove-ts-nocheck-from-lib-db-index-ts-and-fix-typ",
   "state": "building",
   "subtasks": {
-    "completed": 11,
-    "total": 16,
+    "completed": 8,
+    "total": 12,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Implement Granular Permissions",
+    "current": "Fix Any Type Casts",
     "id": null,
-    "total": 2
+    "total": 1
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 12,
-    "started_at": "2025-12-23T22:21:19.401583"
+    "number": 10,
+    "started_at": "2025-12-23T22:34:54.856808"
   },
-  "last_update": "2025-12-23T22:45:45.141691"
+  "last_update": "2025-12-23T23:15:22.460065"
 }
