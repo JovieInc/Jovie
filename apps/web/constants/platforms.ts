@@ -502,3 +502,77 @@ export const CATEGORY_ORDER: readonly PlatformCategory[] = [
   'professional',
   'other',
 ] as const;
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Type guard to check if a value is a valid social platform identifier.
+ * Useful for validating user input or external data.
+ *
+ * @param value - The value to check
+ * @returns True if the value is a valid SocialPlatform, false otherwise
+ *
+ * @example
+ * ```ts
+ * const input = "spotify";
+ * if (isValidPlatform(input)) {
+ *   // input is now typed as SocialPlatform
+ *   console.log(`Valid platform: ${input}`);
+ * }
+ * ```
+ */
+export function isValidPlatform(value: unknown): value is SocialPlatform {
+  return typeof value === 'string' && value in PLATFORM_METADATA_MAP;
+}
+
+/**
+ * Get all platforms grouped by category.
+ * Returns a record mapping each category to its platforms.
+ *
+ * @returns Record of category to array of platform metadata
+ *
+ * @example
+ * ```ts
+ * const grouped = getPlatformsByCategory();
+ * console.log(grouped.music); // [{ id: 'spotify', ... }, { id: 'apple_music', ... }, ...]
+ * ```
+ */
+export function getPlatformsByCategory(): Readonly<
+  Record<PlatformCategory, readonly PlatformMetadata[]>
+> {
+  const grouped = {} as Record<PlatformCategory, PlatformMetadata[]>;
+
+  // Initialize all categories with empty arrays
+  for (const category of CATEGORY_ORDER) {
+    grouped[category] = [];
+  }
+
+  // Group platforms by category
+  for (const platform of ALL_PLATFORMS) {
+    grouped[platform.category].push(platform);
+  }
+
+  return grouped;
+}
+
+/**
+ * Get metadata for a specific platform by ID.
+ * Returns undefined if the platform ID is not found.
+ *
+ * @param id - The platform identifier to look up
+ * @returns Platform metadata or undefined if not found
+ *
+ * @example
+ * ```ts
+ * const metadata = getPlatformMetadata('spotify');
+ * if (metadata) {
+ *   console.log(metadata.name); // "Spotify"
+ *   console.log(metadata.color); // "1DB954"
+ * }
+ * ```
+ */
+export function getPlatformMetadata(id: string): PlatformMetadata | undefined {
+  return PLATFORM_METADATA_MAP[id];
+}
