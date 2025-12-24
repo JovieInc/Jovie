@@ -40,18 +40,8 @@ export const COPYRIGHT_YEAR = new Date().getFullYear();
 export const getCopyrightText = (year?: number) =>
   `© ${year ?? COPYRIGHT_YEAR} ${LEGAL_ENTITY_NAME}`;
 
-export const SOCIAL_PLATFORMS = [
-  'instagram',
-  'twitter',
-  'tiktok',
-  'youtube',
-  'facebook',
-  'spotify',
-  'apple_music',
-  'website',
-] as const;
-
-export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
+// Re-export from canonical source for backward compatibility
+export { SOCIAL_PLATFORMS, type SocialPlatform } from './platforms';
 export type DSP = keyof typeof DSPS;
 
 // Global platform popularity ordering (lower index = more popular)
