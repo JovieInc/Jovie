@@ -5,7 +5,12 @@
   "remoteCache": {
     "enabled": true
   },
-  "globalPassThroughEnv": ["SENTRY_AUTH_TOKEN"],
+  "globalPassThroughEnv": [
+    "SENTRY_AUTH_TOKEN",
+    "DOPPLER_PROJECT",
+    "DOPPLER_ENVIRONMENT",
+    "DOPPLER_CONFIG"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
