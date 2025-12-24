@@ -1,12 +1,31 @@
 /**
  * Platform Detection and Link Normalization Service
  * Atomic utility for identifying and normalizing social/music platform links
+ *
+ * This module imports platform metadata from the canonical source (constants/platforms.ts)
+ * and extends it with detection-specific fields like placeholders.
  */
+
+import {
+  PLATFORM_METADATA_MAP,
+  type PlatformMetadata,
+} from '@/constants/platforms';
+
+/**
+ * Detection-specific category types.
+ * Maps from canonical categories to detection categories.
+ */
+export type DetectionCategory =
+  | 'dsp'
+  | 'social'
+  | 'earnings'
+  | 'websites'
+  | 'custom';
 
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: 'dsp' | 'social' | 'earnings' | 'websites' | 'custom'; // DSP = Digital Service Provider (music platforms)
+  category: DetectionCategory; // DSP = Digital Service Provider (music platforms)
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -21,270 +40,223 @@ export interface DetectedLink {
   error?: string;
 }
 
-// Platform configuration registry (using Simple Icons keys)
+/**
+ * Maps canonical platform categories to detection categories
+ */
+function mapCategoryToDetectionCategory(
+  category: PlatformMetadata['category']
+): DetectionCategory {
+  switch (category) {
+    case 'music':
+      return 'dsp';
+    case 'social':
+    case 'creator':
+    case 'messaging':
+      return 'social';
+    case 'payment':
+      return 'earnings';
+    case 'link_aggregators':
+    case 'professional':
+      return 'websites';
+    default:
+      return 'custom';
+  }
+}
+
+/**
+ * Creates a PlatformInfo from canonical metadata with detection-specific extensions
+ */
+function createPlatformInfo(
+  id: string,
+  placeholder: string,
+  overrides?: Partial<Omit<PlatformInfo, 'id' | 'placeholder'>>
+): PlatformInfo {
+  const canonical = PLATFORM_METADATA_MAP[id];
+  if (canonical) {
+    return {
+      id: canonical.id,
+      name: overrides?.name ?? canonical.name,
+      category:
+        overrides?.category ?? mapCategoryToDetectionCategory(canonical.category),
+      icon: overrides?.icon ?? canonical.icon,
+      color: overrides?.color ?? canonical.color,
+      placeholder,
+    };
+  }
+  // Fallback for platforms not in canonical registry
+  return {
+    id,
+    name: overrides?.name ?? id,
+    category: overrides?.category ?? 'custom',
+    icon: overrides?.icon ?? 'link',
+    color: overrides?.color ?? '6B7280',
+    placeholder,
+  };
+}
+
+/**
+ * Platform configuration registry
+ * Uses canonical platform metadata from constants/platforms.ts with detection-specific placeholders
+ */
 const PLATFORMS: Record<string, PlatformInfo> = {
-  spotify: {
-    id: 'spotify',
-    name: 'Spotify',
-    category: 'dsp',
-    icon: 'spotify',
-    color: '1DB954',
-    placeholder: 'https://open.spotify.com/artist/...',
-  },
-  'apple-music': {
-    id: 'apple-music',
-    name: 'Apple Music',
-    category: 'dsp',
-    icon: 'applemusic',
-    color: 'FA2D48',
-    placeholder: 'https://music.apple.com/artist/...',
-  },
-  'youtube-music': {
-    id: 'youtube-music',
-    name: 'YouTube Music',
-    category: 'dsp',
-    icon: 'youtube',
-    color: 'FF6D00',
-    placeholder: 'https://music.youtube.com/channel/...',
-  },
-  instagram: {
-    id: 'instagram',
-    name: 'Instagram',
-    category: 'social',
-    icon: 'instagram',
-    color: 'E4405F',
-    placeholder: 'https://instagram.com/username',
-  },
-  tiktok: {
-    id: 'tiktok',
-    name: 'TikTok',
-    category: 'social',
-    icon: 'tiktok',
-    color: '000000',
-    placeholder: 'https://tiktok.com/@username',
-  },
-  twitter: {
-    id: 'twitter',
+  // Music Platforms (DSPs)
+  spotify: createPlatformInfo(
+    'spotify',
+    'https://open.spotify.com/artist/...'
+  ),
+  apple_music: createPlatformInfo(
+    'apple_music',
+    'https://music.apple.com/artist/...'
+  ),
+  youtube_music: createPlatformInfo(
+    'youtube_music',
+    'https://music.youtube.com/channel/...'
+  ),
+  soundcloud: createPlatformInfo(
+    'soundcloud',
+    'https://soundcloud.com/username'
+  ),
+  bandcamp: createPlatformInfo('bandcamp', 'https://username.bandcamp.com'),
+  amazon_music: createPlatformInfo(
+    'amazon_music',
+    'https://music.amazon.com/artists/...'
+  ),
+  tidal: createPlatformInfo('tidal', 'https://tidal.com/browse/artist/...'),
+  deezer: createPlatformInfo('deezer', 'https://deezer.com/artist/...'),
+  pandora: createPlatformInfo('pandora', 'https://pandora.com/artist/...'),
+
+  // Social Media Platforms
+  instagram: createPlatformInfo('instagram', 'https://instagram.com/username'),
+  twitter: createPlatformInfo('twitter', 'https://x.com/username', {
     name: 'X (Twitter)',
-    category: 'social',
-    icon: 'x',
-    color: '000000',
-    placeholder: 'https://x.com/username',
-  },
-  facebook: {
-    id: 'facebook',
-    name: 'Facebook',
-    category: 'social',
-    icon: 'facebook',
-    color: '1877F2',
-    placeholder: 'https://facebook.com/username',
-  },
-  soundcloud: {
-    id: 'soundcloud',
-    name: 'SoundCloud',
-    category: 'dsp',
-    icon: 'soundcloud',
-    color: 'FF5500',
-    placeholder: 'https://soundcloud.com/username',
-  },
-  'amazon-music': {
-    id: 'amazon-music',
-    name: 'Amazon Music',
-    category: 'dsp',
-    icon: 'amazon',
-    color: 'FF9900',
-    placeholder: 'https://music.amazon.com/artists/...',
-  },
-  bandcamp: {
-    id: 'bandcamp',
-    name: 'Bandcamp',
-    category: 'dsp',
-    icon: 'bandcamp',
-    color: '629AA0',
-    placeholder: 'https://username.bandcamp.com',
-  },
-  'tencent-music': {
-    id: 'tencent-music',
-    name: 'Tencent Music',
-    category: 'dsp',
-    icon: 'qq',
-    color: '12B7F5',
-    placeholder: 'https://y.qq.com/n/ryqq/singer/...',
-  },
-  netease: {
-    id: 'netease',
-    name: 'Netease Music',
-    category: 'dsp',
-    icon: 'neteasecloudmusic',
-    color: 'C20C0C',
-    placeholder: 'https://music.163.com/#/artist?id=...',
-  },
-  youtube: {
-    id: 'youtube',
-    name: 'YouTube',
-    category: 'social',
-    icon: 'youtube',
-    color: 'FF0000',
-    placeholder: 'https://youtube.com/@username',
-  },
-  twitch: {
-    id: 'twitch',
-    name: 'Twitch',
-    category: 'social',
-    icon: 'twitch',
-    color: '9146FF',
-    placeholder: 'https://twitch.tv/username',
-  },
-  linkedin: {
-    id: 'linkedin',
-    name: 'LinkedIn',
-    category: 'social',
-    icon: 'linkedin',
-    color: '0A66C2',
-    placeholder: 'https://linkedin.com/in/username',
-  },
-  venmo: {
-    id: 'venmo',
-    name: 'Venmo',
-    category: 'earnings',
-    icon: 'venmo',
-    color: '3D95CE',
-    placeholder: 'https://venmo.com/username',
-  },
-  website: {
-    id: 'website',
-    name: 'Website',
-    category: 'websites',
-    icon: 'website',
-    color: '6B7280',
-    placeholder: 'https://your-website.com',
-  },
-  linktree: {
-    id: 'linktree',
-    name: 'Linktree',
-    category: 'websites',
-    icon: 'linktree',
-    color: '39E09B',
-    placeholder: 'https://linktr.ee/username',
-  },
-  laylo: {
-    id: 'laylo',
+  }),
+  x: createPlatformInfo('x', 'https://x.com/username'),
+  tiktok: createPlatformInfo('tiktok', 'https://tiktok.com/@username'),
+  youtube: createPlatformInfo('youtube', 'https://youtube.com/@username'),
+  facebook: createPlatformInfo('facebook', 'https://facebook.com/username'),
+  linkedin: createPlatformInfo('linkedin', 'https://linkedin.com/in/username'),
+  snapchat: createPlatformInfo(
+    'snapchat',
+    'https://www.snapchat.com/add/username'
+  ),
+  pinterest: createPlatformInfo(
+    'pinterest',
+    'https://www.pinterest.com/username'
+  ),
+  reddit: createPlatformInfo('reddit', 'https://www.reddit.com/user/username'),
+
+  // Creator/Content Platforms
+  twitch: createPlatformInfo('twitch', 'https://twitch.tv/username'),
+  discord: createPlatformInfo('discord', 'https://discord.gg/inviteCode'),
+  patreon: createPlatformInfo('patreon', 'https://patreon.com/username'),
+  onlyfans: createPlatformInfo('onlyfans', 'https://onlyfans.com/username'),
+  substack: createPlatformInfo('substack', 'https://username.substack.com'),
+  medium: createPlatformInfo('medium', 'https://medium.com/@username'),
+  github: createPlatformInfo('github', 'https://github.com/username'),
+  behance: createPlatformInfo('behance', 'https://behance.net/username'),
+  dribbble: createPlatformInfo('dribbble', 'https://dribbble.com/username'),
+
+  // Link Aggregators
+  linktree: createPlatformInfo('linktree', 'https://linktr.ee/username'),
+  beacons: createPlatformInfo('beacons', 'https://beacons.ai/username'),
+  linkfire: createPlatformInfo('linkfire', 'https://lnk.to/...'),
+  toneden: createPlatformInfo('toneden', 'https://toneden.io/...'),
+
+  // Payment/Tip Platforms
+  venmo: createPlatformInfo('venmo', 'https://venmo.com/username'),
+  paypal: createPlatformInfo('paypal', 'https://paypal.me/username'),
+  cashapp: createPlatformInfo('cashapp', 'https://cash.app/$username'),
+  ko_fi: createPlatformInfo('ko_fi', 'https://ko-fi.com/username'),
+  buymeacoffee: createPlatformInfo(
+    'buymeacoffee',
+    'https://buymeacoffee.com/username'
+  ),
+
+  // Messaging Platforms
+  telegram: createPlatformInfo('telegram', 'https://t.me/username'),
+  whatsapp: createPlatformInfo('whatsapp', 'https://wa.me/...'),
+  signal: createPlatformInfo('signal', 'https://signal.me/...'),
+
+  // Professional
+  website: createPlatformInfo('website', 'https://your-website.com'),
+  blog: createPlatformInfo('blog', 'https://your-blog.com'),
+  portfolio: createPlatformInfo('portfolio', 'https://your-portfolio.com'),
+
+  // Detection-only platforms (not in canonical registry)
+  tencent_music: createPlatformInfo(
+    'tencent_music',
+    'https://y.qq.com/n/ryqq/singer/...',
+    { name: 'Tencent Music', category: 'dsp', icon: 'qq', color: '12B7F5' }
+  ),
+  netease: createPlatformInfo(
+    'netease',
+    'https://music.163.com/#/artist?id=...',
+    {
+      name: 'Netease Music',
+      category: 'dsp',
+      icon: 'neteasecloudmusic',
+      color: 'C20C0C',
+    }
+  ),
+  laylo: createPlatformInfo('laylo', 'https://laylo.com/username', {
     name: 'Laylo',
     category: 'websites',
     icon: 'link',
     color: '6B7280',
-    placeholder: 'https://laylo.com/username',
-  },
-  beacons: {
-    id: 'beacons',
-    name: 'Beacons',
-    category: 'websites',
-    icon: 'link',
-    color: '6B7280',
-    placeholder: 'https://beacons.ai/username',
-  },
-  // Additional social platforms
-  telegram: {
-    id: 'telegram',
-    name: 'Telegram',
-    category: 'social',
-    icon: 'telegram',
-    color: '26A5E4',
-    placeholder: 'https://t.me/username',
-  },
-  snapchat: {
-    id: 'snapchat',
-    name: 'Snapchat',
-    category: 'social',
-    icon: 'snapchat',
-    color: 'FFFC00',
-    placeholder: 'https://www.snapchat.com/add/username',
-  },
-  reddit: {
-    id: 'reddit',
-    name: 'Reddit',
-    category: 'social',
-    icon: 'reddit',
-    color: 'FF4500',
-    placeholder: 'https://www.reddit.com/user/username',
-  },
-  pinterest: {
-    id: 'pinterest',
-    name: 'Pinterest',
-    category: 'social',
-    icon: 'pinterest',
-    color: 'E60023',
-    placeholder: 'https://www.pinterest.com/username',
-  },
-  onlyfans: {
-    id: 'onlyfans',
-    name: 'OnlyFans',
-    category: 'social',
-    icon: 'onlyfans',
-    color: '00AFF0',
-    placeholder: 'https://onlyfans.com/username',
-  },
-  quora: {
-    id: 'quora',
+  }),
+  quora: createPlatformInfo('quora', 'https://www.quora.com/profile/Name', {
     name: 'Quora',
     category: 'social',
     icon: 'quora',
     color: 'B92B27',
-    placeholder: 'https://www.quora.com/profile/Name',
-  },
-  threads: {
-    id: 'threads',
+  }),
+  threads: createPlatformInfo('threads', 'https://www.threads.net/@username', {
     name: 'Threads',
     category: 'social',
     icon: 'threads',
     color: '000000',
-    placeholder: 'https://www.threads.net/@username',
-  },
-  discord: {
-    id: 'discord',
-    name: 'Discord',
-    category: 'social',
-    icon: 'discord',
-    color: '5865F2',
-    placeholder: 'https://discord.gg/inviteCode',
-  },
-  line: {
-    id: 'line',
+  }),
+  line: createPlatformInfo('line', 'https://line.me/R/ti/p/@username', {
     name: 'LINE',
     category: 'social',
     icon: 'line',
     color: '00C300',
-    placeholder: 'https://line.me/R/ti/p/@username',
-  },
-  viber: {
-    id: 'viber',
+  }),
+  viber: createPlatformInfo('viber', 'https://www.viber.com/username', {
     name: 'Viber',
     category: 'social',
     icon: 'viber',
     color: '7360F2',
-    placeholder: 'https://www.viber.com/username',
-  },
-  rumble: {
-    id: 'rumble',
+  }),
+  rumble: createPlatformInfo('rumble', 'https://rumble.com/c/ChannelName', {
     name: 'Rumble',
     category: 'social',
     icon: 'rumble',
     color: '85C742',
-    placeholder: 'https://rumble.com/c/ChannelName',
-  },
+  }),
+  cameo: createPlatformInfo('cameo', 'https://cameo.com/username', {
+    name: 'Cameo',
+    category: 'social',
+    icon: 'cameo',
+    color: '8A2BE2',
+  }),
 };
 
 // Domain pattern matching for platform detection
+// Uses canonical platform IDs from constants/platforms.ts (snake_case format)
 const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
-  { pattern: /music\.apple\.com/i, platformId: 'apple-music' },
+  { pattern: /music\.apple\.com/i, platformId: 'apple_music' },
   {
     pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
-    platformId: 'youtube-music',
+    platformId: 'youtube_music',
   },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
   { pattern: /bandcamp\.com/i, platformId: 'bandcamp' },
+  { pattern: /music\.amazon\.com/i, platformId: 'amazon_music' },
+  { pattern: /tidal\.com/i, platformId: 'tidal' },
+  { pattern: /deezer\.com/i, platformId: 'deezer' },
 
   // Social platforms (including YouTube for social/channels)
   { pattern: /(?:www\.)?youtube\.com|youtu\.be/i, platformId: 'youtube' },
@@ -294,20 +266,48 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?facebook\.com/i, platformId: 'facebook' },
   { pattern: /(?:www\.)?twitch\.tv/i, platformId: 'twitch' },
   { pattern: /(?:www\.)?linkedin\.com/i, platformId: 'linkedin' },
-  { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
   { pattern: /(?:www\.)?reddit\.com/i, platformId: 'reddit' },
   { pattern: /(?:www\.)?pinterest\.com/i, platformId: 'pinterest' },
-  { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
-  { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
-  { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
-  { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
-  { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
-  { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
+
+  // Creator platforms
+  { pattern: /(?:www\.)?discord\.gg|discord\.com\/invite/i, platformId: 'discord' },
+  { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
+  { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
+  { pattern: /(?:www\.)?substack\.com/i, platformId: 'substack' },
+  { pattern: /(?:www\.)?medium\.com/i, platformId: 'medium' },
+  { pattern: /(?:www\.)?github\.com/i, platformId: 'github' },
+  { pattern: /(?:www\.)?behance\.net/i, platformId: 'behance' },
+  { pattern: /(?:www\.)?dribbble\.com/i, platformId: 'dribbble' },
+  { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
+
+  // Payment platforms
+  { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
+  { pattern: /(?:www\.)?paypal\.me|paypal\.com/i, platformId: 'paypal' },
+  { pattern: /(?:www\.)?cash\.app/i, platformId: 'cashapp' },
+  { pattern: /(?:www\.)?ko-fi\.com/i, platformId: 'ko_fi' },
+  { pattern: /(?:www\.)?buymeacoffee\.com/i, platformId: 'buymeacoffee' },
+
+  // Messaging platforms
+  { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
+  { pattern: /(?:www\.)?wa\.me|whatsapp\.com/i, platformId: 'whatsapp' },
+
+  // Link aggregators
+  { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
+  { pattern: /(?:www\.)?beacons\.ai/i, platformId: 'beacons' },
+  { pattern: /(?:www\.)?lnk\.to|linkfire\.com/i, platformId: 'linkfire' },
+  { pattern: /(?:www\.)?toneden\.io/i, platformId: 'toneden' },
+  { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
+
+  // Detection-only platforms
   { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
   { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
   { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
-  { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
+  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
+  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
+  { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
+  { pattern: /music\.163\.com/i, platformId: 'netease' },
+
   // Website fallback - keep last
   { pattern: /./, platformId: 'website' },
 ];
