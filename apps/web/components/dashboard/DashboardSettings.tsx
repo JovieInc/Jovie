@@ -13,7 +13,7 @@ const SettingsPolished = dynamic(
   {
     loading: () => (
       <div className='mx-auto max-w-2xl space-y-8 pb-8'>
-        <div className='h-96 animate-pulse rounded-lg bg-surface-1' />
+        <div className='h-96 animate-pulse motion-reduce:animate-none rounded-lg bg-surface-1' />
       </div>
     ),
   }

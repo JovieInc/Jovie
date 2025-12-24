@@ -17,7 +17,7 @@ export function HomeHero({ subtitle }: { subtitle?: ReactNode }) {
 
   const content = loading ? (
     <div className='flex flex-col items-center gap-4'>
-      <div className='animate-pulse'>
+      <div className='animate-pulse motion-reduce:animate-none'>
         <div className='h-4 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4'></div>
         <div className='h-10 bg-gray-200 dark:bg-gray-700 rounded w-full'></div>
       </div>

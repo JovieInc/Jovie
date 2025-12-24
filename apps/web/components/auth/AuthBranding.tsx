@@ -66,8 +66,8 @@ export function AuthBranding({
         </div>
 
         {/* Decorative elements with enhanced dark mode glow */}
-        <div className='absolute top-20 left-20 w-32 h-32 bg-white/10 dark:bg-white/15 rounded-full blur-xl animate-pulse-slow' />
-        <div className='absolute bottom-20 right-20 w-40 h-40 bg-white/10 dark:bg-white/15 rounded-full blur-xl animate-pulse-slow [animation-delay:1s]' />
+        <div className='absolute top-20 left-20 w-32 h-32 bg-white/10 dark:bg-white/15 rounded-full blur-xl animate-pulse-slow motion-reduce:animate-none' />
+        <div className='absolute bottom-20 right-20 w-40 h-40 bg-white/10 dark:bg-white/15 rounded-full blur-xl animate-pulse-slow motion-reduce:animate-none [animation-delay:1s]' />
         <div className='absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/5 dark:bg-white/8 rounded-full blur-3xl' />
       </div>
 

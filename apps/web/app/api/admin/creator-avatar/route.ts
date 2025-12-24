@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -48,7 +49,17 @@ export async function POST(request: NextRequest) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin avatar update error', error);
+    const entitlements = await getCurrentUserEntitlements();
+    await captureCriticalError(
+      'Admin action failed: update creator avatar',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/api/admin/creator-avatar',
+        action: 'update_creator_avatar',
+        adminEmail: entitlements.email,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     if (error instanceof Error) {
       if (error.message === 'Unauthorized') {

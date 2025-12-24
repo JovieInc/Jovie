@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteCreatorOrUserAction } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -70,7 +71,16 @@ export async function POST(request: NextRequest) {
     const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('Admin delete creator/user error:', error);
+    await captureCriticalError(
+      'Admin action failed: delete user',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/api/admin/users/delete',
+        action: 'delete_user',
+        adminEmail: entitlements.email,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     if (wantsJson) {
       const message =

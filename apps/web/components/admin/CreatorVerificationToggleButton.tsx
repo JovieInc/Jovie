@@ -25,9 +25,9 @@ export function CreatorVerificationToggleButton({
   const stateClass = cn(
     'transition duration-200 ease-in-out transform',
     status === 'success' &&
-      'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     status === 'error' &&
-      'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
   const icon = isSuccess ? (

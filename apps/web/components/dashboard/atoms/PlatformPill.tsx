@@ -175,7 +175,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
           tone === 'faded' &&
             'bg-surface-1/60 hover:bg-surface-1 text-secondary-token/85 hover:text-primary-token',
           state === 'hidden' && 'opacity-60',
-          state === 'loading' && 'animate-pulse',
+          state === 'loading' && 'animate-pulse motion-reduce:animate-none',
           className
         )}
         style={wrapperStyle}
@@ -185,7 +185,7 @@ export const PlatformPill = React.forwardRef<HTMLDivElement, PlatformPillProps>(
         {showShimmer ? (
           <span
             aria-hidden='true'
-            className='pointer-events-none absolute inset-0 animate-shimmer opacity-30 dark:opacity-20'
+            className='pointer-events-none absolute inset-0 animate-shimmer motion-reduce:animate-none opacity-30 dark:opacity-20'
             style={{
               backgroundImage:
                 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)',

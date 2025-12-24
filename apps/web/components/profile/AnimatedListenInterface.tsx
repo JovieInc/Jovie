@@ -272,7 +272,7 @@ export function AnimatedListenInterface({
                           ? { opacity: 1, scale: 1 }
                           : { opacity: 1, scale: 1 }
                       }
-                      className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin'
+                      className='w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none'
                     />
                   )}
                 </motion.span>

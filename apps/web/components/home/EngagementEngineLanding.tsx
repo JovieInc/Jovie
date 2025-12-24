@@ -16,7 +16,7 @@ export function EngagementEngineLanding() {
           <div className='max-w-4xl mx-auto text-center'>
             <div className='mb-6 inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-full bg-surface-1 text-secondary-token border border-subtle'>
               <span className='relative flex h-1.5 w-1.5'>
-                <span className='animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' />
+                <span className='animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' />
                 <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500' />
               </span>
               Built for DJs, indie artists, and AI-first creators

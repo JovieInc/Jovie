@@ -133,7 +133,7 @@ export function InterstitialClient({
         {isVerifying ? (
           <span className='flex items-center justify-center'>
             <svg
-              className='animate-spin -ml-1 mr-3 h-5 w-5 text-current'
+              className='animate-spin motion-reduce:animate-none -ml-1 mr-3 h-5 w-5 text-current'
               xmlns='http://www.w3.org/2000/svg'
               fill='none'
               viewBox='0 0 24 24'

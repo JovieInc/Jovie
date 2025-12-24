@@ -33,8 +33,7 @@
         "FLAGS_*",
         "EXPERIMENTATION_*",
         "BLOB_*",
-        "CRON*",
-        "DOPPLER*"
+        "CRON_*"
       ]
     },
     "lint": {

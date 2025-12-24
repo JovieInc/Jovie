@@ -1,0 +1,35 @@
+# Trivy Ignore Configuration for Jovie
+# https://aquasecurity.github.io/trivy/latest/docs/configuration/filtering/
+#
+# This file lists CVE IDs that should be ignored during vulnerability scanning.
+# Use this file for:
+# - Vulnerabilities with no available fix (vendor-pending)
+# - False positives specific to our usage
+# - Accepted risks with documented rationale
+#
+# =============================================================================
+# Format
+# =============================================================================
+# Each line should contain a CVE ID (e.g., CVE-2024-12345)
+# Comments start with # and are ignored
+# Blank lines are ignored
+#
+# Example entries:
+#   CVE-2024-12345  # No fix available, low risk in our context
+#   CVE-2024-67890  # False positive - we don't use affected function
+#
+# =============================================================================
+# Best Practices
+# =============================================================================
+# 1. Always document WHY a CVE is ignored (add a comment on the same line)
+# 2. Periodically review ignored CVEs for available fixes
+# 3. Remove entries once a fix is available and applied
+# 4. Only ignore CVEs after security team review
+#
+# =============================================================================
+# Accepted Vulnerabilities
+# =============================================================================
+# Add CVE IDs below this line with justification comments:
+#
+# Currently no vulnerabilities are being ignored.
+# This file is ready for future CVE exceptions as needed.

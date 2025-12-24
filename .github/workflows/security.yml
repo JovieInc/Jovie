@@ -1,0 +1,94 @@
+# Security scanning workflow for secret detection, vulnerability scanning, and supply chain security
+#
+# This workflow complements CodeQL by adding:
+# - Gitleaks: Secret detection in git history
+# - Trivy: Vulnerability scanning for dependencies and filesystem (added in subtask-1-4)
+# - OSSF Scorecard: Supply chain security scoring (added in subtask-1-5)
+#
+name: Security Scanning
+
+on:
+  push:
+    branches: ['main']
+  pull_request:
+    branches: ['main']
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 6:00 AM UTC
+  workflow_dispatch:
+
+# Default permissions - each job specifies its own required permissions
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Gitleaks Secret Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # Full history for comprehensive secret scanning
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  trivy:
+    name: Trivy Vulnerability Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run Trivy vulnerability scanner (filesystem mode)
+        uses: aquasecurity/trivy-action@6c175e9c4083a92bbca2f9724c8a5e33bc2d97a5 # v0.30.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: true
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.28.15
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy-filesystem'
+
+  scorecard:
+    name: OSSF Scorecard Supply Chain Security
+    runs-on: ubuntu-latest
+    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write # Required for OIDC token authentication
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Run OSSF Scorecard
+        uses: ossf/scorecard-action@05b42c624433fc40578a4040d5cf5e36ddca7d0b # v2.4.2
+        with:
+          results_file: scorecard-results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - name: Upload Scorecard results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@45c373516f557556c15d420e3f5e0aa3d64366bc # v3.28.15
+        with:
+          sarif_file: 'scorecard-results.sarif'
+          category: 'ossf-scorecard'

@@ -285,7 +285,10 @@ export function ReleaseProviderMatrix({
               >
                 <Icon
                   name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                  className={cn('h-4 w-4', isSyncing && 'animate-spin')}
+                  className={cn(
+                    'h-4 w-4',
+                    isSyncing && 'animate-spin motion-reduce:animate-none'
+                  )}
                   aria-hidden='true'
                 />
                 {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
@@ -327,7 +330,10 @@ export function ReleaseProviderMatrix({
                     >
                       <Icon
                         name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                        className={cn('h-4 w-4', isSyncing && 'animate-spin')}
+                        className={cn(
+                          'h-4 w-4',
+                          isSyncing && 'animate-spin motion-reduce:animate-none'
+                        )}
                         aria-hidden='true'
                       />
                       {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
