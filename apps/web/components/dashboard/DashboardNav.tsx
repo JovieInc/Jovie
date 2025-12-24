@@ -18,7 +18,6 @@ import {
   UsersIcon,
 } from '@heroicons/react/24/outline';
 import { Kbd } from '@jovie/ui';
-import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
@@ -33,8 +32,9 @@ import {
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { track } from '@/lib/analytics';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 interface DashboardNavProps {

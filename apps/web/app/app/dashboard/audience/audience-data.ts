@@ -8,8 +8,8 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-import { checkStatsigGateForUser } from '@/lib/statsig/server';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { checkGateForUser } from '@/lib/flags/server';
 import { formatCountryLabel } from '@/lib/utils/audience';
 import type { AudienceAction, AudienceMember, AudienceReferrer } from '@/types';
 
@@ -117,7 +117,7 @@ export async function getAudienceServerData(params: {
 
   const { userId, selectedProfileId, searchParams } = params;
 
-  const isAudienceV2Enabled = await checkStatsigGateForUser(
+  const isAudienceV2Enabled = await checkGateForUser(
     STATSIG_FLAGS.AUDIENCE_V2,
     { userID: userId }
   );

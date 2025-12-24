@@ -1,6 +1,6 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -8,8 +8,10 @@ import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
 import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
-import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import {
@@ -17,7 +19,6 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {
@@ -26,6 +27,25 @@ import {
   type SocialPlatform,
 } from '@/types';
 import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+
+const GroupedLinksManager = dynamic(
+  () =>
+    import('@/components/dashboard/organisms/GroupedLinksManager').then(
+      mod => ({
+        default: mod.GroupedLinksManager,
+      })
+    ),
+  {
+    loading: () => (
+      <div className='space-y-3'>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className='h-16 animate-pulse rounded-lg bg-surface-1' />
+        ))}
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 type ProfileUpdatePayload = {
   username?: string;

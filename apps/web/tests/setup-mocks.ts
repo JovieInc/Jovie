@@ -304,19 +304,6 @@ export function setupComponentMocks() {
       ),
   }));
 
-  // Mock feature flags
-  vi.mock('@/components/providers/FeatureFlagsProvider', () => ({
-    useFeatureFlags: () => ({
-      flags: {
-        waitlistEnabled: false,
-        artistSearchEnabled: true,
-        debugBannerEnabled: false,
-        tipPromoEnabled: true,
-        profileSettingsEnabled: true,
-      },
-    }),
-  }));
-
   // Mock notification hook to avoid needing actual toast provider
   vi.mock('@/lib/hooks/useNotifications', () => ({
     useNotifications: () => ({

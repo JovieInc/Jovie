@@ -6,11 +6,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@jovie/ui';
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useMemo, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { decodeContactPayload } from '@/lib/contacts/obfuscation';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 
 interface ArtistContactsButtonProps {

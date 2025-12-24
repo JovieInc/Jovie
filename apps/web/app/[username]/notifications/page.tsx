@@ -1,6 +1,5 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -8,6 +7,8 @@ import { Input } from '@/components/atoms/Input';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { StarterEmptyState } from '@/components/feedback/StarterEmptyState';
 import { track } from '@/lib/analytics';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   getNotificationSubscribeSuccessMessage,
@@ -15,7 +16,6 @@ import {
   subscribeToNotifications,
 } from '@/lib/notifications/client';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 export default function NotificationsPage() {
   const params = useParams();

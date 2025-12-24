@@ -18,6 +18,7 @@ import {
   SidebarHeader,
   SidebarRail,
   SidebarSeparator,
+  SidebarShortcutHint,
   SidebarTrigger,
   useSidebar,
 } from '@/components/organisms/Sidebar';
@@ -93,13 +94,16 @@ export function DashboardSidebar({
               </span>
             </Link>
           )}
-          <SidebarTrigger
-            aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            className={cn(
-              'ml-auto h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-              'group-data-[state=closed]:hidden'
-            )}
-          />
+          <div className='ml-auto flex items-center gap-2'>
+            <SidebarShortcutHint className='hidden lg:inline-flex' />
+            <SidebarTrigger
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className={cn(
+                'h-8 w-8 shrink-0 border border-sidebar-border bg-sidebar/70 text-secondary-token hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                'group-data-[state=closed]:hidden'
+              )}
+            />
+          </div>
         </div>
         {!isInSettings && (
           <div className='px-2 pb-3 pt-2 lg:hidden'>

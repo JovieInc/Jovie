@@ -1,6 +1,7 @@
 'use client';
 import {
   Button,
+  Kbd,
   Sheet,
   SheetContent,
   Tooltip,
@@ -249,6 +250,23 @@ const SidebarTrigger = React.forwardRef<
   );
 });
 SidebarTrigger.displayName = 'SidebarTrigger';
+
+type SidebarShortcutHintProps = {
+  className?: string;
+};
+
+export function SidebarShortcutHint({ className }: SidebarShortcutHintProps) {
+  return (
+    <Kbd
+      className={cn(
+        'inline-flex items-center rounded border border-sidebar-border bg-sidebar/40 px-1.5 py-0.5 text-[10px] font-medium text-sidebar-muted',
+        className
+      )}
+    >
+      ⌘/Ctrl {SIDEBAR_KEYBOARD_SHORTCUT.toUpperCase()}
+    </Kbd>
+  );
+}
 
 const SidebarRail = React.forwardRef<
   HTMLButtonElement,

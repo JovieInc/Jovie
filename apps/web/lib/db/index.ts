@@ -419,6 +419,11 @@ interface TableExistsRow {
   table_exists: boolean;
 }
 
+/** Row type for active connections query */
+interface ActiveConnectionsRow {
+  active_connections: string | number;
+}
+
 export async function doesTableExist(tableName: string): Promise<boolean> {
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
     positiveTableExistenceCache.clear();
@@ -668,7 +673,7 @@ export async function checkDbPerformance(): Promise<{
 
     // 4. Check concurrent connections (if available)
     try {
-      const result = await database.execute(
+      const result = await _db!.execute(
         drizzleSql<ActiveConnectionsRow>`
           SELECT count(*) as active_connections
           FROM pg_stat_activity

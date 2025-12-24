@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -18,7 +17,8 @@ import {
   summarizeTerritories,
 } from '@/lib/contacts/constants';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import type {
   ContactRole,
   DashboardContact,

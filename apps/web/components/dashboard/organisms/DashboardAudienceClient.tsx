@@ -1,9 +1,37 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
-import { DashboardAudienceTable } from '@/components/dashboard/organisms/DashboardAudienceTable';
 import type { AudienceMember } from '@/types';
+
+const DashboardAudienceTable = dynamic(
+  () =>
+    import('@/components/dashboard/organisms/DashboardAudienceTable').then(
+      mod => ({
+        default: mod.DashboardAudienceTable,
+      })
+    ),
+  {
+    loading: () => (
+      <div className='h-full w-full space-y-4 p-4'>
+        <div className='flex items-center justify-between'>
+          <div className='h-8 w-48 animate-pulse rounded bg-surface-1' />
+          <div className='h-8 w-32 animate-pulse rounded bg-surface-1' />
+        </div>
+        <div className='space-y-2'>
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div
+              key={i}
+              className='h-14 animate-pulse rounded-lg bg-surface-1'
+            />
+          ))}
+        </div>
+      </div>
+    ),
+    ssr: false,
+  }
+);
 
 export type AudienceMode = 'members' | 'subscribers';
 

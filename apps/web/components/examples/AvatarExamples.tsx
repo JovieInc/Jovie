@@ -7,16 +7,16 @@
 
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useState } from 'react';
 import { Avatar } from '@/components/atoms/Avatar';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   formatAcceptedImageTypes,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 // Example 1: Display-only avatar (for public profiles, featured creators, etc.)
 export function PublicProfileExample() {

@@ -18,8 +18,8 @@ import {
   isClaimTokenValidForProfile,
 } from '@/lib/db/queries';
 import type { CreatorContact as DbCreatorContact } from '@/lib/db/schema';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-import { checkStatsigGateForUser } from '@/lib/statsig/server';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { checkGateForUser } from '@/lib/flags/server';
 import type { PublicContact } from '@/types/contacts';
 import {
   CreatorProfile,
@@ -220,7 +220,7 @@ export default async function ArtistPage({ params, searchParams }: Props) {
   const artist = convertCreatorProfileToArtist(profile);
 
   const dynamicOverrideEnabled = creatorClerkId
-    ? await checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+    ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
         userID: creatorClerkId,
       })
     : false;

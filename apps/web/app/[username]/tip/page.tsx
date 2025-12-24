@@ -1,9 +1,9 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 
 interface Props {
   params: Promise<{

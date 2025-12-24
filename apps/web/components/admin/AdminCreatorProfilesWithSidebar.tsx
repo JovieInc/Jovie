@@ -11,6 +11,7 @@ import {
   Input,
 } from '@jovie/ui';
 import { Check, Star } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
@@ -24,7 +25,6 @@ import {
   SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
-import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
 import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
@@ -34,15 +34,34 @@ import { useRowSelection } from '@/components/admin/table/useRowSelection';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { useToast } from '@/components/molecules/ToastContainer';
-import { ContactSidebar } from '@/components/organisms/ContactSidebar';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+
 import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from '@/lib/admin/creator-profiles';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
+
+const DeleteCreatorDialog = dynamic(
+  () =>
+    import('@/components/admin/DeleteCreatorDialog').then(mod => ({
+      default: mod.DeleteCreatorDialog,
+    })),
+  { ssr: false }
+);
+
+const ContactSidebar = dynamic(
+  () =>
+    import('@/components/organisms/ContactSidebar').then(mod => ({
+      default: mod.ContactSidebar,
+    })),
+  {
+    loading: () => <div className='h-full w-full animate-pulse bg-surface-1' />,
+    ssr: false,
+  }
+);
 
 const CONTACT_PANEL_WIDTH = 320;
 

@@ -1,11 +1,11 @@
 'use client';
 
 import { BoltIcon } from '@heroicons/react/24/outline';
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 
 type Activity = {
   id: string;

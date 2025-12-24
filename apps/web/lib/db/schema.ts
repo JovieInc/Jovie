@@ -637,6 +637,11 @@ export const clickEvents = pgTable(
     creatorProfileCreatedAtIdx: index(
       'click_events_creator_profile_id_created_at_idx'
     ).on(table.creatorProfileId, table.createdAt),
+    // Composite index for analytics queries that exclude bot traffic
+    // Query pattern: WHERE creator_profile_id = ? AND (is_bot = false OR is_bot IS NULL) AND created_at >= ?
+    creatorProfileIsBotCreatedAtIdx: index(
+      'click_events_creator_profile_id_is_bot_created_at_idx'
+    ).on(table.creatorProfileId, table.isBot, table.createdAt),
   })
 );
 

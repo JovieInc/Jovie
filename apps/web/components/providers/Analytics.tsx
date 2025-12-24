@@ -1,12 +1,12 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import { Analytics as VercelAnalytics } from '@vercel/analytics/react';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { page, setAnalyticsEnabled } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 
 export function Analytics() {
   const pathname = usePathname();
