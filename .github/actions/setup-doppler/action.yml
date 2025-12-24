@@ -1,5 +1,5 @@
 name: 'Setup Doppler'
-description: 'Install Doppler CLI and inject secrets into environment'
+description: 'Install Doppler CLI and inject secrets into environment (Ubuntu/Debian runners only)'
 
 inputs:
   doppler-token:
@@ -27,5 +27,9 @@ runs:
         DOPPLER_TOKEN: ${{ inputs.doppler-token }}
       run: |
         # Export all Doppler secrets as environment variables for subsequent steps
-        doppler secrets download --no-file --format env >> $GITHUB_ENV
-        echo "✅ Doppler secrets loaded into environment"
+        if doppler secrets download --no-file --format env >> $GITHUB_ENV; then
+          echo "✅ Doppler secrets loaded into environment"
+        else
+          echo "❌ Failed to download Doppler secrets. Check token validity and project/config."
+          exit 1
+        fi

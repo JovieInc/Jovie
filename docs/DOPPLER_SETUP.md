@@ -136,7 +136,7 @@ gh secret set DOPPLER_TOKEN_PRD
 Doppler syncs secrets to Vercel automatically via the Vercel integration.
 
 **Setup:**
-1. Go to https://dashboard.doppler.com/workplace/[your-workplace]/projects/jovie-web/integrations
+1. Go to <https://dashboard.doppler.com/workplace/[your-workplace]/projects/jovie-web/integrations>
 2. Click "Add Integration" → "Vercel"
 3. Authorize Doppler to access your Vercel account
 4. Map Doppler configs to Vercel environments:
@@ -174,7 +174,7 @@ doppler secrets set SECRET_NAME=value --project jovie-web --config dev
 ```
 
 **Via Dashboard:**
-1. Go to https://dashboard.doppler.com
+1. Go to <https://dashboard.doppler.com>
 2. Select `jovie-web` project
 3. Select environment (`dev`, `stg`, or `prd`)
 4. Click "Add Secret"
@@ -240,7 +240,7 @@ doppler run --config dev -- pnpm dev
 
 ### Vercel Sync Not Working
 
-1. Check integration status: https://dashboard.doppler.com/workplace/[your-workplace]/projects/jovie-web/integrations
+1. Check integration status: <https://dashboard.doppler.com/workplace/[your-workplace]/projects/jovie-web/integrations>
 2. Verify environment mapping is correct
 3. Trigger a manual sync from the Vercel integration page
 4. Check Vercel dashboard to confirm secrets are present
@@ -257,4 +257,4 @@ doppler run --config dev -- pnpm dev
 If you encounter issues:
 1. Check this documentation
 2. Ask in #engineering Slack channel
-3. Contact Doppler support: https://doppler.com/support
+3. Contact Doppler support: <https://doppler.com/support>
