@@ -24,7 +24,7 @@ jobs:
       group: plan-sync
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Sync plan to issues and assign Copilot
         env:
