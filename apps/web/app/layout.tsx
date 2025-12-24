@@ -213,9 +213,9 @@ export default async function RootLayout({
     }
 
     return (
-      <html lang='en' suppressHydrationWarning>
+      <html lang='en' suppressHydrationWarning nonce={nonce}>
         {headContent}
-        <body className={bodyClassName}>
+        <body className={bodyClassName} nonce={nonce}>
           <div className='flex items-center justify-center min-h-screen'>
             <div className='text-center'>
               <h1 className='text-2xl font-bold text-red-600 mb-4'>
@@ -233,9 +233,9 @@ export default async function RootLayout({
 
   // publishableKey is guaranteed to be defined here
   return (
-    <html lang='en' suppressHydrationWarning>
+    <html lang='en' suppressHydrationWarning nonce={nonce}>
       {headContent}
-      <body className={bodyClassName}>
+      <body className={bodyClassName} nonce={nonce}>
         <ClientProviders publishableKey={publishableKey}>
           {children}
         </ClientProviders>
