@@ -253,7 +253,7 @@ export function UniversalLinkInputArtistSearchMode({
 
         <div className='absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2'>
           {state === 'loading' && (
-            <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin' />
+            <div className='w-4 h-4 border-2 border-tertiary-token border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
           )}
           <button
             type='button'
@@ -274,7 +274,10 @@ export function UniversalLinkInputArtistSearchMode({
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {[...Array(3)].map((_, i) => (
-                <div key={i} className='flex items-center gap-3 animate-pulse'>
+                <div
+                  key={i}
+                  className='flex items-center gap-3 animate-pulse motion-reduce:animate-none'
+                >
                   <div className='w-10 h-10 rounded-full bg-surface-3' />
                   <div className='flex-1 space-y-1'>
                     <div className='h-4 w-32 bg-surface-3 rounded' />

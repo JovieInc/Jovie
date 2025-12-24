@@ -71,7 +71,7 @@ export function BillingDashboard() {
 
   if (loading) {
     return (
-      <div className='animate-pulse'>
+      <div className='animate-pulse motion-reduce:animate-none'>
         <div className='mb-4 h-8 rounded bg-muted'></div>
         <div className='mb-4 h-32 rounded bg-muted'></div>
         <div className='h-10 rounded bg-muted'></div>

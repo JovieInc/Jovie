@@ -154,7 +154,11 @@ const nextConfig = {
   experimental: {
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
-    optimizePackageImports: ['@headlessui/react', '@heroicons/react'],
+    optimizePackageImports: [
+      '@headlessui/react',
+      '@heroicons/react',
+      'lucide-react',
+    ],
     // Build optimizations
     // Turbopack: remove unsupported option
     // forceSwcTransforms: true,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toggleCreatorFeaturedAction } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -78,7 +79,16 @@ export async function POST(request: NextRequest) {
     const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('Admin creators toggle featured error:', error);
+    await captureCriticalError(
+      'Admin action failed: toggle creator featured status',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/api/admin/creators/toggle-featured',
+        action: 'toggle_featured_creator',
+        adminEmail: entitlements.email,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     if (wantsJson) {
       const message =

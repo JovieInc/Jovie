@@ -7,7 +7,10 @@ interface ButtonSpinnerProps {
 export function ButtonSpinner({ className }: ButtonSpinnerProps) {
   return (
     <svg
-      className={cn('h-4 w-4 animate-spin', className)}
+      className={cn(
+        'h-4 w-4 animate-spin motion-reduce:animate-none',
+        className
+      )}
       xmlns='http://www.w3.org/2000/svg'
       fill='none'
       viewBox='0 0 24 24'

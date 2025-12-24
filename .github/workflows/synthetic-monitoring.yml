@@ -26,13 +26,13 @@ jobs:
           exit 1
 
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
       - name: Setup Node and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@v5
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'playwright.config*.ts') }}
@@ -86,7 +86,7 @@ jobs:
           fi
 
       - name: Upload test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
           name: synthetic-test-results
@@ -103,7 +103,7 @@ jobs:
 
       - name: Send Slack Alert on Failure
         if: steps.test-results.outputs.test_status != 'passed'
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
         with:
           status: custom
           channel: '#alerts-production'
@@ -139,7 +139,7 @@ jobs:
 
       - name: Send Slack Success Notification (Scheduled Summary)
         if: steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule'
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
         with:
           status: custom
           channel: '#monitoring'

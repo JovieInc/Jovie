@@ -9,6 +9,7 @@ import {
   waitlistInvites,
 } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
@@ -90,8 +91,9 @@ async function findAvailableHandle(tx: DbType, base: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  let entitlements;
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -279,7 +281,16 @@ export async function POST(request: Request) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    console.error('Admin waitlist approve error:', error);
+    await captureCriticalError(
+      'Admin action failed: approve waitlist entry',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/app/admin/waitlist/approve',
+        action: 'approve_waitlist',
+        adminEmail: entitlements?.email ?? 'unknown',
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     return NextResponse.json(
       { success: false, error: 'Failed to approve waitlist entry' },

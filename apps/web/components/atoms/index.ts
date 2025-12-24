@@ -36,6 +36,7 @@ export * from './Separator';
 export * from './Sheet';
 export * from './SidebarCollapseButton';
 export * from './Skeleton';
+export * from './SkipToContent';
 export * from './SocialIcon';
 export * from './Spacer';
 export * from './StatusBadge';

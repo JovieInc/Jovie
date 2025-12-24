@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { toggleCreatorVerifiedAction } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -78,7 +79,16 @@ export async function POST(request: NextRequest) {
     const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('Admin toggle verify error:', error);
+    await captureCriticalError(
+      'Admin action failed: toggle user verification',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/app/admin/users/toggle-verify',
+        action: 'toggle_verify_user',
+        adminEmail: entitlements.email,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     if (wantsJson) {
       const message =

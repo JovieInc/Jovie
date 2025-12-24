@@ -182,7 +182,7 @@ export function OtpInput({
             </span>
             {status === 'cursor' && !value && (
               <span
-                className='animate-pulse text-secondary-token'
+                className='animate-pulse motion-reduce:animate-none text-secondary-token'
                 aria-hidden='true'
               >
                 |

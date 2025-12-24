@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { bulkRerunCreatorIngestionAction } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -82,7 +83,16 @@ export async function POST(request: NextRequest) {
     const redirectUrl = new URL('/app/admin/creators', request.url);
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('Admin creators bulk refresh error:', error);
+    await captureCriticalError(
+      'Admin action failed: bulk refresh creators',
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        route: '/api/admin/creators/bulk-refresh',
+        action: 'bulk_refresh_creators',
+        adminEmail: entitlements.email,
+        timestamp: new Date().toISOString(),
+      }
+    );
 
     if (wantsJson) {
       const message =

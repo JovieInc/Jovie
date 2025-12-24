@@ -10,7 +10,9 @@ on:
       - 'docs/**'
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
+  actions: read
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 1 }
       - name: Validate .env.example contains placeholders only
         run: |
@@ -55,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 1 }
       - name: Short-circuit for docs-only / empty-diff PR updates
         if: ${{ github.event_name == 'pull_request' }}
@@ -88,7 +90,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 1 }
       - name: Short-circuit for docs-only / empty-diff PR updates
         if: ${{ github.event_name == 'pull_request' }}
@@ -110,14 +112,14 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             .cache/tsbuildinfo
@@ -139,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 1 }
       - name: Short-circuit for docs-only / empty-diff PR updates
         if: ${{ github.event_name == 'pull_request' }}
@@ -161,7 +163,7 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
@@ -178,7 +180,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with: { fetch-depth: 1 }
       - name: Short-circuit for docs-only / empty-diff PR updates
         if: ${{ github.event_name == 'pull_request' }}
@@ -200,14 +202,14 @@ jobs:
           fi
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .turbo
           key: ${{ runner.os }}-turbo-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache Next build cache
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             apps/web/.next/cache
@@ -240,7 +242,7 @@ jobs:
     outputs:
       branch_name: ${{ steps.sanitize-branch.outputs.name }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
 
@@ -295,7 +297,7 @@ jobs:
       - name: Create or reuse Neon branch
         id: create-branch
         if: ${{ github.event_name != 'pull_request' || steps.check-backend.outputs.needs_db == 'true' }}
-        uses: neondatabase/create-branch-action@v6
+        uses: neondatabase/create-branch-action@f642cf9c91ab9bf742ec8217b9615e0e42e437dd # v6.1.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
@@ -327,7 +329,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
       - name: Check for relevant changes
@@ -370,7 +372,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -395,7 +397,7 @@ jobs:
       - name: Resolve Neon DB URL (job-local)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
-        uses: neondatabase/create-branch-action@v6
+        uses: neondatabase/create-branch-action@f642cf9c91ab9bf742ec8217b9615e0e42e437dd # v6.1.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
@@ -448,7 +450,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -492,7 +494,7 @@ jobs:
       - name: Create or reuse Neon branch
         id: create-branch
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: neondatabase/create-branch-action@v6
+        uses: neondatabase/create-branch-action@f642cf9c91ab9bf742ec8217b9615e0e42e437dd # v6.1.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ steps.sanitize-branch.outputs.name }}
@@ -531,14 +533,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -562,7 +564,7 @@ jobs:
 
       - name: Upload Playwright Artifacts on Failure
         if: failure()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: public-profile-smoke-report-${{ github.run_id }}
           path: |
@@ -580,7 +582,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -610,7 +612,7 @@ jobs:
 
       - name: Cache Next build cache
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .next/cache
           key: ${{ runner.os }}-next-${{ hashFiles('pnpm-lock.yaml', 'package.json') }}
@@ -639,7 +641,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -711,7 +713,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
       - uses: ./.github/actions/setup-node-pnpm
@@ -736,7 +738,7 @@ jobs:
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 2
 
@@ -767,7 +769,7 @@ jobs:
       - name: Resolve Neon DB URL (job-local)
         if: steps.check_changes.outputs.run_full_ci == 'true'
         id: resolve_neon
-        uses: neondatabase/create-branch-action@v6
+        uses: neondatabase/create-branch-action@f642cf9c91ab9bf742ec8217b9615e0e42e437dd # v6.1.1
         with:
           project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_name: ${{ needs.neon-db.outputs.branch_name }}
@@ -808,7 +810,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@v5
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'playwright.config*.ts') }}
@@ -882,7 +884,7 @@ jobs:
 
       - name: Upload Playwright Report on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: ${{ github.job }}-playwright-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/playwright-report/
@@ -890,7 +892,7 @@ jobs:
 
       - name: Upload Playwright Test Results on Failure
         if: ${{ failure() && steps.check_changes.outputs.run_full_ci == 'true' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
           name: ${{ github.job }}-test-results-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
@@ -906,8 +908,8 @@ jobs:
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 20
           package-manager-cache: false
@@ -965,6 +967,10 @@ jobs:
   ci-summary:
     name: CI Summary
     if: ${{ always() && github.event_name == 'pull_request' }}
+    permissions:
+      actions: read
+      pull-requests: write
+      contents: read
     needs:
       - ci-env-example-guard
       - ci-guardrails
@@ -981,13 +987,9 @@ jobs:
       - ci-pr-vercel-preview
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    permissions:
-      actions: read
-      pull-requests: write
-      contents: read
     steps:
       - name: Post CI summary to PR
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
           BUILD_RUN_FULL_CI: ${{ needs.ci-build.outputs.run_full_ci }}
           DRIZZLE_RUN_FULL_CI: ${{ needs.ci-drizzle-check.outputs.run_full_ci }}
@@ -1163,7 +1165,7 @@ jobs:
       name: Production
       url: https://jov.ie
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
@@ -1250,7 +1252,7 @@ jobs:
 
       - name: Slack notify (production deploy)
         if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
         with:
           status: custom
           channel: '#alerts-production'
@@ -1274,7 +1276,7 @@ jobs:
 
       - name: Slack notify (production deploy failed)
         if: ${{ (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@v3
+        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
         with:
           status: custom
           channel: '#alerts-critical'
@@ -1305,7 +1307,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: ./.github/actions/setup-node-pnpm
       - name: Run Lighthouse CI against production
         run: npx lhci autorun --config=.lighthouserc.json

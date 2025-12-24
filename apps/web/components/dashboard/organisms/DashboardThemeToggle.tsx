@@ -29,7 +29,7 @@ export function DashboardThemeToggle({
   if (!mounted) {
     return showSystemOption ? (
       <div className='space-y-3'>
-        <div className='animate-pulse space-y-3'>
+        <div className='animate-pulse motion-reduce:animate-none space-y-3'>
           <div className='h-4 bg-surface-hover-token rounded w-24'></div>
           <div className='h-8 bg-surface-hover-token rounded'></div>
         </div>
@@ -182,7 +182,7 @@ export function DashboardThemeToggle({
             className={cn(
               'flex h-5 w-5 transform rounded-full bg-surface-0 shadow ring-0 transition duration-200 ease-in-out items-center justify-center',
               isDark ? 'translate-x-5' : 'translate-x-0',
-              isUpdating && 'animate-pulse'
+              isUpdating && 'animate-pulse motion-reduce:animate-none'
             )}
           >
             {isDark ? (
