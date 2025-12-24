@@ -197,6 +197,13 @@
       "when": 1766512456779,
       "tag": "0027_social_links_creator_profile_state_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1766600000000,
+      "tag": "0028_click_events_analytics_idx",
+      "breakpoints": true
     }
   ]
 }
