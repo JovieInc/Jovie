@@ -1,31 +1,18 @@
 'use client';
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { DndContext } from '@dnd-kit/core';
+import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { LinkIcon } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/UniversalLinkInput';
-import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
-import { track } from '@/lib/analytics';
+import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
 // getBrandIconStyles reserved for future brand-colored icons
 import '@/lib/utils/color';
@@ -46,8 +33,13 @@ import {
   SUGGESTION_PILLS,
 } from './links/config';
 import {
+  type SuggestedLink,
+  useDragAndDrop,
+  useLinksManager,
+  useSuggestions,
+} from './links/hooks';
+import {
   buildPrefillUrl,
-  canMoveTo,
   compactUrlDisplay,
   groupLinks,
   type LinkSection,
@@ -93,27 +85,7 @@ export interface GroupedLinksManagerProps<
 // Phase 2: wire minimal callbacks for DashboardLinks integration.
 // Note: CROSS_CATEGORY, SUGGESTION_PILLS, MUSIC_FIRST_ORDER, SOCIAL_FIRST_ORDER
 // are now imported from ./links/config and ./links/utils
-
-function buildSuggestionEventProperties(
-  suggestion: {
-    platform: { id: string };
-    sourcePlatform?: string | null;
-    sourceType?: string | null;
-    confidence?: number | null;
-  },
-  profileId?: string
-) {
-  const confidenceValue =
-    typeof suggestion.confidence === 'number' ? suggestion.confidence : null;
-
-  return {
-    platformId: suggestion.platform.id,
-    sourcePlatform: suggestion.sourcePlatform ?? null,
-    sourceType: suggestion.sourceType ?? null,
-    confidence: confidenceValue,
-    profileId: profileId ?? null,
-  };
-}
+// buildSuggestionEventProperties is now in useSuggestions hook
 
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
@@ -128,7 +100,66 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   suggestionsEnabled = false,
   profileId,
 }: GroupedLinksManagerProps<T>) {
-  const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Custom hooks for state management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Link state management (CRUD operations, YouTube prompts, etc.)
+  const {
+    links,
+    setLinks,
+    handleAdd,
+    handleToggle,
+    handleRemove,
+    handleEdit,
+    insertLinkWithSectionOrdering,
+    ytPrompt,
+    confirmYtPrompt,
+    cancelYtPrompt,
+    lastAddedId,
+    addingLink,
+    prefillUrl,
+    setPrefillUrl,
+    clearPrefillUrl,
+    idFor,
+    linkIsVisible,
+  } = useLinksManager<T>({
+    initialLinks,
+    onLinksChange,
+    onLinkAdded,
+  });
+
+  // Suggestion state management (pending suggestions, accept/dismiss with analytics)
+  const {
+    pendingSuggestions,
+    handleAccept: handleAcceptSuggestionFromHook,
+    handleDismiss: handleDismissSuggestionFromHook,
+    suggestionKey,
+    hasPendingSuggestions,
+  } = useSuggestions<SuggestedLink>({
+    suggestedLinks: suggestedLinks as SuggestedLink[],
+    suggestionsEnabled,
+    profileId,
+    onAcceptSuggestion: onAcceptSuggestion as (
+      suggestion: SuggestedLink
+    ) => Promise<DetectedLink | null> | DetectedLink | null | void,
+    onDismissSuggestion: onDismissSuggestion as (
+      suggestion: SuggestedLink
+    ) => Promise<void> | void,
+  });
+
+  // Drag-and-drop functionality (sensors, handlers, hint messages)
+  const { sensors, onDragEnd, hint } = useDragAndDrop<T>({
+    links,
+    onLinksChange: next => {
+      setLinks(next);
+      onLinksChange?.(next);
+    },
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Local UI state
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Ensure only one action menu is open at a time
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -136,75 +167,19 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     setOpenMenuId(id);
   }, []);
 
-  // Pointer sensors for drag-and-drop (hook must be top-level)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
-
   const containerRef = useRef<HTMLDivElement | null>(null);
   const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future collapse animation
   const [_collapsedInitialized, _setCollapsedInitialized] = useState(false);
-  const [ytPrompt, setYtPrompt] = useState<{
-    candidate: DetectedLink;
-    target: 'social' | 'dsp';
-  } | null>(null);
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
-  const [addingLink, setAddingLink] = useState<T | null>(null);
   const [pendingPreview, setPendingPreview] = useState<{
     link: DetectedLink;
     isDuplicate: boolean;
   } | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
 
-  const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
-  const [pendingSuggestions, setPendingSuggestions] = useState(
-    () => suggestedLinks
-  );
-
-  const suggestionKey = useCallback(
-    (s: T & { suggestionId?: string }) =>
-      s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`,
-    []
-  );
-
-  // Memoize signature calculation - use previous value if array reference unchanged
-  const suggestedLinksSignature = useMemo(() => {
-    const keys = suggestedLinks.map(s => suggestionKey(s)).sort();
-    return keys.join('|');
-  }, [suggestedLinks, suggestionKey]);
-
-  const prevSuggestedLinksSignatureRef = useRef<string>(
-    suggestedLinksSignature
-  );
-  const surfacedSuggestionKeysRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (prevSuggestedLinksSignatureRef.current === suggestedLinksSignature) {
-      return;
-    }
-    prevSuggestedLinksSignatureRef.current = suggestedLinksSignature;
-    setPendingSuggestions(suggestedLinks);
-  }, [suggestedLinks, suggestedLinksSignature]);
-
-  useEffect(() => {
-    if (!suggestionsEnabled || pendingSuggestions.length === 0) {
-      return;
-    }
-
-    pendingSuggestions.forEach(suggestion => {
-      const key = suggestionKey(suggestion);
-      if (surfacedSuggestionKeysRef.current.has(key)) {
-        return;
-      }
-      surfacedSuggestionKeysRef.current.add(key);
-      void track(
-        'link_suggestion_surfaced',
-        buildSuggestionEventProperties(suggestion, profileId)
-      );
-    });
-  }, [pendingSuggestions, profileId, suggestionKey, suggestionsEnabled]);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Derived state and memoized values
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const groups = useMemo(() => groupLinks(links), [links]);
 
@@ -229,415 +204,57 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     return sorted;
   }, [groups]);
 
-  // Stable ids for DnD + menu control
-  const idFor = useCallback(
-    (link: T): string =>
-      `${link.platform.id}::${link.normalizedUrl || link.originalUrl || ''}`,
-    []
-  );
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Suggestion handlers (bridge between useSuggestions and link insertion)
+  // ─────────────────────────────────────────────────────────────────────────────
 
-  const mapIdToIndex = useMemo(() => {
-    const m = new Map<string, number>();
-    links.forEach((l, idx) => {
-      m.set(idFor(l), idx);
-    });
-    return m;
-  }, [idFor, links]);
-
-  // Note: sectionOf and canMoveTo are now imported from ./links/utils
-
-  useEffect(() => {
-    if (!lastAddedId) return;
-    const timer = window.setTimeout(() => setLastAddedId(null), 1400);
-    return () => window.clearTimeout(timer);
-  }, [lastAddedId]);
-
-  const linkIsVisible = (l: T): boolean =>
-    ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
-
-  useEffect(() => {
-    onLinksChange?.(links);
-  }, [links, onLinksChange]);
-
-  async function handleAdd(link: DetectedLink) {
-    const enriched = {
-      isVisible: true,
-      ...link,
-    } as unknown as T;
-
-    if ((enriched as DetectedLink).platform.id === 'venmo') {
-      (enriched as DetectedLink).platform = {
-        ...(enriched as DetectedLink).platform,
-        category: 'earnings' as unknown as 'social',
-      } as DetectedLink['platform'];
-    }
-
-    const section = sectionOf(enriched as T);
-
-    const socialVisibleCount = links.filter(
-      l => sectionOf(l as T) === 'social' && linkIsVisible(l as T)
-    ).length;
-    if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-      (enriched as unknown as { isVisible?: boolean }).isVisible = false;
-    }
-
-    const otherSection: 'social' | 'dsp' | null =
-      section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
-    const sameSectionHas = links.some(
-      l => l.platform.id === enriched.platform.id && sectionOf(l) === section
-    );
-    const otherSectionHas = otherSection
-      ? links.some(
-          l =>
-            l.platform.id === enriched.platform.id &&
-            sectionOf(l) === otherSection
-        )
-      : false;
-
-    const canonicalId = canonicalIdentity({
-      platform: (enriched as DetectedLink).platform,
-      normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-    });
-    const dupAt = links.findIndex(
-      l =>
-        canonicalIdentity({
-          platform: (l as DetectedLink).platform,
-          normalizedUrl: (l as DetectedLink).normalizedUrl,
-        }) === canonicalId
-    );
-    const duplicate = dupAt !== -1 ? links[dupAt] : null;
-    const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
-    const hasCrossSectionDuplicate =
-      enriched.platform.id === 'youtube' &&
-      duplicateSection !== null &&
-      duplicateSection !== section;
-
-    if (
-      enriched.platform.id === 'youtube' &&
-      sameSectionHas &&
-      !otherSectionHas &&
-      otherSection
-    ) {
-      setYtPrompt({ candidate: enriched, target: otherSection });
-      return;
-    }
-
-    if (
-      enriched.platform.id === 'youtube' &&
-      dupAt !== -1 &&
-      duplicateSection === section
-    ) {
-      const merged = {
-        ...links[dupAt],
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-      } as T;
-      const next = links.map((l, i) => (i === dupAt ? merged : l));
-      setLinks(next);
-      onLinkAdded?.([merged]);
-      return;
-    }
-
-    if (dupAt !== -1 && !hasCrossSectionDuplicate) {
-      const merged = {
-        ...links[dupAt],
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-      } as T;
-      const next = links.map((l, i) => (i === dupAt ? merged : l));
-      setLinks(next);
-      onLinkAdded?.([merged]);
-      return;
-    }
-
-    if (enriched.platform.id === 'youtube') {
-      if (sameSectionHas && otherSectionHas) {
-        return;
-      }
-    } else if (sameSectionHas) {
-      return;
-    }
-
-    setAddingLink(enriched);
-    // Show pulsing placeholder for a moment to indicate creation
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    let didAdd = false;
-    let didMerge = false;
-    let emittedLink: T | null = null;
-    setLinks(prev => {
-      const section = sectionOf(enriched as T);
-      const canonicalId = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-      });
-
-      const dupAt = prev.findIndex(
-        existing =>
-          canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
-          }) === canonicalId
-      );
-
-      if (dupAt !== -1) {
-        const duplicate = prev[dupAt];
-        if (!duplicate) return prev;
-
-        const duplicateSection = sectionOf(duplicate);
-
-        if (
-          enriched.platform.id === 'youtube' &&
-          duplicateSection !== section
-        ) {
-          // Allow YouTube to exist in both social + dsp.
-        } else if (duplicateSection !== section) {
-          return prev;
-        } else {
-          const merged = {
-            ...duplicate,
-            normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-            suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-          } as T;
-          didMerge = true;
-          emittedLink = merged;
-          return prev.map((l, i) => (i === dupAt ? merged : l));
-        }
-      }
-
-      const socialVisibleCount = prev.filter(
-        existing => sectionOf(existing) === 'social' && linkIsVisible(existing)
-      ).length;
-
-      const adjusted = { ...enriched } as unknown as T;
-      if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-        (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
-      }
-
-      didAdd = true;
-      emittedLink = adjusted;
-      return [...prev, adjusted];
-    });
-
-    if (emittedLink) {
-      setLastAddedId(idFor(emittedLink));
-      if (didAdd || didMerge) {
-        onLinkAdded?.([emittedLink]);
-      }
-    }
-    setAddingLink(null);
-
-    try {
-      if ((enriched as DetectedLink).platform.id === 'venmo') {
-        void fetch('/api/dashboard/tipping/enable', { method: 'POST' });
-      }
-    } catch {
-      // non-blocking
-    }
-  }
-
-  const insertLinkWithSectionOrdering = useCallback(
-    (existing: T[], nextLink: T): T[] => {
-      if (existing.length === 0) return [nextLink];
-
-      const targetSection = sectionOf(nextLink);
-      const targetPopularity = popularityIndex(nextLink.platform.id);
-      const next = [...existing];
-      const sectionIndexes: number[] = [];
-
-      next.forEach((link, index) => {
-        if (sectionOf(link as T) === targetSection) {
-          sectionIndexes.push(index);
-        }
-      });
-
-      if (sectionIndexes.length === 0) {
-        next.push(nextLink);
-        return next;
-      }
-
-      const insertionIdx = sectionIndexes.find(index => {
-        const existingLink = next[index];
-        if (!existingLink) return false;
-        return (
-          popularityIndex((existingLink as DetectedLink).platform.id) >
-          targetPopularity
+  const handleAcceptSuggestionClick = useCallback(
+    async (suggestion: SuggestedLink) => {
+      const accepted = await handleAcceptSuggestionFromHook(suggestion);
+      if (accepted) {
+        const normalizedCategory = sectionOf(accepted as T);
+        const nextLink = {
+          ...(accepted as T),
+          isVisible:
+            (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
+          state: (accepted as unknown as { state?: string }).state ?? 'active',
+          platform: {
+            ...(accepted as T).platform,
+            category: normalizedCategory,
+          },
+        } as T;
+        const acceptedIdentity = canonicalIdentity({
+          platform: (nextLink as DetectedLink).platform,
+          normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
+        });
+        const hasDuplicate = links.some(
+          existing =>
+            canonicalIdentity({
+              platform: (existing as DetectedLink).platform,
+              normalizedUrl: (existing as DetectedLink).normalizedUrl,
+            }) === acceptedIdentity
         );
-      });
-
-      const insertAt = insertionIdx ?? Math.max(...sectionIndexes) + 1;
-
-      next.splice(insertAt, 0, nextLink);
-      return next;
+        if (!hasDuplicate) {
+          setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
+        }
+        onLinkAdded?.([nextLink]);
+      }
     },
-    []
+    [
+      handleAcceptSuggestionFromHook,
+      links,
+      setLinks,
+      insertLinkWithSectionOrdering,
+      onLinkAdded,
+    ]
   );
-  async function handleAcceptSuggestionClick(
-    suggestion: (typeof pendingSuggestions)[number]
-  ) {
-    if (!onAcceptSuggestion) return;
-    track('dashboard_link_suggestion_accept', {
-      platform: suggestion.platform.id,
-      sourcePlatform: suggestion.sourcePlatform ?? undefined,
-      sourceType: suggestion.sourceType ?? undefined,
-      confidence: suggestion.confidence ?? undefined,
-      hasIdentity: Boolean(suggestionIdentity(suggestion)),
-    });
-    const accepted = await onAcceptSuggestion(suggestion);
-    setPendingSuggestions(prev =>
-      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
-    );
-    if (accepted) {
-      const normalizedCategory = sectionOf(accepted as T);
-      const nextLink = {
-        ...(accepted as T),
-        isVisible:
-          (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
-        state: (accepted as unknown as { state?: string }).state ?? 'active',
-        platform: {
-          ...(accepted as T).platform,
-          category: normalizedCategory,
-        },
-      } as T;
-      const acceptedIdentity = canonicalIdentity({
-        platform: (nextLink as DetectedLink).platform,
-        normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
-      });
-      const hasDuplicate = links.some(
-        existing =>
-          canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
-          }) === acceptedIdentity
-      );
-      if (!hasDuplicate) {
-        setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
-        setLastAddedId(idFor(nextLink));
-      }
-      onLinkAdded?.([nextLink]);
-      void track(
-        'link_suggestion_accepted',
-        buildSuggestionEventProperties(suggestion, profileId)
-      );
-    }
-  }
 
-  async function handleDismissSuggestionClick(
-    suggestion: (typeof pendingSuggestions)[number]
-  ) {
-    track('dashboard_link_suggestion_dismiss', {
-      platform: suggestion.platform.id,
-      sourcePlatform: suggestion.sourcePlatform ?? undefined,
-      sourceType: suggestion.sourceType ?? undefined,
-      confidence: suggestion.confidence ?? undefined,
-      hasIdentity: Boolean(suggestionIdentity(suggestion)),
-    });
-    if (onDismissSuggestion) {
-      await onDismissSuggestion(suggestion);
-    }
-    setPendingSuggestions(prev =>
-      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
-    );
-    void track(
-      'link_suggestion_dismissed',
-      buildSuggestionEventProperties(suggestion, profileId)
-    );
-  }
-
-  function handleToggle(idx: number) {
-    setLinks(prev => {
-      const next = [...prev];
-      const curr = next[idx] as unknown as { isVisible?: boolean };
-      next[idx] = {
-        ...next[idx],
-        isVisible: !(curr?.isVisible ?? true),
-      } as unknown as T;
-      return next;
-    });
-  }
-
-  function handleRemove(idx: number) {
-    setLinks(prev => {
-      const next = prev.filter((_, i) => i !== idx);
-      return next;
-    });
-  }
-
-  function handleEdit(idx: number) {
-    const link = links[idx];
-    if (!link) return;
-    // Set the URL in the input field for editing
-    setPrefillUrl(link.normalizedUrl || link.originalUrl);
-    // Remove the link from the list so user can re-add it with changes
-    setLinks(prev => prev.filter((_, i) => i !== idx));
-  }
-
-  function onDragEnd(ev: DragEndEvent) {
-    const { active, over } = ev;
-    if (!over) return;
-    if (active.id === over.id) return;
-
-    const fromIdx = mapIdToIndex.get(String(active.id));
-    const toIdx = mapIdToIndex.get(String(over.id));
-    if (fromIdx == null || toIdx == null) return;
-
-    const from = links[fromIdx];
-    const to = links[toIdx];
-    if (!from || !to) return;
-    const fromSection = sectionOf(from);
-    const toSection = sectionOf(to);
-
-    if (fromSection === toSection) {
-      const next = arrayMove(links, fromIdx, toIdx);
-      setLinks(next);
-      onLinksChange?.(next);
-      return;
-    }
-
-    if (!canMoveTo(from, toSection)) {
-      const platformName = from.platform.name || from.platform.id;
-      const targetLabel = labelFor(toSection);
-      setHint(
-        `${platformName} can’t be moved to ${targetLabel}. Only certain platforms (e.g., YouTube) can live in multiple sections.`
-      );
-      window.setTimeout(() => setHint(null), 2400);
-      return;
-    }
-
-    const next = [...links];
-    const nextCategory = (() => {
-      if (
-        toSection === 'social' ||
-        toSection === 'dsp' ||
-        toSection === 'earnings'
-      ) {
-        return toSection;
-      }
-      const currentCategory = (from.platform.category ?? 'custom') as
-        | 'social'
-        | 'dsp'
-        | 'earnings'
-        | 'websites'
-        | 'custom';
-      if (
-        currentCategory === 'earnings' ||
-        currentCategory === 'websites' ||
-        currentCategory === 'custom'
-      ) {
-        return currentCategory;
-      }
-      return 'custom';
-    })();
-
-    const updated = {
-      ...from,
-      platform: { ...from.platform, category: nextCategory },
-    } as T;
-    next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, updated);
-    setLinks(next);
-    onLinksChange?.(next);
-  }
+  const handleDismissSuggestionClick = useCallback(
+    async (suggestion: SuggestedLink) => {
+      await handleDismissSuggestionFromHook(suggestion);
+    },
+    [handleDismissSuggestionFromHook]
+  );
 
   const buildPillLabel = useCallback((link: DetectedLink): string => {
     const platform = link.platform.name || link.platform.id;
@@ -781,31 +398,10 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
                 ?
               </div>
               <div className='shrink-0 flex items-center gap-2'>
-                <Button
-                  size='sm'
-                  variant='primary'
-                  onClick={() => {
-                    if (!ytPrompt) return;
-                    const adjusted = {
-                      ...ytPrompt.candidate,
-                      platform: {
-                        ...ytPrompt.candidate.platform,
-                        category: ytPrompt.target,
-                      },
-                    } as unknown as T;
-                    const next = [...links, adjusted];
-                    setLinks(next);
-                    setYtPrompt(null);
-                    onLinkAdded?.([adjusted]);
-                  }}
-                >
+                <Button size='sm' variant='primary' onClick={confirmYtPrompt}>
                   Add as {labelFor(ytPrompt.target)}
                 </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => setYtPrompt(null)}
-                >
+                <Button size='sm' variant='outline' onClick={cancelYtPrompt}>
                   Cancel
                 </Button>
               </div>
@@ -820,7 +416,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               .map(l => l.platform.id)}
             creatorName={creatorName}
             prefillUrl={prefillUrl}
-            onPrefillConsumed={() => setPrefillUrl(undefined)}
+            onPrefillConsumed={clearPrefillUrl}
             onQueryChange={() => {}}
             onPreviewChange={(link, isDuplicate) => {
               if (!link || isDuplicate) {
@@ -832,7 +428,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             clearSignal={clearSignal}
           />
 
-          {suggestionsEnabled && pendingSuggestions.length > 0 ? (
+          {hasPendingSuggestions ? (
             <div
               className='rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5'
               aria-label='Ingested link suggestions'
