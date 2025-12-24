@@ -1,0 +1,31 @@
+name: 'Setup Doppler'
+description: 'Install Doppler CLI and inject secrets into environment'
+
+inputs:
+  doppler-token:
+    description: 'Doppler service token for the target environment'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Doppler CLI
+      shell: bash
+      run: |
+        sudo apt-get update && sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
+        curl -sLf --retry 3 --tlsv1.2 --proto "=https" 'https://packages.doppler.com/public/cli/gpg.DE2A7741A397C129.key' | sudo gpg --dearmor -o /usr/share/keyrings/doppler-archive-keyring.gpg
+        echo "deb [signed-by=/usr/share/keyrings/doppler-archive-keyring.gpg] https://packages.doppler.com/public/cli/deb/debian any-version main" | sudo tee /etc/apt/sources.list.d/doppler-cli.list
+        sudo apt-get update && sudo apt-get install doppler
+
+    - name: Verify Doppler installation
+      shell: bash
+      run: doppler --version
+
+    - name: Export Doppler secrets to environment
+      shell: bash
+      env:
+        DOPPLER_TOKEN: ${{ inputs.doppler-token }}
+      run: |
+        # Export all Doppler secrets as environment variables for subsequent steps
+        doppler secrets download --no-file --format env >> $GITHUB_ENV
+        echo "✅ Doppler secrets loaded into environment"
