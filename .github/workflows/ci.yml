@@ -856,14 +856,15 @@ jobs:
           fi
 
       - name: E2E Smoke (PR to Preview)
-        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.event_name == 'pull_request' && github.ref != 'refs/heads/production' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
+        env:
+          SMOKE_ONLY: '1'
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
             exit 0
           fi
-          cd apps/web && pnpm playwright test -g @smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
-        continue-on-error: ${{ github.event_name == 'pull_request' }}
+          cd apps/web && pnpm e2e:smoke --trace=retain-on-failure ${{ steps.quarantine.outputs.allowed_specs }}
 
       - name: E2E Full (Main Branch)
         if: ${{ steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main' && (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}

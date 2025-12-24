@@ -138,7 +138,7 @@ export function generateImageStructuredData(
       author: {
         '@type': 'MusicGroup',
         name: artist.name,
-        url: `https://yourapp.com/${artist.handle}`,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie'}/${artist.handle}`,
       },
     };
   }

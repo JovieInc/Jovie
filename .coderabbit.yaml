@@ -28,6 +28,22 @@ reviews:
       - "DO NOT MERGE"
       - "[skip ci]"
 
+  suggested_labels: true
+  auto_apply_labels: true
+  labeling_instructions:
+    - label: "schema:drizzle"
+      instructions: "Apply when the PR contains changes to drizzle/migrations/ directory. This indicates database migration changes that require careful review."
+    - label: "schema:core"
+      instructions: "Apply when the PR modifies lib/db/schema.ts. This is the core schema definition file."
+    - label: "schema:migration-journal"
+      instructions: "Apply when the PR modifies drizzle/migrations/meta/_journal.json. This is the migration tracking journal."
+    - label: "area:cron"
+      instructions: "Apply when the PR contains changes to app/api/cron/ directory. This affects scheduled background jobs."
+    - label: "area:auth"
+      instructions: "Apply when the PR modifies authentication-related files in app/(auth)/ or lib/auth/. This is security-sensitive code."
+    - label: "area:env"
+      instructions: "Apply when the PR modifies turbo.json build.env array, .env.example, or environment variable configuration. This affects deployment and configuration."
+
   path_instructions:
     # === DRIZZLE MIGRATION RULES (Enhanced) ===
     - path: "drizzle/migrations/**"
@@ -167,10 +183,10 @@ reviews:
 chat:
   auto_reply: true
 
-# NOTE: Removed deprecated 'auto_labeling' and 'label_instructions' sections
-# These features are not supported in the current CodeRabbit schema and caused
-# validation warnings on every PR review without providing functionality.
-# The features were removed on 2025-12-23 to resolve schema validation errors.
+# NOTE: Auto-labeling restored using correct schema (2025-12-24)
+# Previous attempt used deprecated keys: 'auto_labeling', 'label_instructions'
+# Correct keys are: 'suggested_labels', 'auto_apply_labels', 'labeling_instructions'
+# See: https://docs.coderabbit.ai/reference/configuration
 
 code_generation:
   unit_tests:
