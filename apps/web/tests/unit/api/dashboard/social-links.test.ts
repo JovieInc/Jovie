@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PATCH, PUT } from '@/app/api/dashboard/social-links/route';
+import { captureError } from '@/lib/error-tracking';
+import { validateBeaconsUrl } from '@/lib/ingestion/strategies/beacons';
 
 const hoisted = vi.hoisted(() => {
   const profileResult = [
@@ -217,6 +219,10 @@ vi.mock('@/lib/ingestion/strategies/linktree', () => ({
 
 vi.mock('@/lib/ingestion/strategies/youtube', () => ({
   validateYouTubeChannelUrl: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe('PUT /api/dashboard/social-links', () => {
@@ -613,6 +619,53 @@ describe('PUT /api/dashboard/social-links', () => {
     };
     expect(data.code).toBe('VERSION_CONFLICT');
     expect(data.currentVersion).toBe(0);
+  });
+
+  it('captures errors when background processing promises reject', async () => {
+    const ingestionError = new Error('background failure');
+    const validateBeaconsUrlMock = vi.mocked(validateBeaconsUrl);
+    validateBeaconsUrlMock.mockImplementation(() => {
+      throw ingestionError;
+    });
+
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/social-links',
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          profileId: 'profile_123',
+          links: [
+            {
+              platform: 'website',
+              url: 'https://example.com',
+            },
+          ],
+        }),
+      }
+    );
+
+    const response = await PUT(request as unknown as Request);
+
+    expect(response.status).toBe(200);
+
+    // Allow background promise rejection handlers to run
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(captureError).toHaveBeenCalledWith(
+      'Social links enrichment or ingestion failed',
+      ingestionError,
+      expect.objectContaining({
+        route: '/api/dashboard/social-links',
+        profileId: 'profile_123',
+        action: 'background_processing',
+      })
+    );
+
+    validateBeaconsUrlMock.mockReturnValue(null);
   });
 });
 

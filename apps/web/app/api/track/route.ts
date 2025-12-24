@@ -333,15 +333,19 @@ export async function POST(request: NextRequest) {
               updatedAt: new Date(),
             })
             .where(eq(socialLinks.id, linkId))
-            .catch(error => {
-              console.error(
-                '[track] Failed to update social link click count:',
-                error
-              );
-            })
+            .catch(error =>
+              captureError('Failed to update social link click count', error, {
+                route: '/api/track',
+                creatorProfileId: profile.id,
+                handle,
+                linkId,
+                linkType,
+              })
+            )
         : null;
 
     if (socialLinkUpdate) {
+      // Fire-and-forget: failures are logged but should not block the request
       void socialLinkUpdate;
     }
 
