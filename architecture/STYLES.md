@@ -36,8 +36,8 @@ Run `pnpm tailwind:check` to verify configuration integrity.
 
 /* Text tokens */
 --color-text-primary-token: #0c0c0c;    /* primary text */
---color-text-secondary-token: #6b7280;  /* secondary text */
---color-text-tertiary-token: #9ca3af;   /* tertiary text */
+--color-text-secondary-token: #3f3f46;  /* 7.0:1 vs #fff */
+--color-text-tertiary-token: #52525b;   /* 4.5:1 vs #fff */
 
 /* Button tokens */
 --color-btn-primary-bg: #000;      /* primary button background */
@@ -53,6 +53,8 @@ Run `pnpm tailwind:check` to verify configuration integrity.
 @utility bg-surface-2 { background-color: var(--color-bg-surface-2); }
 @utility bg-surface-3 { background-color: var(--color-bg-surface-3); }
 ```
+
+> Dark mode text tokens mirror those ratios: `#d4d4d8` (~8:1 on #0f0f12) for secondary text and `#a1a1aa` (~4.6:1) for tertiary text.
 
 ### Text Utilities
 ```css
