@@ -14,6 +14,7 @@ import React, {
   useState,
   useTransition,
 } from 'react';
+import { SkipToContent } from '@/components/atoms';
 import { PendingClaimRunner } from '@/components/bridge/PendingClaimRunner';
 import { DashboardThemeToggleButton } from '@/components/dashboard/atoms/DashboardThemeToggleButton';
 import { DashboardSidebar } from '@/components/dashboard/layout/DashboardSidebar';
@@ -300,6 +301,7 @@ function DashboardLayoutInner({
 
   return (
     <div className='flex h-svh w-full overflow-hidden bg-base'>
+      <SkipToContent />
       <DashboardSidebar />
       <SidebarInset
         className='flex flex-1 flex-col overflow-hidden transition-[margin-right] duration-300 ease-out'
@@ -331,6 +333,7 @@ function DashboardLayoutInner({
           }
         />
         <main
+          id='main-content'
           className={
             isContactTableRoute
               ? 'flex-1 min-h-0 overflow-hidden'

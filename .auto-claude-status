@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "006-add-reduced-motion-support-for-loading-animations",
+  "spec": "011-add-skip-to-content-link-for-keyboard-navigation",
   "state": "building",
   "subtasks": {
     "completed": 6,
-    "total": 17,
+    "total": 10,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Spinner & Loader Components",
+    "current": "Layout Integration - Dashboard",
     "id": null,
-    "total": 3
+    "total": 2
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 8,
-    "started_at": "2025-12-23T22:35:51.167833"
+    "started_at": "2025-12-24T11:16:21.305725"
   },
-  "last_update": "2025-12-23T23:15:22.460065"
+  "last_update": "2025-12-24T11:46:34.534980"
 }
