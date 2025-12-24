@@ -32,7 +32,9 @@
         "REVENUECAT_*",
         "FLAGS_*",
         "EXPERIMENTATION_*",
-        "BLOB_*"
+        "BLOB_*",
+        "CRON*",
+        "DOPPLER*"
       ]
     },
     "lint": {

@@ -2,6 +2,7 @@
  * SEO utilities for images - alt text generation, structured data, and accessibility
  */
 
+import { publicEnv } from '@/lib/env-public';
 import { Artist } from '@/types/db';
 
 /**
@@ -138,7 +139,7 @@ export function generateImageStructuredData(
       author: {
         '@type': 'MusicGroup',
         name: artist.name,
-        url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie'}/${artist.handle}`,
+        url: `${publicEnv.NEXT_PUBLIC_APP_URL}/${artist.handle}`,
       },
     };
   }
