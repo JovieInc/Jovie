@@ -2,36 +2,87 @@
 
 A modern artist profile and link-in-bio platform built with Next.js, Clerk authentication, Neon PostgreSQL, and Drizzle ORM.
 
-## Architecture
+## Tech Stack
 
-Jovie uses a modern, secure stack designed for scalability and type safety:
+Jovie uses a modern, secure stack designed for scalability, type safety, and exceptional developer experience:
 
-- **Frontend**: Next.js 15 with TypeScript
-- **Authentication**: Clerk for secure user management
-- **Database**: Neon PostgreSQL with connection pooling
-- **ORM**: Drizzle ORM for type-safe database operations
-- **Styling**: Tailwind CSS with custom components
-- **Testing**: Vitest + Playwright for comprehensive testing
+### Core Framework
+- **Next.js 16** - React framework with App Router, Server Components, and Server Actions
+- **React 19** - Latest React with concurrent features
+- **TypeScript 5** - Type-safe development across the entire stack
+- **Turborepo** - Monorepo build system with intelligent caching
+
+### Authentication & Security
+- **Clerk 7** - Complete user management with social login, MFA, and webhooks
+- **Doppler** - Centralized secrets management with audit logging (see [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md))
+
+### Database & ORM
+- **Neon PostgreSQL** - Serverless Postgres with branching and autoscaling
+- **Drizzle ORM 0.45** - Type-safe SQL with edge runtime support
+- **Connection Pooling** - @neondatabase/serverless with optimized pooling
+
+### Payments & Billing
+- **Stripe** - Payment processing with subscriptions and webhooks
+- **RevenueCat** - Cross-platform subscription management (mobile)
+
+### Analytics & Feature Flags
+- **Statsig** - Feature flags, A/B testing, and analytics
+  - `@statsig/react-bindings` - React integration
+  - `@statsig/session-replay` - User session recording
+  - `@statsig/web-analytics` - Web analytics tracking
+
+### Error Tracking & Monitoring
+- **Sentry 10** - Error tracking, performance monitoring, and session replay
+- **Vercel Analytics** - Web vitals and performance metrics
+
+### UI & Styling
+- **Tailwind CSS 4** - Utility-first CSS with JIT compiler
+- **Radix UI** - Accessible, unstyled component primitives
+- **Headless UI** - Accessible UI components
+- **next-themes** - Theme management (dark/light mode)
+- **Biome** - Fast linter and formatter (replaces ESLint + Prettier)
+
+### Testing
+- **Vitest** - Fast unit testing with Vite
+- **Playwright** - End-to-end testing with browser automation
+- **@testing-library/react** - React component testing utilities
+
+### Infrastructure & Deployment
+- **Vercel** - Hosting and edge functions with automatic previews
+- **GitHub Actions** - CI/CD with automated testing and deployment
+- **Neon Branching** - Database branch per PR for isolated testing
+
+### Media & Assets
+- **Cloudinary** - Image and video hosting with transformations
+- **Vercel Blob Storage** - File storage for user uploads
 
 ## Key Features
 
-- 🎵 Artist profile pages with customizable themes
-- 🔗 Link-in-bio functionality with click tracking
-- 💸 Integrated tipping with Stripe
-- 📊 Analytics dashboard for creators
-- 🔐 Row Level Security (RLS) for data protection
-- 📱 Mobile-optimized responsive design
-- ⚡ Server-side rendering with edge optimization
+- 🎵 **Artist Profiles** - Customizable profile pages with themes and branding
+- 🔗 **Link-in-Bio** - Centralized link hub with click tracking
+- 💸 **Tipping & Payments** - Integrated Stripe payments with subscription support
+- 📊 **Analytics Dashboard** - Real-time creator analytics with Statsig
+- 🔐 **Row Level Security** - Database-level security with Clerk JWT integration
+- 📱 **Mobile Optimized** - Responsive design with touch-friendly UI
+- ⚡ **Edge Performance** - Server-side rendering with edge optimization
+- 🌙 **Dark Mode** - System-aware theme switching
+- 🎭 **Feature Flags** - Gradual rollouts with Statsig
+- 📈 **Session Replay** - Debug user issues with Statsig session replay
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20.17+
-- pnpm 8.0.0+
-- A Neon PostgreSQL database
-- Clerk account for authentication
-- Stripe account for payments
+- **Node.js 20.17+** (LTS)
+- **pnpm 8.0.0+** (package manager)
+- **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
+- **Accounts Required:**
+  - [Neon](https://neon.tech/) - PostgreSQL database
+  - [Clerk](https://clerk.com/) - Authentication
+  - [Stripe](https://stripe.com/) - Payments
+  - [Doppler](https://doppler.com/) - Secrets management
+  - [Statsig](https://statsig.com/) - Feature flags & analytics (optional)
+  - [Sentry](https://sentry.io/) - Error tracking (optional)
 
 ### Installation
 
@@ -48,61 +99,160 @@ Jovie uses a modern, secure stack designed for scalability and type safety:
    pnpm install
    ```
 
-3. **Set up environment variables**
-   Copy `.env.example` to `.env.local` and fill in your credentials:
+3. **Set up Doppler (Recommended)**
+
+   Follow the [Doppler setup guide](docs/DOPPLER_SETUP.md):
+
+   ```bash
+   # Install Doppler CLI
+   brew install dopplerhq/cli/doppler  # macOS
+
+   # Authenticate
+   doppler login
+
+   # Configure project
+   doppler setup --project jovie-web --config dev
+   ```
+
+4. **Alternative: Manual Environment Setup**
+
+   If not using Doppler, copy `.env.example` to `.env.local`:
 
    ```bash
    cp .env.example .env.local
+   # Edit .env.local with your credentials
    ```
 
-4. **Run database migrations**
+5. **Run database migrations**
 
    ```bash
-   pnpm run drizzle:migrate
+   # With Doppler
+   doppler run -- pnpm drizzle:migrate:main
+
+   # Or without Doppler
+   pnpm drizzle:migrate:main
    ```
 
-5. **Start the development server**
+6. **Start the development server**
+
    ```bash
-   pnpm run dev
+   # With Doppler (recommended)
+   doppler run -- pnpm dev
+
+   # Or without Doppler
+   pnpm dev
    ```
 
-## Database Migration (Supabase → Drizzle + Neon)
+   Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-This project has been migrated from Supabase to a modern stack using Clerk, Neon, and Drizzle ORM.
+## Development
 
-### Migration Overview
+### Monorepo Structure
 
-The migration involved:
+```
+Jovie/
+├── apps/
+│   ├── web/              # Main Next.js application
+│   └── should-i-make/    # Side project
+├── packages/
+│   └── ui/               # Shared UI components
+├── drizzle/
+│   ├── migrations/       # Database migrations (append-only)
+│   └── migrations/_journal.json
+└── docs/                 # Documentation
+```
 
-- **Authentication**: Supabase Auth → Clerk
-- **Database**: Supabase PostgreSQL → Neon PostgreSQL
-- **ORM**: Supabase client → Drizzle ORM
-- **Security**: Supabase RLS → Custom RLS with Clerk JWT integration
-
-### Database Schema
-
-The application uses the following core tables:
-
-- `users` - User account information linked to Clerk
-- `creator_profiles` - Artist/creator profile data
-- `social_links` - Social media and music platform links
-- `click_events` - Analytics and tracking data
-- `tips` - Payment and tipping records
-
-### Row Level Security (RLS)
-
-All tables are protected with RLS policies that:
-
-- Use Clerk JWT tokens for user identification
-- Allow users to only access their own data
-- Support public profile visibility settings
-- Enable anonymous click tracking for analytics
-
-### Environment Variables
-
-Create a `.env.local` file with the following variables:
+### Database Management
 
 ```bash
+# Check schema matches database
+pnpm drizzle:check:main
+
+# Generate migrations from schema changes
+pnpm drizzle:generate
+
+# Run migrations on main branch
+pnpm drizzle:migrate:main
+
+# Open Drizzle Studio (database GUI)
+pnpm drizzle:studio
+
+# Note: Migrations are APPEND-ONLY - never modify existing migrations
+```
+
+### Testing
+
+```bash
+# Unit tests (fast)
+pnpm test:fast
+
+# All tests
+pnpm test
+
+# E2E smoke tests
+pnpm e2e:smoke
+
+# E2E full suite
+pnpm test:e2e
+
+# E2E with UI
+pnpm test:e2e:ui
+
+# Profile tests
+pnpm test:profile
+```
+
+### Code Quality
+
+```bash
+# Type checking
+pnpm typecheck
+
+# Linting (Biome)
+pnpm lint
+pnpm lint:fix
+
+# Code formatting (Biome)
+pnpm format
+pnpm format:check
+
+# Tailwind CSS check
+pnpm tailwind:check
+```
+
+### CI/CD
+
+The project uses **trunk-based development**:
+
+- **Main Branch** → deploys directly to production (`jov.ie`)
+- **PR Checks** - Fast validation (typecheck, lint) - ~30 seconds
+- **Post-Merge** - Full CI (build, tests, E2E) then deploy
+- **Canary Gate** - Health check before deployment success
+- **Smoke Tests** - Production validation after deploy
+
+See [.github/workflows/README.md](.github/workflows/README.md) for workflow details.
+
+## Environment Variables
+
+### Using Doppler (Recommended)
+
+All secrets are managed in Doppler with automatic sync to Vercel and GitHub Actions.
+
+**Environments:**
+- `dev` - Local development
+- `stg` - Staging/preview
+- `prd` - Production
+
+**See:** [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md)
+
+### Manual Setup (Fallback)
+
+Create `.env.local` with the following:
+
+```bash
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
@@ -115,141 +265,126 @@ STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 
-# Optional: Analytics and monitoring
-NEXT_PUBLIC_POSTHOG_KEY=phc_...
-NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+# Statsig (Feature Flags & Analytics)
+NEXT_PUBLIC_STATSIG_CLIENT_KEY=client-...
+STATSIG_SERVER_API_KEY=secret-...
+
+# Sentry (Error Tracking)
+SENTRY_AUTH_TOKEN=...
+NEXT_PUBLIC_SENTRY_DSN=https://...
+
+# Optional: Cloudinary (Media)
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
 ```
 
-## Development
-
-### Database Management
-
-```bash
-# Generate migrations from schema changes
-pnpm run drizzle:generate
-
-# Run migrations
-pnpm run drizzle:migrate
-
-# Open Drizzle Studio (database GUI)
-pnpm run drizzle:studio
-
-# Seed the database with test data
-pnpm run db:seed
-```
-
-### Testing
-
-```bash
-# Run all tests
-pnpm test
-
-# Run tests in watch mode
-pnpm run test:watch
-
-# Run E2E tests
-pnpm run test:e2e
-
-# Run specific test suites
-pnpm run test:unit
-pnpm run test:integration
-```
-
-### Code Quality
-
-```bash
-# Type checking
-pnpm run typecheck
-
-# Linting
-pnpm run lint
-pnpm run lint:fix
-
-# Code formatting
-pnpm run format
-pnpm run format:check
-```
+See `.env.example` for complete list.
 
 ## Deployment
 
-The application is deployed on Vercel with automatic previews for pull requests.
+### Vercel (Production)
 
-### Production Deployment
+1. **Connect Repository** - Link GitHub repo to Vercel
+2. **Configure Environment** - Doppler auto-syncs to Vercel
+3. **Deploy** - Automatic on push to `main`
 
-1. **Neon Database**: Create a production database in Neon
-2. **Clerk**: Configure production environment in Clerk dashboard
-3. **Stripe**: Set up production webhook endpoints
-4. **Vercel**: Deploy with environment variables configured
+**Environments:**
+- **Production** - `jov.ie` (main branch)
+- **Preview** - Automatic for all PRs
 
-### Database Migrations in Production
+### Database Migrations
 
+**In CI/CD:**
 ```bash
-# Set production environment
-export GIT_BRANCH=production
+# Migrations run automatically in CI after merge to main
+# See .github/workflows/ci.yml
+```
+
+**Manual (Production):**
+```bash
 export ALLOW_PROD_MIGRATIONS=true
-
-# Run production migrations
-pnpm run drizzle:migrate:prod
+doppler run --config prd -- pnpm drizzle:migrate:main
 ```
 
-## Rollback Procedures
+## Monitoring & Observability
 
-In case of issues with the new stack:
+### Performance
+- **Vercel Analytics** - Core Web Vitals, page performance
+- **Statsig Web Analytics** - User behavior, feature adoption
+- **Sentry Performance** - Backend performance, slow queries
 
-### 1. Application Rollback
+### Errors
+- **Sentry** - Error tracking, stack traces, user context
+- **Clerk Dashboard** - Authentication errors, login analytics
+- **Neon Dashboard** - Database errors, connection issues
 
-```bash
-# Revert to previous stable commit
-git revert HEAD~1
+### Feature Flags
+- **Statsig Console** - Feature rollouts, A/B tests, metrics
+- **Session Replay** - User session recordings for debugging
 
-# Or rollback via Vercel dashboard
-# Go to Vercel → Deployments → Promote previous deployment
-```
+## Database Schema
 
-### 2. Database Rollback
+### Core Tables
 
-```bash
-# Rollback specific migration
-npx drizzle-kit drop --target=<previous_migration>
+- `users` - User accounts (synced with Clerk)
+- `creator_profiles` - Artist/creator profile data
+- `social_links` - Social media and platform links
+- `click_events` - Link click tracking and analytics
+- `tips` - Payment records and transaction history
+- `notification_subscriptions` - Push notification preferences
 
-# Or restore from Neon backup
-# Go to Neon dashboard → Backups → Restore to point-in-time
-```
+### Row Level Security (RLS)
 
-### 3. Feature Flag Rollback
+All tables use PostgreSQL RLS with Clerk JWT integration:
 
-```bash
-# Disable feature flags if implemented
-# Update environment variables to disable new features
-NEXT_PUBLIC_ENABLE_NEW_AUTH=false
-```
+- Users can only access their own data
+- Public profiles respect visibility settings
+- Analytics allow anonymous tracking
+- Webhook endpoints bypass RLS with service keys
 
-## Performance Monitoring
+## Migration History
 
-The application includes comprehensive monitoring:
+This project has evolved through several migrations:
 
-### Metrics Tracked
+1. **Supabase → Neon + Clerk** (2025)
+   - Auth: Supabase Auth → Clerk
+   - Database: Supabase PostgreSQL → Neon PostgreSQL
+   - ORM: Supabase client → Drizzle ORM
 
-- **Database**: Query performance, connection pool usage
-- **Authentication**: Login success rates, token refresh rates
-- **API**: Response times, error rates
-- **Frontend**: Core Web Vitals, user interactions
+2. **Secrets Management** (Dec 2025)
+   - `.env` files → Doppler centralized secrets
 
-### Monitoring Tools
-
-- **Neon**: Database performance metrics
-- **Clerk**: Authentication analytics
-- **Vercel**: Edge function performance
-- **PostHog**: User behavior analytics
+3. **Trunk-Based Development** (Dec 2025)
+   - Removed staging branch
+   - Main deploys directly to production
+   - Fast CI for PRs, full CI post-merge
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feat/your-feature`
-3. Follow the conventional commit format: `feat:`, `fix:`, `chore:`
-4. Ensure all tests pass: `pnpm run check`
-5. Submit a pull request
+1. **Fork** the repository
+2. **Create branch** - `feat/your-feature` or `fix/your-bug`
+3. **Commit format** - Use conventional commits:
+   - `feat:` - New features
+   - `fix:` - Bug fixes
+   - `chore:` - Maintenance tasks
+   - `docs:` - Documentation updates
+4. **Test** - Ensure all tests pass: `pnpm test:fast && pnpm typecheck`
+5. **Submit PR** - PRs auto-run fast CI checks
+
+### Code Review Process
+
+- **CodeRabbit** - Automated AI code review
+- **Required Checks** - Typecheck, lint, fast tests
+- **Auto-Merge** - Enabled for Dependabot and approved PRs
+
+## Support
+
+- **Documentation** - Check [/docs](/docs) directory
+- **Issues** - [GitHub Issues](https://github.com/JovieInc/Jovie/issues)
+- **Doppler Setup** - [docs/DOPPLER_SETUP.md](docs/DOPPLER_SETUP.md)
+- **CI/CD** - [.github/workflows/README.md](.github/workflows/README.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is proprietary and confidential.
