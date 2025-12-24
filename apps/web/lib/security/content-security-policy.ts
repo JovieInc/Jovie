@@ -54,6 +54,7 @@ export const buildContentSecurityPolicy = ({
       'https://*.statsig.com',
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',
+      'https://clerk.jov.ie',
       'https://*.clerk.com',
       'https://*.clerk.accounts.dev',
       'https://api.stripe.com',
