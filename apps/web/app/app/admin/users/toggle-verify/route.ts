@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       'Admin action failed: toggle user verification',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/api/admin/users/toggle-verify',
+        route: '/app/admin/users/toggle-verify',
         action: 'toggle_verify_user',
         adminEmail: entitlements.email,
         timestamp: new Date().toISOString(),

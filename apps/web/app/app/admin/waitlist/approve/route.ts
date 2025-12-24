@@ -91,8 +91,9 @@ async function findAvailableHandle(tx: DbType, base: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  let entitlements;
   try {
-    const entitlements = await getCurrentUserEntitlements();
+    entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
@@ -280,14 +281,13 @@ export async function POST(request: Request) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (error) {
-    const entitlements = await getCurrentUserEntitlements();
     await captureCriticalError(
       'Admin action failed: approve waitlist entry',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/api/admin/waitlist/approve',
+        route: '/app/admin/waitlist/approve',
         action: 'approve_waitlist',
-        adminEmail: entitlements.email,
+        adminEmail: entitlements?.email ?? 'unknown',
         timestamp: new Date().toISOString(),
       }
     );

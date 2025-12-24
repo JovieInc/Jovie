@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
       'Admin action failed: toggle user featured status',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/api/admin/users/toggle-featured',
+        route: '/app/admin/users/toggle-featured',
         action: 'toggle_featured_user',
         adminEmail: entitlements.email,
         timestamp: new Date().toISOString(),

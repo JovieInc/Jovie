@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       'Admin action failed: toggle user marketing preferences',
       error instanceof Error ? error : new Error(String(error)),
       {
-        route: '/api/admin/users/toggle-marketing',
+        route: '/app/admin/users/toggle-marketing',
         action: 'toggle_marketing_user',
         adminEmail: entitlements.email,
         timestamp: new Date().toISOString(),

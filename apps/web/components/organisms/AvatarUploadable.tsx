@@ -165,12 +165,12 @@ function ProgressRing({
       {/* Status icons */}
       <div className='absolute inset-0 flex items-center justify-center'>
         {status === 'success' && (
-          <div className='rounded-full bg-white text-green-600 ring-1 ring-green-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
+          <div className='rounded-full bg-white text-green-600 ring-1 ring-green-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
             <Check size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
         {status === 'error' && (
-          <div className='rounded-full bg-white text-red-600 ring-1 ring-red-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in'>
+          <div className='rounded-full bg-white text-red-600 ring-1 ring-red-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
             <X size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}
