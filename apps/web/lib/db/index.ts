@@ -390,6 +390,30 @@ export async function withTransaction<T>(
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isTableExistsRow(value: unknown): value is TableExistsRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.table_exists === 'boolean';
+}
+
+function isActiveConnectionsRow(value: unknown): value is ActiveConnectionsRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const activeConnections = value.active_connections;
+  return (
+    typeof activeConnections === 'string' ||
+    typeof activeConnections === 'number'
+  );
+}
+
 /** Row type for table existence check query */
 interface TableExistsRow {
   table_exists: boolean;
@@ -426,8 +450,8 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
     );
 
     // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
-    const firstRow = result.rows[0] as TableExistsRow | undefined;
-    const exists = Boolean(firstRow?.table_exists ?? false);
+    const firstRow = result.rows[0];
+    const exists = isTableExistsRow(firstRow) ? firstRow.table_exists : false;
 
     if (exists) {
       positiveTableExistenceCache.add(tableName);
@@ -652,8 +676,8 @@ export async function checkDbPerformance(): Promise<{
         `
       );
       // result.rows is ActiveConnectionsRow[] - rows is always defined, first element may be undefined
-      const firstRow = result.rows[0] as ActiveConnectionsRow | undefined;
-      metrics.concurrentConnections = firstRow
+      const firstRow = result.rows[0];
+      metrics.concurrentConnections = isActiveConnectionsRow(firstRow)
         ? Number(firstRow.active_connections) || 0
         : 0;
     } catch {
