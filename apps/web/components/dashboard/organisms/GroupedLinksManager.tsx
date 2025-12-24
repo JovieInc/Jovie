@@ -1,18 +1,11 @@
 'use client';
-import { DndContext } from '@dnd-kit/core';
-import { SortableContext, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { LinkIcon } from '@heroicons/react/24/outline';
-import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, X } from 'lucide-react';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/UniversalLinkInput';
-import { popularityIndex } from '@/constants/app';
 import { cn } from '@/lib/utils';
 // getBrandIconStyles reserved for future brand-colored icons
 import '@/lib/utils/color';
@@ -21,32 +14,16 @@ import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
-import { CategorySection } from '../atoms/CategorySection';
-import {
-  LinkPill,
-  type LinkPillMenuItem,
-  type LinkPillState,
-} from '../atoms/LinkPill';
-import {
-  MUSIC_FIRST_ORDER,
-  SOCIAL_FIRST_ORDER,
-  SUGGESTION_PILLS,
-} from './links/config';
 import {
   type SuggestedLink,
-  useDragAndDrop,
   useLinksManager,
   useSuggestions,
 } from './links/hooks';
-import {
-  buildPrefillUrl,
-  compactUrlDisplay,
-  groupLinks,
-  type LinkSection,
-  labelFor,
-  sectionOf,
-  suggestionIdentity,
-} from './links/utils';
+import { IngestedSuggestions } from './links/IngestedSuggestions';
+import { LinkCategoryGrid } from './links/LinkCategoryGrid';
+import { QuickAddSuggestions } from './links/QuickAddSuggestions';
+import { compactUrlDisplay, sectionOf } from './links/utils';
+import { YouTubeCrossCategoryPrompt } from './links/YouTubeCrossCategoryPrompt';
 
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
@@ -121,8 +98,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     prefillUrl,
     setPrefillUrl,
     clearPrefillUrl,
-    idFor,
-    linkIsVisible,
   } = useLinksManager<T>({
     initialLinks,
     onLinksChange,
@@ -148,15 +123,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     ) => Promise<void> | void,
   });
 
-  // Drag-and-drop functionality (sensors, handlers, hint messages)
-  const { sensors, onDragEnd, hint } = useDragAndDrop<T>({
-    links,
-    onLinksChange: next => {
-      setLinks(next);
-      onLinksChange?.(next);
-    },
-  });
-
   // ─────────────────────────────────────────────────────────────────────────────
   // Local UI state
   // ─────────────────────────────────────────────────────────────────────────────
@@ -176,33 +142,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     isDuplicate: boolean;
   } | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // Derived state and memoized values
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  const groups = useMemo(() => groupLinks(links), [links]);
-
-  // Memoize sorted groups to avoid O(n log n) sort on every render
-  const sortedGroups = useMemo(() => {
-    const sorted: Record<LinkSection, T[]> = {
-      social: [],
-      dsp: [],
-      earnings: [],
-      custom: [],
-    };
-
-    (['social', 'dsp', 'earnings', 'custom'] as const).forEach(section => {
-      sorted[section] = groups[section]
-        .slice()
-        .sort(
-          (a, b) =>
-            popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
-        );
-    });
-
-    return sorted;
-  }, [groups]);
 
   // ─────────────────────────────────────────────────────────────────────────────
   // Suggestion handlers (bridge between useSuggestions and link insertion)
@@ -315,29 +254,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     [links]
   );
 
-  const suggestionPills = useMemo(() => {
-    const base = SUGGESTION_PILLS.filter(pill => {
-      if (existingPlatforms.has(pill.id)) return false;
-      if (pill.id === 'youtube-music' && existingPlatforms.has('youtube')) {
-        return false;
-      }
-      return true;
-    });
-    const order = isMusicProfile ? MUSIC_FIRST_ORDER : SOCIAL_FIRST_ORDER;
-    const rank = new Map<string, number>();
-    order.forEach((id, index) => {
-      rank.set(id, index);
-    });
-
-    return base
-      .slice()
-      .sort(
-        (a, b) =>
-          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
-          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-      );
-  }, [existingPlatforms, isMusicProfile]);
-
   const hasAnyLinks = links.length > 0;
 
   const focusLinkInput = useCallback(() => {
@@ -353,12 +269,26 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     });
   }, []);
 
-  const buildSecondaryText = useCallback(
-    (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
-      return suggestionIdentity(link);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Pending preview handlers (for LinkCategoryGrid)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  const handleAddPendingPreview = useCallback(
+    (link: DetectedLink) => {
+      void handleAdd(link);
+      setPendingPreview(null);
+      setClearSignal(c => c + 1);
     },
-    []
+    [handleAdd]
   );
+
+  const handleCancelPendingPreview = useCallback(() => {
+    setPendingPreview(null);
+    setClearSignal(c => c + 1);
+  }, []);
+
+  // Hint state for drag-and-drop validation messages (from LinkCategoryGrid)
+  const [hint, setHint] = useState<string | null>(null);
 
   return (
     <section
@@ -385,27 +315,16 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* YouTube cross-category prompt */}
           {ytPrompt && (
-            <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
-              <div className='text-primary-token'>
-                You already added{' '}
-                {ytPrompt.candidate.platform.name ||
-                  ytPrompt.candidate.platform.id}{' '}
-                in this section. Do you also want to add it as{' '}
-                {ytPrompt.target === 'dsp'
-                  ? 'a music service'
-                  : labelFor(ytPrompt.target)}
-                ?
-              </div>
-              <div className='shrink-0 flex items-center gap-2'>
-                <Button size='sm' variant='primary' onClick={confirmYtPrompt}>
-                  Add as {labelFor(ytPrompt.target)}
-                </Button>
-                <Button size='sm' variant='outline' onClick={cancelYtPrompt}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            <YouTubeCrossCategoryPrompt
+              candidate={ytPrompt.candidate}
+              target={ytPrompt.target as 'social' | 'dsp'}
+              onConfirm={confirmYtPrompt}
+              onCancel={cancelYtPrompt}
+              animate={false}
+            />
           )}
           {/* Combined search + add input */}
           <UniversalLinkInput
@@ -428,75 +347,23 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             clearSignal={clearSignal}
           />
 
-          {hasPendingSuggestions ? (
-            <div
-              className='rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5'
-              aria-label='Ingested link suggestions'
-            >
-              <div className='flex flex-wrap items-center justify-center gap-2'>
-                {pendingSuggestions.map(suggestion => {
-                  const identity =
-                    buildSecondaryText(suggestion) ||
-                    compactUrlDisplay(
-                      suggestion.platform.id,
-                      suggestion.normalizedUrl
-                    );
-                  const pillText = identity
-                    ? `${suggestion.platform.name} • ${identity}`
-                    : suggestion.platform.name;
-                  return (
-                    <PlatformPill
-                      key={suggestionKey(suggestion)}
-                      platformIcon={suggestion.platform.icon}
-                      platformName={suggestion.platform.name}
-                      primaryText={pillText}
-                      badgeText='Suggested'
-                      state='ready'
-                      suffix={<Plus className='h-3.5 w-3.5' aria-hidden />}
-                      trailing={
-                        <button
-                          type='button'
-                          aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
-                          className='grid h-6 w-6 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
-                          onClick={event => {
-                            event.stopPropagation();
-                            void handleDismissSuggestionClick(suggestion);
-                          }}
-                        >
-                          <X className='h-3.5 w-3.5' aria-hidden />
-                        </button>
-                      }
-                      onClick={() => {
-                        void handleAcceptSuggestionClick(suggestion);
-                      }}
-                      className='pr-1.5'
-                      testId='ingested-suggestion-pill'
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {/* Ingested AI-discovered suggestions */}
+          {hasPendingSuggestions && (
+            <IngestedSuggestions
+              suggestions={pendingSuggestions}
+              onAccept={handleAcceptSuggestionClick}
+              onDismiss={handleDismissSuggestionClick}
+              profileId={profileId}
+              suggestionKey={suggestionKey}
+            />
+          )}
 
-          {suggestionPills.length > 0 ? (
-            <div
-              className='flex flex-wrap items-center justify-center gap-2'
-              aria-label='Quick link suggestions'
-            >
-              {suggestionPills.map(pill => (
-                <PlatformPill
-                  key={pill.id}
-                  platformIcon={pill.simpleIconId}
-                  platformName={pill.label}
-                  primaryText={pill.label}
-                  suffix='+'
-                  tone='faded'
-                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='whitespace-nowrap'
-                />
-              ))}
-            </div>
-          ) : null}
+          {/* Quick-add platform suggestion pills */}
+          <QuickAddSuggestions
+            existingPlatforms={existingPlatforms}
+            isMusicProfile={isMusicProfile}
+            onPlatformSelect={setPrefillUrl}
+          />
         </div>
       </div>
 
@@ -519,237 +386,30 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         )}
 
         {hasAnyLinks && (
-          <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
-            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-              {(['social', 'dsp', 'earnings', 'custom'] as const).map(
-                section => {
-                  const items = sortedGroups[section];
-
-                  const isAddingToThis =
-                    addingLink && sectionOf(addingLink) === section;
-                  if (items.length === 0 && !isAddingToThis) {
-                    return null;
-                  }
-
-                  return (
-                    <CategorySection
-                      key={section}
-                      title={labelFor(section)}
-                      variant='card'
-                    >
-                      <SortableContext items={items.map(idFor)}>
-                        {items.map(link => {
-                          const linkId = idFor(link as T);
-                          return (
-                            <SortableRow
-                              key={linkId}
-                              id={linkId}
-                              link={link as T}
-                              index={links.findIndex(
-                                l => l.normalizedUrl === link.normalizedUrl
-                              )}
-                              draggable={items.length > 1}
-                              onToggle={handleToggle}
-                              onRemove={handleRemove}
-                              onEdit={handleEdit}
-                              visible={linkIsVisible(link as T)}
-                              openMenuId={openMenuId}
-                              onAnyMenuOpen={handleAnyMenuOpen}
-                              isLastAdded={lastAddedId === linkId}
-                              buildPillLabel={buildPillLabel}
-                            />
-                          );
-                        })}
-
-                        {pendingPreview &&
-                        sectionOf(pendingPreview.link as T) === section ? (
-                          <LinkPill
-                            platformIcon={pendingPreview.link.platform.icon}
-                            platformName={pendingPreview.link.platform.name}
-                            primaryText={buildPillLabel(pendingPreview.link)}
-                            secondaryText={buildSecondaryText(
-                              pendingPreview.link
-                            )}
-                            state='ready'
-                            badgeText='Ready to add'
-                            menuId='pending-preview'
-                            isMenuOpen={openMenuId === 'pending-preview'}
-                            onMenuOpenChange={next =>
-                              handleAnyMenuOpen(next ? 'pending-preview' : null)
-                            }
-                            menuItems={[
-                              {
-                                id: 'add',
-                                label: 'Add',
-                                iconName: 'Plus',
-                                onSelect: () => {
-                                  void handleAdd(pendingPreview.link);
-                                  setPendingPreview(null);
-                                  setClearSignal(c => c + 1);
-                                },
-                              },
-                              {
-                                id: 'cancel',
-                                label: 'Cancel',
-                                iconName: 'X',
-                                onSelect: () => {
-                                  setPendingPreview(null);
-                                  setClearSignal(c => c + 1);
-                                },
-                              },
-                            ]}
-                          />
-                        ) : null}
-
-                        {isAddingToThis && (
-                          <LinkPill
-                            platformIcon='website'
-                            platformName='Loading'
-                            primaryText='Adding…'
-                            state='loading'
-                            menuId={`loading-${section}`}
-                            isMenuOpen={false}
-                            onMenuOpenChange={() => {}}
-                            menuItems={[]}
-                          />
-                        )}
-                      </SortableContext>
-                    </CategorySection>
-                  );
-                }
-              )}
-            </div>
-          </DndContext>
+          <LinkCategoryGrid
+            links={links}
+            onLinksChange={next => {
+              setLinks(next);
+              onLinksChange?.(next);
+            }}
+            onToggle={handleToggle}
+            onRemove={handleRemove}
+            onEdit={handleEdit}
+            openMenuId={openMenuId}
+            onAnyMenuOpen={handleAnyMenuOpen}
+            lastAddedId={lastAddedId}
+            buildPillLabel={buildPillLabel}
+            addingLink={addingLink}
+            pendingPreview={pendingPreview}
+            onAddPendingPreview={handleAddPendingPreview}
+            onCancelPendingPreview={handleCancelPendingPreview}
+            onHint={setHint}
+          />
         )}
       </div>
     </section>
   );
 }
 
-// Note: buildPrefillUrl is now imported from ./links/utils
-
-interface SortableRowProps<T extends DetectedLink> {
-  id: string;
-  link: T;
-  index: number;
-  onToggle: (idx: number) => void;
-  onRemove: (idx: number) => void;
-  onEdit: (idx: number) => void;
-  visible: boolean;
-  draggable?: boolean;
-  openMenuId: string | null;
-  onAnyMenuOpen: (id: string | null) => void;
-  isLastAdded: boolean;
-  buildPillLabel: (link: DetectedLink) => string;
-}
-
-/**
- * SortableRow - Memoized row component for drag-and-drop link items.
- * Uses shared color utilities for consistent brand theming.
- */
-const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
-  id,
-  link,
-  index,
-  onToggle,
-  onRemove,
-  onEdit,
-  visible,
-  draggable = true,
-  openMenuId,
-  onAnyMenuOpen,
-  isLastAdded,
-  buildPillLabel,
-}: SortableRowProps<T>) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({
-      id,
-      disabled: !draggable,
-    });
-
-  // Reserved for future drag handle pointer down handler
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleDragHandlePointerDown = React.useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (listeners?.onPointerDown) {
-        listeners.onPointerDown(e);
-      }
-    },
-    [listeners]
-  );
-
-  const cardStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const urlDisplay = compactUrlDisplay(link.platform.id, link.normalizedUrl);
-  const identity = canonicalIdentity(link);
-  const secondaryText = identity.startsWith('@') ? identity : undefined;
-
-  const pillState: LinkPillState = !visible
-    ? 'hidden'
-    : link.isValid === false
-      ? 'error'
-      : 'connected';
-
-  const badgeText = !visible
-    ? 'Hidden'
-    : pillState === 'error'
-      ? 'Needs fix'
-      : isLastAdded
-        ? 'New'
-        : undefined;
-
-  const menuItems: LinkPillMenuItem[] = [
-    {
-      id: 'edit',
-      label: 'Edit',
-      iconName: 'Pencil',
-      onSelect: () => onEdit(index),
-    },
-    {
-      id: 'toggle',
-      label: visible ? 'Hide' : 'Show',
-      iconName: visible ? 'EyeOff' : 'Eye',
-      onSelect: () => onToggle(index),
-    },
-    {
-      id: 'delete',
-      label: 'Delete',
-      iconName: 'Trash',
-      variant: 'destructive',
-      onSelect: () => onRemove(index),
-    },
-  ];
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      className={cn('relative')}
-      style={cardStyle}
-      {...listeners}
-    >
-      <LinkPill
-        platformIcon={link.platform.icon}
-        platformName={link.platform.name || link.platform.id}
-        primaryText={buildPillLabel(link)}
-        secondaryText={secondaryText}
-        state={pillState}
-        badgeText={badgeText}
-        shimmerOnMount={isLastAdded}
-        menuItems={menuItems}
-        menuId={id}
-        isMenuOpen={openMenuId === id}
-        onMenuOpenChange={next => onAnyMenuOpen(next ? id : null)}
-        className='max-w-full'
-      />
-
-      <div className='sr-only'>{urlDisplay}</div>
-    </div>
-  );
-});
-
-// Note: groupLinks, labelFor, compactUrlDisplay, and suggestionIdentity
-// are now imported from ./links/utils
+// Note: All sub-components (SortableLinkItem, QuickAddSuggestions, IngestedSuggestions,
+// YouTubeCrossCategoryPrompt, LinkCategoryGrid) are now imported from ./links/
