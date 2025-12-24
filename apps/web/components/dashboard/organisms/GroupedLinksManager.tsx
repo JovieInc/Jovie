@@ -40,8 +40,21 @@ import {
   type LinkPillMenuItem,
   type LinkPillState,
 } from '../atoms/LinkPill';
-
-type LinkSection = 'social' | 'dsp' | 'earnings' | 'custom';
+import {
+  MUSIC_FIRST_ORDER,
+  SOCIAL_FIRST_ORDER,
+  SUGGESTION_PILLS,
+} from './links/config';
+import {
+  buildPrefillUrl,
+  canMoveTo,
+  compactUrlDisplay,
+  groupLinks,
+  type LinkSection,
+  labelFor,
+  sectionOf,
+  suggestionIdentity,
+} from './links/utils';
 
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
@@ -78,62 +91,8 @@ export interface GroupedLinksManagerProps<
 
 // Client Component scaffold for a single, grouped Links Manager
 // Phase 2: wire minimal callbacks for DashboardLinks integration.
-// Configurable cross-category policy (extend here to allow more platforms to span sections)
-export const CROSS_CATEGORY: Record<
-  string,
-  Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
-> = {
-  youtube: ['social', 'dsp'],
-  // soundcloud: ['social', 'dsp'],
-};
-
-interface SuggestionPillConfig {
-  id: string; // platform-detection id
-  label: string;
-  simpleIconId: string; // Simple Icons key for SocialIcon/getPlatformIcon
-}
-
-const SUGGESTION_PILLS: SuggestionPillConfig[] = [
-  { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
-  { id: 'spotify', label: 'Spotify', simpleIconId: 'spotify' },
-  { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
-  {
-    id: 'youtube-music',
-    label: 'YouTube Music',
-    simpleIconId: 'youtube',
-  },
-  { id: 'instagram', label: 'Instagram', simpleIconId: 'instagram' },
-  { id: 'tiktok', label: 'TikTok', simpleIconId: 'tiktok' },
-  { id: 'youtube', label: 'YouTube', simpleIconId: 'youtube' },
-  { id: 'twitter', label: 'X / Twitter', simpleIconId: 'x' },
-  { id: 'venmo', label: 'Venmo', simpleIconId: 'venmo' },
-  { id: 'website', label: 'Website', simpleIconId: 'website' },
-];
-
-const MUSIC_FIRST_ORDER = [
-  'spotify-artist',
-  'spotify',
-  'apple-music',
-  'youtube',
-  'youtube-music',
-  'instagram',
-  'tiktok',
-  'twitter',
-  'venmo',
-  'website',
-] as const;
-
-const SOCIAL_FIRST_ORDER = [
-  'instagram',
-  'tiktok',
-  'youtube',
-  'twitter',
-  'spotify',
-  'apple-music',
-  'youtube-music',
-  'venmo',
-  'website',
-] as const;
+// Note: CROSS_CATEGORY, SUGGESTION_PILLS, MUSIC_FIRST_ORDER, SOCIAL_FIRST_ORDER
+// are now imported from ./links/config and ./links/utils
 
 function buildSuggestionEventProperties(
   suggestion: {
@@ -285,29 +244,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     return m;
   }, [idFor, links]);
 
-  const sectionOf = useCallback((link: T): LinkSection => {
-    const category = (link.platform.category ?? 'custom') as
-      | 'social'
-      | 'dsp'
-      | 'earnings'
-      | 'websites'
-      | 'custom';
-
-    if (category === 'social') return 'social';
-    if (category === 'dsp') return 'dsp';
-    if (category === 'earnings') return 'earnings';
-    return 'custom';
-  }, []);
-
-  const canMoveTo = useCallback(
-    (link: T, target: LinkSection): boolean => {
-      const current = sectionOf(link);
-      if (current === target) return true;
-      const allowed = CROSS_CATEGORY[link.platform.id] ?? [];
-      return allowed.includes(target);
-    },
-    [sectionOf]
-  );
+  // Note: sectionOf and canMoveTo are now imported from ./links/utils
 
   useEffect(() => {
     if (!lastAddedId) return;
@@ -533,7 +470,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
       next.splice(insertAt, 0, nextLink);
       return next;
     },
-    [sectionOf]
+    []
   );
   async function handleAcceptSuggestionClick(
     suggestion: (typeof pendingSuggestions)[number]
@@ -1093,33 +1030,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   );
 }
 
-function buildPrefillUrl(platformId: string): string {
-  switch (platformId) {
-    case 'spotify-artist':
-      // Special case: triggers search mode in UniversalLinkInput
-      return '__SEARCH_MODE__:spotify';
-    case 'spotify':
-      return 'https://open.spotify.com/artist/';
-    case 'apple-music':
-      return 'https://music.apple.com/artist/';
-    case 'youtube-music':
-      return 'https://music.youtube.com/channel/';
-    case 'instagram':
-      return 'https://instagram.com/';
-    case 'tiktok':
-      return 'https://www.tiktok.com/@';
-    case 'youtube':
-      return 'https://www.youtube.com/@';
-    case 'twitter':
-      return 'https://x.com/';
-    case 'venmo':
-      return 'https://venmo.com/';
-    case 'website':
-      return 'https://';
-    default:
-      return '';
-  }
-}
+// Note: buildPrefillUrl is now imported from ./links/utils
 
 interface SortableRowProps<T extends DetectedLink> {
   id: string;
@@ -1244,117 +1155,5 @@ const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
   );
 });
 
-function groupLinks<T extends DetectedLink = DetectedLink>(
-  links: T[]
-): Record<LinkSection, T[]> {
-  // Preserve incoming order; categories are only for grouping/drag between types.
-  const social: T[] = [];
-  const dsp: T[] = [];
-  const earnings: T[] = [];
-  const custom: T[] = [];
-
-  for (const l of links) {
-    // Category comes from platform metadata; fallback to custom
-    const category = (l.platform.category ?? 'custom') as
-      | 'social'
-      | 'dsp'
-      | 'websites'
-      | 'earnings'
-      | 'custom';
-    if (category === 'social') social.push(l);
-    else if (category === 'dsp') dsp.push(l);
-    else if (category === 'earnings') earnings.push(l);
-    else custom.push(l);
-  }
-
-  return {
-    social,
-    dsp,
-    earnings,
-    custom,
-  };
-}
-
-function labelFor(section: LinkSection): string {
-  switch (section) {
-    case 'social':
-      return 'SOCIAL';
-    case 'dsp':
-      return 'MUSIC SERVICE';
-    case 'earnings':
-      return 'MONETIZATION';
-    default:
-      return 'CUSTOM';
-  }
-}
-
-function compactUrlDisplay(platformId: string, url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return '';
-
-  const withScheme = (() => {
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `https://${trimmed}`;
-  })();
-
-  try {
-    const parsed = new URL(withScheme);
-    const host = parsed.hostname.replace(/^www\./, '');
-    const path = parsed.pathname.replace(/\/+$/, '');
-    const segments = path.split('/').filter(Boolean);
-    const first = segments[0] ?? '';
-    const second = segments[1] ?? '';
-
-    const atOr = (value: string): string =>
-      value.startsWith('@') ? value : `@${value}`;
-
-    if (platformId === 'tiktok') {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (
-      platformId === 'instagram' ||
-      platformId === 'twitter' ||
-      platformId === 'x' ||
-      platformId === 'venmo'
-    ) {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'snapchat') {
-      if (!first) return host;
-      if (first === 'add' && second) return atOr(second);
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'youtube') {
-      if (first.startsWith('@')) return first;
-      if (
-        (first === 'channel' || first === 'c' || first === 'user') &&
-        second
-      ) {
-        return atOr(second);
-      }
-      return first ? first : host;
-    }
-
-    if (platformId === 'website') {
-      return host;
-    }
-
-    return host;
-  } catch {
-    const withoutScheme = trimmed.replace(/^https?:\/\//, '');
-    const beforePath = withoutScheme.split('/')[0];
-    return beforePath || trimmed;
-  }
-}
-
-function suggestionIdentity(
-  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
-): string | undefined {
-  const identity = canonicalIdentity(link);
-  return identity.startsWith('@') ? identity : undefined;
-}
+// Note: groupLinks, labelFor, compactUrlDisplay, and suggestionIdentity
+// are now imported from ./links/utils
