@@ -65,3 +65,6 @@ packages/ui/node_modules
 # Turborepo
 .turbo
 doppler.yaml
+
+# Local git worktrees (should never be committed)
+.worktrees/
