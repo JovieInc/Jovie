@@ -1,0 +1,130 @@
+# Gitleaks Configuration for Jovie
+# https://github.com/gitleaks/gitleaks
+#
+# This file configures secret detection scanning with allowlists for:
+# - Test fixtures and mock data
+# - Example environment files
+# - Documentation with sample values
+
+[extend]
+# Use the default gitleaks config as a base
+# See: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+# =============================================================================
+# Path Allowlists
+# =============================================================================
+# Files and directories that should be excluded from scanning
+
+[allowlist]
+description = "Global allowlist for test fixtures, examples, and templates"
+
+# Regex patterns for paths to ignore
+paths = [
+    # Test directories and fixtures
+    '''(?i)tests?/''',
+    '''(?i)__tests__/''',
+    '''(?i)\.test\.(ts|tsx|js|jsx)$''',
+    '''(?i)\.spec\.(ts|tsx|js|jsx)$''',
+    '''(?i)fixtures?/''',
+    '''(?i)mocks?/''',
+
+    # Example and template files
+    '''\.env\.example$''',
+    '''\.env\.sample$''',
+    '''\.env\.template$''',
+
+    # Documentation
+    '''(?i)docs?/''',
+    '''(?i)\.md$''',
+    '''(?i)README''',
+    '''(?i)CONTRIBUTING''',
+
+    # Generated/build output (should not contain secrets anyway)
+    '''node_modules/''',
+    '''\.next/''',
+    '''\.turbo/''',
+    '''dist/''',
+    '''\.vercel/''',
+
+    # Lock files
+    '''pnpm-lock\.yaml$''',
+    '''package-lock\.json$''',
+    '''yarn\.lock$''',
+
+    # Plop templates (code generators)
+    '''plop-templates/''',
+
+    # Cursor/Editor rules
+    '''\.cursor/''',
+    '''\.cursorrules$''',
+    '''copilot-instructions\.md$''',
+
+    # Archive/historical files
+    '''archive/''',
+
+    # Log files from test runs
+    '''\.log$''',
+]
+
+# Regex patterns for content to ignore (false positive patterns)
+regexes = [
+    # Placeholder values in env examples
+    '''your_.*_here''',
+    '''YOUR_.*_HERE''',
+    '''placeholder''',
+    '''PLACEHOLDER''',
+
+    # Common test/mock prefixes
+    '''pk_test_mock''',
+    '''sk_test_mock''',
+    '''dummy''',
+    '''DUMMY''',
+    '''mock-key''',
+    '''test-key''',
+    '''fake-key''',
+    '''sample-key''',
+
+    # Supabase dummy values
+    '''anon_dummy''',
+    '''pub_dummy''',
+    '''dummy_key''',
+    '''dummy\.supabase\.co''',
+
+    # Stripe test mode patterns (commonly appear in docs/tests)
+    '''prctbl_dummy''',
+
+    # URL patterns that look like tokens but aren't
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''0\.0\.0\.0''',
+
+    # Generic placeholder patterns
+    '''xxxx''',
+    '''XXXX''',
+    '''aaaa''',
+    '''1234567890''',
+]
+
+# Specific commit SHAs to ignore (for known false positives in history)
+commits = []
+
+# =============================================================================
+# Custom Rules (Optional Overrides)
+# =============================================================================
+# You can add custom rules or modify built-in rule behavior here
+
+# Example: If you need to create a specific rule allowlist
+# [[rules]]
+# id = "custom-rule-id"
+# description = "Custom rule description"
+# regex = '''pattern'''
+# allowlist = { paths = ['specific/path'] }
+
+# =============================================================================
+# Stop Words
+# =============================================================================
+# Common words that appear in false positives
+
+[allowlist.stopwords]
+# These exact strings are ignored when found as standalone matches
+# Useful for common variable names or documentation references
