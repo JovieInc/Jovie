@@ -29,6 +29,9 @@ Sentry.init({
   // Enable sending user PII - scrubbed via beforeSend hook below
   sendDefaultPii: true,
 
+  // Suppress initialization timeout warnings (Sentry continues in background)
+  debug: false,
+
   // Scrub sensitive data before sending to Sentry
   beforeSend(event) {
     // Anonymize IP addresses
