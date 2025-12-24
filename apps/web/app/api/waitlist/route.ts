@@ -3,6 +3,7 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
+import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
@@ -199,11 +200,11 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Waitlist is temporarily unavailable.',
-          code: 'db_not_configured',
-          debug: isDev
-            ? 'Set DATABASE_URL in .env.local and restart pnpm dev.'
-            : undefined,
+          ...sanitizeErrorResponse(
+            'Waitlist is temporarily unavailable.',
+            'Set DATABASE_URL in .env.local and restart pnpm dev.',
+            { code: 'db_not_configured' }
+          ),
         },
         { status: 503, headers: NO_STORE_HEADERS }
       );
@@ -235,17 +236,18 @@ export async function POST(request: Request) {
       hasWaitlistTable = Boolean(result.rows?.[0]?.table_exists ?? false);
     } catch (error) {
       console.error('[Waitlist API] DB connectivity error:', error);
+      const debugMsg =
+        error instanceof Error
+          ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
+          : `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`;
       return NextResponse.json(
         {
           success: false,
-          error: 'Waitlist is temporarily unavailable.',
-          code: 'db_unreachable',
-          debug:
-            isDev && error instanceof Error
-              ? `${error.message}${dbHost ? ` (host: ${dbHost})` : ''}`
-              : isDev
-                ? `Database connection failed${dbHost ? ` (host: ${dbHost})` : ''}. Check Neon is reachable and credentials are valid.`
-                : undefined,
+          ...sanitizeErrorResponse(
+            'Waitlist is temporarily unavailable.',
+            debugMsg,
+            { code: 'db_unreachable' }
+          ),
         },
         { status: 503, headers: NO_STORE_HEADERS }
       );
@@ -255,11 +257,11 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Waitlist is temporarily unavailable.',
-          code: 'waitlist_table_missing',
-          debug: isDev
-            ? `Run pnpm drizzle:migrate to create/update waitlist tables.${dbHost ? ` (host: ${dbHost})` : ''}`
-            : undefined,
+          ...sanitizeErrorResponse(
+            'Waitlist is temporarily unavailable.',
+            `Run pnpm drizzle:migrate to create/update waitlist tables.${dbHost ? ` (host: ${dbHost})` : ''}`,
+            { code: 'waitlist_table_missing' }
+          ),
         },
         { status: 503, headers: NO_STORE_HEADERS }
       );
@@ -395,20 +397,19 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
 
-    const isDev = process.env.NODE_ENV === 'development';
-
     if (isMissingWaitlistSchemaError(error)) {
+      const debugMsg =
+        error instanceof Error
+          ? error.message
+          : 'Run pnpm drizzle:migrate to update waitlist schema.';
       return NextResponse.json(
         {
           success: false,
-          error: 'Waitlist is temporarily unavailable.',
-          code: 'waitlist_schema_error',
-          debug:
-            isDev && error instanceof Error
-              ? error.message
-              : isDev
-                ? 'Run pnpm drizzle:migrate to update waitlist schema.'
-                : undefined,
+          ...sanitizeErrorResponse(
+            'Waitlist is temporarily unavailable.',
+            debugMsg,
+            { code: 'waitlist_schema_error' }
+          ),
         },
         { status: 503, headers: NO_STORE_HEADERS }
       );

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creatorProfiles, tips } from '@/lib/db/schema';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
@@ -73,9 +74,11 @@ export async function POST(req: NextRequest) {
       if (!creatorProfileId) {
         // CRITICAL: If no profile found, we MUST return 500 to trigger Stripe retry
         // Otherwise customer payment succeeds but tip is lost
-        console.error(
-          'CRITICAL: Tip payment succeeded but no creator profile found',
+        await captureCriticalError(
+          'Tip payment succeeded but no creator profile found',
+          new Error('Creator profile not found for tip'),
           {
+            route: '/api/capture-tip',
             handle,
             payment_intent: pi.id,
             amount_cents: pi.amount_received,
@@ -121,6 +124,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error('Tip webhook error:', error);
+    await captureCriticalError('Tip webhook error', error, {
+      route: '/api/capture-tip',
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500, headers: NO_STORE_HEADERS }
