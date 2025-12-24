@@ -74,17 +74,17 @@ jobs:
             gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
               --body "❌ **CI Auto-Heal Circuit Breaker Triggered**
 
-Maximum retry limit reached ($RUNS attempts). This CI failure requires manual intervention.
+            Maximum retry limit reached ($RUNS attempts). This CI failure requires manual intervention.
 
-**What happened:**
-- CI auto-heal attempted to fix the failure $RUNS times
-- Failures persisted or are not auto-healable
-- Circuit breaker prevents infinite retry loops
+            **What happened:**
+            - CI auto-heal attempted to fix the failure $RUNS times
+            - Failures persisted or are not auto-healable
+            - Circuit breaker prevents infinite retry loops
 
-**Next steps:**
-1. Review CI logs to identify the root cause
-2. Apply manual fixes
-3. Remove \`ci:manual\` label to reset circuit breaker"
+            **Next steps:**
+            1. Review CI logs to identify the root cause
+            2. Apply manual fixes
+            3. Remove \`ci:manual\` label to reset circuit breaker"
 
             exit 1
           else
@@ -159,15 +159,15 @@ Maximum retry limit reached ($RUNS attempts). This CI failure requires manual in
           gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
             --body "⚠️ **CI Failure Requires Manual Intervention**
 
-CI auto-heal analyzed the failure but determined it requires human review.
+          CI auto-heal analyzed the failure but determined it requires human review.
 
-**Failure analysis:**
-${{ steps.analyze.outputs.reason }}
+          **Failure analysis:**
+          ${{ steps.analyze.outputs.reason }}
 
-**Next steps:**
-1. Review the [CI logs](${{ github.event.workflow_run.html_url }})
-2. Identify and fix the root cause
-3. Push fixes to trigger CI again"
+          **Next steps:**
+          1. Review the [CI logs](${{ github.event.workflow_run.html_url }})
+          2. Identify and fix the root cause
+          3. Push fixes to trigger CI again"
 
           exit 0
 
@@ -182,10 +182,10 @@ ${{ steps.analyze.outputs.reason }}
           gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
             --body "🔧 **CI Auto-Heal In Progress**
 
-Detected: ${{ steps.analyze.outputs.reason }}
-Strategy: ${{ steps.analyze.outputs.strategy }}
+          Detected: ${{ steps.analyze.outputs.reason }}
+          Strategy: ${{ steps.analyze.outputs.strategy }}
 
-Auto-heal is attempting to fix this issue automatically..."
+          Auto-heal is attempting to fix this issue automatically..."
 
       - name: Checkout PR branch
         if: steps.analyze.outputs.healable == 'true' && steps.analyze.outputs.strategy == 'format-fix'
@@ -212,9 +212,9 @@ Auto-heal is attempting to fix this issue automatically..."
             git add .
             git commit -m "fix: auto-heal CI formatting issues
 
-🔧 CI Auto-Heal applied formatting fixes
+            🔧 CI Auto-Heal applied formatting fixes
 
-Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+            Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
             git push origin ${{ steps.pr-details.outputs.branch }}
           fi
 
@@ -259,10 +259,10 @@ Co-Authored-By: github-actions[bot] <github-actions[bot]@users.noreply.github.co
           gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
             --body "✅ **CI Auto-Heal Succeeded**
 
-Successfully applied healing strategy: ${{ steps.analyze.outputs.strategy }}
-Reason: ${{ steps.analyze.outputs.reason }}
+          Successfully applied healing strategy: ${{ steps.analyze.outputs.strategy }}
+          Reason: ${{ steps.analyze.outputs.reason }}
 
-CI has been re-triggered. Monitor the [latest run](${{ github.event.workflow_run.html_url }}) to verify the fix."
+          CI has been re-triggered. Monitor the [latest run](${{ github.event.workflow_run.html_url }}) to verify the fix."
 
       - name: Update labels on failure
         if: failure() && steps.analyze.outputs.healable == 'true'
@@ -276,12 +276,12 @@ CI has been re-triggered. Monitor the [latest run](${{ github.event.workflow_run
           gh pr comment ${{ steps.pr-number.outputs.number }} --repo ${{ github.repository }} \
             --body "❌ **CI Auto-Heal Failed**
 
-Attempted strategy: ${{ steps.analyze.outputs.strategy }}
-Reason: ${{ steps.analyze.outputs.reason }}
+          Attempted strategy: ${{ steps.analyze.outputs.strategy }}
+          Reason: ${{ steps.analyze.outputs.reason }}
 
-Auto-heal was unable to fix the CI failure. Manual intervention required.
+          Auto-heal was unable to fix the CI failure. Manual intervention required.
 
-**Next steps:**
-1. Review the [workflow logs](${{ github.event.workflow_run.html_url }})
-2. Apply manual fixes
-3. Push changes to trigger CI again"
+          **Next steps:**
+          1. Review the [workflow logs](${{ github.event.workflow_run.html_url }})
+          2. Apply manual fixes
+          3. Push changes to trigger CI again"
