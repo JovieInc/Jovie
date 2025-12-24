@@ -28,11 +28,27 @@ function resolveIconName(name: string): IconName | undefined {
 
 export interface IconProps extends Omit<LucideProps, 'ref'> {
   name: IconName | string;
+  ariaLabel?: string;
+  ariaHidden?: boolean;
 }
 
-export function Icon({ name, className, ...props }: IconProps) {
+export function Icon({
+  name,
+  className,
+  ariaLabel,
+  ariaHidden,
+  ...props
+}: IconProps) {
   const iconName = resolveIconName(String(name));
   if (!iconName) return null;
   const LucideIcon = icons[iconName];
-  return <LucideIcon className={cn(className)} {...props} />;
+  return (
+    <LucideIcon
+      className={cn(className)}
+      aria-hidden={ariaHidden ?? (ariaLabel ? false : true)}
+      role={ariaLabel ? 'img' : undefined}
+      aria-label={ariaLabel}
+      {...props}
+    />
+  );
 }

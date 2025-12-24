@@ -1,0 +1,51 @@
+{
+  "files_to_modify": {
+    "ci": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/codeql.yml",
+      ".github/actions/setup-node-pnpm/action.yml"
+    ]
+  },
+  "files_to_create": {
+    "ci": [".github/workflows/security.yml", ".gitleaks.toml", ".trivyignore"]
+  },
+  "files_to_reference": [
+    ".github/workflows/codeql.yml",
+    ".github/workflows/ci.yml",
+    ".github/dependabot.yml"
+  ],
+  "patterns": {
+    "sarif_upload": "CodeQL uses github/codeql-action/analyze with category tag and security-events: write permission",
+    "permissions": "codeql.yml uses granular per-workflow permissions (security-events: write, packages: read, actions: read, contents: read)",
+    "concurrency": "CI uses concurrency groups with cancel-in-progress for PRs",
+    "path_filtering": "CI uses paths-ignore for docs-only changes",
+    "schedule": "CodeQL runs weekly on Monday at 13:36 UTC (cron: '36 13 * * 1')"
+  },
+  "existing_implementations": {
+    "description": "CodeQL and Dependabot already configured. CI has env guard for secrets. Needs Gitleaks, Trivy, OSSF Scorecard.",
+    "relevant_files": [".github/workflows/codeql.yml", ".github/dependabot.yml"]
+  },
+  "security_hardening_gaps": {
+    "sha_pinning_needed": [
+      "actions/checkout@v6",
+      "actions/cache@v5",
+      "actions/upload-artifact@v6",
+      "actions/setup-node@v5",
+      "actions/github-script@v8",
+      "neondatabase/create-branch-action@v6",
+      "anthropics/claude-code-action@v1",
+      "dependabot/fetch-metadata@v2",
+      "lewagon/wait-on-check-action@v1.4.1",
+      "8398a7/action-slack@v3",
+      "pnpm/action-setup@v4"
+    ],
+    "global_permissions_to_remove": [
+      ".github/workflows/ci.yml line 13: permissions: read-all"
+    ],
+    "missing_security_tools": [
+      "Gitleaks (secret scanning)",
+      "Trivy (vulnerability scanning)",
+      "OSSF Scorecard (supply chain security)"
+    ]
+  }
+}
