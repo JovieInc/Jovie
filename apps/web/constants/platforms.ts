@@ -1,27 +1,132 @@
 /**
- * Canonical Platform Registry
+ * @fileoverview Canonical Platform Registry - Single Source of Truth
  *
- * This is the SINGLE SOURCE OF TRUTH for all social platform definitions in Jovie.
- * All other files should import from this module rather than defining their own lists.
+ * This module is the **SINGLE SOURCE OF TRUTH** for all social platform definitions
+ * in the Jovie application. It consolidates platform definitions that were previously
+ * scattered across multiple files (constants/app.ts, types/index.ts, eslint-rules/icon-usage.js)
+ * into one authoritative location.
  *
- * When adding a new platform:
- * 1. Add it to the ALL_PLATFORMS array in the appropriate category section
- * 2. Ensure the id uses snake_case (e.g., 'apple_music', not 'apple-music')
- * 3. The icon field should match the Simple Icons slug (https://simpleicons.org/)
- * 4. The color should be the brand's primary color in hex (without #)
+ * ## Why This File Exists
  *
- * Categories:
- * - music: Digital Service Providers (DSPs) for music streaming
- * - social: General social media platforms
- * - creator: Content creation and monetization platforms
- * - link_aggregators: Link-in-bio and multi-link services
- * - payment: Payment and tipping platforms
- * - messaging: Direct messaging and communication platforms
- * - professional: Professional and business-related links
+ * Before consolidation, platform definitions were duplicated across multiple files with
+ * different subsets and inconsistent data. This led to:
+ * - Confusion about which list to use
+ * - Bugs when one list was updated but others weren't
+ * - Inconsistent platform IDs and metadata
+ *
+ * Now, all platform data lives here, and other files import from this module.
+ *
+ * ## Architecture
+ *
+ * ```
+ * constants/platforms.ts (this file - source of truth)
+ *     ↓
+ * ├── types/db.ts (imports SocialPlatform type)
+ * ├── types/index.ts (re-exports for backwards compatibility)
+ * ├── constants/app.ts (re-exports for backwards compatibility)
+ * ├── constants/platforms.cjs (CommonJS export for ESLint rules)
+ * └── lib/utils/platform-detection.ts (imports PLATFORM_METADATA_MAP)
+ * ```
+ *
+ * ## Exports Overview
+ *
+ * **Types:**
+ * - `SocialPlatform` - Union type of all valid platform IDs
+ * - `PlatformCategory` - Union type of all category names
+ * - `PlatformMetadata` - Interface for platform metadata structure
+ *
+ * **Constants:**
+ * - `ALL_PLATFORMS` - Complete readonly array of all platform metadata
+ * - `SOCIAL_PLATFORMS` - Readonly array of just the platform IDs
+ * - `PLATFORM_METADATA_MAP` - O(1) lookup map from ID to metadata
+ * - `CATEGORY_LABELS` - Human-readable labels for each category
+ * - `CATEGORY_ORDER` - Ordered array of categories for UI display
+ *
+ * **Functions:**
+ * - `isValidPlatform(value)` - Type guard for validating platform IDs
+ * - `getPlatformsByCategory()` - Get platforms grouped by category
+ * - `getPlatformMetadata(id)` - Get metadata for a specific platform
+ *
+ * ## How to Add a New Platform
+ *
+ * 1. **Find the appropriate category section** in the ALL_PLATFORMS array below
+ *    (look for the comment headers like "// Music Platforms (DSPs)")
+ *
+ * 2. **Add your platform object** with these required fields:
+ *    ```ts
+ *    {
+ *      id: 'platform_name',      // snake_case, unique identifier
+ *      name: 'Platform Name',    // Display name for UI
+ *      category: 'social',       // One of the PlatformCategory values
+ *      icon: 'platformname',     // Simple Icons slug (https://simpleicons.org/)
+ *      color: 'HEXCODE',         // Brand color WITHOUT the # prefix
+ *    },
+ *    ```
+ *
+ * 3. **Run TypeScript compilation** to verify types: `npm run type-check`
+ *
+ * 4. **Update platforms.cjs** if you added a new platform (it's manually synced):
+ *    `apps/web/constants/platforms.cjs`
+ *
+ * ## Category Definitions
+ *
+ * | Category          | Description                                      | Examples                     |
+ * |-------------------|--------------------------------------------------|------------------------------|
+ * | `music`           | Digital Service Providers (DSPs) for streaming   | Spotify, Apple Music, Tidal  |
+ * | `social`          | General social media platforms                   | Instagram, Twitter, TikTok   |
+ * | `creator`         | Content creation and monetization platforms      | Twitch, Patreon, OnlyFans    |
+ * | `link_aggregators`| Link-in-bio and multi-link services             | Linktree, Beacons, Linkfire  |
+ * | `payment`         | Payment and tipping platforms                    | Venmo, PayPal, Cash App      |
+ * | `messaging`       | Direct messaging and communication platforms     | WhatsApp, Telegram, Signal   |
+ * | `professional`    | Professional and business-related links          | Website, Blog, Portfolio     |
+ * | `other`           | Catch-all for platforms that don't fit elsewhere | Custom links                 |
+ *
+ * ## Usage Examples
+ *
+ * ```ts
+ * import {
+ *   SOCIAL_PLATFORMS,
+ *   SocialPlatform,
+ *   isValidPlatform,
+ *   getPlatformMetadata,
+ *   getPlatformsByCategory,
+ * } from '@/constants/platforms';
+ *
+ * // Validate user input
+ * function handlePlatformInput(input: string) {
+ *   if (isValidPlatform(input)) {
+ *     // input is now typed as SocialPlatform
+ *     const metadata = getPlatformMetadata(input);
+ *     console.log(`Selected: ${metadata?.name} (${metadata?.color})`);
+ *   }
+ * }
+ *
+ * // Render platforms in a dropdown
+ * const platformsByCategory = getPlatformsByCategory();
+ * Object.entries(platformsByCategory).map(([category, platforms]) => {
+ *   // Render category header and platforms
+ * });
+ *
+ * // Type-safe platform handling
+ * function saveSocialLink(platform: SocialPlatform, url: string) {
+ *   // platform is guaranteed to be a valid platform ID
+ * }
+ * ```
+ *
+ * @module constants/platforms
+ * @see {@link https://simpleicons.org/} for icon slugs
  */
 
 /**
- * Platform category types
+ * Platform category types.
+ *
+ * Used to organize platforms into logical groups for UI display and filtering.
+ * When adding a new category, also update:
+ * - {@link CATEGORY_LABELS} with a display name
+ * - {@link CATEGORY_ORDER} with the display position
+ *
+ * @see {@link CATEGORY_LABELS} for human-readable category names
+ * @see {@link CATEGORY_ORDER} for the ordering of categories in UI
  */
 export type PlatformCategory =
   | 'music'
@@ -34,24 +139,76 @@ export type PlatformCategory =
   | 'other';
 
 /**
- * Platform metadata structure
+ * Platform metadata structure.
+ *
+ * This interface defines the shape of platform entries in {@link ALL_PLATFORMS}.
+ * All fields are readonly to prevent accidental mutation.
+ *
+ * @example
+ * ```ts
+ * const platform: PlatformMetadata = {
+ *   id: 'spotify',
+ *   name: 'Spotify',
+ *   category: 'music',
+ *   icon: 'spotify',
+ *   color: '1DB954',
+ * };
+ * ```
  */
 export interface PlatformMetadata {
-  /** Unique identifier in snake_case */
+  /**
+   * Unique identifier in snake_case format.
+   * This is used as the primary key for platform lookups and database storage.
+   * @example 'apple_music', 'youtube_music', 'ko_fi'
+   */
   readonly id: string;
-  /** Display name for UI */
+
+  /**
+   * Human-readable display name for UI.
+   * Should match the platform's official branding.
+   * @example 'Apple Music', 'YouTube Music', 'Ko-fi'
+   */
   readonly name: string;
-  /** Platform category for grouping */
+
+  /**
+   * Platform category for grouping in UI and filtering.
+   * @see {@link PlatformCategory} for available categories
+   */
   readonly category: PlatformCategory;
-  /** Simple Icons slug for the platform icon */
+
+  /**
+   * Simple Icons slug for the platform icon.
+   * Find slugs at https://simpleicons.org/
+   * For generic icons, use: 'link', 'globe', 'mail', 'phone', 'calendar', etc.
+   * @example 'spotify', 'applemusic', 'youtubemusic'
+   */
   readonly icon: string;
-  /** Brand color in hex (without #) */
+
+  /**
+   * Brand color in hex format WITHOUT the '#' prefix.
+   * Used for theming and visual identification.
+   * Use '6B7280' (gray-500) for generic/fallback colors.
+   * @example '1DB954' (Spotify green), 'FF0000' (YouTube red)
+   */
   readonly color: string;
 }
 
 /**
  * Complete list of all supported platforms organized by category.
- * This is the canonical source of truth for platform definitions.
+ *
+ * This is the **canonical source of truth** for platform definitions.
+ * The array is organized by category with section comments for easy navigation.
+ * All entries are readonly via `as const satisfies readonly PlatformMetadata[]`.
+ *
+ * **Total platforms:** 52
+ *
+ * @remarks
+ * When adding a new platform, add it to the appropriate category section
+ * (identified by the comment headers like `// Music Platforms (DSPs)`).
+ * The order within each category determines display order in the UI.
+ *
+ * @see {@link SOCIAL_PLATFORMS} for just the platform IDs
+ * @see {@link PLATFORM_METADATA_MAP} for O(1) lookups by ID
  */
 export const ALL_PLATFORMS = [
   // ========================================
@@ -452,19 +609,62 @@ export const ALL_PLATFORMS = [
 ] as const satisfies readonly PlatformMetadata[];
 
 /**
- * Type representing all valid social platform identifiers.
- * Derived from the ALL_PLATFORMS array for type safety.
+ * Union type representing all valid social platform identifiers.
+ *
+ * Derived automatically from the {@link ALL_PLATFORMS} array for type safety.
+ * TypeScript will enforce that only valid platform IDs are used.
+ *
+ * @example
+ * ```ts
+ * // TypeScript will validate the platform ID at compile time
+ * const myPlatform: SocialPlatform = 'spotify'; // ✓ Valid
+ * const invalid: SocialPlatform = 'not_a_platform'; // ✗ Type error
+ * ```
+ *
+ * @see {@link isValidPlatform} for runtime validation
  */
 export type SocialPlatform = (typeof ALL_PLATFORMS)[number]['id'];
 
 /**
- * Array of all valid social platform identifiers.
- * Use this for validation, iteration, and UI components.
+ * Readonly array of all valid social platform identifiers.
+ *
+ * Use this for:
+ * - Iterating over all platforms in UI components
+ * - Populating dropdown/select options
+ * - Validation in schemas (e.g., Zod, Yup)
+ *
+ * For metadata access, use {@link PLATFORM_METADATA_MAP} or {@link getPlatformMetadata}.
+ *
+ * @example
+ * ```ts
+ * // Use in a Zod schema
+ * const schema = z.object({
+ *   platform: z.enum(SOCIAL_PLATFORMS as unknown as [string, ...string[]]),
+ * });
+ *
+ * // Iterate in React
+ * SOCIAL_PLATFORMS.map(id => <option key={id} value={id}>{id}</option>)
+ * ```
  */
 export const SOCIAL_PLATFORMS = ALL_PLATFORMS.map(p => p.id) as readonly SocialPlatform[];
 
 /**
- * Map of platform ID to metadata for O(1) lookups
+ * Map of platform ID to metadata for O(1) lookups.
+ *
+ * Use this when you need to quickly access platform metadata by ID.
+ * For a type-safe alternative, use {@link getPlatformMetadata}.
+ *
+ * @example
+ * ```ts
+ * const spotifyMeta = PLATFORM_METADATA_MAP['spotify'];
+ * console.log(spotifyMeta.name);  // 'Spotify'
+ * console.log(spotifyMeta.color); // '1DB954'
+ *
+ * // Check if platform exists
+ * if ('custom_id' in PLATFORM_METADATA_MAP) {
+ *   // Platform exists
+ * }
+ * ```
  */
 export const PLATFORM_METADATA_MAP: Readonly<Record<string, PlatformMetadata>> =
   ALL_PLATFORMS.reduce(
@@ -476,7 +676,18 @@ export const PLATFORM_METADATA_MAP: Readonly<Record<string, PlatformMetadata>> =
   );
 
 /**
- * Category display names for UI
+ * Human-readable display labels for each platform category.
+ *
+ * Use this for rendering category headers in the UI.
+ * The keys match {@link PlatformCategory} values.
+ *
+ * @example
+ * ```tsx
+ * const categoryLabel = CATEGORY_LABELS[platform.category];
+ * return <h3>{categoryLabel}</h3>;
+ * ```
+ *
+ * @see {@link CATEGORY_ORDER} for the display order of categories
  */
 export const CATEGORY_LABELS: Readonly<Record<PlatformCategory, string>> = {
   music: 'Music Platforms',
@@ -490,7 +701,27 @@ export const CATEGORY_LABELS: Readonly<Record<PlatformCategory, string>> = {
 };
 
 /**
- * Order of categories for display purposes
+ * Ordered array of categories for consistent UI display.
+ *
+ * Use this to iterate over categories in a specific order.
+ * The order is designed for logical user experience:
+ * music platforms first (most relevant for artists), followed by social,
+ * then creator platforms, etc.
+ *
+ * @example
+ * ```tsx
+ * const grouped = getPlatformsByCategory();
+ * return CATEGORY_ORDER.map(category => (
+ *   <div key={category}>
+ *     <h3>{CATEGORY_LABELS[category]}</h3>
+ *     {grouped[category].map(platform => (
+ *       <PlatformIcon key={platform.id} {...platform} />
+ *     ))}
+ *   </div>
+ * ));
+ * ```
+ *
+ * @see {@link getPlatformsByCategory} for getting platforms grouped by category
  */
 export const CATEGORY_ORDER: readonly PlatformCategory[] = [
   'music',
@@ -506,22 +737,40 @@ export const CATEGORY_ORDER: readonly PlatformCategory[] = [
 // ============================================================================
 // Helper Functions
 // ============================================================================
+//
+// These utility functions provide common operations on the platform registry.
+// Use these instead of writing custom logic for platform validation and lookup.
+// ============================================================================
 
 /**
  * Type guard to check if a value is a valid social platform identifier.
- * Useful for validating user input or external data.
  *
- * @param value - The value to check
- * @returns True if the value is a valid SocialPlatform, false otherwise
+ * Useful for validating user input, external data, or narrowing types.
+ * Uses O(1) lookup against {@link PLATFORM_METADATA_MAP}.
+ *
+ * @param value - The value to check (any type accepted)
+ * @returns `true` if the value is a valid SocialPlatform, `false` otherwise
  *
  * @example
  * ```ts
- * const input = "spotify";
+ * const input: string = getUserInput();
+ *
  * if (isValidPlatform(input)) {
- *   // input is now typed as SocialPlatform
- *   console.log(`Valid platform: ${input}`);
+ *   // TypeScript now knows input is SocialPlatform
+ *   const metadata = getPlatformMetadata(input);
+ *   savePlatformLink(input, url); // Type-safe
+ * } else {
+ *   showError('Invalid platform selected');
+ * }
+ *
+ * // Also works with unknown types from external data
+ * const apiResponse: unknown = await fetchData();
+ * if (isValidPlatform(apiResponse)) {
+ *   // apiResponse is now typed as SocialPlatform
  * }
  * ```
+ *
+ * @see {@link SocialPlatform} for the type this validates against
  */
 export function isValidPlatform(value: unknown): value is SocialPlatform {
   return typeof value === 'string' && value in PLATFORM_METADATA_MAP;
@@ -529,15 +778,40 @@ export function isValidPlatform(value: unknown): value is SocialPlatform {
 
 /**
  * Get all platforms grouped by category.
- * Returns a record mapping each category to its platforms.
  *
- * @returns Record of category to array of platform metadata
+ * Returns a readonly record mapping each category to its platforms array.
+ * Categories are guaranteed to exist even if empty (initialized from {@link CATEGORY_ORDER}).
+ * Useful for rendering categorized platform lists in the UI.
+ *
+ * @returns Readonly record of category to array of platform metadata
  *
  * @example
- * ```ts
+ * ```tsx
  * const grouped = getPlatformsByCategory();
- * console.log(grouped.music); // [{ id: 'spotify', ... }, { id: 'apple_music', ... }, ...]
+ *
+ * // Access specific category
+ * console.log(grouped.music);
+ * // [{ id: 'spotify', ... }, { id: 'apple_music', ... }, ...]
+ *
+ * // Render categorized list
+ * return (
+ *   <>
+ *     {CATEGORY_ORDER.map(category => (
+ *       <section key={category}>
+ *         <h2>{CATEGORY_LABELS[category]}</h2>
+ *         <ul>
+ *           {grouped[category].map(platform => (
+ *             <li key={platform.id}>{platform.name}</li>
+ *           ))}
+ *         </ul>
+ *       </section>
+ *     ))}
+ *   </>
+ * );
  * ```
+ *
+ * @see {@link CATEGORY_ORDER} for the order of categories
+ * @see {@link CATEGORY_LABELS} for display labels
  */
 export function getPlatformsByCategory(): Readonly<
   Record<PlatformCategory, readonly PlatformMetadata[]>
@@ -559,19 +833,37 @@ export function getPlatformsByCategory(): Readonly<
 
 /**
  * Get metadata for a specific platform by ID.
- * Returns undefined if the platform ID is not found.
  *
- * @param id - The platform identifier to look up
- * @returns Platform metadata or undefined if not found
+ * Returns `undefined` if the platform ID is not found.
+ * Uses O(1) lookup against {@link PLATFORM_METADATA_MAP}.
+ *
+ * For type-safe lookups, first validate with {@link isValidPlatform}.
+ *
+ * @param id - The platform identifier to look up (e.g., 'spotify', 'apple_music')
+ * @returns Platform metadata object or `undefined` if not found
  *
  * @example
  * ```ts
+ * // Basic usage
  * const metadata = getPlatformMetadata('spotify');
  * if (metadata) {
- *   console.log(metadata.name); // "Spotify"
+ *   console.log(metadata.name);  // "Spotify"
  *   console.log(metadata.color); // "1DB954"
+ *   console.log(metadata.icon);  // "spotify"
+ * }
+ *
+ * // Safe access pattern with validation
+ * function renderPlatformBadge(platformId: string) {
+ *   if (!isValidPlatform(platformId)) {
+ *     return <UnknownPlatformBadge />;
+ *   }
+ *   const meta = getPlatformMetadata(platformId)!; // Safe - we validated
+ *   return <Badge color={`#${meta.color}`}>{meta.name}</Badge>;
  * }
  * ```
+ *
+ * @see {@link isValidPlatform} for validating platform IDs
+ * @see {@link PLATFORM_METADATA_MAP} for direct map access
  */
 export function getPlatformMetadata(id: string): PlatformMetadata | undefined {
   return PLATFORM_METADATA_MAP[id];
