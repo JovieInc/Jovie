@@ -1,0 +1,54 @@
+{
+  "project_type": "monorepo",
+  "services": {
+    "web": {
+      "path": "apps/web",
+      "tech_stack": ["typescript", "nextjs", "react", "tailwindcss", "drizzle"],
+      "port": 6006,
+      "dev_command": "pnpm --filter=@jovie/web run dev",
+      "test_command": "pnpm --filter=@jovie/web run test"
+    },
+    "ci": {
+      "path": ".github",
+      "tech_stack": ["github-actions", "yaml"],
+      "port": null,
+      "dev_command": null,
+      "test_command": "gh workflow run ci.yml"
+    }
+  },
+  "infrastructure": {
+    "docker": false,
+    "database": "neon-postgresql",
+    "ci_platform": "github-actions",
+    "hosting": "vercel"
+  },
+  "conventions": {
+    "linter": "biome",
+    "formatter": "biome",
+    "testing": "vitest",
+    "e2e_testing": "playwright",
+    "package_manager": "pnpm"
+  },
+  "github_actions": {
+    "workflows": [
+      ".github/workflows/ci.yml",
+      ".github/workflows/codeql.yml",
+      ".github/workflows/canary-health-gate.yml",
+      ".github/workflows/ai-auto-fix.yml",
+      ".github/workflows/auto-merge.yml",
+      ".github/workflows/ci-auto-heal.yml",
+      ".github/workflows/claude.yml",
+      ".github/workflows/neon-ephemeral-branch-cleanup.yml",
+      ".github/workflows/plan-sync.yml",
+      ".github/workflows/synthetic-monitoring.yml",
+      ".github/workflows/tailwind-smoke.yml",
+      ".github/workflows/test-performance.yml"
+    ],
+    "custom_actions": [
+      ".github/actions/setup-node-pnpm",
+      ".github/actions/check-path-changes",
+      ".github/actions/neon-branch-cleanup",
+      ".github/actions/setup-doppler"
+    ]
+  }
+}
