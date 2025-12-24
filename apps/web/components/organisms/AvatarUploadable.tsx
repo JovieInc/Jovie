@@ -175,7 +175,7 @@ function ProgressRing({
           </div>
         )}
         {status === 'uploading' && (
-          <div className='rounded-full bg-indigo-500 text-white ring-1 ring-indigo-100 shadow-sm animate-pulse transition-all duration-200 ease-out'>
+          <div className='rounded-full bg-indigo-500 text-white ring-1 ring-indigo-100 shadow-sm animate-pulse motion-reduce:animate-none transition-all duration-200 ease-out'>
             <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
           </div>
         )}

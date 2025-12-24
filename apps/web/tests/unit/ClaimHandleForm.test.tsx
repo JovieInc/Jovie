@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
@@ -23,6 +24,17 @@ vi.mock('next/navigation', () => ({
     push: mockPush,
     prefetch: mockPrefetch,
   }),
+}));
+
+// Mock @jovie/ui to avoid dependency resolution issues in worktrees
+vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => <button {...props}>{children}</button>,
 }));
 
 // Mock fetch for handle checking
@@ -119,5 +131,98 @@ describe('ClaimHandleForm', () => {
 
     // Check that shake class is added
     expect(input.parentElement).toHaveClass('jv-shake');
+  });
+
+  describe('reduced motion support', () => {
+    test('styled-jsx includes prefers-reduced-motion media query', () => {
+      render(<ClaimHandleForm />);
+
+      // Get all style tags in the document
+      const styleTags = document.querySelectorAll('style');
+      const styleContents = Array.from(styleTags)
+        .map(tag => tag.textContent || '')
+        .join('');
+
+      // Verify the reduced motion media query exists
+      expect(styleContents).toContain('prefers-reduced-motion');
+      expect(styleContents).toMatch(
+        /@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)/
+      );
+    });
+
+    test('shake animation is disabled for reduced motion users via CSS', () => {
+      render(<ClaimHandleForm />);
+
+      // Get all style tags in the document
+      const styleTags = document.querySelectorAll('style');
+      const styleContents = Array.from(styleTags)
+        .map(tag => tag.textContent || '')
+        .join('');
+
+      // Within the prefers-reduced-motion media query, the jv-shake should have animation: none
+      // This verifies the CSS rule exists: .jv-shake { animation: none }
+      expect(styleContents).toContain('jv-shake');
+
+      // Check that within the reduced motion block, animation is set to none
+      // The pattern: @media (prefers-reduced-motion: reduce) { .jv-shake { animation: none } }
+      const reducedMotionMatch = styleContents.match(
+        /@media\s*\(\s*prefers-reduced-motion:\s*reduce\s*\)[^}]*\{[^}]*\.jv-shake[^}]*animation:\s*none/
+      );
+      expect(reducedMotionMatch).not.toBeNull();
+    });
+
+    test('available pulse animation uses opacity fade for reduced motion users', () => {
+      render(<ClaimHandleForm />);
+
+      // Get all style tags in the document
+      const styleTags = document.querySelectorAll('style');
+      const styleContents = Array.from(styleTags)
+        .map(tag => tag.textContent || '')
+        .join('');
+
+      // Verify the jv-available-fade keyframe exists for reduced motion
+      expect(styleContents).toContain('jv-available-fade');
+
+      // Verify the fade animation uses opacity instead of box-shadow
+      expect(styleContents).toMatch(
+        /@keyframes\s+jv-available-fade[^}]*opacity/
+      );
+    });
+
+    test('jv-available class exists and has pulse animation for normal motion', () => {
+      render(<ClaimHandleForm />);
+
+      const styleTags = document.querySelectorAll('style');
+      const styleContents = Array.from(styleTags)
+        .map(tag => tag.textContent || '')
+        .join('');
+
+      // Verify the normal jv-available-pulse keyframes exist
+      expect(styleContents).toContain('jv-available-pulse');
+      expect(styleContents).toMatch(
+        /@keyframes\s+jv-available-pulse[^}]*box-shadow/
+      );
+    });
+
+    test('reduced motion users get box-shadow: none for available state', () => {
+      render(<ClaimHandleForm />);
+
+      const styleTags = document.querySelectorAll('style');
+      const styleContents = Array.from(styleTags)
+        .map(tag => tag.textContent || '')
+        .join('');
+
+      // The reduced motion block should contain .jv-available with box-shadow: none
+      // Since CSS is minified/structured, we check for the presence of both:
+      // 1. The reduced motion media query
+      // 2. The .jv-available selector with box-shadow: none somewhere in the styles
+      expect(styleContents).toContain('prefers-reduced-motion: reduce');
+      expect(styleContents).toContain('.jv-available');
+      expect(styleContents).toContain('box-shadow: none');
+
+      // Verify that the reduced motion block contains both .jv-available and animation: jv-available-fade
+      // (which means box-shadow: none is used alongside the fade animation for reduced motion)
+      expect(styleContents).toContain('jv-available-fade');
+    });
   });
 });

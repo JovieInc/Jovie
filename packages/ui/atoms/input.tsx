@@ -112,7 +112,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {loading && (
               <div
                 className={cn(
-                  'animate-spin rounded-full border-2 border-current border-t-transparent',
+                  'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',
                   'text-muted-foreground',
                   inputSize === 'sm'
                     ? 'h-3 w-3'

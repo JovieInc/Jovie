@@ -116,7 +116,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
                 className='absolute inset-0 flex items-center justify-center'
                 data-testid='spinner'
               >
-                <span className='h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent' />
+                <span className='h-4 w-4 animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent' />
               </span>
             )}
             <span

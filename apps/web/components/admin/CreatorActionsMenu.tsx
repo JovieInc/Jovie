@@ -96,9 +96,9 @@ export function CreatorActionsMenu({
   const stateClass = cn(
     'transition duration-200 ease-in-out transform',
     isSuccess &&
-      'animate-pulse scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
+      'animate-pulse motion-reduce:animate-none scale-[1.02] ring-1 ring-[color:var(--color-accent)]',
     isError &&
-      'animate-bounce scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
+      'animate-bounce motion-reduce:animate-none scale-[0.97] ring-1 ring-[color:var(--color-destructive)]'
   );
 
   // Desktop: Show first 4 actions inline, rest in overflow menu

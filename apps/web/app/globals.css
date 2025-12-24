@@ -620,6 +620,12 @@ body {
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
+
+  /* Reduced motion: show static background instead of shimmer animation */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-image: none;
+  }
 }
 
 @keyframes shimmer {
@@ -635,6 +641,11 @@ body {
 /* Preview update animation */
 @utility animate-shimmer {
   animation: shimmer 1.5s ease-in-out infinite;
+
+  /* Reduced motion: disable shimmer animation */
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
 
 @keyframes fade-in-up {

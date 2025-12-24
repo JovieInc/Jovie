@@ -71,7 +71,7 @@ export function QRCodeCard({ handle }: QRCodeCardProps) {
                 }}
               />
             ) : (
-              <div className='w-full h-full bg-gray-200 animate-pulse rounded'>
+              <div className='w-full h-full bg-gray-200 animate-pulse motion-reduce:animate-none rounded'>
                 {isLoading && (
                   <div className='flex items-center justify-center h-full text-xs text-gray-500'>
                     Loading...

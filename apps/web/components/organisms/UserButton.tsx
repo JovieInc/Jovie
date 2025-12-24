@@ -126,14 +126,14 @@ export function UserButton({
   if (!isLoaded || !user) {
     return showUserInfo ? (
       <div className='flex w-full items-center gap-3 rounded-md border border-subtle bg-surface-1 px-3 py-2'>
-        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2 animate-pulse' />
+        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
         <div className='flex-1 space-y-1'>
-          <div className='h-4 w-24 rounded-sm bg-surface-2 animate-pulse' />
-          <div className='h-3 w-16 rounded-sm bg-surface-2/80 animate-pulse' />
+          <div className='h-4 w-24 rounded-sm bg-surface-2 animate-pulse motion-reduce:animate-none' />
+          <div className='h-3 w-16 rounded-sm bg-surface-2/80 animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
-      <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse' />
+      <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
     );
   }
 
@@ -284,8 +284,8 @@ export function UserButton({
             className='cursor-default focus-visible:bg-transparent px-2.5 py-2 text-[13px] h-9'
           >
             <div className='flex w-full items-center gap-2.5'>
-              <div className='h-4 w-4 animate-pulse rounded bg-white/10' />
-              <div className='h-3 w-20 animate-pulse rounded bg-white/10' />
+              <div className='h-4 w-4 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
+              <div className='h-3 w-20 animate-pulse motion-reduce:animate-none rounded bg-white/10' />
             </div>
           </DropdownMenuItem>
         ) : billingStatus.isPro ? (

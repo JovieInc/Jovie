@@ -41,12 +41,30 @@ export function Icon({
 }: IconProps) {
   const iconName = resolveIconName(String(name));
   if (!iconName) return null;
+
+  // Accessibility logic:
+  // - If no ariaLabel: always hide from screen readers (ignore ariaHidden prop)
+  // - If ariaLabel provided: default to visible, but allow explicit ariaHidden override
+  const shouldHide = ariaLabel ? (ariaHidden ?? false) : true;
+
+  // Development warning: ariaHidden=false without ariaLabel is an a11y violation
+  if (
+    process.env.NODE_ENV === 'development' &&
+    ariaHidden === false &&
+    !ariaLabel
+  ) {
+    console.warn(
+      'Icon: Setting ariaHidden={false} without providing ariaLabel creates an accessibility violation. ' +
+        'Either provide an ariaLabel or remove ariaHidden to allow the default behavior.'
+    );
+  }
+
   const LucideIcon = icons[iconName];
   return (
     <LucideIcon
       className={cn(className)}
-      aria-hidden={ariaHidden ?? (ariaLabel ? false : true)}
-      role={ariaLabel ? 'img' : undefined}
+      aria-hidden={shouldHide}
+      role={ariaLabel && !shouldHide ? 'img' : undefined}
       aria-label={ariaLabel}
       {...props}
     />

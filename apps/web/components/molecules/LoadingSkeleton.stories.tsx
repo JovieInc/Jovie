@@ -92,20 +92,20 @@ export const ReducedMotion: Story = {
       <div className='text-center'>
         <LoadingSkeleton height='h-8' width='w-64' rounded='md' />
         <p className='text-sm mt-2 text-gray-600 dark:text-gray-400'>
-          With prefers-reduced-motion: Slower pulse animation
+          With prefers-reduced-motion: Static skeleton (no animation)
         </p>
       </div>
       <div className='p-4 bg-gray-100 dark:bg-gray-800 rounded-lg'>
         <p className='text-sm mb-2 font-medium'>How it works:</p>
         <ul className='text-sm text-gray-600 dark:text-gray-400 list-disc pl-5 space-y-1'>
-          <li>Standard animation for most users</li>
+          <li>Animated shimmer effect for most users</li>
           <li>
-            Slower, less intense animation when prefers-reduced-motion is
-            enabled
+            Static background when prefers-reduced-motion is enabled (no
+            animation)
           </li>
+          <li>Uses motion-reduce:animate-none utility class</li>
           <li>
-            Uses motion-reduce:animate-[pulse_2s_ease-in-out_infinite] utility
-            class
+            Skeleton remains visible as a static placeholder while loading
           </li>
           <li>Respects user accessibility preferences</li>
         </ul>

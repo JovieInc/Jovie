@@ -33,7 +33,11 @@ export function DashboardRefreshButton({
       onClick={handleClick}
       icon={
         <ArrowPathIcon
-          className={isPending ? 'h-5 w-5 animate-spin' : 'h-5 w-5'}
+          className={
+            isPending
+              ? 'h-5 w-5 animate-spin motion-reduce:animate-none'
+              : 'h-5 w-5'
+          }
         />
       }
       className={className}
