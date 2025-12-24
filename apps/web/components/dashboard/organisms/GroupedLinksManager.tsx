@@ -1,31 +1,11 @@
 'use client';
-import {
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { arrayMove, SortableContext, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 import { LinkIcon } from '@heroicons/react/24/outline';
-import { Button } from '@jovie/ui';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Plus, X } from 'lucide-react';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   UniversalLinkInput,
   type UniversalLinkInputRef,
 } from '@/components/dashboard/molecules/UniversalLinkInput';
-import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
-import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
 // getBrandIconStyles reserved for future brand-colored icons
 import '@/lib/utils/color';
@@ -34,14 +14,16 @@ import {
   canonicalIdentity,
   type DetectedLink,
 } from '@/lib/utils/platform-detection';
-import { CategorySection } from '../atoms/CategorySection';
 import {
-  LinkPill,
-  type LinkPillMenuItem,
-  type LinkPillState,
-} from '../atoms/LinkPill';
-
-type LinkSection = 'social' | 'dsp' | 'earnings' | 'custom';
+  type SuggestedLink,
+  useLinksManager,
+  useSuggestions,
+} from './links/hooks';
+import { IngestedSuggestions } from './links/IngestedSuggestions';
+import { LinkCategoryGrid } from './links/LinkCategoryGrid';
+import { QuickAddSuggestions } from './links/QuickAddSuggestions';
+import { compactUrlDisplay, sectionOf } from './links/utils';
+import { YouTubeCrossCategoryPrompt } from './links/YouTubeCrossCategoryPrompt';
 
 export interface GroupedLinksManagerProps<
   T extends DetectedLink = DetectedLink,
@@ -78,83 +60,9 @@ export interface GroupedLinksManagerProps<
 
 // Client Component scaffold for a single, grouped Links Manager
 // Phase 2: wire minimal callbacks for DashboardLinks integration.
-// Configurable cross-category policy (extend here to allow more platforms to span sections)
-export const CROSS_CATEGORY: Record<
-  string,
-  Array<'social' | 'dsp' | 'earnings' | 'websites' | 'custom'>
-> = {
-  youtube: ['social', 'dsp'],
-  // soundcloud: ['social', 'dsp'],
-};
-
-interface SuggestionPillConfig {
-  id: string; // platform-detection id
-  label: string;
-  simpleIconId: string; // Simple Icons key for SocialIcon/getPlatformIcon
-}
-
-const SUGGESTION_PILLS: SuggestionPillConfig[] = [
-  { id: 'spotify-artist', label: 'Spotify Artist', simpleIconId: 'spotify' },
-  { id: 'spotify', label: 'Spotify', simpleIconId: 'spotify' },
-  { id: 'apple-music', label: 'Apple Music', simpleIconId: 'applemusic' },
-  {
-    id: 'youtube-music',
-    label: 'YouTube Music',
-    simpleIconId: 'youtube',
-  },
-  { id: 'instagram', label: 'Instagram', simpleIconId: 'instagram' },
-  { id: 'tiktok', label: 'TikTok', simpleIconId: 'tiktok' },
-  { id: 'youtube', label: 'YouTube', simpleIconId: 'youtube' },
-  { id: 'twitter', label: 'X / Twitter', simpleIconId: 'x' },
-  { id: 'venmo', label: 'Venmo', simpleIconId: 'venmo' },
-  { id: 'website', label: 'Website', simpleIconId: 'website' },
-];
-
-const MUSIC_FIRST_ORDER = [
-  'spotify-artist',
-  'spotify',
-  'apple-music',
-  'youtube',
-  'youtube-music',
-  'instagram',
-  'tiktok',
-  'twitter',
-  'venmo',
-  'website',
-] as const;
-
-const SOCIAL_FIRST_ORDER = [
-  'instagram',
-  'tiktok',
-  'youtube',
-  'twitter',
-  'spotify',
-  'apple-music',
-  'youtube-music',
-  'venmo',
-  'website',
-] as const;
-
-function buildSuggestionEventProperties(
-  suggestion: {
-    platform: { id: string };
-    sourcePlatform?: string | null;
-    sourceType?: string | null;
-    confidence?: number | null;
-  },
-  profileId?: string
-) {
-  const confidenceValue =
-    typeof suggestion.confidence === 'number' ? suggestion.confidence : null;
-
-  return {
-    platformId: suggestion.platform.id,
-    sourcePlatform: suggestion.sourcePlatform ?? null,
-    sourceType: suggestion.sourceType ?? null,
-    confidence: confidenceValue,
-    profileId: profileId ?? null,
-  };
-}
+// Note: CROSS_CATEGORY, SUGGESTION_PILLS, MUSIC_FIRST_ORDER, SOCIAL_FIRST_ORDER
+// are now imported from ./links/config and ./links/utils
+// buildSuggestionEventProperties is now in useSuggestions hook
 
 export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   initialLinks,
@@ -169,7 +77,55 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
   suggestionsEnabled = false,
   profileId,
 }: GroupedLinksManagerProps<T>) {
-  const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Custom hooks for state management
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  // Link state management (CRUD operations, YouTube prompts, etc.)
+  const {
+    links,
+    setLinks,
+    handleAdd,
+    handleToggle,
+    handleRemove,
+    handleEdit,
+    insertLinkWithSectionOrdering,
+    ytPrompt,
+    confirmYtPrompt,
+    cancelYtPrompt,
+    lastAddedId,
+    addingLink,
+    prefillUrl,
+    setPrefillUrl,
+    clearPrefillUrl,
+  } = useLinksManager<T>({
+    initialLinks,
+    onLinksChange,
+    onLinkAdded,
+  });
+
+  // Suggestion state management (pending suggestions, accept/dismiss with analytics)
+  const {
+    pendingSuggestions,
+    handleAccept: handleAcceptSuggestionFromHook,
+    handleDismiss: handleDismissSuggestionFromHook,
+    suggestionKey,
+    hasPendingSuggestions,
+  } = useSuggestions<SuggestedLink>({
+    suggestedLinks: suggestedLinks as SuggestedLink[],
+    suggestionsEnabled,
+    profileId,
+    onAcceptSuggestion: onAcceptSuggestion as (
+      suggestion: SuggestedLink
+    ) => Promise<DetectedLink | null> | DetectedLink | null | void,
+    onDismissSuggestion: onDismissSuggestion as (
+      suggestion: SuggestedLink
+    ) => Promise<void> | void,
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Local UI state
+  // ─────────────────────────────────────────────────────────────────────────────
 
   // Ensure only one action menu is open at a time
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -177,530 +133,67 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     setOpenMenuId(id);
   }, []);
 
-  // Pointer sensors for drag-and-drop (hook must be top-level)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
-
   const containerRef = useRef<HTMLDivElement | null>(null);
   const linkInputRef = useRef<UniversalLinkInputRef | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for future collapse animation
   const [_collapsedInitialized, _setCollapsedInitialized] = useState(false);
-  const [ytPrompt, setYtPrompt] = useState<{
-    candidate: DetectedLink;
-    target: 'social' | 'dsp';
-  } | null>(null);
-  const [lastAddedId, setLastAddedId] = useState<string | null>(null);
-  const [hint, setHint] = useState<string | null>(null);
-  const [addingLink, setAddingLink] = useState<T | null>(null);
   const [pendingPreview, setPendingPreview] = useState<{
     link: DetectedLink;
     isDuplicate: boolean;
   } | null>(null);
   const [clearSignal, setClearSignal] = useState(0);
 
-  const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
-  const [pendingSuggestions, setPendingSuggestions] = useState(
-    () => suggestedLinks
-  );
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Suggestion handlers (bridge between useSuggestions and link insertion)
+  // ─────────────────────────────────────────────────────────────────────────────
 
-  const suggestionKey = useCallback(
-    (s: T & { suggestionId?: string }) =>
-      s.suggestionId || `${s.platform.id}::${s.normalizedUrl}`,
-    []
-  );
-
-  // Memoize signature calculation - use previous value if array reference unchanged
-  const suggestedLinksSignature = useMemo(() => {
-    const keys = suggestedLinks.map(s => suggestionKey(s)).sort();
-    return keys.join('|');
-  }, [suggestedLinks, suggestionKey]);
-
-  const prevSuggestedLinksSignatureRef = useRef<string>(
-    suggestedLinksSignature
-  );
-  const surfacedSuggestionKeysRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (prevSuggestedLinksSignatureRef.current === suggestedLinksSignature) {
-      return;
-    }
-    prevSuggestedLinksSignatureRef.current = suggestedLinksSignature;
-    setPendingSuggestions(suggestedLinks);
-  }, [suggestedLinks, suggestedLinksSignature]);
-
-  useEffect(() => {
-    if (!suggestionsEnabled || pendingSuggestions.length === 0) {
-      return;
-    }
-
-    pendingSuggestions.forEach(suggestion => {
-      const key = suggestionKey(suggestion);
-      if (surfacedSuggestionKeysRef.current.has(key)) {
-        return;
-      }
-      surfacedSuggestionKeysRef.current.add(key);
-      void track(
-        'link_suggestion_surfaced',
-        buildSuggestionEventProperties(suggestion, profileId)
-      );
-    });
-  }, [pendingSuggestions, profileId, suggestionKey, suggestionsEnabled]);
-
-  const groups = useMemo(() => groupLinks(links), [links]);
-
-  // Memoize sorted groups to avoid O(n log n) sort on every render
-  const sortedGroups = useMemo(() => {
-    const sorted: Record<LinkSection, T[]> = {
-      social: [],
-      dsp: [],
-      earnings: [],
-      custom: [],
-    };
-
-    (['social', 'dsp', 'earnings', 'custom'] as const).forEach(section => {
-      sorted[section] = groups[section]
-        .slice()
-        .sort(
-          (a, b) =>
-            popularityIndex(a.platform.id) - popularityIndex(b.platform.id)
+  const handleAcceptSuggestionClick = useCallback(
+    async (suggestion: SuggestedLink) => {
+      const accepted = await handleAcceptSuggestionFromHook(suggestion);
+      if (accepted) {
+        const normalizedCategory = sectionOf(accepted as T);
+        const nextLink = {
+          ...(accepted as T),
+          isVisible:
+            (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
+          state: (accepted as unknown as { state?: string }).state ?? 'active',
+          platform: {
+            ...(accepted as T).platform,
+            category: normalizedCategory,
+          },
+        } as T;
+        const acceptedIdentity = canonicalIdentity({
+          platform: (nextLink as DetectedLink).platform,
+          normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
+        });
+        const hasDuplicate = links.some(
+          existing =>
+            canonicalIdentity({
+              platform: (existing as DetectedLink).platform,
+              normalizedUrl: (existing as DetectedLink).normalizedUrl,
+            }) === acceptedIdentity
         );
-    });
-
-    return sorted;
-  }, [groups]);
-
-  // Stable ids for DnD + menu control
-  const idFor = useCallback(
-    (link: T): string =>
-      `${link.platform.id}::${link.normalizedUrl || link.originalUrl || ''}`,
-    []
-  );
-
-  const mapIdToIndex = useMemo(() => {
-    const m = new Map<string, number>();
-    links.forEach((l, idx) => {
-      m.set(idFor(l), idx);
-    });
-    return m;
-  }, [idFor, links]);
-
-  const sectionOf = useCallback((link: T): LinkSection => {
-    const category = (link.platform.category ?? 'custom') as
-      | 'social'
-      | 'dsp'
-      | 'earnings'
-      | 'websites'
-      | 'custom';
-
-    if (category === 'social') return 'social';
-    if (category === 'dsp') return 'dsp';
-    if (category === 'earnings') return 'earnings';
-    return 'custom';
-  }, []);
-
-  const canMoveTo = useCallback(
-    (link: T, target: LinkSection): boolean => {
-      const current = sectionOf(link);
-      if (current === target) return true;
-      const allowed = CROSS_CATEGORY[link.platform.id] ?? [];
-      return allowed.includes(target);
-    },
-    [sectionOf]
-  );
-
-  useEffect(() => {
-    if (!lastAddedId) return;
-    const timer = window.setTimeout(() => setLastAddedId(null), 1400);
-    return () => window.clearTimeout(timer);
-  }, [lastAddedId]);
-
-  const linkIsVisible = (l: T): boolean =>
-    ((l as unknown as { isVisible?: boolean }).isVisible ?? true) !== false;
-
-  useEffect(() => {
-    onLinksChange?.(links);
-  }, [links, onLinksChange]);
-
-  async function handleAdd(link: DetectedLink) {
-    const enriched = {
-      isVisible: true,
-      ...link,
-    } as unknown as T;
-
-    if ((enriched as DetectedLink).platform.id === 'venmo') {
-      (enriched as DetectedLink).platform = {
-        ...(enriched as DetectedLink).platform,
-        category: 'earnings' as unknown as 'social',
-      } as DetectedLink['platform'];
-    }
-
-    const section = sectionOf(enriched as T);
-
-    const socialVisibleCount = links.filter(
-      l => sectionOf(l as T) === 'social' && linkIsVisible(l as T)
-    ).length;
-    if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-      (enriched as unknown as { isVisible?: boolean }).isVisible = false;
-    }
-
-    const otherSection: 'social' | 'dsp' | null =
-      section === 'social' ? 'dsp' : section === 'dsp' ? 'social' : null;
-    const sameSectionHas = links.some(
-      l => l.platform.id === enriched.platform.id && sectionOf(l) === section
-    );
-    const otherSectionHas = otherSection
-      ? links.some(
-          l =>
-            l.platform.id === enriched.platform.id &&
-            sectionOf(l) === otherSection
-        )
-      : false;
-
-    const canonicalId = canonicalIdentity({
-      platform: (enriched as DetectedLink).platform,
-      normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-    });
-    const dupAt = links.findIndex(
-      l =>
-        canonicalIdentity({
-          platform: (l as DetectedLink).platform,
-          normalizedUrl: (l as DetectedLink).normalizedUrl,
-        }) === canonicalId
-    );
-    const duplicate = dupAt !== -1 ? links[dupAt] : null;
-    const duplicateSection = duplicate ? sectionOf(duplicate as T) : null;
-    const hasCrossSectionDuplicate =
-      enriched.platform.id === 'youtube' &&
-      duplicateSection !== null &&
-      duplicateSection !== section;
-
-    if (
-      enriched.platform.id === 'youtube' &&
-      sameSectionHas &&
-      !otherSectionHas &&
-      otherSection
-    ) {
-      setYtPrompt({ candidate: enriched, target: otherSection });
-      return;
-    }
-
-    if (
-      enriched.platform.id === 'youtube' &&
-      dupAt !== -1 &&
-      duplicateSection === section
-    ) {
-      const merged = {
-        ...links[dupAt],
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-      } as T;
-      const next = links.map((l, i) => (i === dupAt ? merged : l));
-      setLinks(next);
-      onLinkAdded?.([merged]);
-      return;
-    }
-
-    if (dupAt !== -1 && !hasCrossSectionDuplicate) {
-      const merged = {
-        ...links[dupAt],
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-      } as T;
-      const next = links.map((l, i) => (i === dupAt ? merged : l));
-      setLinks(next);
-      onLinkAdded?.([merged]);
-      return;
-    }
-
-    if (enriched.platform.id === 'youtube') {
-      if (sameSectionHas && otherSectionHas) {
-        return;
-      }
-    } else if (sameSectionHas) {
-      return;
-    }
-
-    setAddingLink(enriched);
-    // Show pulsing placeholder for a moment to indicate creation
-    await new Promise(resolve => setTimeout(resolve, 600));
-
-    let didAdd = false;
-    let didMerge = false;
-    let emittedLink: T | null = null;
-    setLinks(prev => {
-      const section = sectionOf(enriched as T);
-      const canonicalId = canonicalIdentity({
-        platform: (enriched as DetectedLink).platform,
-        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-      });
-
-      const dupAt = prev.findIndex(
-        existing =>
-          canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
-          }) === canonicalId
-      );
-
-      if (dupAt !== -1) {
-        const duplicate = prev[dupAt];
-        if (!duplicate) return prev;
-
-        const duplicateSection = sectionOf(duplicate);
-
-        if (
-          enriched.platform.id === 'youtube' &&
-          duplicateSection !== section
-        ) {
-          // Allow YouTube to exist in both social + dsp.
-        } else if (duplicateSection !== section) {
-          return prev;
-        } else {
-          const merged = {
-            ...duplicate,
-            normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-            suggestedTitle: (enriched as DetectedLink).suggestedTitle,
-          } as T;
-          didMerge = true;
-          emittedLink = merged;
-          return prev.map((l, i) => (i === dupAt ? merged : l));
+        if (!hasDuplicate) {
+          setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
         }
+        onLinkAdded?.([nextLink]);
       }
-
-      const socialVisibleCount = prev.filter(
-        existing => sectionOf(existing) === 'social' && linkIsVisible(existing)
-      ).length;
-
-      const adjusted = { ...enriched } as unknown as T;
-      if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
-        (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
-      }
-
-      didAdd = true;
-      emittedLink = adjusted;
-      return [...prev, adjusted];
-    });
-
-    if (emittedLink) {
-      setLastAddedId(idFor(emittedLink));
-      if (didAdd || didMerge) {
-        onLinkAdded?.([emittedLink]);
-      }
-    }
-    setAddingLink(null);
-
-    try {
-      if ((enriched as DetectedLink).platform.id === 'venmo') {
-        void fetch('/api/dashboard/tipping/enable', { method: 'POST' });
-      }
-    } catch {
-      // non-blocking
-    }
-  }
-
-  const insertLinkWithSectionOrdering = useCallback(
-    (existing: T[], nextLink: T): T[] => {
-      if (existing.length === 0) return [nextLink];
-
-      const targetSection = sectionOf(nextLink);
-      const targetPopularity = popularityIndex(nextLink.platform.id);
-      const next = [...existing];
-      const sectionIndexes: number[] = [];
-
-      next.forEach((link, index) => {
-        if (sectionOf(link as T) === targetSection) {
-          sectionIndexes.push(index);
-        }
-      });
-
-      if (sectionIndexes.length === 0) {
-        next.push(nextLink);
-        return next;
-      }
-
-      const insertionIdx = sectionIndexes.find(index => {
-        const existingLink = next[index];
-        if (!existingLink) return false;
-        return (
-          popularityIndex((existingLink as DetectedLink).platform.id) >
-          targetPopularity
-        );
-      });
-
-      const insertAt = insertionIdx ?? Math.max(...sectionIndexes) + 1;
-
-      next.splice(insertAt, 0, nextLink);
-      return next;
     },
-    [sectionOf]
+    [
+      handleAcceptSuggestionFromHook,
+      links,
+      setLinks,
+      insertLinkWithSectionOrdering,
+      onLinkAdded,
+    ]
   );
-  async function handleAcceptSuggestionClick(
-    suggestion: (typeof pendingSuggestions)[number]
-  ) {
-    if (!onAcceptSuggestion) return;
-    track('dashboard_link_suggestion_accept', {
-      platform: suggestion.platform.id,
-      sourcePlatform: suggestion.sourcePlatform ?? undefined,
-      sourceType: suggestion.sourceType ?? undefined,
-      confidence: suggestion.confidence ?? undefined,
-      hasIdentity: Boolean(suggestionIdentity(suggestion)),
-    });
-    const accepted = await onAcceptSuggestion(suggestion);
-    setPendingSuggestions(prev =>
-      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
-    );
-    if (accepted) {
-      const normalizedCategory = sectionOf(accepted as T);
-      const nextLink = {
-        ...(accepted as T),
-        isVisible:
-          (accepted as unknown as { isVisible?: boolean }).isVisible ?? true,
-        state: (accepted as unknown as { state?: string }).state ?? 'active',
-        platform: {
-          ...(accepted as T).platform,
-          category: normalizedCategory,
-        },
-      } as T;
-      const acceptedIdentity = canonicalIdentity({
-        platform: (nextLink as DetectedLink).platform,
-        normalizedUrl: (nextLink as DetectedLink).normalizedUrl,
-      });
-      const hasDuplicate = links.some(
-        existing =>
-          canonicalIdentity({
-            platform: (existing as DetectedLink).platform,
-            normalizedUrl: (existing as DetectedLink).normalizedUrl,
-          }) === acceptedIdentity
-      );
-      if (!hasDuplicate) {
-        setLinks(prev => insertLinkWithSectionOrdering(prev, nextLink));
-        setLastAddedId(idFor(nextLink));
-      }
-      onLinkAdded?.([nextLink]);
-      void track(
-        'link_suggestion_accepted',
-        buildSuggestionEventProperties(suggestion, profileId)
-      );
-    }
-  }
 
-  async function handleDismissSuggestionClick(
-    suggestion: (typeof pendingSuggestions)[number]
-  ) {
-    track('dashboard_link_suggestion_dismiss', {
-      platform: suggestion.platform.id,
-      sourcePlatform: suggestion.sourcePlatform ?? undefined,
-      sourceType: suggestion.sourceType ?? undefined,
-      confidence: suggestion.confidence ?? undefined,
-      hasIdentity: Boolean(suggestionIdentity(suggestion)),
-    });
-    if (onDismissSuggestion) {
-      await onDismissSuggestion(suggestion);
-    }
-    setPendingSuggestions(prev =>
-      prev.filter(s => suggestionKey(s) !== suggestionKey(suggestion))
-    );
-    void track(
-      'link_suggestion_dismissed',
-      buildSuggestionEventProperties(suggestion, profileId)
-    );
-  }
-
-  function handleToggle(idx: number) {
-    setLinks(prev => {
-      const next = [...prev];
-      const curr = next[idx] as unknown as { isVisible?: boolean };
-      next[idx] = {
-        ...next[idx],
-        isVisible: !(curr?.isVisible ?? true),
-      } as unknown as T;
-      return next;
-    });
-  }
-
-  function handleRemove(idx: number) {
-    setLinks(prev => {
-      const next = prev.filter((_, i) => i !== idx);
-      return next;
-    });
-  }
-
-  function handleEdit(idx: number) {
-    const link = links[idx];
-    if (!link) return;
-    // Set the URL in the input field for editing
-    setPrefillUrl(link.normalizedUrl || link.originalUrl);
-    // Remove the link from the list so user can re-add it with changes
-    setLinks(prev => prev.filter((_, i) => i !== idx));
-  }
-
-  function onDragEnd(ev: DragEndEvent) {
-    const { active, over } = ev;
-    if (!over) return;
-    if (active.id === over.id) return;
-
-    const fromIdx = mapIdToIndex.get(String(active.id));
-    const toIdx = mapIdToIndex.get(String(over.id));
-    if (fromIdx == null || toIdx == null) return;
-
-    const from = links[fromIdx];
-    const to = links[toIdx];
-    if (!from || !to) return;
-    const fromSection = sectionOf(from);
-    const toSection = sectionOf(to);
-
-    if (fromSection === toSection) {
-      const next = arrayMove(links, fromIdx, toIdx);
-      setLinks(next);
-      onLinksChange?.(next);
-      return;
-    }
-
-    if (!canMoveTo(from, toSection)) {
-      const platformName = from.platform.name || from.platform.id;
-      const targetLabel = labelFor(toSection);
-      setHint(
-        `${platformName} can’t be moved to ${targetLabel}. Only certain platforms (e.g., YouTube) can live in multiple sections.`
-      );
-      window.setTimeout(() => setHint(null), 2400);
-      return;
-    }
-
-    const next = [...links];
-    const nextCategory = (() => {
-      if (
-        toSection === 'social' ||
-        toSection === 'dsp' ||
-        toSection === 'earnings'
-      ) {
-        return toSection;
-      }
-      const currentCategory = (from.platform.category ?? 'custom') as
-        | 'social'
-        | 'dsp'
-        | 'earnings'
-        | 'websites'
-        | 'custom';
-      if (
-        currentCategory === 'earnings' ||
-        currentCategory === 'websites' ||
-        currentCategory === 'custom'
-      ) {
-        return currentCategory;
-      }
-      return 'custom';
-    })();
-
-    const updated = {
-      ...from,
-      platform: { ...from.platform, category: nextCategory },
-    } as T;
-    next.splice(fromIdx, 1);
-    next.splice(toIdx, 0, updated);
-    setLinks(next);
-    onLinksChange?.(next);
-  }
+  const handleDismissSuggestionClick = useCallback(
+    async (suggestion: SuggestedLink) => {
+      await handleDismissSuggestionFromHook(suggestion);
+    },
+    [handleDismissSuggestionFromHook]
+  );
 
   const buildPillLabel = useCallback((link: DetectedLink): string => {
     const platform = link.platform.name || link.platform.id;
@@ -761,29 +254,6 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     [links]
   );
 
-  const suggestionPills = useMemo(() => {
-    const base = SUGGESTION_PILLS.filter(pill => {
-      if (existingPlatforms.has(pill.id)) return false;
-      if (pill.id === 'youtube-music' && existingPlatforms.has('youtube')) {
-        return false;
-      }
-      return true;
-    });
-    const order = isMusicProfile ? MUSIC_FIRST_ORDER : SOCIAL_FIRST_ORDER;
-    const rank = new Map<string, number>();
-    order.forEach((id, index) => {
-      rank.set(id, index);
-    });
-
-    return base
-      .slice()
-      .sort(
-        (a, b) =>
-          (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
-          (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER)
-      );
-  }, [existingPlatforms, isMusicProfile]);
-
   const hasAnyLinks = links.length > 0;
 
   const focusLinkInput = useCallback(() => {
@@ -799,12 +269,26 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
     });
   }, []);
 
-  const buildSecondaryText = useCallback(
-    (link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>) => {
-      return suggestionIdentity(link);
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Pending preview handlers (for LinkCategoryGrid)
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  const handleAddPendingPreview = useCallback(
+    (link: DetectedLink) => {
+      void handleAdd(link);
+      setPendingPreview(null);
+      setClearSignal(c => c + 1);
     },
-    []
+    [handleAdd]
   );
+
+  const handleCancelPendingPreview = useCallback(() => {
+    setPendingPreview(null);
+    setClearSignal(c => c + 1);
+  }, []);
+
+  // Hint state for drag-and-drop validation messages (from LinkCategoryGrid)
+  const [hint, setHint] = useState<string | null>(null);
 
   return (
     <section
@@ -831,48 +315,16 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* YouTube cross-category prompt */}
           {ytPrompt && (
-            <div className='rounded-lg border border-subtle bg-surface-1 p-3 text-sm flex items-center justify-between gap-3'>
-              <div className='text-primary-token'>
-                You already added{' '}
-                {ytPrompt.candidate.platform.name ||
-                  ytPrompt.candidate.platform.id}{' '}
-                in this section. Do you also want to add it as{' '}
-                {ytPrompt.target === 'dsp'
-                  ? 'a music service'
-                  : labelFor(ytPrompt.target)}
-                ?
-              </div>
-              <div className='shrink-0 flex items-center gap-2'>
-                <Button
-                  size='sm'
-                  variant='primary'
-                  onClick={() => {
-                    if (!ytPrompt) return;
-                    const adjusted = {
-                      ...ytPrompt.candidate,
-                      platform: {
-                        ...ytPrompt.candidate.platform,
-                        category: ytPrompt.target,
-                      },
-                    } as unknown as T;
-                    const next = [...links, adjusted];
-                    setLinks(next);
-                    setYtPrompt(null);
-                    onLinkAdded?.([adjusted]);
-                  }}
-                >
-                  Add as {labelFor(ytPrompt.target)}
-                </Button>
-                <Button
-                  size='sm'
-                  variant='outline'
-                  onClick={() => setYtPrompt(null)}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            <YouTubeCrossCategoryPrompt
+              candidate={ytPrompt.candidate}
+              target={ytPrompt.target as 'social' | 'dsp'}
+              onConfirm={confirmYtPrompt}
+              onCancel={cancelYtPrompt}
+              animate={false}
+            />
           )}
           {/* Combined search + add input */}
           <UniversalLinkInput
@@ -883,7 +335,7 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
               .map(l => l.platform.id)}
             creatorName={creatorName}
             prefillUrl={prefillUrl}
-            onPrefillConsumed={() => setPrefillUrl(undefined)}
+            onPrefillConsumed={clearPrefillUrl}
             onQueryChange={() => {}}
             onPreviewChange={(link, isDuplicate) => {
               if (!link || isDuplicate) {
@@ -895,75 +347,23 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
             clearSignal={clearSignal}
           />
 
-          {suggestionsEnabled && pendingSuggestions.length > 0 ? (
-            <div
-              className='rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5'
-              aria-label='Ingested link suggestions'
-            >
-              <div className='flex flex-wrap items-center justify-center gap-2'>
-                {pendingSuggestions.map(suggestion => {
-                  const identity =
-                    buildSecondaryText(suggestion) ||
-                    compactUrlDisplay(
-                      suggestion.platform.id,
-                      suggestion.normalizedUrl
-                    );
-                  const pillText = identity
-                    ? `${suggestion.platform.name} • ${identity}`
-                    : suggestion.platform.name;
-                  return (
-                    <PlatformPill
-                      key={suggestionKey(suggestion)}
-                      platformIcon={suggestion.platform.icon}
-                      platformName={suggestion.platform.name}
-                      primaryText={pillText}
-                      badgeText='Suggested'
-                      state='ready'
-                      suffix={<Plus className='h-3.5 w-3.5' aria-hidden />}
-                      trailing={
-                        <button
-                          type='button'
-                          aria-label={`Dismiss ${suggestion.platform.name} suggestion`}
-                          className='grid h-6 w-6 place-items-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition hover:bg-surface-2 hover:text-primary-token'
-                          onClick={event => {
-                            event.stopPropagation();
-                            void handleDismissSuggestionClick(suggestion);
-                          }}
-                        >
-                          <X className='h-3.5 w-3.5' aria-hidden />
-                        </button>
-                      }
-                      onClick={() => {
-                        void handleAcceptSuggestionClick(suggestion);
-                      }}
-                      className='pr-1.5'
-                      testId='ingested-suggestion-pill'
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
+          {/* Ingested AI-discovered suggestions */}
+          {hasPendingSuggestions && (
+            <IngestedSuggestions
+              suggestions={pendingSuggestions}
+              onAccept={handleAcceptSuggestionClick}
+              onDismiss={handleDismissSuggestionClick}
+              profileId={profileId}
+              suggestionKey={suggestionKey}
+            />
+          )}
 
-          {suggestionPills.length > 0 ? (
-            <div
-              className='flex flex-wrap items-center justify-center gap-2'
-              aria-label='Quick link suggestions'
-            >
-              {suggestionPills.map(pill => (
-                <PlatformPill
-                  key={pill.id}
-                  platformIcon={pill.simpleIconId}
-                  platformName={pill.label}
-                  primaryText={pill.label}
-                  suffix='+'
-                  tone='faded'
-                  onClick={() => setPrefillUrl(buildPrefillUrl(pill.id))}
-                  className='whitespace-nowrap'
-                />
-              ))}
-            </div>
-          ) : null}
+          {/* Quick-add platform suggestion pills */}
+          <QuickAddSuggestions
+            existingPlatforms={existingPlatforms}
+            isMusicProfile={isMusicProfile}
+            onPlatformSelect={setPrefillUrl}
+          />
         </div>
       </div>
 
@@ -986,375 +386,30 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
         )}
 
         {hasAnyLinks && (
-          <DndContext sensors={sensors} onDragEnd={onDragEnd} modifiers={[]}>
-            <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-              {(['social', 'dsp', 'earnings', 'custom'] as const).map(
-                section => {
-                  const items = sortedGroups[section];
-
-                  const isAddingToThis =
-                    addingLink && sectionOf(addingLink) === section;
-                  if (items.length === 0 && !isAddingToThis) {
-                    return null;
-                  }
-
-                  return (
-                    <CategorySection
-                      key={section}
-                      title={labelFor(section)}
-                      variant='card'
-                    >
-                      <SortableContext items={items.map(idFor)}>
-                        {items.map(link => {
-                          const linkId = idFor(link as T);
-                          return (
-                            <SortableRow
-                              key={linkId}
-                              id={linkId}
-                              link={link as T}
-                              index={links.findIndex(
-                                l => l.normalizedUrl === link.normalizedUrl
-                              )}
-                              draggable={items.length > 1}
-                              onToggle={handleToggle}
-                              onRemove={handleRemove}
-                              onEdit={handleEdit}
-                              visible={linkIsVisible(link as T)}
-                              openMenuId={openMenuId}
-                              onAnyMenuOpen={handleAnyMenuOpen}
-                              isLastAdded={lastAddedId === linkId}
-                              buildPillLabel={buildPillLabel}
-                            />
-                          );
-                        })}
-
-                        {pendingPreview &&
-                        sectionOf(pendingPreview.link as T) === section ? (
-                          <LinkPill
-                            platformIcon={pendingPreview.link.platform.icon}
-                            platformName={pendingPreview.link.platform.name}
-                            primaryText={buildPillLabel(pendingPreview.link)}
-                            secondaryText={buildSecondaryText(
-                              pendingPreview.link
-                            )}
-                            state='ready'
-                            badgeText='Ready to add'
-                            menuId='pending-preview'
-                            isMenuOpen={openMenuId === 'pending-preview'}
-                            onMenuOpenChange={next =>
-                              handleAnyMenuOpen(next ? 'pending-preview' : null)
-                            }
-                            menuItems={[
-                              {
-                                id: 'add',
-                                label: 'Add',
-                                iconName: 'Plus',
-                                onSelect: () => {
-                                  void handleAdd(pendingPreview.link);
-                                  setPendingPreview(null);
-                                  setClearSignal(c => c + 1);
-                                },
-                              },
-                              {
-                                id: 'cancel',
-                                label: 'Cancel',
-                                iconName: 'X',
-                                onSelect: () => {
-                                  setPendingPreview(null);
-                                  setClearSignal(c => c + 1);
-                                },
-                              },
-                            ]}
-                          />
-                        ) : null}
-
-                        {isAddingToThis && (
-                          <LinkPill
-                            platformIcon='website'
-                            platformName='Loading'
-                            primaryText='Adding…'
-                            state='loading'
-                            menuId={`loading-${section}`}
-                            isMenuOpen={false}
-                            onMenuOpenChange={() => {}}
-                            menuItems={[]}
-                          />
-                        )}
-                      </SortableContext>
-                    </CategorySection>
-                  );
-                }
-              )}
-            </div>
-          </DndContext>
+          <LinkCategoryGrid
+            links={links}
+            onLinksChange={next => {
+              setLinks(next as T[]);
+              onLinksChange?.(next as T[]);
+            }}
+            onToggle={handleToggle}
+            onRemove={handleRemove}
+            onEdit={handleEdit}
+            openMenuId={openMenuId}
+            onAnyMenuOpen={handleAnyMenuOpen}
+            lastAddedId={lastAddedId}
+            buildPillLabel={buildPillLabel}
+            addingLink={addingLink}
+            pendingPreview={pendingPreview}
+            onAddPendingPreview={handleAddPendingPreview}
+            onCancelPendingPreview={handleCancelPendingPreview}
+            onHint={setHint}
+          />
         )}
       </div>
     </section>
   );
 }
 
-function buildPrefillUrl(platformId: string): string {
-  switch (platformId) {
-    case 'spotify-artist':
-      // Special case: triggers search mode in UniversalLinkInput
-      return '__SEARCH_MODE__:spotify';
-    case 'spotify':
-      return 'https://open.spotify.com/artist/';
-    case 'apple-music':
-      return 'https://music.apple.com/artist/';
-    case 'youtube-music':
-      return 'https://music.youtube.com/channel/';
-    case 'instagram':
-      return 'https://instagram.com/';
-    case 'tiktok':
-      return 'https://www.tiktok.com/@';
-    case 'youtube':
-      return 'https://www.youtube.com/@';
-    case 'twitter':
-      return 'https://x.com/';
-    case 'venmo':
-      return 'https://venmo.com/';
-    case 'website':
-      return 'https://';
-    default:
-      return '';
-  }
-}
-
-interface SortableRowProps<T extends DetectedLink> {
-  id: string;
-  link: T;
-  index: number;
-  onToggle: (idx: number) => void;
-  onRemove: (idx: number) => void;
-  onEdit: (idx: number) => void;
-  visible: boolean;
-  draggable?: boolean;
-  openMenuId: string | null;
-  onAnyMenuOpen: (id: string | null) => void;
-  isLastAdded: boolean;
-  buildPillLabel: (link: DetectedLink) => string;
-}
-
-/**
- * SortableRow - Memoized row component for drag-and-drop link items.
- * Uses shared color utilities for consistent brand theming.
- */
-const SortableRow = React.memo(function SortableRow<T extends DetectedLink>({
-  id,
-  link,
-  index,
-  onToggle,
-  onRemove,
-  onEdit,
-  visible,
-  draggable = true,
-  openMenuId,
-  onAnyMenuOpen,
-  isLastAdded,
-  buildPillLabel,
-}: SortableRowProps<T>) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({
-      id,
-      disabled: !draggable,
-    });
-
-  // Reserved for future drag handle pointer down handler
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _handleDragHandlePointerDown = React.useCallback(
-    (e: React.PointerEvent<HTMLButtonElement>) => {
-      if (listeners?.onPointerDown) {
-        listeners.onPointerDown(e);
-      }
-    },
-    [listeners]
-  );
-
-  const cardStyle: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  const urlDisplay = compactUrlDisplay(link.platform.id, link.normalizedUrl);
-  const identity = canonicalIdentity(link);
-  const secondaryText = identity.startsWith('@') ? identity : undefined;
-
-  const pillState: LinkPillState = !visible
-    ? 'hidden'
-    : link.isValid === false
-      ? 'error'
-      : 'connected';
-
-  const badgeText = !visible
-    ? 'Hidden'
-    : pillState === 'error'
-      ? 'Needs fix'
-      : isLastAdded
-        ? 'New'
-        : undefined;
-
-  const menuItems: LinkPillMenuItem[] = [
-    {
-      id: 'edit',
-      label: 'Edit',
-      iconName: 'Pencil',
-      onSelect: () => onEdit(index),
-    },
-    {
-      id: 'toggle',
-      label: visible ? 'Hide' : 'Show',
-      iconName: visible ? 'EyeOff' : 'Eye',
-      onSelect: () => onToggle(index),
-    },
-    {
-      id: 'delete',
-      label: 'Delete',
-      iconName: 'Trash',
-      variant: 'destructive',
-      onSelect: () => onRemove(index),
-    },
-  ];
-
-  return (
-    <div
-      ref={setNodeRef}
-      {...attributes}
-      className={cn('relative')}
-      style={cardStyle}
-      {...listeners}
-    >
-      <LinkPill
-        platformIcon={link.platform.icon}
-        platformName={link.platform.name || link.platform.id}
-        primaryText={buildPillLabel(link)}
-        secondaryText={secondaryText}
-        state={pillState}
-        badgeText={badgeText}
-        shimmerOnMount={isLastAdded}
-        menuItems={menuItems}
-        menuId={id}
-        isMenuOpen={openMenuId === id}
-        onMenuOpenChange={next => onAnyMenuOpen(next ? id : null)}
-        className='max-w-full'
-      />
-
-      <div className='sr-only'>{urlDisplay}</div>
-    </div>
-  );
-});
-
-function groupLinks<T extends DetectedLink = DetectedLink>(
-  links: T[]
-): Record<LinkSection, T[]> {
-  // Preserve incoming order; categories are only for grouping/drag between types.
-  const social: T[] = [];
-  const dsp: T[] = [];
-  const earnings: T[] = [];
-  const custom: T[] = [];
-
-  for (const l of links) {
-    // Category comes from platform metadata; fallback to custom
-    const category = (l.platform.category ?? 'custom') as
-      | 'social'
-      | 'dsp'
-      | 'websites'
-      | 'earnings'
-      | 'custom';
-    if (category === 'social') social.push(l);
-    else if (category === 'dsp') dsp.push(l);
-    else if (category === 'earnings') earnings.push(l);
-    else custom.push(l);
-  }
-
-  return {
-    social,
-    dsp,
-    earnings,
-    custom,
-  };
-}
-
-function labelFor(section: LinkSection): string {
-  switch (section) {
-    case 'social':
-      return 'SOCIAL';
-    case 'dsp':
-      return 'MUSIC SERVICE';
-    case 'earnings':
-      return 'MONETIZATION';
-    default:
-      return 'CUSTOM';
-  }
-}
-
-function compactUrlDisplay(platformId: string, url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return '';
-
-  const withScheme = (() => {
-    if (/^https?:\/\//i.test(trimmed)) return trimmed;
-    return `https://${trimmed}`;
-  })();
-
-  try {
-    const parsed = new URL(withScheme);
-    const host = parsed.hostname.replace(/^www\./, '');
-    const path = parsed.pathname.replace(/\/+$/, '');
-    const segments = path.split('/').filter(Boolean);
-    const first = segments[0] ?? '';
-    const second = segments[1] ?? '';
-
-    const atOr = (value: string): string =>
-      value.startsWith('@') ? value : `@${value}`;
-
-    if (platformId === 'tiktok') {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (
-      platformId === 'instagram' ||
-      platformId === 'twitter' ||
-      platformId === 'x' ||
-      platformId === 'venmo'
-    ) {
-      if (!first) return host;
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'snapchat') {
-      if (!first) return host;
-      if (first === 'add' && second) return atOr(second);
-      return first.startsWith('@') ? first : atOr(first);
-    }
-
-    if (platformId === 'youtube') {
-      if (first.startsWith('@')) return first;
-      if (
-        (first === 'channel' || first === 'c' || first === 'user') &&
-        second
-      ) {
-        return atOr(second);
-      }
-      return first ? first : host;
-    }
-
-    if (platformId === 'website') {
-      return host;
-    }
-
-    return host;
-  } catch {
-    const withoutScheme = trimmed.replace(/^https?:\/\//, '');
-    const beforePath = withoutScheme.split('/')[0];
-    return beforePath || trimmed;
-  }
-}
-
-function suggestionIdentity(
-  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
-): string | undefined {
-  const identity = canonicalIdentity(link);
-  return identity.startsWith('@') ? identity : undefined;
-}
+// Note: All sub-components (SortableLinkItem, QuickAddSuggestions, IngestedSuggestions,
+// YouTubeCrossCategoryPrompt, LinkCategoryGrid) are now imported from ./links/

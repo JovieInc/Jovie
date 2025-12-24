@@ -6,7 +6,6 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import {
@@ -29,11 +28,12 @@ import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { cn, debounce } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { DashboardCard } from '../atoms/DashboardCard';

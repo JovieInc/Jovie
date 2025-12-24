@@ -118,17 +118,6 @@ const nextConfig = {
     });
     return [
       {
-        // Ensure internal flags endpoint is never cached
-        source: '/api/feature-flags',
-        headers: [
-          ...securityHeaders,
-          {
-            key: 'Cache-Control',
-            value: 'no-store',
-          },
-        ],
-      },
-      {
         source: '/api/(.*)',
         headers: [
           ...securityHeaders,
@@ -139,8 +128,7 @@ const nextConfig = {
         ],
       },
       {
-        // Exclude Vercel Flags discovery endpoint from global cache headers
-        source: '/((?!\.well-known/vercel/flags).*)',
+        source: '/(.*)',
         headers: [
           ...securityHeaders,
           {
@@ -154,7 +142,11 @@ const nextConfig = {
   experimental: {
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
-    optimizePackageImports: ['@headlessui/react', '@heroicons/react'],
+    optimizePackageImports: [
+      '@headlessui/react',
+      '@heroicons/react',
+      'lucide-react',
+    ],
     // Build optimizations
     // Turbopack: remove unsupported option
     // forceSwcTransforms: true,

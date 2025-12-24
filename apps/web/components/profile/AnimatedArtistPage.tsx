@@ -1,14 +1,14 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { ArtistNotificationsCTA } from '@/components/profile/ArtistNotificationsCTA';
 import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 

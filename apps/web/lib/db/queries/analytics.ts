@@ -8,8 +8,8 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-import { checkStatsigGateForUser } from '@/lib/statsig/server';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { checkGateForUser } from '@/lib/flags/server';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -293,7 +293,7 @@ export async function getUserDashboardAnalytics(
       .where(eq(users.clerkId, clerkUserId))
       .limit(1)
       .then(results => results[0]),
-    checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+    checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
       userID: clerkUserId,
     }),
     db

@@ -1,6 +1,5 @@
 'use client';
 
-import { useFeatureGate } from '@statsig/react-bindings';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -10,6 +9,8 @@ import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import { useProfileSaveToasts } from '@/lib/hooks/useProfileSaveToasts';
 import {
@@ -17,7 +18,6 @@ import {
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
 import { getProfileIdentity } from '@/lib/profile/profile-identity';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import { debounce } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {

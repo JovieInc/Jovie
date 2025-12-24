@@ -11,5 +11,10 @@ echo "🔍 Cursor Hook: Running typecheck before stop..."
 # Run typecheck
 pnpm run typecheck
 
+if [ "${CURSOR_HOOK_RUN_LINT:-}" = "1" ]; then
+  echo "🔍 Cursor Hook: Running lint before stop..."
+  pnpm run lint
+fi
+
 echo "✅ Typecheck passed"
 

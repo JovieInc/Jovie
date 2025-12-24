@@ -10,6 +10,8 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { checkGateForUser } from '@/lib/flags/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import { sendNotification } from '@/lib/notifications/service';
@@ -17,8 +19,6 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
-import { checkStatsigGateForUser } from '@/lib/statsig/server';
 import type {
   NotificationApiResponse,
   NotificationChannel,
@@ -250,7 +250,7 @@ export const subscribeToNotificationsDomain = async (
         : null;
 
     const dynamicOverrideEnabled = creatorClerkId
-      ? await checkStatsigGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
+      ? await checkGateForUser(STATSIG_FLAGS.DYNAMIC_ENGAGEMENT, {
           userID: creatorClerkId,
         })
       : false;

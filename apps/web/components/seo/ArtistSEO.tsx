@@ -1,3 +1,4 @@
+import Script from 'next/script';
 import { APP_URL } from '@/constants/app';
 import { Artist, SocialLink } from '@/types/db';
 
@@ -70,20 +71,14 @@ export function ArtistSEO({ artist, socialLinks }: ArtistSEOProps) {
   return (
     <>
       {/* Music Group Structured Data */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(musicStructuredData),
-        }}
-      />
+      <Script type='application/ld+json' strategy='beforeInteractive'>
+        {JSON.stringify(musicStructuredData)}
+      </Script>
 
       {/* Breadcrumb Structured Data */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbStructuredData),
-        }}
-      />
+      <Script type='application/ld+json' strategy='beforeInteractive'>
+        {JSON.stringify(breadcrumbStructuredData)}
+      </Script>
 
       {/* Additional meta tags for better SEO */}
       <meta name='author' content={artist.name} />

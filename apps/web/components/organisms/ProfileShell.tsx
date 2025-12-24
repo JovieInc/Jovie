@@ -1,5 +1,4 @@
 'use client';
-import { useFeatureGate } from '@statsig/react-bindings';
 import { usePathname, useSearchParams } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -22,8 +21,9 @@ import { ArtistContactsButton } from '@/components/profile/ArtistContactsButton'
 import { ProfileFooter } from '@/components/profile/ProfileFooter';
 import { Container } from '@/components/site/Container';
 import { CTAButton } from '@/components/ui/CTAButton';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 import type {

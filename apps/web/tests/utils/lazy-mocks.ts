@@ -47,27 +47,6 @@ export function loadClerkMocks() {
 }
 
 /**
- * Lazy load feature flag mocks only when needed
- */
-export function loadFeatureFlagMocks() {
-  if (loadedMocks.has('feature-flags')) return;
-
-  vi.mock('@/components/providers/FeatureFlagsProvider', () => ({
-    useFeatureFlags: () => ({
-      flags: {
-        waitlistEnabled: false,
-        artistSearchEnabled: true,
-        debugBannerEnabled: false,
-        tipPromoEnabled: true,
-        profileSettingsEnabled: true,
-      },
-    }),
-  }));
-
-  loadedMocks.add('feature-flags');
-}
-
-/**
  * Lazy load Next.js mocks only when needed
  */
 export function loadNextJsMocks() {
@@ -220,7 +199,6 @@ export function loadEssentialMocks() {
 export function loadAllMocks() {
   loadEssentialMocks();
   loadClerkMocks();
-  loadFeatureFlagMocks();
   loadNextJsMocks();
   loadHeadlessUiMocks();
 }

@@ -388,6 +388,40 @@ export async function withTransaction<T>(
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isTableExistsRow(value: unknown): value is TableExistsRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return typeof value.table_exists === 'boolean';
+}
+
+function isActiveConnectionsRow(value: unknown): value is ActiveConnectionsRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  const activeConnections = value.active_connections;
+  return (
+    typeof activeConnections === 'string' ||
+    typeof activeConnections === 'number'
+  );
+}
+
+/** Row type for table existence check query */
+interface TableExistsRow {
+  table_exists: boolean;
+}
+
+/** Row type for active connections query */
+interface ActiveConnectionsRow {
+  active_connections: string | number;
+}
+
 export async function doesTableExist(tableName: string): Promise<boolean> {
   if (env.DATABASE_URL && env.DATABASE_URL !== lastTableExistenceDatabaseUrl) {
     positiveTableExistenceCache.clear();
@@ -418,7 +452,9 @@ export async function doesTableExist(tableName: string): Promise<boolean> {
       `
     );
 
-    const exists = Boolean(result.rows?.[0]?.table_exists ?? false);
+    // result.rows is TableExistsRow[] - rows is always defined, first element may be undefined
+    const firstRow = result.rows[0];
+    const exists = isTableExistsRow(firstRow) ? firstRow.table_exists : false;
 
     if (exists) {
       positiveTableExistenceCache.add(tableName);
@@ -626,20 +662,18 @@ export async function checkDbPerformance(): Promise<{
 
     // 4. Check concurrent connections (if available)
     try {
-      const result = await _db!.execute(drizzleSql`
-        SELECT count(*) as active_connections 
-        FROM pg_stat_activity 
-        WHERE state = 'active'
-      `);
-      // Handle the result - Neon HTTP returns a rows array
-      if (Array.isArray(result) && result.length > 0) {
-        const firstRow = result[0] as
-          | { active_connections: number }
-          | undefined;
-        metrics.concurrentConnections = firstRow
-          ? Number(firstRow.active_connections) || 0
-          : 0;
-      }
+      const result = await _db!.execute(
+        drizzleSql<ActiveConnectionsRow>`
+          SELECT count(*) as active_connections
+          FROM pg_stat_activity
+          WHERE state = 'active'
+        `
+      );
+      // result.rows is ActiveConnectionsRow[] - rows is always defined, first element may be undefined
+      const firstRow = result.rows[0];
+      metrics.concurrentConnections = isActiveConnectionsRow(firstRow)
+        ? Number(firstRow.active_connections) || 0
+        : 0;
     } catch {
       // Connection count query might fail due to permissions
       logDbInfo(

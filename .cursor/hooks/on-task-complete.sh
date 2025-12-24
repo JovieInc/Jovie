@@ -11,5 +11,10 @@ echo "🔍 Cursor Hook: Running typecheck after task completion..."
 # Run typecheck
 pnpm run typecheck
 
+if [ "${CURSOR_HOOK_RUN_LINT:-}" = "1" ]; then
+  echo "🔍 Cursor Hook: Running lint after task completion..."
+  pnpm run lint
+fi
+
 echo "✅ Typecheck passed - task completed successfully"
 

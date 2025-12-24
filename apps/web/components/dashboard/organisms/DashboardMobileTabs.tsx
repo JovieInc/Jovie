@@ -7,10 +7,10 @@ import {
   UserCircleIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
-import { useFeatureGate } from '@statsig/react-bindings';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { STATSIG_FLAGS } from '@/lib/statsig/flags';
+import { STATSIG_FLAGS } from '@/lib/flags';
+import { useFeatureGate } from '@/lib/flags/client';
 import { cn } from '@/lib/utils';
 
 type DashboardMobileTab = {
