@@ -91,7 +91,6 @@ export async function seedTestData() {
           isVerified: false,
           isClaimed: false,
           ingestionStatus: 'idle',
-          ingestionSourceType: 'manual',
         })
         .returning({ id: creatorProfiles.id });
 
