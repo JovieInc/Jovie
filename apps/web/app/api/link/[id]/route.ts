@@ -31,7 +31,7 @@ import {
   detectBot,
   logBotDetection,
 } from '@/lib/utils/bot-detection';
-import { generateSignedToken } from '@/lib/utils/url-encryption';
+import { generateSignedToken } from '@/lib/utils/url-encryption.server';
 
 const SECURITY_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',

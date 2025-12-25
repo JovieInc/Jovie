@@ -61,8 +61,11 @@ test.describe('Billing Smoke Tests', () => {
     });
 
     // Navigate to billing page (will redirect to sign-in if not authenticated)
-    // Use waitUntil: 'networkidle' to ensure redirect completes
-    await page.goto('/billing', { waitUntil: 'networkidle', timeout: 15000 });
+    // Avoid waitUntil: 'networkidle' here since auth/analytics can keep long-lived connections.
+    await page.goto('/billing', {
+      waitUntil: 'domcontentloaded',
+      timeout: 15000,
+    });
 
     // Wait for URL to stabilize (redirect may happen)
     try {

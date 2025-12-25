@@ -6,17 +6,19 @@
 import crypto from 'crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  decryptUrl,
   type EncryptionResult,
-  encryptUrl,
   extractDomain,
   generateShortId,
-  generateSignedToken,
   isValidUrl,
   sanitizeUrlForLogging,
   simpleDecryptUrl,
   simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
+import {
+  decryptUrl,
+  encryptUrl,
+  generateSignedToken,
+} from '@/lib/utils/url-encryption.server';
 
 describe('URL Encryption', () => {
   afterEach(() => {
