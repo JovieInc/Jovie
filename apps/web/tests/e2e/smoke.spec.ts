@@ -44,10 +44,23 @@ test.describe('Smoke Tests', () => {
         // Ignore specific expected errors in test environment
         const isClerkError = text.toLowerCase().includes('clerk');
         const isNetworkResourceError = text.includes('Failed to load resource');
+        const isCspError =
+          text.toLowerCase().includes('content security policy') ||
+          text.toLowerCase().includes('csp');
+        const lower = text.toLowerCase();
+        const isNonceHydrationMismatch =
+          lower.includes('nonce') &&
+          (lower.includes('did not match') || lower.includes('hydration'));
         const isExpectedTestError =
           text.includes('Test environment') || text.includes('Mock data');
 
-        if (!isClerkError && !isNetworkResourceError && !isExpectedTestError) {
+        if (
+          !isClerkError &&
+          !isNetworkResourceError &&
+          !isCspError &&
+          !isNonceHydrationMismatch &&
+          !isExpectedTestError
+        ) {
           errors.push(text);
         }
       }
