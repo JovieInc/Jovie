@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 const PublicEnvSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
+  NEXT_PUBLIC_CLERK_FRONTEND_API: z.string().url().optional(),
   NEXT_PUBLIC_APP_URL: z.string().url().default('https://jov.ie'),
   NEXT_PUBLIC_STATSIG_CLIENT_KEY: z.string().optional(),
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: z.string().optional(),
@@ -11,6 +12,7 @@ const PublicEnvSchema = z.object({
 const rawPublicEnv = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_CLERK_FRONTEND_API: process.env.NEXT_PUBLIC_CLERK_FRONTEND_API,
   NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie',
   NEXT_PUBLIC_STATSIG_CLIENT_KEY: process.env.NEXT_PUBLIC_STATSIG_CLIENT_KEY,
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY:
@@ -35,6 +37,9 @@ export const publicEnv = {
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: parsed.success
     ? parsed.data.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
     : process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  NEXT_PUBLIC_CLERK_FRONTEND_API: parsed.success
+    ? parsed.data.NEXT_PUBLIC_CLERK_FRONTEND_API
+    : process.env.NEXT_PUBLIC_CLERK_FRONTEND_API,
   NEXT_PUBLIC_APP_URL: parsed.success
     ? parsed.data.NEXT_PUBLIC_APP_URL
     : (process.env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie'),
