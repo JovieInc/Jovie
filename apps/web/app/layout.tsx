@@ -247,7 +247,7 @@ export default async function RootLayout({
           {children}
         </ClientProviders>
 
-        {showCookieBanner && <CookieBannerSection />}
+        <CookieBannerSection showBanner={showCookieBanner} />
         {shouldInjectToolbar && <VercelToolbar />}
       </body>
     </html>

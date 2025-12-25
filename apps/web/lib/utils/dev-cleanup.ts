@@ -48,8 +48,34 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
     };
 
     proc.once('beforeExit', () => run('beforeExit'));
-    proc.once('SIGINT', () => run('SIGINT'));
-    proc.once('SIGTERM', () => run('SIGTERM'));
+    proc.once('SIGINT', () => {
+      void (async () => {
+        try {
+          await runDevCleanups('SIGINT');
+          process.exit(0);
+        } catch (error) {
+          console.error('[DEV_CLEANUP_FATAL]', {
+            reason: 'SIGINT',
+            error: error instanceof Error ? error.message : String(error),
+          });
+          process.exit(1);
+        }
+      })();
+    });
+    proc.once('SIGTERM', () => {
+      void (async () => {
+        try {
+          await runDevCleanups('SIGTERM');
+          process.exit(0);
+        } catch (error) {
+          console.error('[DEV_CLEANUP_FATAL]', {
+            reason: 'SIGTERM',
+            error: error instanceof Error ? error.message : String(error),
+          });
+          process.exit(1);
+        }
+      })();
+    });
   }
 }
 
