@@ -21,8 +21,9 @@ import * as readline from 'readline';
 import ws from 'ws';
 
 // Load environment variables: prefer .env.local, then fallback to .env
-config({ path: '.env.local', override: true });
-config();
+// Do not override values already provided by the environment (e.g. Doppler).
+config({ path: '.env.local', override: false });
+config({ override: false });
 
 // Configure WebSocket for Node.js environment (required for Neon serverless driver)
 neonConfig.webSocketConstructor = ws;
@@ -223,7 +224,7 @@ async function runMigrations() {
 
   // Connect to database
   let pool: Pool;
-  let db: ReturnType<typeof drizzle>;
+  let db: Parameters<typeof migrate>[0];
   let client: PoolClient | null = null;
   let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
 
@@ -234,17 +235,7 @@ async function runMigrations() {
     const rawUrl = process.env.DATABASE_URL!;
     const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
 
-    // Create connection pool with Neon serverless driver
-    pool = new Pool({
-      connectionString: databaseUrl,
-      max: 1,
-    });
-
-    pool.on('connect', (client: PoolClient) => {
-      client
-        .query("SET app.allow_schema_changes = 'true'")
-        .catch(() => undefined);
-    });
+    pool = new Pool({ connectionString: databaseUrl, max: 1 });
 
     client = await pool.connect();
     await client.query("SET app.allow_schema_changes = 'true'");
