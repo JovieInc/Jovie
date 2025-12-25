@@ -6,28 +6,62 @@ import { track } from '@/lib/analytics';
 // Define the metric handler type
 export type MetricHandler = (metric: Metric) => void;
 
+declare global {
+  // eslint-disable-next-line no-var
+  var jovieWebVitalsInitialized: boolean | undefined;
+  // eslint-disable-next-line no-var
+  var jovieWebVitalsHandlers: Set<MetricHandler> | undefined;
+}
+
+function getWebVitalsHandlers(): Set<MetricHandler> {
+  if (!globalThis.jovieWebVitalsHandlers) {
+    globalThis.jovieWebVitalsHandlers = new Set<MetricHandler>();
+  }
+  return globalThis.jovieWebVitalsHandlers;
+}
+
 /**
  * Initialize Web Vitals tracking
  * @param onMetric Optional custom handler for metrics
  */
 export function initWebVitals(onMetric?: MetricHandler) {
-  // Default handler sends metrics to our analytics providers
-  const handleMetric = (metric: Metric) => {
-    // Always call the custom handler if provided
+  if (typeof window === 'undefined') {
+    return () => {};
+  }
+
+  const handlers = getWebVitalsHandlers();
+  if (onMetric) {
+    handlers.add(onMetric);
+  }
+
+  if (!globalThis.jovieWebVitalsInitialized) {
+    globalThis.jovieWebVitalsInitialized = true;
+
+    const handleMetric = (metric: Metric) => {
+      const currentHandlers = getWebVitalsHandlers();
+      currentHandlers.forEach(handler => {
+        try {
+          handler(metric);
+        } catch {
+          // ignore handler errors
+        }
+      });
+
+      sendToAnalytics(metric);
+    };
+
+    onCLS(handleMetric);
+    onINP(handleMetric);
+    onFCP(handleMetric);
+    onLCP(handleMetric);
+    onTTFB(handleMetric);
+  }
+
+  return () => {
     if (onMetric) {
-      onMetric(metric);
+      getWebVitalsHandlers().delete(onMetric);
     }
-
-    // Send to our analytics providers
-    sendToAnalytics(metric);
   };
-
-  // Initialize all Core Web Vitals metrics
-  onCLS(handleMetric); // Cumulative Layout Shift
-  onINP(handleMetric); // Interaction to Next Paint (replaces FID)
-  onFCP(handleMetric); // First Contentful Paint
-  onLCP(handleMetric); // Largest Contentful Paint
-  onTTFB(handleMetric); // Time to First Byte
 }
 
 /**

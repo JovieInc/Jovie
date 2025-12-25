@@ -5,11 +5,10 @@ import { env } from '@/lib/env-server';
 
 type WebSocketConstructor = typeof WebSocket;
 
-/** Minimal process interface for safe exit calls in Node environments */
-interface ProcessWithExit {
-  exit(code?: number): never;
-}
-
+import {
+  registerDevCleanup,
+  startDevMemoryMonitor,
+} from '@/lib/utils/dev-cleanup';
 import { DB_CONTEXTS, PERFORMANCE_THRESHOLDS, TABLE_NAMES } from './config';
 import * as schema from './schema';
 
@@ -49,7 +48,6 @@ if (webSocketConstructor) {
 declare global {
   var db: NeonDatabase<typeof schema> | undefined;
   var pool: Pool | undefined;
-  var dbCleanupRegistered: boolean | undefined;
 }
 
 // Create the database client with schema
@@ -206,6 +204,14 @@ function initializeDb(): DbType {
   const isProduction = process.env.NODE_ENV === 'production';
   const hasGlobal = typeof global !== 'undefined';
 
+  if (!isProduction && hasGlobal && global.db) {
+    _db = global.db;
+    if (global.pool) {
+      _pool = global.pool;
+    }
+    return global.db;
+  }
+
   logDbInfo(
     'db_init',
     'Initializing database connection with transaction support',
@@ -238,43 +244,28 @@ function initializeDb(): DbType {
       // Don't throw - let the pool attempt to recover
     });
 
-    // In development, clean up pools created during hot reloads to avoid leaks.
-    // Use a process-global flag so we only register listeners once, even if this
-    // module is re-evaluated by Turbopack/Next dev server.
-    if (
-      process.env.NODE_ENV !== 'production' &&
-      typeof process !== 'undefined' &&
-      'once' in process &&
-      typeof process.once === 'function' &&
-      typeof global !== 'undefined' &&
-      !global.dbCleanupRegistered
-    ) {
-      global.dbCleanupRegistered = true;
-      const cleanup = (reason: 'beforeExit' | 'SIGINT' | 'SIGTERM') => {
-        if (_pool) {
-          _pool.end().catch(error => {
-            logDbError('pool_cleanup_failed', error, { reason });
-          });
-          _pool = undefined;
+    // In development, register pool cleanup so hot reloads and Ctrl+C don't leak pools.
+    registerDevCleanup('db_pool', async () => {
+      const poolToClose =
+        _pool ?? (typeof global !== 'undefined' ? global.pool : undefined);
+      if (poolToClose) {
+        try {
+          await poolToClose.end();
+        } catch (error) {
+          logDbError('pool_cleanup_failed', error, { reason: 'dev_cleanup' });
         }
-      };
+      }
 
-      process.once('beforeExit', () => cleanup('beforeExit'));
-      process.once('SIGINT', () => {
-        cleanup('SIGINT');
-        // Safe exit for Node environment, cast to avoid Edge build static analysis error
-        if (typeof process !== 'undefined' && 'exit' in process) {
-          (process as ProcessWithExit).exit(0);
-        }
-      });
-      process.once('SIGTERM', () => {
-        cleanup('SIGTERM');
-        // Safe exit for Node environment, cast to avoid Edge build static analysis error
-        if (typeof process !== 'undefined' && 'exit' in process) {
-          (process as ProcessWithExit).exit(0);
-        }
-      });
-    }
+      _pool = undefined;
+      _db = undefined;
+      if (typeof global !== 'undefined') {
+        global.pool = undefined;
+        global.db = undefined;
+      }
+    });
+
+    // Optional dev-only memory monitor (opt-in via env)
+    startDevMemoryMonitor();
   }
 
   // Use a single connection in development to avoid connection pool exhaustion
@@ -599,11 +590,6 @@ export async function validateDbConnection(): Promise<{
       // Ignore shutdown errors; connection might already be closed.
     }
   }
-}
-
-/** Row type for active connections query */
-interface ActiveConnectionsRow {
-  active_connections: string | number;
 }
 
 /**

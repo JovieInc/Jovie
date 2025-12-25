@@ -291,14 +291,22 @@ export function openDeepLink(
     const handleVisibilityChange = () => {
       if (document.hidden) {
         appOpened = true;
-        if (timeoutId) clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+        cleanup();
         resolve(true);
       }
     };
 
     const handlePageBlur = () => {
       appOpened = true;
-      if (timeoutId) clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      cleanup();
       resolve(true);
     };
 

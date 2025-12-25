@@ -115,14 +115,23 @@ function ClientProvidersInnerBase({
       logger.groupEnd();
 
       // Initialize Web Vitals tracking for performance monitoring
+      let cleanupWebVitals: (() => void) | undefined;
+      let isUnmounted = false;
       import('@/lib/monitoring/web-vitals').then(({ initWebVitals }) => {
-        initWebVitals(metric => {
+        const cleanup = initWebVitals(metric => {
           // Create a custom event for the performance dashboard
           if (typeof window !== 'undefined') {
             const event = new CustomEvent('web-vitals', { detail: metric });
             window.dispatchEvent(event);
           }
         });
+
+        if (isUnmounted) {
+          cleanup();
+          return;
+        }
+
+        cleanupWebVitals = cleanup;
       });
 
       // Initialize other performance monitoring in production
@@ -131,8 +140,16 @@ function ClientProvidersInnerBase({
           initAllMonitoring();
         });
       }
+
+      return () => {
+        isUnmounted = true;
+        if (cleanupWebVitals) {
+          cleanupWebVitals();
+        }
+      };
     } catch (error) {
       console.error('Error initializing monitoring:', error);
+      return undefined;
     }
   }, []);
 
