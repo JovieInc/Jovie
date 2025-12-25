@@ -15,6 +15,11 @@ import {
   vi,
 } from 'vitest';
 
+declare global {
+  // eslint-disable-next-line no-var
+  var jovieDevCleanupRegistered: boolean | undefined;
+}
+
 // Mock the entire @neondatabase/serverless module
 vi.mock('@neondatabase/serverless', () => {
   return {
@@ -61,7 +66,7 @@ import {
 describe('Health Checks', () => {
   beforeAll(() => {
     // Prevent cleanup handlers from being registered
-    global.dbCleanupRegistered = true;
+    globalThis.jovieDevCleanupRegistered = true;
   });
 
   beforeEach(() => {

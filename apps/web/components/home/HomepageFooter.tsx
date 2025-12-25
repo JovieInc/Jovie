@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, LEGAL } from '@/constants/app';
 
@@ -24,6 +25,7 @@ export function HomepageFooter() {
             >
               Terms
             </Link>
+            <CookieSettingsFooterButton className='hover:text-primary-token transition-colors' />
           </div>
         </div>
       </Container>

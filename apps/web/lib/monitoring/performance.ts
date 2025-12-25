@@ -2,6 +2,16 @@
 
 import { track } from '@/lib/analytics';
 
+declare global {
+  // eslint-disable-next-line no-var
+  var joviePerformanceObservers:
+    | {
+        navigation?: PerformanceObserver;
+        resource?: PerformanceObserver;
+      }
+    | undefined;
+}
+
 /**
  * Performance Tracker class for monitoring various performance aspects
  */
@@ -10,12 +20,17 @@ export class PerformanceTracker {
    * Track page load performance metrics
    * @param pageName The name of the page being tracked
    */
-  trackPageLoad(pageName: string) {
+  trackPageLoad(pageName: string): () => void {
     if (typeof window === 'undefined' || !window.performance) {
-      return;
+      return () => {};
     }
 
     // Create observer for navigation timing
+    if (globalThis.joviePerformanceObservers?.navigation) {
+      globalThis.joviePerformanceObservers.navigation.disconnect();
+      globalThis.joviePerformanceObservers.navigation = undefined;
+    }
+
     const observer = new PerformanceObserver(list => {
       list.getEntries().forEach(entry => {
         if (entry.entryType === 'navigation') {
@@ -42,15 +57,32 @@ export class PerformanceTracker {
     } catch (error) {
       console.error('Failed to observe navigation timing:', error);
     }
+
+    if (!globalThis.joviePerformanceObservers) {
+      globalThis.joviePerformanceObservers = {};
+    }
+    globalThis.joviePerformanceObservers.navigation = observer;
+
+    return () => {
+      observer.disconnect();
+      if (globalThis.joviePerformanceObservers?.navigation === observer) {
+        globalThis.joviePerformanceObservers.navigation = undefined;
+      }
+    };
   }
 
   /**
    * Track resource load performance
    * @param resourceType Type of resources to track (e.g., 'script', 'img', 'css')
    */
-  trackResourceLoad(resourceType?: string) {
+  trackResourceLoad(resourceType?: string): () => void {
     if (typeof window === 'undefined' || !window.performance) {
-      return;
+      return () => {};
+    }
+
+    if (globalThis.joviePerformanceObservers?.resource) {
+      globalThis.joviePerformanceObservers.resource.disconnect();
+      globalThis.joviePerformanceObservers.resource = undefined;
     }
 
     const observer = new PerformanceObserver(list => {
@@ -79,6 +111,18 @@ export class PerformanceTracker {
     } catch (error) {
       console.error('Failed to observe resource timing:', error);
     }
+
+    if (!globalThis.joviePerformanceObservers) {
+      globalThis.joviePerformanceObservers = {};
+    }
+    globalThis.joviePerformanceObservers.resource = observer;
+
+    return () => {
+      observer.disconnect();
+      if (globalThis.joviePerformanceObservers?.resource === observer) {
+        globalThis.joviePerformanceObservers.resource = undefined;
+      }
+    };
   }
 
   /**

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
+import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { ThemeToggle } from '@/components/site/ThemeToggle';
@@ -263,6 +264,11 @@ export function Footer({
                       </Link>
                     </li>
                   ))}
+                  <li>
+                    <CookieSettingsFooterButton
+                      className={footerLinkClassName}
+                    />
+                  </li>
                 </ul>
               </nav>
             </div>

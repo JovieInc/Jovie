@@ -2,6 +2,13 @@
 
 import { track } from '@/lib/analytics';
 
+declare global {
+  // eslint-disable-next-line no-var
+  var jovieOnboardingJourneyListeners:
+    | Array<{ eventName: string; handler: (event: Event) => void }>
+    | undefined;
+}
+
 /**
  * User Journey Tracker class for monitoring user flows
  */
@@ -202,27 +209,57 @@ export class UserJourneyTracker {
 
     // Set up event listeners for each step
     if (typeof window !== 'undefined') {
+      if (globalThis.jovieOnboardingJourneyListeners) {
+        globalThis.jovieOnboardingJourneyListeners.forEach(
+          ({ eventName, handler }) => {
+            window.removeEventListener(eventName, handler);
+          }
+        );
+        globalThis.jovieOnboardingJourneyListeners = undefined;
+      }
+
+      const listeners: Array<{
+        eventName: string;
+        handler: (event: Event) => void;
+      }> = [];
+
       steps.forEach(step => {
-        window.addEventListener(`jovie:${step}`, (event: Event) => {
+        const eventName = `jovie:${step}`;
+        const handler = (event: Event) => {
           const customEvent = event as CustomEvent;
           journey.goToStep(step, customEvent.detail || {});
-        });
+        };
+
+        window.addEventListener(eventName, handler);
+        listeners.push({ eventName, handler });
       });
 
       // Listen for completion event
-      window.addEventListener('jovie:onboarding_complete', (event: Event) => {
-        const customEvent = event as CustomEvent;
-        journey.complete(true, customEvent.detail || {});
-      });
+      {
+        const eventName = 'jovie:onboarding_complete';
+        const handler = (event: Event) => {
+          const customEvent = event as CustomEvent;
+          journey.complete(true, customEvent.detail || {});
+        };
+        window.addEventListener(eventName, handler);
+        listeners.push({ eventName, handler });
+      }
 
       // Listen for abandonment events
-      window.addEventListener('jovie:onboarding_abandon', (event: Event) => {
-        const customEvent = event as CustomEvent;
-        journey.abandon(
-          customEvent.detail?.reason || 'unknown',
-          customEvent.detail || {}
-        );
-      });
+      {
+        const eventName = 'jovie:onboarding_abandon';
+        const handler = (event: Event) => {
+          const customEvent = event as CustomEvent;
+          journey.abandon(
+            customEvent.detail?.reason || 'unknown',
+            customEvent.detail || {}
+          );
+        };
+        window.addEventListener(eventName, handler);
+        listeners.push({ eventName, handler });
+      }
+
+      globalThis.jovieOnboardingJourneyListeners = listeners;
     }
 
     return journey;
