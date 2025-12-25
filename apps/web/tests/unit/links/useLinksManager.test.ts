@@ -29,7 +29,6 @@ async function addLinkAndFlushTimers(
   vi.advanceTimersByTime(700);
   await addPromise;
 }
-
 /**
  * Helper to create a mock DetectedLink
  */
@@ -407,7 +406,7 @@ describe('useLinksManager', () => {
   });
 
   describe('handleAdd', () => {
-    it('should add new link to links array', async () => {
+    it('should add a new link', async () => {
       const { result } = renderHook(() =>
         useLinksManager<DetectedLink>({ initialLinks: [] })
       );
@@ -415,9 +414,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        const addPromise = result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
-        await addPromise;
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(result.current.links).toHaveLength(1);
@@ -477,7 +474,6 @@ describe('useLinksManager', () => {
       );
 
       const newLink = createMockLink('instagram');
-
       let addPromise: Promise<void> | null = null;
       act(() => {
         addPromise = result.current.handleAdd(newLink);
@@ -490,7 +486,6 @@ describe('useLinksManager', () => {
         vi.advanceTimersByTime(700);
         await addPromise;
       });
-
       // addingLink should be null after add completes
       expect(result.current.addingLink).toBeNull();
     });
