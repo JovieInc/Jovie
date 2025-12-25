@@ -13,7 +13,7 @@ export function CookieSettingsFooterButton({
     <button
       type='button'
       className={cn(
-        'appearance-none bg-transparent text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
+        'appearance-none bg-transparent text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 dark:ring-offset-background',
         className
       )}
       onClick={() => {

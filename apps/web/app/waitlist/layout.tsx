@@ -2,8 +2,6 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
 
-export const runtime = 'nodejs';
-
 export default async function WaitlistLayout({
   children,
 }: {
