@@ -5,6 +5,7 @@
 
 import 'server-only';
 import Stripe from 'stripe';
+import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 let stripeSingleton: Stripe | undefined;
@@ -21,7 +22,7 @@ function getStripe(): Stripe {
     appInfo: {
       name: 'Jovie',
       version: '1.0.0',
-      url: process.env.NEXT_PUBLIC_MARKETING_URL ?? 'https://meetjovie.com',
+      url: publicEnv.NEXT_PUBLIC_MARKETING_URL,
     },
     typescript: true,
     timeout: 10000,

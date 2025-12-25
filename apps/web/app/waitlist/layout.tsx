@@ -27,7 +27,7 @@ export default async function WaitlistLayout({
   }
 
   if (access.status === 'claimed') {
-    redirect('/app/dashboard');
+    redirect('/app/dashboard/overview');
   }
 
   return children;

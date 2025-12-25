@@ -2,6 +2,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { publicEnv } from '@/lib/env-public';
 
 /**
  * In-memory cache for admin role checks
@@ -16,8 +17,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  */
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  const adminDomain =
-    process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN ?? 'meetjovie.com';
+  const adminDomain = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
   return email.trim().toLowerCase().endsWith(`@${adminDomain}`);
 }
 

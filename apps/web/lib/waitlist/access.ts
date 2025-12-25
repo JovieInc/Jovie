@@ -1,4 +1,4 @@
-import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema';
 
@@ -19,10 +19,11 @@ export async function getWaitlistAccessByEmail(
 ): Promise<WaitlistAccessLookup> {
   const email = normalizeEmail(emailRaw);
 
+  // Email is already normalized at write time, so use direct equality for index efficiency
   const [entry] = await db
     .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
-    .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
+    .where(eq(waitlistEntries.email, email))
     .limit(1);
 
   const entryId = entry?.id ?? null;
