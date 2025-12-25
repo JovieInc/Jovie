@@ -11,7 +11,7 @@ import {
   getCrawlerSafeLabel,
   isSensitiveDomain,
 } from '@/lib/utils/domain-categorizer';
-import { extractDomain } from '@/lib/utils/url-encryption';
+import { extractDomain } from '@/lib/utils/url-parsing';
 import { SocialIcon } from './SocialIcon';
 
 interface WrappedSocialLinkProps {

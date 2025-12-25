@@ -21,6 +21,14 @@ import { useLinksManager } from '@/components/dashboard/organisms/links/hooks/us
 // Import hook after mocks
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
+async function addLinkAndFlushTimers(
+  result: { current: { handleAdd: (link: DetectedLink) => Promise<void> } },
+  link: DetectedLink
+): Promise<void> {
+  const addPromise = result.current.handleAdd(link);
+  vi.advanceTimersByTime(700);
+  await addPromise;
+}
 /**
  * Helper to create a mock DetectedLink
  */
@@ -62,7 +70,7 @@ function createMockLink(
 describe('useLinksManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.useFakeTimers();
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({ ok: true });
   });
@@ -406,8 +414,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(result.current.links).toHaveLength(1);
@@ -422,8 +429,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       const added = result.current.links[0] as DetectedLink & {
@@ -441,8 +447,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(onLinkAdded).toHaveBeenCalled();
@@ -457,8 +462,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(onLinksChange).toHaveBeenCalled();
@@ -470,18 +474,18 @@ describe('useLinksManager', () => {
       );
 
       const newLink = createMockLink('instagram');
-      let addingLinkWhileAdding: DetectedLink | null = null;
-
-      await act(async () => {
-        const addPromise = result.current.handleAdd(newLink);
-        // Capture addingLink state immediately
-        addingLinkWhileAdding = result.current.addingLink;
-        await addPromise;
-        vi.advanceTimersByTime(700);
+      let addPromise: Promise<void> | null = null;
+      act(() => {
+        addPromise = result.current.handleAdd(newLink);
       });
 
       // addingLink should be set during add
-      expect(addingLinkWhileAdding).not.toBeNull();
+      expect(result.current.addingLink).not.toBeNull();
+
+      await act(async () => {
+        vi.advanceTimersByTime(700);
+        await addPromise;
+      });
       // addingLink should be null after add completes
       expect(result.current.addingLink).toBeNull();
     });
@@ -494,8 +498,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(result.current.lastAddedId).not.toBeNull();
@@ -509,8 +512,7 @@ describe('useLinksManager', () => {
       const newLink = createMockLink('instagram');
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       expect(result.current.lastAddedId).not.toBeNull();
@@ -532,8 +534,7 @@ describe('useLinksManager', () => {
       const venmoLink = createMockLink('venmo', 'social'); // Intentionally wrong category
 
       await act(async () => {
-        await result.current.handleAdd(venmoLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, venmoLink);
       });
 
       expect(result.current.links[0].platform.category).toBe('earnings');
@@ -549,8 +550,7 @@ describe('useLinksManager', () => {
       const venmoLink = createMockLink('venmo', 'earnings');
 
       await act(async () => {
-        await result.current.handleAdd(venmoLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, venmoLink);
       });
 
       expect(mockFetch).toHaveBeenCalledWith('/api/dashboard/tipping/enable', {
@@ -577,8 +577,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(duplicateLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, duplicateLink);
       });
 
       // Should not add duplicate
@@ -607,8 +606,7 @@ describe('useLinksManager', () => {
       };
 
       await act(async () => {
-        await result.current.handleAdd(duplicateLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, duplicateLink);
       });
 
       // Should remain 1 link (merged)
@@ -634,7 +632,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newYouTube);
+        await addLinkAndFlushTimers(result, newYouTube);
       });
 
       // Should trigger prompt instead of adding
@@ -659,7 +657,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newYouTube);
+        await addLinkAndFlushTimers(result, newYouTube);
       });
 
       // Should trigger prompt for other section
@@ -686,7 +684,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newYouTube);
+        await addLinkAndFlushTimers(result, newYouTube);
       });
 
       expect(result.current.ytPrompt).not.toBeNull();
@@ -716,7 +714,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newYouTube);
+        await addLinkAndFlushTimers(result, newYouTube);
       });
 
       expect(result.current.ytPrompt).not.toBeNull();
@@ -755,8 +753,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newYouTube);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newYouTube);
       });
 
       // Should not add or prompt - YouTube already in both sections
@@ -909,8 +906,7 @@ describe('useLinksManager', () => {
       );
 
       await act(async () => {
-        await result.current.handleAdd(newLink);
-        vi.advanceTimersByTime(700);
+        await addLinkAndFlushTimers(result, newLink);
       });
 
       // The new link should be added but marked as hidden

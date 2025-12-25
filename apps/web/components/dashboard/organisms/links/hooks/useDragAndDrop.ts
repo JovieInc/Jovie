@@ -13,7 +13,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { canMoveTo, type LinkSection, labelFor, sectionOf } from '../utils';
 
@@ -101,6 +101,16 @@ export function useDragAndDrop<T extends DetectedLink = DetectedLink>({
 }: UseDragAndDropOptions<T>): UseDragAndDropReturn<T> {
   // Hint state for showing error messages on invalid drag operations
   const [hint, setHint] = useState<string | null>(null);
+  const hintTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (hintTimerRef.current != null) {
+        window.clearTimeout(hintTimerRef.current);
+        hintTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Pointer sensors with configurable activation distance
   const sensors = useSensors(
@@ -140,7 +150,15 @@ export function useDragAndDrop<T extends DetectedLink = DetectedLink>({
   const showHintWithTimeout = useCallback(
     (message: string) => {
       setHint(message);
-      window.setTimeout(() => setHint(null), hintDuration);
+
+      if (hintTimerRef.current != null) {
+        window.clearTimeout(hintTimerRef.current);
+      }
+
+      hintTimerRef.current = window.setTimeout(() => {
+        setHint(null);
+        hintTimerRef.current = null;
+      }, hintDuration);
     },
     [hintDuration]
   );

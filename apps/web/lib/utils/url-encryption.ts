@@ -5,6 +5,11 @@
 
 import crypto from 'crypto';
 import { env } from '@/lib/env-server';
+import {
+  extractDomain,
+  isValidUrl,
+  sanitizeUrlForLogging,
+} from './url-parsing';
 
 const DEFAULT_KEY = 'default-key-change-in-production-32-chars';
 const ENCRYPTION_KEY = env.URL_ENCRYPTION_KEY;
@@ -127,14 +132,14 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 }
 
 /**
- * Simple encryption for database storage (using Supabase function in production)
+ * Simple encryption for database storage
  */
 export function simpleEncryptUrl(url: string): string {
   return Buffer.from(url).toString('base64');
 }
 
 /**
- * Simple decryption for database storage (using Supabase function in production)
+ * Simple decryption for database storage
  */
 export function simpleDecryptUrl(encrypted: string): string {
   return Buffer.from(encrypted, 'base64').toString('utf8');
@@ -162,45 +167,4 @@ export function generateSignedToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
 
-/**
- * Validates a URL format
- */
-export function isValidUrl(url: string): boolean {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Extracts domain from URL
- */
-export function extractDomain(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    return urlObj.hostname.replace(/^www\./, '').toLowerCase();
-  } catch {
-    return '';
-  }
-}
-
-/**
- * Sanitizes URL for logging (removes sensitive params)
- */
-export function sanitizeUrlForLogging(url: string): string {
-  try {
-    const urlObj = new URL(url);
-    // Remove potentially sensitive query parameters
-    urlObj.searchParams.delete('token');
-    urlObj.searchParams.delete('key');
-    urlObj.searchParams.delete('auth');
-    urlObj.searchParams.delete('password');
-    urlObj.searchParams.delete('secret');
-
-    return urlObj.toString();
-  } catch {
-    return '[Invalid URL]';
-  }
-}
+export { extractDomain, isValidUrl, sanitizeUrlForLogging };

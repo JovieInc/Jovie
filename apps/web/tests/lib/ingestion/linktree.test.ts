@@ -279,7 +279,7 @@ describe('Linktree Strategy', () => {
         'instagram',
         'spotify',
         'twitter',
-        'youtube-music',
+        'youtube_music',
       ]);
       expect(
         result.links.some(link => {

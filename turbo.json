@@ -25,6 +25,7 @@
         "STATSIG_*",
         "NEON_*",
         "DATABASE_URL",
+        "DATABASE_URL_MAIN",
         "SPOTIFY_*",
         "CLOUDINARY_*",
         "RESEND_*",
@@ -33,7 +34,8 @@
         "FLAGS_*",
         "EXPERIMENTATION_*",
         "BLOB_*",
-        "CRON_*"
+        "CRON_*",
+        "GITLEAKS_LICENSE"
       ]
     },
     "lint": {

@@ -68,7 +68,7 @@ const meta: Meta<typeof SocialsForm> = {
       config: {
         rules: [
           {
-            // We're mocking the Supabase client, so we can ignore this warning
+            // We're mocking the database client, so we can ignore this warning
             id: 'color-contrast',
             enabled: true,
           },

@@ -9,36 +9,14 @@
 
 // Note: This rule doesn't currently use path utilities, but may in the future
 
+// Import social platforms from the canonical source
+const { SOCIAL_PLATFORMS } = require('../constants/platforms.cjs');
+
 // Approved custom SVG files (relative to project root)
 const APPROVED_CUSTOM_SVGS = [
   '/brand/jovie-logo.svg',
   '/brand/Jovie-Logo-Icon.svg',
   // Add more approved custom SVGs here
-];
-
-// Social media platforms that should use SocialIcon component
-const SOCIAL_PLATFORMS = [
-  'instagram',
-  'twitter',
-  'x',
-  'tiktok',
-  'youtube',
-  'facebook',
-  'spotify',
-  'apple',
-  'applemusic',
-  'apple_music',
-  'soundcloud',
-  'bandcamp',
-  'discord',
-  'reddit',
-  'pinterest',
-  'tumblr',
-  'vimeo',
-  'github',
-  'medium',
-  'patreon',
-  'venmo',
 ];
 
 // Common UI icons that should use Heroicons

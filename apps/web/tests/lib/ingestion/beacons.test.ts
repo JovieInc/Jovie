@@ -319,7 +319,7 @@ describe('Beacons Strategy', () => {
       const result = extractBeacons(html);
 
       const platforms = result.links.map(link => link.platformId).sort();
-      expect(platforms).toEqual(['instagram', 'spotify', 'youtube-music']);
+      expect(platforms).toEqual(['instagram', 'spotify', 'youtube_music']);
       expect(
         result.links.some(link => {
           try {

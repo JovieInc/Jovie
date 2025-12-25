@@ -23,6 +23,17 @@ body {
   overscroll-behavior: none;
 }
 
+/* Smooth scroll for anchor links, respecting reduced motion preference */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 /* Fallback colors before token CSS finishes loading */
 body {
   background: #ffffff;

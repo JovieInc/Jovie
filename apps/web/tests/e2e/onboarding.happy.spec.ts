@@ -14,7 +14,7 @@ import { createOrReuseTestUserSession } from '../helpers/clerk-auth';
  *
  * Requirements:
  * - E2E_ONBOARDING_FULL=1 environment variable
- * - Real Clerk and Supabase environment variables
+ * - Real Clerk environment variables and DATABASE_URL
  * - Test duration must be < 60 seconds
  */
 
@@ -32,8 +32,7 @@ test.describe('Onboarding Happy Path', () => {
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
         process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
       CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
-      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-      SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+      DATABASE_URL: process.env.DATABASE_URL,
     };
 
     // Skip if any required env var is missing or contains dummy values

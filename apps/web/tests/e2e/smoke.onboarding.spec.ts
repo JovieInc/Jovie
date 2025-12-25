@@ -17,7 +17,7 @@ test.describe('Onboarding smoke', () => {
   });
 
   // Optional: full flow when properly configured
-  // Run only when E2E_ONBOARDING_FULL=1 and environment is set (Clerk + Supabase)
+  // Run only when E2E_ONBOARDING_FULL=1 and environment is set (Clerk + DATABASE_URL)
   const runFull = process.env.E2E_ONBOARDING_FULL === '1';
   (runFull ? test : test.skip)(
     'programmatic sign-in → onboarding → dashboard',
@@ -27,17 +27,14 @@ test.describe('Onboarding smoke', () => {
       // Skip if env not properly configured (local defaults from global-setup)
       const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
       const sk = process.env.CLERK_SECRET_KEY || '';
-      const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-      const supaSrk = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      const dbUrl = process.env.DATABASE_URL || '';
       if (
         !pk ||
         !sk ||
-        !supaUrl ||
-        !supaSrk ||
+        !dbUrl ||
         pk.includes('dummy') ||
         sk.includes('dummy') ||
-        supaUrl.includes('dummy') ||
-        supaSrk.includes('dummy')
+        dbUrl.includes('dummy')
       ) {
         test.skip();
       }

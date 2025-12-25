@@ -127,7 +127,7 @@ function ClientProvidersInnerBase({
 
       // Initialize other performance monitoring in production
       if (process.env.NODE_ENV === 'production') {
-        import('@/lib/monitoring').then(({ initAllMonitoring }) => {
+        import('@/lib/monitoring/client').then(({ initAllMonitoring }) => {
           initAllMonitoring();
         });
       }
@@ -254,6 +254,9 @@ const clerkAppearance = {
   },
 };
 
+// Get the Clerk proxy URL for custom domain setup (e.g., clerk.jov.ie)
+const clerkProxyUrl = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API;
+
 // Main export - wraps children with ClerkProvider (client-side only)
 // Uses hydration guard to prevent SSR of ClerkProvider which accesses window
 export function ClientProviders({
@@ -292,7 +295,11 @@ export function ClientProviders({
   }
 
   return (
-    <ClerkProvider publishableKey={publishableKey} appearance={clerkAppearance}>
+    <ClerkProvider
+      publishableKey={publishableKey}
+      appearance={clerkAppearance}
+      proxyUrl={clerkProxyUrl}
+    >
       <ClientProvidersInner
         initialThemeMode={initialThemeMode}
         enableStatsig={enableStatsig}
