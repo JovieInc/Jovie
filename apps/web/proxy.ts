@@ -8,11 +8,7 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
-import {
-  APP_HOSTNAME,
-  MARKETING_HOSTNAME,
-  PROFILE_HOSTNAME,
-} from '@/constants/domains';
+import { MARKETING_HOSTNAME, PROFILE_HOSTNAME } from '@/constants/domains';
 import {
   buildContentSecurityPolicy,
   SCRIPT_NONCE_HEADER,
@@ -48,12 +44,8 @@ function isMarketingHost(hostname: string): boolean {
   );
 }
 
-/**
- * Check if a hostname matches the app domain (app.meetjovie.com)
- */
-function isAppHost(hostname: string): boolean {
-  return hostname === APP_HOSTNAME;
-}
+// Note: isAppHost removed - we now use meetjovie.com for both marketing and app
+// to avoid Clerk's satellite domain costs for subdomains
 
 /**
  * Check if we're in a development/preview environment
@@ -198,90 +190,43 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         }
       }
 
-      // Marketing domain (meetjovie.com): Redirect auth/app paths to app domain
+      // Marketing/App domain (meetjovie.com): Handles both marketing and app paths
+      // Note: We use meetjovie.com for both to avoid Clerk satellite domain costs
       if (isMarketingHost(hostname)) {
-        const isAppPath =
-          pathname.startsWith('/app/') ||
-          pathname.startsWith('/dashboard/') ||
-          pathname.startsWith('/settings/') ||
-          pathname.startsWith('/account/') ||
-          pathname.startsWith('/billing/') ||
-          pathname === '/waitlist' ||
-          pathname === '/signin' ||
-          pathname === '/signup' ||
-          pathname === '/sign-in' ||
-          pathname === '/sign-up';
-
-        if (isAppPath) {
-          const appUrl = new URL(pathname, `https://${APP_HOSTNAME}`);
-          appUrl.search = req.nextUrl.search;
-          return NextResponse.redirect(appUrl, 302);
-        }
-
         // Redirect profile paths (/{username}) to profile domain
         if (
           /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) &&
           !pathname.startsWith('/api/')
         ) {
-          // Check if this looks like a username (not a marketing page)
-          const marketingPages = [
+          // Check if this looks like a username (not a marketing/app page)
+          const reservedPages = [
             '/blog',
             '/pricing',
             '/support',
             '/legal',
             '/about',
             '/features',
+            '/app',
+            '/signin',
+            '/signup',
+            '/sign-in',
+            '/sign-up',
+            '/waitlist',
+            '/onboarding',
+            '/claim',
+            '/billing',
+            '/settings',
+            '/account',
+            '/dashboard',
           ];
-          const isMarketingPage = marketingPages.some(
+          const isReservedPage = reservedPages.some(
             page => pathname === page || pathname.startsWith(`${page}/`)
           );
-          if (!isMarketingPage) {
+          if (!isReservedPage) {
             const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
             profileUrl.search = req.nextUrl.search;
             return NextResponse.redirect(profileUrl, 301);
           }
-        }
-      }
-
-      // App domain (app.meetjovie.com): Redirect non-app paths
-      if (isAppHost(hostname)) {
-        const isAppPath =
-          pathname.startsWith('/app/') ||
-          pathname.startsWith('/dashboard/') ||
-          pathname.startsWith('/settings/') ||
-          pathname.startsWith('/account/') ||
-          pathname.startsWith('/billing/') ||
-          pathname.startsWith('/onboarding/') ||
-          pathname.startsWith('/claim/') ||
-          pathname.startsWith('/api/') ||
-          pathname === '/waitlist' ||
-          pathname === '/signin' ||
-          pathname === '/signup' ||
-          pathname === '/sign-in' ||
-          pathname === '/sign-up' ||
-          pathname === '/sso-callback' ||
-          pathname.includes('/sso-callback');
-
-        // Redirect non-app paths to appropriate domain
-        if (!isAppPath && pathname !== '/') {
-          // Profile paths go to profile domain
-          if (/^\/[a-zA-Z0-9_-]+\/?$/.test(pathname)) {
-            const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
-            profileUrl.search = req.nextUrl.search;
-            return NextResponse.redirect(profileUrl, 301);
-          }
-          // Other paths go to marketing domain
-          const marketingUrl = new URL(
-            pathname,
-            `https://${MARKETING_HOSTNAME}`
-          );
-          marketingUrl.search = req.nextUrl.search;
-          return NextResponse.redirect(marketingUrl, 301);
-        }
-
-        // Redirect app domain root to dashboard
-        if (pathname === '/') {
-          return NextResponse.redirect(new URL('/app/dashboard', req.url));
         }
       }
     }

@@ -20,7 +20,9 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { captureError, logFallback } from '@/lib/error-tracking';
+import { db } from '@/lib/db';
+import { signedLinkAccess } from '@/lib/db/schema';
+import { captureError } from '@/lib/error-tracking';
 import {
   getWrappedLink,
   incrementClickCount,
@@ -132,31 +134,22 @@ export async function POST(
     const signedToken = generateSignedToken();
     const expiresAt = new Date(Date.now() + 60 * 1000); // 60 seconds TTL
 
-    // TODO: Create signed_link_access table in Drizzle schema and store signed access record
-    // Schema should include:
-    // - id (uuid primary key)
-    // - wrapped_link_id (foreign key to wrapped_links)
-    // - signed_token (text, indexed)
-    // - ip_address (text)
-    // - user_agent (text)
-    // - expires_at (timestamp)
-    // - accessed_at (timestamp, nullable - set when token is used)
-    // - created_at (timestamp, default now())
-    //
-    // This table enables:
-    // - Audit trail for sensitive link access
-    // - Token reuse prevention (check accessed_at)
-    // - Abuse pattern detection (IP + frequency analysis)
-    // - Compliance with data access logging requirements
-    //
-    // For now, log the signed access attempt using error tracking for visibility
-    await logFallback('Signed link access (no database table yet)', {
-      link_id: wrappedLink.id,
-      signed_token: signedToken.substring(0, 10) + '...', // Only log prefix for security
-      expires_at: expiresAt.toISOString(),
-      ip_address: ip,
-      user_agent_prefix: botResult.userAgent.substring(0, 50),
-    });
+    // Store signed access record for audit trail
+    try {
+      await db.insert(signedLinkAccess).values({
+        linkId: wrappedLink.id,
+        signedToken,
+        ipAddress: ip,
+        userAgent: botResult.userAgent.substring(0, 500),
+        expiresAt,
+      });
+    } catch (dbError) {
+      // Log but don't fail the request - audit is secondary to functionality
+      await captureError('Failed to store signed link access record', dbError, {
+        linkId: wrappedLink.id,
+        route: '/api/link/[id]',
+      });
+    }
 
     // Increment click count asynchronously
     incrementClickCount(shortId).catch(async error => {

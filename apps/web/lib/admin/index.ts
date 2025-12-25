@@ -6,9 +6,4 @@
  */
 
 export { checkIsAdmin, requireAdmin } from './middleware';
-export {
-  clearAdminCache,
-  invalidateAdminCache,
-  isAdmin,
-  isAdminEmail,
-} from './roles';
+export { clearAdminCache, invalidateAdminCache, isAdmin } from './roles';
