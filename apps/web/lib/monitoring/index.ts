@@ -3,10 +3,8 @@
 export { withPerformanceMonitoring as withApiPerformanceMonitoring } from './api';
 export * from './client';
 export {
-  createTrackedSupabaseClient,
   isSlowQuery,
   trackDatabaseQuery as trackClientDatabaseQuery,
-  trackSupabaseQuery,
 } from './database';
 export {
   databaseMonitor,

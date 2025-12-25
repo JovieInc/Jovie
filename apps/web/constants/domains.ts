@@ -3,8 +3,10 @@
  *
  * This file centralizes all domain-related constants for the multi-domain setup:
  * - jov.ie: Public creator profiles (canonical, indexed, viewer subscription cookies)
- * - meetjovie.com: Company/marketing site
- * - app.meetjovie.com: Dashboard/app (Clerk authentication)
+ * - meetjovie.com: Marketing + Dashboard + Auth (Clerk authentication lives here)
+ *
+ * Note: We use meetjovie.com for both marketing and app to avoid Clerk's
+ * satellite domain costs for subdomains like app.meetjovie.com.
  *
  * Environment variables can override defaults for local development or staging.
  */
@@ -23,9 +25,9 @@ export const PROFILE_HOSTNAME =
 export const MARKETING_HOSTNAME =
   process.env.NEXT_PUBLIC_MARKETING_HOSTNAME ?? 'meetjovie.com';
 
-/** App/dashboard domain hostname (Clerk auth lives here) */
+/** App/dashboard domain hostname (same as marketing to avoid Clerk satellite domain costs) */
 export const APP_HOSTNAME =
-  process.env.NEXT_PUBLIC_APP_HOSTNAME ?? 'app.meetjovie.com';
+  process.env.NEXT_PUBLIC_APP_HOSTNAME ?? 'meetjovie.com';
 
 /** Admin email domain - emails ending with this domain get admin access */
 export const ADMIN_EMAIL_DOMAIN =
@@ -169,5 +171,5 @@ export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${MARKETING_URL}
 // ============================================================================
 
 /** Clerk proxy URL for custom domain setup */
-export const CLERK_PROXY_HOSTNAME = `clerk.${APP_HOSTNAME.replace('app.', '')}`;
+export const CLERK_PROXY_HOSTNAME = `clerk.${MARKETING_HOSTNAME}`;
 export const CLERK_PROXY_URL = `https://${CLERK_PROXY_HOSTNAME}`;

@@ -11,11 +11,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 import { track } from '@/lib/analytics';
-import {
-  isSlowQuery,
-  trackDatabaseQuery,
-  trackSupabaseQuery,
-} from '@/lib/monitoring/database';
+import { isSlowQuery, trackDatabaseQuery } from '@/lib/monitoring/database';
 
 describe('Database Monitoring', () => {
   beforeEach(() => {
@@ -99,64 +95,6 @@ describe('Database Monitoring', () => {
       );
 
       vi.useRealTimers();
-    });
-  });
-
-  describe('trackSupabaseQuery', () => {
-    it('should create tracker with correct operation name for select', async () => {
-      const queryFn = vi.fn().mockResolvedValue([{ id: 1 }]);
-
-      const tracker = trackSupabaseQuery('users', 'select');
-      await tracker(queryFn);
-
-      expect(track).toHaveBeenCalledWith(
-        'performance_database_query',
-        expect.objectContaining({
-          operation: 'supabase_users_select',
-        })
-      );
-    });
-
-    it('should create tracker with correct operation name for insert', async () => {
-      const queryFn = vi.fn().mockResolvedValue({ id: 1 });
-
-      const tracker = trackSupabaseQuery('users', 'insert');
-      await tracker(queryFn);
-
-      expect(track).toHaveBeenCalledWith(
-        'performance_database_query',
-        expect.objectContaining({
-          operation: 'supabase_users_insert',
-        })
-      );
-    });
-
-    it('should create tracker with correct operation name for update', async () => {
-      const queryFn = vi.fn().mockResolvedValue({ id: 1 });
-
-      const tracker = trackSupabaseQuery('users', 'update');
-      await tracker(queryFn);
-
-      expect(track).toHaveBeenCalledWith(
-        'performance_database_query',
-        expect.objectContaining({
-          operation: 'supabase_users_update',
-        })
-      );
-    });
-
-    it('should create tracker with correct operation name for delete', async () => {
-      const queryFn = vi.fn().mockResolvedValue(null);
-
-      const tracker = trackSupabaseQuery('users', 'delete');
-      await tracker(queryFn);
-
-      expect(track).toHaveBeenCalledWith(
-        'performance_database_query',
-        expect.objectContaining({
-          operation: 'supabase_users_delete',
-        })
-      );
     });
   });
 

@@ -7,8 +7,10 @@ This document outlines the domain migration from a single-domain setup (`jov.ie`
 | Domain | Purpose | Auth | Cookies |
 |--------|---------|------|---------|
 | `jov.ie` | Public creator profiles | None | Viewer subscription cookies |
-| `meetjovie.com` | Marketing/company site | None | None |
-| `app.meetjovie.com` | Dashboard/app | Clerk | Session cookies |
+| `meetjovie.com` | Marketing + Dashboard + App | Clerk | Session cookies |
+
+> **Note:** We use `meetjovie.com` for both marketing and app to avoid Clerk's
+> satellite domain costs for subdomains like `app.meetjovie.com`.
 
 ## URL Routing
 
@@ -28,16 +30,15 @@ This document outlines the domain migration from a single-domain setup (`jov.ie`
 - `meetjovie.com/about` - About page
 - `meetjovie.com/features` - Features page
 
-### App Domain (`app.meetjovie.com`)
-- `app.meetjovie.com/` - Redirects to dashboard
-- `app.meetjovie.com/app/dashboard` - Main dashboard
-- `app.meetjovie.com/app/settings/*` - Settings pages
-- `app.meetjovie.com/signin` - Sign in
-- `app.meetjovie.com/signup` - Sign up
-- `app.meetjovie.com/waitlist` - Waitlist
-- `app.meetjovie.com/onboarding/*` - Onboarding flow
-- `app.meetjovie.com/claim/*` - Profile claim flow
-- `app.meetjovie.com/billing/*` - Billing pages
+### App Routes (on `meetjovie.com`)
+- `meetjovie.com/app/dashboard` - Main dashboard
+- `meetjovie.com/app/settings/*` - Settings pages
+- `meetjovie.com/signin` - Sign in
+- `meetjovie.com/signup` - Sign up
+- `meetjovie.com/waitlist` - Waitlist
+- `meetjovie.com/onboarding/*` - Onboarding flow
+- `meetjovie.com/claim/*` - Profile claim flow
+- `meetjovie.com/billing/*` - Billing pages
 
 ## Environment Variables
 
@@ -47,10 +48,10 @@ Add these to your Vercel/Doppler configuration:
 # Domain Configuration
 NEXT_PUBLIC_PROFILE_URL=https://jov.ie
 NEXT_PUBLIC_MARKETING_URL=https://meetjovie.com
-NEXT_PUBLIC_APP_URL=https://app.meetjovie.com
+NEXT_PUBLIC_APP_URL=https://meetjovie.com
 NEXT_PUBLIC_PROFILE_HOSTNAME=jov.ie
 NEXT_PUBLIC_MARKETING_HOSTNAME=meetjovie.com
-NEXT_PUBLIC_APP_HOSTNAME=app.meetjovie.com
+NEXT_PUBLIC_APP_HOSTNAME=meetjovie.com
 NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN=meetjovie.com
 ```
 
