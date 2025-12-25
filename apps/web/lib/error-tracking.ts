@@ -225,3 +225,78 @@ export async function logFallback(
     // Silent fail
   }
 }
+
+/**
+ * Sanitize error response for client consumption.
+ *
+ * In production, this strips internal details (stack traces, DB errors, etc.)
+ * and returns only a safe, user-friendly message.
+ *
+ * In development, debug info is preserved for easier debugging.
+ *
+ * @param userMessage - Safe message to show users
+ * @param debugInfo - Internal details (only shown in dev)
+ * @param options - Additional options
+ * @returns Sanitized error response object
+ */
+export function sanitizeErrorResponse(
+  userMessage: string,
+  debugInfo?: string | Record<string, unknown>,
+  options?: {
+    code?: string;
+    includeDebugInDev?: boolean;
+  }
+): { error: string; code?: string; debug?: string | Record<string, unknown> } {
+  const isDev = process.env.NODE_ENV === 'development';
+  const includeDebug = options?.includeDebugInDev ?? true;
+
+  const response: {
+    error: string;
+    code?: string;
+    debug?: string | Record<string, unknown>;
+  } = {
+    error: userMessage,
+  };
+
+  if (options?.code) {
+    response.code = options.code;
+  }
+
+  // Only include debug info in development
+  if (isDev && includeDebug && debugInfo) {
+    response.debug = debugInfo;
+  }
+
+  return response;
+}
+
+/**
+ * Extract a safe error message from an unknown error.
+ *
+ * Never exposes internal error details to users in production.
+ * Returns a generic message for unknown errors.
+ *
+ * @param error - The caught error
+ * @param fallbackMessage - Message to use if error is not an Error instance
+ * @returns Safe error message string
+ */
+export function getSafeErrorMessage(
+  error: unknown,
+  fallbackMessage = 'An unexpected error occurred'
+): string {
+  // In production, always return the fallback for security
+  if (process.env.NODE_ENV === 'production') {
+    return fallbackMessage;
+  }
+
+  // In development, provide more detail for debugging
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return fallbackMessage;
+}
