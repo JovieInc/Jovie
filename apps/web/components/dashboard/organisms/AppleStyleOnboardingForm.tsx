@@ -11,6 +11,7 @@ import {
   AuthTextInput,
 } from '@/components/auth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { PROFILE_HOSTNAME, PROFILE_URL } from '@/constants/domains';
 import { identify, track } from '@/lib/analytics';
 import {
   generateUsernameSuggestions,
@@ -69,8 +70,8 @@ export function AppleStyleOnboardingForm({
 }: AppleStyleOnboardingFormProps) {
   const router = useRouter();
 
-  const PRODUCTION_PROFILE_DOMAIN = 'jov.ie';
-  const PRODUCTION_PROFILE_BASE_URL = 'https://jov.ie';
+  const PRODUCTION_PROFILE_DOMAIN = PROFILE_HOSTNAME;
+  const PRODUCTION_PROFILE_BASE_URL = PROFILE_URL;
 
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const [currentStepIndex, setCurrentStepIndex] = useState(

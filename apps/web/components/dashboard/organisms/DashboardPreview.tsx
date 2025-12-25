@@ -6,6 +6,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { StatusBarMock } from '@/components/dashboard/molecules/StatusBarMock';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import { PROFILE_URL } from '@/constants/domains';
 import type { Artist, LegacySocialLink, SocialLink } from '@/types/db';
 
 interface DashboardPreviewProps {
@@ -119,7 +120,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
       <div className='pt-4 text-center space-y-3'>
         <div className='flex items-center justify-center gap-2'>
           <code className='text-xs bg-surface-2 px-2 py-1 rounded text-secondary-token'>
-            https://jov.ie/{artist.handle || 'username'}
+            {PROFILE_URL}/{artist.handle || 'username'}
           </code>
           <CopyToClipboardButton
             relativePath={`/${artist.handle || 'username'}`}

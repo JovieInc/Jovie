@@ -3,9 +3,10 @@ import { and, eq, gte, isNull, or } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
-import { creatorProfiles, users } from '@/lib/db/schema';
+import { creatorProfiles, users, waitlistEntries } from '@/lib/db/schema';
 import { logger } from '@/lib/utils/logger';
 import { checkRateLimit } from '@/lib/utils/rate-limit';
+import { getWaitlistInviteByToken } from '@/lib/waitlist/access';
 
 interface ClaimPageProps {
   params: {
@@ -66,8 +67,9 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
 
   if (!userId) {
     const redirectTarget = `/claim/${encodeURIComponent(token)}`;
-    // Redirect to signup (most claim users are new) with redirect back to claim
-    redirect(`/signup?redirect_url=${encodeURIComponent(redirectTarget)}`);
+    const invite = await getWaitlistInviteByToken(token);
+    const authPath = invite ? '/signin' : '/signup';
+    redirect(`${authPath}?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
   const claimUserKey = `claim:user:${userId}`;
@@ -166,6 +168,9 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
   // Atomic claim update with race-safe WHERE clause
   // Only updates if: token matches AND not already claimed AND token not expired
   const now = new Date();
+
+  const waitlistInvite = await getWaitlistInviteByToken(token);
+
   const [updatedProfile] = await db
     .update(creatorProfiles)
     .set({
@@ -202,6 +207,27 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       userId: dbUserId,
     });
     redirect('/app/dashboard/overview');
+  }
+
+  if (waitlistInvite) {
+    try {
+      await db
+        .update(waitlistEntries)
+        .set({ status: 'claimed', updatedAt: now })
+        .where(
+          and(
+            eq(waitlistEntries.id, waitlistInvite.waitlistEntryId),
+            eq(waitlistEntries.status, 'invited')
+          )
+        );
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn('Failed to update waitlist entry status after claim', {
+          error,
+          waitlistEntryId: waitlistInvite.waitlistEntryId,
+        });
+      }
+    }
   }
 
   logger.info('Profile claimed successfully', {

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
+import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
 
 interface OnboardingPageProps {
   searchParams?: Promise<{ handle?: string }>;
@@ -22,13 +23,34 @@ export default async function OnboardingPage({
     redirect(`/signin?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
+  const user = await currentUser();
+  const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
+  if (!userEmail) {
+    redirect('/waitlist');
+  }
+
+  const access = await getWaitlistAccessByEmail(userEmail);
+  if (
+    !access.status ||
+    access.status === 'new' ||
+    access.status === 'rejected'
+  ) {
+    redirect('/waitlist');
+  }
+
+  if (access.status === 'invited') {
+    if (access.inviteToken) {
+      redirect(`/claim/${encodeURIComponent(access.inviteToken)}`);
+    }
+    redirect('/waitlist');
+  }
+
   const dashboardData = await getDashboardData();
   if (!dashboardData.needsOnboarding) {
     redirect('/app/dashboard/overview');
   }
 
   const existingProfile = dashboardData.selectedProfile;
-  const user = await currentUser();
 
   const displayNameSource = existingProfile?.displayName
     ? 'profile'
@@ -48,8 +70,6 @@ export default async function OnboardingPage({
     existingProfile?.username ||
     user?.username ||
     '';
-
-  const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
   const skipNameStep =
     displayNameSource === 'profile' || displayNameSource === 'clerk_full_name';

@@ -226,12 +226,18 @@ export default function WaitlistPage() {
         const data = (await response.json().catch(() => null)) as {
           hasEntry: boolean;
           status: string | null;
+          inviteToken: string | null;
         } | null;
 
         if (!response.ok || !data) return;
 
         if (data.hasEntry) {
-          if (data.status === 'invited' || data.status === 'claimed') {
+          if (data.status === 'invited' && data.inviteToken) {
+            router.replace(`/claim/${encodeURIComponent(data.inviteToken)}`);
+            return;
+          }
+
+          if (data.status === 'claimed') {
             router.replace('/app/dashboard');
             return;
           }

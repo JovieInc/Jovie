@@ -113,7 +113,7 @@ export type ExtractionErrorCode =
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
-const DEFAULT_USER_AGENT = 'jovie-link-ingestion/1.0 (+https://jov.ie)';
+const DEFAULT_USER_AGENT = 'jovie-link-ingestion/1.0 (+https://meetjovie.com)';
 const DEFAULT_MAX_RESPONSE_BYTES = 2_000_000;
 const MAX_REDIRECTS = 3;
 

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import * as React from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
+import { PROFILE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 
 interface ProfileNavButtonProps {
@@ -41,7 +42,7 @@ export function ProfileNavButton({
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
 
-  const profileUrl = `https://jov.ie/${artistHandle}`;
+  const profileUrl = `${PROFILE_URL}/${artistHandle}`;
 
   const chromeSize = 'xs' as const;
 

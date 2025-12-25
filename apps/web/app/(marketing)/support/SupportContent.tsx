@@ -15,7 +15,7 @@ export function SupportContent() {
   const handleContactClick = () => {
     // Track email click event
     track('Support Email Clicked', {
-      email: 'support@jov.ie',
+      email: 'support@meetjovie.com',
       source: 'support_page',
     });
   };
@@ -24,10 +24,10 @@ export function SupportContent() {
     <Button
       asChild
       className='mt-8'
-      aria-label='Send email to support team at support@jov.ie'
+      aria-label='Send email to support team at support@meetjovie.com'
       onClick={handleContactClick}
     >
-      <a href='mailto:support@jov.ie'>Contact Support</a>
+      <a href='mailto:support@meetjovie.com'>Contact Support</a>
     </Button>
   );
 }

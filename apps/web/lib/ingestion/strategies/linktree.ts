@@ -215,7 +215,7 @@ export async function fetchLinktreeDocument(
   const options: FetchOptions = {
     timeoutMs,
     maxRetries: 2,
-    userAgent: 'jovie-link-ingestion/1.0 (+https://jov.ie)',
+    userAgent: 'jovie-link-ingestion/1.0 (+https://meetjovie.com)',
     headers: {
       // Linktree may serve different content based on Accept header
       Accept: 'text/html,application/xhtml+xml',

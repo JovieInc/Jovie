@@ -48,6 +48,7 @@
     "db:seed": "doppler run -- tsx scripts/drizzle-seed.ts",
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
+    "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:preflight": "doppler run -- tsx scripts/drizzle-migrate-preflight.ts",
     "drizzle:migrate:preview": "doppler run -c stg -- GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:prod": "doppler run -c prd -- GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",

@@ -271,7 +271,7 @@ const clerkAppearance = {
   },
 };
 
-// Get the Clerk proxy URL for custom domain setup (e.g., clerk.jov.ie)
+// Get the Clerk proxy URL for custom domain setup (e.g., clerk.meetjovie.com)
 const clerkProxyUrl = process.env.NEXT_PUBLIC_CLERK_FRONTEND_API;
 
 // Main export - wraps children with ClerkProvider (client-side only)

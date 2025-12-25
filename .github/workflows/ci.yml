@@ -516,7 +516,7 @@ jobs:
 
       - name: Run migrations (ephemeral Neon)
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        run: pnpm --filter=@jovie/web run drizzle:migrate
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           NODE_ENV: test

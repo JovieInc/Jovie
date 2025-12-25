@@ -9,6 +9,7 @@ import { getQrCodeUrl } from '@/components/atoms/QRCode';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
+import { PROFILE_URL } from '@/constants/domains';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -79,7 +80,7 @@ export function DashboardTipping() {
   const displayHandle = tipHandle || 'your-handle';
   const tipRelativePath = tipHandle ? `/${tipHandle}/tip` : '/tip';
   const tipRelativePathLink = `${tipRelativePath}?source=link`;
-  const tipShareUrlQr = `https://jov.ie${tipRelativePath}?source=qr`;
+  const tipShareUrlQr = `${PROFILE_URL}${tipRelativePath}?source=qr`;
   const qrDisplaySize = 180;
   const qrDownloadSize = 420;
   const qrDownloadUrl = getQrCodeUrl(tipShareUrlQr, qrDownloadSize);
@@ -276,14 +277,15 @@ export function DashboardTipping() {
             <div className='rounded-xl border border-subtle bg-surface-1/40 shadow-none'>
               <SectionHeader
                 title='Share your tip link'
-                description='Send fans directly to jov.ie so they can tip instantly.'
+                description='Send fans directly to your profile so they can tip instantly.'
                 className='px-5 py-4 border-b border-subtle'
               />
               <div className='px-5 py-4'>
                 <div className='space-y-3'>
                   <div className='flex flex-wrap items-center gap-3 rounded-lg border border-subtle bg-surface-2/60 px-3 py-2 text-sm font-sans text-primary-token'>
                     <span className='min-w-0 flex-1 truncate'>
-                      https://jov.ie{tipRelativePathLink}
+                      {PROFILE_URL}
+                      {tipRelativePathLink}
                     </span>
                     <CopyToClipboardButton
                       relativePath={tipRelativePathLink}
@@ -296,7 +298,7 @@ export function DashboardTipping() {
                   <p className='text-xs text-secondary-token'>
                     Fans can visit{' '}
                     <strong className='font-semibold'>
-                      jov.ie/{displayHandle}/tip
+                      {PROFILE_URL.replace('https://', '')}/{displayHandle}/tip
                     </strong>{' '}
                     or scan the QR code below to tip you instantly.
                   </p>
