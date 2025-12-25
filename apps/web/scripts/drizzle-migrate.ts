@@ -224,6 +224,7 @@ async function runMigrations() {
   // Connect to database
   let pool: Pool;
   let db: ReturnType<typeof drizzle>;
+  let client: PoolClient | null = null;
   let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
 
   try {
@@ -234,7 +235,10 @@ async function runMigrations() {
     const databaseUrl = rawUrl.replace(NEON_URL_PATTERN, 'postgres$2$4');
 
     // Create connection pool with Neon serverless driver
-    pool = new Pool({ connectionString: databaseUrl });
+    pool = new Pool({
+      connectionString: databaseUrl,
+      max: 1,
+    });
 
     pool.on('connect', (client: PoolClient) => {
       client
@@ -242,7 +246,10 @@ async function runMigrations() {
         .catch(() => undefined);
     });
 
-    db = drizzle(pool);
+    client = await pool.connect();
+    await client.query("SET app.allow_schema_changes = 'true'");
+
+    db = drizzle(client);
 
     // Using default public schema
 
@@ -255,7 +262,7 @@ async function runMigrations() {
   async function resolveMigrationsSchemaSafely(): Promise<DrizzleMigrationsSchema> {
     try {
       const [{ drizzle_table, public_table }] = (
-        await pool.query<{
+        await (client ?? pool).query<{
           drizzle_table: string | null;
           public_table: string | null;
         }>(
@@ -266,20 +273,7 @@ async function runMigrations() {
       if (drizzle_table) return 'drizzle';
       if (public_table) return 'public';
 
-      const [{ schema_exists, has_schema_create, has_db_create }] = (
-        await pool.query<{
-          schema_exists: boolean;
-          has_schema_create: boolean;
-          has_db_create: boolean;
-        }>(
-          "SELECT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'drizzle') AS schema_exists, has_schema_privilege(current_user, 'drizzle', 'CREATE') AS has_schema_create, has_database_privilege(current_user, current_database(), 'CREATE') AS has_db_create"
-        )
-      ).rows;
-
-      if (schema_exists && has_schema_create) return 'drizzle';
-      if (has_db_create) return 'drizzle';
-
-      return 'public';
+      return 'drizzle';
     } catch {
       return 'drizzle';
     }
@@ -374,6 +368,12 @@ async function runMigrations() {
     }
     process.exit(1);
   } finally {
+    try {
+      client?.release();
+    } catch {
+      // ignore
+    }
+
     // Close database connection
     try {
       await pool.end();
