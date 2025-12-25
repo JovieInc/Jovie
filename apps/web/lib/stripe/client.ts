@@ -21,7 +21,7 @@ function getStripe(): Stripe {
     appInfo: {
       name: 'Jovie',
       version: '1.0.0',
-      url: 'https://jov.ie',
+      url: process.env.NEXT_PUBLIC_MARKETING_URL ?? 'https://meetjovie.com',
     },
     typescript: true,
     timeout: 10000,

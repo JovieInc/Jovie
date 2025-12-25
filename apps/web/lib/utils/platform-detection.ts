@@ -944,13 +944,21 @@ export function getBaseUrl(): string {
     }
 
     // For staging or non-production deployments (e.g., Vercel preview URLs)
-    if (hostname === 'main.jov.ie' || hostname.includes('vercel.app')) {
+    if (
+      hostname === 'main.jov.ie' ||
+      hostname === 'main.meetjovie.com' ||
+      hostname.includes('vercel.app')
+    ) {
       return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
     }
   }
 
-  // Server-side or fallback: use environment variable or production URL
-  return process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
+  // Server-side or fallback: use environment variable or production profile URL
+  return (
+    process.env.NEXT_PUBLIC_PROFILE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://jov.ie'
+  );
 }
 
 /**
@@ -967,7 +975,8 @@ export function isPreview(): boolean {
   if (typeof window !== 'undefined') {
     return (
       window.location.hostname.includes('vercel.app') ||
-      window.location.hostname === 'main.jov.ie'
+      window.location.hostname === 'main.jov.ie' ||
+      window.location.hostname === 'main.meetjovie.com'
     );
   }
   return process.env.VERCEL_ENV === 'preview';
@@ -978,7 +987,12 @@ export function isPreview(): boolean {
  */
 export function isProduction(): boolean {
   if (typeof window !== 'undefined') {
-    return window.location.hostname === 'jov.ie';
+    const hostname = window.location.hostname;
+    return (
+      hostname === 'jov.ie' ||
+      hostname === 'meetjovie.com' ||
+      hostname === 'app.meetjovie.com'
+    );
   }
   return (
     process.env.NODE_ENV === 'production' &&

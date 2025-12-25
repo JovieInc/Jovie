@@ -1,8 +1,9 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db, waitlistEntries } from '@/lib/db';
+import { waitlistInvites } from '@/lib/db/schema';
 import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -146,7 +147,7 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
-      { hasEntry: false, status: null },
+      { hasEntry: false, status: null, inviteToken: null },
       { status: 401, headers: NO_STORE_HEADERS }
     );
   }
@@ -155,7 +156,7 @@ export async function GET() {
   const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
-      { hasEntry: false, status: null },
+      { hasEntry: false, status: null, inviteToken: null },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
@@ -163,15 +164,27 @@ export async function GET() {
   const email = normalizeEmail(emailRaw);
 
   const [entry] = await db
-    .select({ status: waitlistEntries.status })
+    .select({ id: waitlistEntries.id, status: waitlistEntries.status })
     .from(waitlistEntries)
     .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
     .limit(1);
+
+  const inviteToken = await (async () => {
+    if (!entry?.id || entry.status !== 'invited') return null;
+    const [invite] = await db
+      .select({ claimToken: waitlistInvites.claimToken })
+      .from(waitlistInvites)
+      .where(eq(waitlistInvites.waitlistEntryId, entry.id))
+      .orderBy(desc(waitlistInvites.createdAt))
+      .limit(1);
+    return invite?.claimToken ?? null;
+  })();
 
   return NextResponse.json(
     {
       hasEntry: Boolean(entry),
       status: entry?.status ?? null,
+      inviteToken,
     },
     { headers: NO_STORE_HEADERS }
   );

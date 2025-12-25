@@ -41,7 +41,7 @@ export function ProfileNavButton({
 }: ProfileNavButtonProps) {
   const [open, setOpen] = React.useState<boolean>(false);
 
-  const profileUrl = `https://jov.ie/${artistHandle}`;
+  const profileUrl = `${process.env.NEXT_PUBLIC_PROFILE_URL ?? 'https://jov.ie'}/${artistHandle}`;
 
   const chromeSize = 'xs' as const;
 

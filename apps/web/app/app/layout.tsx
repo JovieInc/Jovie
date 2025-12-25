@@ -1,9 +1,8 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
-import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { db, waitlistEntries } from '@/lib/db';
+import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
@@ -12,10 +11,6 @@ import {
 } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 async function ensureWaitlistAccess(): Promise<void> {
   return Sentry.startSpan(
@@ -29,31 +24,20 @@ async function ensureWaitlistAccess(): Promise<void> {
           redirect('/waitlist');
         }
 
-        const email = normalizeEmail(emailRaw);
-        const [entry] = await db
-          .select({ id: waitlistEntries.id, status: waitlistEntries.status })
-          .from(waitlistEntries)
-          .where(drizzleSql`lower(${waitlistEntries.email}) = ${email}`)
-          .limit(1);
-
-        const status = entry?.status ?? null;
-        const isApproved = status === 'invited' || status === 'claimed';
-        if (!isApproved) {
+        const access = await getWaitlistAccessByEmail(emailRaw);
+        if (
+          !access.status ||
+          access.status === 'new' ||
+          access.status === 'rejected'
+        ) {
           redirect('/waitlist');
         }
 
-        if (status === 'invited' && entry?.id) {
-          try {
-            await db
-              .update(waitlistEntries)
-              .set({ status: 'claimed', updatedAt: new Date() })
-              .where(eq(waitlistEntries.id, entry.id));
-          } catch (error) {
-            // Non-blocking; log in development for easier debugging.
-            if (process.env.NODE_ENV === 'development') {
-              console.warn('Failed to mark waitlist entry as claimed', error);
-            }
+        if (access.status === 'invited') {
+          if (access.inviteToken) {
+            redirect(`/claim/${encodeURIComponent(access.inviteToken)}`);
           }
+          redirect('/waitlist');
         }
       } catch (error) {
         if (error instanceof Error && error.message === 'NEXT_REDIRECT') {

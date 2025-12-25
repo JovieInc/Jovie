@@ -12,7 +12,7 @@ export default function PricingPage() {
     'Clean dark/light mode',
     'App deep links (no browser friction)',
     'Conversion-focused analytics',
-    'Unique Jovie handle (jov.ie/yourname)',
+    'Unique Jovie handle (yourname)',
   ];
 
   const proFeatures = [

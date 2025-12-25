@@ -1,5 +1,9 @@
 import { MetadataRoute } from 'next';
-import { APP_URL } from '@/constants/app';
+import { MARKETING_URL } from '@/constants/app';
+
+// Multi-domain robots.txt configuration
+// This serves from the marketing domain (meetjovie.com)
+// Profile domain (jov.ie) will have its own robots.txt if needed
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -73,7 +77,7 @@ export default function robots(): MetadataRoute.Robots {
         crawlDelay: 1,
       },
     ],
-    sitemap: `${APP_URL}/sitemap.xml`,
-    host: APP_URL,
+    sitemap: `${MARKETING_URL}/sitemap.xml`,
+    host: MARKETING_URL,
   };
 }

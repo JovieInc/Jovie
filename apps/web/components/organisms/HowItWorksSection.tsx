@@ -97,7 +97,7 @@ const defaultSteps = [
     number: '02',
     title: 'Get Your Link',
     description:
-      'Get your custom jov.ie link and professional profile. Add your social media and merch links.',
+      'Get your custom Jovie link and professional profile. Add your social media and merch links.',
   },
   {
     number: '03',

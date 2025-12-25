@@ -1,9 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
-import { APP_URL } from '@/constants/app';
+import { MARKETING_URL, PROFILE_URL } from '@/constants/app';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+
+// Multi-domain sitemap configuration:
+// - Marketing pages (blog, legal, etc.) use MARKETING_URL (meetjovie.com)
+// - Profile pages use PROFILE_URL (jov.ie)
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (process.env.NEXT_PHASE === 'phase-production-build') {
@@ -31,86 +35,84 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Continue with empty profiles array on error
   }
 
-  const baseUrl = APP_URL;
-
   const blogSlugs = await getBlogPostSlugs();
 
-  // Static pages with comprehensive metadata
-  const staticPages = [
+  // Marketing pages on meetjovie.com
+  const marketingPages = [
     {
-      url: baseUrl,
+      url: MARKETING_URL,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 1,
     },
     {
-      url: `${baseUrl}/blog`,
+      url: `${MARKETING_URL}/blog`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/legal/privacy`,
+      url: `${MARKETING_URL}/legal/privacy`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
     {
-      url: `${baseUrl}/legal/terms`,
+      url: `${MARKETING_URL}/legal/terms`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
   ];
 
-  // Creator profile pages with optimized priorities
-  const profilePages = profiles.map(profile => ({
-    url: `${baseUrl}/${profile.username}`,
-    lastModified: profile.updatedAt || new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: 0.8,
-  }));
-
+  // Blog pages on meetjovie.com
   const blogPages = blogSlugs.map(slug => ({
-    url: `${baseUrl}/blog/${slug}`,
+    url: `${MARKETING_URL}/blog/${slug}`,
     lastModified: new Date(),
     changeFrequency: 'monthly' as const,
     priority: 0.6,
   }));
 
-  return [...staticPages, ...blogPages, ...profilePages];
+  // Creator profile pages on jov.ie (canonical profile domain)
+  const profilePages = profiles.map(profile => ({
+    url: `${PROFILE_URL}/${profile.username}`,
+    lastModified: profile.updatedAt || new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.8,
+  }));
+
+  return [...marketingPages, ...blogPages, ...profilePages];
 }
 
 async function buildStaticPagesOnly(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = APP_URL;
   const blogSlugs = await getBlogPostSlugs();
   return [
     {
-      url: baseUrl,
+      url: MARKETING_URL,
       lastModified: new Date(),
       changeFrequency: 'daily' as const,
       priority: 1,
     },
     {
-      url: `${baseUrl}/blog`,
+      url: `${MARKETING_URL}/blog`,
       lastModified: new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.7,
     },
     {
-      url: `${baseUrl}/legal/privacy`,
+      url: `${MARKETING_URL}/legal/privacy`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
     {
-      url: `${baseUrl}/legal/terms`,
+      url: `${MARKETING_URL}/legal/terms`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.3,
     },
     ...blogSlugs.map(slug => ({
-      url: `${baseUrl}/blog/${slug}`,
+      url: `${MARKETING_URL}/blog/${slug}`,
       lastModified: new Date(),
       changeFrequency: 'monthly' as const,
       priority: 0.6,

@@ -16,7 +16,9 @@ const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
  */
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return email.trim().toLowerCase().endsWith('@jov.ie');
+  const adminDomain =
+    process.env.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN ?? 'meetjovie.com';
+  return email.trim().toLowerCase().endsWith(`@${adminDomain}`);
 }
 
 /**

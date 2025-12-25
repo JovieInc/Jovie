@@ -3,7 +3,7 @@ import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
 const appUrl = publicEnv.NEXT_PUBLIC_APP_URL ?? APP_URL;
-const fallbackHostname = 'jov.ie';
+const fallbackHostname = 'meetjovie.com';
 const hostname = (() => {
   try {
     return new URL(appUrl).hostname || fallbackHostname;

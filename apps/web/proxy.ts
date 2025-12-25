@@ -9,11 +9,63 @@ import {
   AUDIENCE_IDENTIFIED_COOKIE,
 } from '@/constants/app';
 import {
+  APP_HOSTNAME,
+  MARKETING_HOSTNAME,
+  PROFILE_HOSTNAME,
+} from '@/constants/domains';
+import {
   buildContentSecurityPolicy,
   SCRIPT_NONCE_HEADER,
 } from '@/lib/security/content-security-policy';
 import { ensureSentry } from '@/lib/sentry/ensure';
 import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
+
+// ============================================================================
+// Multi-Domain Routing Configuration
+// ============================================================================
+// - jov.ie (PROFILE_HOSTNAME): Public creator profiles + viewer subscription cookies
+// - meetjovie.com (MARKETING_HOSTNAME): Company/marketing site
+// - app.meetjovie.com (APP_HOSTNAME): Dashboard/app with Clerk authentication
+// ============================================================================
+
+/**
+ * Check if a hostname matches the profile domain (jov.ie)
+ */
+function isProfileHost(hostname: string): boolean {
+  return (
+    hostname === PROFILE_HOSTNAME ||
+    hostname === `www.${PROFILE_HOSTNAME}` ||
+    hostname === `main.${PROFILE_HOSTNAME}`
+  );
+}
+
+/**
+ * Check if a hostname matches the marketing domain (meetjovie.com)
+ */
+function isMarketingHost(hostname: string): boolean {
+  return (
+    hostname === MARKETING_HOSTNAME || hostname === `www.${MARKETING_HOSTNAME}`
+  );
+}
+
+/**
+ * Check if a hostname matches the app domain (app.meetjovie.com)
+ */
+function isAppHost(hostname: string): boolean {
+  return hostname === APP_HOSTNAME;
+}
+
+/**
+ * Check if we're in a development/preview environment
+ */
+function isDevOrPreview(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.includes('vercel.app') ||
+    hostname.startsWith('main.')
+  );
+}
 
 const EU_EEA_UK = [
   'AT',
@@ -119,6 +171,121 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
     }
 
+    // ========================================================================
+    // Multi-Domain Routing
+    // ========================================================================
+    const hostname = req.nextUrl.hostname;
+
+    // Skip domain routing in development/preview environments
+    if (!isDevOrPreview(hostname)) {
+      // Profile domain (jov.ie): Only allow profile-related paths
+      if (isProfileHost(hostname)) {
+        // Allow: /{username}, /{username}/tip, /{username}/listen, /api/*, static assets
+        const isProfilePath =
+          pathname === '/' ||
+          pathname.startsWith('/api/') ||
+          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) || // /{username}
+          /^\/[a-zA-Z0-9_-]+\/(tip|listen|subscribe)\/?$/.test(pathname); // /{username}/tip etc.
+
+        // Redirect non-profile paths to marketing domain
+        if (!isProfilePath) {
+          const marketingUrl = new URL(
+            pathname,
+            `https://${MARKETING_HOSTNAME}`
+          );
+          marketingUrl.search = req.nextUrl.search;
+          return NextResponse.redirect(marketingUrl, 301);
+        }
+      }
+
+      // Marketing domain (meetjovie.com): Redirect auth/app paths to app domain
+      if (isMarketingHost(hostname)) {
+        const isAppPath =
+          pathname.startsWith('/app/') ||
+          pathname.startsWith('/dashboard/') ||
+          pathname.startsWith('/settings/') ||
+          pathname.startsWith('/account/') ||
+          pathname.startsWith('/billing/') ||
+          pathname === '/waitlist' ||
+          pathname === '/signin' ||
+          pathname === '/signup' ||
+          pathname === '/sign-in' ||
+          pathname === '/sign-up';
+
+        if (isAppPath) {
+          const appUrl = new URL(pathname, `https://${APP_HOSTNAME}`);
+          appUrl.search = req.nextUrl.search;
+          return NextResponse.redirect(appUrl, 302);
+        }
+
+        // Redirect profile paths (/{username}) to profile domain
+        if (
+          /^\/[a-zA-Z0-9_-]+\/?$/.test(pathname) &&
+          !pathname.startsWith('/api/')
+        ) {
+          // Check if this looks like a username (not a marketing page)
+          const marketingPages = [
+            '/blog',
+            '/pricing',
+            '/support',
+            '/legal',
+            '/about',
+            '/features',
+          ];
+          const isMarketingPage = marketingPages.some(
+            page => pathname === page || pathname.startsWith(`${page}/`)
+          );
+          if (!isMarketingPage) {
+            const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
+            profileUrl.search = req.nextUrl.search;
+            return NextResponse.redirect(profileUrl, 301);
+          }
+        }
+      }
+
+      // App domain (app.meetjovie.com): Redirect non-app paths
+      if (isAppHost(hostname)) {
+        const isAppPath =
+          pathname.startsWith('/app/') ||
+          pathname.startsWith('/dashboard/') ||
+          pathname.startsWith('/settings/') ||
+          pathname.startsWith('/account/') ||
+          pathname.startsWith('/billing/') ||
+          pathname.startsWith('/onboarding/') ||
+          pathname.startsWith('/claim/') ||
+          pathname.startsWith('/api/') ||
+          pathname === '/waitlist' ||
+          pathname === '/signin' ||
+          pathname === '/signup' ||
+          pathname === '/sign-in' ||
+          pathname === '/sign-up' ||
+          pathname === '/sso-callback' ||
+          pathname.includes('/sso-callback');
+
+        // Redirect non-app paths to appropriate domain
+        if (!isAppPath && pathname !== '/') {
+          // Profile paths go to profile domain
+          if (/^\/[a-zA-Z0-9_-]+\/?$/.test(pathname)) {
+            const profileUrl = new URL(pathname, `https://${PROFILE_HOSTNAME}`);
+            profileUrl.search = req.nextUrl.search;
+            return NextResponse.redirect(profileUrl, 301);
+          }
+          // Other paths go to marketing domain
+          const marketingUrl = new URL(
+            pathname,
+            `https://${MARKETING_HOSTNAME}`
+          );
+          marketingUrl.search = req.nextUrl.search;
+          return NextResponse.redirect(marketingUrl, 301);
+        }
+
+        // Redirect app domain root to dashboard
+        if (pathname === '/') {
+          return NextResponse.redirect(new URL('/app/dashboard', req.url));
+        }
+      }
+    }
+
     // Safely access geo information
     let country = '';
     let region = '';
@@ -174,8 +341,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           new URL(normalizeRedirectPath(redirectUrl), req.url)
         );
       } else {
-        // Default to dashboard
-        res = NextResponse.redirect(new URL('/app/dashboard', req.url));
+        // Default to waitlist so the app can route the user to the correct next step.
+        res = NextResponse.redirect(new URL('/waitlist', req.url));
       }
     } else if (!userId && pathname === '/sign-in') {
       // Normalize legacy /sign-in to /signin
@@ -201,6 +368,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     } else {
       // Handle unauthenticated users
       if (
+        pathname === '/waitlist' ||
         pathname.startsWith('/app') ||
         pathname.startsWith('/dashboard') ||
         pathname.startsWith('/account') ||
