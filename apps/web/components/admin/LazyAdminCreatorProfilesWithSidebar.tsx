@@ -1,11 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import type {
-  AdminCreatorProfileRow,
-  AdminCreatorProfilesSort,
-} from '@/lib/admin/creator-profiles';
-import type { ContactSidebarMode } from '@/types';
+import type { AdminCreatorProfilesWithSidebarProps } from '@/components/admin/AdminCreatorProfilesWithSidebar';
 
 const AdminCreatorProfilesWithSidebar = dynamic(
   () =>
@@ -36,19 +32,11 @@ const AdminCreatorProfilesWithSidebar = dynamic(
   }
 );
 
-export interface LazyAdminCreatorProfilesWithSidebarProps {
-  profiles: AdminCreatorProfileRow[];
-  page: number;
-  pageSize: number;
-  total: number;
-  search: string;
-  sort: AdminCreatorProfilesSort;
-  mode?: ContactSidebarMode;
-  basePath?: string;
-}
+export type LazyAdminCreatorProfilesWithSidebarProps =
+  AdminCreatorProfilesWithSidebarProps;
 
 export function LazyAdminCreatorProfilesWithSidebar(
-  props: LazyAdminCreatorProfilesWithSidebarProps
+  props: AdminCreatorProfilesWithSidebarProps
 ) {
   return <AdminCreatorProfilesWithSidebar {...props} />;
 }

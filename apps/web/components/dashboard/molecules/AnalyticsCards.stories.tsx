@@ -79,7 +79,7 @@ const meta: Meta<typeof MockAnalyticsCards> = {
     docs: {
       description: {
         component:
-          'A grid of analytics cards displaying various metrics. This component fetches data from the database and displays it in a responsive grid layout.',
+          'A grid of analytics cards displaying various metrics. This Storybook mock renders from provided props (static demo data) and displays it in a responsive grid layout.',
       },
     },
   },

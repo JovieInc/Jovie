@@ -127,7 +127,7 @@ function ClientProvidersInnerBase({
 
       // Initialize other performance monitoring in production
       if (process.env.NODE_ENV === 'production') {
-        import('@/lib/monitoring').then(({ initAllMonitoring }) => {
+        import('@/lib/monitoring/client').then(({ initAllMonitoring }) => {
           initAllMonitoring();
         });
       }

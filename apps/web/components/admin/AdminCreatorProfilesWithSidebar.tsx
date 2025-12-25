@@ -73,7 +73,7 @@ function useOptionalTableMeta() {
   }
 }
 
-interface AdminCreatorProfilesWithSidebarProps {
+export interface AdminCreatorProfilesWithSidebarProps {
   profiles: AdminCreatorProfileRow[];
   page: number;
   pageSize: number;

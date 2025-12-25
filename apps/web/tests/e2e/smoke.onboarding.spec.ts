@@ -33,7 +33,8 @@ test.describe('Onboarding smoke', () => {
         !sk ||
         !dbUrl ||
         pk.includes('dummy') ||
-        sk.includes('dummy')
+        sk.includes('dummy') ||
+        dbUrl.includes('dummy')
       ) {
         test.skip();
       }

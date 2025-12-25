@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 // Public seed handles from test data
-const publicHandles = ['musicmaker', 'popstar', 'techtalks', 'lifestyleguru'];
+const publicHandles = ['dualipa', 'taylorswift'];
 
 for (const handle of publicHandles) {
   test.describe(`Public profile: /${handle}`, () => {
