@@ -224,8 +224,7 @@ async function runMigrations() {
 
   // Connect to database
   let pool: Pool;
-  let db: Parameters<typeof migrate>[0];
-  let client: PoolClient | null = null;
+  let db: ReturnType<typeof drizzle>;
   let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
 
   try {
@@ -237,10 +236,14 @@ async function runMigrations() {
 
     pool = new Pool({ connectionString: databaseUrl, max: 1 });
 
-    client = await pool.connect();
-    await client.query("SET app.allow_schema_changes = 'true'");
+    pool.on('connect', (poolClient: PoolClient) => {
+      poolClient
+        .query("SET app.allow_schema_changes = 'true'")
+        .catch(() => undefined);
+    });
 
-    db = drizzle(client);
+    db = drizzle(pool);
+    await pool.query("SET app.allow_schema_changes = 'true'");
 
     // Using default public schema
 
@@ -253,7 +256,7 @@ async function runMigrations() {
   async function resolveMigrationsSchemaSafely(): Promise<DrizzleMigrationsSchema> {
     try {
       const [{ drizzle_table, public_table }] = (
-        await (client ?? pool).query<{
+        await pool.query<{
           drizzle_table: string | null;
           public_table: string | null;
         }>(
@@ -359,12 +362,6 @@ async function runMigrations() {
     }
     process.exit(1);
   } finally {
-    try {
-      client?.release();
-    } catch {
-      // ignore
-    }
-
     // Close database connection
     try {
       await pool.end();
