@@ -5,7 +5,7 @@
  * Handles duplicate detection, YouTube cross-category logic, and MAX_SOCIAL_LINKS visibility.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MAX_SOCIAL_LINKS, popularityIndex } from '@/constants/app';
 import {
   canonicalIdentity,
@@ -108,10 +108,15 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
   onLinkAdded,
 }: UseLinksManagerOptions<T>): UseLinksManagerReturn<T> {
   const [links, setLinks] = useState<T[]>(() => [...initialLinks]);
+  const linksRef = useRef<T[]>(links);
   const [ytPrompt, setYtPrompt] = useState<YouTubePromptState | null>(null);
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [addingLink, setAddingLink] = useState<T | null>(null);
   const [prefillUrl, setPrefillUrl] = useState<string | undefined>();
+
+  useEffect(() => {
+    linksRef.current = links;
+  }, [links]);
   // Stable ID generator for links (used for DnD and menu control)
   const idFor = useCallback(
     (link: T): string =>
@@ -301,66 +306,76 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
       setAddingLink(enriched);
       await new Promise(resolve => setTimeout(resolve, 600));
 
+      const prev = linksRef.current;
+      const currentSection = sectionOf(enriched as T);
+      const canonicalIdAfterDelay = canonicalIdentity({
+        platform: (enriched as DetectedLink).platform,
+        normalizedUrl: (enriched as DetectedLink).normalizedUrl,
+      });
+
+      const dupAtAfterDelay = prev.findIndex(
+        existing =>
+          canonicalIdentity({
+            platform: (existing as DetectedLink).platform,
+            normalizedUrl: (existing as DetectedLink).normalizedUrl,
+          }) === canonicalIdAfterDelay
+      );
+
+      let next = prev;
       let didAdd = false;
       let didMerge = false;
       let emittedLink: T | null = null;
 
-      setLinks(prev => {
-        const section = sectionOf(enriched as T);
-        const canonicalId = canonicalIdentity({
-          platform: (enriched as DetectedLink).platform,
-          normalizedUrl: (enriched as DetectedLink).normalizedUrl,
-        });
-
-        const dupAt = prev.findIndex(
-          existing =>
-            canonicalIdentity({
-              platform: (existing as DetectedLink).platform,
-              normalizedUrl: (existing as DetectedLink).normalizedUrl,
-            }) === canonicalId
-        );
-
-        if (dupAt !== -1) {
-          const duplicate = prev[dupAt];
-          if (!duplicate) return prev;
-
+      if (dupAtAfterDelay !== -1) {
+        const duplicate = prev[dupAtAfterDelay];
+        if (duplicate) {
           const duplicateSection = sectionOf(duplicate);
 
           if (
-            enriched.platform.id === 'youtube' &&
-            duplicateSection !== section
+            (enriched as DetectedLink).platform.id !== 'youtube' &&
+            duplicateSection !== currentSection
           ) {
-            // Allow YouTube to exist in both social + dsp
-          } else if (duplicateSection !== section) {
-            return prev;
+            // Cross-section duplicates are not allowed (except YouTube)
+            emittedLink = null;
+          } else if (
+            (enriched as DetectedLink).platform.id === 'youtube' &&
+            duplicateSection !== currentSection
+          ) {
+            // Allow YouTube to exist in both social + dsp: treat as add
           } else {
             const merged = {
               ...duplicate,
               normalizedUrl: (enriched as DetectedLink).normalizedUrl,
               suggestedTitle: (enriched as DetectedLink).suggestedTitle,
             } as T;
-            didMerge = true;
+            next = prev.map((l, i) => (i === dupAtAfterDelay ? merged : l));
             emittedLink = merged;
-            return prev.map((l, i) => (i === dupAt ? merged : l));
+            didMerge = true;
           }
         }
+      }
 
+      if (!emittedLink) {
         const socialVisibleCount = prev.filter(
           existing =>
             sectionOf(existing) === 'social' && linkIsVisible(existing)
         ).length;
 
         const adjusted = { ...enriched } as unknown as T;
-        if (section === 'social' && socialVisibleCount >= MAX_SOCIAL_LINKS) {
+        if (
+          currentSection === 'social' &&
+          socialVisibleCount >= MAX_SOCIAL_LINKS
+        ) {
           (adjusted as unknown as { isVisible?: boolean }).isVisible = false;
         }
 
-        didAdd = true;
+        next = [...prev, adjusted];
         emittedLink = adjusted;
-        return [...prev, adjusted];
-      });
+        didAdd = true;
+      }
 
       if (emittedLink) {
+        setLinks(next);
         setLastAddedId(idFor(emittedLink));
         if (didAdd || didMerge) {
           onLinkAdded?.([emittedLink]);
