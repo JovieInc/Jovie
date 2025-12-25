@@ -2,6 +2,9 @@
 // SHARED ENUMS AND TYPES
 // =====================================
 
+// Import SocialPlatform from the canonical source
+export type { SocialPlatform } from '@/constants/platforms';
+
 // Creator type enum
 export type CreatorType = 'artist' | 'podcaster' | 'influencer' | 'creator';
 
@@ -48,69 +51,6 @@ export type CurrencyCode =
   | 'SEK'
   | 'NOK'
   | 'DKK';
-
-// Social platform enum for validation
-export type SocialPlatform =
-  // Music Platforms
-  | 'spotify'
-  | 'apple_music'
-  | 'youtube_music'
-  | 'soundcloud'
-  | 'bandcamp'
-  | 'tidal'
-  | 'deezer'
-  | 'amazon_music'
-  | 'pandora'
-  // Social Media
-  | 'instagram'
-  | 'twitter'
-  | 'x'
-  | 'tiktok'
-  | 'youtube'
-  | 'facebook'
-  | 'linkedin'
-  | 'snapchat'
-  | 'pinterest'
-  | 'reddit'
-  // Creator/Content Platforms
-  | 'twitch'
-  | 'discord'
-  | 'patreon'
-  | 'onlyfans'
-  | 'substack'
-  | 'medium'
-  | 'github'
-  | 'behance'
-  | 'dribbble'
-  // Link Aggregators
-  | 'linktree'
-  | 'beacons'
-  | 'linkin_bio'
-  | 'allmylinks'
-  | 'linkfire'
-  | 'toneden'
-  // Payment/Tip Platforms
-  | 'venmo'
-  | 'paypal'
-  | 'cashapp'
-  | 'zelle'
-  | 'ko_fi'
-  | 'buymeacoffee'
-  | 'gofundme'
-  // Messaging/Communication
-  | 'whatsapp'
-  | 'telegram'
-  | 'signal'
-  | 'email'
-  | 'phone'
-  // Professional
-  | 'website'
-  | 'blog'
-  | 'portfolio'
-  | 'booking'
-  | 'press_kit'
-  // Other
-  | 'other';
 
 export type ContactRole =
   | 'bookings'

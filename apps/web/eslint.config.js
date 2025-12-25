@@ -30,11 +30,6 @@ const baseConfig = {
       {
         paths: [
           {
-            name: '@/lib/supabase',
-            message:
-              "Client-side Supabase is deprecated. Use server-only helpers from '@/lib/supabase/client' or server routes/actions.",
-          },
-          {
             name: '@clerk/clerk-react',
             message:
               'Use @clerk/nextjs in the App Router. Import components/hooks from @clerk/nextjs or @clerk/nextjs/server only.',
@@ -127,11 +122,6 @@ module.exports = [
       'eslint.config.js',
       'next.config.js',
       '**/.storybook/**',
-      'scripts/archive-supabase/**',
-      'scripts/db-migrate.js',
-      'scripts/ensure-valid-artist-images.js',
-      'scripts/update-artist-images.js',
-      'scripts/verify-artist-images.js',
       'scripts/fix-spotify-ids.js',
       'tests/e2e/**',
       '.github/scripts/**',

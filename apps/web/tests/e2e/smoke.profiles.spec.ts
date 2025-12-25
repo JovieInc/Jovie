@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Public seed handles from `supabase/seed.sql`
+// Public seed handles from test data
 const publicHandles = ['musicmaker', 'popstar', 'techtalks', 'lifestyleguru'];
 
 for (const handle of publicHandles) {

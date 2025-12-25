@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { captureCriticalError } from '@/lib/error-tracking';
 
 const GrantRoleSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
@@ -76,6 +77,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error('[admin/roles] Failed to grant admin role:', error);
+    await captureCriticalError('Failed to grant admin role', error, {
+      route: '/api/admin/roles',
+      action: 'grant',
+    });
     return NextResponse.json(
       { error: 'Failed to grant admin role' },
       { status: 500 }
@@ -149,6 +154,10 @@ export async function DELETE(request: Request) {
     });
   } catch (error) {
     console.error('[admin/roles] Failed to revoke admin role:', error);
+    await captureCriticalError('Failed to revoke admin role', error, {
+      route: '/api/admin/roles',
+      action: 'revoke',
+    });
     return NextResponse.json(
       { error: 'Failed to revoke admin role' },
       { status: 500 }

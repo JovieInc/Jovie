@@ -62,6 +62,6 @@ function sendApiMetric(data: Record<string, unknown>) {
   // - Server-side PostHog
   // - Datadog
   // - New Relic
-  // - Custom logging to Supabase
+  // - Custom logging to database
   // - etc.
 }

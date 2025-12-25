@@ -9,7 +9,7 @@ export type {
 export * from './alerts';
 // Export API and middleware monitoring with aliases to avoid conflicts
 export { withPerformanceMonitoring as withApiPerformanceMonitoring } from './api';
-export * from './database';
+export * from './database-performance';
 export { withPerformanceMonitoring as withMiddlewarePerformanceMonitoring } from './middleware';
 export * from './performance';
 export * from './regression';

@@ -69,15 +69,6 @@ async function globalSetup() {
       process.env.CLERK_SECRET_KEY || 'sk_test_mock-key-for-testing',
     E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME || '',
     E2E_CLERK_USER_PASSWORD: process.env.E2E_CLERK_USER_PASSWORD || '',
-    NEXT_PUBLIC_SUPABASE_URL:
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co',
-    // Ensure Supabase client keys exist so server can boot locally
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY || 'pub_dummy',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY:
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon_dummy',
-    SUPABASE_SERVICE_ROLE_KEY:
-      process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy_key',
     // Helpful default for links and sitemap-related logic
     NEXT_PUBLIC_APP_URL:
       process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3100',

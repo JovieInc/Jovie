@@ -22,21 +22,6 @@ import {
   simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
 
-// Mock Supabase client
-vi.mock('@/lib/supabase/server', () => ({
-  createServerSupabaseClient: () => ({
-    from: () => ({
-      select: () => ({
-        eq: () => ({
-          single: () => Promise.resolve({ data: null, error: null }),
-        }),
-      }),
-      insert: () => Promise.resolve({ error: null }),
-      upsert: () => Promise.resolve({ error: null }),
-    }),
-  }),
-}));
-
 describe('Anti-Cloaking Bot Detection', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -234,7 +234,10 @@ export default async function HomePage() {
       />
 
       {/* Main content */}
-      <div className='relative min-h-screen bg-base text-primary-token'>
+      <main
+        id='main-content'
+        className='relative min-h-screen bg-base text-primary-token'
+      >
         {/* 1. Hero Section */}
         <RedesignedHero />
 
@@ -249,7 +252,7 @@ export default async function HomePage() {
 
         {/* 5. Final CTA Section */}
         <FinalCTASection />
-      </div>
+      </main>
     </>
   );
 }

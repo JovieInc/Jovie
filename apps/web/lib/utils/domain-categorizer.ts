@@ -3,7 +3,7 @@
  * Categorizes domains and provides crawler-safe aliases
  */
 
-import { extractDomain } from './url-encryption';
+import { extractDomain } from './url-parsing';
 
 export interface DomainCategory {
   category: string | null;
