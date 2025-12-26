@@ -2,7 +2,6 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
-import { publicEnv } from '@/lib/env-public';
 
 /**
  * In-memory cache for admin role checks
@@ -10,16 +9,6 @@ import { publicEnv } from '@/lib/env-public';
  */
 const roleCache = new Map<string, { isAdmin: boolean; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * @deprecated Legacy email-based admin check. Use isAdmin() instead.
- * Only used as fallback during migration period.
- */
-export function isAdminEmail(email: string | null | undefined): boolean {
-  if (!email) return false;
-  const adminDomain = publicEnv.NEXT_PUBLIC_ADMIN_EMAIL_DOMAIN;
-  return email.trim().toLowerCase().endsWith(`@${adminDomain}`);
-}
 
 /**
  * Check if a user has admin role based on database verification.
