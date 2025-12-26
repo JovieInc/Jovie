@@ -29,7 +29,10 @@ describe('SupportPage', () => {
       name: /send email to support team/i,
     });
     expect(contactButton).toBeInTheDocument();
-    expect(contactButton).toHaveAttribute('href', 'mailto:support@jov.ie');
+    expect(contactButton).toHaveAttribute(
+      'href',
+      'mailto:support@meetjovie.com'
+    );
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
@@ -41,7 +44,7 @@ describe('SupportPage', () => {
     });
     expect(contactButton).toHaveAttribute(
       'aria-label',
-      'Send email to support team at support@jov.ie'
+      'Send email to support team at support@meetjovie.com'
     );
   });
 
@@ -55,7 +58,7 @@ describe('SupportPage', () => {
     fireEvent.click(contactButton);
 
     expect(track).toHaveBeenCalledWith('Support Email Clicked', {
-      email: 'support@jov.ie',
+      email: 'support@meetjovie.com',
       source: 'support_page',
     });
   });
