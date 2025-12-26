@@ -22,6 +22,7 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { IngestionStatusManager } from './status-manager';
 import { ExtractionError } from './strategies/base';
 import {
   extractBeacons,
@@ -169,14 +170,12 @@ export async function handleIngestionJobFailure(
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ...(shouldRetry ? {} : { ingestionStatus: 'failed' as const }),
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, creatorProfileId));
+    await IngestionStatusManager.handleJobFailure(
+      tx,
+      creatorProfileId,
+      shouldRetry,
+      message
+    );
   }
 
   await failJob(tx, job, message, { reason });
@@ -619,10 +618,7 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
     throw new Error('Creator profile not found for ingestion job');
   }
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+  await IngestionStatusManager.markProcessing(tx, profile.id);
 
   try {
     const html = await fetchLinktreeDocument(parsed.sourceUrl);
@@ -636,10 +632,7 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
       extraction,
     });
 
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markIdle(tx, profile.id);
 
     return {
       ...result,
@@ -649,14 +642,7 @@ export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Linktree ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markFailed(tx, profile.id, message);
     throw error;
   }
 }
@@ -698,29 +684,21 @@ export async function claimPendingJobs(
       )
     );
 
-  for (const stuckJob of stuckJobs) {
-    const creatorProfileId = getCreatorProfileIdFromJob({
-      jobType: stuckJob.jobType,
-      payload: stuckJob.payload,
-    } as typeof ingestionJobs.$inferSelect);
+  const stuckProfileIds = stuckJobs
+    .map(stuckJob =>
+      getCreatorProfileIdFromJob({
+        jobType: stuckJob.jobType,
+        payload: stuckJob.payload,
+      } as typeof ingestionJobs.$inferSelect)
+    )
+    .filter((id): id is string => id !== null);
 
-    if (!creatorProfileId) continue;
-
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'idle',
-        lastIngestionError: 'Processing timeout; requeued',
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(creatorProfiles.id, creatorProfileId),
-          eq(creatorProfiles.ingestionStatus, 'processing'),
-          lte(creatorProfiles.updatedAt, stuckBefore)
-        )
-      );
-  }
+  await IngestionStatusManager.handleStuckJobs(
+    tx,
+    stuckProfileIds,
+    stuckBefore,
+    'Processing timeout; requeued'
+  );
 
   const exhaustedJobs = await tx
     .select({
@@ -934,10 +912,7 @@ async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
     throw new Error('Creator profile not found for ingestion job');
   }
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+  await IngestionStatusManager.markProcessing(tx, profile.id);
 
   try {
     const html = await fetchBeaconsDocument(parsed.sourceUrl);
@@ -951,10 +926,7 @@ async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
       extraction,
     });
 
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markIdle(tx, profile.id);
 
     return {
       ...result,
@@ -964,17 +936,11 @@ async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Beacons ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markFailed(tx, profile.id, message);
     throw error;
   }
 }
+
 async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
   const parsed = youtubePayloadSchema.parse(jobPayload);
 
@@ -995,10 +961,7 @@ async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
     throw new Error('Creator profile not found for ingestion job');
   }
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+  await IngestionStatusManager.markProcessing(tx, profile.id);
 
   try {
     const html = await fetchYouTubeAboutDocument(parsed.sourceUrl);
@@ -1011,10 +974,8 @@ async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
       currentDepth: parsed.depth,
       extraction,
     });
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
+
+    await IngestionStatusManager.markIdle(tx, profile.id);
 
     return {
       ...result,
@@ -1024,14 +985,7 @@ async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'YouTube ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markFailed(tx, profile.id, message);
     throw error;
   }
 }
@@ -1056,10 +1010,7 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
     throw new Error('Creator profile not found for ingestion job');
   }
 
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
+  await IngestionStatusManager.markProcessing(tx, profile.id);
 
   try {
     const layloHandle = deriveLayloHandle(
@@ -1077,10 +1028,8 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
       currentDepth: parsed.depth,
       extraction,
     });
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
+
+    await IngestionStatusManager.markIdle(tx, profile.id);
 
     return {
       ...result,
@@ -1090,14 +1039,7 @@ async function processLayloJob(tx: DbType, jobPayload: unknown) {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'Laylo ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
+    await IngestionStatusManager.markFailed(tx, profile.id, message);
     throw error;
   }
 }

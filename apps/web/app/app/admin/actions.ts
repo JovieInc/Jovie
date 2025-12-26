@@ -9,6 +9,7 @@ import { creatorProfiles, users } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
 class AdminUnauthorizedError extends Error {
@@ -144,15 +145,10 @@ export async function bulkRerunCreatorIngestionAction(
       })
     );
 
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'pending', updatedAt: new Date() })
-      .where(
-        inArray(
-          creatorProfiles.id,
-          profiles.map(p => p.id)
-        )
-      );
+    await IngestionStatusManager.markPendingBulk(
+      tx,
+      profiles.map(p => p.id)
+    );
 
     return jobIds.filter(Boolean).length;
   });
