@@ -70,9 +70,11 @@ export function CookieBannerSection({
       {showBanner && visible ? (
         <div
           data-testid='cookie-banner'
-          className='fixed bottom-0 left-0 right-0 z-40 flex flex-col gap-2 bg-gray-100 p-4 text-gray-900 shadow md:flex-row md:items-center md:justify-between dark:bg-gray-800 dark:text-gray-100'
+          className='fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 text-gray-900 shadow-lg backdrop-blur-sm sm:px-6 md:flex md:items-center md:justify-between md:gap-4 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-100'
         >
-          <p className='text-sm'>We use cookies to improve your experience.</p>
+          <p className='mb-3 text-sm leading-relaxed md:mb-0 md:flex-1'>
+            We use cookies to improve your experience.
+          </p>
 
           <CookieActions
             onAcceptAll={acceptAll}
