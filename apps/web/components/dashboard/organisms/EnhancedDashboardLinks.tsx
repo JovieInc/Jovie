@@ -6,7 +6,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
-import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
@@ -67,31 +66,6 @@ type ProfileUpdateResponse = {
 
 // Alias PlatformCategory from shared utility for local usage
 type PlatformType = PlatformCategory;
-
-function getHostnameForUrl(value: string): string | null {
-  try {
-    const parsed = new URL(value);
-    return parsed.hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
-function _isIngestableUrl(value: string): boolean {
-  const hostname = getHostnameForUrl(value);
-  if (!hostname) return false;
-
-  if (hostname === 'youtu.be') return true;
-  if (hostname === 'linktr.ee') return true;
-  if (hostname === 'laylo.com') return true;
-  if (hostname === 'beacons.ai') return true;
-
-  if (hostname === 'youtube.com' || hostname.endsWith('.youtube.com')) {
-    return true;
-  }
-
-  return false;
-}
 
 interface Platform {
   id: string;
@@ -794,8 +768,6 @@ export function EnhancedDashboardLinks({
     },
     [profileId]
   );
-
-  const _previewPanel = usePreviewPanel();
 
   return (
     <div className='space-y-6'>
