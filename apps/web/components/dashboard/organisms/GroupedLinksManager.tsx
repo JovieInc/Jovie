@@ -389,8 +389,8 @@ export function GroupedLinksManager<T extends DetectedLink = DetectedLink>({
           <LinkCategoryGrid
             links={links}
             onLinksChange={next => {
-              setLinks(next as T[]);
-              onLinksChange?.(next as T[]);
+              setLinks(next);
+              onLinksChange?.(next);
             }}
             onToggle={handleToggle}
             onRemove={handleRemove}

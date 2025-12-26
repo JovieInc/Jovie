@@ -25,11 +25,9 @@ vi.mock('@/components/atoms/SocialIcon', () => {
   } as unknown as typeof import('@/components/atoms/SocialIcon');
 });
 
+import type { SuggestedLink } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
 // Import after mocks
-import {
-  IngestedSuggestions,
-  type SuggestedLink,
-} from '@/components/dashboard/organisms/links/IngestedSuggestions';
+import { IngestedSuggestions } from '@/components/dashboard/organisms/links/IngestedSuggestions';
 import { track } from '@/lib/analytics';
 
 /**

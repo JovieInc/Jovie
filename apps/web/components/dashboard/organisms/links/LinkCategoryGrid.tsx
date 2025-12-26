@@ -394,6 +394,4 @@ export const LinkCategoryGrid = React.memo(function LinkCategoryGrid<
   );
 });
 
-// Set displayName for debugging
-(LinkCategoryGrid as unknown as { displayName: string }).displayName =
-  'LinkCategoryGrid';
+LinkCategoryGrid.displayName = 'LinkCategoryGrid';

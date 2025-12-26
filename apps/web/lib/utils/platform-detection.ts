@@ -1,21 +1,17 @@
 /**
  * Platform Detection and Link Normalization Service
  * Atomic utility for identifying and normalizing social/music platform links
- *
- * This module imports platform metadata from the canonical source (constants/platforms.ts)
- * and extends it with detection-specific fields like placeholders.
  */
-
-import {
-  PLATFORM_METADATA_MAP,
-  type PlatformMetadata,
-} from '@/constants/platforms';
 
 /**
- * Detection-specific category types.
- * Maps from canonical categories to detection categories.
+ * Platform category types
+ * - dsp: Digital Service Providers (music streaming platforms like Spotify, Apple Music)
+ * - social: Social media platforms (Instagram, TikTok, Twitter, etc.)
+ * - earnings: Monetization platforms (Venmo, PayPal, Patreon, etc.)
+ * - websites: Link aggregators and personal websites (Linktree, personal sites)
+ * - custom: User-defined custom links
  */
-export type DetectionCategory =
+export type PlatformCategory =
   | 'dsp'
   | 'social'
   | 'earnings'
@@ -25,7 +21,7 @@ export type DetectionCategory =
 export interface PlatformInfo {
   id: string;
   name: string;
-  category: DetectionCategory; // DSP = Digital Service Provider (music platforms)
+  category: PlatformCategory;
   icon: string; // Simple Icons platform key
   color: string; // Brand color hex
   placeholder: string;
@@ -40,221 +36,456 @@ export interface DetectedLink {
   error?: string;
 }
 
-/**
- * Maps canonical platform categories to detection categories
- */
-function mapCategoryToDetectionCategory(
-  category: PlatformMetadata['category']
-): DetectionCategory {
-  switch (category) {
-    case 'music':
-      return 'dsp';
-    case 'social':
-    case 'creator':
-    case 'messaging':
-      return 'social';
-    case 'payment':
-      return 'earnings';
-    case 'link_aggregators':
-    case 'professional':
-      return 'websites';
-    default:
-      return 'custom';
-  }
-}
-
-/**
- * Creates a PlatformInfo from canonical metadata with detection-specific extensions
- */
-function createPlatformInfo(
-  id: string,
-  placeholder: string,
-  overrides?: Partial<Omit<PlatformInfo, 'id' | 'placeholder'>>
-): PlatformInfo {
-  const canonical = PLATFORM_METADATA_MAP[id];
-  if (canonical) {
-    return {
-      id: canonical.id,
-      name: overrides?.name ?? canonical.name,
-      category:
-        overrides?.category ??
-        mapCategoryToDetectionCategory(canonical.category),
-      icon: overrides?.icon ?? canonical.icon,
-      color: overrides?.color ?? canonical.color,
-      placeholder,
-    };
-  }
-  // Fallback for platforms not in canonical registry
-  return {
-    id,
-    name: overrides?.name ?? id,
-    category: overrides?.category ?? 'custom',
-    icon: overrides?.icon ?? 'link',
-    color: overrides?.color ?? '6B7280',
-    placeholder,
-  };
-}
-
-/**
- * Platform configuration registry
- * Uses canonical platform metadata from constants/platforms.ts with detection-specific placeholders
- */
+// Platform configuration registry (using Simple Icons keys)
 const PLATFORMS: Record<string, PlatformInfo> = {
-  // Music Platforms (DSPs)
-  spotify: createPlatformInfo('spotify', 'https://open.spotify.com/artist/...'),
-  apple_music: createPlatformInfo(
-    'apple_music',
-    'https://music.apple.com/artist/...'
-  ),
-  youtube_music: createPlatformInfo(
-    'youtube_music',
-    'https://music.youtube.com/channel/...'
-  ),
-  soundcloud: createPlatformInfo(
-    'soundcloud',
-    'https://soundcloud.com/username'
-  ),
-  bandcamp: createPlatformInfo('bandcamp', 'https://username.bandcamp.com'),
-  amazon_music: createPlatformInfo(
-    'amazon_music',
-    'https://music.amazon.com/artists/...'
-  ),
-  tidal: createPlatformInfo('tidal', 'https://tidal.com/browse/artist/...'),
-  deezer: createPlatformInfo('deezer', 'https://deezer.com/artist/...'),
-  pandora: createPlatformInfo('pandora', 'https://pandora.com/artist/...'),
-
-  // Social Media Platforms
-  instagram: createPlatformInfo('instagram', 'https://instagram.com/username'),
-  twitter: createPlatformInfo('twitter', 'https://x.com/username', {
+  spotify: {
+    id: 'spotify',
+    name: 'Spotify',
+    category: 'dsp',
+    icon: 'spotify',
+    color: '1DB954',
+    placeholder: 'https://open.spotify.com/artist/...',
+  },
+  'apple-music': {
+    id: 'apple-music',
+    name: 'Apple Music',
+    category: 'dsp',
+    icon: 'applemusic',
+    color: 'FA2D48',
+    placeholder: 'https://music.apple.com/artist/...',
+  },
+  'youtube-music': {
+    id: 'youtube-music',
+    name: 'YouTube Music',
+    category: 'dsp',
+    icon: 'youtube',
+    color: 'FF6D00',
+    placeholder: 'https://music.youtube.com/channel/...',
+  },
+  instagram: {
+    id: 'instagram',
+    name: 'Instagram',
+    category: 'social',
+    icon: 'instagram',
+    color: 'E4405F',
+    placeholder: 'https://instagram.com/username',
+  },
+  tiktok: {
+    id: 'tiktok',
+    name: 'TikTok',
+    category: 'social',
+    icon: 'tiktok',
+    color: '000000',
+    placeholder: 'https://tiktok.com/@username',
+  },
+  twitter: {
+    id: 'twitter',
     name: 'X (Twitter)',
-  }),
-  x: createPlatformInfo('x', 'https://x.com/username'),
-  tiktok: createPlatformInfo('tiktok', 'https://tiktok.com/@username'),
-  youtube: createPlatformInfo('youtube', 'https://youtube.com/@username'),
-  facebook: createPlatformInfo('facebook', 'https://facebook.com/username'),
-  linkedin: createPlatformInfo('linkedin', 'https://linkedin.com/in/username'),
-  snapchat: createPlatformInfo(
-    'snapchat',
-    'https://www.snapchat.com/add/username'
-  ),
-  pinterest: createPlatformInfo(
-    'pinterest',
-    'https://www.pinterest.com/username'
-  ),
-  reddit: createPlatformInfo('reddit', 'https://www.reddit.com/user/username'),
-
-  // Creator/Content Platforms
-  twitch: createPlatformInfo('twitch', 'https://twitch.tv/username'),
-  discord: createPlatformInfo('discord', 'https://discord.gg/inviteCode'),
-  patreon: createPlatformInfo('patreon', 'https://patreon.com/username'),
-  onlyfans: createPlatformInfo('onlyfans', 'https://onlyfans.com/username'),
-  substack: createPlatformInfo('substack', 'https://username.substack.com'),
-  medium: createPlatformInfo('medium', 'https://medium.com/@username'),
-  github: createPlatformInfo('github', 'https://github.com/username'),
-  behance: createPlatformInfo('behance', 'https://behance.net/username'),
-  dribbble: createPlatformInfo('dribbble', 'https://dribbble.com/username'),
-
-  // Link Aggregators
-  linktree: createPlatformInfo('linktree', 'https://linktr.ee/username'),
-  beacons: createPlatformInfo('beacons', 'https://beacons.ai/username'),
-  linkfire: createPlatformInfo('linkfire', 'https://lnk.to/...'),
-  toneden: createPlatformInfo('toneden', 'https://toneden.io/...'),
-
-  // Payment/Tip Platforms
-  venmo: createPlatformInfo('venmo', 'https://venmo.com/username'),
-  paypal: createPlatformInfo('paypal', 'https://paypal.me/username'),
-  cashapp: createPlatformInfo('cashapp', 'https://cash.app/$username'),
-  ko_fi: createPlatformInfo('ko_fi', 'https://ko-fi.com/username'),
-  buymeacoffee: createPlatformInfo(
-    'buymeacoffee',
-    'https://buymeacoffee.com/username'
-  ),
-
-  // Messaging Platforms
-  telegram: createPlatformInfo('telegram', 'https://t.me/username'),
-  whatsapp: createPlatformInfo('whatsapp', 'https://wa.me/...'),
-  signal: createPlatformInfo('signal', 'https://signal.me/...'),
-
-  // Professional
-  website: createPlatformInfo('website', 'https://your-website.com'),
-  blog: createPlatformInfo('blog', 'https://your-blog.com'),
-  portfolio: createPlatformInfo('portfolio', 'https://your-portfolio.com'),
-
-  // Detection-only platforms (not in canonical registry)
-  tencent_music: createPlatformInfo(
-    'tencent_music',
-    'https://y.qq.com/n/ryqq/singer/...',
-    { name: 'Tencent Music', category: 'dsp', icon: 'qq', color: '12B7F5' }
-  ),
-  netease: createPlatformInfo(
-    'netease',
-    'https://music.163.com/#/artist?id=...',
-    {
-      name: 'Netease Music',
-      category: 'dsp',
-      icon: 'neteasecloudmusic',
-      color: 'C20C0C',
-    }
-  ),
-  laylo: createPlatformInfo('laylo', 'https://laylo.com/username', {
+    category: 'social',
+    icon: 'x',
+    color: '000000',
+    placeholder: 'https://x.com/username',
+  },
+  facebook: {
+    id: 'facebook',
+    name: 'Facebook',
+    category: 'social',
+    icon: 'facebook',
+    color: '1877F2',
+    placeholder: 'https://facebook.com/username',
+  },
+  soundcloud: {
+    id: 'soundcloud',
+    name: 'SoundCloud',
+    category: 'dsp',
+    icon: 'soundcloud',
+    color: 'FF5500',
+    placeholder: 'https://soundcloud.com/username',
+  },
+  'amazon-music': {
+    id: 'amazon-music',
+    name: 'Amazon Music',
+    category: 'dsp',
+    icon: 'amazon',
+    color: 'FF9900',
+    placeholder: 'https://music.amazon.com/artists/...',
+  },
+  bandcamp: {
+    id: 'bandcamp',
+    name: 'Bandcamp',
+    category: 'dsp',
+    icon: 'bandcamp',
+    color: '629AA0',
+    placeholder: 'https://username.bandcamp.com',
+  },
+  'tencent-music': {
+    id: 'tencent-music',
+    name: 'Tencent Music',
+    category: 'dsp',
+    icon: 'qq',
+    color: '12B7F5',
+    placeholder: 'https://y.qq.com/n/ryqq/singer/...',
+  },
+  netease: {
+    id: 'netease',
+    name: 'Netease Music',
+    category: 'dsp',
+    icon: 'neteasecloudmusic',
+    color: 'C20C0C',
+    placeholder: 'https://music.163.com/#/artist?id=...',
+  },
+  youtube: {
+    id: 'youtube',
+    name: 'YouTube',
+    category: 'social',
+    icon: 'youtube',
+    color: 'FF0000',
+    placeholder: 'https://youtube.com/@username',
+  },
+  twitch: {
+    id: 'twitch',
+    name: 'Twitch',
+    category: 'social',
+    icon: 'twitch',
+    color: '9146FF',
+    placeholder: 'https://twitch.tv/username',
+  },
+  linkedin: {
+    id: 'linkedin',
+    name: 'LinkedIn',
+    category: 'social',
+    icon: 'linkedin',
+    color: '0A66C2',
+    placeholder: 'https://linkedin.com/in/username',
+  },
+  venmo: {
+    id: 'venmo',
+    name: 'Venmo',
+    category: 'earnings',
+    icon: 'venmo',
+    color: '3D95CE',
+    placeholder: 'https://venmo.com/username',
+  },
+  website: {
+    id: 'website',
+    name: 'Website',
+    category: 'websites',
+    icon: 'website',
+    color: '6B7280',
+    placeholder: 'https://your-website.com',
+  },
+  linktree: {
+    id: 'linktree',
+    name: 'Linktree',
+    category: 'websites',
+    icon: 'linktree',
+    color: '39E09B',
+    placeholder: 'https://linktr.ee/username',
+  },
+  laylo: {
+    id: 'laylo',
     name: 'Laylo',
     category: 'websites',
     icon: 'link',
     color: '6B7280',
-  }),
-  quora: createPlatformInfo('quora', 'https://www.quora.com/profile/Name', {
+    placeholder: 'https://laylo.com/username',
+  },
+  beacons: {
+    id: 'beacons',
+    name: 'Beacons',
+    category: 'websites',
+    icon: 'link',
+    color: '6B7280',
+    placeholder: 'https://beacons.ai/username',
+  },
+  // Additional social platforms
+  telegram: {
+    id: 'telegram',
+    name: 'Telegram',
+    category: 'social',
+    icon: 'telegram',
+    color: '26A5E4',
+    placeholder: 'https://t.me/username',
+  },
+  snapchat: {
+    id: 'snapchat',
+    name: 'Snapchat',
+    category: 'social',
+    icon: 'snapchat',
+    color: 'FFFC00',
+    placeholder: 'https://www.snapchat.com/add/username',
+  },
+  reddit: {
+    id: 'reddit',
+    name: 'Reddit',
+    category: 'social',
+    icon: 'reddit',
+    color: 'FF4500',
+    placeholder: 'https://www.reddit.com/user/username',
+  },
+  pinterest: {
+    id: 'pinterest',
+    name: 'Pinterest',
+    category: 'social',
+    icon: 'pinterest',
+    color: 'E60023',
+    placeholder: 'https://www.pinterest.com/username',
+  },
+  onlyfans: {
+    id: 'onlyfans',
+    name: 'OnlyFans',
+    category: 'social',
+    icon: 'onlyfans',
+    color: '00AFF0',
+    placeholder: 'https://onlyfans.com/username',
+  },
+  quora: {
+    id: 'quora',
     name: 'Quora',
     category: 'social',
     icon: 'quora',
     color: 'B92B27',
-  }),
-  threads: createPlatformInfo('threads', 'https://www.threads.net/@username', {
+    placeholder: 'https://www.quora.com/profile/Name',
+  },
+  threads: {
+    id: 'threads',
     name: 'Threads',
     category: 'social',
     icon: 'threads',
     color: '000000',
-  }),
-  line: createPlatformInfo('line', 'https://line.me/R/ti/p/@username', {
+    placeholder: 'https://www.threads.net/@username',
+  },
+  discord: {
+    id: 'discord',
+    name: 'Discord',
+    category: 'social',
+    icon: 'discord',
+    color: '5865F2',
+    placeholder: 'https://discord.gg/inviteCode',
+  },
+  line: {
+    id: 'line',
     name: 'LINE',
     category: 'social',
     icon: 'line',
     color: '00C300',
-  }),
-  viber: createPlatformInfo('viber', 'https://www.viber.com/username', {
+    placeholder: 'https://line.me/R/ti/p/@username',
+  },
+  viber: {
+    id: 'viber',
     name: 'Viber',
     category: 'social',
     icon: 'viber',
     color: '7360F2',
-  }),
-  rumble: createPlatformInfo('rumble', 'https://rumble.com/c/ChannelName', {
+    placeholder: 'https://www.viber.com/username',
+  },
+  rumble: {
+    id: 'rumble',
     name: 'Rumble',
     category: 'social',
     icon: 'rumble',
     color: '85C742',
-  }),
-  cameo: createPlatformInfo('cameo', 'https://cameo.com/username', {
-    name: 'Cameo',
+    placeholder: 'https://rumble.com/c/ChannelName',
+  },
+  // Additional DSP platforms
+  tidal: {
+    id: 'tidal',
+    name: 'Tidal',
+    category: 'dsp',
+    icon: 'tidal',
+    color: '000000',
+    placeholder: 'https://tidal.com/artist/...',
+  },
+  deezer: {
+    id: 'deezer',
+    name: 'Deezer',
+    category: 'dsp',
+    icon: 'deezer',
+    color: 'FEAA2D',
+    placeholder: 'https://www.deezer.com/artist/...',
+  },
+  pandora: {
+    id: 'pandora',
+    name: 'Pandora',
+    category: 'dsp',
+    icon: 'pandora',
+    color: '005483',
+    placeholder: 'https://www.pandora.com/artist/...',
+  },
+  // Additional earnings platforms
+  patreon: {
+    id: 'patreon',
+    name: 'Patreon',
+    category: 'earnings',
+    icon: 'patreon',
+    color: 'FF424D',
+    placeholder: 'https://www.patreon.com/username',
+  },
+  'buy-me-a-coffee': {
+    id: 'buy-me-a-coffee',
+    name: 'Buy Me a Coffee',
+    category: 'earnings',
+    icon: 'buymeacoffee',
+    color: 'FFDD00',
+    placeholder: 'https://www.buymeacoffee.com/username',
+  },
+  kofi: {
+    id: 'kofi',
+    name: 'Ko-fi',
+    category: 'earnings',
+    icon: 'kofi',
+    color: 'FF5E5B',
+    placeholder: 'https://ko-fi.com/username',
+  },
+  paypal: {
+    id: 'paypal',
+    name: 'PayPal',
+    category: 'earnings',
+    icon: 'paypal',
+    color: '00457C',
+    placeholder: 'https://paypal.me/username',
+  },
+  cashapp: {
+    id: 'cashapp',
+    name: 'Cash App',
+    category: 'earnings',
+    icon: 'cashapp',
+    color: '00D632',
+    placeholder: 'https://cash.app/$username',
+  },
+  shopify: {
+    id: 'shopify',
+    name: 'Shopify',
+    category: 'earnings',
+    icon: 'shopify',
+    color: '7AB55C',
+    placeholder: 'https://your-store.myshopify.com',
+  },
+  etsy: {
+    id: 'etsy',
+    name: 'Etsy',
+    category: 'earnings',
+    icon: 'etsy',
+    color: 'F16521',
+    placeholder: 'https://www.etsy.com/shop/StoreName',
+  },
+  // Additional creator/content platforms
+  substack: {
+    id: 'substack',
+    name: 'Substack',
     category: 'social',
+    icon: 'substack',
+    color: 'FF6719',
+    placeholder: 'https://username.substack.com',
+  },
+  medium: {
+    id: 'medium',
+    name: 'Medium',
+    category: 'social',
+    icon: 'medium',
+    color: '000000',
+    placeholder: 'https://medium.com/@username',
+  },
+  github: {
+    id: 'github',
+    name: 'GitHub',
+    category: 'social',
+    icon: 'github',
+    color: '181717',
+    placeholder: 'https://github.com/username',
+  },
+  behance: {
+    id: 'behance',
+    name: 'Behance',
+    category: 'social',
+    icon: 'behance',
+    color: '1769FF',
+    placeholder: 'https://behance.net/username',
+  },
+  dribbble: {
+    id: 'dribbble',
+    name: 'Dribbble',
+    category: 'social',
+    icon: 'dribbble',
+    color: 'EA4C89',
+    placeholder: 'https://dribbble.com/username',
+  },
+  // Additional link aggregators
+  linkfire: {
+    id: 'linkfire',
+    name: 'Linkfire',
+    category: 'websites',
+    icon: 'linkfire',
+    color: 'FFB81C',
+    placeholder: 'https://lnk.to/...',
+  },
+  toneden: {
+    id: 'toneden',
+    name: 'ToneDen',
+    category: 'websites',
+    icon: 'toneden',
+    color: '007AFF',
+    placeholder: 'https://toneden.io/...',
+  },
+  // Additional messaging platforms
+  whatsapp: {
+    id: 'whatsapp',
+    name: 'WhatsApp',
+    category: 'social',
+    icon: 'whatsapp',
+    color: '25D366',
+    placeholder: 'https://wa.me/...',
+  },
+  signal: {
+    id: 'signal',
+    name: 'Signal',
+    category: 'social',
+    icon: 'signal',
+    color: '3A76F0',
+    placeholder: 'https://signal.me/...',
+  },
+  // Additional professional platforms
+  blog: {
+    id: 'blog',
+    name: 'Blog',
+    category: 'websites',
+    icon: 'rss',
+    color: '6B7280',
+    placeholder: 'https://your-blog.com',
+  },
+  portfolio: {
+    id: 'portfolio',
+    name: 'Portfolio',
+    category: 'websites',
+    icon: 'briefcase',
+    color: '6B7280',
+    placeholder: 'https://your-portfolio.com',
+  },
+  cameo: {
+    id: 'cameo',
+    name: 'Cameo',
+    category: 'earnings',
     icon: 'cameo',
     color: '8A2BE2',
-  }),
+    placeholder: 'https://cameo.com/username',
+  },
 };
 
 // Domain pattern matching for platform detection
-// Uses canonical platform IDs from constants/platforms.ts (snake_case format)
 const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   // DSP platforms (Digital Service Providers)
   { pattern: /(?:open\.)?spotify\.com/i, platformId: 'spotify' },
-  { pattern: /music\.apple\.com/i, platformId: 'apple_music' },
+  { pattern: /music\.apple\.com/i, platformId: 'apple-music' },
   {
     pattern: /music\.youtube\.com|youtube\.com\/(channel|@)/i,
-    platformId: 'youtube_music',
+    platformId: 'youtube-music',
   },
   { pattern: /soundcloud\.com/i, platformId: 'soundcloud' },
   { pattern: /bandcamp\.com/i, platformId: 'bandcamp' },
-  { pattern: /music\.amazon\.com/i, platformId: 'amazon_music' },
-  { pattern: /tidal\.com/i, platformId: 'tidal' },
-  { pattern: /deezer\.com/i, platformId: 'deezer' },
+  { pattern: /(?:www\.)?tidal\.com/i, platformId: 'tidal' },
+  { pattern: /(?:www\.)?deezer\.com/i, platformId: 'deezer' },
+  { pattern: /(?:www\.)?pandora\.com/i, platformId: 'pandora' },
+  { pattern: /music\.amazon\.com/i, platformId: 'amazon-music' },
 
   // Social platforms (including YouTube for social/channels)
   { pattern: /(?:www\.)?youtube\.com|youtu\.be/i, platformId: 'youtube' },
@@ -267,31 +498,40 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?reddit\.com/i, platformId: 'reddit' },
   { pattern: /(?:www\.)?pinterest\.com/i, platformId: 'pinterest' },
   { pattern: /(?:www\.)?snapchat\.com/i, platformId: 'snapchat' },
-
-  // Creator platforms
+  { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
+  { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
+  { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
+  { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
+  { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
+  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
+  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
   {
     pattern: /(?:www\.)?discord\.gg|discord\.com\/invite/i,
     platformId: 'discord',
   },
+
+  // Creator platforms
   { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
-  { pattern: /(?:www\.)?onlyfans\.com/i, platformId: 'onlyfans' },
   { pattern: /(?:www\.)?substack\.com/i, platformId: 'substack' },
   { pattern: /(?:www\.)?medium\.com/i, platformId: 'medium' },
   { pattern: /(?:www\.)?github\.com/i, platformId: 'github' },
   { pattern: /(?:www\.)?behance\.net/i, platformId: 'behance' },
   { pattern: /(?:www\.)?dribbble\.com/i, platformId: 'dribbble' },
+
+  // Payment/earnings platforms
+  { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
+  { pattern: /(?:www\.)?patreon\.com/i, platformId: 'patreon' },
+  { pattern: /(?:www\.)?buymeacoffee\.com/i, platformId: 'buy-me-a-coffee' },
+  { pattern: /(?:www\.)?ko-fi\.com/i, platformId: 'kofi' },
+  { pattern: /(?:www\.)?paypal\.(?:me|com)/i, platformId: 'paypal' },
+  { pattern: /(?:www\.)?cash\.app/i, platformId: 'cashapp' },
+  { pattern: /(?:www\.)?etsy\.com/i, platformId: 'etsy' },
+  { pattern: /\.myshopify\.com/i, platformId: 'shopify' },
   { pattern: /(?:www\.)?cameo\.com/i, platformId: 'cameo' },
 
-  // Payment platforms
-  { pattern: /(?:www\.)?venmo\.com/i, platformId: 'venmo' },
-  { pattern: /(?:www\.)?paypal\.me|paypal\.com/i, platformId: 'paypal' },
-  { pattern: /(?:www\.)?cash\.app/i, platformId: 'cashapp' },
-  { pattern: /(?:www\.)?ko-fi\.com/i, platformId: 'ko_fi' },
-  { pattern: /(?:www\.)?buymeacoffee\.com/i, platformId: 'buymeacoffee' },
-
   // Messaging platforms
-  { pattern: /(?:t\.me|telegram\.me)/i, platformId: 'telegram' },
   { pattern: /(?:www\.)?wa\.me|whatsapp\.com/i, platformId: 'whatsapp' },
+  { pattern: /signal\.me/i, platformId: 'signal' },
 
   // Link aggregators
   { pattern: /(?:linktr\.ee|linktree\.com)/i, platformId: 'linktree' },
@@ -301,12 +541,7 @@ const DOMAIN_PATTERNS: Array<{ pattern: RegExp; platformId: string }> = [
   { pattern: /(?:www\.)?laylo\.com/i, platformId: 'laylo' },
 
   // Detection-only platforms
-  { pattern: /(?:www\.)?line\.me/i, platformId: 'line' },
-  { pattern: /(?:www\.)?viber\.com/i, platformId: 'viber' },
-  { pattern: /(?:www\.)?rumble\.com/i, platformId: 'rumble' },
-  { pattern: /(?:www\.)?threads\.net/i, platformId: 'threads' },
-  { pattern: /(?:www\.)?quora\.com/i, platformId: 'quora' },
-  { pattern: /y\.qq\.com/i, platformId: 'tencent_music' },
+  { pattern: /y\.qq\.com/i, platformId: 'tencent-music' },
   { pattern: /music\.163\.com/i, platformId: 'netease' },
 
   // Website fallback - keep last
@@ -431,571 +666,145 @@ export function normalizeUrl(url: string): string {
       [/\b(bandcamp)com\b/i, '$1.com'],
       [/\b(spotify)com\b/i, '$1.com'],
       [/\b(venmo)com\b/i, '$1.com'],
-      [/\b(linkedin)com\b/i, '$1.com'],
       [/\b(pinterest)com\b/i, '$1.com'],
-      [/\b(reddit)com\b/i, '$1.com'],
-      [/\b(onlyfans)com\b/i, '$1.com'],
-      [/\b(quora)com\b/i, '$1.com'],
-      [/\b(threads)net\b/i, '$1.net'],
+      [/\b(snapchat)com\b/i, '$1.com'],
       [/\b(twitch)tv\b/i, '$1.tv'],
-      [/\b(rumble)com\b/i, '$1.com'],
+      [/\b(paypal)com\b/i, '$1.com'],
       [/\b(linkedin)com\b/i, '$1.com'],
-      [/\b(telegram)me\b/i, '$1.me'],
-      [/\b(telegram)com\b/i, '$1.com'],
-      [/\b(line)me\b/i, '$1.me'],
-      [/\b(viber)com\b/i, '$1.com'],
-      // Short domains / special cases
-      [/\b(discord)gg\b/i, '$1.gg'],
-      [/\b(t)me\b/i, '$1.me'],
-      // With spaces or commas before TLDs
-      [
-        /\b(youtube|instagram|tiktok|twitter|facebook|soundcloud|bandcamp|spotify|venmo|linkedin|pinterest|reddit|onlyfans|quora|rumble)[\s,]+com\b/gi,
-        '$1.com',
-      ],
-      [/\b(threads)[\s,]+net\b/gi, '$1.net'],
-      [/\b(twitch)[\s,]+tv\b/gi, '$1.tv'],
-      [/\b(youtu)[\s,]+be\b/gi, '$1.be'],
-      [/\b(discord)[\s,]+gg\b/gi, '$1.gg'],
-      [/\b(t)[\s,]+me\b/gi, '$1.me'],
+      [/\b(reddit)com\b/i, '$1.com'],
+      [/\b(patreon)com\b/i, '$1.com'],
+      [/\b(medium)com\b/i, '$1.com'],
     ];
     for (const [pattern, replacement] of dotFixes) {
       url = url.replace(pattern, replacement);
     }
 
-    // Support bare X (Twitter) handles like @username
-    if (/^@[a-zA-Z0-9._]+$/.test(url)) {
-      return `https://x.com/${url.slice(1)}`;
-    }
-    // Add protocol if missing
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    // Enforce https
+    if (!url.startsWith('https://') && !url.startsWith('http://')) {
       url = 'https://' + url;
+    } else if (url.startsWith('http://')) {
+      url = 'https://' + url.slice(7);
     }
 
-    const parsedUrl = new URL(url);
-
-    // Force HTTPS for known platforms
-    parsedUrl.protocol = 'https:';
-
-    // Canonicalize Twitter domain to x.com
-    if (/^(?:www\.)?twitter\.com$/i.test(parsedUrl.hostname)) {
-      parsedUrl.hostname = 'x.com';
+    // Remove trailing slashes for consistency
+    if (url.endsWith('/') && url !== 'https://') {
+      url = url.slice(0, -1);
     }
 
-    // Normalize YouTube legacy custom channel URLs (accept single segment like /timwhite)
-    if (/(?:www\.)?youtube\.com/i.test(parsedUrl.hostname)) {
-      const path = parsedUrl.pathname;
-      const parts = path.split('/').filter(Boolean);
-      const reserved = [
-        'watch',
-        'results',
-        'shorts',
-        'live',
-        'playlist',
-        'feed',
-        'gaming',
-        'music',
-        'premium',
-        'c',
-        'channel',
-        'user',
-        'embed',
-      ];
-      // If a single-segment legacy custom URL and not reserved, keep as-is
-      if (parts.length === 1 && !reserved.includes(parts[0].toLowerCase())) {
-        // no-op; just ensuring we don't reject/transform it unnecessarily
-      }
-    }
-
-    // Platform-specific URL normalization
-    if (/(?:www\.)?tiktok\.com/i.test(parsedUrl.hostname)) {
-      // Auto-add @ for TikTok handles if missing, but avoid reserved paths
-      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-      const reservedPaths = [
-        'for',
-        'following',
-        'live',
-        'upload',
-        'search',
-        'discover',
-        'trending',
-      ];
-
-      if (
-        pathParts.length > 0 &&
-        !pathParts[0].startsWith('@') &&
-        !reservedPaths.includes(pathParts[0].toLowerCase()) &&
-        // Basic username validation: alphanumeric, dots, underscores only
-        /^[a-zA-Z0-9._]+$/.test(pathParts[0])
-      ) {
-        pathParts[0] = '@' + pathParts[0];
-        parsedUrl.pathname = '/' + pathParts.join('/');
-      }
-    }
-
-    // Remove UTM parameters and tracking
-    const paramsToRemove = [
-      'utm_source',
-      'utm_medium',
-      'utm_campaign',
-      'utm_term',
-      'utm_content',
-      'fbclid',
-      'gclid',
-      'igshid',
-      '_ga',
-      'ref',
-      'source',
-    ];
-
-    paramsToRemove.forEach(param => {
-      parsedUrl.searchParams.delete(param);
-    });
-
-    return parsedUrl.toString();
+    return url;
   } catch {
-    return url; // Return original if URL parsing fails
+    return url;
   }
 }
 
 /**
- * Detect platform from URL and return normalized link info
+ * Extract and return a sensible platform ID from a raw, possibly malformed URL.
+ * Returns null if no platform match is found.
  */
-export function detectPlatform(
+export function detectPlatformFromUrl(url: string): string | null {
+  try {
+    const normalized = normalizeUrl(url);
+    const urlObj = new URL(normalized);
+    const hostname = urlObj.hostname.toLowerCase();
+
+    for (const { pattern, platformId } of DOMAIN_PATTERNS) {
+      if (pattern.test(hostname)) {
+        return platformId;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get platform info by ID
+ */
+export function getPlatformInfo(platformId: string): PlatformInfo | null {
+  return PLATFORMS[platformId] ?? null;
+}
+
+/**
+ * Detect a platform from a URL and return full platform info
+ */
+export function detectPlatform(url: string): PlatformInfo | null {
+  const platformId = detectPlatformFromUrl(url);
+  if (!platformId) {
+    return null;
+  }
+  return getPlatformInfo(platformId);
+}
+
+/**
+ * Validate a link and return detection information
+ */
+export function validateLink(
   url: string,
-  creatorName?: string
-): DetectedLink {
-  const normalizedUrl = normalizeUrl(url);
-
-  // Find matching platform
-  let detectedPlatform: PlatformInfo | null = null;
-
-  for (const { pattern, platformId } of DOMAIN_PATTERNS) {
-    if (pattern.test(normalizedUrl)) {
-      detectedPlatform = PLATFORMS[platformId];
-      break;
-    }
-  }
-
-  // Fallback to custom/website
-  if (!detectedPlatform) {
-    detectedPlatform = PLATFORMS.website;
-  }
-
-  // Generate suggested title
-  const suggestedTitle = generateSuggestedTitle(
-    normalizedUrl,
-    detectedPlatform,
-    creatorName
-  );
-
-  // Validate URL
-  const isValid = validateUrl(normalizedUrl, detectedPlatform);
-
-  // Friendly error copy per platform
-  const errorExamples: Record<string, string> = {
-    spotify:
-      'Add your artist ID. Example: https://open.spotify.com/artist/1234',
-    instagram: 'Add your username. Example: https://instagram.com/username',
-    tiktok: 'Add your username. Example: https://tiktok.com/@username',
-    youtube: 'Add your handle. Example: https://youtube.com/@handle',
-    twitter: 'Add your username. Example: https://x.com/username',
-    venmo: 'Add your username. Example: https://venmo.com/username',
-    facebook: 'Add your page name. Example: https://facebook.com/pagename',
-    linkedin: 'Add your profile. Example: https://linkedin.com/in/username',
-    soundcloud: 'Add your username. Example: https://soundcloud.com/username',
-    twitch: 'Add your username. Example: https://twitch.tv/username',
-    threads: 'Add your username. Example: https://threads.net/@username',
-    snapchat: 'Add your username. Example: https://snapchat.com/add/username',
-    discord: 'Add your invite code. Example: https://discord.gg/invitecode',
-    telegram: 'Add your username. Example: https://t.me/username',
-    reddit: 'Add your username. Example: https://reddit.com/u/username',
-    pinterest: 'Add your username. Example: https://pinterest.com/username',
-    onlyfans: 'Add your username. Example: https://onlyfans.com/username',
-    linktree: 'Add your username. Example: https://linktr.ee/username',
-    bandcamp: 'Add your subdomain. Example: https://username.bandcamp.com',
-  };
-
-  return {
-    platform: detectedPlatform,
-    normalizedUrl,
-    originalUrl: url,
-    suggestedTitle,
-    isValid,
-    error: isValid
-      ? undefined
-      : errorExamples[detectedPlatform.id] || 'Invalid URL format',
-  };
-}
-
-/**
- * Generate a suggested title for the link
- * @param url The URL to generate a title for
- * @param platform The platform info
- * @param creatorName Optional creator's name to use in the title (e.g., "Tim White")
- */
-function generateSuggestedTitle(
-  url: string,
-  platform: PlatformInfo,
-  creatorName?: string
-): string {
+  platformId?: string
+): DetectedLink | null {
   try {
-    const parsedUrl = new URL(url);
+    const normalized = normalizeUrl(url);
+    const detected = platformId
+      ? getPlatformInfo(platformId)
+      : detectPlatform(normalized);
 
-    // Extract meaningful parts for different platforms
-    switch (platform.id) {
-      case 'spotify':
-        if (url.includes('/artist/')) {
-          return `${platform.name} Artist`;
-        }
-        if (url.includes('/album/')) {
-          return `${platform.name} Album`;
-        }
-        if (url.includes('/track/')) {
-          return `${platform.name} Track`;
-        }
-        return platform.name;
-
-      case 'instagram':
-      case 'twitter':
-      case 'tiktok':
-      case 'youtube':
-      case 'facebook':
-      case 'linkedin': {
-        const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
-        const username = pathParts[0]?.replace('@', '') || '';
-
-        // If we have a creator name, use it in the title
-        if (creatorName) {
-          return `${creatorName} on ${platform.name}`;
-        }
-
-        // Fall back to username if available
-        if (username) {
-          if (platform.id === 'tiktok') {
-            return `${platform.name} (@${username})`;
-          }
-          return `@${username} on ${platform.name}`;
-        }
-
-        return platform.name;
-      }
-
-      case 'youtube-channel': {
-        if (creatorName) {
-          return `${creatorName} on YouTube`;
-        }
-        return 'YouTube Channel';
-      }
-
-      default:
-        return platform.name;
+    if (!detected) {
+      return {
+        platform: getPlatformInfo('website') || {
+          id: 'unknown',
+          name: 'Unknown',
+          category: 'custom',
+          icon: 'link',
+          color: '6B7280',
+          placeholder: 'https://example.com',
+        },
+        normalizedUrl: normalized,
+        originalUrl: url,
+        suggestedTitle: new URL(normalized).hostname,
+        isValid: false,
+        error: 'Unable to detect platform',
+      };
     }
-  } catch {
-    return platform.name;
+
+    return {
+      platform: detected,
+      normalizedUrl: normalized,
+      originalUrl: url,
+      suggestedTitle: detected.name,
+      isValid: true,
+    };
+  } catch (error) {
+    return {
+      platform: getPlatformInfo('website') || {
+        id: 'unknown',
+        name: 'Unknown',
+        category: 'custom',
+        icon: 'link',
+        color: '6B7280',
+        placeholder: 'https://example.com',
+      },
+      normalizedUrl: url,
+      originalUrl: url,
+      suggestedTitle: 'Invalid URL',
+      isValid: false,
+      error: error instanceof Error ? error.message : 'Invalid URL',
+    };
   }
 }
 
 /**
- * Validate URL format for specific platform
+ * Get all platforms in a specific category
  */
-function validateUrl(url: string, platform: PlatformInfo): boolean {
-  try {
-    const lowered = url.trim().toLowerCase();
-    const dangerousSchemes = [
-      'javascript:',
-      'data:',
-      'vbscript:',
-      'file:',
-      'mailto:',
-    ];
-    if (dangerousSchemes.some(scheme => lowered.startsWith(scheme))) {
-      return false;
-    }
-    if (/%(0a|0d|09|00)/i.test(lowered)) {
-      return false;
-    }
-
-    new URL(url); // Basic URL validation
-
-    const pathParts = new URL(url).pathname.split('/').filter(Boolean);
-    const requiresHandle = new Set([
-      'instagram',
-      'twitter',
-      'tiktok',
-      'facebook',
-      'linkedin',
-      'venmo',
-      'soundcloud',
-      'twitch',
-      'threads',
-      'snapchat',
-      'discord',
-      'telegram',
-      'reddit',
-      'pinterest',
-      'onlyfans',
-      'linktree',
-      'bandcamp',
-      'line',
-      'viber',
-      'rumble',
-      'youtube',
-    ]);
-    if (requiresHandle.has(platform.id)) {
-      const last = pathParts[pathParts.length - 1] ?? '';
-      // must have at least one non-separator character (not just @)
-      if (!last.replace(/^@/, '').trim()) {
-        return false;
-      }
-    }
-
-    // Platform-specific validation rules
-    switch (platform.id) {
-      case 'spotify':
-        return /open\.spotify\.com\/(artist|album|track|playlist)\/[a-zA-Z0-9]+/.test(
-          url
-        );
-      case 'instagram':
-        return /instagram\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'twitter':
-        return /(twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/?$/.test(url);
-      case 'tiktok':
-        return /tiktok\.com\/@[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'youtube': {
-        const u = new URL(url);
-        const host = u.hostname.replace(/^www\./, '');
-        const path = u.pathname;
-        const parts = path.split('/').filter(Boolean);
-        const reserved = new Set([
-          'watch',
-          'results',
-          'shorts',
-          'live',
-          'playlist',
-          'feed',
-          'gaming',
-          'music',
-          'premium',
-          'embed',
-          'c',
-          'channel',
-          'user',
-        ]);
-
-        if (host === 'youtu.be') {
-          return /^\/[A-Za-z0-9_-]{6,}/.test(path);
-        }
-        if (host === 'youtube.com') {
-          if (/^\/(c|channel|user)\/[A-Za-z0-9_-]+/.test(path)) return true;
-          if (/^\/@[A-Za-z0-9._-]+/.test(path)) return true;
-          if (/^\/shorts\/[A-Za-z0-9_-]+/.test(path)) return true;
-          if (u.searchParams.get('v')) return true; // watch?v=
-          if (parts.length === 1 && !reserved.has(parts[0].toLowerCase())) {
-            return true; // legacy custom URL like /timwhite
-          }
-        }
-        return false;
-      }
-      // Platforms that require a username/handle in the path
-      case 'venmo':
-        return /venmo\.com\/[a-zA-Z0-9_-]+\/?$/.test(url);
-      case 'facebook':
-        return /facebook\.com\/[a-zA-Z0-9._-]+\/?$/.test(url);
-      case 'linkedin':
-        return /linkedin\.com\/(in|company)\/[a-zA-Z0-9_-]+\/?$/.test(url);
-      case 'soundcloud':
-        return /soundcloud\.com\/[a-zA-Z0-9_-]+\/?/.test(url);
-      case 'twitch':
-        return /twitch\.tv\/[a-zA-Z0-9_]+\/?$/.test(url);
-      case 'threads':
-        return /threads\.net\/@[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'snapchat':
-        return /snapchat\.com\/add\/[a-zA-Z0-9._-]+\/?$/.test(url);
-      case 'discord':
-        return /discord\.(gg|com\/invite)\/[a-zA-Z0-9]+\/?$/.test(url);
-      case 'telegram':
-        return /(t\.me|telegram\.me)\/[a-zA-Z0-9_]+\/?$/.test(url);
-      case 'reddit':
-        return /reddit\.com\/(r|u|user)\/[a-zA-Z0-9_]+\/?$/.test(url);
-      case 'pinterest':
-        return /pinterest\.com\/[a-zA-Z0-9_]+\/?$/.test(url);
-      case 'onlyfans':
-        return /onlyfans\.com\/[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'linktree':
-        return /linktr\.ee\/[a-zA-Z0-9._]+\/?$/.test(url);
-      case 'bandcamp':
-        return /[a-zA-Z0-9_-]+\.bandcamp\.com\/?/.test(url);
-      default:
-        return true; // Basic URL validation passed for unknown platforms
-    }
-  } catch {
-    return false;
-  }
+export function getPlatformsByCategory(
+  category: PlatformCategory
+): PlatformInfo[] {
+  return Object.values(PLATFORMS).filter(p => p.category === category);
 }
 
 /**
- * Get all available platforms grouped by category
+ * Get all available platforms
  */
-export function getPlatformsByCategory(): Record<string, PlatformInfo[]> {
-  const categorized: Record<string, PlatformInfo[]> = {
-    dsp: [],
-    social: [],
-    custom: [],
-  };
-
-  Object.values(PLATFORMS).forEach(platform => {
-    categorized[platform.category].push(platform);
-  });
-
-  return categorized;
-}
-
-/**
- * Check if a platform is a DSP (Digital Service Provider)
- */
-export function isDSPPlatform(platform: PlatformInfo): boolean {
-  return platform.category === 'dsp';
-}
-
-/**
- * Check if a platform is a social platform
- */
-export function isSocialPlatform(platform: PlatformInfo): boolean {
-  return platform.category === 'social';
-}
-
-/**
- * Get platform by ID
- */
-export function getPlatform(id: string): PlatformInfo | undefined {
-  return PLATFORMS[id];
-}
-
-/**
- * Compute a canonical identity string used to detect duplicates across
- * small URL variations (missing dots, protocol, www, with/without @, etc.).
- * The identity is stable per platform + primary handle/ID where possible.
- */
-export function canonicalIdentity(
-  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
-): string {
-  try {
-    const u = new URL(link.normalizedUrl);
-    const host = u.hostname.replace(/^www\./, '').toLowerCase();
-    const parts = u.pathname.split('/').filter(Boolean);
-
-    switch (link.platform.id) {
-      case 'instagram':
-      case 'twitter':
-        // x.com and twitter.com both map here; username is first segment
-        if (parts[0])
-          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
-        break;
-      case 'tiktok':
-        if (parts[0])
-          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
-        break;
-      case 'youtube':
-        // Prefer @handle, else channel/ID, else legacy single segment
-        if (parts[0]?.startsWith('@'))
-          return `youtube:${parts[0].slice(1).toLowerCase()}`;
-        if (parts[0] === 'channel' && parts[1])
-          return `youtube:channel:${parts[1].toLowerCase()}`;
-        if (parts[0] === 'user' && parts[1])
-          return `youtube:user:${parts[1].toLowerCase()}`;
-        if (parts.length === 1)
-          return `youtube:legacy:${parts[0].toLowerCase()}`;
-        break;
-      case 'facebook':
-      case 'twitch':
-      case 'linkedin':
-      case 'soundcloud':
-      case 'bandcamp':
-        if (parts[0]) return `${link.platform.id}:${parts[0].toLowerCase()}`;
-        break;
-      case 'linktree':
-        if (parts[0]) return `linktree:${parts[0].toLowerCase()}`;
-        break;
-      default:
-        break;
-    }
-
-    // Fallback to host+path signature
-    return `${link.platform.id}:${host}${u.pathname.toLowerCase()}`;
-  } catch {
-    // If parsing fails, fall back to normalized URL
-    return `${link.platform.id}:${link.normalizedUrl.toLowerCase()}`;
-  }
-}
-
-/**
- * Dynamically get the correct base URL for the current environment
- * This ensures profile links work correctly in local, preview, and production environments
- */
-export function getBaseUrl(): string {
-  // If we have NEXT_PUBLIC_APP_URL from env, use that first
-  if (typeof window !== 'undefined' && window.location) {
-    // Client-side: use current origin for local/preview environments
-    const { protocol, hostname, port } = window.location;
-
-    // For local development
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
-    }
-
-    // For staging or non-production deployments (e.g., Vercel preview URLs)
-    if (
-      hostname === 'main.jov.ie' ||
-      hostname === 'main.meetjovie.com' ||
-      hostname.includes('vercel.app')
-    ) {
-      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
-    }
-  }
-
-  // Server-side or fallback: use environment variable or production profile URL
-  return (
-    process.env.NEXT_PUBLIC_PROFILE_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    'https://jov.ie'
-  );
-}
-
-/**
- * Check if we're in a development environment
- */
-export function isDevelopment(): boolean {
-  return process.env.NODE_ENV === 'development';
-}
-
-/**
- * Check if we're in a preview environment
- */
-export function isPreview(): boolean {
-  if (typeof window !== 'undefined') {
-    return (
-      window.location.hostname.includes('vercel.app') ||
-      window.location.hostname === 'main.jov.ie' ||
-      window.location.hostname === 'main.meetjovie.com'
-    );
-  }
-  return process.env.VERCEL_ENV === 'preview';
-}
-
-/**
- * Check if we're in production
- */
-export function isProduction(): boolean {
-  if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    return (
-      hostname === 'jov.ie' ||
-      hostname === 'meetjovie.com' ||
-      hostname === 'app.meetjovie.com'
-    );
-  }
-  return (
-    process.env.NODE_ENV === 'production' &&
-    process.env.VERCEL_ENV === 'production'
-  );
+export function getAllPlatforms(): PlatformInfo[] {
+  return Object.values(PLATFORMS);
 }

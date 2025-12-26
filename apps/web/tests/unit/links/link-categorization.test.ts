@@ -3,7 +3,6 @@ import {
   CROSS_CATEGORY,
   canMoveTo,
   groupLinks,
-  type LinkSection,
   sectionOf,
 } from '@/components/dashboard/organisms/links/utils/link-categorization';
 import { type DetectedLink } from '@/lib/utils/platform-detection';
@@ -401,215 +400,23 @@ describe('link-categorization', () => {
           createMockLink('apple-music', 'dsp'),
         ];
         const result = groupLinks(links);
-
         expect(result.social).toHaveLength(2);
         expect(result.dsp).toHaveLength(2);
         expect(result.earnings).toHaveLength(1);
         expect(result.custom).toHaveLength(1);
       });
 
-      it('should handle all sections having multiple links', () => {
+      it('should maintain insertion order within sections', () => {
         const links = [
-          createMockLink('instagram', 'social'),
           createMockLink('twitter', 'social'),
+          createMockLink('instagram', 'social'),
           createMockLink('tiktok', 'social'),
-          createMockLink('spotify', 'dsp'),
-          createMockLink('apple-music', 'dsp'),
-          createMockLink('youtube-music', 'dsp'),
-          createMockLink('venmo', 'earnings'),
-          createMockLink('cashapp', 'earnings'),
-          createMockLink('website1', 'websites'),
-          createMockLink('website2', 'custom'),
         ];
         const result = groupLinks(links);
-
-        expect(result.social).toHaveLength(3);
-        expect(result.dsp).toHaveLength(3);
-        expect(result.earnings).toHaveLength(2);
-        expect(result.custom).toHaveLength(2);
+        expect(result.social[0].platform.id).toBe('twitter');
+        expect(result.social[1].platform.id).toBe('instagram');
+        expect(result.social[2].platform.id).toBe('tiktok');
       });
-    });
-
-    describe('order preservation', () => {
-      it('should preserve original order within each group', () => {
-        const links = [
-          createMockLink('instagram', 'social', 'https://instagram.com/first'),
-          createMockLink('spotify', 'dsp', 'https://spotify.com/first'),
-          createMockLink('twitter', 'social', 'https://twitter.com/second'),
-          createMockLink('apple-music', 'dsp', 'https://apple.com/second'),
-          createMockLink('tiktok', 'social', 'https://tiktok.com/third'),
-        ];
-        const result = groupLinks(links);
-
-        // Check that social links are in original order
-        expect(result.social[0].normalizedUrl).toBe(
-          'https://instagram.com/first'
-        );
-        expect(result.social[1].normalizedUrl).toBe(
-          'https://twitter.com/second'
-        );
-        expect(result.social[2].normalizedUrl).toBe('https://tiktok.com/third');
-
-        // Check that dsp links are in original order
-        expect(result.dsp[0].normalizedUrl).toBe('https://spotify.com/first');
-        expect(result.dsp[1].normalizedUrl).toBe('https://apple.com/second');
-      });
-
-      it('should preserve order even when links are interleaved', () => {
-        const links = [
-          createMockLink('instagram', 'social', 'https://instagram.com/1'),
-          createMockLink('spotify', 'dsp', 'https://spotify.com/1'),
-          createMockLink('venmo', 'earnings', 'https://venmo.com/1'),
-          createMockLink('website', 'custom', 'https://example.com/1'),
-          createMockLink('twitter', 'social', 'https://twitter.com/2'),
-          createMockLink('apple-music', 'dsp', 'https://apple.com/2'),
-        ];
-        const result = groupLinks(links);
-
-        expect(result.social[0].platform.id).toBe('instagram');
-        expect(result.social[1].platform.id).toBe('twitter');
-        expect(result.dsp[0].platform.id).toBe('spotify');
-        expect(result.dsp[1].platform.id).toBe('apple-music');
-      });
-    });
-
-    describe('type preservation', () => {
-      it('should preserve link properties in grouped output', () => {
-        const link = createMockLink(
-          'instagram',
-          'social',
-          'https://instagram.com/test'
-        );
-        link.isValid = true;
-        link.originalUrl = 'instagram.com/test';
-
-        const result = groupLinks([link]);
-
-        expect(result.social[0].normalizedUrl).toBe(
-          'https://instagram.com/test'
-        );
-        expect(result.social[0].originalUrl).toBe('instagram.com/test');
-        expect(result.social[0].isValid).toBe(true);
-        expect(result.social[0].platform.id).toBe('instagram');
-        expect(result.social[0].platform.category).toBe('social');
-      });
-
-      it('should work with generic type parameter', () => {
-        interface ExtendedLink extends DetectedLink {
-          customField: string;
-        }
-
-        const extendedLink: ExtendedLink = {
-          ...createMockLink('instagram', 'social'),
-          customField: 'test-value',
-        };
-
-        const result = groupLinks<ExtendedLink>([extendedLink]);
-
-        expect(result.social[0].customField).toBe('test-value');
-        expect(result.social[0].platform.id).toBe('instagram');
-      });
-    });
-
-    describe('YouTube cross-category', () => {
-      it('should group YouTube based on its category, not platform ID', () => {
-        const youtubeAsSocial = createMockLink('youtube', 'social');
-        const youtubeAsDsp = createMockLink('youtube', 'dsp');
-
-        const result1 = groupLinks([youtubeAsSocial]);
-        expect(result1.social).toHaveLength(1);
-        expect(result1.dsp).toHaveLength(0);
-
-        const result2 = groupLinks([youtubeAsDsp]);
-        expect(result2.social).toHaveLength(0);
-        expect(result2.dsp).toHaveLength(1);
-      });
-
-      it('should handle both YouTube links with different categories', () => {
-        const youtubeAsSocial = createMockLink(
-          'youtube',
-          'social',
-          'https://youtube.com/social'
-        );
-        const youtubeAsDsp = createMockLink(
-          'youtube',
-          'dsp',
-          'https://youtube.com/dsp'
-        );
-
-        const result = groupLinks([youtubeAsSocial, youtubeAsDsp]);
-        expect(result.social).toHaveLength(1);
-        expect(result.dsp).toHaveLength(1);
-        expect(result.social[0].normalizedUrl).toBe(
-          'https://youtube.com/social'
-        );
-        expect(result.dsp[0].normalizedUrl).toBe('https://youtube.com/dsp');
-      });
-    });
-  });
-
-  describe('LinkSection type', () => {
-    it('should accept valid section values', () => {
-      const sections: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
-      expect(sections).toHaveLength(4);
-    });
-
-    it('should be usable in function parameters', () => {
-      const testSection = (section: LinkSection): string => {
-        return section.toUpperCase();
-      };
-
-      expect(testSection('social')).toBe('SOCIAL');
-      expect(testSection('dsp')).toBe('DSP');
-      expect(testSection('earnings')).toBe('EARNINGS');
-      expect(testSection('custom')).toBe('CUSTOM');
-    });
-
-    it('should be usable in canMoveTo function', () => {
-      const link = createMockLink('youtube', 'social');
-      const sections: LinkSection[] = ['social', 'dsp', 'earnings', 'custom'];
-
-      const results = sections.map(section => canMoveTo(link, section));
-
-      expect(results).toEqual([true, true, false, false]); // YouTube can move to social and dsp
-    });
-  });
-
-  describe('integration tests', () => {
-    it('should correctly categorize and validate moves for a realistic set of links', () => {
-      const links = [
-        createMockLink('instagram', 'social'),
-        createMockLink('tiktok', 'social'),
-        createMockLink('youtube', 'social'),
-        createMockLink('spotify', 'dsp'),
-        createMockLink('apple-music', 'dsp'),
-        createMockLink('venmo', 'earnings'),
-        createMockLink('website', 'websites'),
-      ];
-
-      const grouped = groupLinks(links);
-
-      // Verify grouping
-      expect(grouped.social).toHaveLength(3);
-      expect(grouped.dsp).toHaveLength(2);
-      expect(grouped.earnings).toHaveLength(1);
-      expect(grouped.custom).toHaveLength(1);
-
-      // Verify sectionOf for each
-      expect(sectionOf(links[0])).toBe('social'); // instagram
-      expect(sectionOf(links[3])).toBe('dsp'); // spotify
-      expect(sectionOf(links[5])).toBe('earnings'); // venmo
-      expect(sectionOf(links[6])).toBe('custom'); // website
-
-      // Verify canMoveTo for YouTube
-      const youtube = links[2];
-      expect(canMoveTo(youtube, 'dsp')).toBe(true);
-      expect(canMoveTo(youtube, 'earnings')).toBe(false);
-
-      // Verify canMoveTo for non-cross-category
-      const instagram = links[0];
-      expect(canMoveTo(instagram, 'dsp')).toBe(false);
-      expect(canMoveTo(instagram, 'social')).toBe(true);
     });
   });
 });

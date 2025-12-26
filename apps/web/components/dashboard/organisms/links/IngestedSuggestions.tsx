@@ -7,9 +7,6 @@ import { track } from '@/lib/analytics';
 import type { SuggestedLink } from './hooks/useSuggestions';
 import { compactUrlDisplay, suggestionIdentity } from './utils';
 
-// Re-export SuggestedLink for convenience
-export type { SuggestedLink } from './hooks/useSuggestions';
-
 /**
  * Props for the IngestedSuggestions component
  */

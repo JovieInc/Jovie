@@ -120,26 +120,7 @@ export function suggestionIdentity(
   link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
 ): string | undefined {
   const identity = canonicalIdentity(link);
-  const [platformId, ...rest] = identity.split(':');
-
-  if (platformId === 'youtube') {
-    const handle = rest.length === 1 ? rest[0] : undefined;
-    return handle ? `@${handle}` : undefined;
-  }
-
-  const handlePlatforms = new Set([
-    'instagram',
-    'twitter',
-    'x',
-    'tiktok',
-    'venmo',
-  ]);
-  if (handlePlatforms.has(platformId)) {
-    const handle = rest[0];
-    return handle ? `@${handle}` : undefined;
-  }
-
-  return undefined;
+  return identity.startsWith('@') ? identity : undefined;
 }
 
 /**

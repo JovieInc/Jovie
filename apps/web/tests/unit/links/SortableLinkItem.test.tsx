@@ -407,7 +407,6 @@ describe('SortableLinkItem', () => {
     });
 
     it('should handle isValid being undefined (treated as true)', () => {
-      // Use Partial to allow omitting isValid for this edge case test
       const link = {
         platform: {
           id: 'instagram',
@@ -420,8 +419,8 @@ describe('SortableLinkItem', () => {
         normalizedUrl: 'https://instagram.com/user',
         originalUrl: 'https://instagram.com/user',
         suggestedTitle: 'Instagram',
-        // isValid is intentionally undefined to test fallback behavior
-      } as DetectedLink;
+        isValid: undefined as undefined,
+      } as unknown as DetectedLink;
 
       renderWithProviders(<SortableLinkItem {...defaultProps} link={link} />);
 
