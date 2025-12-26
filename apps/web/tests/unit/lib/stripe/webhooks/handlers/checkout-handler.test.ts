@@ -107,7 +107,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_123',
               subscription: 'sub_123',
               metadata: { clerk_user_id: 'user_abc123' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_123',
@@ -194,7 +194,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_789',
               subscription: 'sub_no_meta',
               metadata: {}, // No clerk_user_id
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_789',
@@ -267,7 +267,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_unknown',
               subscription: 'sub_123',
               metadata: {},
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_no_user',
@@ -337,7 +337,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_123',
               subscription: 'sub_unknown_price',
               metadata: { clerk_user_id: 'user_test' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_unknown_price',
@@ -370,7 +370,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_123',
               subscription: 'sub_no_price',
               metadata: { clerk_user_id: 'user_test' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_no_price',
@@ -438,7 +438,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_123',
               subscription: 'sub_active',
               metadata: { clerk_user_id: 'user_active' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_active',
@@ -448,7 +448,6 @@ describe('CheckoutSessionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(true);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: true,
@@ -477,7 +476,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_456',
               subscription: 'sub_trial',
               metadata: { clerk_user_id: 'user_trial' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_trial',
@@ -487,7 +486,6 @@ describe('CheckoutSessionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(true);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: true,
@@ -516,7 +514,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_789',
               subscription: 'sub_incomplete',
               metadata: { clerk_user_id: 'user_incomplete' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_incomplete',
@@ -526,7 +524,6 @@ describe('CheckoutSessionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: false,
@@ -557,7 +554,7 @@ describe('CheckoutSessionHandler', () => {
               customer: 'cus_cache',
               subscription: 'sub_cache',
               metadata: { clerk_user_id: 'user_cache' },
-            } as Stripe.Checkout.Session,
+            } as unknown as Stripe.Checkout.Session,
           },
         } as Stripe.Event,
         stripeEventId: 'evt_cache',

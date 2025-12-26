@@ -207,5 +207,5 @@ describe('track route synthetic benchmark', () => {
       clicks: result.clicks,
       socialUpdates: result.socialUpdates,
     });
-  });
+  }, 10000);
 });

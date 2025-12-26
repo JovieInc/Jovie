@@ -1,17 +1,17 @@
 {
   "active": true,
-  "spec": "070-split-stripe-webhook-handler-into-domain-specific-",
+  "spec": "063-add-retry-capability-to-useformstate-hook",
   "state": "building",
   "subtasks": {
     "completed": 10,
-    "total": 15,
+    "total": 16,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Testing and verification",
+    "current": "Testing",
     "id": null,
-    "total": 6
+    "total": 5
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 12,
-    "started_at": "2025-12-26T13:42:08.347010"
+    "started_at": "2025-12-26T12:58:01.525189"
   },
-  "last_update": "2025-12-26T14:27:01.622482"
+  "last_update": "2025-12-26T14:17:47.554896"
 }

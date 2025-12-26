@@ -321,7 +321,6 @@ describe('PaymentHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(true);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: true,

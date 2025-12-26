@@ -144,10 +144,10 @@ describe('Stripe webhook utils', () => {
 
   describe('stripeTimestampToDate', () => {
     it('converts Unix timestamp to Date', () => {
-      const timestamp = 1640000000; // 2021-12-20T06:13:20.000Z
+      const timestamp = 1640000000; // 2021-12-20T11:33:20.000Z
       const date = stripeTimestampToDate(timestamp);
 
-      expect(date.toISOString()).toBe('2021-12-20T06:13:20.000Z');
+      expect(date.toISOString()).toBe('2021-12-20T11:33:20.000Z');
     });
 
     it('converts current timestamp correctly', () => {

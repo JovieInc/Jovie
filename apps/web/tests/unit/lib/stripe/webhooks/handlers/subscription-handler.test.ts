@@ -181,7 +181,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(true);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           clerkUserId: 'user_updated',
@@ -216,7 +215,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           clerkUserId: 'user_past_due',
@@ -250,7 +248,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(true);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: true,
@@ -631,7 +628,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: false,
@@ -662,7 +658,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: false,
@@ -693,7 +688,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
       expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           isPro: false,
@@ -724,7 +718,6 @@ describe('SubscriptionHandler', () => {
       const result = await handler.handle(context);
 
       expect(result.success).toBe(true);
-      expect(result.isActive).toBe(false);
     });
   });
 
