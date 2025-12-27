@@ -6,6 +6,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 
 const rerunSchema = z.object({
@@ -84,10 +85,7 @@ export async function POST(request: Request) {
         );
       }
 
-      await tx
-        .update(creatorProfiles)
-        .set({ ingestionStatus: 'pending', updatedAt: new Date() })
-        .where(eq(creatorProfiles.id, profile.id));
+      await IngestionStatusManager.markPending(tx, profile.id);
 
       return NextResponse.json(
         {
