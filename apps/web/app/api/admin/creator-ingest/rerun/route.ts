@@ -8,6 +8,7 @@ import { enqueueLinktreeIngestionJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 const rerunSchema = z.object({
   profileId: z.string().uuid(),
@@ -15,7 +16,6 @@ const rerunSchema = z.object({
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
   try {

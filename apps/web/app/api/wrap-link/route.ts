@@ -27,16 +27,11 @@ export const runtime = 'nodejs';
 
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
+import { NO_CACHE_HEADERS } from '@/lib/api/constants';
 import { captureError } from '@/lib/error-tracking';
 import { createWrappedLink } from '@/lib/services/link-wrapping';
 import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
 import { isValidUrl } from '@/lib/utils/url-encryption';
-
-const NO_STORE_HEADERS = {
-  'Cache-Control': 'no-cache, no-store, must-revalidate',
-  Pragma: 'no-cache',
-  Expires: '0',
-} as const;
 
 interface RequestBody {
   url: string;
@@ -59,7 +54,7 @@ export async function POST(request: NextRequest) {
     if (isRateLimited) {
       return NextResponse.json(
         { error: 'Rate limit exceeded' },
-        { status: 429, headers: NO_STORE_HEADERS }
+        { status: 429, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -70,7 +65,7 @@ export async function POST(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: 'Invalid JSON' },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -81,7 +76,7 @@ export async function POST(request: NextRequest) {
     if (!url || !isValidUrl(url)) {
       return NextResponse.json(
         { error: 'Invalid URL' },
-        { status: 400, headers: NO_STORE_HEADERS }
+        { status: 400, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -105,7 +100,7 @@ export async function POST(request: NextRequest) {
     if (!wrappedLink) {
       return NextResponse.json(
         { error: 'Failed to create wrapped link' },
-        { status: 500, headers: NO_STORE_HEADERS }
+        { status: 500, headers: NO_CACHE_HEADERS }
       );
     }
 
@@ -122,7 +117,7 @@ export async function POST(request: NextRequest) {
         createdAt: wrappedLink.createdAt,
         expiresAt: wrappedLink.expiresAt,
       },
-      { headers: NO_STORE_HEADERS }
+      { headers: NO_CACHE_HEADERS }
     );
   } catch (error) {
     await captureError('Link wrapping API error', error, {
@@ -131,7 +126,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500, headers: NO_STORE_HEADERS }
+      { status: 500, headers: NO_CACHE_HEADERS }
     );
   }
 }
@@ -140,20 +135,20 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   return NextResponse.json(
     { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
+    { status: 405, headers: NO_CACHE_HEADERS }
   );
 }
 
 export async function PUT() {
   return NextResponse.json(
     { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
+    { status: 405, headers: NO_CACHE_HEADERS }
   );
 }
 
 export async function DELETE() {
   return NextResponse.json(
     { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
+    { status: 405, headers: NO_CACHE_HEADERS }
   );
 }

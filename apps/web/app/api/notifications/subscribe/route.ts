@@ -10,11 +10,11 @@ import {
   getClientIP,
   getRateLimitStatus,
 } from '@/lib/utils/rate-limit';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * POST handler for notification subscriptions

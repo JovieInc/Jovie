@@ -1,5 +1,7 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
+import { getActionIcon, getActionLabel } from '@/lib/constants/actions';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -10,6 +12,7 @@ import {
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
+import { inferDeviceType } from '@/lib/utils/device-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { LinkType } from '@/types/db';
 import {
@@ -19,7 +22,6 @@ import {
   trimHistory,
 } from '../audience/lib/audience-utils';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
@@ -54,31 +56,6 @@ function isValidURL(url: string): boolean {
   }
 }
 
-function inferAudienceDeviceType(
-  userAgent: string | null
-): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
-  if (!userAgent) return 'unknown';
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
-    return 'mobile';
-  }
-  return 'desktop';
-}
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 export async function POST(request: NextRequest) {
   try {
@@ -164,7 +141,7 @@ export async function POST(request: NextRequest) {
       request.headers.get('x-vercel-ip-country') ??
       request.headers.get('cf-ipcountry') ??
       undefined;
-    const audienceDeviceType = inferAudienceDeviceType(userAgent);
+    const audienceDeviceType = inferDeviceType(userAgent);
     const fingerprint = createFingerprint(ipAddress, userAgent);
 
     // Find the creator profile
@@ -255,10 +232,10 @@ export async function POST(request: NextRequest) {
         ? resolvedMember.latestActions
         : [];
       const actionEntry = {
-        label: ACTION_LABELS[linkType] ?? 'interacted',
+        label: getActionLabel(linkType) ?? 'interacted',
         type: linkType,
         platform: target,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
+        emoji: getActionIcon(linkType) ?? '⭐',
         timestamp: now.toISOString(),
       };
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);

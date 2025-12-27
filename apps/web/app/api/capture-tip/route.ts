@@ -5,10 +5,10 @@ import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creatorProfiles, tips } from '@/lib/db/schema';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(req: NextRequest) {
   try {

@@ -34,10 +34,10 @@ import {
 import { detectPlatform } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { isValidSocialPlatform } from '@/types';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * Idempotency key expiration time (24 hours).

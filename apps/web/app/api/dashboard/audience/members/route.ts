@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { audienceMembers, creatorProfiles, users } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const MEMBER_SORT_COLUMNS = {
   lastSeen: audienceMembers.lastSeenAt,

@@ -1,7 +1,9 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 import { withDbSession } from '@/lib/auth/session';
+import { getActionIcon } from '@/lib/constants/actions';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -11,20 +13,11 @@ import {
   users,
 } from '@/lib/db/schema';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
 const querySchema = z.object({
   profileId: z.string().uuid(),
   limit: z.preprocess(val => Number(val ?? 5), z.number().int().min(1).max(20)),
   range: z.enum(['7d', '30d', '90d']).optional().default('7d'),
 });
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
 
 type ActivityRow = {
   id: string;
@@ -221,7 +214,7 @@ export async function GET(request: NextRequest) {
           row.clickCountry ?? row.memberCountry,
         ]);
         const phrase = getClickPhrase(row.linkType, row.target ?? null);
-        const icon = ACTION_ICONS[row.linkType] ?? '✨';
+        const icon = getActionIcon(row.linkType) ?? '✨';
         return {
           id: row.id,
           description: `${actorLabel}${locationLabel} ${phrase}.`,

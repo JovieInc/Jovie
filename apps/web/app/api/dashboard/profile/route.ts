@@ -14,11 +14,11 @@ import {
   UsernameValidationError,
 } from '@/lib/username/sync';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 // Use Node.js runtime for compatibility with PostHog Node client and DB libs
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const allowedUrlProtocols = new Set(['http:', 'https:']);
 

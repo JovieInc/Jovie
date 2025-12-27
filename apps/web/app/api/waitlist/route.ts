@@ -8,10 +8,10 @@ import { sanitizeErrorResponse } from '@/lib/error-tracking';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const allowedUrlProtocols = new Set(['http:', 'https:']);
 

@@ -6,10 +6,10 @@ import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

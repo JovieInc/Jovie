@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 import {
   checkClickRateLimit,
   getRateLimitHeaders,
@@ -9,6 +10,7 @@ import {
   isTrackingTokenEnabled,
   validateTrackingToken,
 } from '@/lib/analytics/tracking-token';
+import { getActionIcon, getActionLabel } from '@/lib/constants/actions';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
@@ -27,8 +29,6 @@ import {
 } from '../lib/audience-utils';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const clickSchema = z.object({
   profileId: z.string().uuid(),
@@ -49,20 +49,6 @@ const clickSchema = z.object({
   // HMAC-SHA256 signed tracking token for request authentication
   trackingToken: z.string().optional(),
 });
-
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
-};
-
-const ACTION_LABELS: Record<string, string> = {
-  listen: 'listened',
-  social: 'tapped a social link',
-  tip: 'sent a tip',
-  other: 'clicked a link',
-};
 
 type AudienceMemberRecord = {
   id: string;
@@ -304,10 +290,10 @@ export async function POST(request: NextRequest) {
         ? member.latestActions
         : [];
       const actionEntry = {
-        label: actionLabel ?? ACTION_LABELS[linkType] ?? 'interacted',
+        label: actionLabel ?? getActionLabel(linkType) ?? 'interacted',
         type: linkType,
         platform: platform ?? linkType,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
+        emoji: getActionIcon(linkType) ?? '⭐',
         timestamp: now.toISOString(),
       };
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);

@@ -4,8 +4,8 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 type WebhookEvent = {
   data: {

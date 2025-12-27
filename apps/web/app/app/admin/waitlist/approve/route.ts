@@ -13,10 +13,10 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const approveSchema = z.object({
   entryId: z.string().uuid(),

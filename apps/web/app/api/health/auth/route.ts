@@ -4,10 +4,10 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries';
 import { creatorProfiles } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const dynamic = 'force-dynamic';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Internal health check that validates auth.jwt()->>'sub' path
 // Only accessible in development for security

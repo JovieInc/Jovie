@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { audienceMembers, creatorProfiles } from '@/lib/db/schema';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectBot } from '@/lib/utils/bot-detection';
+import { inferDeviceType } from '@/lib/utils/device-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import {
   checkPublicRateLimit,
@@ -23,10 +24,9 @@ import {
   deriveIntentLevel,
   trimHistory,
 } from '../lib/audience-utils';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const visitSchema = z.object({
   profileId: z.string().uuid(),
@@ -39,18 +39,6 @@ const visitSchema = z.object({
   // HMAC-SHA256 signed tracking token for request authentication
   trackingToken: z.string().optional(),
 });
-
-function inferDeviceType(
-  userAgent: string | null
-): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
-  if (!userAgent) return 'unknown';
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
-    return 'mobile';
-  }
-  return 'desktop';
-}
 
 export async function POST(request: NextRequest) {
   try {

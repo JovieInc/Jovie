@@ -14,10 +14,10 @@ import {
 } from '@/lib/images/config';
 import { validateMagicBytes } from '@/lib/images/validate-magic-bytes';
 import { avatarUploadRateLimit } from '@/lib/rate-limit';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const UPLOAD_ERROR_CODES = {
   MISSING_BLOB_TOKEN: 'MISSING_BLOB_TOKEN',
