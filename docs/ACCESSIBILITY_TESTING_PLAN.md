@@ -46,65 +46,106 @@ This document outlines a comprehensive strategy for integrating accessibility (a
 
 ## Phase 1: Static Analysis (Week 1)
 
-### 1.1 Add eslint-plugin-jsx-a11y
+### 1.1 Enable Biome's a11y Rule Group
 
-Install and configure static a11y linting to catch issues as developers write code.
+Biome has a built-in `a11y` rule group with 35+ accessibility rules equivalent to `eslint-plugin-jsx-a11y`. No additional packages needed—just enable the rules.
 
-```bash
-pnpm add -D eslint-plugin-jsx-a11y --filter web
+**Update `biome.json`:**
+
+```json
+{
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "a11y": {
+        "recommended": true,
+        // Or enable specific rules:
+        "noAccessKey": "error",
+        "noAriaHiddenOnFocusable": "error",
+        "noAriaUnsupportedElements": "error",
+        "noAutofocus": "warn",
+        "noBlankTarget": "error",
+        "noDistractingElements": "error",
+        "noHeaderScope": "error",
+        "noInteractiveElementToNoninteractiveRole": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        "noNoninteractiveTabindex": "warn",
+        "noPositiveTabindex": "error",
+        "noRedundantAlt": "warn",
+        "noRedundantRoles": "warn",
+        "noSvgWithoutTitle": "warn",
+        "useAltText": "error",
+        "useAnchorContent": "error",
+        "useAriaActivedescendantWithTabindex": "error",
+        "useAriaPropsForRole": "error",
+        "useButtonType": "error",
+        "useFocusableInteractive": "error",
+        "useHeadingContent": "error",
+        "useHtmlLang": "error",
+        "useIframeTitle": "error",
+        "useKeyWithClickEvents": "warn",
+        "useKeyWithMouseEvents": "warn",
+        "useMediaCaption": "error",
+        "useValidAnchor": "error",
+        "useValidAriaProps": "error",
+        "useValidAriaRole": "error",
+        "useValidAriaValues": "error",
+        "useValidLang": "error"
+      },
+      // ... your existing rules
+    }
+  }
+}
 ```
 
-**Update `apps/web/eslint.config.js`:**
+### Biome a11y Rules Reference
 
-```javascript
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-
-export default [
-  // ... existing config
-  {
-    plugins: {
-      'jsx-a11y': jsxA11y,
-    },
-    rules: {
-      // Recommended rules from jsx-a11y
-      'jsx-a11y/alt-text': 'error',
-      'jsx-a11y/anchor-has-content': 'error',
-      'jsx-a11y/anchor-is-valid': 'error',
-      'jsx-a11y/aria-activedescendant-has-tabindex': 'error',
-      'jsx-a11y/aria-props': 'error',
-      'jsx-a11y/aria-proptypes': 'error',
-      'jsx-a11y/aria-role': 'error',
-      'jsx-a11y/aria-unsupported-elements': 'error',
-      'jsx-a11y/click-events-have-key-events': 'warn',
-      'jsx-a11y/heading-has-content': 'error',
-      'jsx-a11y/html-has-lang': 'error',
-      'jsx-a11y/img-redundant-alt': 'warn',
-      'jsx-a11y/interactive-supports-focus': 'warn',
-      'jsx-a11y/label-has-associated-control': 'error',
-      'jsx-a11y/mouse-events-have-key-events': 'warn',
-      'jsx-a11y/no-access-key': 'error',
-      'jsx-a11y/no-autofocus': 'warn',
-      'jsx-a11y/no-distracting-elements': 'error',
-      'jsx-a11y/no-noninteractive-element-interactions': 'warn',
-      'jsx-a11y/no-noninteractive-tabindex': 'warn',
-      'jsx-a11y/no-redundant-roles': 'warn',
-      'jsx-a11y/role-has-required-aria-props': 'error',
-      'jsx-a11y/role-supports-aria-props': 'error',
-      'jsx-a11y/scope': 'error',
-      'jsx-a11y/tabindex-no-positive': 'warn',
-    },
-  },
-];
-```
+| Biome Rule | Equivalent jsx-a11y Rule | Purpose |
+|------------|-------------------------|---------|
+| `useAltText` | `alt-text` | Enforce alt text on img, area, input[type="image"] |
+| `useAnchorContent` | `anchor-has-content` | Anchors must have accessible content |
+| `useValidAnchor` | `anchor-is-valid` | Anchors must be valid navigable elements |
+| `useValidAriaProps` | `aria-props` | ARIA attributes must be valid |
+| `useValidAriaValues` | `aria-proptypes` | ARIA attribute values must be valid |
+| `useValidAriaRole` | `aria-role` | ARIA roles must be valid |
+| `noAriaUnsupportedElements` | `aria-unsupported-elements` | No ARIA on elements that don't support it |
+| `useKeyWithClickEvents` | `click-events-have-key-events` | onClick must have keyboard handler |
+| `useHeadingContent` | `heading-has-content` | Headings must have content |
+| `useHtmlLang` | `html-has-lang` | `<html>` must have lang attribute |
+| `noRedundantAlt` | `img-redundant-alt` | No "image" in alt text |
+| `useFocusableInteractive` | `interactive-supports-focus` | Interactive elements must be focusable |
+| `noAccessKey` | `no-access-key` | Avoid accessKey attribute |
+| `noAriaHiddenOnFocusable` | `no-aria-hidden-on-focusable` | No aria-hidden on focusable elements |
+| `noAutofocus` | `no-autofocus` | Avoid autofocus attribute |
+| `noDistractingElements` | `no-distracting-elements` | No `<marquee>` or `<blink>` |
+| `noRedundantRoles` | `no-redundant-roles` | No redundant ARIA roles |
+| `noPositiveTabindex` | `tabindex-no-positive` | No positive tabindex values |
 
 ### 1.2 IDE Integration
 
-Add VS Code settings for real-time feedback:
+Biome has excellent VS Code integration. Ensure you have the extension installed:
+
+```json
+// .vscode/extensions.json
+{
+  "recommendations": [
+    "biomejs.biome"
+  ]
+}
+```
 
 ```json
 // .vscode/settings.json
 {
-  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"]
+  "editor.codeActionsOnSave": {
+    "quickfix.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "editor.defaultFormatter": "biomejs.biome",
+  "[javascript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" }
 }
 ```
 
@@ -457,7 +498,7 @@ on:
 
 jobs:
   lint-a11y:
-    name: ESLint jsx-a11y
+    name: Biome A11y Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -467,7 +508,7 @@ jobs:
           node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint --filter web
+      - run: pnpm biome check --error-on-warnings
 
   storybook-a11y:
     name: Storybook A11y Tests
@@ -511,7 +552,7 @@ jobs:
 ```json
 {
   "scripts": {
-    "a11y:lint": "eslint --ext .tsx,.ts components/ --rule 'jsx-a11y/*: error'",
+    "a11y:lint": "biome check --diagnostic-level=warn",
     "a11y:storybook": "test-storybook --url http://localhost:6006",
     "a11y:e2e": "playwright test tests/e2e/a11y/",
     "a11y:ci": "start-server-and-test 'pnpm dev' http://localhost:3000 'pnpm a11y:e2e'",
@@ -526,28 +567,21 @@ jobs:
 
 ### 6.1 Pre-commit Hook
 
-**Update `.husky/pre-commit`:**
-
-```bash
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
-# Run a11y linting on staged files
-pnpm lint-staged
-```
+Biome integrates with your existing lint-staged setup. Update to include a11y checks:
 
 **Update `package.json` lint-staged config:**
 
 ```json
 {
   "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "eslint --quiet"
+    "*.{ts,tsx,js,jsx}": [
+      "biome check --apply --no-errors-on-unmatched"
     ]
   }
 }
 ```
+
+This will automatically fix auto-fixable a11y issues and warn about others before commit.
 
 ### 6.2 VS Code Extension Recommendations
 
@@ -556,12 +590,16 @@ pnpm lint-staged
 ```json
 {
   "recommendations": [
-    "dbaeumer.vscode-eslint",
-    "deque-systems.vscode-axe-linter",
-    "webhint.vscode-webhint"
+    "biomejs.biome",
+    "deque-systems.vscode-axe-linter"
   ]
 }
 ```
+
+The Biome extension provides:
+- Real-time a11y linting as you type
+- Quick fixes for auto-fixable issues
+- Inline error explanations with WCAG references
 
 ### 6.3 A11y Checklist for PRs
 
@@ -585,8 +623,8 @@ pnpm lint-staged
 
 | Layer | Tool | Purpose |
 |-------|------|---------|
-| Static Analysis | `eslint-plugin-jsx-a11y` | Catch issues at author time |
-| IDE | Axe Linter VS Code extension | Real-time feedback |
+| Static Analysis | Biome `a11y` rules | Catch issues at author time (built-in, no extra deps) |
+| IDE | Biome VS Code extension | Real-time feedback with auto-fix |
 | Component Testing | `jest-axe` + Vitest | Test isolated components |
 | Storybook | `@storybook/addon-a11y` | Visual a11y panel + tests |
 | E2E | `@axe-core/playwright` | Full page audits |
@@ -615,7 +653,7 @@ Key requirements:
 
 1. **Zero major a11y violations** in CI (axe-core critical/serious)
 2. **100% of atoms and molecules** have a11y tests
-3. **All PRs pass** jsx-a11y linting
+3. **All PRs pass** Biome a11y linting (zero errors)
 4. **Storybook a11y panel** shows no violations for all stories
 5. **Contrast ratio** ≥ 4.5:1 for all text (verified in both themes)
 
@@ -625,7 +663,7 @@ Key requirements:
 
 | Week | Phase | Deliverables |
 |------|-------|--------------|
-| 1 | Static Analysis | eslint-plugin-jsx-a11y installed and configured |
+| 1 | Static Analysis | Biome a11y rules enabled in biome.json |
 | 2 | Storybook Integration | Vitest a11y tests running for all stories |
 | 3 | Component Tests | A11y tests for all atoms and critical molecules |
 | 4 | E2E Tests | axe-core Playwright tests for all routes |
