@@ -4,6 +4,8 @@ import { Button } from '@jovie/ui';
 import { useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
+import { updateProfile } from '@/lib/api-client/endpoints/dashboard/profile';
+import { ApiError } from '@/lib/api-client/types';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
   Artist,
@@ -59,34 +61,25 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     setSuccess(false);
 
     try {
-      const res = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          profileId: artist.id,
-          updates: {
-            spotify_url: formData.spotify_url || null,
-            apple_music_url: formData.apple_music_url || null,
-            youtube_url: formData.youtube_url || null,
-          },
-        }),
+      const { profile } = await updateProfile({
+        spotifyUrl: formData.spotify_url || undefined,
+        appleMusicUrl: formData.apple_music_url || undefined,
+        youtubeUrl: formData.youtube_url || undefined,
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(err?.error ?? 'Failed to update music links');
-      }
-      const json: { profile: unknown } = await res.json();
       const updatedArtist = convertCreatorProfileToArtist(
-        json.profile as CreatorProfile
+        profile as unknown as CreatorProfile
       );
       onUpdate(updatedArtist);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update music links');
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : error instanceof Error
+            ? error.message
+            : 'Failed to update music links';
+      setError(message);
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,11 @@ import { useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
+import {
+  UpdateProfileResponse,
+  updateProfile,
+} from '@/lib/api-client/endpoints/dashboard/profile';
+import { ApiError } from '@/lib/api-client/types';
 // flags import removed - pre-launch
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -78,27 +83,16 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         ? { hide_branding: formData.hide_branding }
         : undefined;
 
-      const res = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          updates: {
-            displayName: formData.name,
-            bio: formData.tagline,
-            avatarUrl: formData.image_url || null,
-            ...(settingsUpdates ? { settings: settingsUpdates } : {}),
-          },
-        }),
+      // Use the API client for consistent error handling and type safety
+      const response: UpdateProfileResponse = await updateProfile({
+        displayName: formData.name,
+        bio: formData.tagline,
+        avatarUrl: formData.image_url || null,
+        ...(settingsUpdates ? { settings: settingsUpdates } : {}),
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(err?.error ?? 'Failed to update profile');
-      }
-      const json: { profile: unknown } = await res.json();
+
       const updatedArtist = convertDrizzleCreatorProfileToArtist(
-        json.profile as Parameters<
+        response.profile as Parameters<
           typeof convertDrizzleCreatorProfileToArtist
         >[0]
       );
@@ -112,9 +106,10 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
       }
 
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update profile');
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Failed to update profile';
+      setError(message);
     } finally {
       setLoading(false);
     }

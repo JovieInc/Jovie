@@ -10,6 +10,7 @@ import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipbo
 import { SectionHeader } from '@/components/dashboard/molecules/SectionHeader';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { PROFILE_URL } from '@/constants/domains';
+import { updateVenmoHandle } from '@/lib/api-client/endpoints/dashboard/profile';
 import { cn } from '@/lib/utils';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -35,31 +36,20 @@ export function DashboardTipping() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            venmo_handle: venmoHandle ? `@${venmoHandle}` : '',
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update Venmo handle');
-      }
-
       const normalizedHandle = venmoHandle ? `@${venmoHandle}` : '';
+
+      // Use the API client for consistent error handling and type safety
+      await updateVenmoHandle(normalizedHandle);
+
       const updatedArtist = { ...artist, venmo_handle: normalizedHandle };
       setArtist(updatedArtist);
       setIsEditing(false);
       setSaveSuccess(`Connected to ${normalizedHandle}`);
       // Clear success after a short delay
       setTimeout(() => setSaveSuccess(null), 2500);
-    } catch (error) {
-      console.error('Failed to update Venmo handle:', error);
+    } catch {
+      // Error is already logged and handled by the API client
+      // Could add user-facing error state here if needed
     } finally {
       setIsSaving(false);
     }

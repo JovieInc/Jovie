@@ -4,6 +4,8 @@ import { Button, Input } from '@jovie/ui';
 import { useState } from 'react';
 
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
+import { ingestCreator } from '@/lib/api-client/endpoints/admin/creators';
+import { ApiError } from '@/lib/api-client/types';
 
 interface IngestProfileDialogProps {
   open: boolean;
@@ -53,27 +55,7 @@ export function IngestProfileDialog({
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/creator-ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: url.trim() }),
-      });
-
-      const data = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        profile?: { id: string; username: string };
-        links?: number;
-      };
-
-      if (!response.ok || !data.ok) {
-        const errorMessage = data.error || 'Failed to ingest profile';
-        setError(errorMessage);
-        setIsLoading(false);
-        return;
-      }
+      await ingestCreator({ url: url.trim() });
 
       setSuccess(true);
       setUrl('');
@@ -86,7 +68,7 @@ export function IngestProfileDialog({
       }, 1500);
     } catch (err) {
       const errorMessage =
-        err instanceof Error ? err.message : 'Failed to ingest profile';
+        err instanceof ApiError ? err.message : 'Failed to ingest profile';
       setError(errorMessage);
     } finally {
       setIsLoading(false);

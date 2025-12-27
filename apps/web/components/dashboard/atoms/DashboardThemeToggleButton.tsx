@@ -4,6 +4,7 @@ import { MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 import { useTheme } from 'next-themes';
 import { useState } from 'react';
 import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { setThemeSafe } from '@/lib/api-client/endpoints/dashboard/theme';
 
 export function DashboardThemeToggleButton() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -15,34 +16,15 @@ export function DashboardThemeToggleButton() {
   const handleThemeChange = async () => {
     setIsUpdating(true);
 
-    try {
-      // Save theme preference to database for signed-in users
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: nextTheme },
-          },
-        }),
-      });
+    // Save theme preference to database for signed-in users
+    const result = await setThemeSafe(nextTheme);
 
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
-        // Don't update local theme if API call failed
-        return;
-      }
-
+    if (result.ok) {
       // Only update local theme after successful API call
       setTheme(nextTheme);
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-      // Don't update local theme if API call failed
-    } finally {
-      setIsUpdating(false);
     }
+
+    setIsUpdating(false);
   };
 
   return (

@@ -12,6 +12,8 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { ingestCreator } from '@/lib/api-client/endpoints/admin/creators';
+import { ApiError } from '@/lib/api-client/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 type IngestPlatform = 'linktree' | 'beacons' | 'instagram';
@@ -88,22 +90,7 @@ export function IngestProfileDropdown({
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/creator-ingest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: effectiveUrl }),
-      });
-
-      const result = (await response.json()) as {
-        ok?: boolean;
-        error?: string;
-        profile?: { id: string; username: string };
-        links?: number;
-      };
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || 'Failed to ingest profile');
-      }
+      const result = await ingestCreator({ url: effectiveUrl });
 
       const profileId = result.profile?.id;
       const profileUsername = result.profile?.username;
@@ -138,9 +125,8 @@ export function IngestProfileDropdown({
         setIsSuccess(false);
       }, 900);
     } catch (error) {
-      console.error('Ingestion error', error);
       notifications.error(
-        error instanceof Error ? error.message : 'Failed to ingest profile'
+        error instanceof ApiError ? error.message : 'Failed to ingest profile'
       );
     } finally {
       setIsLoading(false);

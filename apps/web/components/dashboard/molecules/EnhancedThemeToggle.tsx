@@ -1,6 +1,7 @@
 'use client';
 
 import { DashboardThemeToggle as DashboardThemeToggleOrganism } from '@/components/dashboard/organisms/DashboardThemeToggle';
+import { setThemeSafe } from '@/lib/api-client/endpoints/dashboard/theme';
 
 interface EnhancedThemeToggleProps {
   onThemeChange?: (theme: 'light' | 'dark' | 'system') => void;
@@ -19,26 +20,9 @@ export function EnhancedThemeToggle({
   variant = 'default',
 }: EnhancedThemeToggleProps) {
   const handleThemeSave = async (newTheme: 'light' | 'dark' | 'system') => {
-    try {
-      // Save theme preference to database for signed-in users
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: newTheme },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
-      }
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-    }
+    // Save theme preference to database for signed-in users
+    // Using setThemeSafe to avoid throwing errors - we silently fail on theme save errors
+    await setThemeSafe(newTheme);
   };
 
   return (

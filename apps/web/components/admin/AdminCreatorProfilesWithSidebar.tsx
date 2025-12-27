@@ -41,6 +41,12 @@ import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
 } from '@/lib/admin/creator-profiles';
+import { api } from '@/lib/api-client';
+import {
+  getCreatorSocialLinksSafe,
+  updateCreatorAvatar,
+} from '@/lib/api-client/endpoints/admin/creators';
+import { ApiError } from '@/lib/api-client/types';
 import { cn } from '@/lib/utils';
 import type { Contact, ContactSidebarMode } from '@/types';
 
@@ -101,20 +107,17 @@ function mapProfileToContact(
   };
 }
 
-type AdminCreatorSocialLinksResponse =
-  | {
-      success: true;
-      links: Array<{
-        id: string;
-        label: string;
-        url: string;
-        platformType: string;
-      }>;
-    }
-  | {
-      success: false;
-      error: string;
-    };
+// Admin endpoint group for page-level routes (not /api/admin/)
+const adminPagesApi = api.createGroup('/app/admin/creators');
+
+/**
+ * Response type for bulk refresh endpoint
+ */
+interface BulkRefreshResponse {
+  success: boolean;
+  queuedCount?: number;
+  error?: string;
+}
 
 export function AdminCreatorProfilesWithSidebar({
   profiles: initialProfiles,
@@ -223,37 +226,22 @@ export function AdminCreatorProfilesWithSidebar({
       );
       if (!contactBase) return;
 
-      try {
-        const response = await fetch(
-          `/api/admin/creator-social-links?profileId=${encodeURIComponent(profileId)}`,
-          {
-            headers: {
-              Accept: 'application/json',
-            },
-          }
-        );
+      const result = await getCreatorSocialLinksSafe(profileId);
 
-        const payload = (await response
-          .json()
-          .catch(() => null)) as AdminCreatorSocialLinksResponse | null;
-
-        if (!response.ok || !payload || !payload.success) {
-          setDraftContact(contactBase);
-          return;
-        }
-
-        setDraftContact({
-          ...contactBase,
-          socialLinks: payload.links.map(link => ({
-            id: link.id,
-            label: link.label,
-            url: link.url,
-            platformType: link.platformType,
-          })),
-        });
-      } catch {
+      if (!result.ok || !result.data.success) {
         setDraftContact(contactBase);
+        return;
       }
+
+      setDraftContact({
+        ...contactBase,
+        socialLinks: result.data.links.map(link => ({
+          id: link.id,
+          label: link.label,
+          url: link.url,
+          platformType: link.platformType,
+        })),
+      });
     },
     [filteredProfiles]
   );
@@ -278,23 +266,18 @@ export function AdminCreatorProfilesWithSidebar({
     async (profileId: string): Promise<void> => {
       setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'loading' }));
       try {
-        const response = await fetch('/app/admin/creators/bulk-refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
-          body: JSON.stringify({ profileIds: [profileId] }),
-        });
+        const result = await adminPagesApi.request<BulkRefreshResponse>(
+          'POST',
+          '/bulk-refresh',
+          { body: { profileIds: [profileId] } }
+        );
 
-        const payload = (await response.json().catch(() => ({}))) as {
-          success?: boolean;
-          queuedCount?: number;
-          error?: string;
-        };
+        if (!result.ok) {
+          throw result.error;
+        }
 
-        if (!response.ok || !payload.success) {
-          throw new Error(payload.error ?? 'Failed to queue ingestion');
+        if (!result.data.success) {
+          throw new Error(result.data.error ?? 'Failed to queue ingestion');
         }
 
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'success' }));
@@ -311,7 +294,12 @@ export function AdminCreatorProfilesWithSidebar({
         setIngestRefreshStatuses(prev => ({ ...prev, [profileId]: 'error' }));
         showToast({
           type: 'error',
-          message: error instanceof Error ? error.message : 'Refresh failed',
+          message:
+            error instanceof ApiError
+              ? error.message
+              : error instanceof Error
+                ? error.message
+                : 'Refresh failed',
         });
       } finally {
         window.setTimeout(() => {
@@ -342,6 +330,7 @@ export function AdminCreatorProfilesWithSidebar({
 
   const handleAvatarUpload = useCallback(
     async (file: File, contact: Contact): Promise<string> => {
+      // Step 1: Upload image to blob storage (uses FormData, not JSON)
       const formData = new FormData();
       formData.append('file', file);
 
@@ -362,24 +351,11 @@ export function AdminCreatorProfilesWithSidebar({
 
       const blobUrl = uploadJson.blobUrl;
 
-      const adminResponse = await fetch('/api/admin/creator-avatar', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          profileId: contact.id,
-          avatarUrl: blobUrl,
-        }),
+      // Step 2: Update creator profile with new avatar URL via admin API
+      await updateCreatorAvatar({
+        profileId: contact.id,
+        avatarUrl: blobUrl,
       });
-
-      if (!adminResponse.ok) {
-        const adminJson = (await adminResponse.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        const message = adminJson.error || 'Failed to update creator avatar';
-        throw new Error(message);
-      }
 
       return blobUrl;
     },

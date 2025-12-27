@@ -6,9 +6,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
+import { usePreviewPanel } from '@/app/app/dashboard/PreviewPanelContext';
 import { Input } from '@/components/atoms/Input';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 
+import { updateProfile as updateProfileApi } from '@/lib/api-client/endpoints/dashboard/profile';
+import {
+  acceptSuggestion,
+  dismissSuggestion,
+  getSocialLinks,
+  updateSocialLinksSafe,
+} from '@/lib/api-client/endpoints/dashboard/social-links';
+import { ApiError } from '@/lib/api-client/types';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
@@ -17,6 +26,7 @@ import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   SUPPORTED_IMAGE_MIME_TYPES,
 } from '@/lib/images/config';
+import { getProfileIdentity } from '@/lib/profile/profile-identity';
 import { debounce } from '@/lib/utils';
 import {
   type DetectedLink,
@@ -240,30 +250,8 @@ export function EnhancedDashboardLinks({
 
   const updateProfile = useCallback(
     async (updates: ProfileUpdatePayload): Promise<ProfileUpdateResponse> => {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ updates }),
-      });
-
-      const body = (await response.json().catch(() => null)) as
-        | ProfileUpdateResponse
-        | { error?: string }
-        | null;
-
-      if (!response.ok) {
-        const message =
-          body && 'error' in body && typeof body.error === 'string'
-            ? body.error
-            : 'Failed to update profile';
-        throw new Error(message);
-      }
-
-      if (!body || !('profile' in body)) {
-        throw new Error('Failed to update profile');
-      }
-
-      return body;
+      const response = await updateProfileApi(updates);
+      return response as ProfileUpdateResponse;
     },
     []
   );
@@ -522,362 +510,257 @@ export function EnhancedDashboardLinks({
   );
 
   const [suggestions, setSuggestions] = useState<SuggestedLink[]>([]);
+  const suggestionsRef = useRef<SuggestedLink[]>(suggestions);
 
   useEffect(() => {
-    const newLinks = convertDbLinksToLinkItems(initialLinks);
-    setLinks(prev => (areLinkItemsEqual(prev, newLinks) ? prev : newLinks));
-  }, [initialLinks, convertDbLinksToLinkItems]);
+    suggestionsRef.current = suggestions;
+  }, [suggestions]);
 
-  const fetchSuggestions = useCallback(async (): Promise<void> => {
-    if (!profileId || !suggestionsEnabled) return;
-
-    try {
-      const response = await fetch(
-        `/api/dashboard/${profileId}/link-suggestions`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!response.ok) {
-        console.warn('Failed to fetch suggestions');
-        return;
-      }
-
-      const data = (await response.json().catch(() => null)) as {
-        suggestions?: Array<{
-          platform: {
-            id: string;
-            name: string;
-            category?: PlatformType;
-            icon: string;
-            color: string;
-            placeholder: string;
-          };
-          normalizedUrl: string;
-          originalUrl: string;
-          suggestedTitle: string;
-          isValid: boolean;
-          suggestionId: string;
-          state?: 'active' | 'suggested' | 'rejected';
-          confidence?: number | null;
-          sourcePlatform?: string | null;
-          sourceType?: 'manual' | 'admin' | 'ingested' | null;
-          evidence?: { sources?: string[]; signals?: string[] } | null;
-        }>;
-      } | null;
-
-      if (!data?.suggestions) {
-        setSuggestions([]);
-        return;
-      }
-
-      const newSuggestions: SuggestedLink[] = data.suggestions.map(item => ({
-        ...item,
-        platform: {
-          ...item.platform,
-          category:
-            (item.platform.category as PlatformType | null | undefined) ??
-            getPlatformCategory(item.platform.id),
-        },
-      }));
-
-      setSuggestions(prev =>
-        areSuggestionListsEqual(prev, newSuggestions) ? prev : newSuggestions
-      );
-    } catch (error) {
-      console.error('Error fetching suggestions:', error);
-      setSuggestions([]);
-    }
-  }, [profileId, suggestionsEnabled]);
-
-  usePollingCoordinator({
-    profileId,
-    autoRefreshUntilMs,
-    suggestionsEnabled,
-    onFetch: fetchSuggestions,
-  });
-
-  const handleAcceptSuggestion = useCallback(
-    async (suggestion: SuggestedLink): Promise<void> => {
-      if (!profileId) return;
-
+  const handleLinkUpdate = useCallback(
+    async (
+      updatedLinks: LinkItem[]
+    ): Promise<{ success: boolean; error?: string }> => {
       try {
-        const response = await fetch(
-          `/api/dashboard/${profileId}/link-suggestions/${suggestion.suggestionId}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'accept' }),
-          }
-        );
+        const formattedLinks = updatedLinks.map(item => ({
+          id: item.id,
+          sortOrder: item.order,
+          isActive: item.isVisible,
+          platform: item.platform.id,
+        }));
 
-        if (response.ok) {
-          toast.success('Link added successfully');
-          setAutoRefreshUntilMs(Date.now() + 5000);
-
-          // Remove from suggestions
-          setSuggestions(prev =>
-            prev.filter(s => s.suggestionId !== suggestion.suggestionId)
-          );
-        } else {
-          toast.error('Failed to add link');
-        }
+        await updateSocialLinksSafe(formattedLinks);
+        setLinks(updatedLinks);
+        return { success: true };
       } catch (error) {
-        console.error('Error accepting suggestion:', error);
-        toast.error('Failed to add link');
+        const errorMessage =
+          error instanceof ApiError
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : 'Unknown error updating links';
+        return { success: false, error: errorMessage };
       }
     },
-    [profileId]
+    []
+  );
+
+  const handleAcceptSuggestion = useCallback(
+    async (suggestionId: string): Promise<boolean> => {
+      try {
+        await acceptSuggestion(suggestionId);
+
+        const suggestion = suggestionsRef.current.find(
+          s => s.suggestionId === suggestionId
+        );
+        if (suggestion) {
+          const newLinkItem: LinkItem = {
+            id: suggestionId,
+            title: suggestion.suggestedTitle,
+            url: suggestion.normalizedUrl,
+            platform: suggestion.platform,
+            isVisible: true,
+            order: links.length,
+            category: suggestion.platform.category,
+            normalizedUrl: suggestion.normalizedUrl,
+            originalUrl: suggestion.originalUrl,
+            suggestedTitle: suggestion.suggestedTitle,
+            isValid: suggestion.isValid,
+            state: 'active',
+            confidence: suggestion.confidence ?? null,
+            sourcePlatform: suggestion.sourcePlatform ?? null,
+            sourceType: suggestion.sourceType ?? null,
+            evidence: suggestion.evidence ?? null,
+            version: 1,
+          };
+
+          const updatedLinks = [...links, newLinkItem];
+          await handleLinkUpdate(updatedLinks);
+
+          setSuggestions(prev =>
+            prev.filter(s => s.suggestionId !== suggestionId)
+          );
+        }
+
+        return true;
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to accept suggestion';
+        toast.error(message);
+        return false;
+      }
+    },
+    [links, handleLinkUpdate]
   );
 
   const handleRejectSuggestion = useCallback(
-    async (suggestion: SuggestedLink): Promise<void> => {
-      if (!profileId) return;
-
+    async (suggestionId: string): Promise<boolean> => {
       try {
-        const response = await fetch(
-          `/api/dashboard/${profileId}/link-suggestions/${suggestion.suggestionId}`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ action: 'reject' }),
-          }
+        await dismissSuggestion(suggestionId);
+        setSuggestions(prev =>
+          prev.filter(s => s.suggestionId !== suggestionId)
         );
-
-        if (response.ok) {
-          // Remove from suggestions
-          setSuggestions(prev =>
-            prev.filter(s => s.suggestionId !== suggestion.suggestionId)
-          );
-        } else {
-          toast.error('Failed to dismiss suggestion');
-        }
+        return true;
       } catch (error) {
-        console.error('Error rejecting suggestion:', error);
-        toast.error('Failed to dismiss suggestion');
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Failed to reject suggestion';
+        toast.error(message);
+        return false;
       }
     },
-    [profileId]
+    []
   );
 
-  const handleLinkChange = useCallback(
-    async (updatedLinks: LinkItem[]): Promise<void> => {
-      setLinks(updatedLinks);
-      if (!profileId) return;
+  const loadSocialLinks = useCallback(async (): Promise<void> => {
+    if (!profileId) return;
 
-      try {
-        const updatePayload = updatedLinks.map((link, index) => ({
-          id: link.id,
-          displayText: link.title,
-          url: link.url,
-          isActive: link.isVisible,
-          sortOrder: index,
-        }));
-
-        const response = await fetch(
-          `/api/dashboard/${profileId}/social-links`,
-          {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updatePayload),
-          }
-        );
-
-        if (!response.ok) {
-          toast.error('Failed to update links');
-          setAutoRefreshUntilMs(Date.now() + 3000);
-        } else {
-          toast.success('Links updated');
-        }
-      } catch (error) {
-        console.error('Error updating links:', error);
-        toast.error('Failed to update links');
-        setAutoRefreshUntilMs(Date.now() + 3000);
+    try {
+      const response = await getSocialLinks(profileId);
+      if (response.links) {
+        const dbLinks = response.links as ProfileSocialLink[];
+        const convertedLinks = convertDbLinksToLinkItems(dbLinks);
+        setLinks(convertedLinks);
       }
-    },
-    [profileId]
-  );
 
-  const handleLinkAdd = useCallback(
-    async (link: LinkItem): Promise<void> => {
-      if (!profileId) return;
-
-      try {
-        const response = await fetch(
-          `/api/dashboard/${profileId}/social-links`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              platform: link.platform.id,
-              displayText: link.title,
-              url: link.url,
-            }),
-          }
+      if (suggestionsEnabled && response.suggestions) {
+        setSuggestions(
+          response.suggestions.map((suggestion: SuggestedLink, index: number) => ({
+            ...suggestion,
+            suggestionId: suggestion.suggestionId ?? `suggestion-${index}`,
+          }))
         );
-
-        if (response.ok) {
-          toast.success('Link added successfully');
-          setAutoRefreshUntilMs(Date.now() + 5000);
-        } else {
-          toast.error('Failed to add link');
-        }
-      } catch (error) {
-        console.error('Error adding link:', error);
-        toast.error('Failed to add link');
       }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Failed to load links';
+      console.error('Error loading social links:', message);
+    }
+  }, [profileId, suggestionsEnabled, convertDbLinksToLinkItems]);
+
+  // Poll for social links if suggestions are enabled
+  const pollingEnabled =
+    suggestionsEnabled && profileId ? autoRefreshUntilMs !== null : false;
+  usePollingCoordinator(
+    () => {
+      loadSocialLinks();
     },
-    [profileId]
+    {
+      enabled: pollingEnabled,
+      interval: 3000,
+      maxDuration: autoRefreshUntilMs,
+    }
   );
 
-  const handleLinkDelete = useCallback(
-    async (linkId: string): Promise<void> => {
-      if (!profileId) return;
-
-      try {
-        const response = await fetch(
-          `/api/dashboard/${profileId}/social-links/${linkId}`,
-          {
-            method: 'DELETE',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (response.ok) {
-          toast.success('Link removed successfully');
-          setAutoRefreshUntilMs(Date.now() + 5000);
-        } else {
-          toast.error('Failed to remove link');
-        }
-      } catch (error) {
-        console.error('Error deleting link:', error);
-        toast.error('Failed to remove link');
-      }
-    },
-    [profileId]
-  );
+  // Load links on mount and profile change
+  useEffect(() => {
+    loadSocialLinks();
+  }, [loadSocialLinks]);
 
   return (
-    <div className='space-y-6'>
-      <div className='rounded-lg border border-surface-2 bg-surface-0 p-6'>
-        <div className='space-y-6'>
-          {/* Display Name Field */}
-          <div className='space-y-2'>
-            <label className='text-sm font-medium text-text-2'>
-              Display Name
-            </label>
-            {editingField === 'displayName' ? (
-              <div className='flex gap-2'>
-                <Input
-                  ref={displayNameInputRef}
-                  value={profileDisplayName}
-                  onChange={e => setProfileDisplayName(e.target.value)}
-                  onBlur={() => {
-                    setEditingField(null);
-                    debouncedProfileSave({
-                      displayName: profileDisplayName,
-                      username: profileUsername,
-                    });
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      setEditingField(null);
+    <div className='w-full'>
+      <div className='space-y-6'>
+        <div className='rounded-lg border border-surface-3 bg-surface-1 p-6'>
+          <div className='space-y-4'>
+            <div>
+              <label className='block text-sm font-medium text-content-primary'>
+                Display Name
+              </label>
+              <div className='mt-1 flex items-center gap-2'>
+                {editingField === 'displayName' ? (
+                  <Input
+                    ref={displayNameInputRef}
+                    value={profileDisplayName}
+                    onChange={e => {
+                      setProfileDisplayName(e.target.value);
                       debouncedProfileSave({
-                        displayName: profileDisplayName,
+                        displayName: e.target.value,
                         username: profileUsername,
                       });
-                    }
-                  }}
-                  className='flex-1'
-                />
+                    }}
+                    onBlur={() => setEditingField(null)}
+                    className='flex-1'
+                  />
+                ) : (
+                  <div
+                    className='flex-1 cursor-pointer rounded px-3 py-2 hover:bg-surface-2'
+                    onClick={() => setEditingField('displayName')}
+                  >
+                    {profileDisplayName || 'Click to edit'}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div
-                onClick={() => setEditingField('displayName')}
-                className='cursor-pointer rounded-lg border border-surface-2 bg-surface-1 p-3 text-text-1 hover:bg-surface-2'
-              >
-                {profileDisplayName || 'Click to add display name'}
-              </div>
-            )}
-          </div>
+            </div>
 
-          {/* Username Field */}
-          <div className='space-y-2'>
-            <label className='text-sm font-medium text-text-2'>Username</label>
-            {editingField === 'username' ? (
-              <div className='flex gap-2'>
-                <Input
-                  ref={usernameInputRef}
-                  value={profileUsername}
-                  onChange={e => setProfileUsername(e.target.value)}
-                  onBlur={() => {
-                    setEditingField(null);
-                    debouncedProfileSave({
-                      displayName: profileDisplayName,
-                      username: profileUsername,
-                    });
-                  }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      setEditingField(null);
+            <div>
+              <label className='block text-sm font-medium text-content-primary'>
+                Username
+              </label>
+              <div className='mt-1 flex items-center gap-2'>
+                {editingField === 'username' ? (
+                  <Input
+                    ref={usernameInputRef}
+                    value={profileUsername}
+                    onChange={e => {
+                      setProfileUsername(e.target.value);
                       debouncedProfileSave({
                         displayName: profileDisplayName,
-                        username: profileUsername,
+                        username: e.target.value,
                       });
-                    }
-                  }}
-                  className='flex-1'
-                />
+                    }}
+                    onBlur={() => setEditingField(null)}
+                    className='flex-1'
+                  />
+                ) : (
+                  <div
+                    className='flex-1 cursor-pointer rounded px-3 py-2 hover:bg-surface-2'
+                    onClick={() => setEditingField('username')}
+                  >
+                    {profileUsername || 'Click to edit'}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div
-                onClick={() => setEditingField('username')}
-                className='cursor-pointer rounded-lg border border-surface-2 bg-surface-1 p-3 text-text-1 hover:bg-surface-2'
-              >
-                {profileUsername || 'Click to add username'}
-              </div>
-            )}
-          </div>
+            </div>
 
-          {/* Avatar Upload */}
-          <div className='space-y-2'>
-            <label className='text-sm font-medium text-text-2'>
-              Profile Photo
-            </label>
-            {isMusicProfile && artist ? (
+            <div>
+              <label className='block text-sm font-medium text-content-primary'>
+                Profile Photo
+              </label>
               <AvatarUploadable
-                artist={artist}
+                src={artist?.image_url}
                 onUpload={handleAvatarUpload}
-                maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
+                maxFileSizeBytes={AVATAR_MAX_FILE_SIZE_BYTES}
                 supportedMimeTypes={SUPPORTED_IMAGE_MIME_TYPES}
+                aria-label='Upload profile photo'
               />
-            ) : null}
+            </div>
+
+            {profileSaveStatus.error && (
+              <div className='rounded bg-red-100 p-3 text-sm text-red-800'>
+                {profileSaveStatus.error}
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* Links Manager */}
-      <GroupedLinksManager
-        links={links}
-        suggestions={suggestionsEnabled ? suggestions : []}
-        onLinksChange={handleLinkChange}
-        onAcceptSuggestion={handleAcceptSuggestion}
-        onRejectSuggestion={handleRejectSuggestion}
-        onAddLink={handleLinkAdd}
-        onDeleteLink={handleLinkDelete}
-      />
+        {isMusicProfile && (
+          <div className='rounded-lg border border-surface-3 bg-surface-1 p-6'>
+            <h2 className='mb-4 text-lg font-semibold text-content-primary'>
+              Social Links
+            </h2>
+            <GroupedLinksManager
+              links={links}
+              suggestions={suggestions}
+              onLinksUpdate={handleLinkUpdate}
+              onAcceptSuggestion={handleAcceptSuggestion}
+              onRejectSuggestion={handleRejectSuggestion}
+              onRefreshStart={() => setAutoRefreshUntilMs(Date.now() + 30000)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

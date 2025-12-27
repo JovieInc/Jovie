@@ -28,6 +28,14 @@ import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_URL } from '@/constants/app';
 import { useBillingStatus } from '@/hooks/use-billing-status';
+import { api } from '@/lib/api-client';
+import {
+  updateAvatar,
+  updateProfile,
+  updateSettings,
+} from '@/lib/api-client/endpoints/dashboard/profile';
+import { setThemeSafe } from '@/lib/api-client/endpoints/dashboard/theme';
+import { ApiError } from '@/lib/api-client/types';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import {
@@ -139,28 +147,7 @@ export function SettingsPolished({
       const previousImage = artist.image_url;
 
       try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            updates: {
-              avatarUrl: imageUrl,
-            },
-          }),
-        });
-
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(
-            (data as { error?: string }).error ||
-              'Failed to update profile photo'
-          );
-        }
-
-        const profile = (data as { profile?: { avatarUrl?: string } }).profile;
-        const warning = (data as { warning?: string }).warning;
+        const { profile, warning } = await updateAvatar(imageUrl);
 
         if (onArtistUpdate) {
           onArtistUpdate({
@@ -182,9 +169,11 @@ export function SettingsPolished({
         }
 
         const message =
-          error instanceof Error && error.message
+          error instanceof ApiError
             ? error.message
-            : 'Failed to update profile photo';
+            : error instanceof Error && error.message
+              ? error.message
+              : 'Failed to update profile photo';
         showToast({ type: 'error', message });
       }
     },
@@ -195,23 +184,7 @@ export function SettingsPolished({
     async (enabled: boolean) => {
       setIsSavingBranding(true);
       try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            updates: {
-              settings: {
-                hide_branding: enabled,
-              },
-            },
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to update branding settings');
-        }
+        await updateSettings({ hide_branding: enabled });
 
         setHideBranding(enabled);
 
@@ -224,8 +197,7 @@ export function SettingsPolished({
             },
           });
         }
-      } catch (error) {
-        console.error('Failed to update branding settings:', error);
+      } catch {
         // Revert the toggle on error
         setHideBranding(!enabled);
       } finally {
@@ -261,57 +233,34 @@ export function SettingsPolished({
       setProfileSaveStatus({ saving: true, success: null, error: null });
 
       try {
-        const response = await fetch('/api/dashboard/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            updates: {
-              username,
-              displayName,
-            },
-          }),
-        });
-
-        const data = (await response.json().catch(() => ({}))) as {
-          profile?: {
-            username?: string;
-            usernameNormalized?: string;
-            displayName?: string;
-            bio?: string | null;
-          };
-          error?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to update profile');
-        }
+        const { profile } = await updateProfile({ username, displayName });
 
         lastProfileSavedRef.current = { displayName, username };
 
-        if (data.profile && onArtistUpdate) {
+        if (profile && onArtistUpdate) {
           onArtistUpdate({
             ...artist,
-            handle: data.profile.username ?? artist.handle,
-            name: data.profile.displayName ?? artist.name,
-            tagline: data.profile.bio ?? artist.tagline,
+            handle: profile.username ?? artist.handle,
+            name: profile.displayName ?? artist.name,
+            tagline: profile.bio ?? artist.tagline,
           });
         }
 
         setFormData(prev => ({
           ...prev,
-          username: data.profile?.username ?? username,
-          displayName: data.profile?.displayName ?? displayName,
+          username: profile?.username ?? username,
+          displayName: profile?.displayName ?? displayName,
         }));
 
         setProfileSaveStatus({ saving: false, success: true, error: null });
         router.refresh();
       } catch (error) {
         const message =
-          error instanceof Error && error.message
+          error instanceof ApiError
             ? error.message
-            : 'Failed to update profile';
+            : error instanceof Error && error.message
+              ? error.message
+              : 'Failed to update profile';
         setProfileSaveStatus({ saving: false, success: false, error: message });
         showToast({ type: 'error', message });
       }
@@ -349,52 +298,17 @@ export function SettingsPolished({
   const handleThemeChange = async (newTheme: 'light' | 'dark' | 'system') => {
     setTheme(newTheme);
 
-    try {
-      // Save theme preference to database for signed-in users
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            theme: { preference: newTheme },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to save theme preference');
-      }
-    } catch (error) {
-      console.error('Error saving theme preference:', error);
-    }
+    // Save theme preference to database for signed-in users (fire-and-forget)
+    void setThemeSafe(newTheme);
   };
 
   const handleMarketingToggle = useCallback(async (enabled: boolean) => {
     setIsMarketingSaving(true);
     try {
-      const response = await fetch('/api/dashboard/profile', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          updates: {
-            settings: {
-              marketing_emails: enabled,
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update marketing preferences');
-      }
+      await updateSettings({ marketing_emails: enabled });
 
       setMarketingEmails(enabled);
-    } catch (error) {
-      console.error('Failed to update marketing preferences:', error);
+    } catch {
       setMarketingEmails(!enabled);
     } finally {
       setIsMarketingSaving(false);
@@ -407,33 +321,23 @@ export function SettingsPolished({
       setIsPixelSaving(true);
 
       try {
-        const response = await fetch('/api/dashboard/pixels', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
+        await api.dashboard.put('/pixels', {
+          body: {
             facebookPixel: pixelData.facebookPixel,
             googleAdsConversion: pixelData.googleAdsConversion,
             tiktokPixel: pixelData.tiktokPixel,
             customPixel: pixelData.customPixel,
-          }),
+          },
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to save pixels');
-        }
-
-        // Optionally show success message or handle response
-        console.log('Pixels saved successfully');
-      } catch (error) {
-        console.error('Failed to save pixels:', error);
-        // Optionally show error message to user
+        showToast({ type: 'success', message: 'Pixels saved successfully' });
+      } catch {
+        showToast({ type: 'error', message: 'Failed to save pixels' });
       } finally {
         setIsPixelSaving(false);
       }
     },
-    [pixelData]
+    [pixelData, showToast]
   );
 
   const appDomain = APP_URL.replace(/^https?:\/\//, '');

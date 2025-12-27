@@ -14,6 +14,11 @@ import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { track } from '@/lib/analytics';
+import {
+  getSocialLinks,
+  updateSocialLinks,
+} from '@/lib/api-client/endpoints/dashboard/social-links';
+import { ApiError } from '@/lib/api-client/types';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import { Artist } from '@/types/db';
 
@@ -37,22 +42,22 @@ export function SocialsForm({ artist }: SocialsFormProps) {
   useEffect(() => {
     const fetchSocialLinks = async () => {
       try {
-        const res = await fetch(
-          `/api/dashboard/social-links?profileId=${encodeURIComponent(
-            artist.id
-          )}`,
-          { cache: 'no-store' }
-        );
-        if (!res.ok) {
-          const err = (await res.json().catch(() => ({}))) as {
-            error?: string;
-          };
-          throw new Error(err?.error ?? 'Failed to fetch social links');
-        }
-        const json: { links: SocialLink[] } = await res.json();
-        setSocialLinks(json.links || []);
-      } catch (error) {
-        console.error('Error:', error);
+        // Use the API client for consistent error handling
+        const response = await getSocialLinks(artist.id);
+        // Map to local SocialLink interface (id, platform, url)
+        const mappedLinks: SocialLink[] = (response.links || []).map(link => ({
+          id: link.id,
+          platform: link.platform,
+          url: link.url,
+        }));
+        setSocialLinks(mappedLinks);
+      } catch (err) {
+        // ApiError provides consistent error handling; we silently fail for fetch
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : 'Failed to fetch social links';
+        setError(message);
       }
     };
 
@@ -66,7 +71,7 @@ export function SocialsForm({ artist }: SocialsFormProps) {
     setSuccess(false);
 
     try {
-      // Insert new social links via server API
+      // Build the links array for the API client
       const linksToInsert = socialLinks
         .filter(link => link.url.trim())
         .map((link, index) => ({
@@ -77,23 +82,19 @@ export function SocialsForm({ artist }: SocialsFormProps) {
           isActive: true,
         }));
 
-      const res = await fetch('/api/dashboard/social-links', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: artist.id, links: linksToInsert }),
+      // Use the API client for consistent error handling and type safety
+      await updateSocialLinks({
+        profileId: artist.id,
+        links: linksToInsert,
       });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        throw new Error(err?.error ?? 'Failed to update social links');
-      }
+
       setSuccess(true);
       track('dashboard_social_links_saved', { profileId: artist.id });
       setTimeout(() => setSuccess(false), 3000);
-    } catch (error) {
-      console.error('Error:', error);
-      setError('Failed to update social links');
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : 'Failed to update social links';
+      setError(message);
     } finally {
       setLoading(false);
     }
