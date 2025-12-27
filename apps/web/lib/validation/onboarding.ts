@@ -1,13 +1,8 @@
 import { z } from 'zod';
+import { usernameSchema } from './schemas/username';
 
 export const onboardingSchema = z.object({
-  handle: z
-    .string()
-    .min(3, { message: 'Must be at least 3 characters' })
-    .max(24, { message: 'Must be no more than 24 characters' })
-    .regex(/^[a-z0-9-]+$/, {
-      message: 'Only lowercase letters, numbers, and hyphens are allowed',
-    }),
+  handle: usernameSchema,
   fullName: z
     .string()
     .min(1, { message: 'Full name is required' })
