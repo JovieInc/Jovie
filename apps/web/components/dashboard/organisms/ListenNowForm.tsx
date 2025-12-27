@@ -8,8 +8,8 @@ import { updateProfile } from '@/lib/api-client/endpoints/dashboard/profile';
 import { ApiError } from '@/lib/api-client/types';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
-  Artist,
-  CreatorProfile,
+  type Artist,
+  type CreatorProfile,
   convertCreatorProfileToArtist,
 } from '@/types/db';
 

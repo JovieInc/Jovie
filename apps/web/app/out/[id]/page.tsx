@@ -3,7 +3,7 @@
  * Anti-cloaking compliant interstitial for sensitive domains
  */
 
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { getWrappedLink } from '@/lib/services/link-wrapping';
 import { getCategoryDescription } from '@/lib/utils/domain-categorizer';

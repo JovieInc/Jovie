@@ -99,13 +99,15 @@ export function AuthLayout({
       'focus',
     ];
 
-    events.forEach(event =>
-      window.addEventListener(event, resetTimer, { passive: true })
-    );
+    events.forEach(event => {
+      window.addEventListener(event, resetTimer, { passive: true });
+    });
 
     return () => {
       if (timeoutId) clearTimeout(timeoutId);
-      events.forEach(event => window.removeEventListener(event, resetTimer));
+      events.forEach(event => {
+        window.removeEventListener(event, resetTimer);
+      });
     };
   }, [logoSpinDelayMs]);
 

@@ -41,7 +41,9 @@ export function useCreatorActions(
   useEffect(() => {
     const timeouts = statusTimeoutsRef.current;
     return () => {
-      Object.values(timeouts).forEach(timeout => window.clearTimeout(timeout));
+      Object.values(timeouts).forEach(timeout => {
+        window.clearTimeout(timeout);
+      });
     };
   }, []);
 

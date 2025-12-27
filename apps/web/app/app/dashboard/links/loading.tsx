@@ -1,6 +1,16 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export default function LinksLoading() {
+  const pillKeys = [
+    'pill-1',
+    'pill-2',
+    'pill-3',
+    'pill-4',
+    'pill-5',
+    'pill-6',
+  ] as const;
+  const rowKeys = ['row-1', 'row-2', 'row-3', 'row-4'] as const;
+
   return (
     <div className='min-h-screen'>
       <div className='rounded-xl border border-subtle bg-surface-1 p-6 shadow-sm'>
@@ -10,9 +20,9 @@ export default function LinksLoading() {
         </div>
 
         <div className='mt-6 flex flex-wrap gap-2'>
-          {Array.from({ length: 6 }).map((_, index) => (
+          {pillKeys.map(key => (
             <LoadingSkeleton
-              key={index}
+              key={key}
               height='h-8'
               width='w-24'
               rounded='full'
@@ -22,9 +32,9 @@ export default function LinksLoading() {
         </div>
 
         <div className='mt-6 space-y-3'>
-          {Array.from({ length: 4 }).map((_, index) => (
+          {rowKeys.map(key => (
             <div
-              key={index}
+              key={key}
               className='flex items-start gap-3 rounded-lg border border-subtle bg-surface-0 p-3'
             >
               <LoadingSkeleton

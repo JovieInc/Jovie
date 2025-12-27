@@ -1,4 +1,4 @@
-import { expect, Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { signInUser } from '../helpers/clerk-auth';
 
 type Issue = {
@@ -21,7 +21,7 @@ const issues: Issue[] = [];
 function getLuminance(r: number, g: number, b: number) {
   const a = [r, g, b].map(v => {
     v /= 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   });
   return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
 }
@@ -120,9 +120,7 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
         const getLuminance = (r: number, g: number, b: number) => {
           const a = [r, g, b].map(v => {
             v /= 255;
-            return v <= 0.03928
-              ? v / 12.92
-              : Math.pow((v + 0.055) / 1.055, 2.4);
+            return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
           });
           return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
         };
@@ -135,7 +133,7 @@ async function auditPage(page: Page, theme: 'light' | 'dark', route: string) {
             g1 = fgC[1],
             b1 = fgC[2],
             a1 = fgC[3];
-          let r2 = bgC[0],
+          const r2 = bgC[0],
             g2 = bgC[1],
             b2 = bgC[2];
 

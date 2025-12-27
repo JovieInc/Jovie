@@ -1,4 +1,4 @@
-import { type FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
+import type { FeaturedCreator } from '@/components/organisms/FeaturedArtistsSection';
 import { Container } from '@/components/site/Container';
 import { getFeaturedCreators } from '@/lib/featured-creators';
 import { FeaturedArtistsDriftRow } from './FeaturedArtistsDriftRow';

@@ -2,7 +2,7 @@
 
 import * as Clerk from '@clerk/elements/common';
 import { Input } from '@jovie/ui';
-import * as React from 'react';
+import type * as React from 'react';
 import { cn } from '@/lib/utils';
 
 type AuthInputVariant = 'default' | 'otp';

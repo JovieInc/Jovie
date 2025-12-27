@@ -56,6 +56,7 @@ export default function Page() {
           <a
             target='_blank'
             href='https://jovie.sentry.io/issues/?project=4510479236792320'
+            rel='noopener'
           >
             Issues Page
           </a>
@@ -63,6 +64,7 @@ export default function Page() {
           <a
             target='_blank'
             href='https://docs.sentry.io/platforms/javascript/guides/nextjs/'
+            rel='noopener'
           >
             read our docs
           </a>

@@ -22,9 +22,9 @@ import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
 import type { PublicContact } from '@/types/contacts';
 import {
-  CreatorProfile,
+  type CreatorProfile,
   convertCreatorProfileToArtist,
-  LegacySocialLink,
+  type LegacySocialLink,
 } from '@/types/db';
 
 // Note: runtime = 'edge' removed for cacheComponents compatibility

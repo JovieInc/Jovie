@@ -522,9 +522,7 @@ export function extractLinks(
           signals: [options.sourceSignal],
         },
       });
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return links;

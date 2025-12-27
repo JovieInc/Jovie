@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { getCreatorProfileWithLinks } from '@/lib/db/queries';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;

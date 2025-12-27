@@ -48,7 +48,7 @@ test.describe('Onboarding smoke', () => {
       // Wait for Clerk to be ready
       await page.waitForFunction(
         () => {
-          // @ts-ignore
+          // @ts-expect-error
           return window.Clerk && window.Clerk.isReady();
         },
         { timeout: 10_000 }
@@ -91,7 +91,7 @@ test.describe('Onboarding smoke', () => {
       // Wait for authentication to complete
       await page.waitForFunction(
         () => {
-          // @ts-ignore
+          // @ts-expect-error
           return window.Clerk?.user;
         },
         { timeout: 10_000 }

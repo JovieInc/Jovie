@@ -3,7 +3,7 @@
  * Tests for bot detection and anti-cloaking utilities
  */
 
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { describe, expect, it } from 'vitest';
 import {
   checkMetaASN,

@@ -47,7 +47,7 @@ for (const line of lines) {
     currentSection = sec[1].trim();
     continue;
   }
-  const m = /^\s*-\s*\[([ x\/])\]\s+(.*)$/.exec(line);
+  const m = /^\s*-\s*\[([ x/])\]\s+(.*)$/.exec(line);
   if (!m) continue;
   const state = m[1];
   const title = m[2].trim();

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import React from 'react';
+import type React from 'react';
 
 // Lazy load non-critical providers to reduce initial bundle size
 const TooltipProvider = dynamic(

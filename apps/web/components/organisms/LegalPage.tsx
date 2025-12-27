@@ -1,7 +1,7 @@
 import type { LegalHeroProps } from '@/components/molecules/LegalHero';
 import { LegalSupportBlock } from '@/components/molecules/LegalSupportBlock';
 import { DocPage } from '@/components/organisms/DocPage';
-import { LegalDocument } from '@/lib/legal/getLegalDocument';
+import type { LegalDocument } from '@/lib/legal/getLegalDocument';
 
 export interface LegalPageProps {
   doc: LegalDocument;

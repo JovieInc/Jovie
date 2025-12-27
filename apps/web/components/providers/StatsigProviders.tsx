@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { MyStatsig } from '@/app/my-statsig';
 
 export interface StatsigProvidersProps {

@@ -8,13 +8,13 @@
 
 import { createFetcher } from './fetcher';
 import {
-  ApiClientConfig,
+  type ApiClientConfig,
   ApiError,
-  ApiResponse,
-  ApiResult,
-  HttpMethod,
-  RequestOptions,
-  RequestWithBodyOptions,
+  type ApiResponse,
+  type ApiResult,
+  type HttpMethod,
+  type RequestOptions,
+  type RequestWithBodyOptions,
 } from './types';
 
 // =============================================================================

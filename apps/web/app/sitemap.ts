@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 import { MARKETING_URL, PROFILE_URL } from '@/constants/app';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';

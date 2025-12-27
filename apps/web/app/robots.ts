@@ -1,4 +1,4 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from 'next';
 import { MARKETING_URL } from '@/constants/app';
 
 // Multi-domain robots.txt configuration

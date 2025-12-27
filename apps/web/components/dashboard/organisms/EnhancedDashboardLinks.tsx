@@ -627,10 +627,12 @@ export function EnhancedDashboardLinks({
 
       if (suggestionsEnabled && response.suggestions) {
         setSuggestions(
-          response.suggestions.map((suggestion: SuggestedLink, index: number) => ({
-            ...suggestion,
-            suggestionId: suggestion.suggestionId ?? `suggestion-${index}`,
-          }))
+          response.suggestions.map(
+            (suggestion: SuggestedLink, index: number) => ({
+              ...suggestion,
+              suggestionId: suggestion.suggestionId ?? `suggestion-${index}`,
+            })
+          )
         );
       }
     } catch (error) {

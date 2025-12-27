@@ -1,8 +1,9 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Artist } from '@/types/db';
+import type React from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { Artist } from '@/types/db';
 
 export type ArtistTheme = 'light' | 'dark' | 'auto';
 

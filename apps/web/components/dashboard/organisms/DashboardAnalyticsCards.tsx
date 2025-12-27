@@ -60,7 +60,7 @@ export function DashboardAnalyticsCards({
     const step = (now: number) => {
       const t = Math.min(1, (now - startTime) / duration);
       // easeOutCubic
-      const eased = 1 - Math.pow(1 - t, 3);
+      const eased = 1 - (1 - t) ** 3;
       const nextValue = Math.round(
         startValue + (endValue - startValue) * eased
       );

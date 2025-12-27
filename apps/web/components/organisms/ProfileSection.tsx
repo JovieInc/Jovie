@@ -1,7 +1,7 @@
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { FrostedContainer } from '@/components/molecules/FrostedContainer';
 import { Container } from '@/components/site/Container';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface ProfileSectionProps {
   artist: Artist;

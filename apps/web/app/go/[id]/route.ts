@@ -3,7 +3,7 @@
  * Fast redirects for normal (non-sensitive) links with anti-cloaking compliance
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import {
   getWrappedLink,
   incrementClickCount,
@@ -39,10 +39,11 @@ export async function GET(
       return NextResponse.redirect(interstitialUrl, { status: 302 });
     }
 
-    // Increment click count asynchronously (don't wait)
-    incrementClickCount(shortId).catch(error => {
+    try {
+      await incrementClickCount(shortId);
+    } catch (error) {
       console.error('Failed to increment click count:', error);
-    });
+    }
 
     // Create redirect response with anti-cloaking headers
     const response = NextResponse.redirect(wrappedLink.originalUrl, {

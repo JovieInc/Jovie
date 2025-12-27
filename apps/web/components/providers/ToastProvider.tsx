@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { ToastProvider as ToastContextProvider } from '@/components/molecules/ToastContainer';
 
 interface ToastProviderProps {

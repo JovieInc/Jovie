@@ -1,18 +1,18 @@
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { Input } from '@jovie/ui';
-import React from 'react';
+import type React from 'react';
 
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
-import { type DetectedLink } from '@/lib/utils/platform-detection';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputPlatformSelector } from './UniversalLinkInputPlatformSelector';
-import {
-  type ArtistSearchProvider,
+import type {
+  ArtistSearchProvider,
   PLATFORM_OPTIONS,
 } from './universalLinkInput.constants';
-import { type CursorPosition } from './useInputFocusController';
+import type { CursorPosition } from './useInputFocusController';
 
 interface UniversalLinkInputUrlModeProps {
   url: string;

@@ -6,8 +6,8 @@
  * and whether links can be moved between sections.
  */
 
-import { type DetectedLink } from '@/lib/utils/platform-detection';
-import { type LinkSection } from './link-display-utils';
+import type { DetectedLink } from '@/lib/utils/platform-detection';
+import type { LinkSection } from './link-display-utils';
 
 // Re-export LinkSection for convenience
 export type { LinkSection } from './link-display-utils';

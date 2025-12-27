@@ -13,7 +13,7 @@
  *   tsx tools/codemods/migrate-frosted-button.ts [path] [--dry-run]
  */
 
-import fs from 'fs';
+import fs from 'node:fs';
 import { glob } from 'glob';
 
 interface MigrationStats {
@@ -36,7 +36,7 @@ const targetPath = process.argv[2] || 'components/**/*.{tsx,ts}';
 /**
  * Transform FrostedButton component to Button with variant
  */
-function transformFile(filePath: string, content: string): string | null {
+function transformFile(_filePath: string, content: string): string | null {
   let modified = content;
   let hasChanges = false;
 
@@ -55,7 +55,7 @@ function transformFile(filePath: string, content: string): string | null {
   // 2. Transform component usage
   // Handle self-closing tags: <FrostedButton ... />
   const selfClosingRegex = /<FrostedButton\s+([^>]*?)\/>/g;
-  modified = modified.replace(selfClosingRegex, (match, props) => {
+  modified = modified.replace(selfClosingRegex, (_match, props) => {
     hasChanges = true;
     stats.transformations++;
     return transformFrostedButtonProps(`<Button ${props}/>`, props);
@@ -63,7 +63,7 @@ function transformFile(filePath: string, content: string): string | null {
 
   // Handle opening tags: <FrostedButton ...>
   const openingRegex = /<FrostedButton(\s+[^>]*?)?>/g;
-  modified = modified.replace(openingRegex, (match, props) => {
+  modified = modified.replace(openingRegex, (_match, props) => {
     hasChanges = true;
     stats.transformations++;
     return transformFrostedButtonProps(`<Button${props || ''}>`, props || '');
@@ -192,7 +192,9 @@ async function main() {
 
   if (stats.errors.length > 0) {
     console.log(`\n❌ Errors: ${stats.errors.length}`);
-    stats.errors.forEach(err => console.log(`  - ${err}`));
+    stats.errors.forEach(err => {
+      console.log(`  - ${err}`);
+    });
   }
 
   if (isDryRun && stats.filesModified > 0) {

@@ -1,6 +1,6 @@
 import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 import { ProfileSection } from './ProfileSection';
 
 const meta: Meta<typeof ProfileSection> = {

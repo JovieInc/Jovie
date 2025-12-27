@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { creatorProfiles, tips } from '@/lib/db/schema';

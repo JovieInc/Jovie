@@ -18,8 +18,8 @@
 import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import { type NextRequest, NextResponse } from 'next/server';
+import type Stripe from 'stripe';
 import { db, withTransaction } from '@/lib/db';
 import { stripeWebhookEvents, users } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
@@ -498,18 +498,36 @@ async function handlePaymentSucceeded(
     // If this is for a subscription, ensure the user's status is up to date
     if (subscriptionId && typeof subscriptionId === 'string') {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const userId = subscription.metadata?.clerk_user_id;
+      let userId: string | undefined = subscription.metadata?.clerk_user_id;
 
-      if (userId) {
-        await processSubscription(
-          subscription,
-          userId,
-          stripeEventId,
-          stripeEventTimestamp,
-          'payment_succeeded'
-        );
-        await invalidateBillingCache();
+      // Fallback: Look up user by Stripe customer ID if metadata is missing
+      if (!userId && typeof subscription.customer === 'string') {
+        userId =
+          (await getUserIdFromStripeCustomer(subscription.customer)) ??
+          undefined;
       }
+
+      if (!userId) {
+        await captureCriticalError(
+          'Cannot identify user for payment succeeded event',
+          new Error('Missing user ID in subscription'),
+          {
+            route: '/api/stripe/webhooks',
+            event: 'invoice.payment_succeeded',
+            invoiceId: invoice.id,
+          }
+        );
+        throw new Error('Missing user ID for invoice.payment_succeeded');
+      }
+
+      await processSubscription(
+        subscription,
+        userId,
+        stripeEventId,
+        stripeEventTimestamp,
+        'payment_succeeded'
+      );
+      await invalidateBillingCache();
     }
   } catch (error) {
     await captureCriticalError(
@@ -521,6 +539,7 @@ async function handlePaymentSucceeded(
         event: 'invoice.payment_succeeded',
       }
     );
+    throw error;
   }
 }
 
@@ -565,53 +584,39 @@ async function handlePaymentFailed(
     }
 
     if (userId) {
-      // Expanded payment failure handling: Handle all failure statuses
-      // past_due: Payment is late but subscription is still technically active
-      // unpaid: Multiple payment attempts failed
-      // incomplete: Initial payment failed (new subscription)
-      // incomplete_expired: Initial payment failed and grace period expired
-      const failureStatuses = [
-        'past_due',
-        'unpaid',
-        'incomplete',
-        'incomplete_expired',
-      ];
+      const customerId = getCustomerId(subscription.customer);
+      const result = await updateUserBillingStatus({
+        clerkUserId: userId,
+        isPro: false,
+        stripeCustomerId: customerId ?? undefined,
+        stripeSubscriptionId: null,
+        stripeEventId,
+        stripeEventTimestamp,
+        eventType: 'payment_failed',
+        source: 'webhook',
+        metadata: {
+          subscriptionStatus: subscription.status,
+          invoiceId: invoice.id,
+          amountDue: invoice.amount_due,
+          attemptCount: invoice.attempt_count,
+        },
+      });
 
-      if (failureStatuses.includes(subscription.status)) {
-        const customerId = getCustomerId(subscription.customer);
-        const result = await updateUserBillingStatus({
-          clerkUserId: userId,
-          isPro: false,
-          stripeCustomerId: customerId ?? undefined,
-          stripeSubscriptionId: null,
-          stripeEventId,
-          stripeEventTimestamp,
-          eventType: 'payment_failed',
-          source: 'webhook',
-          metadata: {
+      if (!result.success && !result.skipped) {
+        await captureCriticalError(
+          'Failed to downgrade user after payment failure',
+          new Error(result.error || 'Unknown error'),
+          {
+            userId,
             subscriptionStatus: subscription.status,
-            invoiceId: invoice.id,
-            amountDue: invoice.amount_due,
-            attemptCount: invoice.attempt_count,
-          },
-        });
-
-        if (!result.success && !result.skipped) {
-          await captureCriticalError(
-            'Failed to downgrade user after payment failure',
-            new Error(result.error || 'Unknown error'),
-            {
-              userId,
-              subscriptionStatus: subscription.status,
-              route: '/api/stripe/webhooks',
-              event: 'invoice.payment_failed',
-            }
-          );
-          throw new Error(`Failed to downgrade user: ${result.error}`);
-        }
-
-        await invalidateBillingCache();
+            route: '/api/stripe/webhooks',
+            event: 'invoice.payment_failed',
+          }
+        );
+        throw new Error(`Failed to downgrade user: ${result.error}`);
       }
+
+      await invalidateBillingCache();
     }
   }
 }

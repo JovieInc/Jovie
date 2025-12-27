@@ -3,7 +3,7 @@
  * Conservative bot detection to avoid anti-cloaking penalties
  */
 
-import { NextRequest } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { createScopedLogger } from '@/lib/utils/logger';
 
 const log = createScopedLogger('BotDetection');

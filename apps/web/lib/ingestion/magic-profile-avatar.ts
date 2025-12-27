@@ -118,9 +118,7 @@ export async function maybeCopyIngestionAvatarFromLinks(params: {
       );
 
       return blobUrl;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return null;
@@ -550,9 +548,7 @@ export async function maybeSetProfileAvatarFromLinks(params: {
         .where(eq(creatorProfiles.id, profileId));
 
       return blobUrl;
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return null;

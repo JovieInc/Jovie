@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { createScopedLogger } from '@/lib/utils/logger';
 
 const log = createScopedLogger('Monitoring');

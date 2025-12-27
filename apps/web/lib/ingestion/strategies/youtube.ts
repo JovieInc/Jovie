@@ -253,9 +253,7 @@ export function extractYouTube(html: string): ExtractionResult {
           ],
         },
       });
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   const displayName = extractDisplayName(data);

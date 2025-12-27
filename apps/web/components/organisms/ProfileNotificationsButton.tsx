@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import type React from 'react';
 import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';
 import type { ProfileNotificationsState } from './hooks/useProfileNotificationsController';
 

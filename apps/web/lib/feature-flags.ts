@@ -59,14 +59,8 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
       const data: Record<string, unknown> = await res.json();
       // New app-internal shape: direct booleans
       const hasRpcFlag =
-        Object.prototype.hasOwnProperty.call(
-          data,
-          'featureClickAnalyticsRpc'
-        ) ||
-        Object.prototype.hasOwnProperty.call(
-          data,
-          'feature_click_analytics_rpc'
-        );
+        Object.hasOwn(data, 'featureClickAnalyticsRpc') ||
+        Object.hasOwn(data, 'feature_click_analytics_rpc');
       if (
         typeof data?.artistSearchEnabled !== 'undefined' ||
         typeof data?.debugBannerEnabled !== 'undefined' ||

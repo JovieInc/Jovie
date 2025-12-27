@@ -15,7 +15,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useState } from 'react';
-import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
+import { useOptionalTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminCreatorFilters } from '@/components/admin/AdminCreatorFilters';
 import { CreatorActionsMenu } from '@/components/admin/CreatorActionsMenu';
 import { CreatorAvatarCell } from '@/components/admin/CreatorAvatarCell';
@@ -23,7 +23,7 @@ import {
   getNextSort,
   getSortDirection,
   SORTABLE_COLUMNS,
-  SortableColumnKey,
+  type SortableColumnKey,
 } from '@/components/admin/creator-sort-config';
 import { IngestProfileDropdown } from '@/components/admin/IngestProfileDropdown';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
@@ -70,14 +70,6 @@ const ContactSidebar = dynamic(
 );
 
 const CONTACT_PANEL_WIDTH = 320;
-
-function useOptionalTableMeta() {
-  try {
-    return useTableMeta();
-  } catch {
-    return null;
-  }
-}
 
 export interface AdminCreatorProfilesWithSidebarProps {
   profiles: AdminCreatorProfileRow[];
@@ -157,7 +149,7 @@ export function AdminCreatorProfilesWithSidebar({
   const tableMetaCtx = useOptionalTableMeta();
   const [searchTerm, setSearchTerm] = useState(search);
   const setTableMeta = React.useMemo(
-    () => tableMetaCtx?.setTableMeta ?? (() => {}),
+    () => tableMetaCtx?.setTableMeta ?? (() => { }),
     [tableMetaCtx]
   );
 
@@ -496,7 +488,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 w-14 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -511,7 +503,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 px-4 py-3 text-left border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -555,7 +547,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -569,7 +561,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -583,7 +575,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 px-4 py-3 text-left cursor-pointer select-none border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -597,7 +589,7 @@ export function AdminCreatorProfilesWithSidebar({
                     className={cn(
                       'sticky z-20 px-4 py-3 text-right border-b border-subtle bg-surface-1/80 backdrop-blur supports-backdrop-filter:bg-surface-1/70',
                       headerElevated &&
-                        'shadow-sm shadow-black/10 dark:shadow-black/40'
+                      'shadow-sm shadow-black/10 dark:shadow-black/40'
                     )}
                     style={{ top: stickyTopPx }}
                   >
@@ -711,10 +703,10 @@ export function AdminCreatorProfilesWithSidebar({
                         <td className='px-4 py-3 align-middle text-xs text-tertiary-token whitespace-nowrap'>
                           {profile.createdAt
                             ? new Intl.DateTimeFormat('en-US', {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              }).format(profile.createdAt)
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            }).format(profile.createdAt)
                             : '—'}
                         </td>
                         <td className='px-4 py-3 align-middle text-xs whitespace-nowrap'>
@@ -762,7 +754,7 @@ export function AdminCreatorProfilesWithSidebar({
                             className={cn(
                               'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
                               openMenuProfileId === profile.id &&
-                                'opacity-100 pointer-events-auto'
+                              'opacity-100 pointer-events-auto'
                             )}
                           >
                             <CreatorActionsMenu

@@ -1,6 +1,6 @@
 import Script from 'next/script';
 import { APP_URL } from '@/constants/app';
-import { Artist, SocialLink } from '@/types/db';
+import type { Artist, SocialLink } from '@/types/db';
 
 interface ArtistSEOProps {
   artist: Artist;

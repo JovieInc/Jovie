@@ -1,5 +1,5 @@
 import { APP_NAME } from '@/constants/app';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface FooterOptions {
   artist: Artist;

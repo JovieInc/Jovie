@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
@@ -11,15 +11,14 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const CRON_SECRET = process.env.CRON_SECRET;
-
 function isAuthorized(request: NextRequest): boolean {
-  if (!CRON_SECRET) {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
     return false;
   }
 
   const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${CRON_SECRET}`;
+  return authHeader === `Bearer ${cronSecret}`;
 }
 
 const sendWindowSchema = z.object({

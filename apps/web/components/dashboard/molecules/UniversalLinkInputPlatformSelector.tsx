@@ -18,7 +18,7 @@ import {
   type ArtistSearchProvider,
   PLATFORM_OPTIONS,
 } from './universalLinkInput.constants';
-import { type CursorPosition } from './useInputFocusController';
+import type { CursorPosition } from './useInputFocusController';
 
 interface PlatformSelectorProps {
   currentPlatformIcon: string;

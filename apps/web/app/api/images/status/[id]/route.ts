@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { db, profilePhotos, users } from '@/lib/db';
 
 export const runtime = 'edge';
@@ -48,15 +48,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // Get photo record - ensure user owns it by matching Clerk user to internal UUID
-    // @ts-ignore drizzle version mismatch between test/runtime typings
+    // @ts-expect-error drizzle version mismatch between test/runtime typings
     const [row] = await db
-      // @ts-ignore drizzle version mismatch between test/runtime typings
+      // @ts-expect-error drizzle version mismatch between test/runtime typings
       .select({ photo: profilePhotos })
-      // @ts-ignore drizzle version mismatch between test/runtime typings
+      // @ts-expect-error drizzle version mismatch between test/runtime typings
       .from(profilePhotos)
-      // @ts-ignore drizzle version mismatch between test/runtime typings
+      // @ts-expect-error drizzle version mismatch between test/runtime typings
       .innerJoin(users, eq(users.id, profilePhotos.userId))
-      // @ts-ignore drizzle version mismatch between test/runtime typings
+      // @ts-expect-error drizzle version mismatch between test/runtime typings
       .where(and(eq(profilePhotos.id, photoId), eq(users.clerkId, clerkUserId)))
       .limit(1);
 

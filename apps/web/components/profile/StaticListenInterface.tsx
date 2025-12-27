@@ -8,8 +8,8 @@ import {
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { track } from '@/lib/analytics';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
-import { Artist } from '@/types/db';
+import { type AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import type { Artist } from '@/types/db';
 
 interface StaticListenInterfaceProps {
   artist: Artist;

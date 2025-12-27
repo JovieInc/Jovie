@@ -1,5 +1,19 @@
+<<<<<<< /Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/audience/visit/route.ts
+<<<<<<< /Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/audience/visit/route.ts
+
 import { and, eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
+=======
+
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+=======
+import { sql as drizzleSql, eq } from 'drizzle-orm';
+>>>>>>> /Users/timwhite/.windsurf/worktrees/Jovie/Jovie-379d7b44/apps/web/app/api/audience/visit/route.ts
+import { type NextRequest, NextResponse } from 'next/server';
+
+>>>>>>> /Users/timwhite/.windsurf/worktrees/Jovie/Jovie-379d7b44/apps/web/app/api/audience/visit/route.ts
+
 import { z } from 'zod';
 import {
   checkVisitRateLimit,
@@ -178,80 +192,104 @@ export async function POST(request: NextRequest) {
       : [];
 
     await withSystemIngestionSession(async tx => {
-      const [existing] = await tx
-        .select({
-          id: audienceMembers.id,
-          visits: audienceMembers.visits,
-          latestActions: audienceMembers.latestActions,
-          referrerHistory: audienceMembers.referrerHistory,
-          engagementScore: audienceMembers.engagementScore,
-          geoCity: audienceMembers.geoCity,
-          geoCountry: audienceMembers.geoCountry,
-          deviceType: audienceMembers.deviceType,
+      const [inserted] = await tx
+        .insert(audienceMembers)
+        .values({
+          creatorProfileId: profileId,
+          fingerprint,
+          type: 'anonymous',
+          displayName: 'Visitor',
+          firstSeenAt: now,
+          lastSeenAt: now,
+          visits: 1,
+          engagementScore: 1,
+          intentLevel: 'low',
+          geoCity: resolvedGeoCity ?? null,
+          geoCountry: resolvedGeoCountry ?? null,
+          deviceType: normalizedDevice,
+          referrerHistory: referrerEntry,
+          tags: [],
+          latestActions: [],
+          updatedAt: now,
+          createdAt: now,
         })
-        .from(audienceMembers)
-        .where(
-          and(
-            eq(audienceMembers.creatorProfileId, profileId),
-            eq(audienceMembers.fingerprint, fingerprint)
-          )
-        )
-        .limit(1);
+        .onConflictDoNothing({
+          target: [
+            audienceMembers.creatorProfileId,
+            audienceMembers.fingerprint,
+          ],
+        })
+        .returning({ id: audienceMembers.id });
 
-      const updatedVisits = (existing?.visits ?? 0) + 1;
-      const actionCount = Array.isArray(existing?.latestActions)
+      if (inserted) {
+        return;
+      }
+
+      const lockedExistingResult = await tx.execute(
+        drizzleSql`
+          select
+            id,
+            visits,
+            latest_actions as "latestActions",
+            referrer_history as "referrerHistory",
+            engagement_score as "engagementScore",
+            geo_city as "geoCity",
+            geo_country as "geoCountry"
+          from audience_members
+          where creator_profile_id = ${profileId}
+            and fingerprint = ${fingerprint}
+          limit 1
+          for update
+        `
+      );
+
+      const existing =
+        (lockedExistingResult.rows[0] as
+          | {
+              id: string;
+              visits: number | null;
+              latestActions: Record<string, unknown>[] | null;
+              referrerHistory: Record<string, unknown>[] | null;
+              engagementScore: number | null;
+              geoCity: string | null;
+              geoCountry: string | null;
+            }
+          | undefined) ?? undefined;
+
+      if (!existing) {
+        throw new Error('Unable to resolve audience member for visit');
+      }
+
+      const updatedVisits = (existing.visits ?? 0) + 1;
+      const actionCount = Array.isArray(existing.latestActions)
         ? existing.latestActions.length
         : 0;
       const updatedIntent = deriveIntentLevel(updatedVisits, actionCount);
-      const updatedScore = (existing?.engagementScore ?? 0) + 1;
-      const previousReferrers = Array.isArray(existing?.referrerHistory)
+      const updatedScore = (existing.engagementScore ?? 0) + 1;
+      const previousReferrers = Array.isArray(existing.referrerHistory)
         ? existing.referrerHistory
         : [];
       const referrerHistory = trimHistory(
         [...referrerEntry, ...previousReferrers],
         3
       );
-      const geoCityValue = resolvedGeoCity ?? existing?.geoCity ?? null;
-      const geoCountryValue =
-        resolvedGeoCountry ?? existing?.geoCountry ?? null;
+      const geoCityValue = resolvedGeoCity ?? existing.geoCity ?? null;
+      const geoCountryValue = resolvedGeoCountry ?? existing.geoCountry ?? null;
 
-      if (existing) {
-        await tx
-          .update(audienceMembers)
-          .set({
-            visits: updatedVisits,
-            lastSeenAt: now,
-            updatedAt: now,
-            engagementScore: updatedScore,
-            intentLevel: updatedIntent,
-            geoCity: geoCityValue,
-            geoCountry: geoCountryValue,
-            deviceType: normalizedDevice,
-            referrerHistory,
-          })
-          .where(eq(audienceMembers.id, existing.id));
-        return;
-      }
-
-      await tx.insert(audienceMembers).values({
-        creatorProfileId: profileId,
-        fingerprint,
-        type: 'anonymous',
-        displayName: 'Visitor',
-        firstSeenAt: now,
-        lastSeenAt: now,
-        visits: 1,
-        engagementScore: 1,
-        intentLevel: 'low',
-        geoCity: geoCityValue,
-        geoCountry: geoCountryValue,
-        deviceType: normalizedDevice,
-        referrerHistory,
-        tags: [],
-        latestActions: [],
-        updatedAt: now,
-        createdAt: now,
-      });
+      await tx
+        .update(audienceMembers)
+        .set({
+          visits: updatedVisits,
+          lastSeenAt: now,
+          updatedAt: now,
+          engagementScore: updatedScore,
+          intentLevel: updatedIntent,
+          geoCity: geoCityValue,
+          geoCountry: geoCountryValue,
+          deviceType: normalizedDevice,
+          referrerHistory,
+        })
+        .where(eq(audienceMembers.id, existing.id));
     });
 
     return NextResponse.json(

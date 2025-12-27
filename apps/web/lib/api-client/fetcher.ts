@@ -6,17 +6,17 @@
  */
 
 import {
-  ApiClientConfig,
+  type ApiClientConfig,
   ApiError,
   ApiErrorCode,
-  ApiErrorResponse,
-  ApiResponse,
-  ApiResult,
+  type ApiErrorResponse,
+  type ApiResponse,
+  type ApiResult,
   DEFAULT_API_CLIENT_CONFIG,
-  HttpMethod,
+  type HttpMethod,
   isApiErrorResponse,
-  RequestOptions,
-  RequestWithBodyOptions,
+  type RequestOptions,
+  type RequestWithBodyOptions,
 } from './types';
 
 // =============================================================================

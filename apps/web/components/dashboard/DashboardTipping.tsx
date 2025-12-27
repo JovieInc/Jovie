@@ -12,7 +12,7 @@ import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { PROFILE_URL } from '@/constants/domains';
 import { updateVenmoHandle } from '@/lib/api-client/endpoints/dashboard/profile';
 import { cn } from '@/lib/utils';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 const formatCount = (value: number) => value.toLocaleString();
 

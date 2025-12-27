@@ -46,7 +46,7 @@ import {
   fetchYouTubeAboutDocument,
   isYouTubeChannelUrl,
 } from './strategies/youtube';
-import { type ExtractionResult } from './types';
+import type { ExtractionResult } from './types';
 
 // Retry configuration
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -73,7 +73,7 @@ export function calculateBackoff(
     reason === 'rate_limited' ? RATE_LIMIT_BASE_BACKOFF_MS : BASE_BACKOFF_MS;
   const cap =
     reason === 'rate_limited' ? RATE_LIMIT_MAX_BACKOFF_MS : MAX_BACKOFF_MS;
-  const exponentialDelay = base * Math.pow(2, attempt - 1);
+  const exponentialDelay = base * 2 ** (attempt - 1);
   const jitterRange = reason === 'rate_limited' ? 5000 : 1000; // broader jitter for rate limits
   const jitter = Math.random() * jitterRange; // small random jitter to avoid thundering herd
   return Math.min(exponentialDelay + jitter, cap);

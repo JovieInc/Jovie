@@ -14,7 +14,7 @@
 
 import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+import type Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
@@ -43,9 +43,6 @@ export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
-
 interface ReconciliationStats {
   usersChecked: number;
   mismatches: number;
@@ -72,8 +69,9 @@ export async function GET(request: Request) {
 
   // Verify cron secret in production
   if (process.env.NODE_ENV === 'production') {
+    const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }

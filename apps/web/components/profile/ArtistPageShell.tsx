@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/ProfileShell';
 import type { PublicContact } from '@/types/contacts';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 type ArtistPageShellProps = {
   artist: Artist;

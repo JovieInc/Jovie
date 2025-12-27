@@ -7,12 +7,12 @@ import { Input } from '@/components/atoms/Input';
 import { FormField } from '@/components/molecules/FormField';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import {
-  UpdateProfileResponse,
+  type UpdateProfileResponse,
   updateProfile,
 } from '@/lib/api-client/endpoints/dashboard/profile';
 import { ApiError } from '@/lib/api-client/types';
 // flags import removed - pre-launch
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 interface ProfileFormProps {
   artist: Artist;

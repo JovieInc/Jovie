@@ -7,7 +7,8 @@ import {
 } from '@heroicons/react/24/outline';
 import { Button } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
-import React, {
+import type React from 'react';
+import {
   createContext,
   useContext,
   useEffect,
@@ -58,6 +59,10 @@ export function useTableMeta(): TableMetaContextValue {
     throw new Error('useTableMeta must be used within DashboardLayoutClient');
   }
   return ctx;
+}
+
+export function useOptionalTableMeta(): TableMetaContextValue | null {
+  return useContext(TableMetaContext);
 }
 
 interface DashboardLayoutClientProps {

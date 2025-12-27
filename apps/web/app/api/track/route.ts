@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -11,7 +11,7 @@ import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-import { LinkType } from '@/types/db';
+import type { LinkType } from '@/types/db';
 import {
   createFingerprint,
   deriveIntentLevel,
@@ -250,9 +250,30 @@ export async function POST(request: NextRequest) {
         throw new Error('Unable to resolve audience member');
       }
 
+      const lockedMemberResult = await tx.execute(
+        drizzleSql`
+          select
+            id,
+            visits,
+            engagement_score as "engagementScore",
+            latest_actions as "latestActions",
+            geo_city as "geoCity",
+            geo_country as "geoCountry",
+            device_type as "deviceType",
+            spotify_connected as "spotifyConnected"
+          from audience_members
+          where id = ${resolvedMember.id}
+          for update
+        `
+      );
+
+      const lockedMember =
+        (lockedMemberResult.rows[0] as typeof resolvedMember | undefined) ??
+        resolvedMember;
+
       const now = new Date();
-      const existingActions = Array.isArray(resolvedMember.latestActions)
-        ? resolvedMember.latestActions
+      const existingActions = Array.isArray(lockedMember.latestActions)
+        ? lockedMember.latestActions
         : [];
       const actionEntry = {
         label: ACTION_LABELS[linkType] ?? 'interacted',
@@ -264,9 +285,9 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
+      const updatedScore = (lockedMember.engagementScore ?? 0) + weight;
       const intentLevel = deriveIntentLevel(
-        resolvedMember.visits ?? 0,
+        lockedMember.visits ?? 0,
         actionCount
       );
 
@@ -282,7 +303,7 @@ export async function POST(request: NextRequest) {
           geoCity: geoCity ?? resolvedMember.geoCity ?? null,
           geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
           spotifyConnected:
-            Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
+            Boolean(lockedMember.spotifyConnected) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, resolvedMember.id));
 
@@ -305,6 +326,16 @@ export async function POST(request: NextRequest) {
         })
         .returning({ id: clickEvents.id });
 
+      if (linkType === 'social' && linkId) {
+        await tx
+          .update(socialLinks)
+          .set({
+            clicks: drizzleSql`${socialLinks.clicks} + 1`,
+            updatedAt: now,
+          })
+          .where(eq(socialLinks.id, linkId));
+      }
+
       return insertedClickEvent ? [insertedClickEvent] : [];
     });
 
@@ -322,31 +353,6 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to log click event' },
         { status: 500, headers: NO_STORE_HEADERS }
       );
-    }
-
-    const socialLinkUpdate =
-      linkType === 'social' && linkId
-        ? db
-            .update(socialLinks)
-            .set({
-              clicks: drizzleSql`${socialLinks.clicks} + 1`,
-              updatedAt: new Date(),
-            })
-            .where(eq(socialLinks.id, linkId))
-            .catch(error =>
-              captureError('Failed to update social link click count', error, {
-                route: '/api/track',
-                creatorProfileId: profile.id,
-                handle,
-                linkId,
-                linkType,
-              })
-            )
-        : null;
-
-    if (socialLinkUpdate) {
-      // Fire-and-forget: failures are logged but should not block the request
-      void socialLinkUpdate;
     }
 
     return NextResponse.json(

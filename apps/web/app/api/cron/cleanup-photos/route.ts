@@ -8,9 +8,6 @@ export const maxDuration = 60; // Allow up to 60 seconds for cleanup
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
-
 // Cleanup thresholds
 const FAILED_RECORD_MAX_AGE_HOURS = 24;
 const UPLOADING_RECORD_MAX_AGE_HOURS = 1; // Stuck uploads older than 1 hour
@@ -27,8 +24,9 @@ const UPLOADING_RECORD_MAX_AGE_HOURS = 1; // Stuck uploads older than 1 hour
 export async function GET(request: Request) {
   // Verify cron secret in production
   if (process.env.NODE_ENV === 'production') {
+    const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }

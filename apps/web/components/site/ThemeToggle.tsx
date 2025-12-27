@@ -8,7 +8,8 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import type React from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 interface ThemeToggleProps {
   appearance?: 'icon' | 'segmented';

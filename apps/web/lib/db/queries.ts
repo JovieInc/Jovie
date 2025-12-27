@@ -2,7 +2,7 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { createScopedLogger } from '@/lib/utils/logger';
 import { db } from './index';
 import {
-  CreatorContact,
+  type CreatorContact,
   creatorContacts,
   creatorProfiles,
   socialLinks,
@@ -275,9 +275,7 @@ export async function incrementProfileViews(
 
       // If not the last attempt, wait before retrying (exponential backoff)
       if (attempt < maxRetries) {
-        await new Promise(resolve =>
-          setTimeout(resolve, Math.pow(2, attempt) * 100)
-        );
+        await new Promise(resolve => setTimeout(resolve, 2 ** attempt * 100));
       }
     }
   }

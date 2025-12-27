@@ -1,6 +1,37 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
 export default function Loading() {
+  const headerKeys = [
+    'header-1',
+    'header-2',
+    'header-3',
+    'header-4',
+    'header-5',
+    'header-6',
+    'header-7',
+  ] as const;
+  const rowKeys = [
+    'row-1',
+    'row-2',
+    'row-3',
+    'row-4',
+    'row-5',
+    'row-6',
+    'row-7',
+    'row-8',
+    'row-9',
+    'row-10',
+  ] as const;
+  const cellKeys = [
+    'cell-1',
+    'cell-2',
+    'cell-3',
+    'cell-4',
+    'cell-5',
+    'cell-6',
+    'cell-7',
+  ] as const;
+
   return (
     <div className='flex h-full min-h-0 flex-col'>
       <div className='shrink-0 border-b border-subtle bg-surface-1/75 backdrop-blur-md'>
@@ -19,9 +50,9 @@ export default function Loading() {
             <div className='px-4 py-4 sm:px-6'>
               <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 shadow-sm'>
                 <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
-                  {Array.from({ length: 7 }).map((_, index) => (
+                  {headerKeys.map(key => (
                     <LoadingSkeleton
-                      key={`header-${index}`}
+                      key={key}
                       height='h-4'
                       width='w-24'
                       rounded='md'
@@ -29,15 +60,15 @@ export default function Loading() {
                   ))}
                 </div>
                 <ul>
-                  {Array.from({ length: 10 }).map((_, rowIndex) => (
+                  {rowKeys.map(rowKey => (
                     <li
-                      key={`row-${rowIndex}`}
+                      key={rowKey}
                       className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3 last:border-b-0'
                       aria-hidden='true'
                     >
-                      {Array.from({ length: 7 }).map((__, colIndex) => (
+                      {cellKeys.map(cellKey => (
                         <LoadingSkeleton
-                          key={`cell-${rowIndex}-${colIndex}`}
+                          key={`${rowKey}-${cellKey}`}
                           height='h-4'
                           width='w-full'
                           rounded='md'

@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import type { NextRequest } from 'next/server';
 import { describe, expect, it, vi } from 'vitest';
-import { LinkType } from '@/types/db';
+import type { LinkType } from '@/types/db';
 
 const PERF_LATENCY_ENABLED = process.env.PERF_LATENCY === 'true';
 

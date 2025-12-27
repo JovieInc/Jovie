@@ -152,7 +152,7 @@ async function withRetry<T>(
       // Exponential backoff delay
       const delay =
         DB_CONFIG.retryDelay *
-        Math.pow(DB_CONFIG.retryBackoffMultiplier, attempt - 1);
+        DB_CONFIG.retryBackoffMultiplier ** (attempt - 1);
       await new Promise(resolve => setTimeout(resolve, delay));
     }
   }

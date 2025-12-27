@@ -75,10 +75,7 @@ const normalizePreferences = (
     dismissedNotificationIds: normalizeDismissed(notifications),
     preferredChannel:
       notifications.preferredChannel &&
-      Object.prototype.hasOwnProperty.call(
-        DEFAULT_CHANNELS,
-        notifications.preferredChannel
-      )
+      Object.hasOwn(DEFAULT_CHANNELS, notifications.preferredChannel)
         ? notifications.preferredChannel
         : undefined,
     email: fallbackEmail ?? null,

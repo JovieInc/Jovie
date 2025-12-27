@@ -25,7 +25,7 @@ import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { PublicContact } from '@/types/contacts';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 import type {
   NotificationChannel,
   NotificationContactValues,

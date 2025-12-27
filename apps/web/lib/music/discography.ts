@@ -1,4 +1,4 @@
-import { DSPS } from '@/constants/app';
+import type { DSPS } from '@/constants/app';
 
 export type DSPProviderKey = keyof typeof DSPS | 'youtube_music';
 

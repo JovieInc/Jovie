@@ -9,5 +9,3 @@ declare global {
   // If you're using the raw SQL client directly, you might also want:
   // var sql: NeonQueryFunction<boolean, boolean>;
 }
-
-export {}; // This file needs to be a module

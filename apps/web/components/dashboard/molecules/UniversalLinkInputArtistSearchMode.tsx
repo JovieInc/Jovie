@@ -20,7 +20,7 @@ import {
   ARTIST_SEARCH_PLATFORMS,
   type ArtistSearchProvider,
 } from './universalLinkInput.constants';
-import { type CursorPosition } from './useInputFocusController';
+import type { CursorPosition } from './useInputFocusController';
 
 interface ArtistSearchModeProps {
   provider: ArtistSearchProvider;

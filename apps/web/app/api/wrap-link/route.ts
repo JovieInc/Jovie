@@ -26,7 +26,7 @@
 export const runtime = 'nodejs';
 
 import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
 import { createWrappedLink } from '@/lib/services/link-wrapping';
 import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';

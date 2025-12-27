@@ -8,7 +8,7 @@ import { track } from '@/lib/analytics';
  * @returns A function that wraps the query function and tracks its performance
  */
 export function trackDatabaseQuery(operation: string) {
-  return async function <T>(queryFn: () => Promise<T>): Promise<T> {
+  return async <T>(queryFn: () => Promise<T>): Promise<T> => {
     const start = performance.now();
 
     try {

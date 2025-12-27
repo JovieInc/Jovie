@@ -1,5 +1,15 @@
+<<<<<<< /Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web/app/api/audience/click/route.ts
+
 import { and, eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
+=======
+
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { type NextRequest, NextResponse } from 'next/server';
+
+>>>>>>> /Users/timwhite/.windsurf/worktrees/Jovie/Jovie-379d7b44/apps/web/app/api/audience/click/route.ts
+
 import { z } from 'zod';
 import {
   checkClickRateLimit,
@@ -300,8 +310,29 @@ export async function POST(request: NextRequest) {
         throw new Error('Unable to resolve audience member');
       }
 
-      const existingActions = Array.isArray(member.latestActions)
-        ? member.latestActions
+      const lockedMemberResult = await tx.execute(
+        drizzleSql`
+          select
+            id,
+            visits,
+            engagement_score as "engagementScore",
+            latest_actions as "latestActions",
+            geo_city as "geoCity",
+            geo_country as "geoCountry",
+            device_type as "deviceType",
+            spotify_connected as "spotifyConnected"
+          from audience_members
+          where id = ${member.id}
+          for update
+        `
+      );
+
+      const lockedMember =
+        (lockedMemberResult.rows[0] as AudienceMemberRecord | undefined) ??
+        member;
+
+      const existingActions = Array.isArray(lockedMember.latestActions)
+        ? lockedMember.latestActions
         : [];
       const actionEntry = {
         label: actionLabel ?? ACTION_LABELS[linkType] ?? 'interacted',
@@ -313,8 +344,11 @@ export async function POST(request: NextRequest) {
       const latestActions = trimHistory([actionEntry, ...existingActions], 5);
       const actionCount = latestActions.length;
       const weight = getActionWeight(linkType);
-      const updatedScore = (member.engagementScore ?? 0) + weight;
-      const intentLevel = deriveIntentLevel(member.visits ?? 0, actionCount);
+      const updatedScore = (lockedMember.engagementScore ?? 0) + weight;
+      const intentLevel = deriveIntentLevel(
+        lockedMember.visits ?? 0,
+        actionCount
+      );
 
       await tx.insert(clickEvents).values({
         creatorProfileId: profileId,
@@ -342,10 +376,10 @@ export async function POST(request: NextRequest) {
           intentLevel,
           latestActions,
           deviceType: normalizedDevice,
-          geoCity: city ?? member.geoCity ?? null,
-          geoCountry: country ?? member.geoCountry ?? null,
+          geoCity: city ?? lockedMember.geoCity ?? null,
+          geoCountry: country ?? lockedMember.geoCountry ?? null,
           spotifyConnected:
-            (member.spotifyConnected ?? false) || linkType === 'listen',
+            (lockedMember.spotifyConnected ?? false) || linkType === 'listen',
         })
         .where(eq(audienceMembers.id, member.id));
     });

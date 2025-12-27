@@ -2,7 +2,7 @@
 
 import {
   LogLevel,
-  StatsigClient,
+  type StatsigClient,
   type StatsigPlugin,
   StatsigProvider,
   useClientAsyncInit,

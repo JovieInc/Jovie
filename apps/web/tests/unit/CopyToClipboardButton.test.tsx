@@ -403,4 +403,128 @@ describe('CopyToClipboardButton', () => {
     const statusElement = screen.getByRole('status');
     expect(statusElement).toHaveTextContent('Failed to copy profile URL');
   });
+
+  describe('visual state styling', () => {
+    it('has data-status="idle" initially', () => {
+      setupClipboardMocks(true);
+
+      render(<CopyToClipboardButton relativePath='/test-profile' />);
+
+      const button = screen.getByRole('button');
+      expect(button).toHaveAttribute('data-status', 'idle');
+    });
+
+    it('has data-status="success" and success styling after successful copy', async () => {
+      setupClipboardMocks(true, true);
+
+      render(<CopyToClipboardButton relativePath='/test-profile' />);
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await flushPromises();
+
+      expect(button).toHaveAttribute('data-status', 'success');
+      // Verify success styling classes are applied
+      expect(button.className).toContain('bg-emerald-500/10');
+      expect(button.className).toContain('text-emerald-600');
+    });
+
+    it('has data-status="error" and error styling after failed copy', async () => {
+      setupClipboardMocks(true, false, false);
+
+      // Mock DOM methods for fallback that also fails
+      const mockTextarea = {
+        focus: vi.fn(),
+        select: vi.fn(),
+        value: '',
+        style: {},
+      };
+
+      const mockAppendChild = vi.fn((node: Node | typeof mockTextarea) => {
+        if (node === mockTextarea) {
+          return node;
+        }
+
+        return originalAppendChild(node as Node);
+      });
+      const mockRemoveChild = vi.fn((node: Node | typeof mockTextarea) => {
+        if (node === mockTextarea) {
+          return node;
+        }
+
+        return originalRemoveChild(node as Node);
+      });
+      const mockCreateElement = vi
+        .fn((tagName: string) => {
+          if (tagName === 'textarea') {
+            return mockTextarea as unknown as HTMLTextAreaElement;
+          }
+
+          return originalCreateElement(tagName);
+        })
+        .mockName('mockCreateElement');
+
+      Object.defineProperty(document, 'createElement', {
+        value: mockCreateElement,
+        writable: true,
+      });
+
+      Object.defineProperty(document.body, 'appendChild', {
+        value: mockAppendChild,
+        writable: true,
+      });
+
+      Object.defineProperty(document.body, 'removeChild', {
+        value: mockRemoveChild,
+        writable: true,
+      });
+
+      render(<CopyToClipboardButton relativePath='/test-profile' />);
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await flushPromises();
+
+      expect(button).toHaveAttribute('data-status', 'error');
+      // Verify error styling classes are applied
+      expect(button.className).toContain('bg-red-500/10');
+      expect(button.className).toContain('text-red-600');
+    });
+
+    it('returns to idle state after 2 seconds', async () => {
+      setupClipboardMocks(true, true);
+
+      render(<CopyToClipboardButton relativePath='/test-profile' />);
+
+      const button = screen.getByRole('button');
+      fireEvent.click(button);
+
+      await flushPromises();
+
+      // Should be in success state
+      expect(button).toHaveAttribute('data-status', 'success');
+
+      // Advance timers by 2 seconds
+      await act(async () => {
+        vi.advanceTimersByTime(2000);
+      });
+
+      // Should return to idle state
+      expect(button).toHaveAttribute('data-status', 'idle');
+      expect(button.className).not.toContain('bg-emerald-500/10');
+      expect(button.className).not.toContain('bg-red-500/10');
+    });
+
+    it('includes transition-colors class for smooth animations', () => {
+      setupClipboardMocks(true);
+
+      render(<CopyToClipboardButton relativePath='/test-profile' />);
+
+      const button = screen.getByRole('button');
+      expect(button.className).toContain('transition-colors');
+      expect(button.className).toContain('duration-200');
+    });
+  });
 });

@@ -3,6 +3,21 @@
 import dynamic from 'next/dynamic';
 import type { AdminCreatorProfilesWithSidebarProps } from '@/components/admin/AdminCreatorProfilesWithSidebar';
 
+const skeletonRowKeys = [
+  'row-1',
+  'row-2',
+  'row-3',
+  'row-4',
+  'row-5',
+  'row-6',
+  'row-7',
+  'row-8',
+  'row-9',
+  'row-10',
+  'row-11',
+  'row-12',
+] as const;
+
 const AdminCreatorProfilesWithSidebar = dynamic(
   () =>
     import('@/components/admin/AdminCreatorProfilesWithSidebar').then(mod => ({
@@ -19,9 +34,9 @@ const AdminCreatorProfilesWithSidebar = dynamic(
           </div>
         </div>
         <div className='space-y-2'>
-          {Array.from({ length: 12 }).map((_, i) => (
+          {skeletonRowKeys.map(key => (
             <div
-              key={i}
+              key={key}
               className='h-16 animate-pulse rounded-lg bg-surface-1'
             />
           ))}

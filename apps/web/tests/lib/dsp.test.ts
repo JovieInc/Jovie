@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 describe('DSP Utils', () => {
   const mockArtist: Artist = {

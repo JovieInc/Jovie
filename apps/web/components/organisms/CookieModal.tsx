@@ -7,7 +7,7 @@ import {
   DialogBody,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { type Consent } from '@/lib/cookies/consent';
+import type { Consent } from '@/lib/cookies/consent';
 import { saveConsentClient } from '@/lib/cookies/consent-client';
 
 interface CookieModalProps {

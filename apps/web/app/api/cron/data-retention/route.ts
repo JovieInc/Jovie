@@ -9,7 +9,7 @@
  */
 
 import crypto from 'crypto';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 
 export const runtime = 'nodejs';

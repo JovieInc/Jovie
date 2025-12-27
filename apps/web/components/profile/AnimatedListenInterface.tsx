@@ -13,9 +13,9 @@ import {
   LISTEN_COOKIE,
 } from '@/constants/app';
 import { getDSPDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
-import { AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
+import { type AvailableDSP, getAvailableDSPs } from '@/lib/dsp';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface AnimatedListenInterfaceProps {
   artist: Artist;

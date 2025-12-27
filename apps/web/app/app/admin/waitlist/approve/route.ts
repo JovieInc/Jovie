@@ -91,7 +91,7 @@ async function findAvailableHandle(tx: DbType, base: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
-  let entitlements;
+  let entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>> | undefined;
   try {
     entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {

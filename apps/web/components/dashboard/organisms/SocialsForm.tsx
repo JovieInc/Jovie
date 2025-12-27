@@ -20,7 +20,7 @@ import {
 } from '@/lib/api-client/endpoints/dashboard/social-links';
 import { ApiError } from '@/lib/api-client/types';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface SocialLink {
   id: string;

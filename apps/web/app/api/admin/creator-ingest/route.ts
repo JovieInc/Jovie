@@ -3,7 +3,7 @@ import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { type DbType } from '@/lib/db';
+import type { DbType } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { parseJsonBody } from '@/lib/http/parse-json';

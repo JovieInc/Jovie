@@ -5,7 +5,7 @@ import { StaticListenInterface } from '@/components/profile/StaticListenInterfac
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
 import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
 import type { PublicContact } from '@/types/contacts';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 type PrimaryAction = 'subscribe' | 'listen';
 
@@ -99,7 +99,7 @@ function renderContent(
         </div>
       );
 
-    case 'tip':
+    case 'tip': {
       // Extract Venmo link from social links
       const venmoLink =
         socialLinks.find(l => l.platform === 'venmo')?.url || null;
@@ -145,6 +145,7 @@ function renderContent(
           )}
         </div>
       );
+    }
 
     case 'subscribe':
       // Subscribe mode - show notification subscription form directly

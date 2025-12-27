@@ -52,9 +52,9 @@ export function TableBulkActionsToolbar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start'>
-            {actions.map((action, index) => (
+            {actions.map(action => (
               <DropdownMenuItem
-                key={index}
+                key={action.label}
                 onClick={action.onClick}
                 className='flex items-center gap-2'
               >

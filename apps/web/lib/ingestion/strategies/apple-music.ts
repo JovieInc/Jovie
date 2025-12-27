@@ -423,10 +423,7 @@ function extractAppleMusicJsonLd(
             };
           }
         }
-      } catch {
-        // Invalid JSON, continue to next match
-        continue;
-      }
+      } catch {}
     }
   } catch {
     // Regex or parsing failed

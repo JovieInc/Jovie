@@ -3,7 +3,8 @@
 import { Button, Input, Label } from '@jovie/ui';
 import { Copy, ExternalLink, Plus, RefreshCw, X } from 'lucide-react';
 import Link from 'next/link';
-import React, { useCallback, useMemo, useState } from 'react';
+import type React from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { Avatar } from '@/components/atoms/Avatar';
 import { HeaderIconButton } from '@/components/atoms/HeaderIconButton';

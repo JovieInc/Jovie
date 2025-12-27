@@ -1,7 +1,7 @@
 import { VercelToolbar } from '@vercel/toolbar/next';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import React from 'react';
+import type React from 'react';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch

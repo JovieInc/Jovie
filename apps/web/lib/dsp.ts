@@ -1,4 +1,4 @@
-import { Artist, Release } from '@/types/db';
+import type { Artist, Release } from '@/types/db';
 
 export interface DSPConfig {
   name: string;

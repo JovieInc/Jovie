@@ -6,7 +6,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
-import { type DbType } from '@/lib/db';
+import type { DbType } from '@/lib/db';
 import { creatorContacts, creatorProfiles, users } from '@/lib/db/schema';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 

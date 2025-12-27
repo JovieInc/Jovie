@@ -1,7 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { beforeAll, describe, expect, it } from 'vitest';
-import * as schema from '@/lib/db/schema';
+import type * as schema from '@/lib/db/schema';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 
 // Use the global test database connection provisioned in tests/setup.ts

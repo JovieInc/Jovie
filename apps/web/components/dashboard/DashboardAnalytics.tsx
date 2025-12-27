@@ -8,7 +8,7 @@ import { DashboardRefreshButton } from '@/components/dashboard/atoms/DashboardRe
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { useDashboardAnalytics } from '@/lib/hooks/useDashboardAnalytics';
 import type { AnalyticsRange } from '@/types/analytics';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 type Range = Extract<AnalyticsRange, '1d' | '7d' | '30d'>;
 

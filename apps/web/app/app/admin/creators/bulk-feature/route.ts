@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
 import { bulkSetCreatorsFeaturedAction } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';

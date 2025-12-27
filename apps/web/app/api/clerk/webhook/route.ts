@@ -1,7 +1,7 @@
 import { clerkClient } from '@clerk/nextjs/server';
 import { randomBytes } from 'crypto';
 import { headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 

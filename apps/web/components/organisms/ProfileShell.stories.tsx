@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 import { ProfileShell } from './ProfileShell';
 
 // Mock data for the stories

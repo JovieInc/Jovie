@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,

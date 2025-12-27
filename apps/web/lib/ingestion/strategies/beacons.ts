@@ -432,10 +432,7 @@ function extractJsonLd(html: string): { name?: string; image?: string } | null {
             };
           }
         }
-      } catch {
-        // Invalid JSON, continue to next match
-        continue;
-      }
+      } catch {}
     }
   } catch {
     // Regex or parsing failed

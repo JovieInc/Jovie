@@ -1,5 +1,5 @@
 import { Footer } from '@/components/organisms/Footer';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface ProfileFooterProps {
   artist: Artist;

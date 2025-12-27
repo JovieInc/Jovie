@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import React from 'react';
+import type React from 'react';
 import { describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state

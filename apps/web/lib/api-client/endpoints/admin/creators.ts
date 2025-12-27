@@ -30,8 +30,8 @@
  */
 
 import { api } from '../../client';
-import { ApiResult, RequestOptions } from '../../types';
-import {
+import type { ApiResult, RequestOptions } from '../../types';
+import type {
   AdminSocialLink,
   GetCreatorSocialLinksResponse,
   IngestCreatorPartialResponse,

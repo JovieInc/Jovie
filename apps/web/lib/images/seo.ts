@@ -3,7 +3,7 @@
  */
 
 import { publicEnv } from '@/lib/env-public';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 /**
  * Generate SEO-friendly alt text from various sources

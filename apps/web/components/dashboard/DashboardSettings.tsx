@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
 import { useDashboardData } from '@/app/app/dashboard/DashboardDataContext';
-import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
+import { type Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 const SettingsPolished = dynamic(
   () =>

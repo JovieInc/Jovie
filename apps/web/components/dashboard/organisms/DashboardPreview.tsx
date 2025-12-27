@@ -2,7 +2,8 @@
 
 import { useSession } from '@clerk/nextjs';
 import Link from 'next/link';
-import React, { useEffect, useMemo, useState } from 'react';
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CopyToClipboardButton } from '@/components/dashboard/atoms/CopyToClipboardButton';
 import { StatusBarMock } from '@/components/dashboard/molecules/StatusBarMock';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';

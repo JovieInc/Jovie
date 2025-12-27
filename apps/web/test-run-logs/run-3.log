@@ -1,0 +1,839 @@
+
+> @jovie/web@0.1.0 test
+> NODE_OPTIONS=--max-old-space-size=8192 vitest run --config=vitest.config.mts
+
+[dotenv@17.2.3] injecting env (0) from .env.test -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+
+ RUN  v3.2.4 /Users/timwhite/Documents/GitHub/TBF/Jovie/apps/web
+
+ ❯ lib/api-client/fetcher.test.ts (48 tests | 10 failed) 30605ms
+   ✓ fetcher > success cases > GET: returns parsed JSON data 233ms
+   ✓ fetcher > success cases > POST: sends body and returns response 14ms
+   ✓ fetcher > success cases > PUT: sends body and returns response 29ms
+   ✓ fetcher > success cases > PATCH: sends partial body and returns response 14ms
+   ✓ fetcher > success cases > DELETE: sends request and returns response 44ms
+   ✓ fetcher > success cases > handles 204 No Content responses 79ms
+   ✓ fetcher > success cases > handles empty response bodies 3ms
+   ✓ fetcher > success cases > includes custom headers in request 8ms
+   ✓ fetcher > WithResponse variants > getWithResponse: returns full response object 7ms
+   ✓ fetcher > WithResponse variants > postWithResponse: returns full response object 2ms
+   ✓ fetcher > error handling > throws ApiError for 400 Bad Request 7ms
+   ✓ fetcher > error handling > throws ApiError for 401 Unauthorized 3ms
+   ✓ fetcher > error handling > throws ApiError for 403 Forbidden 1ms
+   ✓ fetcher > error handling > throws ApiError for 404 Not Found 2ms
+   ✓ fetcher > error handling > throws ApiError for 409 Conflict 8ms
+   ✓ fetcher > error handling > throws ApiError for 422 Unprocessable Entity 3ms
+   ✓ fetcher > error handling > throws ApiError for 429 Rate Limited 2ms
+   ✓ fetcher > error handling > throws ApiError for 500 Server Error 5ms
+   ✓ fetcher > error handling > provides default error message when response has no error field 1ms
+   ✓ fetcher > error handling > includes response body in ApiError 6ms
+   ✓ fetcher > network errors > throws ApiError for network failures 2ms
+   ✓ fetcher > network errors > throws ApiError with ABORTED code for AbortError 7ms
+   × fetcher > timeout behavior > aborts request after timeout 10050ms
+     → Test timed out in 10000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × fetcher > timeout behavior > uses config timeout when option not specified 10009ms
+     → Test timed out in 10000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ fetcher > timeout behavior > clears timeout on successful response 2ms
+   ✓ fetcher > response parsing > handles non-JSON content-type gracefully 1ms
+   ✓ fetcher > response parsing > tries to parse JSON even with wrong content-type 1ms
+   ✓ fetcher > response parsing > throws ApiError for JSON parse failures on success responses 1ms
+   ✓ fetcher > request method (result pattern) > returns ok: true with data on success 1ms
+   ✓ fetcher > request method (result pattern) > returns ok: false with error on failure 1ms
+   ✓ fetcher > request method (result pattern) > returns ok: false with error on network failure 0ms
+   ✓ fetcher > request method (result pattern) > supports POST with body 0ms
+   × fetcher > configuration > uses baseUrl from configuration 11ms
+     → expected "spy" to be called with arguments: [ …(2) ][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[2m  [[22m
+[32m-   "https://api.example.com/items",[90m
+[32m-   Anything,[90m
+[31m+   "/items",[90m
+[31m+   {[90m
+[31m+     "body": undefined,[90m
+[31m+     "cache": undefined,[90m
+[31m+     "credentials": "same-origin",[90m
+[31m+     "headers": {[90m
+[31m+       "Content-Type": "application/json",[90m
+[31m+     },[90m
+[31m+     "method": "GET",[90m
+[31m+     "signal": AbortSignal {},[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   × fetcher > configuration > uses default headers from configuration 3ms
+     → expected "spy" to be called with arguments: [ '/items', ObjectContaining{…} ][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[2m  [[22m
+[2m    "/items",[22m
+[32m-   ObjectContaining {[90m
+[32m-     "headers": ObjectContaining {[90m
+[32m-       "Authorization": "Bearer token123",[90m
+[32m-       "X-API-Key": "key123",[90m
+[31m+   {[90m
+[31m+     "body": undefined,[90m
+[31m+     "cache": undefined,[90m
+[31m+     "credentials": "same-origin",[90m
+[31m+     "headers": {[90m
+[31m+       "Content-Type": "application/json",[90m
+[2m      },[22m
+[31m+     "method": "GET",[90m
+[31m+     "signal": AbortSignal {},[90m
+[2m    },[22m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ fetcher > configuration > allows request headers to override default headers 1ms
+   × fetcher > configuration > calls onError callback when error occurs 3ms
+     → expected "spy" to be called with arguments: [ Any<ApiError> ][90m
+
+Number of calls: [1m0[22m
+[39m
+   × fetcher > configuration > calls onResponse callback for successful responses 1ms
+     → expected "spy" to be called with arguments: [ ObjectContaining{…} ][90m
+
+Number of calls: [1m0[22m
+[39m
+   × fetcher > configuration > allows onResponse to transform the response 2ms
+     → expected { original: true } to deeply equal { original: true, transformed: true }
+   × fetcher > configuration > respects throwOnError: false configuration 3ms
+     → Not found
+   ✓ fetcher > createFetcher > creates independent fetcher with custom config 2ms
+   ✓ fetcher > createFetcher > custom fetcher does not affect global fetcher 1ms
+   ✓ fetcher > createFetcher > custom fetcher inherits global config 1ms
+   × fetcher > AbortSignal support > respects provided AbortSignal 10008ms
+     → Test timed out in 10000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   × fetcher > AbortSignal support > respects already-aborted signal 7ms
+     → promise resolved "{}" instead of rejecting
+   ✓ fetcher > credentials > uses same-origin credentials by default 1ms
+   ✓ fetcher > credentials > allows overriding credentials per request 1ms
+   ✓ fetcher > cache control > passes cache option to fetch 0ms
+   ✓ fetcher > cache control > passes Next.js specific options 1ms
+ ❯ tests/lib/ingestion/apple-music.test.ts (42 tests | 2 failed) 6420ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > accepts valid Apple Music artist URLs 33ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > accepts URLs with various regions 8ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects HTTP URLs 1ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects non-artist URLs 2ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects root URLs without artist path 2ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects invalid hosts 2ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects URLs without artist ID 1ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > handles malformed URLs gracefully 1ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects dangerous URL schemes 0ms
+   ✓ Apple Music Strategy > isAppleMusicUrl > rejects protocol-relative URLs 0ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > returns canonical URL for valid inputs 4ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > normalizes to lowercase 1ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > removes www prefix 1ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > returns null for invalid URLs 5ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > returns null for malformed URLs 7ms
+   ✓ Apple Music Strategy > validateAppleMusicUrl > returns null for dangerous schemes 0ms
+   ✓ Apple Music Strategy > extractAppleMusicArtistId > extracts artist ID from valid URLs 4ms
+   ✓ Apple Music Strategy > extractAppleMusicArtistId > extracts artist ID with www prefix 1ms
+   ✓ Apple Music Strategy > extractAppleMusicArtistId > returns null for invalid URLs 3ms
+   ✓ Apple Music Strategy > extractAppleMusicArtistId > returns null for URLs without artist ID 1ms
+   ✓ Apple Music Strategy > extractAppleMusicArtistId > returns null for malformed URLs 1ms
+   ✓ Apple Music Strategy > extractAppleMusic > extracts display name from og:title 3ms
+   ✓ Apple Music Strategy > extractAppleMusic > extracts display name from twitter:title 5ms
+   ✓ Apple Music Strategy > extractAppleMusic > cleans platform suffix from display name 1ms
+   ✓ Apple Music Strategy > extractAppleMusic > extracts avatar from og:image 2ms
+   ✓ Apple Music Strategy > extractAppleMusic > skips default Apple Music placeholder images 1ms
+   ✓ Apple Music Strategy > extractAppleMusic > extracts links from JSON-LD sameAs property 8ms
+   × Apple Music Strategy > extractAppleMusic > extracts links from data-href attributes 38ms
+     → expected false to be true // Object.is equality
+   ✓ Apple Music Strategy > extractAppleMusic > extracts external links from href attributes 22ms
+   ✓ Apple Music Strategy > extractAppleMusic > skips internal Apple Music links 8ms
+   ✓ Apple Music Strategy > extractAppleMusic > skips Apple internal domains 3ms
+   ✓ Apple Music Strategy > extractAppleMusic > deduplicates links 7ms
+   ✓ Apple Music Strategy > extractAppleMusic > handles empty HTML gracefully 0ms
+   ✓ Apple Music Strategy > extractAppleMusic > handles malformed HTML gracefully 0ms
+   × Apple Music Strategy > extractAppleMusic > extracts data from structured fixture 82ms
+     → expected [ 'instagram', 'soundcloud', …(4) ] to include 'youtube_music'
+   ✓ Apple Music Strategy > extractAppleMusic > handles edge cases correctly 43ms
+   ✓ Apple Music Strategy > extractAppleMusic > handles minimal data gracefully 1ms
+   ✓ Apple Music Strategy > fetchAppleMusicDocument > throws ExtractionError for invalid URL 20ms
+   ✓ Apple Music Strategy > fetchAppleMusicDocument > throws ExtractionError for non-artist URL 10ms
+   ✓ Apple Music Strategy > fetchAppleMusicDocument > throws ExtractionError on 404  3036ms
+   ✓ Apple Music Strategy > fetchAppleMusicDocument > throws ExtractionError on 429 rate limit  3024ms
+   ✓ Apple Music Strategy > fetchAppleMusicDocument > returns HTML on success 12ms
+ ❯ tests/lib/ingestion/beacons.test.ts (41 tests | 1 failed) 6311ms
+   ✓ Beacons Strategy > isBeaconsUrl > accepts valid beacons.ai URLs 33ms
+   ✓ Beacons Strategy > isBeaconsUrl > accepts valid beacons.page URLs 6ms
+   ✓ Beacons Strategy > isBeaconsUrl > rejects HTTP URLs 1ms
+   ✓ Beacons Strategy > isBeaconsUrl > rejects root URLs without handle 2ms
+   ✓ Beacons Strategy > isBeaconsUrl > rejects invalid hosts 2ms
+   ✓ Beacons Strategy > isBeaconsUrl > rejects reserved paths 6ms
+   ✓ Beacons Strategy > isBeaconsUrl > handles malformed URLs gracefully 1ms
+   ✓ Beacons Strategy > validateBeaconsUrl > returns canonical URL for valid inputs 7ms
+   ✓ Beacons Strategy > validateBeaconsUrl > returns null for invalid URLs 2ms
+   ✓ Beacons Strategy > validateBeaconsUrl > returns null for reserved paths 6ms
+   ✓ Beacons Strategy > validateBeaconsUrl > strips @ prefix from handles 1ms
+   ✓ Beacons Strategy > isValidHandle > accepts valid handles 7ms
+   ✓ Beacons Strategy > isValidHandle > rejects reserved handles 0ms
+   ✓ Beacons Strategy > isValidHandle > rejects handles that are too long 1ms
+   ✓ Beacons Strategy > isValidHandle > rejects empty handles 0ms
+   ✓ Beacons Strategy > normalizeHandle > lowercases handles 0ms
+   ✓ Beacons Strategy > normalizeHandle > strips @ prefix 0ms
+   ✓ Beacons Strategy > normalizeHandle > trims whitespace 2ms
+   ✓ Beacons Strategy > extractBeaconsHandle > extracts handle from valid URLs 9ms
+   ✓ Beacons Strategy > extractBeaconsHandle > normalizes handles to lowercase 1ms
+   ✓ Beacons Strategy > extractBeaconsHandle > strips @ prefix 0ms
+   ✓ Beacons Strategy > extractBeaconsHandle > returns null for invalid URLs 1ms
+   ✓ Beacons Strategy > extractBeaconsHandle > returns null for reserved paths 2ms
+   ✓ Beacons Strategy > extractBeaconsHandle > handles URLs with trailing slashes and paths 1ms
+   ✓ Beacons Strategy > extractBeacons > extracts display name from og:title 13ms
+   ✓ Beacons Strategy > extractBeacons > extracts display name from twitter:title 6ms
+   ✓ Beacons Strategy > extractBeacons > cleans up various Beacons suffixes 1ms
+   ✓ Beacons Strategy > extractBeacons > extracts avatar from og:image 2ms
+   ✓ Beacons Strategy > extractBeacons > skips default Beacons placeholder images 6ms
+   ✓ Beacons Strategy > extractBeacons > extracts external links 17ms
+   ✓ Beacons Strategy > extractBeacons > skips internal Beacons links 1ms
+   ✓ Beacons Strategy > extractBeacons > deduplicates links 16ms
+   ✓ Beacons Strategy > extractBeacons > handles empty HTML gracefully 2ms
+   ✓ Beacons Strategy > extractBeacons > sets correct source platform and signal 4ms
+   × Beacons Strategy > extractBeacons > prefers structured data sources before href scanning 53ms
+     → expected [ 'instagram', 'spotify', 'youtube' ] to deeply equal [ 'instagram', 'spotify', …(1) ]
+   ✓ Beacons Strategy > extractBeacons > falls back when structured data is absent 17ms
+   ✓ Beacons Strategy > fetchBeaconsDocument > throws ExtractionError for invalid URL 22ms
+   ✓ Beacons Strategy > fetchBeaconsDocument > throws ExtractionError for reserved paths 4ms
+   ✓ Beacons Strategy > fetchBeaconsDocument > throws ExtractionError on 404  3023ms
+   ✓ Beacons Strategy > fetchBeaconsDocument > throws ExtractionError on 429 rate limit  3010ms
+   ✓ Beacons Strategy > fetchBeaconsDocument > returns HTML on success 11ms
+ ❯ tests/lib/ingestion/linktree.test.ts (36 tests | 1 failed) 6199ms
+   ✓ Linktree Strategy > isLinktreeUrl > accepts valid linktr.ee URLs 18ms
+   ✓ Linktree Strategy > isLinktreeUrl > accepts valid linktree.com URLs 2ms
+   ✓ Linktree Strategy > isLinktreeUrl > rejects HTTP URLs 1ms
+   ✓ Linktree Strategy > isLinktreeUrl > rejects root URLs without handle 1ms
+   ✓ Linktree Strategy > isLinktreeUrl > rejects invalid hosts 13ms
+   ✓ Linktree Strategy > isLinktreeUrl > rejects invalid handles 2ms
+   ✓ Linktree Strategy > isLinktreeUrl > handles malformed URLs gracefully 1ms
+   ✓ Linktree Strategy > validateLinktreeUrl > returns canonical URL for valid inputs 5ms
+   ✓ Linktree Strategy > validateLinktreeUrl > returns null for invalid URLs 5ms
+   ✓ Linktree Strategy > validateLinktreeUrl > strips @ prefix from handles 5ms
+   ✓ Linktree Strategy > isValidHandle > accepts valid handles 7ms
+   ✓ Linktree Strategy > isValidHandle > rejects handles with invalid characters 1ms
+   ✓ Linktree Strategy > isValidHandle > rejects handles that are too long 0ms
+   ✓ Linktree Strategy > isValidHandle > rejects empty handles 3ms
+   ✓ Linktree Strategy > normalizeHandle > lowercases handles 0ms
+   ✓ Linktree Strategy > normalizeHandle > strips @ prefix 0ms
+   ✓ Linktree Strategy > normalizeHandle > trims whitespace 0ms
+   ✓ Linktree Strategy > extractLinktreeHandle > extracts handle from valid URLs 2ms
+   ✓ Linktree Strategy > extractLinktreeHandle > normalizes handles to lowercase 0ms
+   ✓ Linktree Strategy > extractLinktreeHandle > strips @ prefix 0ms
+   ✓ Linktree Strategy > extractLinktreeHandle > returns null for invalid URLs 1ms
+   ✓ Linktree Strategy > extractLinktreeHandle > handles URLs with trailing slashes and paths 1ms
+   ✓ Linktree Strategy > extractLinktree > extracts display name from og:title 7ms
+   ✓ Linktree Strategy > extractLinktree > extracts display name from twitter:title 1ms
+   ✓ Linktree Strategy > extractLinktree > extracts avatar from og:image 1ms
+   ✓ Linktree Strategy > extractLinktree > extracts external links 5ms
+   ✓ Linktree Strategy > extractLinktree > skips internal Linktree links 1ms
+   ✓ Linktree Strategy > extractLinktree > deduplicates links 10ms
+   ✓ Linktree Strategy > extractLinktree > handles empty HTML gracefully 5ms
+   ✓ Linktree Strategy > extractLinktree > handles malformed HTML gracefully 0ms
+   × Linktree Strategy > extractLinktree > prefers structured Next.js data when available 27ms
+     → expected [ 'instagram', 'spotify', …(2) ] to deeply equal [ 'instagram', 'spotify', …(2) ]
+   ✓ Linktree Strategy > extractLinktree > falls back to href scanning when structured data is missing 5ms
+   ✓ Linktree Strategy > fetchLinktreeDocument > throws ExtractionError for invalid URL 2ms
+   ✓ Linktree Strategy > fetchLinktreeDocument > throws ExtractionError on 404  3016ms
+   ✓ Linktree Strategy > fetchLinktreeDocument > throws ExtractionError on 429 rate limit  3030ms
+   ✓ Linktree Strategy > fetchLinktreeDocument > returns HTML on success 15ms
+ ❯ tests/unit/links/useLinksManager.test.ts (33 tests | 2 failed) 7144ms
+   ✓ useLinksManager > initialization > should initialize with provided links 85ms
+   ✓ useLinksManager > initialization > should initialize with empty array when no links provided 6ms
+   ✓ useLinksManager > initialization > should have null lastAddedId on init 10ms
+   ✓ useLinksManager > initialization > should have null addingLink on init 4ms
+   ✓ useLinksManager > initialization > should have undefined prefillUrl on init 5ms
+   ✓ useLinksManager > idFor > should generate stable ID from platform and URL 7ms
+   ✓ useLinksManager > idFor > should generate consistent IDs for same link 3ms
+   ✓ useLinksManager > idFor > should use originalUrl as fallback when normalizedUrl is missing 3ms
+   ✓ useLinksManager > mapIdToIndex > should map link IDs to their indices 11ms
+   ✓ useLinksManager > mapIdToIndex > should update when links change 12ms
+   ✓ useLinksManager > linkIsVisible > should return true for links without isVisible property 8ms
+   ✓ useLinksManager > linkIsVisible > should return true for links with isVisible=true 2ms
+   ✓ useLinksManager > linkIsVisible > should return false for links with isVisible=false 2ms
+   ✓ useLinksManager > handleToggle > should toggle link visibility from visible to hidden 9ms
+   ✓ useLinksManager > handleToggle > should toggle link visibility from hidden to visible 4ms
+   ✓ useLinksManager > handleToggle > should toggle link visibility from undefined (true) to false 23ms
+   ✓ useLinksManager > handleRemove > should remove a link by index 37ms
+   ✓ useLinksManager > handleRemove > should remove the first link correctly 6ms
+   ✓ useLinksManager > handleRemove > should remove the last link correctly 37ms
+   ✓ useLinksManager > handleEdit > should set prefillUrl and remove the link 25ms
+   ✓ useLinksManager > handleEdit > should use originalUrl as fallback 8ms
+   ✓ useLinksManager > handleEdit > should do nothing for invalid index 8ms
+   ✓ useLinksManager > clearPrefillUrl > should clear the prefillUrl 2ms
+   ✓ useLinksManager > handleAdd > should add a new link  671ms
+   ✓ useLinksManager > handleAdd > should add isVisible:true to the link  675ms
+   ✓ useLinksManager > handleAdd > should call onLinkAdded callback  773ms
+   ✓ useLinksManager > handleAdd > should call onLinksChange callback  686ms
+   × useLinksManager > handleAdd > should set and clear addingLink during add 797ms
+     → expected null not to be null
+   ✓ useLinksManager > handleAdd > should set lastAddedId after adding  720ms
+   ✓ useLinksManager > handleAdd > should clear lastAddedId after timeout  751ms
+   ✓ useLinksManager > handleDuplicate > should not add duplicate links 23ms
+   ✓ useLinksManager > YouTube cross-category handling > should remove YouTube from social when added to dsp  757ms
+   × useLinksManager > MAX_SOCIAL_LINKS visibility > should prevent adding more than MAX_SOCIAL_LINKS social links 949ms
+     → expected [ { platform: { …(6) }, …(4) }, …(5) ] to have a length of 5 but got 6
+ ❯ tests/components/dashboard/UniversalLinkInput.keyboard.test.tsx (10 tests | 7 failed) 2575ms
+   × UniversalLinkInput Keyboard Accessibility > prefills URL after platform selection 1396ms
+     → Unable to find an accessible element with the role "textbox"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div />[39m
+[36m</body>[39m
+   × UniversalLinkInput Keyboard Accessibility > supports fuzzy platform autosuggest + Enter to prefill 137ms
+     → Unable to find an accessible element with the role "combobox"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div />[39m
+[36m</body>[39m
+   × UniversalLinkInput Keyboard Accessibility > allows typing handle after platform selection 250ms
+     → Unable to find an accessible element with the role "textbox"
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div />[39m
+[36m</body>[39m
+   × UniversalLinkInput Keyboard Accessibility > supports Enter key to add valid link 245ms
+     → expected "spy" to be called with arguments: [ ObjectContaining{…} ][90m
+
+Number of calls: [1m0[22m
+[39m
+   ✓ UniversalLinkInput Keyboard Accessibility > blocks Enter when URL has unsafe scheme 120ms
+   × UniversalLinkInput Keyboard Accessibility > supports Escape key to clear input 101ms
+     → [2mexpect([22m[31melement[39m[2m).toHaveValue([22m[32mhttps://spotify.com/test[39m[2m)[22m
+
+Expected the element to have value:
+[32m  https://spotify.com/test[39m
+Received:
+[31m  h[39m
+   ✓ UniversalLinkInput Keyboard Accessibility > dropdown trigger has visible focus ring 30ms
+   × UniversalLinkInput Keyboard Accessibility > clear button has visible focus ring 79ms
+     → Unable to find an accessible element with the role "button" and name `/clear input/i`
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div />[39m
+[36m</body>[39m
+   × UniversalLinkInput Keyboard Accessibility > Tab navigates through all interactive elements 101ms
+     → Unable to find an accessible element with the role "button" and name `/clear input/i`
+
+There are no accessible roles. But there might be some inaccessible roles. If you wish to access them, then set the `hidden` option to `true`. Learn more about this here: https://testing-library.com/docs/dom-testing-library/api-queries#byrole
+
+Ignored nodes: comments, script, style
+[36m<body[39m
+  [33mstyle[39m=[32m""[39m
+[36m>[39m
+  [36m<div />[39m
+[36m</body>[39m
+   ✓ UniversalLinkInput Keyboard Accessibility > dropdown opens with Enter/Space and navigates with arrow keys 113ms
+ ❯ tests/unit/SupportPage.test.tsx (7 tests | 3 failed) 798ms
+   ✓ SupportPage > renders the support page correctly  380ms
+   × SupportPage > renders the contact support button as a link 62ms
+     → [2mexpect([22m[31melement[39m[2m).toHaveAttribute([22m[32m[32m"href"[32m[39m[2m, [22m[32m[32m"mailto:support@jov.ie"[32m[39m[2m) // element.getAttribute("href") === "mailto:support@jov.ie"[22m
+
+Expected the element to have attribute:
+[32m  href="mailto:support@jov.ie"[39m
+Received:
+[31m  href="mailto:support@meetjovie.com"[39m
+   × SupportPage > has proper accessibility attributes 27ms
+     → [2mexpect([22m[31melement[39m[2m).toHaveAttribute([22m[32m[32m"aria-label"[32m[39m[2m, [22m[32m[32m"Send email to support team at support@jov.ie"[32m[39m[2m) // element.getAttribute("aria-label") === "Send email to support team at support@jov.ie"[22m
+
+Expected the element to have attribute:
+[32m  aria-label="Send email to support team at support@jov.ie"[39m
+Received:
+[31m  aria-label="Send email to support team at support@meetjovie.com"[39m
+   × SupportPage > tracks analytics events when email is clicked 39ms
+     → expected "spy" to be called with arguments: [ 'Support Email Clicked', …(1) ][90m
+
+Received: 
+
+[1m  1st spy call:
+
+[22m[2m  [[22m
+[2m    "Support Email Clicked",[22m
+[2m    {[22m
+[32m-     "email": "support@jov.ie",[90m
+[31m+     "email": "support@meetjovie.com",[90m
+[2m      "source": "support_page",[22m
+[2m    },[22m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ SupportPage > tracks page view on mount 24ms
+   ✓ SupportPage > has proper styling classes 248ms
+   ✓ SupportPage > renders within a Container component 10ms
+ ❯ tests/unit/api/dashboard/profile.test.ts (6 tests | 3 failed) 122ms
+   × PUT /api/dashboard/profile > syncs username and display name to Clerk before updating the database 78ms
+     → expected 500 to be 200 // Object.is equality
+   × PUT /api/dashboard/profile > normalizes usernames before syncing 9ms
+     → expected 500 to be 200 // Object.is equality
+   × PUT /api/dashboard/profile > downloads the uploaded avatar and forwards it to Clerk 16ms
+     → expected 500 to be 200 // Object.is equality
+   ✓ PUT /api/dashboard/profile > rejects unsupported updates 8ms
+   ✓ PUT /api/dashboard/profile > rejects invalid display names 6ms
+   ✓ PUT /api/dashboard/profile > rejects invalid urls 3ms
+ ❯ lib/http/parse-json.test.ts (4 tests | 1 failed) 66ms
+   ✓ parseJsonBody > returns parsed JSON for valid payloads 28ms
+   × parseJsonBody > logs and captures parse failures 16ms
+     → expected 'Unexpected token \'o\', "not-json" is…' to be undefined
+   ✓ parseJsonBody > includes error details in development mode 18ms
+   ✓ parseJsonBody > returns fallback when empty body is allowed 2ms
+ ❯ tests/lib/platform-detection.test.ts (31 tests | 1 failed) 151ms
+   ✓ Platform Detection > Unsafe inputs > rejects dangerous schemes 31ms
+   × Platform Detection > Unsafe inputs > rejects encoded control characters 38ms
+     → expected true to be false // Object.is equality
+   ✓ Platform Detection > Unsafe inputs > normalizeUrl throws away dangerous inputs and returns original string 0ms
+   ✓ Platform Detection > Domain dot-fix normalization > auto-inserts missing dot for common platforms 10ms
+   ✓ Platform Detection > TikTok URL normalization > should normalize TikTok URLs correctly 1ms
+   ✓ Platform Detection > TikTok URL normalization > should not add duplicate @ symbol to TikTok handles 1ms
+   ✓ Platform Detection > TikTok URL normalization > should detect TikTok platform correctly 2ms
+   ✓ Platform Detection > TikTok URL normalization > should validate TikTok URLs with @ symbol 2ms
+   ✓ Platform Detection > TikTok URL normalization > should generate correct suggested title for TikTok handles 1ms
+   ✓ Platform Detection > Twitch and OnlyFans detection > detects Twitch profiles and validates format 8ms
+   ✓ Platform Detection > Twitch and OnlyFans detection > detects OnlyFans profiles and validates format 4ms
+   ✓ Platform Detection > Linktree detection > detects linktree hosts and normalizes URL 2ms
+   ✓ Platform Detection > getPlatformsByCategory > DSP platforms > returns dsp platforms 2ms
+   ✓ Platform Detection > getPlatformsByCategory > Social platforms > returns social media platforms 13ms
+   ✓ Platform Detection > getPlatformsByCategory > Earnings platforms > returns monetization platforms 2ms
+   ✓ Platform Detection > getPlatformsByCategory > Website platforms > returns link aggregators and personal websites 1ms
+   ✓ Platform Detection > getPlatformsByCategory > Unknown platforms > returns null for unknown platform IDs 0ms
+   ✓ Platform Detection > Category Sets > DSP_PLATFORMS > contains expected DSP platforms 1ms
+   ✓ Platform Detection > Category Sets > DSP_PLATFORMS > does not contain non-DSP platforms 0ms
+   ✓ Platform Detection > Category Sets > DSP_PLATFORMS > is consistent with getPlatformsByCategory 0ms
+   ✓ Platform Detection > Category Sets > SOCIAL_PLATFORMS > contains expected social platforms 13ms
+   ✓ Platform Detection > Category Sets > SOCIAL_PLATFORMS > does not contain non-social platforms 1ms
+   ✓ Platform Detection > Category Sets > SOCIAL_PLATFORMS > is consistent with getPlatformsByCategory 1ms
+   ✓ Platform Detection > Category Sets > EARNINGS_PLATFORMS > contains expected earnings platforms 0ms
+   ✓ Platform Detection > Category Sets > EARNINGS_PLATFORMS > does not contain non-earnings platforms 0ms
+   ✓ Platform Detection > Category Sets > EARNINGS_PLATFORMS > is consistent with getPlatformsByCategory 0ms
+   ✓ Platform Detection > Category Sets > WEBSITES_PLATFORMS > contains expected website platforms 0ms
+   ✓ Platform Detection > Category Sets > WEBSITES_PLATFORMS > does not contain non-website platforms 0ms
+   ✓ Platform Detection > Category Sets > WEBSITES_PLATFORMS > is consistent with getPlatformsByCategory 0ms
+   ✓ Platform Detection > Category Sets > Set consistency > all category Sets are mutually exclusive 7ms
+   ✓ Platform Detection > Category Sets > Set consistency > each category has a non-zero size 2ms
+ ❯ tests/lib/monitoring/user-journey.test.ts (30 tests | 2 failed) 136ms
+   ✓ UserJourneyTracker > constructor > should initialize with journey name and steps 3ms
+   ✓ UserJourneyTracker > start > should track journey start event 4ms
+   ✓ UserJourneyTracker > start > should return self for chaining 3ms
+   ✓ UserJourneyTracker > start > should reset state when starting 7ms
+   ✓ UserJourneyTracker > nextStep > should track step progression 3ms
+   ✓ UserJourneyTracker > nextStep > should track time since start 3ms
+   ✓ UserJourneyTracker > nextStep > should track time since previous step 1ms
+   ✓ UserJourneyTracker > nextStep > should include custom data 1ms
+   × UserJourneyTracker > nextStep > should warn when no more steps 43ms
+     → expected "warn" to be called with arguments: [ Array(1) ][90m
+
+Received: 
+
+[1m  1st warn call:
+
+[22m[2m  [[22m
+[32m-   "Journey checkout has no more steps defined",[90m
+[31m+   "[UserJourney] Journey has no more steps defined",[90m
+[31m+   {[90m
+[31m+     "currentStep": 1,[90m
+[31m+     "journey": "checkout",[90m
+[31m+     "totalSteps": 1,[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ UserJourneyTracker > nextStep > should return self for chaining 2ms
+   ✓ UserJourneyTracker > nextStep > should dispatch custom event when window exists 2ms
+   ✓ UserJourneyTracker > goToStep > should jump to a specific step 2ms
+   × UserJourneyTracker > goToStep > should warn if step not found 12ms
+     → expected "warn" to be called with arguments: [ Array(1) ][90m
+
+Received: 
+
+[1m  1st warn call:
+
+[22m[2m  [[22m
+[32m-   "Step nonexistent not found in journey checkout",[90m
+[31m+   "[UserJourney] Step not found in journey",[90m
+[31m+   {[90m
+[31m+     "availableSteps": [[90m
+[31m+       "step1",[90m
+[31m+     ],[90m
+[31m+     "journey": "checkout",[90m
+[31m+     "stepName": "nonexistent",[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ UserJourneyTracker > goToStep > should include custom data 2ms
+   ✓ UserJourneyTracker > goToStep > should return self for chaining 1ms
+   ✓ UserJourneyTracker > complete > should track journey completion 8ms
+   ✓ UserJourneyTracker > complete > should track partial completion 5ms
+   ✓ UserJourneyTracker > complete > should track unsuccessful completion 11ms
+   ✓ UserJourneyTracker > complete > should track total time 7ms
+   ✓ UserJourneyTracker > complete > should include custom data 1ms
+   ✓ UserJourneyTracker > complete > should dispatch custom event when window exists 1ms
+   ✓ UserJourneyTracker > complete > should return self for chaining 0ms
+   ✓ UserJourneyTracker > abandon > should track journey abandonment 1ms
+   ✓ UserJourneyTracker > abandon > should handle abandonment before any steps 1ms
+   ✓ UserJourneyTracker > abandon > should track total time before abandonment 0ms
+   ✓ UserJourneyTracker > abandon > should include custom data 4ms
+   ✓ UserJourneyTracker > abandon > should return self for chaining 1ms
+   ✓ UserJourneyTracker > trackOnboardingFunnel > should create and start an onboarding journey 1ms
+   ✓ UserJourneyTracker > trackOnboardingFunnel > should have correct onboarding steps 2ms
+   ✓ UserJourneyTracker > trackOnboardingFunnel > should set up event listeners when window exists 1ms
+ ❯ tests/lib/monitoring/api-latency.test.ts (46 tests | 39 failed) 537ms
+   × ApiLatencyCollector > constructor > should initialize with default options 14ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > constructor > should accept custom options 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > constructor > should start flush timer when flushInterval > 0 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > constructor > should not start flush timer when flushInterval is 0 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > record > should add a metric to the buffer 20ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > record > should return self for method chaining 10ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > record > should create metric with correct properties 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > record > should use provided timestamp when specified 3ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > record > should auto-flush when buffer reaches maxBufferSize 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > recordBatch > should add multiple metrics to the buffer 260ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > recordBatch > should return self for method chaining 88ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > recordBatch > should auto-flush during batch if buffer fills up 22ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should return and clear buffered metrics 12ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should check thresholds when autoCheckThresholds is true 5ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should not check thresholds when autoCheckThresholds is false 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should override autoCheckThresholds with checkThresholds parameter 3ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should skip threshold check when buffer is empty 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > flush > should return empty array when buffer is empty 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > getBufferSize > should return correct buffer size 9ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > getBufferedMetrics > should return a copy of buffered metrics 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > clear > should clear the buffer without checking thresholds 6ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > clear > should return self for method chaining 9ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > stopFlushTimer > should stop the automatic flush timer 10ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > stopFlushTimer > should be safe to call multiple times 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > dispose > should flush remaining metrics and stop timer 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > dispose > should be safe to call multiple times 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > automatic flush timer > should flush only when buffer is not empty 0ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × ApiLatencyCollector > automatic flush timer > should continue flushing on each interval 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   ✓ createApiLatencyMetric > should create a metric with correct structure 14ms
+   ✓ createApiLatencyMetric > should support all HTTP methods 4ms
+   ✓ createApiLatencyMetric > should support various status codes 1ms
+   ✓ collectApiLatencyFromResponse > should calculate duration from start time 1ms
+   ✓ collectApiLatencyFromResponse > should extract status from response object 0ms
+   ✓ collectApiLatencyFromResponse > should create valid metric structure 1ms
+   ✓ collectApiLatencyFromResponse > should work with minimal response object 0ms
+   × Integration with PerformanceAlerts > threshold alerting > should trigger warning alert for latency > 500ms 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > threshold alerting > should trigger error alert for latency > 2000ms 0ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > threshold alerting > should trigger critical alert for latency > 5000ms 6ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > threshold alerting > should trigger all applicable thresholds for very slow requests 3ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > threshold alerting > should not trigger alert for fast requests 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > metric collection flow > should correctly flow from sample to alert 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > metric collection flow > should handle mixed endpoints in batch 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > metric collection flow > should integrate with createApiLatencyMetric utility 0ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > metric collection flow > should respect cooldown between alerts for same endpoint 2ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > automatic flushing with alerts > should check thresholds on auto-flush 1ms
+     → (intermediate value).addApiLatencyRules is not a function
+   × Integration with PerformanceAlerts > automatic flushing with alerts > should check thresholds on buffer full auto-flush 0ms
+     → (intermediate value).addApiLatencyRules is not a function
+stdout | tests/lib/environment-validation.test.ts > Environment Validation > validateAndLogEnvironment > should run validation and return results
+[EnvServer] Environment: development | Platform: darwin | Node: v20.17.0 { nodeEnv: [32m'development'[39m, platform: [32m'darwin'[39m, nodeVersion: [32m'v20.17.0'[39m }
+
+ ❯ tests/lib/environment-validation.test.ts (15 tests | 1 failed) 66ms
+   ✓ Environment Validation > validateEnvironment > should validate environment variables for runtime context 4ms
+   ✓ Environment Validation > validateEnvironment > should validate environment variables for build context 1ms
+   ✓ Environment Validation > validateEnvironment > should have different validation for runtime vs build context 0ms
+   × Environment Validation > validateAndLogEnvironment > should run validation and return results 29ms
+     → expected "log" to be called at least once
+   ✓ Environment Validation > validateDatabaseEnvironment > should fail when DATABASE_URL is not set 3ms
+   ✓ Environment Validation > validateDatabaseEnvironment > should validate correct PostgreSQL URLs 13ms
+   ✓ Environment Validation > validateDatabaseEnvironment > should reject invalid database URLs 3ms
+   ✓ Environment Validation > validateDatabaseEnvironment > should reject URLs with invalid protocols 1ms
+   ✓ Environment Validation > validateDatabaseEnvironment > should require database name in URL 1ms
+   ✓ Environment Validation > validateEnvironmentForApiRoute > should validate required environment variables for API routes 2ms
+   ✓ Environment Validation > validateEnvironmentForApiRoute > should detect missing required variables 1ms
+   ✓ Environment Validation > validateEnvironmentForApiRoute > should return empty missing array when all variables are present 1ms
+   ✓ Environment Validation > validateEnvironmentForMiddleware > should validate basic middleware requirements 0ms
+   ✓ Environment Validation > validateEnvironmentForMiddleware > should return true when Clerk key is present 1ms
+   ✓ Environment Validation > validateEnvironmentForMiddleware > should return false when Clerk key is missing 0ms
+ ❯ tests/lib/monitoring/performance.test.ts (8 tests | 2 failed) 79ms
+   ✓ PerformanceTracker > trackPageLoad > should not track when window is undefined 2ms
+   ✓ PerformanceTracker > trackPageLoad > should observe navigation entries when window exists 3ms
+   ✓ PerformanceTracker > trackPageLoad > should send metrics when navigation entry is received 1ms
+   × PerformanceTracker > trackPageLoad > should handle PerformanceObserver errors gracefully 61ms
+     → expected "error" to be called with arguments: [ …(2) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[32m-   "Failed to observe navigation timing:",[90m
+[32m-   Any<Error>,[90m
+[31m+   "[Performance] Failed to observe navigation timing",[90m
+[31m+   {[90m
+[31m+     "error": Error {[90m
+[31m+       "message": "PerformanceObserver not supported",[90m
+[31m+     },[90m
+[31m+     "pageName": "/test-page",[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ PerformanceTracker > trackResourceLoad > should not track when window is undefined 0ms
+   ✓ PerformanceTracker > trackResourceLoad > should observe resource entries when window exists 2ms
+   ✓ PerformanceTracker > trackResourceLoad > should filter resources by type when specified 1ms
+   × PerformanceTracker > trackResourceLoad > should handle PerformanceObserver errors gracefully 2ms
+     → expected "error" to be called with arguments: [ …(2) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[32m-   "Failed to observe resource timing:",[90m
+[32m-   Any<Error>,[90m
+[31m+   "[Performance] Failed to observe resource timing",[90m
+[31m+   {[90m
+[31m+     "error": Error {[90m
+[31m+       "message": "PerformanceObserver not supported",[90m
+[31m+     },[90m
+[31m+     "resourceType": undefined,[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+ ❯ tests/lib/admin/roles.test.ts (8 tests | 1 failed) 45ms
+   ✓ Admin Roles > isAdmin > should return false for empty user ID 4ms
+   ✓ Admin Roles > isAdmin > should return true for user with admin role in database 10ms
+   ✓ Admin Roles > isAdmin > should return false for user without admin role 4ms
+   ✓ Admin Roles > isAdmin > should return false when user not found in database 2ms
+   ✓ Admin Roles > isAdmin > should cache admin status and not query database twice 1ms
+   × Admin Roles > isAdmin > should return false and fail closed on database error 18ms
+     → expected "error" to be called with arguments: [ …(2) ][90m
+
+Received: 
+
+[1m  1st error call:
+
+[22m[2m  [[22m
+[32m-   "[admin/roles] Failed to check admin status:",[90m
+[32m-   Any<Error>,[90m
+[31m+   "[Admin-Roles] Failed to check admin status",[90m
+[31m+   {[90m
+[31m+     "error": Error {[90m
+[31m+       "message": "Database connection failed",[90m
+[31m+     },[90m
+[31m+   },[90m
+[2m  ][22m
+[39m[90m
+
+Number of calls: [1m1[22m
+[39m
+   ✓ Admin Roles > isAdmin > should invalidate cache when requested 2ms
+   ✓ Admin Roles > isAdmin > should clear entire cache when requested 1ms
+ ❯ tests/lib/monitoring/web-vitals.test.ts (16 tests | 15 failed) 59ms
+   ✓ Web Vitals > initWebVitals > should initialize all core web vitals listeners 3ms
+   × Web Vitals > initWebVitals > should call custom handler when metric is received 7ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > initWebVitals > should send metrics to analytics 9ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > CLS ratings > should rate CLS <= 0.1 as good 3ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > CLS ratings > should rate CLS > 0.1 and <= 0.25 as needs-improvement 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > CLS ratings > should rate CLS > 0.25 as poor 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > LCP ratings > should rate LCP <= 2500ms as good 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > LCP ratings > should rate LCP > 2500ms and <= 4000ms as needs-improvement 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > LCP ratings > should rate LCP > 4000ms as poor 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > INP ratings > should rate INP <= 200ms as good 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > INP ratings > should rate INP > 200ms and <= 500ms as needs-improvement 2ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > INP ratings > should rate INP > 500ms as poor 5ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > TTFB ratings > should rate TTFB <= 800ms as good 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > getRating (internal function tested via initWebVitals) > TTFB ratings > should rate TTFB > 800ms and <= 1800ms as needs-improvement 1ms
+     → Cannot read properties of undefined (reading '0')
+   × Web Vitals > trackPerformanceExperiment > should initialize web vitals with experiment context 14ms
+     → expected "spy" to be called at least once
+   × Web Vitals > trackPerformanceExperiment > should include experiment name in metric tracking 1ms
+     → Cannot read properties of undefined (reading '0')
+ ✓ tests/lib/ingestion/youtube.test.ts (32 tests) 6188ms
+   ✓ YouTube Strategy > fetchYouTubeAboutDocument > throws ExtractionError on 404  3027ms
+   ✓ YouTube Strategy > fetchYouTubeAboutDocument > throws ExtractionError on 429 rate limit  3026ms
+ ✓ tests/lib/analytics/pii-encryption.test.ts (21 tests) 6227ms
+   ✓ PII Encryption > encryptPII and decryptPII > should generate different ciphertext for same input (random IV)  821ms
+   ✓ PII Encryption > Email encryption helpers > should encrypt and decrypt email addresses  302ms
+   ✓ PII Encryption > IP encryption helpers > should encrypt and decrypt IPv6 addresses  1821ms
+   ✓ PII Encryption > Batch encryption helpers > should encrypt multiple fields at once  1308ms
+   ✓ PII Encryption > Batch encryption helpers > should decrypt multiple fields at once  1062ms
+ ✓ tests/lib/stripe/billing-hardening.test.ts (10 tests) 856ms
+   ✓ Billing Hardening - updateUserBillingStatus > Event Ordering > should skip events older than lastBillingEventAt  306ms
+   ✓ Billing Hardening - updateUserBillingStatus > Optimistic Locking > should fail after two optimistic lock failures  506ms
+ ✓ tests/integration/analytics-tracking.test.ts (15 tests) 9460ms
+   ✓ Analytics Tracking Integration > Security Hardening > should encrypt PII before storage  807ms
+   ✓ Analytics Tracking Integration > RLS Security > should not have RLS bypass capability  7268ms
+ ✓ tests/lib/utils/url-encryption.test.ts (34 tests) 6782ms
+   ✓ URL Encryption > encryptUrl > should include IV in result  477ms
+   ✓ URL Encryption > encryptUrl > should produce different ciphertext for same input (random IV)  895ms
+   ✓ URL Encryption > encryptUrl > should include auth tag and support round trip decryption  1033ms
+   ✓ URL Encryption > encryptUrl > should throw error when cipher creation fails  1145ms
+   ✓ URL Encryption > decryptUrl > should decrypt values generated by encryptUrl  1773ms
+   ✓ URL Encryption > decryptUrl > should throw error when encrypted payload is tampered  1100ms
+ ✓ tests/components/auth/OtpSignUpForm.test.tsx (10 tests) 2533ms
+   ✓ OtpSignUpForm > renders the signup form correctly  415ms
+   ✓ OtpSignUpForm > uses semantic design tokens for global error  301ms
+   ✓ OtpSignUpForm > supports the email sign-up flow end-to-end  323ms
+   ✓ OtpSignUpForm > has aria-live region for global errors  689ms
+ ✓ tests/unit/dashboard/DashboardOverview.test.tsx (3 tests) 4782ms
+   ✓ DashboardOverview > renders setup tasks when incomplete  2996ms
+   ✓ DashboardOverview > marks tasks complete based on data  833ms
+   ✓ DashboardOverview > supports copy-to-clipboard with aria-live status  941ms
+ ❯ tests/bench/track-route.bench.test.ts (1 test | 1 failed) 11566ms
+   × track route synthetic benchmark > captures p50/p95 latency and ensures click persistence 11559ms
+     → Test timed out in 10000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ✓ tests/unit/links/SortableLinkItem.test.tsx (29 tests) 6871ms
+   ✓ SortableLinkItem > rendering > should render the link pill with platform name  400ms
+   ✓ SortableLinkItem > menu items > should show "Edit" menu item  387ms
+   ✓ SortableLinkItem > menu items > should show "Hide" menu item when visible  1347ms
+   ✓ SortableLinkItem > menu items > should show "Show" menu item when hidden  360ms
+   ✓ SortableLinkItem > callbacks > should call onEdit with index when Edit is clicked  529ms
+   ✓ SortableLinkItem > callbacks > should call onToggle with index when Hide is clicked  541ms
+   ✓ SortableLinkItem > callbacks > should call onRemove with index when Delete is clicked  519ms
+ ✓ tests/components/dashboard/UniversalLinkInput.a11y.test.tsx (8 tests) 7749ms
+   ✓ UniversalLinkInput Accessibility > Search mode ARIA attributes > should have proper combobox role and ARIA attributes when in search mode  2970ms
+   ✓ UniversalLinkInput Accessibility > Search mode ARIA attributes > should have aria-expanded true when results are shown  2213ms
+   ✓ UniversalLinkInput Accessibility > Search mode ARIA attributes > should have listbox role on results container  754ms
+   ✓ UniversalLinkInput Accessibility > Search mode ARIA attributes > should have option role on each result item  772ms
+   ✓ UniversalLinkInput Accessibility > Screen reader status announcements > should announce empty results  481ms
+   ✓ UniversalLinkInput Accessibility > Exit search mode button > should have accessible label on exit button  331ms
+ ✓ tests/unit/links/IngestedSuggestions.test.tsx (25 tests) 3242ms
+   ✓ IngestedSuggestions > rendering > should render multiple suggestions  346ms
+   ✓ IngestedSuggestions > accept flow > should fire analytics events after async handler resolves  753ms
+ ✓ tests/unit/links/QuickAddSuggestions.test.tsx (16 tests) 2982ms
+   ✓ QuickAddSuggestions > rendering > should render all suggestion pills when no platforms are added  1284ms
+ ✓ tests/components/user-button.test.tsx (2 tests) 3620ms
+   ✓ UserButton billing actions > offers a direct upgrade checkout when the user is not on Pro  2217ms
+   ✓ UserButton billing actions > opens the Stripe billing portal for Pro users  1401ms
+ ✓ tests/components/dashboard/LinkActions.keyboard.test.tsx (5 tests) 8905ms
+   ✓ LinkActions Keyboard Accessibility > menu button opens dropdown and toggle is accessible  5293ms
+   ✓ LinkActions Keyboard Accessibility > menu button opens dropdown and remove is accessible  1559ms
+   ✓ LinkActions Keyboard Accessibility > shows correct toggle text based on visibility  1524ms
+ ✓ tests/unit/Form.test.tsx (12 tests) 1932ms
+   ✓ Form > renders children correctly  850ms
+ ✓ tests/unit/tooltip.test.tsx (18 tests | 2 skipped) 2038ms
+   ✓ Tooltip > Rendering > renders trigger without tooltip initially  526ms
+ ✓ tests/components/auth/OtpSignInForm.test.tsx (11 tests) 2942ms
+   ✓ OtpSignInForm > renders the signin form correctly  896ms
+   ✓ OtpSignInForm > renders both form steps  446ms
+   ✓ OtpSignInForm > supports the email sign-in flow end-to-end  516ms
+ ✓ tests/unit/TipPromo.test.tsx (6 tests) 548ms
+   ✓ TipPromo > renders the component when NEXT_PUBLIC_FEATURE_TIPS is "true"  334ms
+ ✓ tests/components/billing.test.tsx (12 tests) 2740ms
+   ✓ Billing Components > BillingPortalLink Component > renders with default props  1269ms
+   ✓ Billing Components > UpgradeButton Component > handles checkout creation error  367ms
+ ✓ tests/lib/analytics/query-timeout.test.ts (13 tests) 401ms
+ ✓ tests/unit/components/molecules/AvatarUploadable.test.tsx (25 tests | 1 skipped) 1599ms
+   ✓ AvatarUploadable Component > Display Mode (Non-uploadable) > renders as regular avatar when uploadable is false  375ms
+ ✓ tests/unit/dashboard/DashboardNav.test.tsx (6 tests) 1322ms
+   ✓ DashboardNav > renders primary navigation items  863ms
+ ✓ tests/unit/links/useSuggestions.test.ts (31 tests) 407ms
+ ✓ tests/unit/atoms/AvatarAvatar.error-handling.test.tsx (2 tests) 150ms
+ ✓ tests/components/admin-creator-profiles-with-sidebar.test.tsx (3 tests) 1719ms
+   ✓ AdminCreatorProfilesWithSidebar > renders rows and pagination summary with accessible link  1083ms
+   ✓ AdminCreatorProfilesWithSidebar > renders actions menu for unclaimed profiles  422ms
+ ✓ tests/unit/ClaimHandleForm.test.tsx (10 tests) 632ms
+ ✓ tests/unit/CopyToClipboardButton.test.tsx (15 tests) 660ms
+ ✓ tests/unit/feedback/StarterEmptyState.test.tsx (2 tests) 179ms
+ ✓ tests/unit/CTAButton.test.tsx (14 tests) 726ms
+ ✓ tests/unit/DataCard.test.tsx (16 tests) 426ms
+ ✓ tests/unit/profile/ProfilePrimaryCTA.test.tsx (1 test) 940ms
+   ✓ ProfilePrimaryCTA > shows Listen CTA (not Subscribe capture) while subscription status is hydrating from stored contacts  938ms
+ ✓ tests/unit/atoms/Toast.test.tsx (12 tests) 540ms
+ ✓ tests/unit/ClaimHandleForm.optimized.test.tsx (4 tests) 358ms
+ ✓ tests/unit/ProblemSolutionSection.optimized.test.tsx (4 tests) 833ms
+   ✓ ProblemSolutionSection (Optimized) > renders unified section with problem and solution content  344ms
+   ✓ ProblemSolutionSection (Optimized) > renders CTA button with proper attributes  331ms
+ ✓ tests/unit/Button.test.tsx (10 tests) 2542ms
+   ✓ Button > renders correctly with default props  1257ms
+   ✓ Button > renders with different variants  374ms
+   ✓ Button > renders with different sizes  338ms
+ ✓ tests/unit/PreFooterCTA.test.tsx (5 tests) 597ms
+ ✓ tests/unit/EmptyState.test.tsx (5 tests) 2208ms
+   ✓ EmptyState > renders heading, description, and icon  1483ms

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { buildSpotifyArtistUrl, searchSpotifyArtists } from '@/lib/spotify';
 
 // API routes should be dynamic

@@ -19,7 +19,7 @@
 
 export const runtime = 'nodejs';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { signedLinkAccess } from '@/lib/db/schema';
 import { captureError } from '@/lib/error-tracking';
@@ -151,13 +151,14 @@ export async function POST(
       });
     }
 
-    // Increment click count asynchronously
-    incrementClickCount(shortId).catch(async error => {
+    try {
+      await incrementClickCount(shortId);
+    } catch (error) {
       await captureError('Failed to increment click count', error, {
         shortId,
         route: '/api/link/[id]',
       });
-    });
+    }
 
     // Return the original URL directly (single-use)
     return NextResponse.json(

@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
-import React, { useMemo, useState } from 'react';
+import type React from 'react';
+import { useMemo, useState } from 'react';
 import {
   SidebarGroup,
   SidebarGroupContent,

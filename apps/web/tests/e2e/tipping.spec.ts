@@ -95,10 +95,10 @@ test.describe('Tipping MVP', () => {
 
           const originalPostHogCapture = window.posthog?.capture;
           if (window.posthog) {
-            window.posthog.capture = function (
+            window.posthog.capture = (
               eventName: string,
               properties?: Record<string, unknown>
-            ) {
+            ) => {
               if (eventName === 'tip_click') {
                 window.__TEST_TIP_CLICK_CAPTURED__ = true;
               }

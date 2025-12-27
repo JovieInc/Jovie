@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 import { ArtistInfo } from './ArtistInfo';
 
 const meta: Meta<typeof ArtistInfo> = {

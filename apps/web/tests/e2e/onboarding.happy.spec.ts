@@ -59,7 +59,7 @@ test.describe('Onboarding Happy Path', () => {
     // Wait for Clerk to be ready
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk && window.Clerk.isReady();
       },
       { timeout: 10_000 }
@@ -76,7 +76,7 @@ test.describe('Onboarding Happy Path', () => {
     // Verify authentication completed
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk?.user?.id;
       },
       { timeout: 10_000 }
@@ -215,7 +215,7 @@ test.describe('Onboarding Happy Path', () => {
     // Wait for Clerk initialization
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk && window.Clerk.isReady();
       },
       { timeout: 10_000 }
@@ -231,7 +231,7 @@ test.describe('Onboarding Happy Path', () => {
     // Verify authentication
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk?.user?.id;
       },
       { timeout: 10_000 }

@@ -83,7 +83,7 @@ test.describe('Onboarding Handle Taken Prevention', () => {
       // Wait for Clerk to be ready
       await page.waitForFunction(
         () => {
-          // @ts-ignore
+          // @ts-expect-error
           return window.Clerk && window.Clerk.isReady();
         },
         { timeout: 10_000 }

@@ -10,7 +10,7 @@ import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import type { PublicContact } from '@/types/contacts';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazily load heavy profile sub-components to keep initial bundle lean
 const AnimatedListenInterface = dynamic(
@@ -60,7 +60,7 @@ function renderContent(
         </div>
       );
 
-    case 'tip':
+    case 'tip': {
       if (!tippingEnabled) {
         return (
           <motion.div
@@ -147,6 +147,7 @@ function renderContent(
           </div>
         </motion.div>
       );
+    }
 
     default: // 'profile' mode
       return (

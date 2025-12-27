@@ -60,7 +60,7 @@ test.describe('Dashboard Access Control', () => {
     // Wait for Clerk to be ready
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk && window.Clerk.isReady();
       },
       { timeout: 10_000 }
@@ -101,7 +101,7 @@ test.describe('Dashboard Access Control', () => {
     // Verify User A is authenticated
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk?.user?.id;
       },
       { timeout: 10_000 }
@@ -138,7 +138,7 @@ test.describe('Dashboard Access Control', () => {
 
     // Store User A's Clerk ID for later verification
     const userAClerkId = await page.evaluate(() => {
-      // @ts-ignore
+      // @ts-expect-error
       return window.Clerk?.user?.id;
     });
 
@@ -209,7 +209,7 @@ test.describe('Dashboard Access Control', () => {
 
     // Store User B's Clerk ID for later verification
     const userBClerkId = await page.evaluate(() => {
-      // @ts-ignore
+      // @ts-expect-error
       return window.Clerk?.user?.id;
     });
 
@@ -252,7 +252,7 @@ test.describe('Dashboard Access Control', () => {
 
     // Verify User A is authenticated
     const currentUserIdAfterSignIn = await page.evaluate(() => {
-      // @ts-ignore
+      // @ts-expect-error
       return window.Clerk?.user?.id;
     });
     expect(currentUserIdAfterSignIn).toBe(userAClerkId);

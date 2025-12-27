@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Toast, ToastProps } from '@/components/atoms/Toast';
+import { Toast, type ToastProps } from '@/components/atoms/Toast';
 
 export interface ToastOptions extends Omit<ToastProps, 'id' | 'onClose'> {
   id?: string;

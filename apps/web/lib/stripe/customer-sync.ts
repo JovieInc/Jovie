@@ -506,7 +506,7 @@ async function retryUpdateWithFreshData(
   try {
     // Add jittered exponential backoff before retry
     if (retryCount > 0) {
-      const backoffMs = BASE_DELAY_MS * Math.pow(2, retryCount - 1);
+      const backoffMs = BASE_DELAY_MS * 2 ** (retryCount - 1);
       const jitter = Math.random() * backoffMs * 0.5; // Add up to 50% jitter
       await delay(backoffMs + jitter);
     }

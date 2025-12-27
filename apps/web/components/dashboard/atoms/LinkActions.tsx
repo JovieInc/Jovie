@@ -1,13 +1,7 @@
 'use client';
 
-import React, {
-  memo,
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-} from 'react';
+import type React from 'react';
+import { memo, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
@@ -110,12 +104,13 @@ export const LinkActions = memo(function LinkActions({
           setFocusedIndex(0);
           itemRefs.current[0]?.focus();
           break;
-        case 'End':
+        case 'End': {
           e.preventDefault();
           const lastIndex = menuItems.length - 1;
           setFocusedIndex(lastIndex);
           itemRefs.current[lastIndex]?.focus();
           break;
+        }
       }
     },
     [open, menuItems.length, setOpen]

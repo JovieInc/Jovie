@@ -1,5 +1,5 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
-import { expect, Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 
 /**
  * Custom error types for better test debugging

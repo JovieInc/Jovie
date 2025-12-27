@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
+import type React from 'react';
+import { useCallback, useMemo } from 'react';
 
 interface UseAdminTableKeyboardNavigationOptions<ItemType> {
   items: ItemType[];

@@ -18,7 +18,7 @@ test.describe('New user completes onboarding and sees live profile', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await page.waitForFunction(
       () => {
-        // @ts-ignore
+        // @ts-expect-error
         return window.Clerk && window.Clerk.isReady();
       },
       { timeout: 10_000 }

@@ -1,4 +1,4 @@
-import { type SocialLinkState } from '@/types/db';
+import type { SocialLinkState } from '@/types/db';
 
 export interface IngestionJobPayload {
   creatorProfileId: string;

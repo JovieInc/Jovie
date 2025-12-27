@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
-import { ArtistTheme } from '@/components/profile/ArtistThemeProvider';
+import { type NextRequest, NextResponse } from 'next/server';
+import type { ArtistTheme } from '@/components/profile/ArtistThemeProvider';
 import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';

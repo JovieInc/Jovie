@@ -1,5 +1,5 @@
 import { ArtistInfo } from '@/components/molecules/ArtistInfo';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface ProfileHeaderProps {
   artist: Artist;

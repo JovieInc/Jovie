@@ -9,7 +9,7 @@ import { clsx } from 'clsx';
 import Image from 'next/image';
 import {
   forwardRef,
-  KeyboardEvent,
+  type KeyboardEvent,
   useCallback,
   useEffect,
   useId,

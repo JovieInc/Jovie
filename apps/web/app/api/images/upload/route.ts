@@ -1,6 +1,6 @@
 import { auth } from '@clerk/nextjs/server';
 import { eq } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -395,7 +395,7 @@ export async function POST(request: NextRequest) {
           clerkId: users.clerkId,
         })
         .from(users)
-        // @ts-ignore drizzle version mismatch in tests/runtime
+        // @ts-expect-error drizzle version mismatch in tests/runtime
         .where(eq(users.clerkId, userIdFromSession))
         .limit(1);
 
@@ -426,7 +426,7 @@ export async function POST(request: NextRequest) {
             status: 'processing',
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
+          // @ts-expect-error drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         // Process image with timeout protection (single canonical AVIF)
@@ -477,7 +477,7 @@ export async function POST(request: NextRequest) {
             processedAt: new Date(),
             updatedAt: new Date(),
           })
-          // @ts-ignore drizzle version mismatch in tests/runtime
+          // @ts-expect-error drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
 
         return NextResponse.json(

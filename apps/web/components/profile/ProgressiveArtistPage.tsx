@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
-import { Artist, LegacySocialLink } from '@/types/db';
+import type { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazy load the animated version
 const AnimatedArtistPage = dynamic(

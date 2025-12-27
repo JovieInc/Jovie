@@ -1,5 +1,5 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';

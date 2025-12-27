@@ -1,16 +1,16 @@
 function plopGenerator(plop) {
   // Helper for PascalCase
-  plop.setHelper('pascalCase', function (text) {
-    return (
+  plop.setHelper(
+    'pascalCase',
+    text =>
       text.charAt(0).toUpperCase() +
       text.slice(1).replace(/[-_](\w)/g, (_, c) => c.toUpperCase())
-    );
-  });
+  );
 
   // Helper for kebab-case
-  plop.setHelper('kebabCase', function (text) {
-    return text.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
-  });
+  plop.setHelper('kebabCase', text =>
+    text.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase()
+  );
 
   // Atom generator
   plop.setGenerator('atom', {
@@ -20,7 +20,7 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'name',
         message: 'Component name (PascalCase):',
-        validate: function (value) {
+        validate: value => {
           if (!value) return 'Component name is required';
           if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) {
             return 'Component name must be PascalCase (e.g., Button, LoadingSpinner)';
@@ -63,7 +63,7 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'name',
         message: 'Component name (PascalCase):',
-        validate: function (value) {
+        validate: value => {
           if (!value) return 'Component name is required';
           if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) {
             return 'Component name must be PascalCase (e.g., SearchField, AuthActions)';
@@ -100,7 +100,7 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'name',
         message: 'Component name (PascalCase):',
-        validate: function (value) {
+        validate: value => {
           if (!value) return 'Component name is required';
           if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) {
             return 'Component name must be PascalCase (e.g., HeaderNav, ProductFlyout)';
@@ -150,10 +150,8 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'customFeature',
         message: 'Enter feature name (kebab-case):',
-        when: function (answers) {
-          return answers.feature === 'other';
-        },
-        validate: function (value) {
+        when: answers => answers.feature === 'other',
+        validate: value => {
           if (!value) return 'Feature name is required';
           if (!/^[a-z][a-z0-9-]*$/.test(value)) {
             return 'Feature name must be kebab-case (e.g., user-settings, link-in-bio)';
@@ -165,7 +163,7 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'name',
         message: 'Component name (PascalCase):',
-        validate: function (value) {
+        validate: value => {
           if (!value) return 'Component name is required';
           if (!/^[A-Z][a-zA-Z0-9]*$/.test(value)) {
             return 'Component name must be PascalCase (e.g., ClaimHandleForm, FeaturedArtists)';
@@ -180,7 +178,7 @@ function plopGenerator(plop) {
         choices: ['atoms', 'molecules', 'organisms'],
       },
     ],
-    actions: function (data) {
+    actions: data => {
       const featureName = data.customFeature || data.feature;
       return [
         {
@@ -213,7 +211,7 @@ function plopGenerator(plop) {
         type: 'input',
         name: 'name',
         message: 'Hook name (without "use" prefix):',
-        validate: function (value) {
+        validate: value => {
           if (!value) return 'Hook name is required';
           if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(value)) {
             return 'Hook name must be camelCase (e.g., Profile, LocalStorage)';

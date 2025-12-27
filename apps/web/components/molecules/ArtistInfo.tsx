@@ -1,7 +1,7 @@
 import { ArtistName } from '@/components/atoms/ArtistName';
 import { Avatar } from '@/components/atoms/Avatar';
 import { DEFAULT_PROFILE_TAGLINE } from '@/constants/app';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 interface ArtistInfoProps {
   artist: Artist;

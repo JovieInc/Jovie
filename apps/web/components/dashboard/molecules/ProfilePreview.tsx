@@ -2,7 +2,7 @@
 
 import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
 import { cn } from '@/lib/utils';
-import { Artist } from '@/types/db';
+import type { Artist } from '@/types/db';
 
 export interface ProfilePreviewProps {
   username: string;
