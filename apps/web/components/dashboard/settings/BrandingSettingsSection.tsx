@@ -1,0 +1,91 @@
+'use client';
+
+import { SparklesIcon } from '@heroicons/react/24/outline';
+import { useCallback, useState } from 'react';
+import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import type { Artist } from '@/types/db';
+
+interface BrandingSettingsSectionProps {
+  artist: Artist;
+  onArtistUpdate?: (updatedArtist: Artist) => void;
+}
+
+export function BrandingSettingsSection({
+  artist,
+  onArtistUpdate,
+}: BrandingSettingsSectionProps) {
+  const [hideBranding, setHideBranding] = useState(
+    artist.settings?.hide_branding ?? false
+  );
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+
+  const handleBrandingToggle = useCallback(
+    async (enabled: boolean) => {
+      setIsSavingBranding(true);
+      try {
+        const response = await fetch('/api/dashboard/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            updates: {
+              settings: { hide_branding: enabled },
+            },
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update branding settings');
+        }
+
+        setHideBranding(enabled);
+
+        if (onArtistUpdate) {
+          onArtistUpdate({
+            ...artist,
+            settings: {
+              ...artist.settings,
+              hide_branding: enabled,
+            },
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update branding settings:', error);
+        setHideBranding(!enabled);
+      } finally {
+        setIsSavingBranding(false);
+      }
+    },
+    [artist, onArtistUpdate]
+  );
+
+  return (
+    <DashboardCard variant='settings'>
+      <SettingsToggleRow
+        title='Hide Jovie Branding'
+        description='When enabled, Jovie branding will be removed from your profile page, giving your fans a fully custom experience.'
+        checked={hideBranding}
+        onCheckedChange={enabled => void handleBrandingToggle(enabled)}
+        disabled={isSavingBranding}
+        ariaLabel='Hide Jovie branding'
+      />
+
+      {hideBranding && (
+        <div className='mt-4 p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg'>
+          <div className='flex items-start gap-3'>
+            <SparklesIcon className='h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0' />
+            <div>
+              <p className='text-sm font-medium text-green-800 dark:text-green-200'>
+                Branding Hidden
+              </p>
+              <p className='text-xs text-green-600 dark:text-green-400 mt-1'>
+                Your profile now shows a completely custom experience without
+                Jovie branding.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </DashboardCard>
+  );
+}
