@@ -1,6 +1,6 @@
 {
   "buildCommand": "cd ../.. && pnpm turbo build --filter=@jovie/web",
-  "installCommand": "cd ../.. && corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install",
+  "installCommand": "cd ../.. && corepack enable && pnpm install",
   "ignoreCommand": "cd ../.. && npx turbo-ignore @jovie/web",
   "crons": [
     {
