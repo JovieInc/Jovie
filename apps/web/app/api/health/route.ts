@@ -11,8 +11,8 @@ import {
   getClientIP,
   getRateLimitStatus,
 } from '@/lib/utils/rate-limit';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
   // Rate limit check (30 req/60s for health endpoints)

@@ -37,6 +37,7 @@ import {
   validateLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { logger } from '@/lib/utils/logger';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
@@ -77,7 +78,6 @@ async function findAvailableHandle(
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isSafeExternalHttpsUrl(input: string): boolean {
   try {

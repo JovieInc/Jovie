@@ -1,6 +1,8 @@
 import type { ContactChannel, DashboardContactInput } from '@/types/contacts';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import {
+  normalizeEmail,
+  normalizePhone as normalizePhoneBase,
+} from '@/lib/validation/contact';
 
 export function normalizeTerritories(raw: string[]): string[] {
   const cleaned = raw.map(value => value.trim()).filter(Boolean);
@@ -18,29 +20,13 @@ export function normalizeTerritories(raw: string[]): string[] {
 }
 
 export function validateEmail(email: string | null | undefined): string | null {
-  if (!email) return null;
-  const trimmed = email.trim();
-  if (!trimmed) return null;
-  if (!EMAIL_REGEX.test(trimmed)) {
-    throw new Error('Please enter a valid email');
-  }
-  return trimmed.toLowerCase();
+  return normalizeEmail(email, { throwOnError: true });
 }
 
 export function normalizePhone(
   phone: string | null | undefined
 ): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/[^\d+]/g, '');
-  const numeric = digits.startsWith('+') ? digits.slice(1) : digits;
-  const cleanDigits = numeric.replace(/[^\d]/g, '');
-
-  if (cleanDigits.length === 0) return null;
-  if (cleanDigits.length < 7 || cleanDigits.length > 15) {
-    throw new Error('Please enter a valid phone number');
-  }
-
-  return `+${cleanDigits}`;
+  return normalizePhoneBase(phone, { throwOnError: true });
 }
 
 export function resolvePreferredChannel(

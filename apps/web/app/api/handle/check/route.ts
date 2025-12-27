@@ -1,17 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { NO_CACHE_HEADERS } from '@/lib/api/constants';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
-
-const NO_STORE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-  Pragma: 'no-cache',
-  Expires: '0',
-} as const;
 
 /**
  * Handle Availability Check API
@@ -153,7 +148,7 @@ export async function GET(request: Request) {
     }
     return NextResponse.json(body, {
       status: options?.status ?? 200,
-      headers: NO_STORE_HEADERS,
+      headers: NO_CACHE_HEADERS,
     });
   };
 

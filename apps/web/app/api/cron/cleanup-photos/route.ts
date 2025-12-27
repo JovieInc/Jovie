@@ -2,11 +2,11 @@ import { del } from '@vercel/blob';
 import { and, eq, lt, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for cleanup
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Vercel Cron secret for authentication
 const CRON_SECRET = process.env.CRON_SECRET;

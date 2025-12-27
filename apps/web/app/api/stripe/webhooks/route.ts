@@ -36,11 +36,11 @@ import {
   stripeTimestampToDate,
   type WebhookContext,
 } from '@/lib/stripe/webhooks';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 // Force Node.js runtime for Stripe SDK compatibility
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 

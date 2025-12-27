@@ -552,7 +552,8 @@ export function EnhancedDashboardLinks({
     (dbLinks: ProfileSocialLink[] = []): LinkItem[] => {
       return dbLinks.map((link, index) => {
         const detected = convertDbLinkToDetected(link);
-        const platformMeta = buildPlatformMeta(link);
+        // Reuse platform from detected instead of calling buildPlatformMeta again
+        const platformMeta = detected.platform;
         const order =
           typeof link.sortOrder === 'number' ? link.sortOrder : index;
         const isVisible = link.isActive ?? true;
@@ -580,7 +581,7 @@ export function EnhancedDashboardLinks({
         return item;
       });
     },
-    [buildPlatformMeta, convertDbLinkToDetected]
+    [convertDbLinkToDetected]
   );
 
   const convertDbLinksToSuggestions = useCallback(

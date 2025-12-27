@@ -110,7 +110,7 @@ export interface DashboardAudienceTableProps {
   profileUrl?: string;
 }
 
-export function DashboardAudienceTable({
+function DashboardAudienceTableImpl({
   mode,
   rows,
   total,
@@ -777,3 +777,50 @@ export function DashboardAudienceTable({
     </div>
   );
 }
+
+/**
+ * Custom comparison for React.memo.
+ * Compares data props by value, callbacks by reference.
+ * This prevents re-renders when parent re-renders with same data.
+ */
+function arePropsEqual(
+  prev: DashboardAudienceTableProps,
+  next: DashboardAudienceTableProps
+): boolean {
+  // Compare primitive props
+  if (
+    prev.mode !== next.mode ||
+    prev.total !== next.total ||
+    prev.page !== next.page ||
+    prev.pageSize !== next.pageSize ||
+    prev.sort !== next.sort ||
+    prev.direction !== next.direction ||
+    prev.profileUrl !== next.profileUrl
+  ) {
+    return false;
+  }
+
+  // Compare rows array by reference first (fast path)
+  if (prev.rows === next.rows) {
+    return true;
+  }
+
+  // Compare rows by length and IDs (shallow comparison)
+  if (prev.rows.length !== next.rows.length) {
+    return false;
+  }
+
+  // Check if row IDs match (indicates same data set)
+  for (let i = 0; i < prev.rows.length; i++) {
+    if (prev.rows[i].id !== next.rows[i].id) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export const DashboardAudienceTable = React.memo(
+  DashboardAudienceTableImpl,
+  arePropsEqual
+);

@@ -7,10 +7,10 @@ import {
   notificationSubscriptions,
   users,
 } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const SORTABLE_COLUMNS = {
   email: notificationSubscriptions.email,

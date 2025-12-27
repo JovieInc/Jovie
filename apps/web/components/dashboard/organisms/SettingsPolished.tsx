@@ -897,83 +897,88 @@ export function SettingsPolished({
     />
   );
 
-  const sections = [
-    {
-      id: 'profile',
-      title: 'Profile',
-      description: 'Manage your public profile and account details.',
-      render: renderProfileSection,
-    },
-    {
-      id: 'account',
-      title: 'Account',
-      description:
-        'Manage email addresses, password, connected accounts, and more.',
-      render: renderAccountSection,
-    },
-    {
-      id: 'appearance',
-      title: 'Appearance',
-      description: 'Customize how the interface looks and feels.',
-      render: renderAppearanceSection,
-    },
-    {
-      id: 'notifications',
-      title: 'Notifications',
-      description: 'Manage your email preferences and communication settings.',
-      render: () =>
-        notificationsEnabled ? (
-          renderNotificationsSection()
-        ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-lg font-medium text-primary mb-2'>
-                Notifications are not available yet
-              </h3>
-              <p className='text-sm text-secondary'>
-                We&apos;re focused on getting the core Jovie profile experience
-                right before launching notifications.
-              </p>
-            </div>
-          </DashboardCard>
-        ),
-    },
-    {
-      id: 'remove-branding',
-      title: 'Remove Branding',
-      description:
-        'Remove Jovie branding to create a fully custom experience for your fans.',
-      render: () =>
-        isPro
-          ? renderRemoveBrandingSection()
-          : renderProUpgradeCard(
-              'Professional Appearance',
-              'Remove Jovie branding to create a fully custom experience for your fans.',
-              SparklesIcon
-            ),
-    },
-    {
-      id: 'ad-pixels',
-      title: 'Ad Pixels',
-      description:
-        'Connect Facebook, Google, and TikTok pixels to track conversions.',
-      render: () =>
-        isPro
-          ? renderAdPixelsSection()
-          : renderProUpgradeCard(
-              'Unlock Growth Tracking',
-              'Seamlessly integrate Facebook, Google, and TikTok pixels.',
-              RocketLaunchIcon
-            ),
-    },
-    {
-      id: 'billing',
-      title: 'Billing & Subscription',
-      description:
-        'Manage your subscription, payment methods, and billing history.',
-      render: renderBillingSection,
-    },
-  ];
+  const sections = useMemo(
+    () => [
+      {
+        id: 'profile',
+        title: 'Profile',
+        description: 'Manage your public profile and account details.',
+        render: renderProfileSection,
+      },
+      {
+        id: 'account',
+        title: 'Account',
+        description:
+          'Manage email addresses, password, connected accounts, and more.',
+        render: renderAccountSection,
+      },
+      {
+        id: 'appearance',
+        title: 'Appearance',
+        description: 'Customize how the interface looks and feels.',
+        render: renderAppearanceSection,
+      },
+      {
+        id: 'notifications',
+        title: 'Notifications',
+        description: 'Manage your email preferences and communication settings.',
+        render: () =>
+          notificationsEnabled ? (
+            renderNotificationsSection()
+          ) : (
+            <DashboardCard variant='settings'>
+              <div className='text-center py-4'>
+                <h3 className='text-lg font-medium text-primary mb-2'>
+                  Notifications are not available yet
+                </h3>
+                <p className='text-sm text-secondary'>
+                  We&apos;re focused on getting the core Jovie profile experience
+                  right before launching notifications.
+                </p>
+              </div>
+            </DashboardCard>
+          ),
+      },
+      {
+        id: 'remove-branding',
+        title: 'Remove Branding',
+        description:
+          'Remove Jovie branding to create a fully custom experience for your fans.',
+        render: () =>
+          isPro
+            ? renderRemoveBrandingSection()
+            : renderProUpgradeCard(
+                'Professional Appearance',
+                'Remove Jovie branding to create a fully custom experience for your fans.',
+                SparklesIcon
+              ),
+      },
+      {
+        id: 'ad-pixels',
+        title: 'Ad Pixels',
+        description:
+          'Connect Facebook, Google, and TikTok pixels to track conversions.',
+        render: () =>
+          isPro
+            ? renderAdPixelsSection()
+            : renderProUpgradeCard(
+                'Unlock Growth Tracking',
+                'Seamlessly integrate Facebook, Google, and TikTok pixels.',
+                RocketLaunchIcon
+              ),
+      },
+      {
+        id: 'billing',
+        title: 'Billing & Subscription',
+        description:
+          'Manage your subscription, payment methods, and billing history.',
+        render: renderBillingSection,
+      },
+    ],
+    // Key dependencies that determine section visibility and content
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [notificationsEnabled, isPro]
+  );
 
   const visibleSections = focusSection
     ? sections.filter(section => section.id === focusSection)

@@ -3,10 +3,10 @@ import Stripe from 'stripe';
 import { z } from 'zod';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { validateUsername } from '@/lib/validation/username';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const TipIntentSchema = z.object({
   amount: z.number().int().min(1).max(500),

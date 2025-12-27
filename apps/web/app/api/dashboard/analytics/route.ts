@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { getUserDashboardAnalytics } from '@/lib/db/queries/analytics';
 import type { AnalyticsRange, DashboardAnalyticsView } from '@/types/analytics';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 type TimeRange = AnalyticsRange;
 
@@ -15,7 +16,6 @@ const TTL_MS = 5_000;
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<unknown>>();
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isRange(value: string): value is TimeRange {
   return (

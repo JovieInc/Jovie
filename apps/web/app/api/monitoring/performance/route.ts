@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Define metric shape
 interface PerformanceMetric {

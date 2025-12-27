@@ -6,10 +6,10 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const syncSchema = z.object({
   email: z.string().email(),
