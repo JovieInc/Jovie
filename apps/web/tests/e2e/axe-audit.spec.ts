@@ -58,34 +58,33 @@ test.describe('Axe WCAG 2.1 Compliance', () => {
   const smokeOnly = process.env.SMOKE_ONLY === '1';
 
   for (const route of authenticatedRoutes) {
-    test.skip(
-      smokeOnly,
-      `${route.name} (${route.path}) should have no a11y violations`,
-      async ({ page }) => {
-        await page.goto(route.path);
-        await page.waitForLoadState('networkidle');
+    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
+      page,
+    }) => {
+      test.skip(smokeOnly, 'Skip authenticated routes in smoke mode');
+      await page.goto(route.path);
+      await page.waitForLoadState('networkidle');
 
-        const results = await new AxeBuilder({ page })
-          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-          .analyze();
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
 
-        if (results.violations.length > 0) {
+      if (results.violations.length > 0) {
+        console.log(
+          `\nAccessibility violations found on ${route.name} (${route.path}):`
+        );
+        results.violations.forEach(violation => {
+          console.log(`\n- ${violation.id}: ${violation.description}`);
+          console.log(`  Impact: ${violation.impact}`);
+          console.log(`  Help: ${violation.helpUrl}`);
           console.log(
-            `\nAccessibility violations found on ${route.name} (${route.path}):`
+            `  Affected elements: ${violation.nodes.length} element(s)`
           );
-          results.violations.forEach(violation => {
-            console.log(`\n- ${violation.id}: ${violation.description}`);
-            console.log(`  Impact: ${violation.impact}`);
-            console.log(`  Help: ${violation.helpUrl}`);
-            console.log(
-              `  Affected elements: ${violation.nodes.length} element(s)`
-            );
-          });
-        }
-
-        expect(results.violations).toEqual([]);
+        });
       }
-    );
+
+      expect(results.violations).toEqual([]);
+    });
   }
 });
 
