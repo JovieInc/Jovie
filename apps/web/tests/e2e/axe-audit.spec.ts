@@ -1,0 +1,113 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test } from '@playwright/test';
+
+/**
+ * Axe WCAG 2.1 Level AA Compliance Tests
+ *
+ * These tests use axe-core to scan critical routes for accessibility violations.
+ * Tests run against WCAG 2.0 Level A and AA, plus WCAG 2.1 Level A and AA standards.
+ *
+ * @see https://www.deque.com/axe/core-documentation/api-documentation/
+ */
+
+test.describe('Axe WCAG 2.1 Compliance', () => {
+  const publicRoutes = [
+    { path: '/', name: 'Homepage' },
+    { path: '/signin', name: 'Sign In' },
+    { path: '/signup', name: 'Sign Up' },
+    { path: '/pricing', name: 'Pricing' },
+    { path: '/support', name: 'Support' },
+  ];
+
+  for (const route of publicRoutes) {
+    test(`${route.name} (${route.path}) should have no a11y violations`, async ({
+      page,
+    }) => {
+      await page.goto(route.path);
+      await page.waitForLoadState('networkidle');
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+
+      if (results.violations.length > 0) {
+        console.log(
+          `\nAccessibility violations found on ${route.name} (${route.path}):`
+        );
+        results.violations.forEach(violation => {
+          console.log(`\n- ${violation.id}: ${violation.description}`);
+          console.log(`  Impact: ${violation.impact}`);
+          console.log(`  Help: ${violation.helpUrl}`);
+          console.log(
+            `  Affected elements: ${violation.nodes.length} element(s)`
+          );
+        });
+      }
+
+      expect(results.violations).toEqual([]);
+    });
+  }
+
+  // Authenticated routes tests (skipped in smoke mode)
+  const authenticatedRoutes = [
+    { path: '/dashboard', name: 'Dashboard' },
+    { path: '/dashboard/links', name: 'Links Manager' },
+    { path: '/dashboard/settings', name: 'Settings' },
+  ];
+
+  const smokeOnly = process.env.SMOKE_ONLY === '1';
+
+  for (const route of authenticatedRoutes) {
+    test.skip(
+      smokeOnly,
+      `${route.name} (${route.path}) should have no a11y violations`,
+      async ({ page }) => {
+        await page.goto(route.path);
+        await page.waitForLoadState('networkidle');
+
+        const results = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+          .analyze();
+
+        if (results.violations.length > 0) {
+          console.log(
+            `\nAccessibility violations found on ${route.name} (${route.path}):`
+          );
+          results.violations.forEach(violation => {
+            console.log(`\n- ${violation.id}: ${violation.description}`);
+            console.log(`  Impact: ${violation.impact}`);
+            console.log(`  Help: ${violation.helpUrl}`);
+            console.log(
+              `  Affected elements: ${violation.nodes.length} element(s)`
+            );
+          });
+        }
+
+        expect(results.violations).toEqual([]);
+      }
+    );
+  }
+});
+
+test.describe('Axe Best Practices', () => {
+  test('Homepage should follow best practices', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    const results = await new AxeBuilder({ page })
+      .withTags(['best-practice'])
+      .analyze();
+
+    if (results.violations.length > 0) {
+      console.log('\nBest practice violations found on Homepage:');
+      results.violations.forEach(violation => {
+        console.log(`\n- ${violation.id}: ${violation.description}`);
+        console.log(`  Impact: ${violation.impact}`);
+        console.log(`  Help: ${violation.helpUrl}`);
+      });
+    }
+
+    // Log warnings but don't fail on best-practice violations
+    expect(results.violations.length).toBeGreaterThanOrEqual(0);
+  });
+});

@@ -67,6 +67,9 @@
     "*.{js,jsx,ts,tsx}": [
       "biome check --write --no-errors-on-unmatched"
     ],
+    "apps/web/components/**/*.{tsx,ts}": [
+      "pnpm --filter=@jovie/web run a11y:check:staged"
+    ],
     "*.{json,css}": [
       "biome format --write --no-errors-on-unmatched"
     ]
