@@ -1,7 +1,9 @@
 import { del } from '@vercel/blob';
-import { and, eq, lt, or } from 'drizzle-orm';
+import crypto from 'node:crypto';
+import { and, eq, inArray, lt, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
+import { captureWarning } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for cleanup
@@ -22,11 +24,26 @@ const UPLOADING_RECORD_MAX_AGE_HOURS = 1; // Stuck uploads older than 1 hour
  * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  // Verify cron secret in production
+  // Verify cron secret in production using timing-safe comparison
   if (process.env.NODE_ENV === 'production') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    const providedSecret = authHeader?.replace('Bearer ', '');
+
+    if (!cronSecret || !providedSecret) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Use timing-safe comparison to prevent timing attacks
+    const providedBuffer = Buffer.from(providedSecret);
+    const expectedBuffer = Buffer.from(cronSecret);
+    if (
+      providedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+    ) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
@@ -88,17 +105,29 @@ export async function GET(request: Request) {
       );
     }
 
-    // Collect blob URLs to delete
-    const blobUrlsToDelete: string[] = [];
+    // Collect blob URLs to delete (deduplicated - same URL may appear in multiple columns)
+    const blobUrlSet = new Set<string>();
     for (const record of orphanedRecords) {
-      if (record.blobUrl) blobUrlsToDelete.push(record.blobUrl);
-      if (record.smallUrl) blobUrlsToDelete.push(record.smallUrl);
-      if (record.mediumUrl) blobUrlsToDelete.push(record.mediumUrl);
-      if (record.largeUrl) blobUrlsToDelete.push(record.largeUrl);
+      if (record.blobUrl) blobUrlSet.add(record.blobUrl);
+      if (record.smallUrl) blobUrlSet.add(record.smallUrl);
+      if (record.mediumUrl) blobUrlSet.add(record.mediumUrl);
+      if (record.largeUrl) blobUrlSet.add(record.largeUrl);
     }
+    const blobUrlsToDelete = Array.from(blobUrlSet);
 
-    // Delete blobs from Vercel Blob storage (if token is configured)
+    // IMPORTANT: Delete database records FIRST in a single atomic batch transaction
+    // This ensures we don't leave orphaned DB records if blob deletion partially fails
+    // If DB deletion fails, we abort before deleting any blobs (safe rollback)
+    const recordIds = orphanedRecords.map(r => r.id);
+    await db
+      .delete(profilePhotos)
+      .where(inArray(profilePhotos.id, recordIds));
+
+    // Now delete blobs from Vercel Blob storage (if token is configured)
+    // This is best-effort - if it fails, blobs become orphaned but DB is clean
+    // Orphaned blobs can be cleaned up via Vercel dashboard or future reconciliation
     let blobsDeleted = 0;
+    let blobDeletionFailed = false;
     if (process.env.BLOB_READ_WRITE_TOKEN && blobUrlsToDelete.length > 0) {
       try {
         await del(blobUrlsToDelete, {
@@ -106,15 +135,18 @@ export async function GET(request: Request) {
         });
         blobsDeleted = blobUrlsToDelete.length;
       } catch (blobError) {
-        // Log but don't fail - blob deletion is best-effort
-        console.warn('Failed to delete some blobs:', blobError);
+        blobDeletionFailed = true;
+        // Log structured warning for ops monitoring
+        console.warn('[cleanup-photos] Blob deletion failed:', {
+          error: blobError instanceof Error ? blobError.message : blobError,
+          blobCount: blobUrlsToDelete.length,
+          recordsDeleted: recordIds.length,
+        });
+        await captureWarning('Blob deletion failed during photo cleanup', blobError, {
+          blobCount: blobUrlsToDelete.length,
+          recordsDeleted: recordIds.length,
+        });
       }
-    }
-
-    // Delete database records
-    const recordIds = orphanedRecords.map(r => r.id);
-    for (const id of recordIds) {
-      await db.delete(profilePhotos).where(eq(profilePhotos.id, id));
     }
 
     console.log(
@@ -127,6 +159,7 @@ export async function GET(request: Request) {
         message: `Cleaned up ${recordIds.length} orphaned photo records`,
         deleted: recordIds.length,
         blobsDeleted,
+        blobDeletionFailed,
         details: {
           failed: orphanedRecords.filter(r => r.status === 'failed').length,
           stuckUploading: orphanedRecords.filter(r => r.status === 'uploading')

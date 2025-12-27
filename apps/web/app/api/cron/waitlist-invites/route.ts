@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -18,7 +19,21 @@ function isAuthorized(request: NextRequest): boolean {
   }
 
   const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${cronSecret}`;
+  const providedSecret = authHeader?.replace('Bearer ', '');
+
+  if (!providedSecret) {
+    return false;
+  }
+
+  // Use timing-safe comparison to prevent timing attacks
+  const providedBuffer = Buffer.from(providedSecret);
+  const expectedBuffer = Buffer.from(cronSecret);
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 const sendWindowSchema = z.object({

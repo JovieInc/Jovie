@@ -1,5 +1,5 @@
 import { clerkClient } from '@clerk/nextjs/server';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { headers } from 'next/headers';
 import { type NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
@@ -152,14 +152,13 @@ export async function POST(request: NextRequest) {
           error
         );
 
-        // Return 200 to prevent Clerk from retrying, but log the error
+        // Return 500 to trigger Clerk retry - user.created is critical for onboarding
         return NextResponse.json(
           {
             success: false,
             error: 'Failed to process user data',
-            message: error instanceof Error ? error.message : 'Unknown error',
           },
-          { status: 200, headers: NO_STORE_HEADERS } // Return 200 to prevent retries for non-critical errors
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
     }
@@ -179,13 +178,13 @@ export async function POST(request: NextRequest) {
           error
         );
 
-        // Do not cause Clerk retries on non-critical sync failures
+        // Return 500 to trigger Clerk retry - username sync failures should be retried
         return NextResponse.json(
           {
             success: false,
             error: 'Failed to sync username from Clerk',
           },
-          { status: 200, headers: NO_STORE_HEADERS }
+          { status: 500, headers: NO_STORE_HEADERS }
         );
       }
 

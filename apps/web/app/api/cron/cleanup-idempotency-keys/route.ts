@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { dashboardIdempotencyKeys, db } from '@/lib/db';
@@ -16,11 +17,26 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Schedule: Daily at 4:00 AM UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  // Verify cron secret in production
+  // Verify cron secret in production using timing-safe comparison
   if (process.env.NODE_ENV === 'production') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    const providedSecret = authHeader?.replace('Bearer ', '');
+
+    if (!cronSecret || !providedSecret) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Use timing-safe comparison to prevent timing attacks
+    const providedBuffer = Buffer.from(providedSecret);
+    const expectedBuffer = Buffer.from(cronSecret);
+    if (
+      providedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+    ) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }

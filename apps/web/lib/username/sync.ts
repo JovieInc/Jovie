@@ -92,14 +92,40 @@ async function updateCanonicalUsernameInternal(
         };
       }
 
-      await tx
-        .update(creatorProfiles)
-        .set({
-          username: rawUsername,
-          usernameNormalized: normalized,
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, profile.id));
+      // RACE PROTECTION: The unique constraint on usernameNormalized is the ultimate
+      // safeguard against race conditions. If two users try to claim the same handle
+      // simultaneously, only one will succeed. We catch the constraint violation
+      // and return a conflict result.
+      try {
+        await tx
+          .update(creatorProfiles)
+          .set({
+            username: rawUsername,
+            usernameNormalized: normalized,
+            updatedAt: new Date(),
+          })
+          .where(eq(creatorProfiles.id, profile.id));
+      } catch (error) {
+        // Check for unique constraint violation (Postgres error code 23505)
+        const pgError = error as { code?: string; constraint?: string };
+        if (
+          pgError.code === '23505' &&
+          pgError.constraint?.includes('username_normalized')
+        ) {
+          console.warn('[username/sync] Race condition detected - handle claimed by another user', {
+            normalized,
+            profileId: profile.id,
+          });
+          return {
+            normalized,
+            changed: false,
+            conflict: true,
+            canonicalUsername,
+          };
+        }
+        // Re-throw other errors
+        throw error;
+      }
 
       return {
         normalized,

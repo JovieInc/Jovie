@@ -12,6 +12,7 @@
  * Schedule: Every hour (configured in vercel.json)
  */
 
+import crypto from 'node:crypto';
 import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import type Stripe from 'stripe';
@@ -67,11 +68,26 @@ interface ReconciliationResult {
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  // Verify cron secret in production
+  // Verify cron secret in production using timing-safe comparison
   if (process.env.NODE_ENV === 'production') {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
-    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    const providedSecret = authHeader?.replace('Bearer ', '');
+
+    if (!cronSecret || !providedSecret) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Use timing-safe comparison to prevent timing attacks
+    const providedBuffer = Buffer.from(providedSecret);
+    const expectedBuffer = Buffer.from(cronSecret);
+    if (
+      providedBuffer.length !== expectedBuffer.length ||
+      !crypto.timingSafeEqual(providedBuffer, expectedBuffer)
+    ) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }

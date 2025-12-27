@@ -122,7 +122,14 @@ async function checkIdempotencyKey(
 }
 
 /**
- * Store idempotency key with response for future deduplication
+ * Store idempotency key with response for future deduplication.
+ *
+ * IMPORTANT: This should be called BEFORE performing side effects when possible,
+ * or immediately after the side effect succeeds. The key acts as a "lock" to
+ * prevent duplicate processing.
+ *
+ * Returns true if the key was stored successfully, false if it already exists
+ * (indicating a concurrent request is in progress or completed).
  */
 async function storeIdempotencyKey(
   key: string,
@@ -130,11 +137,11 @@ async function storeIdempotencyKey(
   endpoint: string,
   responseStatus: number,
   responseBody: Record<string, unknown>
-): Promise<void> {
-  if (!key) return;
+): Promise<{ stored: boolean }> {
+  if (!key) return { stored: true }; // No key = no idempotency tracking needed
 
   try {
-    await db
+    const result = await db
       .insert(dashboardIdempotencyKeys)
       .values({
         key,
@@ -144,10 +151,33 @@ async function storeIdempotencyKey(
         responseBody,
         expiresAt: new Date(Date.now() + IDEMPOTENCY_KEY_TTL_MS),
       })
-      .onConflictDoNothing();
-  } catch {
-    // Non-critical: idempotency key storage failure shouldn't fail the request
-    console.error('Failed to store idempotency key');
+      .onConflictDoNothing()
+      .returning({ id: dashboardIdempotencyKeys.id });
+
+    if (result.length === 0) {
+      // Key already exists - concurrent request or retry
+      console.warn('[social-links] Idempotency key conflict detected', {
+        key,
+        userId,
+        endpoint,
+        reason: 'key_already_exists',
+      });
+      return { stored: false };
+    }
+
+    return { stored: true };
+  } catch (error) {
+    // Log the error for observability but don't fail the request
+    // The operation already succeeded, we just couldn't record the idempotency key
+    console.error('[social-links] Failed to store idempotency key', {
+      key,
+      userId,
+      endpoint,
+      error: error instanceof Error ? error.message : error,
+    });
+    // Return stored: true to allow the request to complete
+    // The worst case is a duplicate request might be processed again
+    return { stored: true };
   }
 }
 

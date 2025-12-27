@@ -105,20 +105,32 @@ export async function POST(req: NextRequest) {
         .onConflictDoNothing({ target: tips.paymentIntentId })
         .returning({ id: tips.id });
 
+      // Structured logging for observability - distinguish between:
+      // 1. New tip successfully recorded
+      // 2. Duplicate webhook (idempotent - Stripe retried, we already processed)
       if (!inserted) {
-        console.log('Duplicate tip event, record already exists', {
+        // This is expected behavior - Stripe may retry webhooks
+        // The onConflictDoNothing ensures idempotency
+        console.log('[capture-tip] Idempotent duplicate webhook received', {
+          event_type: 'tip_webhook_duplicate',
           payment_intent: pi.id,
+          handle,
+          amount_cents: pi.amount_received,
+          reason: 'payment_intent_already_processed',
+        });
+      } else {
+        // New tip successfully recorded
+        console.log('[capture-tip] Tip recorded successfully', {
+          event_type: 'tip_recorded',
+          tip_id: inserted.id,
+          payment_intent: pi.id,
+          handle,
+          amount_cents: pi.amount_received,
+          currency: pi.currency?.toUpperCase(),
+          has_contact_email: !!charge?.billing_details?.email,
+          has_contact_phone: !!charge?.billing_details?.phone,
         });
       }
-
-      console.log('Tip received:', {
-        artist_id: handle,
-        amount_cents: pi.amount_received,
-        currency: pi.currency?.toUpperCase(),
-        payment_intent: pi.id,
-        contact_email: charge?.billing_details?.email,
-        contact_phone: charge?.billing_details?.phone,
-      });
     }
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });

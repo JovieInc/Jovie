@@ -72,8 +72,10 @@ export async function GET() {
     );
   } catch (e: unknown) {
     const error = e instanceof Error ? e : new Error('Unknown error');
+    // Log full error server-side only - never expose stack traces in API responses
+    console.error('[health/auth] Error:', error.message, error.stack);
     return NextResponse.json(
-      { ok: false, error: error.message, stack: error.stack },
+      { ok: false, error: 'Internal server error' },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

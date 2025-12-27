@@ -1,10 +1,12 @@
+import { del } from '@vercel/blob';
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { and, desc, eq, ne } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import type { OutputInfo } from 'sharp';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { profilePhotos, users } from '@/lib/db';
+import { captureWarning } from '@/lib/error-tracking';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
   AVATAR_OPTIMIZED_SIZES,
@@ -479,6 +481,76 @@ export async function POST(request: NextRequest) {
           })
           // @ts-expect-error drizzle version mismatch in tests/runtime
           .where(eq(profilePhotos.id, photoRecord.id));
+
+        // BLOB ORPHAN PREVENTION: After successful DB update, clean up previous avatar blobs
+        // This runs AFTER the DB transaction succeeds to ensure we don't delete the active avatar
+        // If blob deletion fails, we log a warning but don't fail the request - orphaned blobs
+        // can be cleaned up later via the cleanup-photos cron job or Vercel dashboard
+        if (process.env.BLOB_READ_WRITE_TOKEN) {
+          try {
+            // Find previous ready photos for this user (excluding the one we just created)
+            const previousPhotos = await tx
+              .select({
+                id: profilePhotos.id,
+                blobUrl: profilePhotos.blobUrl,
+                smallUrl: profilePhotos.smallUrl,
+                mediumUrl: profilePhotos.mediumUrl,
+                largeUrl: profilePhotos.largeUrl,
+              })
+              .from(profilePhotos)
+              .where(
+                and(
+                  eq(profilePhotos.userId, dbUser.id),
+                  eq(profilePhotos.status, 'ready'),
+                  ne(profilePhotos.id, photoRecord.id)
+                )
+              )
+              .orderBy(desc(profilePhotos.createdAt))
+              .limit(10); // Limit to prevent runaway cleanup
+
+            if (previousPhotos.length > 0) {
+              // Collect unique blob URLs to delete
+              const blobUrlsToDelete = new Set<string>();
+              for (const photo of previousPhotos) {
+                if (photo.blobUrl) blobUrlsToDelete.add(photo.blobUrl);
+                if (photo.smallUrl) blobUrlsToDelete.add(photo.smallUrl);
+                if (photo.mediumUrl) blobUrlsToDelete.add(photo.mediumUrl);
+                if (photo.largeUrl) blobUrlsToDelete.add(photo.largeUrl);
+              }
+
+              // Delete old blobs (best-effort)
+              if (blobUrlsToDelete.size > 0) {
+                await del(Array.from(blobUrlsToDelete), {
+                  token: process.env.BLOB_READ_WRITE_TOKEN,
+                });
+                console.log('[upload] Cleaned up previous avatar blobs', {
+                  userId: dbUser.id,
+                  blobsDeleted: blobUrlsToDelete.size,
+                  photosReplaced: previousPhotos.length,
+                });
+              }
+
+              // Mark old photo records as replaced (soft cleanup)
+              // The cleanup-photos cron will handle any remaining orphans
+              for (const photo of previousPhotos) {
+                await tx
+                  .update(profilePhotos)
+                  .set({ status: 'failed', errorMessage: 'Replaced by newer upload' })
+                  .where(eq(profilePhotos.id, photo.id));
+              }
+            }
+          } catch (cleanupError) {
+            // Log but don't fail - blob cleanup is best-effort
+            console.warn('[upload] Failed to clean up previous avatar blobs', {
+              userId: dbUser.id,
+              error: cleanupError instanceof Error ? cleanupError.message : cleanupError,
+            });
+            await captureWarning('Failed to clean up previous avatar blobs', cleanupError, {
+              userId: dbUser.id,
+              newPhotoId: photoRecord.id,
+            });
+          }
+        }
 
         return NextResponse.json(
           {
