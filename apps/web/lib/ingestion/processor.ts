@@ -19,16 +19,10 @@ import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
   detectPlatform,
-  validateLink,
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
-import {
-  extractAppleMusic,
-  fetchAppleMusicDocument,
-  isAppleMusicUrl,
-  validateAppleMusicUrl,
-} from './strategies/apple-music';
+import { IngestionStatusManager } from './status-manager';
 import { ExtractionError } from './strategies/base';
 import {
   extractBeacons,
@@ -160,10 +154,6 @@ function getCreatorProfileIdFromJob(
       const parsed = beaconsPayloadSchema.safeParse(job.payload);
       return parsed.success ? parsed.data.creatorProfileId : null;
     }
-    case 'import_apple_music': {
-      const parsed = appleMusicPayloadSchema.safeParse(job.payload);
-      return parsed.success ? parsed.data.creatorProfileId : null;
-    }
     default:
       return null;
   }
@@ -180,44 +170,15 @@ export async function handleIngestionJobFailure(
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ...(shouldRetry ? {} : { ingestionStatus: 'failed' as const }),
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, creatorProfileId));
+    await IngestionStatusManager.handleJobFailure(
+      tx,
+      creatorProfileId,
+      shouldRetry,
+      message
+    );
   }
 
-  // TODO: Re-enable failJob once job-utils module is available
-  // await failJob(tx, job, message, { reason });
-
-  // Temporary inline implementation for retry scheduling
-  if (shouldRetry) {
-    const backoffMs = Math.min(1000 * Math.pow(2, job.attempts), 300000);
-    const nextRunAt = new Date(Date.now() + backoffMs);
-
-    await tx
-      .update(ingestionJobs)
-      .set({
-        status: 'pending',
-        error: message,
-        nextRunAt,
-        runAt: nextRunAt,
-        updatedAt: new Date(),
-      })
-      .where(eq(ingestionJobs.id, job.id));
-  } else {
-    await tx
-      .update(ingestionJobs)
-      .set({
-        status: 'failed',
-        error: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(ingestionJobs.id, job.id));
-  }
+  await failJob(tx, job, message, { reason });
 }
 
 const linktreePayloadSchema = z.object({
@@ -247,29 +208,183 @@ const beaconsPayloadSchema = z.object({
   dedupKey: z.string().optional(),
   depth: z.number().int().min(0).max(3).default(0),
 });
-
-const appleMusicPayloadSchema = z.object({
-  creatorProfileId: z.string().uuid(),
-  sourceUrl: z.string().url(),
-  dedupKey: z.string().optional(),
-  depth: z.number().int().min(0).max(1).default(0),
-});
-
 type SocialLinkRow = typeof socialLinks.$inferSelect;
+
+/**
+ * Base payload type for all ingestion jobs.
+ */
+interface BaseJobPayload {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth: number;
+  dedupKey?: string;
+}
+
+/**
+ * Profile data fetched for ingestion processing.
+ */
+interface ProfileData {
+  id: string;
+  usernameNormalized: string | null;
+  avatarUrl: string | null;
+  displayName: string | null;
+  avatarLockedByUser: boolean | null;
+  displayNameLocked: boolean | null;
+}
+
+/**
+ * Configuration for a job executor.
+ * Defines the schema, platform name, and fetch/extract logic for a job type.
+ */
+interface JobExecutorConfig<TPayload extends BaseJobPayload> {
+  /** Zod schema to validate and parse the job payload */
+  payloadSchema: z.ZodSchema<TPayload>;
+  /** Human-readable platform name for error messages */
+  platformName: string;
+  /** Platform-specific logic to fetch and extract data */
+  fetchAndExtract: (
+    payload: TPayload,
+    profile: ProfileData
+  ) => Promise<ExtractionResult>;
+}
+
+/**
+ * Generic job executor that handles the common workflow for all ingestion jobs.
+ * This reduces duplication across processLinktreeJob, processLayloJob, etc.
+ */
+async function executeIngestionJob<TPayload extends BaseJobPayload>(
+  tx: DbType,
+  jobPayload: unknown,
+  config: JobExecutorConfig<TPayload>
+): Promise<{
+  inserted: number;
+  updated: number;
+  sourceUrl: string;
+  extractedLinks: number;
+}> {
+  const parsed = config.payloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const extraction = await config.fetchAndExtract(parsed, profile);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `${config.platformName} ingestion failed`;
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+/**
+ * Job executor configurations for each supported platform.
+ */
+const linktreeJobConfig: JobExecutorConfig<
+  z.infer<typeof linktreePayloadSchema>
+> = {
+  payloadSchema: linktreePayloadSchema,
+  platformName: 'Linktree',
+  fetchAndExtract: async payload => {
+    const html = await fetchLinktreeDocument(payload.sourceUrl);
+    return extractLinktree(html);
+  },
+};
+
+const beaconsJobConfig: JobExecutorConfig<
+  z.infer<typeof beaconsPayloadSchema>
+> = {
+  payloadSchema: beaconsPayloadSchema,
+  platformName: 'Beacons',
+  fetchAndExtract: async payload => {
+    const html = await fetchBeaconsDocument(payload.sourceUrl);
+    return extractBeacons(html);
+  },
+};
+
+const youtubeJobConfig: JobExecutorConfig<
+  z.infer<typeof youtubePayloadSchema>
+> = {
+  payloadSchema: youtubePayloadSchema,
+  platformName: 'YouTube',
+  fetchAndExtract: async payload => {
+    const html = await fetchYouTubeAboutDocument(payload.sourceUrl);
+    return extractYouTube(html);
+  },
+};
+
+const layloJobConfig: JobExecutorConfig<z.infer<typeof layloPayloadSchema>> = {
+  payloadSchema: layloPayloadSchema,
+  platformName: 'Laylo',
+  fetchAndExtract: async (payload, profile) => {
+    const layloHandle = deriveLayloHandle(
+      payload.sourceUrl,
+      profile.usernameNormalized
+    );
+    const { profile: layloProfile, user } =
+      await fetchLayloProfile(layloHandle);
+    return extractLaylo(layloProfile, user);
+  },
+};
 
 type SupportedRecursiveJobType =
   | 'import_linktree'
   | 'import_laylo'
   | 'import_youtube'
-  | 'import_beacons'
-  | 'import_apple_music';
+  | 'import_beacons';
 
 const MAX_DEPTH_BY_JOB_TYPE: Record<SupportedRecursiveJobType, number> = {
   import_linktree: 3,
   import_laylo: 3,
   import_youtube: 1,
   import_beacons: 3,
-  import_apple_music: 1,
 };
 
 async function enqueueIngestionJobTx(params: {
@@ -284,10 +399,7 @@ async function enqueueIngestionJobTx(params: {
   const maxDepth = MAX_DEPTH_BY_JOB_TYPE[jobType];
   if (depth > maxDepth) return null;
 
-  const detected = validateLink(sourceUrl);
-  if (!detected || !detected.isValid) {
-    return null;
-  }
+  const detected = detectPlatform(sourceUrl);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -401,19 +513,6 @@ export async function enqueueFollowupIngestionJobs(params: {
         sourceUrl: validatedLaylo,
         depth: nextDepth,
       });
-      continue;
-    }
-
-    // Apple Music
-    const validatedAppleMusic = validateAppleMusicUrl(url);
-    if (validatedAppleMusic && isAppleMusicUrl(validatedAppleMusic)) {
-      await enqueueIngestionJobTx({
-        tx,
-        jobType: 'import_apple_music',
-        creatorProfileId,
-        sourceUrl: validatedAppleMusic,
-        depth: nextDepth,
-      });
     }
   }
 }
@@ -523,8 +622,7 @@ export async function normalizeAndMergeExtraction(
 
   for (const row of existingRows) {
     try {
-      const detected = validateLink(row.url);
-      if (!detected || !detected.isValid) continue;
+      const detected = detectPlatform(row.url);
       const canonical = canonicalIdentity({
         platform: detected.platform,
         normalizedUrl: detected.normalizedUrl,
@@ -541,8 +639,8 @@ export async function normalizeAndMergeExtraction(
 
   for (const link of extraction.links) {
     try {
-      const detected = validateLink(link.url);
-      if (!detected || !detected.isValid) continue;
+      const detected = detectPlatform(link.url);
+      if (!detected.isValid) continue;
 
       const canonical = canonicalIdentity({
         platform: detected.platform,
@@ -594,7 +692,12 @@ export async function normalizeAndMergeExtraction(
             evidence: mergedEvidence,
             // Persist confidence as a fixed-point string to match the numeric column type
             confidence: merged.confidence.toFixed(2),
-            state: merged.state,
+            state:
+              existing.sourceType === 'ingested' ? merged.state : existingState,
+            isActive:
+              (existing.sourceType === 'ingested'
+                ? merged.state
+                : existingState) === 'active',
             updatedAt: new Date(),
           })
           .where(eq(socialLinks.id, existing.id));
@@ -624,5 +727,276 @@ export async function normalizeAndMergeExtraction(
     }
   }
 
+  // Apply basic enrichment for display name and avatar (phase 3 rules: respect locks)
+  await applyProfileEnrichment(tx, {
+    profileId: profile.id,
+    displayNameLocked: profile.displayNameLocked,
+    avatarLockedByUser: profile.avatarLockedByUser,
+    currentDisplayName: profile.displayName,
+    currentAvatarUrl: profile.avatarUrl,
+    extractedDisplayName: extraction.displayName ?? null,
+    extractedAvatarUrl: extraction.avatarUrl ?? null,
+  });
+
   return { inserted, updated };
+}
+
+export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, linktreeJobConfig);
+}
+
+/**
+ * Claim pending jobs for processing.
+ * Respects maxAttempts and only claims jobs that are ready to run.
+ */
+export async function claimPendingJobs(
+  tx: DbType,
+  now: Date,
+  limit = 5
+): Promise<(typeof ingestionJobs.$inferSelect)[]> {
+  const stuckBefore = new Date(now.getTime() - STUCK_PROCESSING_AFTER_MS);
+  const stuckJobs = await tx
+    .select({ jobType: ingestionJobs.jobType, payload: ingestionJobs.payload })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.status, 'processing'),
+        lte(ingestionJobs.updatedAt, stuckBefore)
+      )
+    )
+    .limit(50);
+
+  await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'pending',
+      error: 'Processing timeout; requeued',
+      runAt: now,
+      nextRunAt: null,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(ingestionJobs.status, 'processing'),
+        lte(ingestionJobs.updatedAt, stuckBefore)
+      )
+    );
+
+  const stuckProfileIds = stuckJobs
+    .map(stuckJob =>
+      getCreatorProfileIdFromJob({
+        jobType: stuckJob.jobType,
+        payload: stuckJob.payload,
+      } as typeof ingestionJobs.$inferSelect)
+    )
+    .filter((id): id is string => id !== null);
+
+  await IngestionStatusManager.handleStuckJobs(
+    tx,
+    stuckProfileIds,
+    stuckBefore,
+    'Processing timeout; requeued'
+  );
+
+  const exhaustedJobs = await tx
+    .select({
+      id: ingestionJobs.id,
+      maxAttempts: ingestionJobs.maxAttempts,
+    })
+    .from(ingestionJobs)
+    .where(
+      and(
+        eq(ingestionJobs.status, 'pending'),
+        lte(ingestionJobs.runAt, now),
+        gte(ingestionJobs.attempts, ingestionJobs.maxAttempts)
+      )
+    )
+    .limit(50);
+
+  for (const job of exhaustedJobs) {
+    await tx
+      .update(ingestionJobs)
+      .set({
+        status: 'failed',
+        error: `Exceeded max attempts (${job.maxAttempts})`,
+        updatedAt: new Date(),
+      })
+      .where(eq(ingestionJobs.id, job.id));
+  }
+
+  const processingHostCounts = await getProcessingHostCounts(tx);
+
+  const candidateLimit = Math.max(limit * CLAIM_CANDIDATE_MULTIPLIER, limit);
+  const candidateResult = await tx.execute(
+    drizzleSql`
+      select *
+      from ingestion_jobs
+      where status = 'pending'
+        and run_at <= ${now}
+        and attempts < max_attempts
+      order by priority asc, run_at asc
+      limit ${candidateLimit}
+      for update skip locked
+    `
+  );
+
+  const candidates =
+    candidateResult.rows as (typeof ingestionJobs.$inferSelect)[];
+
+  const hostCounts = new Map(processingHostCounts);
+  const selectedIds: string[] = [];
+
+  for (const candidate of candidates) {
+    const host = getJobHost(candidate);
+
+    if (host) {
+      const current = hostCounts.get(host) ?? 0;
+      if (current >= MAX_CONCURRENT_JOBS_PER_HOST) {
+        continue;
+      }
+      hostCounts.set(host, current + 1);
+    }
+
+    selectedIds.push(candidate.id);
+
+    if (selectedIds.length >= limit) break;
+  }
+
+  if (selectedIds.length === 0) return [];
+
+  return tx
+    .update(ingestionJobs)
+    .set({
+      status: 'processing',
+      attempts: drizzleSql`${ingestionJobs.attempts} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(inArray(ingestionJobs.id, selectedIds))
+    .returning();
+}
+
+/**
+ * Mark a job as failed with optional retry scheduling.
+ * If attempts < maxAttempts, schedules retry with exponential backoff.
+ */
+export async function failJob(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect,
+  error: string,
+  options: { reason?: JobFailureReason } = {}
+): Promise<void> {
+  const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
+  const shouldRetry = job.attempts < maxAttempts;
+  const reason = options.reason ?? 'transient';
+
+  if (shouldRetry) {
+    const backoffMs = calculateBackoff(job.attempts, reason);
+    const nextRunAt = new Date(Date.now() + backoffMs);
+
+    logger.info('Scheduling job retry', {
+      jobId: job.id,
+      attempt: job.attempts,
+      maxAttempts,
+      reason,
+      nextRunAt,
+      backoffMs,
+    });
+
+    await tx
+      .update(ingestionJobs)
+      .set({
+        status: 'pending',
+        error,
+        nextRunAt,
+        runAt: nextRunAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(ingestionJobs.id, job.id));
+  } else {
+    logger.warn('Job failed permanently', {
+      jobId: job.id,
+      attempts: job.attempts,
+      maxAttempts,
+      error,
+    });
+
+    await tx
+      .update(ingestionJobs)
+      .set({
+        status: 'failed',
+        error,
+        updatedAt: new Date(),
+      })
+      .where(eq(ingestionJobs.id, job.id));
+  }
+}
+
+/**
+ * Mark a job as succeeded.
+ */
+export async function succeedJob(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect
+): Promise<void> {
+  await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'succeeded',
+      error: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(ingestionJobs.id, job.id));
+}
+
+/**
+ * Reset a failed job for retry (admin action).
+ * Clears error, resets attempts, and sets status to pending.
+ */
+export async function resetJobForRetry(
+  tx: DbType,
+  jobId: string
+): Promise<boolean> {
+  const [updated] = await tx
+    .update(ingestionJobs)
+    .set({
+      status: 'pending',
+      error: null,
+      attempts: 0,
+      runAt: new Date(),
+      nextRunAt: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(ingestionJobs.id, jobId))
+    .returning({ id: ingestionJobs.id });
+
+  return !!updated;
+}
+
+export async function processJob(
+  tx: DbType,
+  job: typeof ingestionJobs.$inferSelect
+) {
+  switch (job.jobType) {
+    case 'import_linktree':
+      return processLinktreeJob(tx, job.payload);
+    case 'import_laylo':
+      return processLayloJob(tx, job.payload);
+    case 'import_youtube':
+      return processYouTubeJob(tx, job.payload);
+    case 'import_beacons':
+      return processBeaconsJob(tx, job.payload);
+    default:
+      throw new Error(`Unsupported ingestion job type: ${job.jobType}`);
+  }
+}
+
+function processBeaconsJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, beaconsJobConfig);
+}
+function processYouTubeJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, youtubeJobConfig);
+}
+
+function processLayloJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, layloJobConfig);
 }

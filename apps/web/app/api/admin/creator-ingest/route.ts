@@ -19,6 +19,7 @@ import {
   normalizeAndMergeExtraction,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { IngestionStatusManager } from '@/lib/ingestion/status-manager';
 import {
   extractLaylo,
   extractLayloHandle,
@@ -392,10 +393,7 @@ export async function POST(request: Request) {
       };
 
       if (isReingest && existing) {
-        await tx
-          .update(creatorProfiles)
-          .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-          .where(eq(creatorProfiles.id, existing.id));
+        await IngestionStatusManager.markProcessing(tx, existing.id);
 
         let mergeError: string | null = null;
         try {
@@ -427,13 +425,11 @@ export async function POST(request: Request) {
           });
         }
 
-        await tx
-          .update(creatorProfiles)
-          .set({
-            ingestionStatus: mergeError ? 'failed' : 'idle',
-            updatedAt: new Date(),
-          })
-          .where(eq(creatorProfiles.id, existing.id));
+        await IngestionStatusManager.markIdleOrFailed(
+          tx,
+          existing.id,
+          mergeError
+        );
 
         return NextResponse.json(
           {
@@ -538,13 +534,7 @@ export async function POST(request: Request) {
       }
 
       // Update ingestion status (success or failure)
-      await tx
-        .update(creatorProfiles)
-        .set({
-          ingestionStatus: mergeError ? 'failed' : 'idle',
-          updatedAt: new Date(),
-        })
-        .where(eq(creatorProfiles.id, created.id));
+      await IngestionStatusManager.markIdleOrFailed(tx, created.id, mergeError);
 
       logger.info('Creator profile ingested', {
         profileId: created.id,
