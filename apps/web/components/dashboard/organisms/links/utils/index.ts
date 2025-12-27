@@ -7,3 +7,5 @@
 
 export * from './link-categorization';
 export * from './link-display-utils';
+export * from './link-transformers';
+export * from './platform-category';
