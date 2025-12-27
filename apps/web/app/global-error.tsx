@@ -103,7 +103,6 @@ export default function GlobalError({
               .logo-icon {
                 fill: var(--logo-bg);
               }
-
               h1 {
                 font-size: 1.5rem;
                 font-weight: 600;
