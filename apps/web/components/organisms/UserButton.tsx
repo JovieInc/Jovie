@@ -15,7 +15,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { FeedbackModal } from '@/components/dashboard/molecules/FeedbackModal';
 import { useToast } from '@/components/molecules/ToastContainer';
 import { Badge } from '@/components/ui/Badge';
-import { useBillingStatus } from '@/hooks/use-billing-status';
+import { useBillingStatus } from '@/hooks/useBillingStatus';
 import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 import { useUserMenuActions } from './useUserMenuActions';

@@ -3,7 +3,7 @@ import {
   buildSearchUrl,
   resolveProviderLinks,
   type TrackDescriptor,
-} from '@/lib/discog/provider-links';
+} from '@/lib/discography/provider-links';
 
 const baseTrack: TrackDescriptor = {
   title: 'Anti-Hero',

@@ -27,7 +27,7 @@ import { SettingsSection } from '@/components/dashboard/organisms/SettingsSectio
 import { useToast } from '@/components/molecules/ToastContainer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_URL } from '@/constants/app';
-import { useBillingStatus } from '@/hooks/use-billing-status';
+import { useBillingStatus } from '@/hooks/useBillingStatus';
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { useFeatureGate } from '@/lib/flags/client';
 import {

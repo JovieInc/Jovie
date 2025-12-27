@@ -1,10 +1,10 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { ActivityTable } from '@/components/admin/activity-table';
+import { ActivityTable } from '@/components/admin/ActivityTable';
 import { DefaultStatusBanner } from '@/components/admin/DefaultStatusBanner';
-import { KpiCards } from '@/components/admin/kpi-cards';
-import { MetricsChart } from '@/components/admin/metrics-chart';
-import { ReliabilityCard } from '@/components/admin/reliability-card';
+import { KpiCards } from '@/components/admin/KpiCards';
+import { MetricsChart } from '@/components/admin/MetricsChart';
+import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
 import { getAdminMercuryMetrics } from '@/lib/admin/mercury-metrics';
 import {
   getAdminActivityFeed,

@@ -2,7 +2,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useToast } from '@/components/molecules/ToastContainer';
-import type { BillingStatus } from '@/hooks/use-billing-status';
+import type { BillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
 
 type ClerkSignOut = ReturnType<typeof useClerk>['signOut'];

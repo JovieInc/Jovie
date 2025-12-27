@@ -4,21 +4,21 @@ import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCachedAuth } from '@/lib/auth/cached';
 import {
+  PRIMARY_PROVIDER_KEYS,
+  PROVIDER_CONFIG,
+} from '@/lib/discography/config';
+import {
   getProviderLink,
   getReleaseById,
   getReleasesForProfile as getReleasesFromDb,
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
-} from '@/lib/discog/queries';
+} from '@/lib/discography/queries';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
-} from '@/lib/discog/spotify-import';
-import {
-  PRIMARY_PROVIDER_KEYS,
-  PROVIDER_CONFIG,
-} from '@/lib/discography/config';
+} from '@/lib/discography/spotify-import';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { getDashboardData } from '../actions';
