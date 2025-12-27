@@ -1,8 +1,6 @@
 import { and, eq } from 'drizzle-orm';
-import { z } from 'zod';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { APP_URL, AUDIENCE_IDENTIFIED_COOKIE } from '@/constants/app';
-import { trackServerEvent } from '@/lib/analytics/runtime-aware';
 import { db } from '@/lib/db';
 import {
   audienceMembers,
@@ -13,71 +11,57 @@ import {
 import { STATSIG_FLAGS } from '@/lib/flags';
 import { checkGateForUser } from '@/lib/flags/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import {
+  extractPayloadProps,
+  inferChannel,
+  trackServerError,
+  trackSubscribeAttempt,
+  trackSubscribeError,
+  trackSubscribeSuccess,
+  trackUnsubscribeAttempt,
+  trackUnsubscribeError,
+  trackUnsubscribeSuccess,
+} from '@/lib/notifications/analytics';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
+import {
+  buildInvalidRequestResponse,
+  buildMissingIdentifierResponse,
+  buildServerErrorResponse,
+  buildStatusSuccessResponse,
+  buildSubscribeNotFoundError,
+  buildSubscribeServerError,
+  buildSubscribeSuccessResponse,
+  buildSubscribeValidationError,
+  buildUnsubscribeSuccessResponse,
+  buildValidationErrorResponse,
+  type NotificationDomainContext,
+  type NotificationDomainResponse,
+  type NotificationSubscribeDomainResponse,
+} from '@/lib/notifications/response';
+import {
+  statusSchema,
+  subscribeSchema,
+  unsubscribeSchema,
+} from '@/lib/notifications/schemas';
 import { sendNotification } from '@/lib/notifications/service';
 import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
-import { createScopedLogger } from '@/lib/utils/logger';
 import type {
-  NotificationApiResponse,
   NotificationChannel,
   NotificationContactValues,
-  NotificationErrorCode,
   NotificationPreferences,
   NotificationStatusResponse,
-  NotificationSubscribeResponse,
   NotificationSubscriptionState,
   NotificationTarget,
   NotificationUnsubscribeResponse,
 } from '@/types/notifications';
 
-const log = createScopedLogger('NotificationsDomain');
-
-type NotificationDomainResponse<T> = {
-  status: number;
-  body: NotificationApiResponse<T>;
-};
-
-type NotificationDomainContext = {
-  headers?: Headers;
-};
-
-type NotificationSubscribeDomainResponse =
-  NotificationDomainResponse<NotificationSubscribeResponse> & {
-    audienceIdentified: boolean;
-  };
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
 const CONTROL_CHAR_REGEX = /[\u0000-\u001F\u007F]/g;
-
-const buildErrorResponse = (
-  status: number,
-  error: string,
-  code: NotificationErrorCode,
-  details?: Record<string, unknown>
-): NotificationDomainResponse<never> => ({
-  status,
-  body: {
-    success: false,
-    error,
-    code,
-    details,
-  },
-});
-
-const buildSubscribeErrorResponse = (
-  status: number,
-  error: string,
-  code: NotificationErrorCode,
-  details?: Record<string, unknown>
-): NotificationSubscribeDomainResponse => ({
-  ...buildErrorResponse(status, error, code, details),
-  audienceIdentified: false,
-});
 
 const getHeader = (headers: Headers | undefined, key: string) =>
   headers?.get(key) ?? null;
@@ -100,83 +84,7 @@ const sanitizeCountryCode = (raw: string | null | undefined) => {
   return normalized.length === 2 ? normalized : null;
 };
 
-const subscribeSchema = z
-  .object({
-    artist_id: z.string().uuid(),
-    channel: z.enum(['email', 'sms']).default('email'),
-    email: z.string().max(254).optional(),
-    phone: z.string().max(32).optional(),
-    country_code: z
-      .string()
-      .length(2)
-      .regex(/^[a-zA-Z]{2}$/)
-      .optional(),
-    city: z.string().max(120).optional(),
-    source: z.string().min(1).max(80).default('profile_bell'),
-  })
-  .superRefine((data, ctx) => {
-    if (data.channel === 'email' && !data.email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Email is required for email notifications.',
-        path: ['email'],
-      });
-    }
-
-    if (data.channel === 'sms' && !data.phone) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Phone number is required for SMS notifications.',
-        path: ['phone'],
-      });
-    }
-  });
-
-const unsubscribeSchema = z
-  .object({
-    artist_id: z.string().uuid(),
-    channel: z.enum(['email', 'sms']).optional(),
-    email: z.string().email().optional(),
-    phone: z.string().min(1).max(64).optional(),
-    token: z.string().optional(),
-    method: z
-      .enum(['email_link', 'dashboard', 'api', 'dropdown'])
-      .default('api'),
-  })
-  .superRefine((data, ctx) => {
-    const hasToken = Boolean(data.token);
-    const hasEmail = Boolean(data.email);
-    const hasPhone = Boolean(data.phone);
-
-    if (hasToken || hasEmail || hasPhone) return;
-
-    const path =
-      data.channel === 'sms'
-        ? ['phone']
-        : data.channel === 'email'
-          ? ['email']
-          : ['channel'];
-
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Either email, phone, or token must be provided.',
-      path,
-    });
-  });
-
-const statusSchema = z
-  .object({
-    artist_id: z.string().uuid(),
-    email: z.string().email().optional(),
-    phone: z.string().min(1).max(64).optional(),
-  })
-  .refine(
-    data => Boolean(data.email) || Boolean(data.phone),
-    'Email or phone is required'
-  );
-
-export const buildInvalidRequestResponse = () =>
-  buildErrorResponse(400, 'Invalid request data', 'invalid_request');
+export { buildInvalidRequestResponse };
 
 export const subscribeToNotificationsDomain = async (
   payload: unknown,
@@ -186,38 +94,19 @@ export const subscribeToNotificationsDomain = async (
   const bodyObject = isRecord(payload) ? payload : {};
 
   try {
-    await trackServerEvent('notifications_subscribe_attempt', {
-      artist_id:
-        typeof bodyObject.artist_id === 'string' ? bodyObject.artist_id : null,
-      channel:
-        typeof bodyObject.channel === 'string' ? bodyObject.channel : 'email',
-      email_length:
-        typeof bodyObject.email === 'string' ? bodyObject.email.length : 0,
-      phone_length:
-        typeof bodyObject.phone === 'string' ? bodyObject.phone.length : 0,
-      source:
-        typeof bodyObject.source === 'string' ? bodyObject.source : 'unknown',
-    });
+    await trackSubscribeAttempt(bodyObject);
 
     const result = subscribeSchema.safeParse(payload);
 
     if (!result.success) {
-      await trackServerEvent('notifications_subscribe_error', {
-        artist_id:
-          typeof bodyObject.artist_id === 'string'
-            ? bodyObject.artist_id
-            : null,
+      const props = extractPayloadProps(bodyObject);
+      await trackSubscribeError({
+        artist_id: props.artist_id,
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
-        source:
-          typeof bodyObject.source === 'string' ? bodyObject.source : 'unknown',
+        source: props.source,
       });
-
-      return buildSubscribeErrorResponse(
-        400,
-        'Invalid request data',
-        'validation_error'
-      );
+      return buildSubscribeValidationError();
     }
 
     const { artist_id, email, phone, channel, source, country_code, city } =
@@ -237,13 +126,12 @@ export const subscribeToNotificationsDomain = async (
       .limit(1);
 
     if (!artistProfile) {
-      await trackServerEvent('notifications_subscribe_error', {
+      await trackSubscribeError({
         artist_id,
         error_type: 'artist_not_found',
         source,
       });
-
-      return buildSubscribeErrorResponse(404, 'Artist not found', 'not_found');
+      return buildSubscribeNotFoundError();
     }
 
     const creatorIsPro = !!artistProfile.creatorIsPro;
@@ -275,32 +163,26 @@ export const subscribeToNotificationsDomain = async (
       channel === 'sms' ? (normalizeSubscriptionPhone(phone) ?? null) : null;
 
     if (channel === 'email' && !normalizedEmail) {
-      await trackServerEvent('notifications_subscribe_error', {
+      await trackSubscribeError({
         artist_id,
         error_type: 'validation_error',
         validation_errors: ['Invalid email address'],
         source,
       });
-
-      return buildSubscribeErrorResponse(
-        400,
-        'Please provide a valid email address',
-        'validation_error'
+      return buildSubscribeValidationError(
+        'Please provide a valid email address'
       );
     }
 
     if (channel === 'sms' && !normalizedPhone) {
-      await trackServerEvent('notifications_subscribe_error', {
+      await trackSubscribeError({
         artist_id,
         error_type: 'validation_error',
         validation_errors: ['Invalid phone number'],
         source,
       });
-
-      return buildSubscribeErrorResponse(
-        400,
-        'Please provide a valid phone number',
-        'validation_error'
+      return buildSubscribeValidationError(
+        'Please provide a valid phone number'
       );
     }
 
@@ -332,7 +214,7 @@ export const subscribeToNotificationsDomain = async (
         id: notificationSubscriptions.id,
       });
 
-    await trackServerEvent('notifications_subscribe_success', {
+    await trackSubscribeSuccess({
       artist_id,
       channel,
       email_domain: normalizedEmail ? normalizedEmail.split('@')[1] : undefined,
@@ -419,24 +301,15 @@ export const subscribeToNotificationsDomain = async (
       );
     }
 
-    return {
-      status: 200,
-      audienceIdentified: dynamicEnabled,
-      body: {
-        success: true,
-        message: 'Subscription successful',
-        emailDispatched: dispatchResult?.delivered.includes('email') ?? false,
-        durationMs: Math.round(Date.now() - runtimeStart),
-      },
-    };
+    return buildSubscribeSuccessResponse(
+      dynamicEnabled,
+      dispatchResult?.delivered.includes('email') ?? false,
+      Math.round(Date.now() - runtimeStart)
+    );
   } catch (error) {
-    await trackServerEvent('notifications_subscribe_error', {
-      error_type: 'server_error',
-      error_message: error instanceof Error ? error.message : String(error),
-    });
-
-    log.error('Subscribe domain error', { error });
-    return buildSubscribeErrorResponse(500, 'Server error', 'server_error');
+    await trackServerError('subscribe', error);
+    console.error('[Notifications Subscribe Domain] Error:', error);
+    return buildSubscribeServerError();
   }
 };
 
@@ -448,55 +321,31 @@ export const unsubscribeFromNotificationsDomain = async (
   try {
     const result = unsubscribeSchema.safeParse(payload);
 
-    await trackServerEvent('notifications_unsubscribe_attempt', {
-      artist_id:
-        typeof bodyObject.artist_id === 'string' ? bodyObject.artist_id : null,
-      method: typeof bodyObject.method === 'string' ? bodyObject.method : 'api',
-      channel:
-        typeof bodyObject.channel === 'string'
-          ? bodyObject.channel
-          : typeof bodyObject.phone === 'string'
-            ? 'phone'
-            : 'email',
-    });
+    await trackUnsubscribeAttempt(bodyObject);
 
     if (!result.success) {
-      await trackServerEvent('notifications_unsubscribe_error', {
-        artist_id:
-          typeof bodyObject.artist_id === 'string'
-            ? bodyObject.artist_id
-            : null,
+      const props = extractPayloadProps(bodyObject);
+      await trackUnsubscribeError({
+        artist_id: props.artist_id,
         error_type: 'validation_error',
         validation_errors: result.error.format()._errors,
-        channel:
-          typeof bodyObject.channel === 'string'
-            ? bodyObject.channel
-            : typeof bodyObject.phone === 'string'
-              ? 'phone'
-              : 'email',
+        channel: inferChannel(bodyObject),
       });
-
-      return buildErrorResponse(
-        400,
-        'Invalid request data',
-        'validation_error'
-      );
+      return buildValidationErrorResponse('Invalid request data');
     }
 
     const { artist_id, email, phone, token, method, channel } = result.data;
 
     if (!email && !phone && !token) {
-      await trackServerEvent('notifications_unsubscribe_error', {
+      const targetChannel = channel || (phone ? 'sms' : 'email');
+      await trackUnsubscribeError({
         artist_id,
         error_type: 'missing_identifier',
         method,
-        channel: channel || (phone ? 'sms' : 'email'),
+        channel: targetChannel,
       });
-
-      return buildErrorResponse(
-        400,
-        'Either email, phone, or token must be provided',
-        'missing_identifier'
+      return buildMissingIdentifierResponse(
+        'Either email, phone, or token must be provided'
       );
     }
 
@@ -504,17 +353,15 @@ export const unsubscribeFromNotificationsDomain = async (
     const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
 
     if (phone && !normalizedPhone) {
-      await trackServerEvent('notifications_unsubscribe_error', {
+      const targetChannel = channel || 'sms';
+      await trackUnsubscribeError({
         artist_id,
         error_type: 'validation_error',
         validation_errors: ['Invalid phone number'],
-        channel: channel || 'sms',
+        channel: targetChannel,
       });
-
-      return buildErrorResponse(
-        400,
-        'Please provide a valid phone number',
-        'validation_error'
+      return buildValidationErrorResponse(
+        'Please provide a valid phone number'
       );
     }
 
@@ -522,18 +369,13 @@ export const unsubscribeFromNotificationsDomain = async (
       channel || (normalizedPhone ? 'sms' : 'email');
 
     if (!normalizedEmail && !normalizedPhone) {
-      await trackServerEvent('notifications_unsubscribe_error', {
+      await trackUnsubscribeError({
         artist_id,
         error_type: 'missing_identifier',
         method,
         channel: targetChannel,
       });
-
-      return buildErrorResponse(
-        400,
-        'Contact required to unsubscribe',
-        'missing_identifier'
-      );
+      return buildMissingIdentifierResponse('Contact required to unsubscribe');
     }
 
     const whereClauses = [
@@ -553,31 +395,17 @@ export const unsubscribeFromNotificationsDomain = async (
       .where(and(...whereClauses))
       .returning({ id: notificationSubscriptions.id });
 
-    await trackServerEvent('notifications_unsubscribe_success', {
+    await trackUnsubscribeSuccess({
       artist_id,
       method,
       channel: targetChannel,
     });
 
-    return {
-      status: 200,
-      body: {
-        success: true,
-        removed: deleted.length,
-        message:
-          deleted.length > 0
-            ? 'Unsubscription successful'
-            : 'No matching subscription found',
-      },
-    };
+    return buildUnsubscribeSuccessResponse(deleted.length);
   } catch (error) {
-    await trackServerEvent('notifications_unsubscribe_error', {
-      error_type: 'server_error',
-      error_message: error instanceof Error ? error.message : String(error),
-    });
-
-    log.error('Unsubscribe domain error', { error });
-    return buildErrorResponse(500, 'Server error', 'server_error');
+    await trackServerError('unsubscribe', error);
+    console.error('[Notifications Unsubscribe Domain] Error:', error);
+    return buildServerErrorResponse();
   }
 };
 
@@ -588,11 +416,7 @@ export const getNotificationStatusDomain = async (
     const result = statusSchema.safeParse(payload);
 
     if (!result.success) {
-      return buildErrorResponse(
-        400,
-        'Invalid request data',
-        'validation_error'
-      );
+      return buildValidationErrorResponse('Invalid request data');
     }
 
     const { artist_id, email, phone } = result.data;
@@ -600,10 +424,8 @@ export const getNotificationStatusDomain = async (
     const normalizedPhone = normalizeSubscriptionPhone(phone) ?? null;
 
     if (phone && !normalizedPhone) {
-      return buildErrorResponse(
-        400,
-        'Please provide a valid phone number',
-        'validation_error'
+      return buildValidationErrorResponse(
+        'Please provide a valid phone number'
       );
     }
 
@@ -653,17 +475,10 @@ export const getNotificationStatusDomain = async (
       }
     }
 
-    return {
-      status: 200,
-      body: {
-        success: true,
-        channels,
-        details,
-      },
-    };
+    return buildStatusSuccessResponse(channels, details);
   } catch (error) {
-    log.error('Status domain error', { error });
-    return buildErrorResponse(500, 'Server error', 'server_error');
+    console.error('[Notifications Status Domain] Error:', error);
+    return buildServerErrorResponse();
   }
 };
 

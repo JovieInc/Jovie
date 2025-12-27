@@ -1,46 +1,25 @@
 {
   "active": true,
-<<<<<<< Updated upstream
-  "spec": "056-add-apple-music-ingestion-strategy",
+  "spec": "063-add-retry-capability-to-useformstate-hook",
   "state": "building",
   "subtasks": {
-    "completed": 14,
+    "completed": 10,
     "total": 16,
-=======
-  "spec": "073-replace-console-log-statements-with-structured-log",
-  "state": "building",
-  "subtasks": {
-    "completed": 29,
-    "total": 30,
->>>>>>> Stashed changes
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-<<<<<<< Updated upstream
-    "current": "Verification and Cleanup",
+    "current": "Testing",
     "id": null,
-    "total": 3
-=======
-    "current": "Testing and Validation",
-    "id": null,
-    "total": 4
->>>>>>> Stashed changes
+    "total": 5
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-<<<<<<< Updated upstream
-    "number": 16,
-    "started_at": "2025-12-26T15:36:41.483773"
+    "number": 12,
+    "started_at": "2025-12-26T12:58:01.525189"
   },
-  "last_update": "2025-12-26T16:58:09.828917"
-=======
-    "number": 31,
-    "started_at": "2025-12-26T13:34:33.720753"
-  },
-  "last_update": "2025-12-26T15:35:19.633660"
->>>>>>> Stashed changes
+  "last_update": "2025-12-26T14:17:47.554896"
 }

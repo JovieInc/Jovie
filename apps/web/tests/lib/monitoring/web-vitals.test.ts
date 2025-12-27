@@ -29,6 +29,11 @@ import {
 describe('Web Vitals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset global state
+    globalThis.jovieWebVitalsInitialized = undefined;
+    globalThis.jovieWebVitalsHandlers = undefined;
+    // Mock window to ensure initWebVitals doesn't bail early
+    vi.stubGlobal('window', {});
   });
 
   describe('initWebVitals', () => {
