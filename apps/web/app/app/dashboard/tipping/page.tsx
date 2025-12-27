@@ -1,10 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGate';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../actions';
 
 export default async function TippingPage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   // Handle unauthenticated users
   if (!userId) {

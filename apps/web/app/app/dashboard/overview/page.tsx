@@ -1,11 +1,11 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
 
 export default async function OverviewPage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/dashboard/overview');

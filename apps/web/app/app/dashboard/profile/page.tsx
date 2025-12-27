@@ -1,10 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { LazyEnhancedDashboardLinks } from '@/components/dashboard/organisms/LazyEnhancedDashboardLinks';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached, getProfileSocialLinks } from '../actions';
 
 export default async function ProfilePage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   // Handle unauthenticated users
   if (!userId) {

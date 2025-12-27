@@ -183,13 +183,31 @@ export function DashboardAudienceTable({
   const activeColumns =
     mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
 
-  // Virtualization for table rows
+  /**
+   * Virtual scrolling configuration for table rows.
+   *
+   * Virtualization dramatically improves performance for large datasets (500+ rows)
+   * by only rendering rows that are visible in the viewport, plus a small buffer.
+   * This reduces DOM node count from O(n) to O(viewport_height / row_height + overscan).
+   *
+   * Configuration choices:
+   * - estimateSize: 60px - Based on the actual rendered row height with padding (py-3 = 12px * 2)
+   *   and content. This doesn't need to be exact since we use measureElement for dynamic sizing,
+   *   but a close estimate prevents layout shifts during initial render.
+   * - overscan: 5 - Renders 5 extra rows above and below the visible area. This provides:
+   *   1. Smoother scrolling by pre-rendering rows before they become visible
+   *   2. Better keyboard navigation (rows exist in DOM before focus reaches them)
+   *   3. Reduced "blank flash" during fast scrolling
+   *   Higher values (e.g., 10) would be smoother but increase DOM size; 5 is a good balance.
+   *
+   * @see https://tanstack.com/virtual/latest/docs/api/virtualizer
+   */
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => tableContainerRef.current,
-    estimateSize: () => 60, // Estimated row height in pixels
-    overscan: 5, // Render 5 extra rows above/below viewport
+    estimateSize: () => 60,
+    overscan: 5,
   });
 
   const sortableColumnMap: Partial<
@@ -466,6 +484,12 @@ export function DashboardAudienceTable({
                   </tr>
                 </thead>
 
+                {/*
+                  Virtualized tbody container:
+                  - position: relative - Creates positioning context for absolutely positioned rows
+                  - height: getTotalSize() - Sets total scrollable height as if all rows were rendered,
+                    enabling proper scrollbar sizing even though only visible rows exist in DOM
+                */}
                 <tbody
                   ref={tbodyRef}
                   style={{
@@ -480,6 +504,14 @@ export function DashboardAudienceTable({
                     const rowNumber =
                       (page - 1) * pageSize + virtualRow.index + 1;
 
+                    /**
+                     * Virtualized row positioning:
+                     * - data-index: Required by measureElement for row height measurement
+                     * - ref={measureElement}: Enables dynamic row height calculation
+                     * - position: absolute - Removes row from document flow
+                     * - translateY: Positions row at its calculated offset within the virtual list
+                     * - Using transform instead of top for better paint performance (GPU accelerated)
+                     */
                     return (
                       <tr
                         key={row.id}
