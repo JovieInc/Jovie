@@ -63,7 +63,10 @@ let nextAddPayload: DetectedLink | null = null;
 vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
   return {
     UniversalLinkInput: ({ onAdd }: { onAdd: (l: DetectedLink) => void }) => (
-      <button onClick={() => nextAddPayload && onAdd(nextAddPayload)}>
+      <button
+        type='button'
+        onClick={() => nextAddPayload && onAdd(nextAddPayload)}
+      >
         mock-add
       </button>
     ),

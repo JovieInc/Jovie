@@ -41,6 +41,7 @@ export function AvatarProgressRing({
         height={size}
         viewBox='0 0 100 100'
         className='-rotate-90'
+        aria-hidden='true'
       >
         {/* Background ring */}
         <circle

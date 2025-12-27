@@ -67,7 +67,7 @@ const BasicTooltip = ({
   <TooltipWrapper>
     <Tooltip defaultOpen={defaultOpen}>
       <TooltipTrigger>
-        <button>{triggerText}</button>
+        <button type='button'>{triggerText}</button>
       </TooltipTrigger>
       <TooltipContent showArrow={showArrow}>{content}</TooltipContent>
     </Tooltip>
@@ -170,11 +170,11 @@ describe('Tooltip', () => {
         <TooltipWrapper>
           <Tooltip>
             <TooltipTrigger>
-              <button>First button</button>
+              <button type='button'>First button</button>
             </TooltipTrigger>
             <TooltipContent>First tooltip</TooltipContent>
           </Tooltip>
-          <button>Second button</button>
+          <button type='button'>Second button</button>
         </TooltipWrapper>
       );
 
@@ -279,7 +279,9 @@ describe('Tooltip', () => {
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
               <span>
-                <button disabled>Disabled button</button>
+                <button type='button' disabled>
+                  Disabled button
+                </button>
               </span>
             </TooltipTrigger>
             <TooltipContent>This action is unavailable</TooltipContent>
@@ -305,7 +307,7 @@ describe('Tooltip', () => {
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
-              <button>Trigger</button>
+              <button type='button'>Trigger</button>
             </TooltipTrigger>
             <TooltipContent side='top'>Top tooltip</TooltipContent>
           </Tooltip>
@@ -324,7 +326,7 @@ describe('Tooltip', () => {
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
-              <button>Trigger</button>
+              <button type='button'>Trigger</button>
             </TooltipTrigger>
             <TooltipContent sideOffset={16}>
               Custom offset tooltip
@@ -346,7 +348,7 @@ describe('Tooltip', () => {
         <TooltipWrapper delayDuration={100}>
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
-              <button>Delayed trigger</button>
+              <button type='button'>Delayed trigger</button>
             </TooltipTrigger>
             <TooltipContent>Delayed tooltip</TooltipContent>
           </Tooltip>
@@ -380,7 +382,7 @@ describe('Tooltip', () => {
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
-              <button>Complex trigger</button>
+              <button type='button'>Complex trigger</button>
             </TooltipTrigger>
             <TooltipContent>
               <div>
@@ -405,7 +407,7 @@ describe('Tooltip', () => {
         <TooltipWrapper>
           <Tooltip defaultOpen={true}>
             <TooltipTrigger>
-              <button>Custom class trigger</button>
+              <button type='button'>Custom class trigger</button>
             </TooltipTrigger>
             <TooltipContent className='custom-tooltip-class'>
               Custom styled tooltip

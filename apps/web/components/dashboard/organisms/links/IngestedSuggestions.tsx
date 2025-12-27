@@ -218,6 +218,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
   }
 
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
     <div
       className={`rounded-2xl border border-subtle bg-surface-1/60 px-3 py-2.5 shadow-sm shadow-black/5 ${className ?? ''}`}
       aria-label='Ingested link suggestions'

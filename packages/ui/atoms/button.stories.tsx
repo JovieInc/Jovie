@@ -166,6 +166,7 @@ export const Icon: Story = {
         fill='none'
         stroke='currentColor'
         viewBox='0 0 24 24'
+        aria-hidden='true'
       >
         <path
           strokeLinecap='round'
@@ -211,6 +212,7 @@ export const WithIcon: Story = {
           fill='none'
           stroke='currentColor'
           viewBox='0 0 24 24'
+          aria-hidden='true'
         >
           <path
             strokeLinecap='round'
@@ -284,6 +286,7 @@ export const AllVariants: Story = {
               fill='none'
               stroke='currentColor'
               viewBox='0 0 24 24'
+              aria-hidden='true'
             >
               <path
                 strokeLinecap='round'

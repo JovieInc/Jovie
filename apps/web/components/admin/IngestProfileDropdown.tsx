@@ -227,9 +227,12 @@ export function IngestProfileDropdown({
             </div>
 
             <div className='space-y-1'>
-              <label className='text-xs text-secondary-token'>
-                Or paste full URL
-              </label>
+              {
+                // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with control via DOM structure
+                <label className='text-xs text-secondary-token'>
+                  Or paste full URL
+                </label>
+              }
               <Input
                 type='url'
                 placeholder={currentPlatform?.placeholder}

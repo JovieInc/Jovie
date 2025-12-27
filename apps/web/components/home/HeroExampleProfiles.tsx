@@ -26,6 +26,7 @@ export async function HeroExampleProfiles() {
 
         {/* Full-width horizontal scroll (no fades, no visible scrollbar) */}
         <div className='w-full overflow-x-auto overflow-y-hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'>
+          {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility */}
           <div
             aria-label='Example creator profiles'
             className='flex w-max items-start gap-6 px-4 sm:px-6 lg:px-8'

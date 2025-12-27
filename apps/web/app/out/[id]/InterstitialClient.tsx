@@ -79,6 +79,7 @@ export function InterstitialClient({
               stroke='currentColor'
               viewBox='0 0 24 24'
             >
+              <title>Verified</title>
               <path
                 strokeLinecap='round'
                 strokeLinejoin='round'
@@ -119,6 +120,7 @@ export function InterstitialClient({
       )}
 
       <button
+        type='button'
         onClick={handleContinue}
         disabled={isVerifying}
         className={`
@@ -137,6 +139,7 @@ export function InterstitialClient({
               xmlns='http://www.w3.org/2000/svg'
               fill='none'
               viewBox='0 0 24 24'
+              aria-hidden='true'
             >
               <circle
                 className='opacity-25'

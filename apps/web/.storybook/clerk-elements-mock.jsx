@@ -20,6 +20,7 @@ export const Input = React.forwardRef(({ className, ...props }, ref) => (
 Input.displayName = 'ClerkInput';
 
 export const Label = ({ className, children }) => (
+  // biome-ignore lint/a11y/noLabelWithoutControl: Mock component for testing
   <label className={className}>{children}</label>
 );
 

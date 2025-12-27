@@ -654,6 +654,7 @@ export function AppleStyleOnboardingForm({
                   </div>
                 </div>
 
+                {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
                 <div
                   className='min-h-[24px] flex flex-col items-center justify-center px-1'
                   role='status'
@@ -694,6 +695,7 @@ export function AppleStyleOnboardingForm({
                   )}
                 </AuthButton>
 
+                {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for error message */}
                 <div
                   className='min-h-[40px] flex items-center justify-center text-center text-xs text-[#6b6f76]'
                   role='status'
@@ -766,7 +768,6 @@ export function AppleStyleOnboardingForm({
       <main
         className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
         id='main-content'
-        role='main'
         aria-labelledby='step-heading'
       >
         <div id='step-heading' className='sr-only'>

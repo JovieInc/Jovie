@@ -165,12 +165,14 @@ export const SocialBar: Story = {
       <h3 className='text-lg font-semibold mb-4 text-center'>Follow @artist</h3>
       <div className='flex justify-center gap-4'>
         <a
+          // biome-ignore lint/a11y/useValidAnchor: Story example anchor
           href='#'
           className='p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow'
         >
           <SocialIcon platform='spotify' className='h-5 w-5 text-green-500' />
         </a>
         <a
+          // biome-ignore lint/a11y/useValidAnchor: Story example anchor
           href='#'
           className='p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow'
         >
@@ -180,12 +182,14 @@ export const SocialBar: Story = {
           />
         </a>
         <a
+          // biome-ignore lint/a11y/useValidAnchor: Story example anchor
           href='#'
           className='p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow'
         >
           <SocialIcon platform='instagram' className='h-5 w-5 text-pink-500' />
         </a>
         <a
+          // biome-ignore lint/a11y/useValidAnchor: Story example anchor
           href='#'
           className='p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow'
         >
@@ -195,6 +199,7 @@ export const SocialBar: Story = {
           />
         </a>
         <a
+          // biome-ignore lint/a11y/useValidAnchor: Story example anchor
           href='#'
           className='p-2 rounded-full bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition-shadow'
         >

@@ -56,7 +56,10 @@ export const FiveOptions: Story = {
           </button>
         ))}
       </div>
-      <button className='w-full bg-blue-600 text-white rounded-md py-3 font-medium'>
+      <button
+        type='button'
+        className='w-full bg-blue-600 text-white rounded-md py-3 font-medium'
+      >
         Continue
       </button>
     </div>

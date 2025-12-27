@@ -15,7 +15,10 @@ type Story = StoryObj<typeof AuthFormContainer>;
 const SampleForm = () => (
   <div className='space-y-4'>
     <div className='space-y-2'>
-      <label className='text-sm font-medium'>Email</label>
+      {
+        // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+        <label className='text-sm font-medium'>Email</label>
+      }
       <input
         type='email'
         placeholder='you@example.com'
@@ -23,14 +26,20 @@ const SampleForm = () => (
       />
     </div>
     <div className='space-y-2'>
-      <label className='text-sm font-medium'>Password</label>
+      {
+        // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+        <label className='text-sm font-medium'>Password</label>
+      }
       <input
         type='password'
         placeholder='••••••••'
         className='w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800'
       />
     </div>
-    <button className='w-full py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'>
+    <button
+      type='button'
+      className='w-full py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'
+    >
       Sign In
     </button>
   </div>

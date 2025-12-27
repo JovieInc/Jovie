@@ -138,6 +138,7 @@ export function DashboardOverview({
                     {completedCount}/{totalSteps} complete
                   </p>
                 </div>
+                {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for screen reader accessibility */}
                 <p
                   className='sr-only'
                   aria-label={`Setup progress: ${completedCount} of ${totalSteps} steps completed`}

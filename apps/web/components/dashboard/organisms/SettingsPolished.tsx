@@ -618,6 +618,7 @@ export function SettingsPolished({
             },
           ].map(option => (
             <button
+              type='button'
               key={option.value}
               onClick={() =>
                 handleThemeChange(option.value as 'light' | 'dark' | 'system')
@@ -690,6 +691,7 @@ export function SettingsPolished({
                     fill='none'
                     stroke='currentColor'
                     viewBox='0 0 24 24'
+                    aria-hidden='true'
                   >
                     <path
                       strokeLinecap='round'

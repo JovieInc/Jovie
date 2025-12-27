@@ -564,6 +564,7 @@ export default function WaitlistPage() {
                 onKeyDown={handleSocialPlatformKeyDown}
               >
                 {SOCIAL_PLATFORM_OPTIONS.map(option => (
+                  // biome-ignore lint/a11y/useSemanticElements: button element used with ARIA radio pattern for custom radio group
                   <button
                     key={option.value}
                     ref={el => {

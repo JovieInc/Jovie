@@ -123,7 +123,7 @@ function renderContent(
       const AMOUNTS = [3, 5, 7];
 
       return (
-        <div className='space-y-4' role='main' aria-labelledby='tipping-title'>
+        <main className='space-y-4' aria-labelledby='tipping-title'>
           <h1 id='tipping-title' className='sr-only'>
             Tip {artist.name}
           </h1>
@@ -143,7 +143,7 @@ function renderContent(
               </div>
             </div>
           )}
-        </div>
+        </main>
       );
 
     case 'subscribe':

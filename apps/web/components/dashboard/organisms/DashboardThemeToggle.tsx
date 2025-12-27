@@ -67,9 +67,12 @@ export function DashboardThemeToggle({
     // Full theme selector with system option (for settings page)
     return (
       <div className='space-y-3'>
-        <label className='text-sm font-medium text-primary-token'>
-          Theme Preference
-        </label>
+        {
+          // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with control via DOM structure
+          <label className='text-sm font-medium text-primary-token'>
+            Theme Preference
+          </label>
+        }
         <div className='grid grid-cols-3 gap-2'>
           {[
             { value: 'light', label: 'Light', icon: '☀️' },
@@ -77,6 +80,7 @@ export function DashboardThemeToggle({
             { value: 'system', label: 'System', icon: '💻' },
           ].map(option => (
             <button
+              type='button'
               key={option.value}
               onClick={() =>
                 handleThemeChange(option.value as 'light' | 'dark' | 'system')
@@ -128,6 +132,7 @@ export function DashboardThemeToggle({
                 className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
+                aria-hidden='true'
               >
                 <path
                   fillRule='evenodd'
@@ -140,6 +145,7 @@ export function DashboardThemeToggle({
                 className='h-4 w-4 text-secondary-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
+                aria-hidden='true'
               >
                 <path
                   fillRule='evenodd'
@@ -190,6 +196,7 @@ export function DashboardThemeToggle({
                 className='h-3 w-3 text-accent-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
+                aria-hidden='true'
               >
                 <path
                   fillRule='evenodd'
@@ -202,6 +209,7 @@ export function DashboardThemeToggle({
                 className='h-3 w-3 text-accent-token'
                 fill='currentColor'
                 viewBox='0 0 20 20'
+                aria-hidden='true'
               >
                 <path
                   fillRule='evenodd'

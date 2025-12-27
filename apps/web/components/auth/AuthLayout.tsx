@@ -202,7 +202,7 @@ export function AuthLayout({
       </div>
 
       {/* Title - hide when keyboard is visible on mobile */}
-      {showFormTitle && (
+      {showFormTitle && formTitle && (
         <h1
           className={cn(
             formTitleClassName,
@@ -228,7 +228,6 @@ export function AuthLayout({
           // Smooth scroll target
           'scroll-mt-4'
         )}
-        role='main'
       >
         {children}
       </main>

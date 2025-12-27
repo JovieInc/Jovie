@@ -45,6 +45,7 @@ export function JovieLogo({
         viewBox='0 0 136 39'
         className={cn('w-auto transition-colors', colorClass, sizeClass)}
         fill='currentColor'
+        role='img'
         aria-label={`${APP_NAME} logo`}
       >
         <path
@@ -82,6 +83,7 @@ export function JovieLogo({
   return (
     <div
       className={wrapperClasses}
+      role='img'
       aria-label={computedAriaLabel}
       title={title}
     >

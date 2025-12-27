@@ -88,7 +88,10 @@ export const Large: Story = {
         <DialogBody>
           <div className='space-y-4'>
             <div className='space-y-2'>
-              <label className='text-sm font-medium'>Display Name</label>
+              {
+                // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+                <label className='text-sm font-medium'>Display Name</label>
+              }
               <input
                 type='text'
                 className='w-full px-3 py-2 border border-subtle rounded-lg'
@@ -96,7 +99,10 @@ export const Large: Story = {
               />
             </div>
             <div className='space-y-2'>
-              <label className='text-sm font-medium'>Bio</label>
+              {
+                // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+                <label className='text-sm font-medium'>Bio</label>
+              }
               <textarea
                 className='w-full px-3 py-2 border border-subtle rounded-lg'
                 rows={3}

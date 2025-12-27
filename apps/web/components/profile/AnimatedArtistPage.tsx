@@ -119,11 +119,7 @@ function renderContent(
             prefersReducedMotion ? { duration: 0 } : { duration: 0.6 }
           }
         >
-          <div
-            className='space-y-4'
-            role='main'
-            aria-labelledby='tipping-title'
-          >
+          <main className='space-y-4' aria-labelledby='tipping-title'>
             <h1 id='tipping-title' className='sr-only'>
               Tip {artist.name}
             </h1>
@@ -144,7 +140,7 @@ function renderContent(
                 </div>
               </div>
             )}
-          </div>
+          </main>
         </motion.div>
       );
 

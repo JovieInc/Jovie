@@ -128,6 +128,9 @@ export const InteractiveDemo: Story = {
     };
 
     return (
+      // biome-ignore lint/a11y/useKeyWithClickEvents: Story demo - click handler is intentional
+      // biome-ignore lint/a11y/noStaticElementInteractions: Story demo - interactive wrapper
+      // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Story demo - interactive wrapper
       <div onClick={handleClick}>
         <LoadingButton isLoading={isLoading} loadingText='Processing...'>
           {isLoading ? 'Processing...' : 'Click to test'}

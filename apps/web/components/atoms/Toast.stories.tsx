@@ -107,6 +107,7 @@ const InteractiveExample = () => {
 
       <div className='grid grid-cols-2 gap-4'>
         <button
+          type='button'
           onClick={() => notifications.success('Success! Operation completed.')}
           className='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
         >
@@ -114,6 +115,7 @@ const InteractiveExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.error('Error! Something went wrong.')}
           className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
@@ -121,6 +123,7 @@ const InteractiveExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.warning('Warning! Please be careful.')}
           className='px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700'
         >
@@ -128,6 +131,7 @@ const InteractiveExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.info("Info: Here's some information.")}
           className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
         >
@@ -137,6 +141,7 @@ const InteractiveExample = () => {
 
       <div className='grid grid-cols-2 gap-4 mt-4'>
         <button
+          type='button'
           onClick={() =>
             notifications.undo('Item deleted', () => {
               notifications.success('Item restored!');
@@ -148,6 +153,7 @@ const InteractiveExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() =>
             notifications.retry('Upload failed', () => {
               notifications.info('Retrying upload...');
@@ -161,6 +167,7 @@ const InteractiveExample = () => {
 
       <div className='grid grid-cols-2 gap-4 mt-4'>
         <button
+          type='button'
           onClick={() => {
             const promise = new Promise(resolve => {
               setTimeout(resolve, 2000);
@@ -177,6 +184,7 @@ const InteractiveExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.clearToasts()}
           className='px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900'
         >
@@ -203,6 +211,7 @@ const PredefinedExample = () => {
 
       <div className='grid grid-cols-2 gap-4'>
         <button
+          type='button'
           onClick={() => notifications.saveSuccess()}
           className='px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700'
         >
@@ -210,6 +219,7 @@ const PredefinedExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.saveError()}
           className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
@@ -217,6 +227,7 @@ const PredefinedExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.uploadSuccess()}
           className='px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700'
         >
@@ -224,6 +235,7 @@ const PredefinedExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => notifications.networkError()}
           className='px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700'
         >
@@ -270,6 +282,7 @@ const ErrorHandlingExample = () => {
 
       <div className='grid grid-cols-2 gap-4'>
         <button
+          type='button'
           onClick={() => simulateError('network')}
           className='px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700'
         >
@@ -277,6 +290,7 @@ const ErrorHandlingExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => simulateError('validation')}
           className='px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700'
         >
@@ -284,6 +298,7 @@ const ErrorHandlingExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => simulateError('technical')}
           className='px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700'
         >
@@ -291,6 +306,7 @@ const ErrorHandlingExample = () => {
         </button>
 
         <button
+          type='button'
           onClick={() => simulateError('generic')}
           className='px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700'
         >

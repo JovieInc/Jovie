@@ -115,6 +115,9 @@ export function OtpInput({
   };
 
   return (
+    // biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive OTP input container
+    // biome-ignore lint/a11y/noStaticElementInteractions: Custom interactive OTP input container
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Container delegates to underlying input element
     <div
       onClick={focusUnderlyingInput}
       onPasteCapture={handlePasteCapture}

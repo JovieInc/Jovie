@@ -9,6 +9,7 @@ const LightningIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -25,6 +26,7 @@ const ChartIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -41,6 +43,7 @@ const BulbIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -57,6 +60,7 @@ const CheckIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'

@@ -19,6 +19,7 @@ vi.mock('@clerk/elements/common', () => ({
     'aria-label'?: string;
     render?: (props: { value: string; status: string }) => React.ReactNode;
   }) => (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Test mock component with ARIA props
     <div
       data-testid='clerk-otp-input'
       data-type={type}

@@ -240,6 +240,7 @@ export function AnimatedListenInterface({
                 >
                   <motion.span
                     className='flex items-center'
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
                     dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
                     animate={
                       prefersReducedMotion

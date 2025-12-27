@@ -9,6 +9,7 @@ const LinkIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -25,6 +26,7 @@ const LockIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -41,6 +43,7 @@ const MusicIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'
@@ -57,6 +60,7 @@ const LightningIcon = (
     fill='none'
     viewBox='0 0 24 24'
     stroke='currentColor'
+    aria-hidden='true'
   >
     <path
       strokeLinecap='round'

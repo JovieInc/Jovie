@@ -317,11 +317,7 @@ export function DashboardNav(_props: DashboardNavProps) {
   );
 
   return (
-    <nav
-      className='flex flex-1 flex-col'
-      aria-label='Dashboard navigation'
-      role='navigation'
-    >
+    <nav className='flex flex-1 flex-col' aria-label='Dashboard navigation'>
       <SidebarGroup className='mb-1 space-y-1.5'>
         <SidebarGroupContent className='space-y-1'>
           {navSections.map((section, idx) => (

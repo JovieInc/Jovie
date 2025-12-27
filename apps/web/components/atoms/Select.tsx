@@ -59,6 +59,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       return (
         <div className='space-y-2'>
           {label && (
+            // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with select via DOM structure
             <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
               {label}
               {required && <span className='text-red-500 ml-1'>*</span>}

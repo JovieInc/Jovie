@@ -74,6 +74,7 @@ export function BlogMarkdownReader({
           '[&_th]:pb-3 [&_th]:text-sm [&_th]:font-semibold [&_th]:text-tertiary-token [&_th]:border-b [&_th]:border-border-default',
           '[&_td]:py-3 [&_td]:text-secondary-token [&_td]:border-b [&_td]:border-border-subtle'
         )}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for markdown content rendering
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>
