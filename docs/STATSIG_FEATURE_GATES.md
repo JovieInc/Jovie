@@ -218,14 +218,34 @@ The Statsig MCP server is configured in `.claude.json` and enables:
 
 ## Migration from Local Flags
 
-The application previously used local feature flags in `lib/feature-flags.ts`. All flags are being migrated to Statsig for centralized management and A/B testing capabilities.
+The application previously used local feature flags in `lib/feature-flags.ts`. All flags have been migrated to Statsig for centralized management and A/B testing capabilities.
 
 ### Migration Checklist
 - [x] Define all flags in `lib/statsig/flags.ts`
-- [ ] Create all gates in Statsig console (using MCP or manual)
-- [ ] Update code to use Statsig SDK instead of local flags
-- [ ] Remove `lib/feature-flags.ts` after full migration
-- [ ] Update all references to use `STATSIG_FLAGS` constants
+- [x] Create all gates in Statsig console (using MCP or manual)
+- [x] Update code to use Statsig SDK instead of local flags
+- [x] Remove `lib/feature-flags.ts` after full migration
+- [x] Update all references to use `STATSIG_FLAGS` constants
+
+### Consolidated Feature Flag System
+
+The feature flag system is now unified under Statsig:
+
+**Client-side usage:**
+```typescript
+import { useFeatureGate } from '@/lib/flags/client';
+import { STATSIG_FLAGS } from '@/lib/flags';
+
+const { value: isEnabled } = useFeatureGate(STATSIG_FLAGS.TIPPING);
+```
+
+**Server-side usage:**
+```typescript
+import { checkGateForUser } from '@/lib/flags/server';
+import { STATSIG_FLAGS } from '@/lib/flags';
+
+const isEnabled = await checkGateForUser(STATSIG_FLAGS.TIPPING, { userID: userId });
+```
 
 ## Support
 
