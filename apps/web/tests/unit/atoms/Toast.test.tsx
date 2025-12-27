@@ -109,4 +109,122 @@ describe('Toast Component', () => {
 
     vi.useRealTimers();
   });
+
+  describe('Action Button Focus States', () => {
+    it('action button has focus-visible:outline-none class for accessibility', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Test message'
+          action={{
+            label: 'Undo',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Undo' });
+      expect(actionButton).toHaveClass('focus-visible:outline-none');
+    });
+
+    it('action button has focus-visible:underline class for keyboard navigation', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Test message'
+          action={{
+            label: 'Undo',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Undo' });
+      expect(actionButton).toHaveClass('focus-visible:underline');
+    });
+
+    it('action button has focus-visible:ring-2 class for visible focus ring', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Test message'
+          action={{
+            label: 'Undo',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Undo' });
+      expect(actionButton).toHaveClass('focus-visible:ring-2');
+    });
+
+    it('info toast action button has correct focus ring color', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Info message'
+          type='info'
+          action={{
+            label: 'Action',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Action' });
+      expect(actionButton).toHaveClass('focus-visible:ring-sky-500/50');
+    });
+
+    it('success toast action button has correct focus ring color', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Success message'
+          type='success'
+          action={{
+            label: 'Action',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Action' });
+      expect(actionButton).toHaveClass('focus-visible:ring-emerald-500/50');
+    });
+
+    it('warning toast action button has correct focus ring color', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Warning message'
+          type='warning'
+          action={{
+            label: 'Action',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Action' });
+      expect(actionButton).toHaveClass('focus-visible:ring-amber-500/50');
+    });
+
+    it('error toast action button has correct focus ring color', () => {
+      render(
+        <Toast
+          id='test-toast'
+          message='Error message'
+          type='error'
+          action={{
+            label: 'Action',
+            onClick: vi.fn(),
+          }}
+        />
+      );
+
+      const actionButton = screen.getByRole('button', { name: 'Action' });
+      expect(actionButton).toHaveClass('focus-visible:ring-rose-500/50');
+    });
+  });
 });

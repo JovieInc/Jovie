@@ -36,13 +36,13 @@ const accentStyles = {
 };
 
 const actionStyles = {
-  info: 'text-sky-600 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200',
+  info: 'text-sky-600 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200 rounded focus-visible:outline-none focus-visible:underline focus-visible:ring-2 focus-visible:ring-sky-500/50 dark:focus-visible:ring-sky-400/50',
   success:
-    'text-emerald-600 hover:text-emerald-500 dark:text-emerald-300 dark:hover:text-emerald-200',
+    'text-emerald-600 hover:text-emerald-500 dark:text-emerald-300 dark:hover:text-emerald-200 rounded focus-visible:outline-none focus-visible:underline focus-visible:ring-2 focus-visible:ring-emerald-500/50 dark:focus-visible:ring-emerald-400/50',
   warning:
-    'text-amber-700 hover:text-amber-600 dark:text-amber-200 dark:hover:text-amber-100',
+    'text-amber-700 hover:text-amber-600 dark:text-amber-200 dark:hover:text-amber-100 rounded focus-visible:outline-none focus-visible:underline focus-visible:ring-2 focus-visible:ring-amber-500/50 dark:focus-visible:ring-amber-400/50',
   error:
-    'text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200',
+    'text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200 rounded focus-visible:outline-none focus-visible:underline focus-visible:ring-2 focus-visible:ring-rose-500/50 dark:focus-visible:ring-rose-400/50',
 };
 
 export const Toast: React.FC<ToastProps> = ({

@@ -10,8 +10,24 @@ const meta: Meta<typeof Toast> = {
     layout: 'centered',
     docs: {
       description: {
-        component:
-          'Toast notifications for user feedback. Use the useNotifications hook for easier integration.',
+        component: `
+Toast notifications for user feedback. Use the useNotifications hook for easier integration.
+
+## Keyboard Accessibility
+
+Action buttons in toasts support full keyboard accessibility with visible focus states. This ensures keyboard-only users can easily identify and interact with toast actions.
+
+### Focus State Behavior:
+- **Focus Ring**: When tabbing to an action button, a colored focus ring appears matching the toast type's accent color.
+- **Underline**: Focused action buttons display an underline for additional visual indication.
+- **focus-visible**: Uses the \`focus-visible\` pseudo-class to only show focus indicators for keyboard navigation (not mouse clicks).
+
+### Testing Focus States in Storybook:
+1. Navigate to a toast story with an action button (e.g., "With Action")
+2. Press **Tab** to move focus to the action button
+3. The focus ring and underline will appear
+4. Each toast type (info, success, warning, error) has a matching accent color for its focus ring
+        `,
       },
     },
   },
@@ -84,15 +100,100 @@ export const Error: Story = {
 };
 
 // Toast with action button
+/**
+ * Toast with an action button. Press Tab to see the focus ring appear on the action button.
+ * The focus state includes a colored ring and underline matching the toast type's accent color.
+ */
 export const WithAction: Story = {
   args: {
     id: 'action-toast',
     message: 'File uploaded successfully',
     type: 'success',
-    duration: 8000,
+    duration: 0, // No auto-dismiss to allow focus testing
     action: {
       label: 'View File',
       onClick: () => console.log('View file clicked'),
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Toast with action button. Press **Tab** to focus the action button and see the focus ring. The `duration: 0` prevents auto-dismiss for easier testing.',
+      },
+    },
+  },
+};
+
+// Demonstrating focus states for all toast types with action buttons
+/**
+ * Info toast with action button. Focus ring uses sky/cyan accent colors.
+ */
+export const InfoWithAction: Story = {
+  args: {
+    id: 'info-action-toast',
+    message: 'New updates are available',
+    type: 'info',
+    duration: 0,
+    action: {
+      label: 'Update Now',
+      onClick: () => console.log('Update clicked'),
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Info toast with action button. Tab to focus and see the **sky-colored** focus ring.',
+      },
+    },
+  },
+};
+
+/**
+ * Warning toast with action button. Focus ring uses amber/orange accent colors.
+ */
+export const WarningWithAction: Story = {
+  args: {
+    id: 'warning-action-toast',
+    message: 'Your session will expire soon',
+    type: 'warning',
+    duration: 0,
+    action: {
+      label: 'Extend Session',
+      onClick: () => console.log('Extend clicked'),
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Warning toast with action button. Tab to focus and see the **amber-colored** focus ring.',
+      },
+    },
+  },
+};
+
+/**
+ * Error toast with action button. Focus ring uses rose/red accent colors.
+ */
+export const ErrorWithAction: Story = {
+  args: {
+    id: 'error-action-toast',
+    message: 'Failed to save changes',
+    type: 'error',
+    duration: 0,
+    action: {
+      label: 'Retry',
+      onClick: () => console.log('Retry clicked'),
+    },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Error toast with action button. Tab to focus and see the **rose-colored** focus ring.',
+      },
     },
   },
 };
