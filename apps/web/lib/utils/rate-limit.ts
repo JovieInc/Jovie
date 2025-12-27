@@ -1,77 +1,42 @@
 /**
- * Simple in-memory rate limiter for health and public endpoints
- * Note: This is not persistent across server restarts and doesn't scale across multiple instances.
- * For production use, consider implementing with Redis/Upstash.
+ * Rate Limiting Utilities
+ *
+ * This file re-exports from the unified rate limit module for backward compatibility.
+ * New code should import directly from '@/lib/rate-limit'.
+ *
+ * @deprecated Import from '@/lib/rate-limit' instead
  */
 
-import { PUBLIC_RATE_LIMIT_CONFIG, RATE_LIMIT_CONFIG } from '@/lib/db/config';
+import {
+  getClientIP as _getClientIP,
+  createRateLimitHeadersFromStatus,
+  generalLimiter,
+  healthLimiter,
+  publicClickLimiter,
+  publicProfileLimiter,
+  publicVisitLimiter,
+} from '@/lib/rate-limit';
 
-export type PublicEndpointType = 'profile' | 'click' | 'visit';
-
-interface RateLimitEntry {
-  count: number;
-  resetTime: number;
-}
-
-// In-memory storage for rate limiting (per-process)
-// Note: This will be reset on server restart
-const rateLimitStore = new Map<string, RateLimitEntry>();
+export type { PublicEndpointType, RateLimitStatus } from '@/lib/rate-limit';
 
 /**
- * Check if a request should be rate limited
- * @param identifier - Usually IP address, but could be user ID for authenticated endpoints
- * @param isHealthEndpoint - Whether this is a health endpoint (stricter limits)
- * @returns true if rate limited, false if allowed
+ * @deprecated Use generalLimiter or healthLimiter from '@/lib/rate-limit' instead
  */
 export function checkRateLimit(
   identifier: string,
   isHealthEndpoint = false
 ): boolean {
-  const now = Date.now();
-  const config = isHealthEndpoint
-    ? {
-        requests: RATE_LIMIT_CONFIG.healthRequests,
-        windowMs: RATE_LIMIT_CONFIG.healthWindow * 1000,
-      }
-    : {
-        requests: RATE_LIMIT_CONFIG.requests,
-        windowMs: RATE_LIMIT_CONFIG.window * 1000,
-      };
+  const limiter = isHealthEndpoint ? healthLimiter : generalLimiter;
+  const status = limiter.getStatus(identifier);
 
-  const key = `${identifier}:${isHealthEndpoint ? 'health' : 'general'}`;
-  const existing = rateLimitStore.get(key);
+  // Trigger the limit check to increment counter
+  void limiter.limit(identifier);
 
-  // Clean up expired entries periodically (simple cleanup)
-  if (Math.random() < 0.1) {
-    // 10% chance to clean up on each request
-    cleanupExpiredEntries();
-  }
-
-  if (!existing || now > existing.resetTime) {
-    // First request or window has expired
-    rateLimitStore.set(key, {
-      count: 1,
-      resetTime: now + config.windowMs,
-    });
-    return false; // Not rate limited
-  }
-
-  if (existing.count >= config.requests) {
-    // Rate limit exceeded
-    return true;
-  }
-
-  // Increment counter
-  rateLimitStore.set(key, {
-    ...existing,
-    count: existing.count + 1,
-  });
-
-  return false; // Not rate limited
+  return status.blocked;
 }
 
 /**
- * Get rate limit status for an identifier
+ * @deprecated Use limiter.getStatus() from '@/lib/rate-limit' instead
  */
 export function getRateLimitStatus(
   identifier: string,
@@ -82,156 +47,67 @@ export function getRateLimitStatus(
   resetTime: number;
   blocked: boolean;
 } {
-  const now = Date.now();
-  const config = isHealthEndpoint
-    ? {
-        requests: RATE_LIMIT_CONFIG.healthRequests,
-        windowMs: RATE_LIMIT_CONFIG.healthWindow * 1000,
-      }
-    : {
-        requests: RATE_LIMIT_CONFIG.requests,
-        windowMs: RATE_LIMIT_CONFIG.window * 1000,
-      };
-
-  const key = `${identifier}:${isHealthEndpoint ? 'health' : 'general'}`;
-  const existing = rateLimitStore.get(key);
-
-  if (!existing || now > existing.resetTime) {
-    return {
-      limit: config.requests,
-      remaining: config.requests - 1,
-      resetTime: now + config.windowMs,
-      blocked: false,
-    };
-  }
-
-  const remaining = Math.max(0, config.requests - existing.count);
-  const blocked = existing.count >= config.requests;
+  const limiter = isHealthEndpoint ? healthLimiter : generalLimiter;
+  const status = limiter.getStatus(identifier);
 
   return {
-    limit: config.requests,
-    remaining,
-    resetTime: existing.resetTime,
-    blocked,
+    limit: status.limit,
+    remaining: status.remaining,
+    resetTime: status.resetTime,
+    blocked: status.blocked,
   };
 }
 
 /**
- * Clean up expired rate limit entries to prevent memory leaks
- */
-function cleanupExpiredEntries(): void {
-  const now = Date.now();
-  const keysToDelete: string[] = [];
-
-  for (const [key, entry] of rateLimitStore.entries()) {
-    if (now > entry.resetTime) {
-      keysToDelete.push(key);
-    }
-  }
-
-  for (const key of keysToDelete) {
-    rateLimitStore.delete(key);
-  }
-}
-
-/**
- * Get the client IP address from the request
+ * @deprecated Use getClientIP from '@/lib/rate-limit' instead
  */
 export function getClientIP(request: Request): string {
-  // Try various headers in order of preference
-  const headers = {
-    'x-forwarded-for': request.headers.get('x-forwarded-for'),
-    'x-real-ip': request.headers.get('x-real-ip'),
-    'x-client-ip': request.headers.get('x-client-ip'),
-    'cf-connecting-ip': request.headers.get('cf-connecting-ip'), // Cloudflare
-    'true-client-ip': request.headers.get('true-client-ip'), // Cloudflare Enterprise
-  };
-
-  // x-forwarded-for can contain multiple IPs, take the first one
-  const xForwardedFor = headers['x-forwarded-for'];
-  if (xForwardedFor) {
-    const ips = xForwardedFor.split(',').map(ip => ip.trim());
-    return ips[0];
-  }
-
-  // Try other headers
-  for (const header of Object.values(headers)) {
-    if (header) {
-      return header;
-    }
-  }
-
-  // Fallback to localhost for development
-  return '127.0.0.1';
+  return _getClientIP(request);
 }
 
 /**
- * Create standardized rate limit response headers
+ * @deprecated Use createRateLimitHeaders from '@/lib/rate-limit' instead
  */
 export function createRateLimitHeaders(status: {
   limit: number;
   remaining: number;
   resetTime: number;
 }): Record<string, string> {
-  return {
-    'X-RateLimit-Limit': status.limit.toString(),
-    'X-RateLimit-Remaining': status.remaining.toString(),
-    'X-RateLimit-Reset': Math.ceil(status.resetTime / 1000).toString(),
-    'Retry-After': Math.ceil((status.resetTime - Date.now()) / 1000).toString(),
-  };
+  return createRateLimitHeadersFromStatus({
+    ...status,
+    blocked: false,
+    retryAfterSeconds: 0,
+  });
 }
 
 /**
- * Check if a request to a public endpoint should be rate limited
- * @param identifier - Usually IP address
- * @param endpointType - Type of public endpoint (profile, click, visit)
- * @returns true if rate limited, false if allowed
+ * @deprecated Use publicProfileLimiter, publicClickLimiter, or publicVisitLimiter from '@/lib/rate-limit' instead
  */
 export function checkPublicRateLimit(
   identifier: string,
-  endpointType: PublicEndpointType
+  endpointType: 'profile' | 'click' | 'visit'
 ): boolean {
-  const now = Date.now();
-  const config = PUBLIC_RATE_LIMIT_CONFIG[endpointType];
-  const windowMs = config.windowSeconds * 1000;
+  const limiterMap = {
+    profile: publicProfileLimiter,
+    click: publicClickLimiter,
+    visit: publicVisitLimiter,
+  };
 
-  const key = `${identifier}:public:${endpointType}`;
-  const existing = rateLimitStore.get(key);
+  const limiter = limiterMap[endpointType];
+  const status = limiter.getStatus(identifier);
 
-  // Clean up expired entries periodically (simple cleanup)
-  if (Math.random() < 0.1) {
-    cleanupExpiredEntries();
-  }
+  // Trigger the limit check to increment counter
+  void limiter.limit(identifier);
 
-  if (!existing || now > existing.resetTime) {
-    // First request or window has expired
-    rateLimitStore.set(key, {
-      count: 1,
-      resetTime: now + windowMs,
-    });
-    return false; // Not rate limited
-  }
-
-  if (existing.count >= config.requests) {
-    // Rate limit exceeded
-    return true;
-  }
-
-  // Increment counter
-  rateLimitStore.set(key, {
-    ...existing,
-    count: existing.count + 1,
-  });
-
-  return false; // Not rate limited
+  return status.blocked;
 }
 
 /**
- * Get rate limit status for a public endpoint
+ * @deprecated Use limiter.getStatus() from '@/lib/rate-limit' instead
  */
 export function getPublicRateLimitStatus(
   identifier: string,
-  endpointType: PublicEndpointType
+  endpointType: 'profile' | 'click' | 'visit'
 ): {
   limit: number;
   remaining: number;
@@ -239,34 +115,12 @@ export function getPublicRateLimitStatus(
   blocked: boolean;
   retryAfterSeconds: number;
 } {
-  const now = Date.now();
-  const config = PUBLIC_RATE_LIMIT_CONFIG[endpointType];
-  const windowMs = config.windowSeconds * 1000;
-
-  const key = `${identifier}:public:${endpointType}`;
-  const existing = rateLimitStore.get(key);
-
-  if (!existing || now > existing.resetTime) {
-    return {
-      limit: config.requests,
-      remaining: config.requests,
-      resetTime: now + windowMs,
-      blocked: false,
-      retryAfterSeconds: 0,
-    };
-  }
-
-  const remaining = Math.max(0, config.requests - existing.count);
-  const blocked = existing.count >= config.requests;
-  const retryAfterSeconds = blocked
-    ? Math.ceil((existing.resetTime - now) / 1000)
-    : 0;
-
-  return {
-    limit: config.requests,
-    remaining,
-    resetTime: existing.resetTime,
-    blocked,
-    retryAfterSeconds,
+  const limiterMap = {
+    profile: publicProfileLimiter,
+    click: publicClickLimiter,
+    visit: publicVisitLimiter,
   };
+
+  const limiter = limiterMap[endpointType];
+  return limiter.getStatus(identifier);
 }
