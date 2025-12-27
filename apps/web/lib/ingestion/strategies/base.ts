@@ -6,8 +6,8 @@
 import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
-  detectPlatform,
   normalizeUrl,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 import type { ExtractedLink, ExtractionResult } from '../types';
 
@@ -501,8 +501,8 @@ export function extractLinks(
       if (options.skipHosts.has(host)) continue;
       if (TRACKING_HOSTS.has(host)) continue;
 
-      const detected = detectPlatform(normalizedUrl);
-      if (!detected.isValid) continue;
+      const detected = validateLink(normalizedUrl);
+      if (!detected || !detected.isValid) continue;
 
       const cleanedUrl = stripTrackingParams(detected.normalizedUrl);
       const key = canonicalIdentity({

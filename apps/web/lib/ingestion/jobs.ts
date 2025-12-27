@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { db, ingestionJobs } from '@/lib/db';
 import {
   canonicalIdentity,
-  detectPlatform,
   normalizeUrl,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 import { isBeaconsUrl, validateBeaconsUrl } from './strategies/beacons';
 import { isLayloUrl } from './strategies/laylo';
@@ -31,7 +31,7 @@ export async function enqueueLinktreeIngestionJob(params: {
   }
 
   const normalizedSource = normalizeUrl(params.sourceUrl);
-  const detected = detectPlatform(normalizedSource);
+  const detected = validateLink(normalizedSource);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -105,7 +105,7 @@ export async function enqueueBeaconsIngestionJob(params: {
   }
 
   const normalizedSource = normalizeUrl(validated);
-  const detected = detectPlatform(normalizedSource);
+  const detected = validateLink(normalizedSource);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -174,7 +174,7 @@ export async function enqueueYouTubeIngestionJob(params: {
   }
 
   const normalizedSource = validated;
-  const detected = detectPlatform(normalizedSource);
+  const detected = validateLink(normalizedSource);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -242,7 +242,7 @@ export async function enqueueLayloIngestionJob(params: {
   }
 
   const normalizedSource = normalizeUrl(params.sourceUrl);
-  const detected = detectPlatform(normalizedSource);
+  const detected = validateLink(normalizedSource);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,

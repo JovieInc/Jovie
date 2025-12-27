@@ -726,6 +726,17 @@ export function getPlatformInfo(platformId: string): PlatformInfo | null {
 }
 
 /**
+ * Get the category for a platform by ID
+ * Handles both kebab-case (apple-music) and underscore (apple_music) format
+ */
+export function getPlatformCategory(platformId: string): PlatformCategory {
+  // Normalize underscores to hyphens for lookup
+  const normalizedId = platformId.replace(/_/g, '-');
+  const platform = getPlatformInfo(normalizedId);
+  return platform?.category ?? 'custom';
+}
+
+/**
  * Detect a platform from a URL and return full platform info
  */
 export function detectPlatform(url: string): PlatformInfo | null {
@@ -807,4 +818,97 @@ export function getPlatformsByCategory(
  */
 export function getAllPlatforms(): PlatformInfo[] {
   return Object.values(PLATFORMS);
+}
+
+/**
+ * Get the base URL for the application based on environment
+ */
+export function getBaseUrl(): string {
+  // If we have NEXT_PUBLIC_APP_URL from env, use that first
+  if (typeof window !== 'undefined' && window.location) {
+    // Client-side: use current origin for local/preview environments
+    const { protocol, hostname, port } = window.location;
+
+    // For local development
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+    }
+
+    // For staging or non-production deployments (e.g., Vercel preview URLs)
+    if (
+      hostname === 'main.jov.ie' ||
+      hostname === 'main.meetjovie.com' ||
+      hostname.includes('vercel.app')
+    ) {
+      return `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+    }
+  }
+
+  // Server-side or fallback: use environment variable or production profile URL
+  return (
+    process.env.NEXT_PUBLIC_PROFILE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'https://meetjovie.com'
+  );
+}
+
+/**
+ * Generate a canonical identity string for a platform link
+ * Used for duplicate detection and link matching
+ */
+export function canonicalIdentity(
+  link: Pick<DetectedLink, 'platform' | 'normalizedUrl'>
+): string {
+  try {
+    const u = new URL(link.normalizedUrl);
+    const parts = u.pathname.split('/').filter(Boolean);
+
+    switch (link.platform.id) {
+      case 'instagram':
+      case 'twitter':
+        // x.com and twitter.com both map here; username is first segment
+        if (parts[0])
+          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
+        break;
+      case 'tiktok':
+        if (parts[0])
+          return `${link.platform.id}:${parts[0].replace(/^@/, '').toLowerCase()}`;
+        break;
+      case 'youtube':
+        // Prefer @handle, else channel/ID, else legacy single segment
+        if (parts[0]?.startsWith('@'))
+          return `youtube:${parts[0].slice(1).toLowerCase()}`;
+        if (parts[0] === 'channel' && parts[1])
+          return `youtube:channel:${parts[1].toLowerCase()}`;
+        if (parts[0] === 'user' && parts[1])
+          return `youtube:user:${parts[1].toLowerCase()}`;
+        if (parts.length === 1)
+          return `youtube:legacy:${parts[0].toLowerCase()}`;
+        break;
+      case 'facebook':
+        if (parts[0]) return `facebook:${parts[0].toLowerCase()}`;
+        break;
+      case 'spotify':
+        // spotify:artist:ID or spotify:album:ID
+        if (parts[0] && parts[1])
+          return `spotify:${parts[0]}:${parts[1].toLowerCase()}`;
+        break;
+      case 'soundcloud':
+        // SoundCloud uses username as first path segment
+        if (parts[0]) return `soundcloud:${parts[0].toLowerCase()}`;
+        break;
+      case 'linktree':
+      case 'beacons':
+      case 'laylo':
+        if (parts[0]) return `${link.platform.id}:${parts[0].toLowerCase()}`;
+        break;
+      default:
+        // For other platforms, use normalized URL
+        return `${link.platform.id}:${link.normalizedUrl.toLowerCase()}`;
+    }
+
+    return `${link.platform.id}:${link.normalizedUrl.toLowerCase()}`;
+  } catch {
+    return `${link.platform.id}:${link.normalizedUrl.toLowerCase()}`;
+  }
 }

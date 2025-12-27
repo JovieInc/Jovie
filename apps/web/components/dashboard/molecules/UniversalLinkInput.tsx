@@ -13,7 +13,7 @@ import React, {
 import { track } from '@/lib/analytics';
 import {
   type DetectedLink,
-  detectPlatform,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 
 import { UniversalLinkInputArtistSearchMode } from './UniversalLinkInputArtistSearchMode';
@@ -180,8 +180,8 @@ export const UniversalLinkInput = forwardRef<
       ) {
         return null;
       }
-      return detectPlatform(trimmed, creatorName);
-    }, [creatorName, url]);
+      return validateLink(trimmed);
+    }, [url]);
 
     const isPlatformDuplicate = detectedLink
       ? existingPlatforms.includes(detectedLink.platform.id)

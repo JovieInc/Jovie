@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { isBrandDark } from '@/lib/utils/color';
 import {
   type DetectedLink,
-  detectPlatform,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 
 import {
@@ -89,7 +89,7 @@ export function UniversalLinkInputArtistSearchMode({
         result_count: results.length,
       });
 
-      const link = detectPlatform(artist.url, creatorName);
+      const link = validateLink(artist.url);
       if (link && link.isValid) {
         const enrichedLink = {
           ...link,

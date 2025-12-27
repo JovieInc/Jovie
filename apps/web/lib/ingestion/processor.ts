@@ -18,7 +18,7 @@ import {
 import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
-  detectPlatform,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
@@ -236,7 +236,7 @@ async function enqueueIngestionJobTx(params: {
   const maxDepth = MAX_DEPTH_BY_JOB_TYPE[jobType];
   if (depth > maxDepth) return null;
 
-  const detected = detectPlatform(sourceUrl);
+  const detected = validateLink(sourceUrl);
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -459,7 +459,8 @@ export async function normalizeAndMergeExtraction(
 
   for (const row of existingRows) {
     try {
-      const detected = detectPlatform(row.url);
+      const detected = validateLink(row.url);
+      if (!detected || !detected.isValid) continue;
       const canonical = canonicalIdentity({
         platform: detected.platform,
         normalizedUrl: detected.normalizedUrl,
@@ -476,7 +477,7 @@ export async function normalizeAndMergeExtraction(
 
   for (const link of extraction.links) {
     try {
-      const detected = detectPlatform(link.url);
+      const detected = validateLink(link.url);
       if (!detected.isValid) continue;
 
       const canonical = canonicalIdentity({

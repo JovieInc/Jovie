@@ -11,7 +11,7 @@ import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { track } from '@/lib/analytics';
 import { cn } from '@/lib/utils';
-import { detectPlatform } from '@/lib/utils/platform-detection';
+import { validateLink } from '@/lib/utils/platform-detection';
 import type { Contact, ContactSidebarMode, ContactSocialLink } from '@/types';
 
 export interface ContactSidebarProps {
@@ -204,8 +204,8 @@ export function ContactSidebar({
     const trimmedUrl = newLinkUrl.trim();
     if (!isValidUrl(trimmedUrl)) return;
 
-    const detected = detectPlatform(trimmedUrl, fullName || contact.username);
-    if (!detected.isValid) return;
+    const detected = validateLink(trimmedUrl);
+    if (!detected || !detected.isValid) return;
 
     const nextLink: ContactSocialLink = {
       id: undefined,
@@ -475,8 +475,8 @@ export function ContactSidebar({
                     const displayUsername = formatUsername(username);
                     const platformId =
                       (link.platformType as string | undefined) ||
-                      detectPlatform(link.url, fullName || contact.username)
-                        .platform.icon;
+                      validateLink(link.url)?.platform.icon ||
+                      'link';
 
                     const ariaLabel = displayUsername
                       ? `Open ${platformId} profile ${displayUsername}`

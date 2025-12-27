@@ -1,7 +1,7 @@
 import {
   canonicalIdentity,
-  detectPlatform,
   normalizeUrl,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
@@ -130,8 +130,8 @@ export function extractLaylo(
   for (const entry of socialFields) {
     if (!entry.url) continue;
     const normalizedUrl = stripTrackingParams(normalizeUrl(entry.url));
-    const detected = detectPlatform(normalizedUrl);
-    if (!detected.isValid) continue;
+    const detected = validateLink(normalizedUrl);
+    if (!detected || !detected.isValid) continue;
 
     const canonical = canonicalIdentity({
       platform: detected.platform,
@@ -157,8 +157,10 @@ export function extractLaylo(
     : null;
   if (layloUrl && isLayloUrl(layloUrl)) {
     const normalized = normalizeUrl(layloUrl);
+    const detected = validateLink(normalized);
+    if (!detected || !detected.isValid) return { links: [] };
     const canonical = canonicalIdentity({
-      platform: detectPlatform(normalized).platform,
+      platform: detected.platform,
       normalizedUrl: normalized,
     });
     if (!seen.has(canonical)) {

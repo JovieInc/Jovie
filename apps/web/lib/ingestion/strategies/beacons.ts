@@ -7,8 +7,8 @@
 
 import {
   canonicalIdentity,
-  detectPlatform,
   normalizeUrl,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
@@ -261,8 +261,8 @@ export function extractBeacons(html: string): ExtractionResult {
       if (parsed.protocol !== 'https:') return;
       if (SKIP_HOSTS.has(parsed.hostname.toLowerCase())) return;
 
-      const detected = detectPlatform(normalizedUrl);
-      if (!detected.isValid) return;
+      const detected = validateLink(normalizedUrl);
+      if (!detected || !detected.isValid) return;
 
       const key = canonicalIdentity({
         platform: detected.platform,

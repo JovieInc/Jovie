@@ -31,7 +31,7 @@ import {
   createRateLimitHeaders,
   dashboardLinksRateLimit,
 } from '@/lib/rate-limit';
-import { detectPlatform } from '@/lib/utils/platform-detection';
+import { validateLink } from '@/lib/utils/platform-detection';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
 import { isValidSocialPlatform } from '@/types';
 
@@ -481,8 +481,8 @@ export async function PUT(req: Request) {
       if (links.length > 0) {
         const insertPayload: Array<typeof socialLinks.$inferInsert> = links.map(
           (l, idx) => {
-            const detected = detectPlatform(l.url);
-            const normalizedUrl = detected.normalizedUrl;
+            const detected = validateLink(l.url);
+            const normalizedUrl = detected?.normalizedUrl ?? l.url;
             const evidence = {
               sources: l.evidence?.sources ?? [],
               signals: l.evidence?.signals ?? [],
@@ -509,7 +509,7 @@ export async function PUT(req: Request) {
             return {
               creatorProfileId: profileId,
               platform: l.platform,
-              platformType: detected.platform.category,
+              platformType: detected?.platform.category ?? 'custom',
               url: normalizedUrl,
               sortOrder: l.sortOrder ?? idx,
               state,

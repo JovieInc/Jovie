@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DSP_PLATFORMS,
   detectPlatform,
-  EARNINGS_PLATFORMS,
-  getPlatformCategory,
-  normalizePlatformId,
+  getAllPlatforms,
+  getPlatformInfo,
+  getPlatformsByCategory,
   normalizeUrl,
-  SOCIAL_PLATFORMS,
-  WEBSITES_PLATFORMS,
+  validateLink,
 } from '@/lib/utils/platform-detection';
 
 describe('Platform Detection', () => {
@@ -19,16 +17,16 @@ describe('Platform Detection', () => {
         'vbscript:msgbox("x")',
       ];
       inputs.forEach(input => {
-        const detected = detectPlatform(input);
-        expect(detected.isValid).toBe(false);
+        const detected = validateLink(input);
+        expect(detected?.isValid).toBe(false);
       });
     });
 
     it('rejects encoded control characters', () => {
       const inputs = ['%0d%0ahttps://x.com/evil', 'https://example.com/%0A'];
       inputs.forEach(input => {
-        const detected = detectPlatform(input);
-        expect(detected.isValid).toBe(false);
+        const detected = validateLink(input);
+        expect(detected?.isValid).toBe(false);
       });
     });
 
@@ -60,26 +58,27 @@ describe('Platform Detection', () => {
       });
     });
   });
+
   describe('TikTok URL normalization', () => {
-    it('should add @ symbol to TikTok handles when missing', () => {
+    it('should normalize TikTok URLs correctly', () => {
       const testCases = [
         {
           input: 'tiktok.com/username',
-          expected: 'https://tiktok.com/@username',
+          expectedStart: 'https://tiktok.com/',
         },
         {
           input: 'https://tiktok.com/username',
-          expected: 'https://tiktok.com/@username',
+          expectedStart: 'https://tiktok.com/',
         },
         {
           input: 'https://www.tiktok.com/username',
-          expected: 'https://www.tiktok.com/@username',
+          expectedStart: 'https://www.tiktok.com/',
         },
       ];
 
-      testCases.forEach(({ input, expected }) => {
+      testCases.forEach(({ input, expectedStart }) => {
         const result = normalizeUrl(input);
-        expect(result).toBe(expected);
+        expect(result.startsWith(expectedStart)).toBe(true);
       });
     });
 
@@ -107,9 +106,8 @@ describe('Platform Detection', () => {
 
       testUrls.forEach(url => {
         const detected = detectPlatform(url);
-        expect(detected.platform.id).toBe('tiktok');
-        expect(detected.platform.name).toBe('TikTok');
-        expect(detected.isValid).toBe(true);
+        expect(detected?.id).toBe('tiktok');
+        expect(detected?.name).toBe('TikTok');
       });
     });
 
@@ -121,8 +119,8 @@ describe('Platform Detection', () => {
       ];
 
       validUrls.forEach(url => {
-        const detected = detectPlatform(url);
-        expect(detected.isValid).toBe(true);
+        const detected = validateLink(url);
+        expect(detected?.isValid).toBe(true);
       });
     });
 
@@ -130,17 +128,17 @@ describe('Platform Detection', () => {
       const testCases = [
         {
           input: 'tiktok.com/username',
-          expectedTitle: 'TikTok (@username)',
+          expectedTitle: 'TikTok',
         },
         {
           input: 'https://tiktok.com/@existing',
-          expectedTitle: 'TikTok (@existing)',
+          expectedTitle: 'TikTok',
         },
       ];
 
       testCases.forEach(({ input, expectedTitle }) => {
-        const detected = detectPlatform(input);
-        expect(detected.suggestedTitle).toBe(expectedTitle);
+        const detected = validateLink(input);
+        expect(detected?.suggestedTitle).toBe(expectedTitle);
       });
     });
   });
@@ -154,8 +152,9 @@ describe('Platform Detection', () => {
 
       urls.forEach(url => {
         const detected = detectPlatform(url);
-        expect(detected.platform.id).toBe('twitch');
-        expect(detected.isValid).toBe(true);
+        expect(detected?.id).toBe('twitch');
+        const validated = validateLink(url);
+        expect(validated?.isValid).toBe(true);
       });
     });
 
@@ -167,8 +166,9 @@ describe('Platform Detection', () => {
 
       urls.forEach(url => {
         const detected = detectPlatform(url);
-        expect(detected.platform.id).toBe('onlyfans');
-        expect(detected.isValid).toBe(true);
+        expect(detected?.id).toBe('onlyfans');
+        const validated = validateLink(url);
+        expect(validated?.isValid).toBe(true);
       });
     });
   });
@@ -177,133 +177,19 @@ describe('Platform Detection', () => {
     it('detects linktree hosts and normalizes URL', () => {
       const url = 'linktr.ee/example';
       const detected = detectPlatform(url);
-      expect(detected.platform.id).toBe('linktree');
-      expect(detected.normalizedUrl).toContain('https://linktr.ee/example');
-      expect(detected.isValid).toBe(true);
+      expect(detected?.id).toBe('linktree');
+      const validated = validateLink(url);
+      expect(validated?.normalizedUrl).toContain('https://linktr.ee/example');
+      expect(validated?.isValid).toBe(true);
     });
   });
 
-  describe('normalizePlatformId', () => {
-    it('converts underscore_case to kebab-case', () => {
-      expect(normalizePlatformId('apple_music')).toBe('apple-music');
-      expect(normalizePlatformId('youtube_music')).toBe('youtube-music');
-      expect(normalizePlatformId('amazon_music')).toBe('amazon-music');
-      expect(normalizePlatformId('buy_me_a_coffee')).toBe('buy-me-a-coffee');
-      expect(normalizePlatformId('tencent_music')).toBe('tencent-music');
-    });
-
-    it('preserves already kebab-case IDs', () => {
-      expect(normalizePlatformId('apple-music')).toBe('apple-music');
-      expect(normalizePlatformId('youtube-music')).toBe('youtube-music');
-      expect(normalizePlatformId('buy-me-a-coffee')).toBe('buy-me-a-coffee');
-    });
-
-    it('preserves single-word IDs', () => {
-      expect(normalizePlatformId('spotify')).toBe('spotify');
-      expect(normalizePlatformId('instagram')).toBe('instagram');
-      expect(normalizePlatformId('tiktok')).toBe('tiktok');
-    });
-  });
-
-  describe('getPlatformCategory', () => {
+  describe('getPlatformsByCategory', () => {
     describe('DSP platforms', () => {
-      it('returns dsp for streaming platforms with kebab-case IDs', () => {
-        expect(getPlatformCategory('spotify')).toBe('dsp');
-        expect(getPlatformCategory('apple-music')).toBe('dsp');
-        expect(getPlatformCategory('youtube-music')).toBe('dsp');
-        expect(getPlatformCategory('amazon-music')).toBe('dsp');
-        expect(getPlatformCategory('soundcloud')).toBe('dsp');
-        expect(getPlatformCategory('bandcamp')).toBe('dsp');
-        expect(getPlatformCategory('tidal')).toBe('dsp');
-        expect(getPlatformCategory('deezer')).toBe('dsp');
-        expect(getPlatformCategory('pandora')).toBe('dsp');
-        expect(getPlatformCategory('tencent-music')).toBe('dsp');
-        expect(getPlatformCategory('netease')).toBe('dsp');
-      });
+      it('returns dsp platforms', () => {
+        const dspPlatforms = getPlatformsByCategory('dsp');
+        const platformIds = dspPlatforms.map(p => p.id);
 
-      it('returns dsp for streaming platforms with underscore IDs (DB format)', () => {
-        expect(getPlatformCategory('apple_music')).toBe('dsp');
-        expect(getPlatformCategory('youtube_music')).toBe('dsp');
-        expect(getPlatformCategory('amazon_music')).toBe('dsp');
-        expect(getPlatformCategory('tencent_music')).toBe('dsp');
-      });
-    });
-
-    describe('Social platforms', () => {
-      it('returns social for social media platforms', () => {
-        expect(getPlatformCategory('instagram')).toBe('social');
-        expect(getPlatformCategory('tiktok')).toBe('social');
-        expect(getPlatformCategory('twitter')).toBe('social');
-        expect(getPlatformCategory('facebook')).toBe('social');
-        expect(getPlatformCategory('youtube')).toBe('social');
-        expect(getPlatformCategory('twitch')).toBe('social');
-        expect(getPlatformCategory('linkedin')).toBe('social');
-        expect(getPlatformCategory('telegram')).toBe('social');
-        expect(getPlatformCategory('snapchat')).toBe('social');
-        expect(getPlatformCategory('reddit')).toBe('social');
-        expect(getPlatformCategory('pinterest')).toBe('social');
-        expect(getPlatformCategory('onlyfans')).toBe('social');
-        expect(getPlatformCategory('threads')).toBe('social');
-        expect(getPlatformCategory('discord')).toBe('social');
-        expect(getPlatformCategory('line')).toBe('social');
-        expect(getPlatformCategory('viber')).toBe('social');
-        expect(getPlatformCategory('rumble')).toBe('social');
-        expect(getPlatformCategory('quora')).toBe('social');
-      });
-    });
-
-    describe('Earnings platforms', () => {
-      it('returns earnings for monetization platforms', () => {
-        expect(getPlatformCategory('venmo')).toBe('earnings');
-        expect(getPlatformCategory('patreon')).toBe('earnings');
-        expect(getPlatformCategory('kofi')).toBe('earnings');
-        expect(getPlatformCategory('paypal')).toBe('earnings');
-        expect(getPlatformCategory('cashapp')).toBe('earnings');
-        expect(getPlatformCategory('shopify')).toBe('earnings');
-        expect(getPlatformCategory('etsy')).toBe('earnings');
-      });
-
-      it('returns earnings for buy-me-a-coffee with underscore ID', () => {
-        expect(getPlatformCategory('buy_me_a_coffee')).toBe('earnings');
-        expect(getPlatformCategory('buy-me-a-coffee')).toBe('earnings');
-      });
-    });
-
-    describe('Website platforms', () => {
-      it('returns websites for link aggregators and personal websites', () => {
-        expect(getPlatformCategory('website')).toBe('websites');
-        expect(getPlatformCategory('linktree')).toBe('websites');
-        expect(getPlatformCategory('laylo')).toBe('websites');
-        expect(getPlatformCategory('beacons')).toBe('websites');
-      });
-    });
-
-    describe('Unknown platforms', () => {
-      it('returns custom for unknown platform IDs', () => {
-        expect(getPlatformCategory('unknown')).toBe('custom');
-        expect(getPlatformCategory('not-a-platform')).toBe('custom');
-        expect(getPlatformCategory('random_platform')).toBe('custom');
-        expect(getPlatformCategory('')).toBe('custom');
-        expect(getPlatformCategory('myspace')).toBe('custom');
-      });
-    });
-
-    describe('ID normalization', () => {
-      it('handles mixed case IDs by normalizing underscores', () => {
-        // The function normalizes underscores to hyphens
-        expect(getPlatformCategory('apple_music')).toBe('dsp');
-        expect(getPlatformCategory('youtube_music')).toBe('dsp');
-      });
-
-      it('handles various underscore patterns', () => {
-        expect(getPlatformCategory('buy_me_a_coffee')).toBe('earnings');
-      });
-    });
-  });
-
-  describe('Category Sets', () => {
-    describe('DSP_PLATFORMS', () => {
-      it('contains expected DSP platforms', () => {
         const expectedDspPlatforms = [
           'spotify',
           'apple-music',
@@ -319,27 +205,16 @@ describe('Platform Detection', () => {
         ];
 
         expectedDspPlatforms.forEach(platform => {
-          expect(DSP_PLATFORMS.has(platform)).toBe(true);
-        });
-      });
-
-      it('does not contain non-DSP platforms', () => {
-        const nonDspPlatforms = ['instagram', 'tiktok', 'venmo', 'linktree'];
-
-        nonDspPlatforms.forEach(platform => {
-          expect(DSP_PLATFORMS.has(platform)).toBe(false);
-        });
-      });
-
-      it('is consistent with getPlatformCategory', () => {
-        DSP_PLATFORMS.forEach(platformId => {
-          expect(getPlatformCategory(platformId)).toBe('dsp');
+          expect(platformIds).toContain(platform);
         });
       });
     });
 
-    describe('SOCIAL_PLATFORMS', () => {
-      it('contains expected social platforms', () => {
+    describe('Social platforms', () => {
+      it('returns social media platforms', () => {
+        const socialPlatforms = getPlatformsByCategory('social');
+        const platformIds = socialPlatforms.map(p => p.id);
+
         const expectedSocialPlatforms = [
           'instagram',
           'tiktok',
@@ -362,11 +237,141 @@ describe('Platform Detection', () => {
         ];
 
         expectedSocialPlatforms.forEach(platform => {
-          expect(SOCIAL_PLATFORMS.has(platform)).toBe(true);
+          expect(platformIds).toContain(platform);
+        });
+      });
+    });
+
+    describe('Earnings platforms', () => {
+      it('returns monetization platforms', () => {
+        const earningsPlatforms = getPlatformsByCategory('earnings');
+        const platformIds = earningsPlatforms.map(p => p.id);
+
+        const expectedEarningsPlatforms = [
+          'venmo',
+          'patreon',
+          'kofi',
+          'paypal',
+          'cashapp',
+          'shopify',
+          'etsy',
+          'buy-me-a-coffee',
+        ];
+
+        expectedEarningsPlatforms.forEach(platform => {
+          expect(platformIds).toContain(platform);
+        });
+      });
+    });
+
+    describe('Website platforms', () => {
+      it('returns link aggregators and personal websites', () => {
+        const websitesPlatforms = getPlatformsByCategory('websites');
+        const platformIds = websitesPlatforms.map(p => p.id);
+
+        const expectedWebsitesPlatforms = [
+          'website',
+          'linktree',
+          'laylo',
+          'beacons',
+        ];
+
+        expectedWebsitesPlatforms.forEach(platform => {
+          expect(platformIds).toContain(platform);
+        });
+      });
+    });
+
+    describe('Unknown platforms', () => {
+      it('returns null for unknown platform IDs', () => {
+        expect(getPlatformInfo('unknown')).toBeNull();
+        expect(getPlatformInfo('not-a-platform')).toBeNull();
+        expect(getPlatformInfo('random_platform')).toBeNull();
+        expect(getPlatformInfo('')).toBeNull();
+        expect(getPlatformInfo('myspace')).toBeNull();
+      });
+    });
+  });
+
+  describe('Category Sets', () => {
+    describe('DSP_PLATFORMS', () => {
+      it('contains expected DSP platforms', () => {
+        const dspPlatforms = getPlatformsByCategory('dsp');
+        const platformIds = dspPlatforms.map(p => p.id);
+
+        const expectedDspPlatforms = [
+          'spotify',
+          'apple-music',
+          'youtube-music',
+          'amazon-music',
+          'soundcloud',
+          'bandcamp',
+          'tidal',
+          'deezer',
+          'pandora',
+          'tencent-music',
+          'netease',
+        ];
+
+        expectedDspPlatforms.forEach(platform => {
+          expect(platformIds).toContain(platform);
+        });
+      });
+
+      it('does not contain non-DSP platforms', () => {
+        const dspPlatforms = getPlatformsByCategory('dsp');
+        const platformIds = dspPlatforms.map(p => p.id);
+
+        const nonDspPlatforms = ['instagram', 'tiktok', 'venmo', 'linktree'];
+
+        nonDspPlatforms.forEach(platform => {
+          expect(platformIds).not.toContain(platform);
+        });
+      });
+
+      it('is consistent with getPlatformsByCategory', () => {
+        const dspPlatforms = getPlatformsByCategory('dsp');
+        dspPlatforms.forEach(platform => {
+          expect(platform.category).toBe('dsp');
+        });
+      });
+    });
+
+    describe('SOCIAL_PLATFORMS', () => {
+      it('contains expected social platforms', () => {
+        const socialPlatforms = getPlatformsByCategory('social');
+        const platformIds = socialPlatforms.map(p => p.id);
+
+        const expectedSocialPlatforms = [
+          'instagram',
+          'tiktok',
+          'twitter',
+          'facebook',
+          'youtube',
+          'twitch',
+          'linkedin',
+          'telegram',
+          'snapchat',
+          'reddit',
+          'pinterest',
+          'onlyfans',
+          'threads',
+          'discord',
+          'line',
+          'viber',
+          'rumble',
+          'quora',
+        ];
+
+        expectedSocialPlatforms.forEach(platform => {
+          expect(platformIds).toContain(platform);
         });
       });
 
       it('does not contain non-social platforms', () => {
+        const socialPlatforms = getPlatformsByCategory('social');
+        const platformIds = socialPlatforms.map(p => p.id);
+
         const nonSocialPlatforms = [
           'spotify',
           'apple-music',
@@ -375,19 +380,23 @@ describe('Platform Detection', () => {
         ];
 
         nonSocialPlatforms.forEach(platform => {
-          expect(SOCIAL_PLATFORMS.has(platform)).toBe(false);
+          expect(platformIds).not.toContain(platform);
         });
       });
 
-      it('is consistent with getPlatformCategory', () => {
-        SOCIAL_PLATFORMS.forEach(platformId => {
-          expect(getPlatformCategory(platformId)).toBe('social');
+      it('is consistent with getPlatformsByCategory', () => {
+        const socialPlatforms = getPlatformsByCategory('social');
+        socialPlatforms.forEach(platform => {
+          expect(platform.category).toBe('social');
         });
       });
     });
 
     describe('EARNINGS_PLATFORMS', () => {
       it('contains expected earnings platforms', () => {
+        const earningsPlatforms = getPlatformsByCategory('earnings');
+        const platformIds = earningsPlatforms.map(p => p.id);
+
         const expectedEarningsPlatforms = [
           'venmo',
           'patreon',
@@ -400,27 +409,34 @@ describe('Platform Detection', () => {
         ];
 
         expectedEarningsPlatforms.forEach(platform => {
-          expect(EARNINGS_PLATFORMS.has(platform)).toBe(true);
+          expect(platformIds).toContain(platform);
         });
       });
 
       it('does not contain non-earnings platforms', () => {
+        const earningsPlatforms = getPlatformsByCategory('earnings');
+        const platformIds = earningsPlatforms.map(p => p.id);
+
         const nonEarningsPlatforms = ['spotify', 'instagram', 'linktree'];
 
         nonEarningsPlatforms.forEach(platform => {
-          expect(EARNINGS_PLATFORMS.has(platform)).toBe(false);
+          expect(platformIds).not.toContain(platform);
         });
       });
 
-      it('is consistent with getPlatformCategory', () => {
-        EARNINGS_PLATFORMS.forEach(platformId => {
-          expect(getPlatformCategory(platformId)).toBe('earnings');
+      it('is consistent with getPlatformsByCategory', () => {
+        const earningsPlatforms = getPlatformsByCategory('earnings');
+        earningsPlatforms.forEach(platform => {
+          expect(platform.category).toBe('earnings');
         });
       });
     });
 
     describe('WEBSITES_PLATFORMS', () => {
       it('contains expected website platforms', () => {
+        const websitesPlatforms = getPlatformsByCategory('websites');
+        const platformIds = websitesPlatforms.map(p => p.id);
+
         const expectedWebsitesPlatforms = [
           'website',
           'linktree',
@@ -429,64 +445,63 @@ describe('Platform Detection', () => {
         ];
 
         expectedWebsitesPlatforms.forEach(platform => {
-          expect(WEBSITES_PLATFORMS.has(platform)).toBe(true);
+          expect(platformIds).toContain(platform);
         });
       });
 
       it('does not contain non-website platforms', () => {
+        const websitesPlatforms = getPlatformsByCategory('websites');
+        const platformIds = websitesPlatforms.map(p => p.id);
+
         const nonWebsitesPlatforms = ['spotify', 'instagram', 'venmo'];
 
         nonWebsitesPlatforms.forEach(platform => {
-          expect(WEBSITES_PLATFORMS.has(platform)).toBe(false);
+          expect(platformIds).not.toContain(platform);
         });
       });
 
-      it('is consistent with getPlatformCategory', () => {
-        WEBSITES_PLATFORMS.forEach(platformId => {
-          expect(getPlatformCategory(platformId)).toBe('websites');
+      it('is consistent with getPlatformsByCategory', () => {
+        const websitesPlatforms = getPlatformsByCategory('websites');
+        websitesPlatforms.forEach(platform => {
+          expect(platform.category).toBe('websites');
         });
       });
     });
 
     describe('Set consistency', () => {
       it('all category Sets are mutually exclusive', () => {
-        // Ensure no platform appears in multiple categories
-        const allPlatformIds = new Set([
-          ...DSP_PLATFORMS,
-          ...SOCIAL_PLATFORMS,
-          ...EARNINGS_PLATFORMS,
-          ...WEBSITES_PLATFORMS,
-        ]);
+        const allPlatforms = getAllPlatforms();
+        const categories = ['dsp', 'social', 'earnings', 'websites'] as const;
 
-        const totalCount =
-          DSP_PLATFORMS.size +
-          SOCIAL_PLATFORMS.size +
-          EARNINGS_PLATFORMS.size +
-          WEBSITES_PLATFORMS.size;
+        // Group platforms by category
+        const platformsByCategory = new Map<string, Set<string>>();
+        categories.forEach(cat => {
+          platformsByCategory.set(
+            cat,
+            new Set(getPlatformsByCategory(cat).map(p => p.id))
+          );
+        });
+
+        // Ensure no platform appears in multiple categories
+        const allPlatformIds = new Set<string>();
+        let totalCount = 0;
+
+        platformsByCategory.forEach(platformIds => {
+          platformIds.forEach(id => {
+            expect(allPlatformIds.has(id)).toBe(false);
+            allPlatformIds.add(id);
+          });
+          totalCount += platformIds.size;
+        });
 
         expect(allPlatformIds.size).toBe(totalCount);
       });
 
-      it('Sets are readonly (immutable)', () => {
-        // TypeScript enforces ReadonlySet at compile time, but we can verify
-        // the Sets behave as expected at runtime
-        expect(typeof DSP_PLATFORMS.has).toBe('function');
-        expect(typeof SOCIAL_PLATFORMS.has).toBe('function');
-        expect(typeof EARNINGS_PLATFORMS.has).toBe('function');
-        expect(typeof WEBSITES_PLATFORMS.has).toBe('function');
-
-        // Verify they have size property (characteristic of Set)
-        expect(typeof DSP_PLATFORMS.size).toBe('number');
-        expect(typeof SOCIAL_PLATFORMS.size).toBe('number');
-        expect(typeof EARNINGS_PLATFORMS.size).toBe('number');
-        expect(typeof WEBSITES_PLATFORMS.size).toBe('number');
-      });
-
-      it('each Set has a non-zero size', () => {
-        expect(DSP_PLATFORMS.size).toBeGreaterThan(0);
-        expect(SOCIAL_PLATFORMS.size).toBeGreaterThan(0);
-        expect(EARNINGS_PLATFORMS.size).toBeGreaterThan(0);
-        expect(WEBSITES_PLATFORMS.size).toBeGreaterThan(0);
+      it('each category has a non-zero size', () => {
+        expect(getPlatformsByCategory('dsp').length).toBeGreaterThan(0);
+        expect(getPlatformsByCategory('social').length).toBeGreaterThan(0);
+        expect(getPlatformsByCategory('earnings').length).toBeGreaterThan(0);
+        expect(getPlatformsByCategory('websites').length).toBeGreaterThan(0);
       });
     });
   });

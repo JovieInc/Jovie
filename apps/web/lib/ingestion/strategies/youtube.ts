@@ -1,4 +1,4 @@
-import { detectPlatform, normalizeUrl } from '@/lib/utils/platform-detection';
+import { normalizeUrl, validateLink } from '@/lib/utils/platform-detection';
 import type { ExtractionResult } from '../types';
 import {
   ExtractionError,
@@ -238,8 +238,8 @@ export function extractYouTube(html: string): ExtractionResult {
   for (const raw of rawLinks) {
     try {
       const normalized = normalizeUrl(raw);
-      const detected = detectPlatform(normalized);
-      if (!detected.isValid) continue;
+      const detected = validateLink(normalized);
+      if (!detected || !detected.isValid) continue;
       links.push({
         url: detected.normalizedUrl,
         platformId: detected.platform.id,
