@@ -4,6 +4,9 @@
  */
 
 import { NextRequest } from 'next/server';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('BotDetection');
 
 export interface BotDetectionResult {
   isBot: boolean;
@@ -115,7 +118,13 @@ export async function logBotDetection(
 ): Promise<void> {
   // Bot detection logging is disabled in this version
   // Consider implementing with alternative storage if needed
-  console.log(`Bot detection: ${ip} - ${reason} - blocked: ${blocked}`);
+  log.debug('Bot detection event', {
+    ip,
+    userAgent,
+    reason,
+    endpoint,
+    blocked,
+  });
 }
 
 /**
@@ -129,7 +138,7 @@ export async function checkRateLimit(
   // Rate limiting is disabled in this version
   // Always return false (not rate limited) for now
   // Consider implementing with Redis/Upstash if needed
-  console.log(`Rate limit check: ${ip} - ${endpoint} (disabled)`);
+  log.debug('Rate limit check (disabled)', { ip, endpoint });
   return false;
 }
 

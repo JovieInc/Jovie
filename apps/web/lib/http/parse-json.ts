@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('ParseJSON');
 
 interface ParseJsonOptions<T> {
   route: string;
@@ -61,7 +64,7 @@ export async function parseJsonBody<T = unknown>(
       ...options.logContext,
     };
 
-    console.error(`[${options.route}] JSON parse failed`, {
+    log.error(`[${options.route}] JSON parse failed`, {
       ...context,
       error: message,
     });

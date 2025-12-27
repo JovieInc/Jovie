@@ -2,6 +2,7 @@ import { neonConfig, Pool } from '@neondatabase/serverless';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { env } from '@/lib/env-server';
+import { createScopedLogger } from '@/lib/utils/logger';
 
 type WebSocketConstructor = typeof WebSocket;
 
@@ -68,6 +69,9 @@ const DB_CONFIG = {
 const positiveTableExistenceCache = new Set<string>();
 let lastTableExistenceDatabaseUrl: string | null = null;
 
+// Scoped logger for database operations
+const log = createScopedLogger('DB');
+
 // Enhanced logging for database operations
 function logDbError(
   context: string,
@@ -90,7 +94,7 @@ function logDbError(
     nodeEnv: process.env.NODE_ENV,
   };
 
-  console.error('[DB_ERROR]', JSON.stringify(errorInfo, null, 2));
+  log.error('DB_ERROR', errorInfo);
 }
 
 function logDbInfo(
@@ -98,15 +102,13 @@ function logDbInfo(
   message: string,
   metadata?: Record<string, unknown>
 ) {
-  if (process.env.NODE_ENV === 'development') {
-    const info = {
-      context,
-      message,
-      timestamp: new Date().toISOString(),
-      metadata,
-    };
-    console.info('[DB_INFO]', JSON.stringify(info, null, 2));
-  }
+  const info = {
+    context,
+    message,
+    timestamp: new Date().toISOString(),
+    metadata,
+  };
+  log.info('DB_INFO', info);
 }
 
 // Retry logic for transient failures

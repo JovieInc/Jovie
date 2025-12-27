@@ -2,7 +2,10 @@ import 'server-only';
 
 import crypto from 'crypto';
 import { env } from '@/lib/env-server';
+import { createScopedLogger } from '@/lib/utils/logger';
 import type { EncryptionResult } from './url-encryption';
+
+const log = createScopedLogger('UrlEncryption');
 
 const DEFAULT_KEY = 'default-key-change-in-production-32-chars';
 const ALGORITHM = 'aes-256-gcm';
@@ -28,18 +31,15 @@ if (!isBuildTime && (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY)) {
   }
 
   if (vercelEnv === 'development') {
-    console.warn(
-      '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set or using default value. ' +
-        'URL encryption will use a weak default key. Generate a secure key with: openssl rand -base64 32'
+    log.warn(
+      'WARNING: URL_ENCRYPTION_KEY not set or using default value. URL encryption will use a weak default key. Generate a secure key with: openssl rand -base64 32'
     );
   }
 }
 
 export function encryptUrl(url: string): EncryptionResult {
   if ((!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY) && !isTestTime) {
-    console.warn(
-      '[url-encryption] Using base64 fallback due to missing encryption key'
-    );
+    log.warn('Using base64 fallback due to missing encryption key');
 
     return {
       encrypted: Buffer.from(url).toString('base64'),
@@ -70,7 +70,7 @@ export function encryptUrl(url: string): EncryptionResult {
       salt: salt.toString('hex'),
     };
   } catch (error) {
-    console.error('[url-encryption] Encryption failed:', error);
+    log.error('Encryption failed', { error });
     throw new Error('Failed to encrypt URL');
   }
 }
@@ -108,7 +108,7 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
 
     return decryptedBuffer.toString('utf8');
   } catch (error) {
-    console.error('[url-encryption] Decryption failed:', error);
+    log.error('Decryption failed', { error });
     throw new Error('Failed to decrypt URL');
   }
 }

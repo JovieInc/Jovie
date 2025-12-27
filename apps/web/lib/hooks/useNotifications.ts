@@ -1,6 +1,7 @@
 'use client';
 
 import { useToast } from '@/components/molecules/ToastContainer';
+import { createScopedLogger } from '@/lib/utils/logger';
 import {
   createErrorToast,
   createGenericErrorToast,
@@ -18,6 +19,8 @@ import {
   isUserFacingError,
   type ToastUtilOptions,
 } from '@/lib/utils/toast-utils';
+
+const log = createScopedLogger('Notifications');
 
 /**
  * Enhanced notification hook that provides convenient methods for common toast patterns
@@ -99,7 +102,7 @@ export const useNotifications = () => {
       }
 
       // Log technical errors but don't show to user
-      console.error('Technical error:', error);
+      log.error('Technical error', { error });
 
       if (fallbackMessage) {
         return showToast(createErrorToast(fallbackMessage));

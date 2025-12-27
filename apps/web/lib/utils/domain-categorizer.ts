@@ -3,7 +3,10 @@
  * Categorizes domains and provides crawler-safe aliases
  */
 
+import { createScopedLogger } from './logger';
 import { extractDomain } from './url-parsing';
+
+const log = createScopedLogger('DomainCategorizer');
 
 export interface DomainCategory {
   category: string | null;
@@ -256,9 +259,7 @@ export async function addSensitiveDomain(
 ): Promise<boolean> {
   // Adding sensitive domains to database is disabled
   // Consider implementing with alternative storage if needed
-  console.log(
-    `Would add sensitive domain: ${domain} -> ${category} (${alias})`
-  );
+  log.info('Would add sensitive domain', { domain, category, alias });
   return false;
 }
 

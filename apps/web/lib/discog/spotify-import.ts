@@ -9,6 +9,7 @@ import {
   type SpotifyAlbum,
   type SpotifyAlbumFull,
 } from '@/lib/spotify';
+import { createScopedLogger } from '@/lib/utils/logger';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
@@ -16,6 +17,8 @@ import {
   upsertRelease,
   upsertTrack,
 } from './queries';
+
+const log = createScopedLogger('SpotifyImport');
 
 export interface SpotifyImportResult {
   success: boolean;
@@ -94,7 +97,11 @@ export async function importReleasesFromSpotify(
         const message =
           error instanceof Error ? error.message : 'Unknown error';
         result.errors.push(`Failed to import "${album.name}": ${message}`);
-        console.error(`Failed to import album ${album.id}:`, error);
+        log.error('Failed to import album', {
+          error,
+          albumId: album.id,
+          albumName: album.name,
+        });
       }
     }
 
@@ -106,7 +113,11 @@ export async function importReleasesFromSpotify(
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     result.errors.push(`Import failed: ${message}`);
-    console.error('Spotify import failed:', error);
+    log.error('Spotify import failed', {
+      error,
+      creatorProfileId,
+      spotifyArtistId,
+    });
     return result;
   }
 }

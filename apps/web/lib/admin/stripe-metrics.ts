@@ -3,6 +3,9 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { env } from '@/lib/env-server';
 import { stripe } from '@/lib/stripe/client';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-StripeMetrics');
 
 export interface AdminStripeOverviewMetrics {
   mrrUsd: number;
@@ -150,7 +153,7 @@ export async function getAdminStripeOverviewMetrics(): Promise<AdminStripeOvervi
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error loading Stripe metrics:', error);
+    log.error('Error loading Stripe metrics', { error });
     return {
       mrrUsd: 0,
       activeSubscribers: 0,

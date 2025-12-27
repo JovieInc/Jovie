@@ -4,6 +4,14 @@
  * Exports all platform-specific ingestion strategies and shared utilities.
  */
 
+// Apple Music strategy
+export {
+  extractAppleMusic,
+  extractAppleMusicArtistId,
+  fetchAppleMusicDocument,
+  isAppleMusicUrl,
+  validateAppleMusicUrl,
+} from './apple-music';
 // Base utilities
 export {
   createExtractionResult,
@@ -63,6 +71,7 @@ export {
 // Strategy Detection
 // ============================================================================
 
+import { isAppleMusicUrl } from './apple-music';
 import { isBeaconsUrl } from './beacons';
 import { isLayloUrl } from './laylo';
 import { isLinktreeUrl } from './linktree';
@@ -73,6 +82,7 @@ export type IngestionPlatform =
   | 'beacons'
   | 'laylo'
   | 'youtube'
+  | 'apple_music'
   | 'unknown';
 
 /**
@@ -94,6 +104,9 @@ export function detectIngestionPlatform(url: string): IngestionPlatform {
   }
   if (isYouTubeChannelUrl(url)) {
     return 'youtube';
+  }
+  if (isAppleMusicUrl(url)) {
+    return 'apple_music';
   }
   return 'unknown';
 }

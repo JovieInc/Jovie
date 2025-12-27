@@ -1,3 +1,7 @@
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('ContactObfuscation');
+
 export interface EncodedContactPayload {
   type: 'email' | 'phone';
   value: string;
@@ -51,7 +55,7 @@ export function decodeContactPayload(
     if (!parsed.value) return null;
     return parsed;
   } catch (error) {
-    console.warn('Failed to decode contact payload', error);
+    log.warn('Failed to decode contact payload', { error });
     return null;
   }
 }

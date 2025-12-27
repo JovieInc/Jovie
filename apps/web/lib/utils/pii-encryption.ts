@@ -7,6 +7,9 @@
  */
 
 import crypto from 'crypto';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('PIIEncryption');
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -59,9 +62,7 @@ export function encryptPII(value: string | null | undefined): string | null {
   if (!isPIIEncryptionEnabled()) {
     // In development without key, return value as-is with warning
     if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        '[PII Encryption] PII_ENCRYPTION_KEY not set - storing value unencrypted'
-      );
+      log.warn('PII_ENCRYPTION_KEY not set - storing value unencrypted');
       return value;
     }
     throw new Error('PII encryption key not configured');
@@ -80,7 +81,7 @@ export function encryptPII(value: string | null | undefined): string | null {
     const combined = `${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted}`;
     return combined;
   } catch (error) {
-    console.error('[PII Encryption] Failed to encrypt:', error);
+    log.error('Failed to encrypt', { error });
     throw new Error('Failed to encrypt PII data');
   }
 }
@@ -134,7 +135,7 @@ export function decryptPII(
 
     return decrypted;
   } catch (error) {
-    console.error('[PII Encryption] Failed to decrypt:', error);
+    log.error('Failed to decrypt', { error });
     // Return null on decryption failure to prevent exposing corrupt data
     return null;
   }

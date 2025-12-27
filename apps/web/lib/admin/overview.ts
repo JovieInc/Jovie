@@ -4,6 +4,9 @@ import { and, desc, sql as drizzleSql, inArray } from 'drizzle-orm';
 
 import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles, stripeWebhookEvents } from '@/lib/db/schema';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-Overview');
 
 const DISABLED_TABLES = new Set<string>();
 
@@ -67,7 +70,7 @@ export async function getAdminUsageSeries(
       activeUsers: row.active_users != null ? Number(row.active_users) : null,
     }));
   } catch (error) {
-    console.error('Error loading admin usage series', error);
+    log.error('Error loading admin usage series', { error });
     // Fall through with empty rows, which will produce a zeroed series
   }
 
@@ -127,7 +130,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       totalEvents = Number(rows[0]?.count ?? 0);
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
+      log.warn(
         'Stripe webhook events unavailable; skipping reliability summary.'
       );
 
@@ -168,7 +171,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
             : null;
     } catch {
       DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      console.warn(
+      log.warn(
         'Stripe webhook incidents unavailable; skipping reliability summary.'
       );
 
@@ -190,7 +193,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
       lastIncidentAt,
     };
   } catch (error) {
-    console.error('Error loading admin reliability summary', error);
+    log.error('Error loading admin reliability summary', { error });
 
     try {
       const dbHealth = await checkDbHealth();
@@ -320,7 +323,7 @@ export async function getAdminActivityFeed(
             DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
           }
           DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-          console.warn('Stripe webhook activity unavailable; skipping.');
+          log.warn('Stripe webhook activity unavailable; skipping.', { error });
           return [] as StripeActivityRow[];
         }
       })(),
@@ -352,7 +355,7 @@ export async function getAdminActivityFeed(
 
     return allItems.slice(0, limit);
   } catch (error) {
-    console.error('Error loading admin activity feed', error);
+    log.error('Error loading admin activity feed', { error });
     return [];
   }
 }

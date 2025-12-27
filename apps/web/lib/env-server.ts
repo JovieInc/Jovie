@@ -1,10 +1,13 @@
 import 'server-only';
 import { z } from 'zod';
 import { publicEnv } from '@/lib/env-public';
+import { createScopedLogger } from '@/lib/utils/logger';
 import {
   getDatabaseUrlErrorMessage,
   isDatabaseUrlValid,
 } from './utils/database-url-validator';
+
+const log = createScopedLogger('EnvServer');
 
 // Server-side environment variables
 // This module must never be imported in client-side code.
@@ -91,10 +94,9 @@ const rawServerEnv = {
 const parsed = ServerEnvSchema.safeParse(rawServerEnv);
 
 if (!parsed.success && process.env.NODE_ENV === 'development') {
-  console.warn(
-    '[env-server] Validation issues:',
-    parsed.error.flatten().fieldErrors
-  );
+  log.warn('Validation issues', {
+    fieldErrors: parsed.error.flatten().fieldErrors,
+  });
 }
 
 // Export server-side environment variables only
@@ -348,49 +350,58 @@ export function validateAndLogEnvironment(
   const validation = validateEnvironment(context);
   const info = getEnvironmentInfo();
 
-  console.log(
-    `[ENV] Environment: ${info.nodeEnv} | Platform: ${info.platform} | Node: ${info.nodeVersion}`
+  // Log environment info at startup (alwaysLog to ensure visibility in all environments)
+  log.info(
+    `Environment: ${info.nodeEnv} | Platform: ${info.platform} | Node: ${info.nodeVersion}`,
+    {
+      nodeEnv: info.nodeEnv,
+      platform: info.platform,
+      nodeVersion: info.nodeVersion,
+    },
+    { alwaysLog: true }
   );
 
   if (validation.critical.length > 0) {
-    console.error('[ENV] CRITICAL ISSUES:');
-    validation.critical.forEach(issue => console.error(`  ❌ ${issue}`));
+    log.error('CRITICAL ISSUES', { issues: validation.critical });
   }
 
   if (validation.errors.length > 0) {
-    console.error('[ENV] ERRORS:');
-    validation.errors.forEach(error => console.error(`  🔴 ${error}`));
+    log.error('ERRORS', { errors: validation.errors });
   }
 
   if (validation.warnings.length > 0) {
-    console.warn('[ENV] WARNINGS:');
-    validation.warnings.forEach(warning => console.warn(`  ⚠️  ${warning}`));
+    log.warn('WARNINGS', { warnings: validation.warnings });
   }
 
   if (validation.valid) {
-    console.log(
-      `[ENV] ✅ Environment validation passed for ${context} context`
+    log.info(
+      `Environment validation passed for ${context} context`,
+      { context, valid: true },
+      { alwaysLog: true }
     );
   } else {
     const errorCount = validation.critical.length + validation.errors.length;
-    console.error(
-      `[ENV] ❌ Environment validation failed with ${errorCount} error(s)`
-    );
+    log.error(`Environment validation failed with ${errorCount} error(s)`, {
+      context,
+      errorCount,
+      critical: validation.critical,
+      errors: validation.errors,
+    });
 
     if (context === 'runtime' && validation.critical.length > 0) {
-      console.error(
-        '[ENV] Application may not function correctly due to critical missing environment variables'
+      log.error(
+        'Application may not function correctly due to critical missing environment variables',
+        { criticalIssues: validation.critical }
       );
 
       // Fail-fast in production/preview environments
       const vercelEnv =
         process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
       if (vercelEnv === 'production' || vercelEnv === 'preview') {
-        console.error(
-          '[ENV] FATAL: Cannot start application with critical environment validation errors in production/preview'
+        log.error(
+          'FATAL: Cannot start application with critical environment validation errors in production/preview',
+          { environment: vercelEnv, criticalIssues: validation.critical }
         );
-        console.error('[ENV] Please fix the following critical issues:');
-        validation.critical.forEach(issue => console.error(`  - ${issue}`));
         throw new Error(
           'Environment validation failed with critical errors. Application cannot start in production/preview without required environment variables.'
         );

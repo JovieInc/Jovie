@@ -19,6 +19,7 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { createScopedLogger } from '@/lib/utils/logger';
 import type {
   NotificationApiResponse,
   NotificationChannel,
@@ -31,6 +32,8 @@ import type {
   NotificationTarget,
   NotificationUnsubscribeResponse,
 } from '@/types/notifications';
+
+const log = createScopedLogger('NotificationsDomain');
 
 type NotificationDomainResponse<T> = {
   status: number;
@@ -432,7 +435,7 @@ export const subscribeToNotificationsDomain = async (
       error_message: error instanceof Error ? error.message : String(error),
     });
 
-    console.error('[Notifications Subscribe Domain] Error:', error);
+    log.error('Subscribe domain error', { error });
     return buildSubscribeErrorResponse(500, 'Server error', 'server_error');
   }
 };
@@ -573,7 +576,7 @@ export const unsubscribeFromNotificationsDomain = async (
       error_message: error instanceof Error ? error.message : String(error),
     });
 
-    console.error('[Notifications Unsubscribe Domain] Error:', error);
+    log.error('Unsubscribe domain error', { error });
     return buildErrorResponse(500, 'Server error', 'server_error');
   }
 };
@@ -659,7 +662,7 @@ export const getNotificationStatusDomain = async (
       },
     };
   } catch (error) {
-    console.error('[Notifications Status Domain] Error:', error);
+    log.error('Status domain error', { error });
     return buildErrorResponse(500, 'Server error', 'server_error');
   }
 };

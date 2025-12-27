@@ -15,6 +15,9 @@ import {
   clickEvents,
   notificationSubscriptions,
 } from '@/lib/db/schema';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('DataRetention');
 
 // Default retention period in days
 const DEFAULT_RETENTION_DAYS = 90;
@@ -109,7 +112,7 @@ export async function runDataRetentionCleanup(options?: {
   const cutoffDate = getRetentionCutoffDate(retentionDays);
   const dryRun = options?.dryRun ?? false;
 
-  console.log(`[Data Retention] Starting cleanup (dry run: ${dryRun})`, {
+  log.info(`Starting cleanup (dry run: ${dryRun})`, {
     retentionDays,
     cutoffDate: cutoffDate.toISOString(),
   });
@@ -170,7 +173,7 @@ export async function runDataRetentionCleanup(options?: {
     duration,
   };
 
-  console.log('[Data Retention] Cleanup complete', {
+  log.info('Cleanup complete', {
     ...result,
     cutoffDate: result.cutoffDate.toISOString(),
     dryRun,

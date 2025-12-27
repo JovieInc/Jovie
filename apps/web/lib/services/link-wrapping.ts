@@ -11,6 +11,7 @@ import {
   categorizeDomain,
   getCrawlerSafeLabel,
 } from '@/lib/utils/domain-categorizer';
+import { createScopedLogger } from '@/lib/utils/logger';
 import {
   extractDomain,
   generateShortId,
@@ -18,6 +19,8 @@ import {
   simpleDecryptUrl,
   simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
+
+const log = createScopedLogger('LinkWrapping');
 
 // Temporary in-memory store for tracking sensitive shortIds during testing
 const mockSensitiveShortIds = new Set<string>();
@@ -112,7 +115,7 @@ export async function createWrappedLink(
       .returning();
 
     if (!data) {
-      console.error('Failed to create wrapped link: no data returned');
+      log.error('Failed to create wrapped link: no data returned');
       return null;
     }
 
@@ -139,14 +142,14 @@ export async function createWrappedLink(
 
     return result;
   } catch (error) {
-    console.error('Link wrapping service error:', error);
+    log.error('Link wrapping service error', { error });
 
     // Return mock response for testing when database is unavailable
     if (
       error instanceof Error &&
       (error.message.includes('relation') || error.message.includes('table'))
     ) {
-      console.log(
+      log.debug(
         'Database schema incomplete, returning mock wrapped link for testing'
       );
 
@@ -197,8 +200,9 @@ export async function getWrappedLink(
     if (!data) {
       // For testing: if shortId looks valid, return mock data
       if (shortId.length === 12 && /^[a-zA-Z0-9]{12}$/.test(shortId)) {
-        console.log(
-          'No data found for valid-looking shortId, returning mock wrapped link for testing'
+        log.debug(
+          'No data found for valid-looking shortId, returning mock wrapped link for testing',
+          { shortId }
         );
 
         // Check if this shortId was marked as sensitive during creation
@@ -248,7 +252,9 @@ export async function getWrappedLink(
       (error as Error)?.message?.includes('timeout') ||
       (error as Error)?.message?.includes('Database timeout')
     ) {
-      console.log('Database timeout, returning mock wrapped link for testing');
+      log.debug('Database timeout, returning mock wrapped link for testing', {
+        shortId,
+      });
 
       // Check if this shortId was marked as sensitive during creation
       const isSensitive = mockSensitiveShortIds.has(shortId);
@@ -269,7 +275,7 @@ export async function getWrappedLink(
       };
     }
 
-    console.error('Failed to get wrapped link:', error);
+    log.error('Failed to get wrapped link', { error, shortId });
     return null;
   }
 }
@@ -288,7 +294,7 @@ export async function incrementClickCount(shortId: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Failed to increment click count:', error);
+    log.error('Failed to increment click count', { error, shortId });
     return false;
   }
 }
@@ -339,7 +345,7 @@ export async function getLinkStats(userId?: string): Promise<LinkStats> {
       topDomains,
     };
   } catch (error) {
-    console.error('Failed to get link stats:', error);
+    log.error('Failed to get link stats', { error, userId });
     return {
       totalClicks: 0,
       normalLinks: 0,
@@ -361,7 +367,7 @@ export async function cleanupExpiredLinks(): Promise<number> {
 
     return deleted.length;
   } catch (error) {
-    console.error('Cleanup error:', error);
+    log.error('Cleanup error', { error });
     return 0;
   }
 }
@@ -382,7 +388,7 @@ export async function createWrappedLinksBatch(
         results.push(wrappedLink);
       }
     } catch (error) {
-      console.error(`Failed to wrap URL ${url}:`, error);
+      log.error('Failed to wrap URL', { error, url });
     }
   }
 
@@ -408,7 +414,7 @@ export async function updateWrappedLink(
 
     return true;
   } catch (error) {
-    console.error('Failed to update wrapped link:', error);
+    log.error('Failed to update wrapped link', { error, shortId });
     return false;
   }
 }

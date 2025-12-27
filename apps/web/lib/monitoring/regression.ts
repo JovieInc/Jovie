@@ -1,6 +1,9 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Regression');
 
 /**
  * Performance Regression Detector
@@ -147,14 +150,12 @@ export class RegressionDetector {
     // - Send a Slack notification
     // - Log to a monitoring service
 
-    // For now, we'll just log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      const regression = alertData.regression as number;
-      console.warn(
-        `[REGRESSION] ${alertData.metric}: ${regression.toFixed(1)}% regression detected`,
-        alertData
-      );
-    }
+    // Log regression warning - log.warn() always logs (important for observability)
+    const regression = alertData.regression as number;
+    log.warn(
+      `${alertData.metric}: ${regression.toFixed(1)}% regression detected`,
+      alertData
+    );
 
     return alertData;
   }

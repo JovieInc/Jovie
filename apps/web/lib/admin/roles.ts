@@ -2,6 +2,9 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-Roles');
 
 /**
  * In-memory cache for admin role checks
@@ -44,7 +47,7 @@ export async function isAdmin(userId: string): Promise<boolean> {
 
     return isUserAdmin;
   } catch (error) {
-    console.error('[admin/roles] Failed to check admin status:', error);
+    log.error('Failed to check admin status', { error });
     // Fail closed - deny access on error
     return false;
   }

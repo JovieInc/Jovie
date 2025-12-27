@@ -1,6 +1,9 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Alerts');
 
 // Define alert severity levels
 export type AlertSeverity = 'info' | 'warning' | 'error' | 'critical';
@@ -241,13 +244,12 @@ export class PerformanceAlerts {
     // - Send a Slack notification
     // - Log to a monitoring service
 
-    // For now, we'll just log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        `[ALERT] ${alertData.severity.toUpperCase()}: ${alertData.metric} = ${alertData.value.toFixed(2)} (threshold: ${alertData.threshold})`,
-        alertData
-      );
-    }
+    // Log alert via scoped logger (dev/preview only for info-level logs)
+    // Use warn() which always logs - alerts are important and should be visible
+    log.warn(
+      `${alertData.severity.toUpperCase()}: ${alertData.metric} = ${alertData.value.toFixed(2)} (threshold: ${alertData.threshold})`,
+      alertData
+    );
 
     return alertData;
   }

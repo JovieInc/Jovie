@@ -6,12 +6,15 @@ import {
   NOTIFICATIONS_BRAND_NAME,
   RESEND_ENABLED,
 } from '@/lib/notifications/config';
+import { createScopedLogger } from '@/lib/utils/logger';
 import type {
   EmailMessage,
   EmailProvider,
   NotificationChannelResult,
   NotificationDeliveryChannel,
 } from '@/types/notifications';
+
+const log = createScopedLogger('ResendProvider');
 
 let client: Resend | null = null;
 
@@ -63,7 +66,7 @@ export class ResendEmailProvider implements EmailProvider {
       const messageText =
         error instanceof Error ? error.message : 'Unknown Resend error';
 
-      console.error('[notifications] Resend sendEmail error', error);
+      log.error('Resend sendEmail error', { error });
 
       return {
         channel: 'email' as NotificationDeliveryChannel,

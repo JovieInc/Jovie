@@ -1,4 +1,7 @@
 import { register } from '@/instrumentation';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Sentry');
 
 let initializationPromise: Promise<void> | null = null;
 
@@ -15,7 +18,7 @@ const SENTRY_INIT_TIMEOUT_MS = 100;
 export function ensureSentry(): Promise<void> {
   if (!initializationPromise) {
     const sentryInit = register().catch(error => {
-      console.error('[Sentry] Failed to initialize SDK', error);
+      log.error('Failed to initialize SDK', { error });
     });
 
     // Race against timeout to prevent blocking renders
@@ -23,8 +26,8 @@ export function ensureSentry(): Promise<void> {
       sentryInit,
       new Promise<void>(resolve =>
         setTimeout(() => {
-          console.warn(
-            `[Sentry] Initialization timed out after ${SENTRY_INIT_TIMEOUT_MS}ms, continuing in background`
+          log.warn(
+            `Initialization timed out after ${SENTRY_INIT_TIMEOUT_MS}ms, continuing in background`
           );
           resolve();
         }, SENTRY_INIT_TIMEOUT_MS)

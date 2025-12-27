@@ -1,4 +1,5 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { createScopedLogger } from '@/lib/utils/logger';
 import { db } from './index';
 import {
   CreatorContact,
@@ -7,6 +8,9 @@ import {
   socialLinks,
   users,
 } from './schema';
+
+// Scoped logger for database queries
+const log = createScopedLogger('DB-Queries');
 
 // Bounded data retrieval limits to prevent OOM on profiles with many links
 const MAX_SOCIAL_LINKS = 100;
@@ -126,7 +130,7 @@ export async function getCreatorProfileWithLinks(username: string) {
         errorMessage.includes('does not exist') ||
         causeMessage.includes('does not exist')
       ) {
-        console.warn(
+        log.warn(
           'creator_contacts table does not exist, returning empty contacts'
         );
         return [];
@@ -142,17 +146,17 @@ export async function getCreatorProfileWithLinks(username: string) {
 
   // Log if query limits are hit (possible data truncation)
   if (profileSocialLinks.length === MAX_SOCIAL_LINKS) {
-    console.warn(
-      '[db-queries] MAX_SOCIAL_LINKS limit hit - possible data truncation',
-      { profileId: profile.id, count: profileSocialLinks.length }
-    );
+    log.warn('MAX_SOCIAL_LINKS limit hit - possible data truncation', {
+      profileId: profile.id,
+      count: profileSocialLinks.length,
+    });
   }
 
   if (profileContacts.length === MAX_CONTACTS) {
-    console.warn(
-      '[db-queries] MAX_CONTACTS limit hit - possible data truncation',
-      { profileId: profile.id, count: profileContacts.length }
-    );
+    log.warn('MAX_CONTACTS limit hit - possible data truncation', {
+      profileId: profile.id,
+      count: profileContacts.length,
+    });
   }
 
   return {
@@ -262,10 +266,12 @@ export async function incrementProfileViews(
       lastError = error instanceof Error ? error : new Error(String(error));
 
       // Log retry attempt
-      console.warn(
-        `[Profile Views] Retry ${attempt}/${maxRetries} for ${normalizedUsername}:`,
-        lastError.message
-      );
+      log.warn('Profile view increment retry', {
+        attempt,
+        maxRetries,
+        username: normalizedUsername,
+        error: lastError.message,
+      });
 
       // If not the last attempt, wait before retrying (exponential backoff)
       if (attempt < maxRetries) {
@@ -277,10 +283,11 @@ export async function incrementProfileViews(
   }
 
   // All retries exhausted - log error and report to Sentry
-  console.error(
-    `[Profile Views] Failed after ${maxRetries} attempts for ${normalizedUsername}:`,
-    lastError
-  );
+  log.error('Profile view increment failed after all retries', {
+    maxRetries,
+    username: normalizedUsername,
+    error: lastError instanceof Error ? lastError.message : String(lastError),
+  });
 
   // Report to Sentry for monitoring (fire-and-forget)
   // Use dynamic import to avoid blocking and circular dependencies

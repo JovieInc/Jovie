@@ -14,6 +14,9 @@ import {
 
 import { db } from '@/lib/db';
 import { creatorProfiles, socialLinks } from '@/lib/db/schema';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-CreatorProfiles');
 
 // Default claim token expiration: 30 days
 const CLAIM_TOKEN_EXPIRY_DAYS = 30;
@@ -254,7 +257,7 @@ export async function getAdminCreatorProfiles(
       total,
     };
   } catch (error) {
-    console.error('Error loading admin creator profiles', error);
+    log.error('Error loading admin creator profiles', { error });
 
     return {
       profiles: [],

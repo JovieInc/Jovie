@@ -4,6 +4,9 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Analytics');
 
 /**
  * Detect the current runtime environment
@@ -49,10 +52,8 @@ export async function trackEvent(
       server_side: true,
     };
 
-    // Log in development for debugging
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[Analytics ${runtime}] ${event}`, eventProperties);
-    }
+    // Log for debugging (dev/preview only via logger environment gating)
+    log.debug(`${event} (runtime: ${runtime})`, eventProperties);
 
     // In production, send critical events to Sentry for observability
     if (
@@ -68,7 +69,7 @@ export async function trackEvent(
     }
   } catch (error) {
     // Log error but don't throw - analytics should never break the application
-    console.error('[Analytics] Error tracking event:', error);
+    log.error('Error tracking event', { error, event });
   }
 }
 
@@ -88,11 +89,10 @@ export async function identifyUser(
       server_side: true,
     };
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Analytics identify]', distinctId, userProperties);
-    }
+    // Log for debugging (dev/preview only via logger environment gating)
+    log.debug('identify', { distinctId, ...userProperties });
   } catch (error) {
-    console.error('[Analytics] Error identifying user:', error);
+    log.error('Error identifying user', { error, distinctId });
   }
 }
 

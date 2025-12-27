@@ -10,6 +10,9 @@
  */
 
 import crypto from 'crypto';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('TrackingToken');
 
 // Token validity in milliseconds (5 minutes default)
 const TOKEN_VALIDITY_MS = 5 * 60 * 1000;
@@ -65,9 +68,7 @@ export function generateTrackingToken(profileId: string): string {
   if (!isTrackingTokenEnabled()) {
     // Return a placeholder token in development
     if (process.env.NODE_ENV === 'development') {
-      console.warn(
-        '[Tracking Token] TRACKING_TOKEN_SECRET not set - using dev token'
-      );
+      log.warn('TRACKING_TOKEN_SECRET not set - using dev token');
       return `${profileId}:${Date.now()}:dev`;
     }
     throw new Error('Tracking token signing not configured');

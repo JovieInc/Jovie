@@ -32,6 +32,9 @@ export async function enqueueLinktreeIngestionJob(params: {
 
   const normalizedSource = normalizeUrl(params.sourceUrl);
   const detected = validateLink(normalizedSource);
+  if (!detected || !detected.isValid) {
+    return null;
+  }
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -106,6 +109,9 @@ export async function enqueueBeaconsIngestionJob(params: {
 
   const normalizedSource = normalizeUrl(validated);
   const detected = validateLink(normalizedSource);
+  if (!detected || !detected.isValid) {
+    return null;
+  }
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -175,6 +181,9 @@ export async function enqueueYouTubeIngestionJob(params: {
 
   const normalizedSource = validated;
   const detected = validateLink(normalizedSource);
+  if (!detected || !detected.isValid) {
+    return null;
+  }
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,
@@ -243,6 +252,9 @@ export async function enqueueLayloIngestionJob(params: {
 
   const normalizedSource = normalizeUrl(params.sourceUrl);
   const detected = validateLink(normalizedSource);
+  if (!detected || !detected.isValid) {
+    return null;
+  }
   const dedupKey = canonicalIdentity({
     platform: detected.platform,
     normalizedUrl: detected.normalizedUrl,

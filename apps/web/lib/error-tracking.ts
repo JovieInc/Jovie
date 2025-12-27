@@ -19,6 +19,9 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('ErrorTracking');
 
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
@@ -77,7 +80,7 @@ function formatError(error: unknown): {
  * Capture an error and send to Sentry and PostHog
  *
  * This function:
- * - Logs to console for debugging
+ * - Logs via structured logger for debugging
  * - Sends error to Sentry for error tracking
  * - Sends error event to PostHog for monitoring
  * - Never throws (safe to use in catch blocks)
@@ -101,19 +104,19 @@ export async function captureError(
     environment: getEnvironment(),
   };
 
-  // Always log to console for debugging
-  const consoleMessage = `[${severity.toUpperCase()}] ${message}`;
-  const consoleData = {
+  // Always log using structured logger for debugging
+  const logPayload = {
     ...errorData,
     ...metadata.context,
+    severity,
   };
 
   if (severity === 'critical') {
-    console.error(consoleMessage, consoleData);
+    log.error(`[CRITICAL] ${message}`, logPayload);
   } else if (severity === 'warning') {
-    console.warn(consoleMessage, consoleData);
+    log.warn(message, logPayload);
   } else {
-    console.error(consoleMessage, consoleData);
+    log.error(message, logPayload);
   }
 
   // Send to Sentry for error tracking (primary)
@@ -134,7 +137,7 @@ export async function captureError(
       },
     });
   } catch (sentryError) {
-    console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
+    log.warn('Failed to send to Sentry', { error: sentryError });
   }
 
   // Send to PostHog for monitoring (secondary, fire-and-forget)
@@ -154,7 +157,7 @@ export async function captureError(
     context?.userId as string | undefined
   ).catch(trackingError => {
     // Never let error tracking break the app
-    console.warn('[Error Tracking] Failed to send to PostHog:', trackingError);
+    log.warn('Failed to send to PostHog', { error: trackingError });
   });
 }
 
@@ -210,7 +213,7 @@ export async function logFallback(
   message: string,
   context: ErrorContext
 ): Promise<void> {
-  console.warn(`[FALLBACK] ${message}`, context);
+  log.warn(`[FALLBACK] ${message}`, context);
 
   try {
     await trackEvent(

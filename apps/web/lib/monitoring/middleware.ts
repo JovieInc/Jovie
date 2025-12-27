@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Monitoring');
 
 /**
  * Middleware function to monitor API performance
@@ -46,18 +49,18 @@ export function withPerformanceMonitoring(
       const route = req.nextUrl.pathname;
       const method = req.method;
 
-      // In a real implementation, you would send metric data to your analytics service
-      // For now, we'll just log it in development
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API Middleware] ${method} ${route} - ${duration}ms`);
-        // Log additional context in development
-        console.log('Context:', {
+      // Log performance data (dev/preview only via scoped logger)
+      log.debug(`API Middleware: ${method} ${route} - ${duration}ms`, {
+        method,
+        route,
+        duration,
+        context: {
           userAgent: req.headers.get('user-agent'),
           country: req.headers.get('x-vercel-ip-country'),
           region: req.headers.get('x-vercel-ip-region'),
           city: req.headers.get('x-vercel-ip-city'),
-        });
-      }
+        },
+      });
     }
 
     return response;

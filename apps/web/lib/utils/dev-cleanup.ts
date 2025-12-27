@@ -1,3 +1,7 @@
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('DevCleanup');
+
 export type DevCleanupFn = () => void | Promise<void>;
 
 interface ProcessWithOnce {
@@ -54,7 +58,7 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
           await runDevCleanups('SIGINT');
           process.exit(0);
         } catch (error) {
-          console.error('[DEV_CLEANUP_FATAL]', {
+          log.error('Fatal cleanup error', {
             reason: 'SIGINT',
             error: error instanceof Error ? error.message : String(error),
           });
@@ -68,7 +72,7 @@ export function registerDevCleanup(key: string, fn: DevCleanupFn): void {
           await runDevCleanups('SIGTERM');
           process.exit(0);
         } catch (error) {
-          console.error('[DEV_CLEANUP_FATAL]', {
+          log.error('Fatal cleanup error', {
             reason: 'SIGTERM',
             error: error instanceof Error ? error.message : String(error),
           });
@@ -103,7 +107,7 @@ export async function runDevCleanups(
     try {
       await fn();
     } catch (error) {
-      console.error('[DEV_CLEANUP_ERROR]', {
+      log.error('Cleanup function error', {
         reason,
         key,
         error: error instanceof Error ? error.message : String(error),
@@ -139,7 +143,7 @@ export function startDevMemoryMonitor(options?: {
 
   globalThis.jovieDevMemoryMonitorInterval = setInterval(() => {
     const mem = process.memoryUsage();
-    console.info('[DEV_MEMORY]', {
+    log.info('Memory usage', {
       rss: mem.rss,
       heapTotal: mem.heapTotal,
       heapUsed: mem.heapUsed,

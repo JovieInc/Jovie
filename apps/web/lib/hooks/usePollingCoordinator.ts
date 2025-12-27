@@ -1,6 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('PollingCoordinator');
 
 export interface PollingTask {
   id: string;
@@ -75,7 +78,7 @@ export function usePollingCoordinator() {
         await currentTask.callback();
         state.lastRun.set(task.id, Date.now());
       } catch (error) {
-        console.error(`Polling task ${task.id} failed:`, error);
+        log.error(`Polling task ${task.id} failed`, { error, taskId: task.id });
         // Exponential backoff on error
         const lastRun = state.lastRun.get(task.id) ?? 0;
         const timeSinceLastRun = Date.now() - lastRun;

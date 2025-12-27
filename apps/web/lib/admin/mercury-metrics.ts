@@ -1,5 +1,9 @@
 import 'server-only';
 
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-MercuryMetrics');
+
 const MERCURY_BASE_URL =
   process.env.MERCURY_API_BASE_URL ?? 'https://api.mercury.com/api/v1';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -210,7 +214,7 @@ export async function getAdminMercuryMetrics(): Promise<AdminMercuryMetrics> {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error loading Mercury metrics:', error);
+    log.error('Error loading Mercury metrics', { error });
     return {
       balanceUsd: 0,
       burnRateUsd: 0,

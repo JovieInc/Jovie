@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('EnvPublic');
 
 const PublicEnvSchema = z.object({
   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().optional(),
@@ -48,10 +51,9 @@ if (!parsed.success && process.env.NODE_ENV === 'development') {
   // Log zod issues once in dev to aid setup
   // Do not throw to avoid blocking the entire app
   // This mirrors the behaviour in lib/env.ts but for public-only vars
-  console.warn(
-    '[env-public] Validation issues:',
-    parsed.error.flatten().fieldErrors
-  );
+  log.warn('Validation issues', {
+    fieldErrors: parsed.error.flatten().fieldErrors,
+  });
 }
 
 export const publicEnv = {

@@ -1,4 +1,7 @@
 import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('API-Monitoring');
 
 /**
  * Higher-order function to wrap API handlers with performance monitoring
@@ -30,9 +33,7 @@ export function withPerformanceMonitoring(handler: NextApiHandler) {
       };
 
       // Log performance data
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`[API] ${method} ${route} - ${status} - ${duration}ms`);
-      }
+      log.debug(`${method} ${route} - ${status} - ${duration}ms`, metricData);
 
       // Send to server-side analytics
       // In a real implementation, you would send this to your analytics service
@@ -53,10 +54,8 @@ function sendApiMetric(data: Record<string, unknown>) {
   // In a real implementation, you would send this to your analytics service
   // For example, using a server-side analytics SDK or API
 
-  // For now, we'll just log it in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[API Metric]', data);
-  }
+  // Log metric data (scoped logger handles environment gating - dev/preview only)
+  log.debug('Metric', data);
 
   // In production, you might use:
   // - Server-side PostHog

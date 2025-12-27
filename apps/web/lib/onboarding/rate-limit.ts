@@ -3,7 +3,10 @@ import {
   OnboardingErrorCode,
 } from '@/lib/errors/onboarding';
 import { handleCheckRateLimit, onboardingRateLimit } from '@/lib/rate-limit';
+import { createScopedLogger } from '@/lib/utils/logger';
 import { checkRateLimit } from '@/lib/utils/rate-limit';
+
+const log = createScopedLogger('OnboardingRateLimit');
 
 // In-memory fallback tracking for when Redis is unavailable
 // This provides basic protection but doesn't persist across restarts
@@ -102,9 +105,7 @@ export async function enforceOnboardingRateLimit({
 
   // Fallback to in-memory rate limiting when Redis is unavailable
   // This provides basic protection but doesn't persist across restarts or scale across instances
-  console.warn(
-    '[ONBOARDING_RATE_LIMIT] Redis unavailable, using in-memory fallback'
-  );
+  log.warn('Redis unavailable, using in-memory fallback');
 
   if (checkInMemoryOnboardingLimit(userKey)) {
     const error = createOnboardingError(

@@ -4,6 +4,9 @@ import { asc, count, desc, ilike, or, type SQL } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Admin-Users');
 
 export type AdminUserPlan = 'free' | 'pro';
 
@@ -145,7 +148,7 @@ export async function getAdminUsers(
       total,
     };
   } catch (error) {
-    console.error('Error loading admin users', error);
+    log.error('Error loading admin users', { error });
 
     return {
       users: [],

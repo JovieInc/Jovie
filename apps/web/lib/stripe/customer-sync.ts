@@ -16,7 +16,10 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { createScopedLogger } from '@/lib/utils/logger';
 import { getOrCreateCustomer, stripe } from './client';
+
+const log = createScopedLogger('Stripe-CustomerSync');
 
 /**
  * Audit log event types for billing state changes
@@ -188,10 +191,9 @@ export async function ensureStripeCustomer(): Promise<{
           metadata: { clerkUserId },
         });
       } catch (updateError) {
-        console.error(
-          'Failed to update user with Stripe customer ID:',
-          updateError
-        );
+        log.error('Failed to update user with Stripe customer ID', {
+          error: updateError,
+        });
         // Customer was created in Stripe but we couldn't save the ID
         // This is recoverable - we can find the customer later by metadata
         return { success: true, customerId: customer.id };
@@ -321,7 +323,7 @@ export async function getUserBillingInfo(): Promise<{
       };
     });
   } catch (error) {
-    console.error('Error getting user billing info:', error);
+    log.error('Error getting user billing info', { error });
     return { success: false, error: 'Failed to retrieve billing information' };
   }
 }
@@ -692,7 +694,7 @@ export async function getUserBillingInfoByClerkId(
       },
     };
   } catch (error) {
-    console.error('Error getting user billing info by Clerk ID:', error);
+    log.error('Error getting user billing info by Clerk ID', { error });
     return { success: false, error: 'Failed to retrieve billing information' };
   }
 }
@@ -750,7 +752,7 @@ export async function getBillingAuditLog(
       })),
     };
   } catch (error) {
-    console.error('Error getting billing audit log:', error);
+    log.error('Error getting billing audit log', { error });
     return { success: false, error: 'Failed to retrieve audit log' };
   }
 }

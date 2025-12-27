@@ -1,3 +1,7 @@
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('FeatureFlags');
+
 // Feature flags interface
 export interface FeatureFlags {
   artistSearchEnabled: boolean;
@@ -256,7 +260,7 @@ export async function getServerFeatureFlags(
         defaultFeatureFlags.avatarUploaderEnabled,
     };
   } catch (error) {
-    console.warn('[Feature Flags] Server flags failed:', error);
+    log.warn('Server flags failed', { error });
     return defaultFeatureFlags;
   }
 }

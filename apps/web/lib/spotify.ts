@@ -1,4 +1,7 @@
 import { env } from '@/lib/env-server';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Spotify');
 
 // Spotify API configuration
 const SPOTIFY_CLIENT_ID = env.SPOTIFY_CLIENT_ID;
@@ -246,11 +249,12 @@ export async function getSpotifyArtistAlbums(
       );
 
       if (!response.ok) {
-        console.error(
-          'Spotify API error:',
-          response.status,
-          await response.text()
-        );
+        const responseText = await response.text();
+        log.error('Spotify API error fetching artist albums', {
+          status: response.status,
+          response: responseText,
+          artistId,
+        });
         break;
       }
 
@@ -272,7 +276,7 @@ export async function getSpotifyArtistAlbums(
 
     return albums;
   } catch (error) {
-    console.error('Failed to fetch Spotify artist albums:', error);
+    log.error('Failed to fetch Spotify artist albums', { error, artistId });
     return [];
   }
 }
@@ -300,13 +304,16 @@ export async function getSpotifyAlbum(
     );
 
     if (!response.ok) {
-      console.error('Spotify API error:', response.status);
+      log.error('Spotify API error fetching album', {
+        status: response.status,
+        albumId,
+      });
       return null;
     }
 
     return await response.json();
   } catch (error) {
-    console.error('Failed to fetch Spotify album:', error);
+    log.error('Failed to fetch Spotify album', { error, albumId });
     return null;
   }
 }
@@ -343,7 +350,10 @@ export async function getSpotifyAlbums(
       );
 
       if (!response.ok) {
-        console.error('Spotify API error:', response.status);
+        log.error('Spotify API error fetching albums batch', {
+          status: response.status,
+          albumIds: chunk,
+        });
         continue;
       }
 
@@ -353,7 +363,7 @@ export async function getSpotifyAlbums(
 
     return albums;
   } catch (error) {
-    console.error('Failed to fetch Spotify albums:', error);
+    log.error('Failed to fetch Spotify albums', { error, albumIds });
     return [];
   }
 }

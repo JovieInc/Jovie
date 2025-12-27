@@ -5,7 +5,10 @@
  * Supports iOS and Android URL schemes plus universal links.
  */
 
+import { createScopedLogger } from '@/lib/utils/logger';
 import { detectPlatformFromUA } from './utils';
+
+const log = createScopedLogger('DeepLinks');
 
 export interface DeepLinkConfig {
   /** Display name of the platform */
@@ -336,7 +339,7 @@ export function openDeepLink(
         window.location.href = deepLink.nativeUrl;
       }
     } catch (error) {
-      console.debug('Native app opening failed:', error);
+      log.debug('Native app opening failed', { error });
     }
 
     // Set timeout for fallback

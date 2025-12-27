@@ -5,6 +5,9 @@
 
 import { sql as drizzleSql } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('DB-Performance');
 
 export interface QueryPerformanceMetrics {
   query: string;
@@ -60,9 +63,10 @@ class DatabasePerformanceMonitor {
 
       // Log slow queries
       if (duration > 1000) {
-        console.warn(
-          `Slow query detected: ${queryName} took ${duration.toFixed(2)}ms`
-        );
+        log.warn('Slow query detected', {
+          query: queryName,
+          durationMs: Number(duration.toFixed(2)),
+        });
       }
 
       return result;
@@ -79,7 +83,7 @@ class DatabasePerformanceMonitor {
         error: errorMessage,
       });
 
-      console.error(`Query failed: ${queryName} - ${errorMessage}`);
+      log.error('Query failed', { query: queryName, error: errorMessage });
       throw error;
     }
   }
@@ -166,7 +170,7 @@ class DatabasePerformanceMonitor {
         blockedQueries,
       };
     } catch (error) {
-      console.error('Database health check failed:', error);
+      log.error('Database health check failed', { error });
       return {
         isHealthy: false,
         responseTime: performance.now() - startTime,
@@ -193,7 +197,7 @@ class DatabasePerformanceMonitor {
         maxConnections: 20,
       };
     } catch (error) {
-      console.error('Failed to get connection stats:', error);
+      log.error('Failed to get connection stats', { error });
       return {
         totalConnections: 0,
         idleConnections: 0,
@@ -220,7 +224,7 @@ class DatabasePerformanceMonitor {
       return Number(result.rows[0]?.count) || 0;
     } catch (error) {
       // Might not have permission to access pg_stat_activity
-      console.warn('Cannot check long-running queries:', error);
+      log.warn('Cannot check long-running queries', { error });
       return 0;
     }
   }
@@ -239,7 +243,7 @@ class DatabasePerformanceMonitor {
 
       return Number(result.rows[0]?.count) || 0;
     } catch (error) {
-      console.warn('Cannot check blocked queries:', error);
+      log.warn('Cannot check blocked queries', { error });
       return 0;
     }
   }

@@ -10,6 +10,9 @@
 
 import { Ratelimit } from '@upstash/ratelimit';
 import { redis } from '@/lib/redis';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('RateLimit');
 
 // Rate limit configuration
 const CLICKS_PER_HOUR = parseInt(
@@ -84,7 +87,7 @@ export async function checkClickRateLimit(
 ): Promise<RateLimitResult> {
   // If Redis is not configured, allow all requests (dev mode)
   if (!clickRateLimiter) {
-    console.warn('[Rate Limit] Redis not configured - allowing request');
+    log.warn('Redis not configured - allowing request');
     return {
       success: true,
       limit: CLICKS_PER_HOUR,
@@ -129,7 +132,7 @@ export async function checkClickRateLimit(
       reset: new Date(creatorResult.reset),
     };
   } catch (error) {
-    console.error('[Rate Limit] Check failed:', error);
+    log.error('Click rate limit check failed', { error });
     // On error, allow the request but log it
     return {
       success: true,
@@ -153,7 +156,7 @@ export async function checkVisitRateLimit(
 ): Promise<RateLimitResult> {
   // If Redis is not configured, allow all requests (dev mode)
   if (!visitRateLimiter) {
-    console.warn('[Rate Limit] Redis not configured - allowing request');
+    log.warn('Redis not configured - allowing request');
     return {
       success: true,
       limit: VISITS_PER_HOUR,
@@ -198,7 +201,7 @@ export async function checkVisitRateLimit(
       reset: new Date(creatorResult.reset),
     };
   } catch (error) {
-    console.error('[Rate Limit] Check failed:', error);
+    log.error('Visit rate limit check failed', { error });
     // On error, allow the request but log it
     return {
       success: true,

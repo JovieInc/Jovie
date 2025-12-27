@@ -1,3 +1,7 @@
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('ProviderLinks');
+
 export type ProviderKey =
   | 'apple_music'
   | 'spotify'
@@ -139,7 +143,7 @@ export async function lookupAppleMusicByIsrc(
       trackId,
     };
   } catch (error) {
-    console.debug('Apple Music lookup failed', error);
+    log.debug('Apple Music lookup failed', { error, isrc });
     return null;
   }
 }

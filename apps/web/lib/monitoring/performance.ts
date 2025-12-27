@@ -1,6 +1,9 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('Performance');
 
 declare global {
   // eslint-disable-next-line no-var
@@ -55,7 +58,7 @@ export class PerformanceTracker {
     try {
       observer.observe({ entryTypes: ['navigation'] });
     } catch (error) {
-      console.error('Failed to observe navigation timing:', error);
+      log.error('Failed to observe navigation timing', { error, pageName });
     }
 
     if (!globalThis.joviePerformanceObservers) {
@@ -109,7 +112,7 @@ export class PerformanceTracker {
     try {
       observer.observe({ entryTypes: ['resource'] });
     } catch (error) {
-      console.error('Failed to observe resource timing:', error);
+      log.error('Failed to observe resource timing', { error, resourceType });
     }
 
     if (!globalThis.joviePerformanceObservers) {

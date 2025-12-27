@@ -1,6 +1,9 @@
 'use client';
 
 import { track } from '@/lib/analytics';
+import { createScopedLogger } from '@/lib/utils/logger';
+
+const log = createScopedLogger('UserJourney');
 
 declare global {
   // eslint-disable-next-line no-var
@@ -53,7 +56,11 @@ export class UserJourneyTracker {
     this.currentStep++;
 
     if (this.currentStep >= this.steps.length) {
-      console.warn(`Journey ${this.journeyName} has no more steps defined`);
+      log.warn('Journey has no more steps defined', {
+        journey: this.journeyName,
+        currentStep: this.currentStep,
+        totalSteps: this.steps.length,
+      });
       return this;
     }
 
@@ -105,7 +112,11 @@ export class UserJourneyTracker {
     const stepIndex = this.steps.indexOf(stepName);
 
     if (stepIndex === -1) {
-      console.warn(`Step ${stepName} not found in journey ${this.journeyName}`);
+      log.warn('Step not found in journey', {
+        stepName,
+        journey: this.journeyName,
+        availableSteps: this.steps,
+      });
       return this;
     }
 

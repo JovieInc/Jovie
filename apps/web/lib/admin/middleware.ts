@@ -1,7 +1,10 @@
 import 'server-only';
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import { createScopedLogger } from '@/lib/utils/logger';
 import { isAdmin } from './roles';
+
+const log = createScopedLogger('Admin');
 
 /**
  * Admin route protection middleware
@@ -28,9 +31,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   // User not authenticated
   if (!userId) {
-    console.warn(
-      '[admin/middleware] Unauthorized admin access attempt - no user ID'
-    );
+    log.warn('Unauthorized admin access attempt - no user ID');
     return NextResponse.json(
       { error: 'Unauthorized. Please sign in.' },
       { status: 401 }
@@ -42,9 +43,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
 
   if (!userIsAdmin) {
     // Log unauthorized access attempt
-    console.warn(
-      `[admin/middleware] Forbidden admin access attempt by user: ${userId}`
-    );
+    log.warn('Forbidden admin access attempt', { userId });
 
     return NextResponse.json(
       { error: 'Forbidden. Admin privileges required.' },
@@ -53,7 +52,7 @@ export async function requireAdmin(): Promise<NextResponse | null> {
   }
 
   // Log successful admin access (for audit trail)
-  console.log(`[admin/middleware] Admin access granted to user: ${userId}`);
+  log.info('Admin access granted', { userId });
 
   // Authorization successful
   return null;
