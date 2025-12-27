@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
 type CopyStatus = 'idle' | 'success' | 'error';
@@ -100,13 +101,28 @@ export function CopyToClipboardButton({
     }
   };
 
+  // Build status-based styling for visual feedback
+  const statusStyles = cn(
+    // Base transition for smooth color changes
+    'transition-colors duration-200',
+    // Success state: green background and text
+    status === 'success' &&
+      'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-200',
+    // Error state: red background and text
+    status === 'error' &&
+      'bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-200',
+    // User-provided className
+    className
+  );
+
   return (
     <div className='relative'>
       <Button
         variant='secondary'
         size='sm'
         onClick={onCopy}
-        className={className}
+        className={statusStyles}
+        data-status={status}
       >
         {iconName ? (
           <>
