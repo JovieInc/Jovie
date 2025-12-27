@@ -1,6 +1,5 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import {
   and,
@@ -17,6 +16,7 @@ import {
   updateTag,
 } from 'next/cache';
 import { cache } from 'react';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSession, withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { type DbType, db } from '@/lib/db';
@@ -478,7 +478,7 @@ export async function getProfileSocialLinks(
   // Prevent caching of user-specific data
   noStore();
 
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -553,7 +553,7 @@ export async function getProfileSocialLinks(
 export async function setSidebarCollapsed(collapsed: boolean): Promise<void> {
   'use server';
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -602,7 +602,7 @@ export async function updateCreatorProfile(
   // Prevent caching of mutations
   noStore();
 
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     throw new Error('Unauthorized');

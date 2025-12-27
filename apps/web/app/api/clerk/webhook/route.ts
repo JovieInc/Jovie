@@ -1,5 +1,5 @@
+import { randomBytes } from 'node:crypto';
 import { clerkClient } from '@clerk/nextjs/server';
-import { randomBytes } from 'crypto';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';

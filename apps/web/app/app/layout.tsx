@@ -1,7 +1,7 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
 import { MyStatsig } from '../my-statsig';
 import {
@@ -17,7 +17,7 @@ async function ensureWaitlistAccess(): Promise<void> {
     { op: 'waitlist', name: 'app.waitlistAccess' },
     async () => {
       try {
-        const user = await currentUser();
+        const user = await getCachedCurrentUser();
         const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
         if (!emailRaw) {
@@ -57,7 +57,7 @@ export default async function AppShellLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/dashboard');

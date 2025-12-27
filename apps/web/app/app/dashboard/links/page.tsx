@@ -1,8 +1,8 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { getCachedAuth } from '@/lib/auth/cached';
 
 export default async function LinksPage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   // Handle unauthenticated users
   if (!userId) {

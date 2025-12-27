@@ -1,7 +1,7 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
 import { APP_URL } from '@/constants/app';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from '../actions';
 import {
@@ -14,7 +14,7 @@ export default async function AudiencePage({
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   // Handle unauthenticated users
   if (!userId) {

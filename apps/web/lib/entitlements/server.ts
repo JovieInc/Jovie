@@ -1,13 +1,13 @@
 'server only';
 
-import { auth, currentUser } from '@clerk/nextjs/server';
 import { isAdmin } from '@/lib/admin/roles';
+import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import type { UserEntitlements } from '@/types';
 
 export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return {
       userId: null,
@@ -20,7 +20,7 @@ export async function getCurrentUserEntitlements(): Promise<UserEntitlements> {
     };
   }
 
-  const clerkIdentity = resolveClerkIdentity(await currentUser());
+  const clerkIdentity = resolveClerkIdentity(await getCachedCurrentUser());
   const clerkEmail = clerkIdentity.email;
 
   // Check admin status from database (cached)
