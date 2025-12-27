@@ -9,7 +9,7 @@ import {
   vi,
 } from 'vitest';
 
-vi.mock('@/hooks/use-billing-status', () => ({
+vi.mock('@/hooks/useBillingStatus', () => ({
   useBillingStatus: vi.fn(),
 }));
 
@@ -41,7 +41,7 @@ vi.mock('@/lib/analytics', () => ({
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/UserButton';
-import { useBillingStatus } from '@/hooks/use-billing-status';
+import { useBillingStatus } from '@/hooks/useBillingStatus';
 import { track } from '@/lib/analytics';
 
 const flushMicrotasks = async () => {

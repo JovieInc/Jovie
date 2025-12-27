@@ -2,7 +2,7 @@
 
 import * as Clerk from '@clerk/elements/common';
 import { useCallback, useRef, useState } from 'react';
-import { useHapticFeedback } from '@/hooks/use-haptic-feedback';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 const OTP_LENGTH = 6;

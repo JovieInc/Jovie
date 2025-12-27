@@ -16,12 +16,12 @@ import React from 'react';
 import { Divider } from '@/components/atoms/Divider';
 import { Input } from '@/components/atoms/Input';
 import { Skeleton } from '@/components/atoms/Skeleton';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useSidebarCookieState } from '@/hooks/use-sidebar-cookie-state';
+import { useIsMobile } from '@/hooks/useMobile';
+import { useSidebarCookieState } from '@/hooks/useSidebarCookieState';
 import {
   SIDEBAR_KEYBOARD_SHORTCUT,
   useSidebarKeyboardShortcut,
-} from '@/hooks/use-sidebar-keyboard-shortcut';
+} from '@/hooks/useSidebarKeyboardShortcut';
 import { cn } from '@/lib/utils';
 
 type SidebarContext = {

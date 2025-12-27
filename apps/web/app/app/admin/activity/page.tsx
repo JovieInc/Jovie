@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { ActivityTable } from '@/components/admin/activity-table';
+import { ActivityTable } from '@/components/admin/ActivityTable';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 
 export const metadata: Metadata = {
