@@ -7,4 +7,7 @@
 
 export * from './useDragAndDrop';
 export * from './useLinksManager';
+export * from './useLinksPersistence';
+export * from './useProfileEditor';
+export * from './useSuggestionSync';
 export * from './useSuggestions';
