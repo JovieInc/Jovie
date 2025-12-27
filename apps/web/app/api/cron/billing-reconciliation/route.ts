@@ -13,23 +13,18 @@
  */
 
 import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
-import { NO_STORE_HEADERS } from '@/lib/api/constants';
+import { withCronAuth } from '@/lib/api/middleware';
+import { successResponse, internalErrorResponse } from '@/lib/api/responses';
 
-// Pagination settings
 const BATCH_SIZE = 100;
-const MAX_BATCHES = 50; // Safety limit: process max 5000 users per run
+const MAX_BATCHES = 50;
 
-/**
- * Safely extract customer ID from Stripe objects
- * Handles both string IDs and expanded customer objects
- */
 function getCustomerId(
   customer: string | Stripe.Customer | Stripe.DeletedCustomer | null
 ): string | null {
@@ -40,11 +35,7 @@ function getCustomerId(
 }
 
 export const runtime = 'nodejs';
-export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
-
-
-// Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
+export const maxDuration = 60;
 
 interface ReconciliationStats {
   usersChecked: number;
@@ -55,31 +46,13 @@ interface ReconciliationStats {
   staleCustomers: number;
 }
 
-interface ReconciliationResult {
-  success: boolean;
-  stats: ReconciliationStats;
-  errors: string[];
-  duration: number;
-}
-
 /**
  * GET /api/cron/billing-reconciliation
  *
  * Hourly cron job to reconcile billing status between DB and Stripe
  */
-export async function GET(request: Request) {
+export const GET = withCronAuth(async () => {
   const startTime = Date.now();
-
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-  }
 
   const stats: ReconciliationStats = {
     usersChecked: 0,
@@ -92,35 +65,22 @@ export async function GET(request: Request) {
   const errors: string[] = [];
 
   try {
-    // 1. Check users with subscription IDs - verify they match Stripe
     await reconcileUsersWithSubscriptions(stats, errors);
-
-    // 2. Check users marked as Pro but without subscription ID
     await reconcileProUsersWithoutSubscription(stats, errors);
-
-    // 3. Check for stale Stripe customers (customer exists but user deleted)
     await checkStaleCustomers(stats);
 
     const duration = Date.now() - startTime;
 
-    const result: ReconciliationResult = {
-      success: stats.errors === 0,
-      stats,
-      errors,
-      duration,
-    };
+    console.log('[billing-reconciliation] Completed:', { stats, errors, duration });
 
-    console.log('[billing-reconciliation] Completed:', result);
-
-    // Report any issues to error tracking
     if (stats.mismatches > 0 || stats.errors > 0) {
       await captureWarning('Billing reconciliation found issues', undefined, {
         stats,
-        errors: errors.slice(0, 5), // Limit to first 5 errors
+        errors: errors.slice(0, 5),
       });
     }
 
-    return NextResponse.json(result, { headers: NO_STORE_HEADERS });
+    return successResponse({ stats, errors, duration });
   } catch (error) {
     const duration = Date.now() - startTime;
     await captureCriticalError('Billing reconciliation failed', error, {
@@ -128,22 +88,12 @@ export async function GET(request: Request) {
       duration,
     });
 
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Reconciliation failed',
-        stats,
-        duration,
-      },
-      { status: 500, headers: NO_STORE_HEADERS }
+    return internalErrorResponse(
+      error instanceof Error ? error.message : 'Reconciliation failed'
     );
   }
-}
+});
 
-/**
- * Reconcile users who have a subscription ID stored in DB
- * Uses cursor-based pagination to handle >100 users
- */
 async function reconcileUsersWithSubscriptions(
   stats: ReconciliationStats,
   errors: string[]
@@ -151,11 +101,9 @@ async function reconcileUsersWithSubscriptions(
   let lastUserId: string | null = null;
   let batchCount = 0;
 
-  // Process users in batches with cursor-based pagination
   while (batchCount < MAX_BATCHES) {
     batchCount++;
 
-    // Build query with cursor
     const usersWithSubscriptions = await db
       .select({
         id: users.id,
@@ -173,9 +121,7 @@ async function reconcileUsersWithSubscriptions(
       .orderBy(users.id)
       .limit(BATCH_SIZE);
 
-    if (usersWithSubscriptions.length === 0) {
-      break; // No more users to process
-    }
+    if (usersWithSubscriptions.length === 0) break;
 
     for (const user of usersWithSubscriptions) {
       stats.usersChecked++;
@@ -184,26 +130,22 @@ async function reconcileUsersWithSubscriptions(
       try {
         if (!user.stripeSubscriptionId) continue;
 
-        // Fetch subscription from Stripe
         let subscription;
         try {
           subscription = await stripe.subscriptions.retrieve(
             user.stripeSubscriptionId
           );
         } catch (stripeError) {
-          // Subscription not found in Stripe - might be deleted
           const errorMessage =
             stripeError instanceof Error
               ? stripeError.message
               : String(stripeError);
 
           if (errorMessage.includes('No such subscription')) {
-            // Subscription was deleted in Stripe but DB still has it
             stats.orphanedSubscriptions++;
             stats.mismatches++;
 
             if (user.isPro) {
-              // User is marked as Pro but subscription is gone - downgrade
               const result = await updateUserBillingStatus({
                 clerkUserId: user.clerkId,
                 isPro: false,
@@ -223,7 +165,6 @@ async function reconcileUsersWithSubscriptions(
                 errors.push(`Failed to fix user ${user.id}: ${result.error}`);
               }
             } else {
-              // Just clear the orphaned subscription ID
               await db
                 .update(users)
                 .set({
@@ -237,22 +178,18 @@ async function reconcileUsersWithSubscriptions(
             continue;
           }
 
-          // Other Stripe error - log and continue
           stats.errors++;
           errors.push(`Stripe error for user ${user.id}: ${errorMessage}`);
           continue;
         }
 
-        // Determine expected Pro status from Stripe
         const shouldBePro =
           subscription.status === 'active' ||
           subscription.status === 'trialing';
 
-        // Check for mismatch
         if (user.isPro !== shouldBePro) {
           stats.mismatches++;
 
-          // Fix the mismatch
           const customerId = getCustomerId(subscription.customer);
           const result = await updateUserBillingStatus({
             clerkUserId: user.clerkId,
@@ -286,10 +223,7 @@ async function reconcileUsersWithSubscriptions(
       }
     }
 
-    // If we got fewer than BATCH_SIZE, we're done
-    if (usersWithSubscriptions.length < BATCH_SIZE) {
-      break;
-    }
+    if (usersWithSubscriptions.length < BATCH_SIZE) break;
   }
 
   if (batchCount >= MAX_BATCHES) {
@@ -300,15 +234,10 @@ async function reconcileUsersWithSubscriptions(
   }
 }
 
-/**
- * Reconcile users marked as Pro but without a subscription ID
- * This shouldn't happen normally but could due to bugs or manual edits
- */
 async function reconcileProUsersWithoutSubscription(
   stats: ReconciliationStats,
   errors: string[]
 ): Promise<void> {
-  // Find Pro users without subscription ID
   const proUsersWithoutSub = await db
     .select({
       id: users.id,
@@ -326,7 +255,6 @@ async function reconcileProUsersWithoutSubscription(
     stats.usersChecked++;
 
     try {
-      // If they have a customer ID, check for active subscriptions
       if (user.stripeCustomerId) {
         const subscriptions = await stripe.subscriptions.list({
           customer: user.stripeCustomerId,
@@ -335,7 +263,6 @@ async function reconcileProUsersWithoutSubscription(
         });
 
         if (subscriptions.data.length > 0) {
-          // They have an active subscription - link it
           const subscription = subscriptions.data[0];
           stats.mismatches++;
 
@@ -348,16 +275,13 @@ async function reconcileProUsersWithoutSubscription(
             })
             .where(eq(users.id, user.id));
 
-          // Log to audit
           await db.insert(billingAuditLog).values({
             userId: user.id,
             eventType: 'reconciliation_fix',
             previousState: { stripeSubscriptionId: null },
             newState: { stripeSubscriptionId: subscription.id },
             source: 'reconciliation',
-            metadata: {
-              reason: 'linked_active_subscription',
-            },
+            metadata: { reason: 'linked_active_subscription' },
           });
 
           stats.fixed++;
@@ -365,7 +289,6 @@ async function reconcileProUsersWithoutSubscription(
         }
       }
 
-      // No active subscription found - they shouldn't be Pro
       stats.mismatches++;
 
       const result = await updateUserBillingStatus({
@@ -396,12 +319,7 @@ async function reconcileProUsersWithoutSubscription(
   }
 }
 
-/**
- * Check for stale Stripe customers (customers where user might be deleted)
- * This is a lighter check - just logs issues for manual review
- */
 async function checkStaleCustomers(stats: ReconciliationStats): Promise<void> {
-  // Find users with customer IDs but marked as deleted
   const deletedUsersWithCustomers = await db
     .select({
       id: users.id,
@@ -418,8 +336,6 @@ async function checkStaleCustomers(stats: ReconciliationStats): Promise<void> {
   for (const user of deletedUsersWithCustomers) {
     stats.staleCustomers++;
 
-    // Just log for now - don't automatically delete Stripe customers
-    // This requires manual review to avoid accidental deletion
     await captureWarning(
       'Stale Stripe customer found for deleted user',
       undefined,

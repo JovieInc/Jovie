@@ -1,26 +1,19 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
+import { withCronAuth } from '@/lib/api/middleware';
+import {
+  successResponse,
+  validationErrorResponse,
+} from '@/lib/api/responses';
 import { NO_STORE_HEADERS } from '@/lib/api/constants';
 
 export const runtime = 'nodejs';
-
-
-const CRON_SECRET = process.env.CRON_SECRET;
-
-function isAuthorized(request: NextRequest): boolean {
-  if (!CRON_SECRET) {
-    return false;
-  }
-
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${CRON_SECRET}`;
-}
 
 const sendWindowSchema = z.object({
   sendWindowEnabled: z.boolean().default(true),
@@ -44,18 +37,10 @@ function isWithinPacificSendWindow(now: Date): boolean {
   const isWeekday = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(weekday);
   if (!isWeekday) return false;
 
-  // 9am–5pm PT (17:00 exclusive)
   return hour >= 9 && hour < 17;
 }
 
-export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
+export const POST = withCronAuth(async (request: NextRequest) => {
   const now = new Date();
 
   const parsedBody = await parseJsonBody<Record<string, unknown>>(request, {
@@ -67,25 +52,18 @@ export async function POST(request: NextRequest) {
   if (!parsedBody.ok) {
     return parsedBody.response;
   }
-  const body = parsedBody.data;
-  const parsed = sendWindowSchema.safeParse(body);
+
+  const parsed = sendWindowSchema.safeParse(parsedBody.data);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid request body' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
+    return validationErrorResponse('Invalid request body');
   }
 
   const { sendWindowEnabled, maxPerRun, maxPerHour } = parsed.data;
 
   if (sendWindowEnabled && !isWithinPacificSendWindow(now)) {
-    return NextResponse.json(
-      { ok: true, attempted: 0, sent: 0, skipped: 'outside_send_window' },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
+    return successResponse({ attempted: 0, sent: 0, skipped: 'outside_send_window' });
   }
 
-  // Throttle: only allow maxPerHour successful sends in trailing hour
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
   const [{ count: sentLastHour }] = await db
     .select({ count: drizzleSql<number>`count(*)::int` })
@@ -101,13 +79,9 @@ export async function POST(request: NextRequest) {
   const limit = Math.min(maxPerRun, remainingThisHour);
 
   if (limit <= 0) {
-    return NextResponse.json(
-      { ok: true, attempted: 0, sent: 0, skipped: 'hourly_cap_reached' },
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
+    return successResponse({ attempted: 0, sent: 0, skipped: 'hourly_cap_reached' });
   }
 
-  // Claim pending invites with row-level locking, similar to ingestion job runner.
   const claimedRows = await db.transaction(async tx => {
     const candidateResult = await tx.execute(
       drizzleSql`
@@ -188,13 +162,10 @@ export async function POST(request: NextRequest) {
       });
 
       const result = await sendNotification(message, target);
-
       const hadErrors = result.errors.length > 0;
 
       if (hadErrors) {
-        const errorText = result.errors
-          .map(e => e.error ?? e.detail)
-          .join('; ');
+        const errorText = result.errors.map(e => e.error ?? e.detail).join('; ');
         const [row] = await db
           .select({
             attempts: waitlistInvites.attempts,
@@ -246,7 +217,6 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
 
-      // If attempts exceeded, mark failed; otherwise retry later.
       const [row] = await db
         .select({
           attempts: waitlistInvites.attempts,
@@ -285,8 +255,5 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json(
-    { ok: true, attempted, sent },
-    { status: 200, headers: NO_STORE_HEADERS }
-  );
-}
+  return successResponse({ attempted, sent });
+});

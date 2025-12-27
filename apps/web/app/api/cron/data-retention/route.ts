@@ -8,49 +8,15 @@
  * Authorization: Requires CRON_SECRET header
  */
 
-import crypto from 'crypto';
-import { NextRequest, NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
+import { withCronAuthAndErrorHandler } from '@/lib/api/middleware';
+import { successResponse } from '@/lib/api/responses';
 
 export const runtime = 'nodejs';
-export const maxDuration = 300; // 5 minutes max for cleanup
+export const maxDuration = 300;
 
-/**
- * Timing-safe comparison of cron secret to prevent timing attacks
- */
-function verifyCronSecret(provided: string | undefined): boolean {
-  const expected = process.env.CRON_SECRET;
-  if (!expected || !provided) {
-    return false;
-  }
-
-  // Use timing-safe comparison to prevent timing attacks
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-}
-
-export async function GET(request: NextRequest) {
-  // Verify cron authorization
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = authHeader?.replace('Bearer ', '');
-
-  if (!process.env.CRON_SECRET) {
-    console.error('[Data Retention Cron] CRON_SECRET not configured');
-    return NextResponse.json({ error: 'Cron not configured' }, { status: 500 });
-  }
-
-  if (!verifyCronSecret(cronSecret)) {
-    console.warn('[Data Retention Cron] Unauthorized access attempt');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
+export const GET = withCronAuthAndErrorHandler(
+  async () => {
     console.log('[Data Retention Cron] Starting scheduled cleanup');
 
     const result = await runDataRetentionCleanup();
@@ -62,23 +28,14 @@ export async function GET(request: NextRequest) {
       duration: `${result.duration}ms`,
     });
 
-    return NextResponse.json({
-      success: true,
-      result: {
-        clickEventsDeleted: result.clickEventsDeleted,
-        audienceMembersDeleted: result.audienceMembersDeleted,
-        notificationSubscriptionsDeleted:
-          result.notificationSubscriptionsDeleted,
-        retentionDays: result.retentionDays,
-        cutoffDate: result.cutoffDate.toISOString(),
-        duration: result.duration,
-      },
+    return successResponse({
+      clickEventsDeleted: result.clickEventsDeleted,
+      audienceMembersDeleted: result.audienceMembersDeleted,
+      notificationSubscriptionsDeleted: result.notificationSubscriptionsDeleted,
+      retentionDays: result.retentionDays,
+      cutoffDate: result.cutoffDate.toISOString(),
+      duration: result.duration,
     });
-  } catch (error) {
-    console.error('[Data Retention Cron] Cleanup failed', error);
-    return NextResponse.json(
-      { error: 'Cleanup failed', message: (error as Error).message },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { route: '/api/cron/data-retention' }
+);

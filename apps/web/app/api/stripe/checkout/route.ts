@@ -3,8 +3,7 @@
  * Creates checkout sessions for subscription purchases
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import {
   createBillingPortalSession,
@@ -17,43 +16,30 @@ import {
   PRICE_MAPPINGS,
 } from '@/lib/stripe/config';
 import { ensureStripeCustomer } from '@/lib/stripe/customer-sync';
-import { NO_STORE_HEADERS } from '@/lib/api/constants';
+import { withAuthAndErrorHandler } from '@/lib/api/middleware';
+import {
+  successResponse,
+  validationErrorResponse,
+  internalErrorResponse,
+  errorResponse,
+} from '@/lib/api/responses';
 
 export const runtime = 'nodejs';
 
-
-export async function POST(request: NextRequest) {
-  try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Parse request body
+export const POST = withAuthAndErrorHandler(
+  async (request: NextRequest, { userId }) => {
     const body = await request.json();
     const { priceId } = body;
 
     if (!priceId || typeof priceId !== 'string') {
-      return NextResponse.json(
-        { error: 'Invalid price ID' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return validationErrorResponse('Invalid price ID');
     }
 
-    // Validate that the price ID is one of our active prices
     const activePriceIds = getActivePriceIds();
     if (!activePriceIds.includes(priceId)) {
-      return NextResponse.json(
-        { error: 'Invalid price ID' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return validationErrorResponse('Invalid price ID');
     }
 
-    // Get price details for logging
     const priceDetails = getPriceMappingDetails(priceId);
     console.log('Creating checkout session for:', {
       userId,
@@ -62,14 +48,10 @@ export async function POST(request: NextRequest) {
       description: priceDetails?.description,
     });
 
-    // Ensure Stripe customer exists
     const customerResult = await ensureStripeCustomer();
     if (!customerResult.success || !customerResult.customerId) {
       console.error('Failed to ensure Stripe customer:', customerResult.error);
-      return NextResponse.json(
-        { error: 'Failed to create customer' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
+      return internalErrorResponse('Failed to create customer');
     }
 
     if (priceDetails?.plan) {
@@ -103,26 +85,21 @@ export async function POST(request: NextRequest) {
       );
 
       if (alreadySubscribedToPlan) {
-        const baseUrl =
-          publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+        const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const returnUrl = `${baseUrl}/app/dashboard`;
         const portalSession = await createBillingPortalSession({
           customerId: customerResult.customerId,
           returnUrl,
         });
 
-        return NextResponse.json(
-          {
-            sessionId: portalSession.id,
-            url: portalSession.url,
-            alreadySubscribed: true,
-          },
-          { headers: NO_STORE_HEADERS }
-        );
+        return successResponse({
+          sessionId: portalSession.id,
+          url: portalSession.url,
+          alreadySubscribed: true,
+        });
       }
     }
 
-    // Create URLs for success and cancel
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const successUrl = `${baseUrl}/billing/success`;
     const cancelUrl = `${baseUrl}/billing/cancel`;
@@ -130,7 +107,6 @@ export async function POST(request: NextRequest) {
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
     const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
 
-    // Create checkout session
     const session = await createCheckoutSession({
       customerId: customerResult.customerId,
       priceId,
@@ -140,7 +116,6 @@ export async function POST(request: NextRequest) {
       idempotencyKey,
     });
 
-    // Log successful checkout creation
     console.log('Checkout session created:', {
       sessionId: session.id,
       userId,
@@ -149,43 +124,17 @@ export async function POST(request: NextRequest) {
       url: session.url,
     });
 
-    return NextResponse.json(
-      {
-        sessionId: session.id,
-        url: session.url,
-      },
-      { headers: NO_STORE_HEADERS }
-    );
-  } catch (error) {
-    console.error('Error creating checkout session:', error);
+    return successResponse({
+      sessionId: session.id,
+      url: session.url,
+    });
+  },
+  { route: '/api/stripe/checkout' }
+);
 
-    // Return appropriate error based on the error type
-    if (error instanceof Error) {
-      if (error.message.includes('customer')) {
-        return NextResponse.json(
-          { error: 'Customer setup failed' },
-          { status: 500, headers: NO_STORE_HEADERS }
-        );
-      }
-      if (error.message.includes('price')) {
-        return NextResponse.json(
-          { error: 'Invalid pricing configuration' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
-    }
-
-    return NextResponse.json(
-      { error: 'Failed to create checkout session' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
-}
-
-// Only allow POST requests
-export async function GET() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
-  );
-}
+export const GET = withAuthAndErrorHandler(
+  async () => {
+    return errorResponse('Method not allowed', { status: 405 });
+  },
+  { route: '/api/stripe/checkout' }
+);

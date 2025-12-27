@@ -3,104 +3,66 @@
  * Creates billing portal sessions for Pro users to manage their subscriptions
  */
 
-import { auth } from '@clerk/nextjs/server';
-import { NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
-import { NO_STORE_HEADERS } from '@/lib/api/constants';
+import { withAuthAndErrorHandler } from '@/lib/api/middleware';
+import {
+  successResponse,
+  errorResponse,
+  notFoundResponse,
+  internalErrorResponse,
+} from '@/lib/api/responses';
 
 export const runtime = 'nodejs';
 
-
-export async function POST() {
-  try {
-    // Check authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    // Get user's billing information
+export const POST = withAuthAndErrorHandler(
+  async (_request, { userId }) => {
     const billingResult = await getUserBillingInfo();
     if (!billingResult.success || !billingResult.data) {
       console.error('Failed to get user billing info:', billingResult.error);
-      return NextResponse.json(
-        { error: 'Failed to retrieve billing information' },
-        { status: 500, headers: NO_STORE_HEADERS }
-      );
+      return internalErrorResponse('Failed to retrieve billing information');
     }
 
     const { stripeCustomerId } = billingResult.data;
 
-    // Check if user has a Stripe customer ID
     if (!stripeCustomerId) {
-      return NextResponse.json(
-        { error: 'No billing account found' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return errorResponse('No billing account found', { status: 400 });
     }
 
-    // Optionally check if user is Pro (uncomment if you want to restrict access)
-    // if (!isPro) {
-    //   return NextResponse.json(
-    //     { error: 'Pro subscription required' },
-    //     { status: 403 }
-    //   );
-    // }
-
-    // Create return URL
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const returnUrl = `${baseUrl}/app/dashboard`;
 
-    // Create billing portal session
-    const session = await createBillingPortalSession({
-      customerId: stripeCustomerId,
-      returnUrl,
-    });
+    try {
+      const session = await createBillingPortalSession({
+        customerId: stripeCustomerId,
+        returnUrl,
+      });
 
-    // Log portal session creation
-    console.log('Billing portal session created:', {
-      userId,
-      customerId: stripeCustomerId,
-      sessionId: session.id,
-      url: session.url,
-    });
-
-    return NextResponse.json(
-      {
+      console.log('Billing portal session created:', {
+        userId,
+        customerId: stripeCustomerId,
         sessionId: session.id,
         url: session.url,
-      },
-      { headers: NO_STORE_HEADERS }
-    );
-  } catch (error) {
-    console.error('Error creating billing portal session:', error);
+      });
 
-    // Return appropriate error based on the error type
-    if (error instanceof Error) {
-      if (error.message.includes('customer')) {
-        return NextResponse.json(
-          { error: 'Customer not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
+      return successResponse({
+        sessionId: session.id,
+        url: session.url,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('customer')) {
+        return notFoundResponse('Customer not found');
       }
+      throw error;
     }
+  },
+  { route: '/api/stripe/portal' }
+);
 
-    return NextResponse.json(
-      { error: 'Failed to create billing portal session' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
-}
-
-// Only allow POST requests
-export async function GET() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405, headers: NO_STORE_HEADERS }
-  );
-}
+export const GET = withAuthAndErrorHandler(
+  async () => {
+    return errorResponse('Method not allowed', { status: 405 });
+  },
+  { route: '/api/stripe/portal' }
+);
