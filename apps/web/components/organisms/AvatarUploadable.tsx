@@ -1,22 +1,23 @@
 'use client';
 
-import { Check, Upload, X } from 'lucide-react';
 import React, {
   forwardRef,
   useCallback,
   useEffect,
   useMemo,
   useRef,
-  useState,
 } from 'react';
 import type { UploadErrorCode } from '@/app/api/images/upload/route';
 import { Avatar, type AvatarProps } from '@/components/atoms/Avatar';
+import { AvatarUploadAnnouncer } from '@/components/atoms/AvatarUploadAnnouncer';
+import { AvatarUploadOverlay } from '@/components/atoms/AvatarUploadOverlay';
+import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';
+import { AvatarProgressRing } from '@/components/molecules/AvatarProgressRing';
 import { track } from '@/lib/analytics';
 import {
-  AVATAR_MAX_FILE_SIZE_BYTES,
-  formatAcceptedImageTypes,
-  SUPPORTED_IMAGE_MIME_TYPES,
-} from '@/lib/images/config';
+  DEFAULT_ACCEPTED_TYPES,
+  DEFAULT_MAX_FILE_SIZE,
+} from '@/lib/avatar/validation';
 import { cn } from '@/lib/utils';
 
 export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
@@ -42,11 +43,6 @@ export interface AvatarUploadableProps extends Omit<AvatarProps, 'src'> {
   showHoverOverlay?: boolean;
 }
 
-// Progress ring SVG constants
-const STROKE_WIDTH = 3;
-// const RING_SIZE = 100; // Percentage of avatar size (unused for now)
-const RADIUS = 50 - STROKE_WIDTH / 2;
-const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const SIZE_MAP = {
   xs: 24,
   sm: 32,
@@ -63,17 +59,6 @@ const SIZE_MAP = {
   'display-4xl': 384,
 };
 
-// File validation
-const DEFAULT_MAX_FILE_SIZE = AVATAR_MAX_FILE_SIZE_BYTES; // API enforced
-const DEFAULT_ACCEPTED_TYPES = SUPPORTED_IMAGE_MIME_TYPES;
-
-const STATUS_COLORS = {
-  uploading: 'text-indigo-500',
-  success: 'text-green-500',
-  error: 'text-red-500',
-  idle: 'text-secondary-token',
-} as const;
-
 function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
   return (node: T) => {
     refs.forEach(ref => {
@@ -84,104 +69,6 @@ function mergeRefs<T>(...refs: Array<React.Ref<T>>) {
       }
     });
   };
-}
-
-/**
- * Validates a file for upload
- */
-function validateFile(
-  file: File,
-  maxFileSize: number = DEFAULT_MAX_FILE_SIZE,
-  acceptedTypes: readonly string[] = DEFAULT_ACCEPTED_TYPES
-): string | null {
-  const normalizedType = file.type.toLowerCase?.() ?? file.type;
-  if (!acceptedTypes.includes(normalizedType)) {
-    const allowedTypes = formatAcceptedImageTypes(acceptedTypes);
-    return `Invalid file type. Please select ${allowedTypes.join(', ')} files only.`;
-  }
-
-  if (file.size > maxFileSize) {
-    const sizeMB = Math.round(maxFileSize / (1024 * 1024));
-    return `File too large. Please select a file smaller than ${sizeMB}MB.`;
-  }
-
-  return null;
-}
-
-/**
- * Progress Ring Component for radial upload progress
- */
-function ProgressRing({
-  progress,
-  size,
-  status,
-}: {
-  progress: number;
-  size: number;
-  status: 'uploading' | 'success' | 'error' | 'idle';
-}) {
-  const strokeDasharray = `${(progress / 100) * CIRCUMFERENCE} ${CIRCUMFERENCE}`;
-  const ringColor = STATUS_COLORS[status];
-
-  return (
-    <div
-      className='pointer-events-none absolute inset-0 flex items-center justify-center'
-      aria-hidden='true'
-      data-testid='avatar-uploadable-progress'
-    >
-      <svg
-        width={size}
-        height={size}
-        viewBox='0 0 100 100'
-        className='-rotate-90'
-      >
-        {/* Background ring */}
-        <circle
-          cx='50'
-          cy='50'
-          r={RADIUS}
-          fill='none'
-          stroke='currentColor'
-          strokeWidth={STROKE_WIDTH}
-          className='text-border-subtle'
-        />
-        {/* Progress ring */}
-        <circle
-          cx='50'
-          cy='50'
-          r={RADIUS}
-          fill='none'
-          stroke='currentColor'
-          strokeWidth={STROKE_WIDTH}
-          strokeDasharray={strokeDasharray}
-          strokeLinecap='round'
-          className={cn(
-            'stroke-current transition-all duration-300 ease-out',
-            ringColor
-          )}
-        />
-      </svg>
-
-      {/* Status icons */}
-      <div className='absolute inset-0 flex items-center justify-center'>
-        {status === 'success' && (
-          <div className='rounded-full bg-white text-green-600 ring-1 ring-green-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
-            <Check size={size * 0.15} className='p-1' aria-hidden='true' />
-          </div>
-        )}
-        {status === 'error' && (
-          <div className='rounded-full bg-white text-red-600 ring-1 ring-red-100 shadow-sm transition-all duration-200 ease-out animate-in fade-in zoom-in motion-reduce:animate-none'>
-            <X size={size * 0.15} className='p-1' aria-hidden='true' />
-          </div>
-        )}
-        {status === 'uploading' && (
-          <div className='rounded-full bg-indigo-500 text-white ring-1 ring-indigo-100 shadow-sm animate-pulse motion-reduce:animate-none transition-all duration-200 ease-out'>
-            <Upload size={size * 0.15} className='p-1' aria-hidden='true' />
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -215,18 +102,32 @@ export const AvatarUploadable = React.memo(
     },
     forwardedRef
   ) {
-    const [isDragOver, setIsDragOver] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [uploadStatus, setUploadStatus] = useState<
-      'idle' | 'uploading' | 'success' | 'error'
-    >('idle');
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const statusResetTimeoutRef = useRef<number | null>(null);
+
+    const {
+      isDragOver,
+      isUploading,
+      uploadStatus,
+      previewUrl,
+      handleFileUpload,
+      handleDragEnter,
+      handleDragLeave,
+      handleDragOver,
+      handleDrop,
+      containerRef,
+    } = useAvatarUpload({
+      src,
+      onUpload,
+      onError,
+      onSuccess,
+      onRetryableError,
+      maxFileSize,
+      acceptedTypes,
+    });
+
     const mergedRef = useMemo(
       () => mergeRefs<HTMLDivElement>(containerRef, forwardedRef),
-      [forwardedRef]
+      [containerRef, forwardedRef]
     );
 
     const avatarSize = avatarProps.size || 'md';
@@ -234,134 +135,6 @@ export const AvatarUploadable = React.memo(
     const acceptedTypeList = useMemo(
       () => acceptedTypes.join(','),
       [acceptedTypes]
-    );
-
-    const clearStatusReset = useCallback(() => {
-      if (statusResetTimeoutRef.current) {
-        window.clearTimeout(statusResetTimeoutRef.current);
-        statusResetTimeoutRef.current = null;
-      }
-    }, []);
-
-    const resetStatus = useCallback(
-      (delay: number) => {
-        clearStatusReset();
-        statusResetTimeoutRef.current = window.setTimeout(() => {
-          setUploadStatus('idle');
-          statusResetTimeoutRef.current = null;
-        }, delay);
-      },
-      [clearStatusReset]
-    );
-
-    const setPreviewFromFile = useCallback((file: File) => {
-      const canUseObjectUrl =
-        typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function';
-
-      if (!canUseObjectUrl) {
-        return;
-      }
-
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(prev => {
-        if (
-          prev &&
-          prev.startsWith('blob:') &&
-          typeof URL.revokeObjectURL === 'function'
-        ) {
-          URL.revokeObjectURL(prev);
-        }
-        return url;
-      });
-    }, []);
-
-    useEffect(
-      () => () => {
-        if (
-          previewUrl &&
-          previewUrl.startsWith('blob:') &&
-          typeof URL !== 'undefined' &&
-          typeof URL.revokeObjectURL === 'function'
-        ) {
-          URL.revokeObjectURL(previewUrl);
-        }
-      },
-      [previewUrl]
-    );
-
-    const handleFileUpload = useCallback(
-      async (file: File) => {
-        if (!onUpload) return;
-
-        clearStatusReset();
-        const validationError = validateFile(file, maxFileSize, acceptedTypes);
-        if (validationError) {
-          onError?.(validationError);
-          setUploadStatus('error');
-          track('avatar_upload_error', {
-            error: 'validation_failed',
-            message: validationError,
-          });
-          resetStatus(3000);
-          return;
-        }
-
-        setIsUploading(true);
-        setUploadStatus('uploading');
-        setPreviewFromFile(file);
-        track('avatar_upload_start', {
-          file_size: file.size,
-          file_type: file.type,
-        });
-
-        try {
-          const imageUrl = await onUpload(file);
-          setUploadStatus('success');
-          setPreviewUrl(imageUrl);
-          onSuccess?.(imageUrl);
-          track('avatar_upload_success', { file_size: file.size });
-          resetStatus(2000);
-        } catch (error) {
-          // Handle structured error responses
-          const errorData = error as {
-            message?: string;
-            code?: UploadErrorCode;
-            retryable?: boolean;
-          };
-          const errorMessage = errorData.message ?? 'Upload failed';
-          const errorCode = errorData.code;
-          const isRetryable = errorData.retryable ?? false;
-
-          setUploadStatus('error');
-          onError?.(errorMessage);
-
-          if (isRetryable && errorCode && onRetryableError) {
-            onRetryableError(errorMessage, errorCode);
-          }
-
-          track('avatar_upload_error', {
-            error: errorCode ?? 'upload_failed',
-            message: errorMessage,
-            retryable: isRetryable,
-          });
-          // Revert preview to previous image on failure
-          setPreviewUrl(null);
-          resetStatus(3000);
-        } finally {
-          setIsUploading(false);
-        }
-      },
-      [
-        acceptedTypes,
-        clearStatusReset,
-        maxFileSize,
-        onError,
-        onRetryableError,
-        onSuccess,
-        onUpload,
-        resetStatus,
-        setPreviewFromFile,
-      ]
     );
 
     const handleFileSelect = useCallback(
@@ -372,46 +145,6 @@ export const AvatarUploadable = React.memo(
         }
       },
       [handleFileUpload]
-    );
-
-    const handleDragEnter = useCallback(
-      (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (uploadable && onUpload && !isUploading) {
-          setIsDragOver(true);
-        }
-      },
-      [uploadable, onUpload, isUploading]
-    );
-
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!containerRef.current?.contains(e.relatedTarget as Node)) {
-        setIsDragOver(false);
-      }
-    }, []);
-
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-    }, []);
-
-    const handleDrop = useCallback(
-      (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setIsDragOver(false);
-
-        if (!uploadable || !onUpload || isUploading) return;
-
-        const file = e.dataTransfer.files?.[0];
-        if (file) {
-          handleFileUpload(file);
-        }
-      },
-      [uploadable, onUpload, isUploading, handleFileUpload]
     );
 
     const handleClick = useCallback(() => {
@@ -441,8 +174,6 @@ export const AvatarUploadable = React.memo(
       }
     }, [isUploading, progress]);
 
-    useEffect(() => clearStatusReset, [clearStatusReset]);
-
     const canUpload = uploadable && Boolean(onUpload);
     const isInteractive = canUpload && !isUploading;
     const showProgress =
@@ -458,10 +189,10 @@ export const AvatarUploadable = React.memo(
           isInteractive ? 'cursor-pointer focus-ring' : 'cursor-default',
           className
         )}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDragOver={handleDragOver}
-        onDrop={handleDrop}
+        onDragEnter={canUpload ? handleDragEnter : undefined}
+        onDragLeave={canUpload ? handleDragLeave : undefined}
+        onDragOver={canUpload ? handleDragOver : undefined}
+        onDrop={canUpload ? handleDrop : undefined}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         tabIndex={isInteractive ? 0 : undefined}
@@ -482,36 +213,16 @@ export const AvatarUploadable = React.memo(
           {...avatarProps}
         />
 
-        {isInteractive && showHoverOverlay && (
-          <div
-            className={cn(
-              'absolute inset-0 flex items-center justify-center rounded-full',
-              'bg-surface-3/80 text-primary-token ring-1 ring-[color:var(--color-border-subtle)] backdrop-blur',
-              'opacity-0 transition-opacity duration-200 group-hover:opacity-100'
-            )}
-            aria-hidden='true'
-            data-testid='avatar-uploadable-hover-overlay'
-          >
-            <Upload size={numericSize * 0.3} />
-          </div>
+        {isInteractive && showHoverOverlay && !isDragOver && (
+          <AvatarUploadOverlay iconSize={numericSize * 0.3} />
         )}
 
         {isDragOver && (
-          <div
-            className={cn(
-              'absolute inset-0 flex items-center justify-center rounded-full',
-              'bg-[color:var(--color-accent)]/90 text-[color:var(--color-accent-foreground)]',
-              'border-2 border-[color:var(--color-accent)] shadow-md transition-transform duration-200'
-            )}
-            aria-hidden='true'
-            data-testid='avatar-uploadable-drag-overlay'
-          >
-            <Upload size={numericSize * 0.4} />
-          </div>
+          <AvatarUploadOverlay iconSize={numericSize * 0.3} isDragOver />
         )}
 
         {showProgress && (
-          <ProgressRing
+          <AvatarProgressRing
             progress={Math.min(100, Math.max(0, currentProgress))}
             size={numericSize}
             status={uploadStatus}
@@ -529,23 +240,7 @@ export const AvatarUploadable = React.memo(
           />
         )}
 
-        {progress > 0 && (
-          <div className='sr-only' aria-live='polite' aria-atomic='true'>
-            Uploading profile photo: {Math.round(progress)}% complete
-          </div>
-        )}
-
-        {uploadStatus === 'success' && (
-          <div className='sr-only' aria-live='polite'>
-            Profile photo uploaded successfully
-          </div>
-        )}
-
-        {uploadStatus === 'error' && (
-          <div className='sr-only' aria-live='assertive'>
-            Profile photo upload failed
-          </div>
-        )}
+        <AvatarUploadAnnouncer progress={progress} status={uploadStatus} />
       </div>
     );
   })
