@@ -1,0 +1,564 @@
+{
+  "generatedAt": "2025-12-27T07:25:50.755Z",
+  "summary": {
+    "totalRuns": 10,
+    "avgDurationMs": 255342,
+    "avgDurationMinutes": 4.26,
+    "avgPassedTests": 1364,
+    "avgFailedTests": 19,
+    "totalUniqueTests": 1391
+  },
+  "runs": [
+    {
+      "run": 1,
+      "durationMs": 377493.9245605469,
+      "durationMinutes": 6.29,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 2,
+      "durationMs": 371478.3583984375,
+      "durationMinutes": 6.19,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 3,
+      "durationMs": 382704.3151855469,
+      "durationMinutes": 6.38,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 4,
+      "durationMs": 390914.7060546875,
+      "durationMinutes": 6.52,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 5,
+      "durationMs": 401838.70458984375,
+      "durationMinutes": 6.7,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 6,
+      "durationMs": 134331.572265625,
+      "durationMinutes": 2.24,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 7,
+      "durationMs": 123163.3603515625,
+      "durationMinutes": 2.05,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 8,
+      "durationMs": 124188.36743164062,
+      "durationMinutes": 2.07,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 9,
+      "durationMs": 123677.36669921875,
+      "durationMinutes": 2.06,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    },
+    {
+      "run": 10,
+      "durationMs": 123631.37646484375,
+      "durationMinutes": 2.06,
+      "totalTests": 1391,
+      "passedTests": 1364,
+      "failedTests": 19,
+      "pendingTests": 8,
+      "totalSuites": 609,
+      "passedSuites": 567,
+      "failedSuites": 42
+    }
+  ],
+  "flakyTests": [],
+  "consistentlyFailingTests": [
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/lib/http/parse-json.test.ts",
+      "test": "parseJsonBody logs and captures parse failures"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals initWebVitals should call custom handler when metric is received"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals initWebVitals should send metrics to analytics"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) CLS ratings should rate CLS <= 0.1 as good"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) CLS ratings should rate CLS > 0.1 and <= 0.25 as needs-improvement"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) CLS ratings should rate CLS > 0.25 as poor"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) LCP ratings should rate LCP <= 2500ms as good"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) LCP ratings should rate LCP > 2500ms and <= 4000ms as needs-improvement"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) LCP ratings should rate LCP > 4000ms as poor"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) INP ratings should rate INP <= 200ms as good"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) INP ratings should rate INP > 200ms and <= 500ms as needs-improvement"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) INP ratings should rate INP > 500ms as poor"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) TTFB ratings should rate TTFB <= 800ms as good"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals getRating (internal function tested via initWebVitals) TTFB ratings should rate TTFB > 800ms and <= 1800ms as needs-improvement"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals trackPerformanceExperiment should initialize web vitals with experiment context"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/monitoring/web-vitals.test.ts",
+      "test": "Web Vitals trackPerformanceExperiment should include experiment name in metric tracking"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/api/dashboard/profile.test.ts",
+      "test": "PUT /api/dashboard/profile syncs username and display name to Clerk before updating the database"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/api/dashboard/profile.test.ts",
+      "test": "PUT /api/dashboard/profile normalizes usernames before syncing"
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/api/dashboard/profile.test.ts",
+      "test": "PUT /api/dashboard/profile downloads the uploaded avatar and forwards it to Clerk"
+    }
+  ],
+  "slowestTests": [
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/ingestion/linktree.test.ts",
+      "test": "Linktree Strategy fetchLinktreeDocument throws ExtractionError on 429 rate limit",
+      "avgDurationMs": 3011.26,
+      "maxDurationMs": 3025.26,
+      "minDurationMs": 3004.78
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/ingestion/beacons.test.ts",
+      "test": "Beacons Strategy fetchBeaconsDocument throws ExtractionError on 429 rate limit",
+      "avgDurationMs": 3009.96,
+      "maxDurationMs": 3014.93,
+      "minDurationMs": 3007.64
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/ingestion/beacons.test.ts",
+      "test": "Beacons Strategy fetchBeaconsDocument throws ExtractionError on 404",
+      "avgDurationMs": 3009.22,
+      "maxDurationMs": 3021.04,
+      "minDurationMs": 3005.78
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/ingestion/linktree.test.ts",
+      "test": "Linktree Strategy fetchLinktreeDocument throws ExtractionError on 404",
+      "avgDurationMs": 3008.79,
+      "maxDurationMs": 3016.67,
+      "minDurationMs": 3005.73
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/bench/track-route.bench.test.ts",
+      "test": "track route synthetic benchmark captures p50/p95 latency and ensures click persistence",
+      "avgDurationMs": 1110.36,
+      "maxDurationMs": 3485.06,
+      "minDurationMs": 240.95
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/integration/analytics-tracking.test.ts",
+      "test": "Analytics Tracking Integration RLS Security should not have RLS bypass capability",
+      "avgDurationMs": 841.14,
+      "maxDurationMs": 3338.68,
+      "minDurationMs": 164.19
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/stripe/billing-hardening.test.ts",
+      "test": "Billing Hardening - updateUserBillingStatus Optimistic Locking should fail after two optimistic lock failures",
+      "avgDurationMs": 448.13,
+      "maxDurationMs": 502.38,
+      "minDurationMs": 419.57
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption encryptPII and decryptPII should generate different ciphertext for same input (random IV)",
+      "avgDurationMs": 211.49,
+      "maxDurationMs": 349.96,
+      "minDurationMs": 124.41
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption Batch encryption helpers should decrypt multiple fields at once",
+      "avgDurationMs": 207.01,
+      "maxDurationMs": 317.77,
+      "minDurationMs": 123.12
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/components/dashboard/LinkActions.keyboard.test.tsx",
+      "test": "LinkActions Keyboard Accessibility menu button opens dropdown and toggle is accessible",
+      "avgDurationMs": 203.72,
+      "maxDurationMs": 389.65,
+      "minDurationMs": 102.74
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/HeaderNavFlyout.test.tsx",
+      "test": "HeaderNav flyout interactions renders primary navigation links",
+      "avgDurationMs": 187.45,
+      "maxDurationMs": 459.3,
+      "minDurationMs": 89.04
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/AuthActions.test.tsx",
+      "test": "AuthActions always renders log in and request early access links",
+      "avgDurationMs": 170.36,
+      "maxDurationMs": 356.37,
+      "minDurationMs": 74.15
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/components/molecules/AvatarUploadable.test.tsx",
+      "test": "AvatarUploadable Component Display Mode (Non-uploadable) renders as regular avatar when uploadable is false",
+      "avgDurationMs": 163.66,
+      "maxDurationMs": 292.94,
+      "minDurationMs": 72.88
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption Batch encryption helpers should encrypt multiple fields at once",
+      "avgDurationMs": 162.34,
+      "maxDurationMs": 249.6,
+      "minDurationMs": 92.55
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/atoms/Toast.test.tsx",
+      "test": "Toast Component renders with default props",
+      "avgDurationMs": 161.68,
+      "maxDurationMs": 360.98,
+      "minDurationMs": 66.08
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/QuickAddSuggestions.test.tsx",
+      "test": "QuickAddSuggestions ordering should order by SOCIAL_FIRST_ORDER when isMusicProfile is false (default)",
+      "avgDurationMs": 148.76,
+      "maxDurationMs": 303.41,
+      "minDurationMs": 56.84
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/SocialBar.test.tsx",
+      "test": "SocialBar renders social icons with cursor pointer styling",
+      "avgDurationMs": 146.83,
+      "maxDurationMs": 370.71,
+      "minDurationMs": 70.41
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/ProblemSolutionSection.optimized.test.tsx",
+      "test": "ProblemSolutionSection (Optimized) renders CTA button with proper attributes",
+      "avgDurationMs": 141.35,
+      "maxDurationMs": 273.56,
+      "minDurationMs": 63.22
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/QRCode.test.tsx",
+      "test": "QRCode renders QR code image with correct attributes",
+      "avgDurationMs": 140.79,
+      "maxDurationMs": 261.55,
+      "minDurationMs": 69.61
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/LogoLink.test.tsx",
+      "test": "LogoLink renders with default props",
+      "avgDurationMs": 140.39,
+      "maxDurationMs": 234.63,
+      "minDurationMs": 69.02
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/LoadingSpinner.test.tsx",
+      "test": "LoadingSpinner renders with default props and has proper accessibility",
+      "avgDurationMs": 138.05,
+      "maxDurationMs": 267.72,
+      "minDurationMs": 64.16
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/ProblemSolutionSection.test.tsx",
+      "test": "ProblemSolutionSection renders CTA button with proper attributes",
+      "avgDurationMs": 137.09,
+      "maxDurationMs": 266.15,
+      "minDurationMs": 63.79
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/ProgressIndicator.test.tsx",
+      "test": "ProgressIndicator renders progress indicator with correct attributes",
+      "avgDurationMs": 136.81,
+      "maxDurationMs": 260.67,
+      "minDurationMs": 64.64
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/atoms/SkipToContent.test.tsx",
+      "test": "SkipToContent renders with correct default href",
+      "avgDurationMs": 136.71,
+      "maxDurationMs": 244.84,
+      "minDurationMs": 67.78
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/integration/analytics-tracking.test.ts",
+      "test": "Analytics Tracking Integration Security Hardening should encrypt PII before storage",
+      "avgDurationMs": 121.25,
+      "maxDurationMs": 206.85,
+      "minDurationMs": 65.78
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption encryptUrl should produce different ciphertext for same input (random IV)",
+      "avgDurationMs": 119.04,
+      "maxDurationMs": 232.7,
+      "minDurationMs": 62.96
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption encryptUrl should include auth tag and support round trip decryption",
+      "avgDurationMs": 118.97,
+      "maxDurationMs": 247.96,
+      "minDurationMs": 62.55
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/QuickAddSuggestions.test.tsx",
+      "test": "QuickAddSuggestions rendering should render all suggestion pills when no platforms are added",
+      "avgDurationMs": 117.29,
+      "maxDurationMs": 246.17,
+      "minDurationMs": 48.53
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/ClaimHandleForm.test.tsx",
+      "test": "ClaimHandleForm has proper accessibility attributes",
+      "avgDurationMs": 115.09,
+      "maxDurationMs": 228.12,
+      "minDurationMs": 59.09
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/FlyoutItem.test.tsx",
+      "test": "FlyoutItem renders as a link with correct href",
+      "avgDurationMs": 111.16,
+      "maxDurationMs": 219.12,
+      "minDurationMs": 54.08
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption decryptUrl should throw error when encrypted payload is tampered",
+      "avgDurationMs": 111.08,
+      "maxDurationMs": 191.1,
+      "minDurationMs": 62.43
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption decryptUrl should decrypt values generated by encryptUrl",
+      "avgDurationMs": 110.22,
+      "maxDurationMs": 194.48,
+      "minDurationMs": 62.92
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption encryptPII and decryptPII should encrypt and decrypt a string correctly",
+      "avgDurationMs": 109.81,
+      "maxDurationMs": 181.24,
+      "minDurationMs": 65.4
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption Phone encryption helpers should encrypt and decrypt phone numbers",
+      "avgDurationMs": 105.84,
+      "maxDurationMs": 173.21,
+      "minDurationMs": 61.65
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption IP encryption helpers should encrypt and decrypt IPv4 addresses",
+      "avgDurationMs": 103.35,
+      "maxDurationMs": 166.27,
+      "minDurationMs": 61.17
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption IP encryption helpers should encrypt and decrypt IPv6 addresses",
+      "avgDurationMs": 101.71,
+      "maxDurationMs": 162.42,
+      "minDurationMs": 61.1
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/pii-encryption.test.ts",
+      "test": "PII Encryption Email encryption helpers should encrypt and decrypt email addresses",
+      "avgDurationMs": 100.94,
+      "maxDurationMs": 165.32,
+      "minDurationMs": 61.54
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/dashboard/dashboard-data-prefetch.test.ts",
+      "test": "dashboard data prefetch dedupes dashboard fetches after prefetching",
+      "avgDurationMs": 89.04,
+      "maxDurationMs": 235.8,
+      "minDurationMs": 20.17
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/drizzle-config.test.ts",
+      "test": "Database Connection throws error when DATABASE_URL is missing",
+      "avgDurationMs": 83.33,
+      "maxDurationMs": 171.03,
+      "minDurationMs": 31.57
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/components/dashboard/LinkActions.keyboard.test.tsx",
+      "test": "LinkActions Keyboard Accessibility shows correct toggle text based on visibility",
+      "avgDurationMs": 77.71,
+      "maxDurationMs": 145.58,
+      "minDurationMs": 43.61
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption encryptUrl should encrypt a URL and return encryption result",
+      "avgDurationMs": 69.4,
+      "maxDurationMs": 159.86,
+      "minDurationMs": 34.22
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption encryptUrl should throw error when cipher creation fails",
+      "avgDurationMs": 66.07,
+      "maxDurationMs": 146.73,
+      "minDurationMs": 35.38
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/utils/url-encryption.test.ts",
+      "test": "URL Encryption encryptUrl should include IV in result",
+      "avgDurationMs": 60.4,
+      "maxDurationMs": 119.35,
+      "minDurationMs": 31.78
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/IngestedSuggestions.test.tsx",
+      "test": "IngestedSuggestions accept flow should fire analytics events after async handler resolves",
+      "avgDurationMs": 58.01,
+      "maxDurationMs": 64.23,
+      "minDurationMs": 54.83
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/IngestedSuggestions.test.tsx",
+      "test": "IngestedSuggestions dismiss flow should fire analytics events after async handler resolves",
+      "avgDurationMs": 56.67,
+      "maxDurationMs": 61.75,
+      "minDurationMs": 53.09
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/useSuggestions.test.ts",
+      "test": "useSuggestions surfaced analytics tracking should not track same suggestion twice",
+      "avgDurationMs": 56.21,
+      "maxDurationMs": 58.19,
+      "minDurationMs": 54.65
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/IngestedSuggestions.test.tsx",
+      "test": "IngestedSuggestions rendering should render suggestions container with aria-label",
+      "avgDurationMs": 56.13,
+      "maxDurationMs": 124.71,
+      "minDurationMs": 23.87
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/integration/analytics-tracking.test.ts",
+      "test": "Analytics Tracking Integration End-to-End Flow should process click with all security measures",
+      "avgDurationMs": 55.94,
+      "maxDurationMs": 94.9,
+      "minDurationMs": 34.21
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/unit/links/useSuggestions.test.ts",
+      "test": "useSuggestions surfaced analytics tracking should not track surfaced when suggestions disabled",
+      "avgDurationMs": 53.63,
+      "maxDurationMs": 54.85,
+      "minDurationMs": 52.13
+    },
+    {
+      "file": "/Users/timwhite/Documents/GitHub/TBF/Jovie/.worktrees/079-improve-test-reliability-and-performance/apps/web/tests/lib/analytics/query-timeout.test.ts",
+      "test": "Query Timeout withTimeout should reject when promise exceeds timeout",
+      "avgDurationMs": 52.43,
+      "maxDurationMs": 52.84,
+      "minDurationMs": 51.92
+    }
+  ]
+}
