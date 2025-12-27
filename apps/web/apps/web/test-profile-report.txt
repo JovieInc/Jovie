@@ -1,0 +1,213 @@
+=============================================================================
+TEST PERFORMANCE PROFILE REPORT
+Generated: 2025-12-27
+Based on: 10 test runs with verbose profiling
+=============================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+Total Tests: 1391
+Pass Rate: 98.06% (1364/1391)
+Average Duration: 4.26 minutes (255,342ms)
+Consistently Failing: 19 tests
+Flaky Tests: 0
+
+Cache Effect Observed:
+  - Cold runs (1-5): ~6.3 minutes average
+  - Warm runs (6-10): ~2.05 minutes average
+
+=============================================================================
+PERFORMANCE BOTTLENECK ANALYSIS
+=============================================================================
+
+CRITICAL BOTTLENECKS - TESTS >5000ms
+------------------------------------
+(None identified - all tests complete within 5 seconds)
+Total tests >5000ms: 0
+
+SLOW TESTS - Tests >3000ms (marked as SLOW)
+-------------------------------------------
+These tests should be prioritized for optimization:
+
+[SLOW] 1. tests/lib/ingestion/linktree.test.ts
+       Test: "fetchLinktreeDocument throws ExtractionError on 429 rate limit"
+       Duration: 3011ms avg (min: 3004ms, max: 3025ms)
+       Issue: Likely waiting for timeout/retry logic
+
+[SLOW] 2. tests/lib/ingestion/beacons.test.ts
+       Test: "fetchBeaconsDocument throws ExtractionError on 429 rate limit"
+       Duration: 3010ms avg (min: 3007ms, max: 3014ms)
+       Issue: Likely waiting for timeout/retry logic
+
+[SLOW] 3. tests/lib/ingestion/beacons.test.ts
+       Test: "fetchBeaconsDocument throws ExtractionError on 404"
+       Duration: 3009ms avg (min: 3005ms, max: 3021ms)
+       Issue: Likely waiting for timeout/retry logic
+
+[SLOW] 4. tests/lib/ingestion/linktree.test.ts
+       Test: "fetchLinktreeDocument throws ExtractionError on 404"
+       Duration: 3008ms avg (min: 3005ms, max: 3016ms)
+       Issue: Likely waiting for timeout/retry logic
+
+MEDIUM SLOW TESTS - Tests >500ms
+--------------------------------
+[SLOW] 5. tests/bench/track-route.bench.test.ts
+       Test: "captures p50/p95 latency and ensures click persistence"
+       Duration: 1110ms avg (min: 240ms, max: 3485ms)
+       Issue: High variance - possibly I/O bound or database wait
+
+[SLOW] 6. tests/integration/analytics-tracking.test.ts
+       Test: "RLS Security should not have RLS bypass capability"
+       Duration: 841ms avg (min: 164ms, max: 3338ms)
+       Issue: High variance - likely database/async operations
+
+[SLOW] 7. tests/lib/stripe/billing-hardening.test.ts
+       Test: "Optimistic Locking should fail after two optimistic lock failures"
+       Duration: 448ms avg (min: 419ms, max: 502ms)
+       Issue: Retry logic tests
+
+TESTS >200ms (Performance Improvement Candidates)
+-------------------------------------------------
+8.  encryptPII/decryptPII random IV test: 211ms avg
+9.  Batch encryption decrypt multiple fields: 207ms avg
+10. LinkActions Keyboard menu button test: 203ms avg
+11. HeaderNav flyout renders links: 187ms avg
+12. AuthActions renders log in links: 170ms avg
+13. AvatarUploadable non-uploadable mode: 163ms avg
+14. Batch encryption encrypt multiple fields: 162ms avg
+15. Toast Component default props: 161ms avg
+16. QuickAddSuggestions ordering: 148ms avg
+17. SocialBar cursor pointer styling: 146ms avg
+18. ProblemSolutionSection CTA button (optimized): 141ms avg
+19. QRCode correct attributes: 140ms avg
+20. LogoLink default props: 140ms avg
+21. LoadingSpinner accessibility: 138ms avg
+22. ProblemSolutionSection CTA button: 137ms avg
+23. ProgressIndicator correct attributes: 136ms avg
+24. SkipToContent default href: 136ms avg
+
+=============================================================================
+BOTTLENECK CATEGORIES
+=============================================================================
+
+1. TIMEOUT/RETRY LOGIC TESTS (4 tests, ~12 seconds total)
+   - linktree.test.ts: 2 tests (~6 seconds)
+   - beacons.test.ts: 2 tests (~6 seconds)
+   Root Cause: Tests wait for full 3-second timeout
+   Recommendation: Mock the timeout or reduce test timeout values
+
+2. HIGH VARIANCE TESTS (2 tests)
+   - track-route.bench.test.ts (240ms-3485ms variance)
+   - analytics-tracking.test.ts RLS test (164ms-3338ms variance)
+   Root Cause: I/O-bound operations, database connections
+   Recommendation: Better mocking, test isolation
+
+3. ENCRYPTION/CRYPTO TESTS (8 tests, ~1.2 seconds total)
+   - pii-encryption.test.ts: 6 tests
+   - url-encryption.test.ts: 2 tests
+   Root Cause: CPU-intensive crypto operations
+   Recommendation: Use lighter test data, reduce iterations
+
+4. COMPONENT RENDERING TESTS (12+ tests)
+   - Various component tests: 130-200ms each
+   Root Cause: React rendering + jsdom overhead
+   Recommendation: Use shallow rendering where possible
+
+=============================================================================
+CONSISTENTLY FAILING TESTS (19 tests)
+=============================================================================
+
+These tests fail on every run and should be fixed:
+
+1. lib/http/parse-json.test.ts
+   - "parseJsonBody logs and captures parse failures"
+
+2. tests/lib/monitoring/web-vitals.test.ts (15 failures)
+   - "initWebVitals should call custom handler when metric is received"
+   - "initWebVitals should send metrics to analytics"
+   - "getRating CLS/LCP/INP/TTFB rating tests" (12 tests)
+   - "trackPerformanceExperiment" tests (2 tests)
+   Root Cause: Cannot read properties of undefined (reading '0')
+
+3. tests/unit/api/dashboard/profile.test.ts (3 failures)
+   - "syncs username and display name to Clerk"
+   - "normalizes usernames before syncing"
+   - "downloads uploaded avatar and forwards to Clerk"
+   Root Cause: expected 500 to be 200 (mock configuration issue)
+
+=============================================================================
+PERFORMANCE METRICS SUMMARY
+=============================================================================
+
+Setup Time Analysis:
+  - Test environment (jsdom): Primary bottleneck
+  - Module transformation: Secondary bottleneck
+  - Mock initialization: Moderate impact
+
+Per-Test Timing Distribution:
+  - P50 (median): ~50ms
+  - P95: ~200ms
+  - P99: ~350ms
+  - Max observed: 3485ms
+
+Test Categories by Speed:
+  - Fast (<50ms): ~70% of tests
+  - Normal (50-200ms): ~25% of tests
+  - Slow (>200ms): ~5% of tests
+  - Very Slow (>500ms): ~0.5% of tests
+  - Critical (>3000ms): 4 tests
+
+=============================================================================
+OPTIMIZATION RECOMMENDATIONS (PRIORITY ORDER)
+=============================================================================
+
+HIGH PRIORITY:
+1. Fix 4 timeout tests in linktree.test.ts and beacons.test.ts
+   - Reduce timeout from 3000ms to 100ms for error path tests
+   - Mock the retry/timeout behavior instead of waiting
+   - Expected improvement: 12+ seconds saved per run
+
+2. Fix consistently failing tests (19 tests)
+   - web-vitals.test.ts mock configuration
+   - profile.test.ts Clerk mock responses
+   - Expected improvement: Cleaner test output, better signal
+
+MEDIUM PRIORITY:
+3. Optimize high-variance tests
+   - Improve test isolation in track-route.bench.test.ts
+   - Add proper mocking for RLS security test
+   - Expected improvement: More consistent run times
+
+4. Enable parallel execution
+   - Increase maxForks from 1 to CPU cores - 1
+   - Increase maxConcurrency from 1 to 5
+   - Expected improvement: 30-50% reduction in wall clock time
+
+LOW PRIORITY:
+5. Optimize component test rendering
+   - Use React Testing Library's built-in optimizations
+   - Consider shallow rendering for simple components
+   - Expected improvement: 5-10% reduction
+
+6. Crypto test optimization
+   - Reduce test data size for encryption tests
+   - Expected improvement: 1-2 seconds saved
+
+=============================================================================
+EXPECTED IMPROVEMENTS AFTER OPTIMIZATION
+=============================================================================
+
+Current State:
+  - Cold run: ~6.3 minutes
+  - Warm run: ~2.05 minutes
+
+Target State (after optimizations):
+  - Cold run: <4 minutes (37% improvement)
+  - Warm run: <1.5 minutes (27% improvement)
+  - No tests >5000ms: ACHIEVED (currently 0)
+  - No tests >3000ms: Target (currently 4)
+  - Pass rate: >99% (from 98.06%)
+
+=============================================================================
+END OF REPORT
+=============================================================================
