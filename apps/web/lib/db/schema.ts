@@ -182,6 +182,14 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
+// User account status enum (for centralized auth gate)
+export const userStatusEnum = pgEnum('user_status', [
+  'active',
+  'pending',
+  'banned',
+  'deactivated',
+]);
+
 // Tables
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -190,6 +198,10 @@ export const users = pgTable('users', {
   email: text('email').unique(),
   isAdmin: boolean('is_admin').default(false).notNull(),
   isPro: boolean('is_pro').default(false),
+  // User account status for centralized auth gate
+  status: userStatusEnum('status').default('active').notNull(),
+  // Link to original waitlist entry for historical tracking
+  waitlistEntryId: uuid('waitlist_entry_id'),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   billingUpdatedAt: timestamp('billing_updated_at'),
@@ -260,6 +272,8 @@ export const creatorProfiles = pgTable(
     lastLoginAt: timestamp('last_login_at'),
     profileViews: integer('profile_views').default(0),
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
+    // Whether this is the user's primary profile (for future multi-profile support)
+    isPrimary: boolean('is_primary').default(false).notNull(),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
     theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -283,6 +297,10 @@ export const creatorProfiles = pgTable(
     )
       .on(table.usernameNormalized)
       .where(drizzleSql`username_normalized IS NOT NULL`),
+    // Index for efficient primary profile lookup per user
+    userIdIsPrimaryIdx: index('idx_creator_profiles_user_id_is_primary')
+      .on(table.userId, table.isPrimary)
+      .where(drizzleSql`user_id IS NOT NULL`),
   })
 );
 
@@ -901,6 +919,46 @@ export const waitlistInvites = pgTable(
   })
 );
 
+// Admin audit log for tracking all admin actions (security/compliance)
+export const adminAuditLog = pgTable(
+  'admin_audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    adminUserId: uuid('admin_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    targetUserId: uuid('target_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    targetProfileId: uuid('target_profile_id').references(
+      () => creatorProfiles.id,
+      { onDelete: 'set null' }
+    ),
+    action: text('action').notNull(),
+    // Required for sensitive actions: impersonation, waitlist bypass, role changes
+    reason: text('reason'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    adminUserIdIdx: index('idx_admin_audit_log_admin_user_id').on(
+      table.adminUserId
+    ),
+    targetUserIdIdx: index('idx_admin_audit_log_target_user_id')
+      .on(table.targetUserId)
+      .where(drizzleSql`target_user_id IS NOT NULL`),
+    targetProfileIdIdx: index('idx_admin_audit_log_target_profile_id')
+      .on(table.targetProfileId)
+      .where(drizzleSql`target_profile_id IS NOT NULL`),
+    actionIdx: index('idx_admin_audit_log_action').on(table.action),
+    createdAtIdx: index('idx_admin_audit_log_created_at').on(table.createdAt),
+  })
+);
+
 // Schema validations
 export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
@@ -980,6 +1038,9 @@ export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
 export const insertBillingAuditLogSchema = createInsertSchema(billingAuditLog);
 export const selectBillingAuditLogSchema = createSelectSchema(billingAuditLog);
 
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog);
+export const selectAdminAuditLogSchema = createSelectSchema(adminAuditLog);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1056,3 +1117,9 @@ export type NewDashboardIdempotencyKey =
 
 export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
 export type NewBillingAuditLog = typeof billingAuditLog.$inferInsert;
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;
+
+// User status type for type-safe status checks
+export type UserStatus = (typeof userStatusEnum.enumValues)[number];
