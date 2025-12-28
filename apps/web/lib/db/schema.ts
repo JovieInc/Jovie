@@ -182,23 +182,43 @@ export const photoStatusEnum = pgEnum('photo_status', [
   'failed',
 ]);
 
+// User status enum for auth hardening (active, pending waitlist, banned)
+export const userStatusEnum = pgEnum('user_status', [
+  'active',
+  'pending',
+  'banned',
+]);
+
 // Tables
-export const users = pgTable('users', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  clerkId: text('clerk_id').unique().notNull(),
-  name: text('name'),
-  email: text('email').unique(),
-  isAdmin: boolean('is_admin').default(false).notNull(),
-  isPro: boolean('is_pro').default(false),
-  stripeCustomerId: text('stripe_customer_id').unique(),
-  stripeSubscriptionId: text('stripe_subscription_id').unique(),
-  billingUpdatedAt: timestamp('billing_updated_at'),
-  billingVersion: integer('billing_version').default(1).notNull(),
-  lastBillingEventAt: timestamp('last_billing_event_at'),
-  deletedAt: timestamp('deleted_at'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const users = pgTable(
+  'users',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    clerkId: text('clerk_id').unique().notNull(),
+    name: text('name'),
+    email: text('email').unique(),
+    // Auth hardening: user status for access control
+    status: userStatusEnum('status').notNull().default('active'),
+    isAdmin: boolean('is_admin').default(false).notNull(),
+    isPro: boolean('is_pro').default(false),
+    stripeCustomerId: text('stripe_customer_id').unique(),
+    stripeSubscriptionId: text('stripe_subscription_id').unique(),
+    billingUpdatedAt: timestamp('billing_updated_at'),
+    billingVersion: integer('billing_version').default(1).notNull(),
+    lastBillingEventAt: timestamp('last_billing_event_at'),
+    // Auth hardening: link to original waitlist entry for tracking
+    waitlistEntryId: uuid('waitlist_entry_id'),
+    deletedAt: timestamp('deleted_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    statusIdx: index('idx_users_status').on(table.status),
+    waitlistEntryIdIdx: index('idx_users_waitlist_entry_id').on(
+      table.waitlistEntryId
+    ),
+  })
+);
 
 // Per-user settings (separate from creator profile)
 export const userSettings = pgTable('user_settings', {
@@ -284,7 +304,9 @@ export const creatorProfiles = pgTable(
       'creator_profiles_username_normalized_unique'
     )
       .on(table.usernameNormalized)
-      .where(drizzleSql`username_normalized IS NOT NULL AND deleted_at IS NULL`),
+      .where(
+        drizzleSql`username_normalized IS NOT NULL AND deleted_at IS NULL`
+      ),
   })
 );
 
@@ -757,6 +779,35 @@ export const billingAuditLog = pgTable(
   })
 );
 
+// Admin audit log for tracking all admin actions (auth hardening)
+export const adminAuditLog = pgTable(
+  'admin_audit_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    adminUserId: uuid('admin_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    targetUserId: uuid('target_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    action: text('action').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    adminUserIdIdx: index('idx_admin_audit_log_admin_user_id').on(
+      table.adminUserId
+    ),
+    targetUserIdIdx: index('idx_admin_audit_log_target_user_id').on(
+      table.targetUserId
+    ),
+    createdAtIdx: index('idx_admin_audit_log_created_at').on(table.createdAt),
+    actionIdx: index('idx_admin_audit_log_action').on(table.action),
+  })
+);
+
 export const signedLinkAccess = pgTable('signed_link_access', {
   id: uuid('id').primaryKey().defaultRandom(),
   linkId: text('link_id').notNull(),
@@ -982,6 +1033,9 @@ export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
 export const insertBillingAuditLogSchema = createInsertSchema(billingAuditLog);
 export const selectBillingAuditLogSchema = createSelectSchema(billingAuditLog);
 
+export const insertAdminAuditLogSchema = createInsertSchema(adminAuditLog);
+export const selectAdminAuditLogSchema = createSelectSchema(adminAuditLog);
+
 // Types
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -1058,3 +1112,6 @@ export type NewDashboardIdempotencyKey =
 
 export type BillingAuditLog = typeof billingAuditLog.$inferSelect;
 export type NewBillingAuditLog = typeof billingAuditLog.$inferInsert;
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+export type NewAdminAuditLog = typeof adminAuditLog.$inferInsert;

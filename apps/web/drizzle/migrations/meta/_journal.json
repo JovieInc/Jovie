@@ -208,15 +208,22 @@
     {
       "idx": 29,
       "version": "7",
-      "when": 1735419600000,
-      "tag": "0029_add_deleted_at_to_creator_profiles",
-      "breakpoints": false
+      "when": 1767100000000,
+      "tag": "0029_auth_hardening",
+      "breakpoints": true
     },
     {
       "idx": 30,
       "version": "7",
-      "when": 1735419700000,
-      "tag": "0030_update_username_unique_exclude_deleted",
+      "when": 1767200000000,
+      "tag": "0030_add_deleted_at_to_creator_profiles",
+      "breakpoints": false
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1767300000000,
+      "tag": "0031_update_username_unique_exclude_deleted",
       "breakpoints": false
     }
   ]

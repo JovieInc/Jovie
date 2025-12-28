@@ -47,7 +47,10 @@ export async function checkUsernameAvailability(
       .from(creatorProfiles)
       .where(
         and(
-          eq(creatorProfiles.usernameNormalized, normalizedUsername.toLowerCase()),
+          eq(
+            creatorProfiles.usernameNormalized,
+            normalizedUsername.toLowerCase()
+          ),
           isNull(creatorProfiles.deletedAt)
         )
       )
