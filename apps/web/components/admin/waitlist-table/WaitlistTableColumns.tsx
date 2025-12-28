@@ -9,7 +9,11 @@ import {
 } from '@jovie/ui';
 import { useMemo } from 'react';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
-import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS, STATUS_VARIANTS } from './constants';
+import {
+  PLATFORM_LABELS,
+  PRIMARY_GOAL_LABELS,
+  STATUS_VARIANTS,
+} from './constants';
 import type { ApproveStatus, Column } from './types';
 
 interface UseWaitlistColumnsProps {

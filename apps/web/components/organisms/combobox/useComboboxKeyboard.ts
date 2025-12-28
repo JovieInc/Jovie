@@ -69,7 +69,15 @@ export function useComboboxKeyboard({
           break;
       }
     },
-    [filteredOptions, isOpen, activeIndex, handleSelect, setIsOpen, setActiveIndex, inputRef]
+    [
+      filteredOptions,
+      isOpen,
+      activeIndex,
+      handleSelect,
+      setIsOpen,
+      setActiveIndex,
+      inputRef,
+    ]
   );
 
   return { handleKeyDown };

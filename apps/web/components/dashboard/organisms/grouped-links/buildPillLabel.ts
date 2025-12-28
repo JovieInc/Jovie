@@ -48,9 +48,5 @@ export function buildPillLabel(link: DetectedLink): string {
     return pickShortest([cleanSuggested, platform]);
   }
 
-  return pickShortest([
-    cleanSuggested,
-    `${platform} • ${identity}`,
-    platform,
-  ]);
+  return pickShortest([cleanSuggested, `${platform} • ${identity}`, platform]);
 }

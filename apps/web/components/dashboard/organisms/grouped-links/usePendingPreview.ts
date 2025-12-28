@@ -7,7 +7,9 @@ interface UsePendingPreviewProps {
 }
 
 export function usePendingPreview({ onAdd }: UsePendingPreviewProps) {
-  const [pendingPreview, setPendingPreview] = useState<PendingPreview | null>(null);
+  const [pendingPreview, setPendingPreview] = useState<PendingPreview | null>(
+    null
+  );
   const [clearSignal, setClearSignal] = useState(0);
 
   const handleAddPendingPreview = useCallback(

@@ -53,7 +53,14 @@ export function useHelperState({
       tone: 'idle' as const,
       text: 'Use lowercase letters, numbers, or hyphens (3–30 chars).',
     };
-  }, [available, availError, checkingAvail, displayDomain, handle, handleError]);
+  }, [
+    available,
+    availError,
+    checkingAvail,
+    displayDomain,
+    handle,
+    handleError,
+  ]);
 }
 
 export const HELPER_TONE_CLASSES = {

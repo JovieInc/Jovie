@@ -19,10 +19,7 @@ export function HandleStatusIcon({
 }: HandleStatusIconProps) {
   if (showChecking) {
     return (
-      <LoadingSpinner
-        size='sm'
-        className='text-zinc-500 dark:text-zinc-400'
-      />
+      <LoadingSpinner size='sm' className='text-zinc-500 dark:text-zinc-400' />
     );
   }
   if (!handle) return null;
