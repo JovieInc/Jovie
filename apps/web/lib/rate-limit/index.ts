@@ -49,12 +49,17 @@ export {
   handleCheckLimiter,
   // Health
   healthLimiter,
+  // Payment
+  linkWrapLimiter,
   // Onboarding
   onboardingLimiter,
   publicClickLimiter,
   // Public
   publicProfileLimiter,
   publicVisitLimiter,
+  stripeCheckoutLimiter,
+  stripePortalLimiter,
+  tipIntentLimiter,
   // Tracking
   trackingClicksLimiter,
   trackingIpClicksLimiter,

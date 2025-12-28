@@ -6,6 +6,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
+import { createRateLimitHeaders, stripePortalLimiter } from '@/lib/rate-limit';
 import { createBillingPortalSession } from '@/lib/stripe/client';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
@@ -21,6 +22,21 @@ export async function POST() {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Rate limiting - 10 portal sessions per minute per user
+    const rateLimitResult = await stripePortalLimiter.limit(userId);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 
@@ -62,13 +78,8 @@ export async function POST() {
       returnUrl,
     });
 
-    // Log portal session creation
-    console.log('Billing portal session created:', {
-      userId,
-      customerId: stripeCustomerId,
-      sessionId: session.id,
-      url: session.url,
-    });
+    // Log portal session creation (no PII - userId/customerId removed)
+    console.log('Billing portal session created');
 
     return NextResponse.json(
       {

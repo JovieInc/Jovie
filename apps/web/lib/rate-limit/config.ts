@@ -178,6 +178,46 @@ export const RATE_LIMITERS = {
     prefix: 'general',
     analytics: false,
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // Payment Operations (CRITICAL - protect against abuse)
+  // ---------------------------------------------------------------------------
+
+  /** Stripe checkout: 5 checkout attempts per minute per user */
+  stripeCheckout: {
+    name: 'Stripe Checkout',
+    limit: 5,
+    window: '1 m',
+    prefix: 'stripe:checkout',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Stripe portal: 10 portal sessions per minute per user */
+  stripePortal: {
+    name: 'Stripe Portal',
+    limit: 10,
+    window: '1 m',
+    prefix: 'stripe:portal',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Tip intent: 10 tip intents per minute per IP (public endpoint) */
+  tipIntent: {
+    name: 'Tip Intent',
+    limit: 10,
+    window: '1 m',
+    prefix: 'tip:intent',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
+  /** Link wrapping: 30 links per hour per IP */
+  linkWrap: {
+    name: 'Link Wrap',
+    limit: 30,
+    window: '1 h',
+    prefix: 'link:wrap',
+    analytics: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

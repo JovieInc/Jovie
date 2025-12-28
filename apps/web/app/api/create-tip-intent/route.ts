@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { z } from 'zod';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  tipIntentLimiter,
+} from '@/lib/rate-limit';
 import { validateUsername } from '@/lib/validation/username';
 
 export const runtime = 'nodejs';
@@ -21,6 +26,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Stripe not configured' },
         { status: 500, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Rate limiting - 10 tip intents per minute per IP (public endpoint)
+    const clientIP = getClientIP(req);
+    const rateLimitResult = await tipIntentLimiter.limit(clientIP);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 

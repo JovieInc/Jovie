@@ -111,13 +111,10 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Log tip received (no PII - email/phone removed for GDPR/PCI compliance)
       console.log('Tip received:', {
-        artist_id: handle,
         amount_cents: pi.amount_received,
         currency: pi.currency?.toUpperCase(),
-        payment_intent: pi.id,
-        contact_email: charge?.billing_details?.email,
-        contact_phone: charge?.billing_details?.phone,
       });
     }
 

@@ -7,6 +7,10 @@ import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { publicEnv } from '@/lib/env-public';
 import {
+  createRateLimitHeaders,
+  stripeCheckoutLimiter,
+} from '@/lib/rate-limit';
+import {
   createBillingPortalSession,
   createCheckoutSession,
   stripe,
@@ -33,6 +37,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limiting - 5 checkout attempts per minute per user
+    const rateLimitResult = await stripeCheckoutLimiter.limit(userId);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many checkout attempts. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     // Parse request body
     const body = await request.json();
     const { priceId } = body;
@@ -53,11 +72,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get price details for logging
+    // Get price details for logging (no PII)
     const priceDetails = getPriceMappingDetails(priceId);
-    console.log('Creating checkout session for:', {
-      userId,
-      priceId,
+    console.log('Creating checkout session:', {
       plan: priceDetails?.plan,
       description: priceDetails?.description,
     });
@@ -140,13 +157,9 @@ export async function POST(request: NextRequest) {
       idempotencyKey,
     });
 
-    // Log successful checkout creation
+    // Log successful checkout creation (no PII - userId/customerId removed)
     console.log('Checkout session created:', {
-      sessionId: session.id,
-      userId,
-      priceId,
-      customerId: customerResult.customerId,
-      url: session.url,
+      plan: priceDetails?.plan,
     });
 
     return NextResponse.json(

@@ -211,6 +211,42 @@ export async function checkOnboardingRateLimit(
   return userResult;
 }
 
+// ============================================================================
+// Payment Operations (CRITICAL - protect against abuse)
+// ============================================================================
+
+/**
+ * Rate limiter for Stripe checkout sessions
+ * Limit: 5 checkouts per minute per user - prevents payment abuse
+ */
+export const stripeCheckoutLimiter = createRateLimiter(
+  RATE_LIMITERS.stripeCheckout
+);
+
+/**
+ * Rate limiter for Stripe billing portal sessions
+ * Limit: 10 portal sessions per minute per user
+ */
+export const stripePortalLimiter = createRateLimiter(
+  RATE_LIMITERS.stripePortal
+);
+
+/**
+ * Rate limiter for tip payment intents
+ * Limit: 10 tip intents per minute per IP - public endpoint protection
+ */
+export const tipIntentLimiter = createRateLimiter(RATE_LIMITERS.tipIntent);
+
+/**
+ * Rate limiter for link wrapping
+ * Limit: 30 links per hour per IP
+ */
+export const linkWrapLimiter = createRateLimiter(RATE_LIMITERS.linkWrap);
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
 /**
  * Get a map of all limiters for monitoring/debugging
  */
@@ -230,5 +266,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicVisit: publicVisitLimiter,
     health: healthLimiter,
     general: generalLimiter,
+    stripeCheckout: stripeCheckoutLimiter,
+    stripePortal: stripePortalLimiter,
+    tipIntent: tipIntentLimiter,
+    linkWrap: linkWrapLimiter,
   };
 }

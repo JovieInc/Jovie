@@ -204,6 +204,13 @@
       "when": 1766600000000,
       "tag": "0028_click_events_analytics_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1766700000000,
+      "tag": "0029_sensitive_tables_rls",
+      "breakpoints": true
     }
   ]
 }

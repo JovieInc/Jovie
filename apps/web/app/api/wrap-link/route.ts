@@ -2,25 +2,8 @@
  * Link Wrapping API Route
  * Creates wrapped links with anti-cloaking protection
  *
- * Rate Limiting Status: IMPLEMENTED BUT DISABLED
- * This endpoint calls checkRateLimit() which is currently globally disabled in lib/utils/bot-detection.ts.
- * Following YC principle: "do things that don't scale until you have to"
- *
- * Rate limiting will be enabled when:
- * - Wrapped link creation exceeds ~10k/day
- * - Abuse/spam patterns detected in PostHog
- * - Link shortening abuse becomes measurable
- *
- * Current Protection:
- * - Basic URL validation
- * - Bot detection (less aggressive)
- * - Auth optional (allows anonymous usage for growth)
- *
- * Future Considerations:
- * - Enable rate limiting (50/hour per IP is already configured)
- * - Add CAPTCHA for anonymous users after N links
- * - Implement link expiration cleanup job
- * - Track abuse patterns in PostHog
+ * Rate Limiting: ENABLED - 30 links per hour per IP
+ * Protects against link spam and abuse.
  */
 
 export const runtime = 'nodejs';
@@ -28,8 +11,13 @@ export const runtime = 'nodejs';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest, NextResponse } from 'next/server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  linkWrapLimiter,
+} from '@/lib/rate-limit';
 import { createWrappedLink } from '@/lib/services/link-wrapping';
-import { checkRateLimit, detectBot } from '@/lib/utils/bot-detection';
+import { detectBot } from '@/lib/utils/bot-detection';
 import { isValidUrl } from '@/lib/utils/url-encryption';
 
 const NO_STORE_HEADERS = {
@@ -49,17 +37,20 @@ export async function POST(request: NextRequest) {
   try {
     // Basic bot detection (less aggressive for this endpoint)
     const _botResult = detectBot(request, '/api/wrap-link'); // eslint-disable-line @typescript-eslint/no-unused-vars
-    const ip =
-      request.headers.get('x-forwarded-for') ||
-      request.headers.get('x-real-ip') ||
-      'unknown';
 
-    // Rate limiting
-    const isRateLimited = await checkRateLimit(ip, '/api/wrap-link'); // 50 requests per hour
-    if (isRateLimited) {
+    // Rate limiting - 30 links per hour per IP
+    const clientIP = getClientIP(request);
+    const rateLimitResult = await linkWrapLimiter.limit(clientIP);
+    if (!rateLimitResult.success) {
       return NextResponse.json(
-        { error: 'Rate limit exceeded' },
-        { status: 429, headers: NO_STORE_HEADERS }
+        { error: 'Rate limit exceeded. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
       );
     }
 
