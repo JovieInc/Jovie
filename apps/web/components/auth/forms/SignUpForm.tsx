@@ -1,0 +1,148 @@
+'use client';
+
+import { Card, CardContent } from '@jovie/ui';
+import { useEffect } from 'react';
+import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
+import { useSignUpFlow } from '@/hooks/useSignUpFlow';
+import { EmailStep } from './EmailStep';
+import { MethodSelector } from './MethodSelector';
+import { VerificationStep } from './VerificationStep';
+
+const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
+
+/**
+ * Sign-up form using Clerk Core API.
+ * Replaces the old Clerk Elements-based OtpSignUpForm.
+ */
+export function SignUpForm() {
+  const {
+    isLoaded,
+    step,
+    setStep,
+    email,
+    setEmail,
+    code,
+    setCode,
+    loadingState,
+    error,
+    clearError,
+    shouldSuggestSignIn,
+    startEmailFlow,
+    verifyCode,
+    resendCode,
+    startOAuth,
+    goBack,
+  } = useSignUpFlow();
+
+  const [lastAuthMethod] = useLastAuthMethod();
+
+  // Store redirect URL from query params on mount
+  useEffect(() => {
+    try {
+      const redirectUrl = new URL(window.location.href).searchParams.get(
+        'redirect_url'
+      );
+      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
+        window.sessionStorage.setItem(
+          AUTH_REDIRECT_URL_STORAGE_KEY,
+          redirectUrl
+        );
+      }
+    } catch {
+      // Ignore errors
+    }
+  }, []);
+
+  // Show loading skeleton while Clerk initializes
+  if (!isLoaded) {
+    return (
+      <Card className='shadow-none border-0 bg-transparent p-0'>
+        <CardContent className='space-y-3 p-0'>
+          <div className='animate-pulse space-y-4'>
+            <div className='h-6 w-48 mx-auto bg-subtle rounded' />
+            <div className='h-12 w-full bg-subtle rounded-xl' />
+            <div className='h-12 w-full bg-subtle rounded-xl' />
+            <div className='h-12 w-full bg-subtle rounded-xl' />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const handleEmailClick = () => {
+    clearError();
+    setStep('email');
+  };
+
+  const handleBack = () => {
+    goBack();
+  };
+
+  return (
+    <Card className='shadow-none border-0 bg-transparent p-0'>
+      <CardContent className='space-y-3 p-0'>
+        {/* Global error display */}
+        <div className='min-h-[24px]' role='alert' aria-live='polite'>
+          {error && step === 'method' && (
+            <p className='text-destructive text-sm text-center'>{error}</p>
+          )}
+        </div>
+
+        {/* Method selection step */}
+        {step === 'method' && (
+          <MethodSelector
+            onEmailClick={handleEmailClick}
+            onGoogleClick={() => startOAuth('google')}
+            onSpotifyClick={() => startOAuth('spotify')}
+            loadingState={loadingState}
+            lastMethod={lastAuthMethod}
+            mode='signup'
+            error={step === 'method' ? error : null}
+          />
+        )}
+
+        {/* Email input step */}
+        {step === 'email' && (
+          <EmailStep
+            email={email}
+            onEmailChange={setEmail}
+            onSubmit={startEmailFlow}
+            isLoading={loadingState.type === 'submitting'}
+            error={error}
+            onBack={handleBack}
+            mode='signup'
+          />
+        )}
+
+        {/* Verification step */}
+        {step === 'verification' && (
+          <VerificationStep
+            email={email}
+            code={code}
+            onCodeChange={setCode}
+            onSubmit={verifyCode}
+            onResend={resendCode}
+            isVerifying={loadingState.type === 'verifying'}
+            isResending={loadingState.type === 'resending'}
+            error={error}
+            onBack={handleBack}
+            mode='signup'
+          />
+        )}
+
+        {/* Sign in suggestion when account exists */}
+        {shouldSuggestSignIn && step === 'email' && (
+          <p className='text-sm text-secondary-token text-center mt-4'>
+            Account already exists.{' '}
+            <a
+              href='/signin'
+              className='text-primary-token hover:underline focus-ring-themed rounded-md'
+            >
+              Sign in instead
+            </a>
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

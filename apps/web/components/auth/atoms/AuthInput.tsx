@@ -1,6 +1,5 @@
 'use client';
 
-import * as Clerk from '@clerk/elements/common';
 import { Input } from '@jovie/ui';
 import * as React from 'react';
 import { cn } from '@/lib/utils';
@@ -14,6 +13,10 @@ interface AuthInputProps
   > {
   type: 'email' | 'text';
   variant?: AuthInputVariant;
+  /**
+   * Error state - applies error styling
+   */
+  error?: boolean;
 }
 
 const authInputClasses = cn(
@@ -39,52 +42,64 @@ const variantClasses: Record<AuthInputVariant, string> = {
   otp: 'text-2xl tracking-[0.3em] text-center font-sans',
 } as const;
 
-export function AuthInput({
-  type,
-  inputMode,
-  autoComplete,
-  maxLength,
-  variant = 'default',
-  placeholder,
-  autoCapitalize,
-  autoCorrect,
-  spellCheck,
-  name,
-  enterKeyHint,
-  ...rest
-}: AuthInputProps) {
-  // Email-specific optimizations for mobile keyboards
-  const resolvedAutoCapitalize =
-    autoCapitalize ?? (type === 'email' ? 'none' : undefined);
-  const resolvedAutoCorrect =
-    autoCorrect ?? (type === 'email' ? 'off' : undefined);
-  const resolvedSpellCheck =
-    spellCheck ?? (type === 'email' ? false : undefined);
-  // Use email input mode for email type to show @ and .com keys on mobile
-  const resolvedInputMode =
-    inputMode ?? (type === 'email' ? 'email' : undefined);
-  // Default enter key hint to 'next' for forms
-  const resolvedEnterKeyHint = enterKeyHint ?? 'next';
+/**
+ * Auth-optimized input component with mobile keyboard optimizations.
+ * No longer depends on Clerk Elements - uses standard React input.
+ */
+export const AuthInput = React.forwardRef<HTMLInputElement, AuthInputProps>(
+  function AuthInput(
+    {
+      type,
+      inputMode,
+      autoComplete,
+      maxLength,
+      variant = 'default',
+      placeholder,
+      autoCapitalize,
+      autoCorrect,
+      spellCheck,
+      name,
+      enterKeyHint,
+      error,
+      className,
+      ...rest
+    },
+    ref
+  ) {
+    // Email-specific optimizations for mobile keyboards
+    const resolvedAutoCapitalize =
+      autoCapitalize ?? (type === 'email' ? 'none' : undefined);
+    const resolvedAutoCorrect =
+      autoCorrect ?? (type === 'email' ? 'off' : undefined);
+    const resolvedSpellCheck =
+      spellCheck ?? (type === 'email' ? false : undefined);
+    // Use email input mode for email type to show @ and .com keys on mobile
+    const resolvedInputMode =
+      inputMode ?? (type === 'email' ? 'email' : undefined);
+    // Default enter key hint to 'next' for forms
+    const resolvedEnterKeyHint = enterKeyHint ?? 'next';
 
-  return (
-    <Clerk.Input
-      type={type}
-      inputMode={resolvedInputMode}
-      autoComplete={autoComplete}
-      autoCapitalize={resolvedAutoCapitalize}
-      autoCorrect={resolvedAutoCorrect}
-      spellCheck={resolvedSpellCheck}
-      maxLength={maxLength}
-      name={name}
-      enterKeyHint={resolvedEnterKeyHint}
-      {...rest}
-      asChild
-    >
+    return (
       <Input
+        ref={ref}
+        type={type}
+        inputMode={resolvedInputMode}
+        autoComplete={autoComplete}
+        autoCapitalize={resolvedAutoCapitalize}
+        autoCorrect={resolvedAutoCorrect}
+        spellCheck={resolvedSpellCheck}
+        maxLength={maxLength}
+        name={name}
+        enterKeyHint={resolvedEnterKeyHint}
         inputSize='lg'
         placeholder={placeholder}
-        className={cn(authInputClasses, variantClasses[variant])}
+        variant={error ? 'error' : 'default'}
+        className={cn(authInputClasses, variantClasses[variant], className)}
+        aria-invalid={error || undefined}
+        {...rest}
       />
-    </Clerk.Input>
-  );
-}
+    );
+  }
+);
+
+AuthInput.displayName = 'AuthInput';
