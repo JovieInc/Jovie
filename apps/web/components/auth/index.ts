@@ -18,5 +18,6 @@ export {
   AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
-export { OtpSignInForm } from './OtpSignInForm';
-export { OtpSignUpForm } from './OtpSignUpForm';
+
+// Forms (Clerk Core API implementation)
+export { SignInForm, SignUpForm } from './forms';

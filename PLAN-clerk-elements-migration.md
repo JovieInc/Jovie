@@ -1,8 +1,17 @@
 # Migration Plan: Clerk Elements → Clerk Core API
 
-> **Status:** Planning
+> **Status:** In Progress
 > **Risk Level:** High (auth changes require human review per agents.md)
 > **Target:** Replace deprecated `@clerk/elements` with Clerk Core API while preserving world-class custom UI
+
+## Decisions Made
+
+| Question | Decision |
+|----------|----------|
+| Update onboarding flow at the same time? | **Yes** (but note: onboarding already uses custom forms, no Clerk Elements migration needed) |
+| Add new auth features during migration? | **No** - focus on 1:1 replacement |
+| Implement CAPTCHA for bot protection? | **No** |
+| Changes to allowed OAuth providers? | **No** - keep Google + Spotify |
 
 ## Executive Summary
 
@@ -523,13 +532,6 @@ export function useOAuthFlow() {
 5. **Type safety** - Better TypeScript support with hooks
 6. **Testability** - Hooks are easier to unit test than declarative components
 
-## Questions to Resolve
-
-1. Should we update onboarding flow at the same time?
-2. Do we want to add any new auth features during migration?
-3. Should we implement CAPTCHA for bot protection?
-4. Any changes to allowed OAuth providers?
-
 ---
 
-**Next Step:** Review this plan and approve to begin Phase 1 implementation.
+**Status:** Implementation in progress. See branch `claude/migrate-from-clerk-elements-Bti7T`.

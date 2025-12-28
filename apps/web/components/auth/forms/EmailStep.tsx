@@ -1,0 +1,159 @@
+'use client';
+
+import * as React from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { AuthBackButton, AuthButton, AuthInput } from '../atoms';
+import { ButtonSpinner } from '../ButtonSpinner';
+
+const FIELD_ERROR_CLASSES =
+  'mt-3 text-sm text-destructive text-center animate-in fade-in-0 slide-in-from-top-1 duration-200';
+
+interface EmailStepProps {
+  /**
+   * Current email value
+   */
+  email: string;
+  /**
+   * Called when email changes
+   */
+  onEmailChange: (email: string) => void;
+  /**
+   * Called when form is submitted. Returns true if successful.
+   */
+  onSubmit: (email: string) => Promise<boolean | void>;
+  /**
+   * Whether the form is submitting
+   */
+  isLoading: boolean;
+  /**
+   * Error message to display
+   */
+  error: string | null;
+  /**
+   * Called when back button is clicked
+   */
+  onBack?: () => void;
+  /**
+   * Mode - affects copy
+   */
+  mode: 'signin' | 'signup';
+}
+
+/**
+ * Email input step for auth flows.
+ * Shared between sign-in and sign-up forms.
+ */
+export function EmailStep({
+  email,
+  onEmailChange,
+  onSubmit,
+  isLoading,
+  error,
+  onBack,
+  mode,
+}: EmailStepProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+
+  // Focus input on mount
+  React.useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  const validateEmail = (value: string): boolean => {
+    if (!value.trim()) {
+      setLocalError('Please enter your email address.');
+      return false;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) {
+      setLocalError('Please enter a valid email address.');
+      return false;
+    }
+
+    setLocalError(null);
+    return true;
+  };
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (!validateEmail(email)) {
+        return;
+      }
+
+      await onSubmit(email);
+    },
+    [email, onSubmit]
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setLocalError(null);
+      onEmailChange(e.target.value);
+    },
+    [onEmailChange]
+  );
+
+  const displayError = error || localError;
+
+  return (
+    <form onSubmit={handleSubmit} className='space-y-5 sm:space-y-4'>
+      <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
+        What&apos;s your email address?
+      </h1>
+
+      <div className='pt-4'>
+        <label className='sr-only' htmlFor='email-input'>
+          Email Address
+        </label>
+        <AuthInput
+          ref={inputRef}
+          id='email-input'
+          type='email'
+          value={email}
+          onChange={handleChange}
+          placeholder='Enter your email address'
+          autoComplete='email'
+          enterKeyHint='send'
+          error={!!displayError}
+          disabled={isLoading}
+        />
+
+        {displayError && (
+          <p className={FIELD_ERROR_CLASSES} role='alert'>
+            {displayError}
+          </p>
+        )}
+      </div>
+
+      <p className='text-[15px] leading-relaxed text-secondary-token text-center px-2'>
+        {mode === 'signin'
+          ? "We'll email a 6-digit code to keep your account secure."
+          : "We'll send a 6-digit code to verify your email."}
+      </p>
+
+      <AuthButton
+        type='submit'
+        variant='secondary'
+        disabled={isLoading}
+        aria-busy={isLoading}
+        className='touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150'
+      >
+        {isLoading ? (
+          <>
+            <ButtonSpinner />
+            <span>Sending code...</span>
+          </>
+        ) : (
+          'Continue with email'
+        )}
+      </AuthButton>
+
+      {onBack && <AuthBackButton onClick={onBack} ariaLabel='Back' />}
+    </form>
+  );
+}
