@@ -6,18 +6,43 @@ import { defineConfig } from 'vitest/config';
 // Load environment variables from .env.test if it exists
 dotenv.config({ path: '.env.test' });
 
+/**
+ * Optimized Vitest Configuration
+ *
+ * Key optimizations:
+ * - Sets test environment variables directly (avoids .env.test issues)
+ * - Inlines testing library dependencies for faster loading
+ * - Uses esbuild for faster test file compilation
+ * - Pre-bundles common dependencies via optimizeDeps
+ * - Maintains test isolation to prevent cross-contamination
+ *
+ * Note: Parallel execution (maxForks > 1) causes module resolution issues
+ * with @jovie/ui package, so we use single fork for reliability.
+ */
 export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+
+    // Environment variables for tests
+    env: {
+      // Set a test encryption key to enable proper encryption tests
+      URL_ENCRYPTION_KEY: 'test-encryption-key-32-chars!!',
+      // Ensure tests run in test mode
+      NODE_ENV: 'test',
+    },
+
     exclude: [
       'tests/e2e/**',
       'tests/performance/**',
       'node_modules/**',
       '.next/**',
     ],
-    // Use forks pool to prevent JS heap OOM in worker threads
+
+    // Use forks pool for stability with module mocking
+    // Note: Parallel execution (maxForks > 1) causes module resolution issues
+    // with @jovie/ui package, so we use single fork for reliability
     pool: 'forks',
     poolOptions: {
       forks: {
@@ -25,9 +50,12 @@ export default defineConfig({
         maxForks: 1,
       },
     },
-    // Isolate tests to prevent cross-contamination but allow within-file parallelism
+
+    // Enable isolation to prevent mock conflicts between tests
+    // Component tests need isolation for proper mock scoping
     isolate: true,
-    // Coverage optimization
+
+    // Coverage optimization - only enabled when explicitly requested
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -41,13 +69,25 @@ export default defineConfig({
         'dist/**',
       ],
     },
-    // Test timeout - reduced from 30s to 10s (most tests should be <200ms)
-    testTimeout: 10000,
-    hookTimeout: 10000,
+
+    // Timeouts balanced for reliability
+    // Some tests (linktree/beacons) take ~3s intentionally for retry testing
+    testTimeout: 10000, // 10s for reliability
+    hookTimeout: 5000, // 5s for setup/teardown
+
     globals: true,
-    // Reduce overhead by limiting concurrent tests per worker
-    maxConcurrency: 1,
+
+    // Removed maxConcurrency: 1 to allow full parallel execution
+
+    // Optimize dependency handling
+    server: {
+      deps: {
+        // Inline dependencies for faster loading
+        inline: ['@testing-library/react', '@testing-library/jest-dom'],
+      },
+    },
   },
+
   resolve: {
     alias: [
       {
@@ -80,9 +120,20 @@ export default defineConfig({
       },
     ],
   },
-  // Build optimizations
-  build: {
+
+  // Build optimizations for test files
+  esbuild: {
     target: 'esnext',
-    minify: false,
+    format: 'esm',
+  },
+
+  // Optimize dependency pre-bundling
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      '@testing-library/react',
+      '@testing-library/jest-dom',
+    ],
   },
 });
