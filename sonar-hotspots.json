@@ -1,0 +1,76 @@
+{
+  "hotspots": [
+    {
+      "key": "AZtt0Hvmf3XdfRwrPbCX",
+      "message": "Make sure the regex used here, which is vulnerable to super-linear runtime due to backtracking, cannot lead to denial of service.",
+      "file": "apps/web/scripts/audit-icons.js",
+      "line": 87,
+      "securityCategory": "dos",
+      "vulnerabilityProbability": "MEDIUM",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0Hvmf3XdfRwrPbCY",
+      "message": "Make sure the regex used here, which is vulnerable to super-linear runtime due to backtracking, cannot lead to denial of service.",
+      "file": "apps/web/scripts/audit-icons.js",
+      "line": 126,
+      "securityCategory": "dos",
+      "vulnerabilityProbability": "MEDIUM",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H4Xf3XdfRwrPbCs",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/deep-link-demo.html",
+      "line": 12,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H5Gf3XdfRwrPbCt",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/flyout-demo.html",
+      "line": 7,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H5Gf3XdfRwrPbCu",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/flyout-demo.html",
+      "line": 8,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H5Gf3XdfRwrPbCv",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/flyout-demo.html",
+      "line": 9,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H5Gf3XdfRwrPbCw",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/flyout-demo.html",
+      "line": 10,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    },
+    {
+      "key": "AZtt0H5Gf3XdfRwrPbCx",
+      "message": "Make sure not using resource integrity feature is safe here.",
+      "file": "apps/web/public/flyout-demo.html",
+      "line": 429,
+      "securityCategory": "others",
+      "vulnerabilityProbability": "LOW",
+      "status": "TO_REVIEW"
+    }
+  ]
+}

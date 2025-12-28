@@ -1,0 +1,970 @@
+{
+  "summary": {
+    "total": 96,
+    "bugs": 74,
+    "code_smells": 22,
+    "vulnerabilities": 0
+  },
+  "issues": [
+    {
+      "key": "AZtt0Hlxf3XdfRwrPbBU",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@custom-variant\"",
+      "file": "apps/web/app/globals.css",
+      "line": 16,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBV",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@theme\"",
+      "file": "apps/web/app/globals.css",
+      "line": 54,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBW",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 87,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBX",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 94,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBY",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 120,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBZ",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 125,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlyf3XdfRwrPbBa",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 129,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hlzf3XdfRwrPbBb",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 133,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBc",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 138,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBd",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 142,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBe",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 146,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBf",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 150,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBg",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 154,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBh",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 158,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBi",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 162,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBj",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 166,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBk",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 171,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBl",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 175,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBm",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 179,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBn",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 185,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl0f3XdfRwrPbBo",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 189,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBp",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 194,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBq",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 198,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBr",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 202,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBs",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 206,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBt",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 211,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBu",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 215,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBv",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 219,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBw",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 224,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBx",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 228,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBy",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 232,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbBz",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 237,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB0",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 241,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB1",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 245,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB2",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 249,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB3",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 262,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB4",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 273,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB5",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 287,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB6",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 301,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB7",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 313,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB8",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 317,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB9",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 321,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB-",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 378,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbB_",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 401,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbCA",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 416,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbCB",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 420,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl1f3XdfRwrPbCC",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 424,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCD",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 435,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCE",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 439,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCF",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 443,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCG",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 598,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCH",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 603,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCI",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 607,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCJ",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 611,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCK",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 615,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCL",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 619,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCM",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 624,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCN",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 653,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCO",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 674,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCP",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 689,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCQ",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 694,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCR",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 698,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCS",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@utility\"",
+      "file": "apps/web/app/globals.css",
+      "line": 702,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hl2f3XdfRwrPbCT",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Unexpected unknown at-rule \"@theme\"",
+      "file": "apps/web/app/globals.css",
+      "line": 763,
+      "rule": "css:S4662",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hrnf3XdfRwrPbCU",
+      "type": "CODE_SMELL",
+      "severity": "MINOR",
+      "message": "Replace this if-then-else flow by a single return statement.",
+      "file": "apps/web/eslint-rules/edge-runtime-node-imports.js",
+      "line": 25,
+      "rule": "javascript:S1126",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCm",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 23,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCn",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 66,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCo",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 103,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCp",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 156,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCq",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 168,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0H3Ff3XdfRwrPbCr",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Refactor this function to always return the same type.",
+      "file": "apps/web/plopfile.js",
+      "line": 216,
+      "rule": "javascript:S3800",
+      "effort": "20min"
+    },
+    {
+      "key": "AZtt0Hvmf3XdfRwrPbCW",
+      "type": "CODE_SMELL",
+      "severity": "CRITICAL",
+      "message": "Refactor this function to reduce its Cognitive Complexity from 24 to the 15 allowed.",
+      "file": "apps/web/scripts/audit-icons.js",
+      "line": 81,
+      "rule": "javascript:S3776",
+      "effort": "14min"
+    },
+    {
+      "key": "AZtt0Huff3XdfRwrPbCV",
+      "type": "CODE_SMELL",
+      "severity": "CRITICAL",
+      "message": "Refactor this function to reduce its Cognitive Complexity from 61 to the 15 allowed.",
+      "file": "apps/web/scripts/tailwind-guard.mjs",
+      "line": 12,
+      "rule": "javascript:S3776",
+      "effort": "51min"
+    },
+    {
+      "key": "AZtt0Hy5f3XdfRwrPbCZ",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 45,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCa",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root.dark\", first used at line 28",
+      "file": "apps/web/styles/design-system.css",
+      "line": 132,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCb",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 273,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCc",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root.dark\", first used at line 28",
+      "file": "apps/web/styles/design-system.css",
+      "line": 295,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCd",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 320,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCe",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 333,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCf",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 374,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCg",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 397,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCh",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 410,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCi",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 436,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCj",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root.dark\", first used at line 28",
+      "file": "apps/web/styles/design-system.css",
+      "line": 453,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCk",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root\", first used at line 16",
+      "file": "apps/web/styles/design-system.css",
+      "line": 473,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Hy6f3XdfRwrPbCl",
+      "type": "CODE_SMELL",
+      "severity": "MAJOR",
+      "message": "Unexpected duplicate selector \":root.dark\", first used at line 28",
+      "file": "apps/web/styles/design-system.css",
+      "line": 482,
+      "rule": "css:S4666",
+      "effort": "1min"
+    },
+    {
+      "key": "AZtt0Fj2f3XdfRwrPbBK",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/beacons/edge-case.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0Fj3f3XdfRwrPbBL",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add a <title> tag to this page.",
+      "file": "apps/web/tests/lib/ingestion/fixtures/beacons/edge-case.html",
+      "line": 3,
+      "rule": "Web:PageWithoutTitleCheck",
+      "effort": "5min"
+    },
+    {
+      "key": "AZtt0Fl1f3XdfRwrPbBM",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/beacons/structured.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0Fl2f3XdfRwrPbBN",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add a <title> tag to this page.",
+      "file": "apps/web/tests/lib/ingestion/fixtures/beacons/structured.html",
+      "line": 3,
+      "rule": "Web:PageWithoutTitleCheck",
+      "effort": "5min"
+    },
+    {
+      "key": "AZtt0Fmjf3XdfRwrPbBO",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/linktree/edge-case.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0Fmjf3XdfRwrPbBP",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add a <title> tag to this page.",
+      "file": "apps/web/tests/lib/ingestion/fixtures/linktree/edge-case.html",
+      "line": 3,
+      "rule": "Web:PageWithoutTitleCheck",
+      "effort": "5min"
+    },
+    {
+      "key": "AZtt0FnJf3XdfRwrPbBQ",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/linktree/structured.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0FnJf3XdfRwrPbBR",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add a <title> tag to this page.",
+      "file": "apps/web/tests/lib/ingestion/fixtures/linktree/structured.html",
+      "line": 3,
+      "rule": "Web:PageWithoutTitleCheck",
+      "effort": "5min"
+    },
+    {
+      "key": "AZtt0Fn0f3XdfRwrPbBS",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/youtube/edge-case.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    },
+    {
+      "key": "AZtt0Foyf3XdfRwrPbBT",
+      "type": "BUG",
+      "severity": "MAJOR",
+      "message": "Add \"lang\" and/or \"xml:lang\" attributes to this \"<html>\" element",
+      "file": "apps/web/tests/lib/ingestion/fixtures/youtube/structured.html",
+      "line": 2,
+      "rule": "Web:S5254",
+      "effort": "2min"
+    }
+  ]
+}

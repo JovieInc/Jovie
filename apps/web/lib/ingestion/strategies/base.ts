@@ -3,6 +3,11 @@
  * Provides common fetch, parsing, and error handling patterns.
  */
 
+import {
+  ExternalServiceError,
+  NotFoundError,
+  ValidationError,
+} from '@/lib/errors';
 import { logger } from '@/lib/utils/logger';
 import {
   canonicalIdentity,
@@ -83,28 +88,8 @@ export interface StrategyConfig {
   defaultTimeoutMs: number;
 }
 
-export class ExtractionError extends Error {
-  constructor(
-    message: string,
-    public readonly code: ExtractionErrorCode,
-    public readonly statusCode?: number,
-    public readonly cause?: unknown
-  ) {
-    super(message);
-    this.name = 'ExtractionError';
-  }
-}
-
-export type ExtractionErrorCode =
-  | 'INVALID_URL'
-  | 'INVALID_HOST'
-  | 'INVALID_HANDLE'
-  | 'FETCH_FAILED'
-  | 'FETCH_TIMEOUT'
-  | 'RATE_LIMITED'
-  | 'NOT_FOUND'
-  | 'PARSE_ERROR'
-  | 'EMPTY_RESPONSE';
+// ExtractionError migrated to use AppError subclasses
+// See: lib/errors/base.ts for error class definitions
 
 // ============================================================================
 // Constants
@@ -164,10 +149,10 @@ export async function fetchDocument(
   const normalizeAndValidate = (candidateUrl: string): string => {
     const parsed = new URL(candidateUrl);
     if (parsed.protocol !== 'https:') {
-      throw new ExtractionError('Invalid URL', 'INVALID_URL');
+      throw new ValidationError('Invalid URL', 'url');
     }
     if (allowedHosts && !allowedHosts.has(parsed.hostname.toLowerCase())) {
-      throw new ExtractionError('Invalid host', 'INVALID_HOST');
+      throw new ValidationError('Invalid host', 'host');
     }
     return parsed.toString();
   };
@@ -201,7 +186,7 @@ export async function fetchDocument(
         if (allowedHosts) {
           const finalHost = new URL(response.url).hostname.toLowerCase();
           if (!allowedHosts.has(finalHost)) {
-            throw new ExtractionError('Invalid host', 'INVALID_HOST');
+            throw new ValidationError('Invalid host', 'host');
           }
 
           if (
@@ -210,11 +195,14 @@ export async function fetchDocument(
             response.headers.get('location')
           ) {
             if (redirects >= MAX_REDIRECTS) {
-              throw new ExtractionError('Too many redirects', 'FETCH_FAILED');
+              throw new ExternalServiceError(
+                'platform',
+                'Too many redirects'
+              );
             }
             const location = response.headers.get('location');
             if (!location) {
-              throw new ExtractionError('Invalid redirect', 'FETCH_FAILED');
+              throw new ExternalServiceError('platform', 'Invalid redirect');
             }
             const nextUrl = normalizeAndValidate(
               new URL(location, currentUrl).toString()
@@ -229,22 +217,20 @@ export async function fetchDocument(
 
         // Handle specific HTTP status codes
         if (response.status === 404) {
-          throw new ExtractionError('Profile not found', 'NOT_FOUND', 404);
+          throw new NotFoundError('Profile', url);
         }
 
         if (response.status === 429) {
-          throw new ExtractionError(
-            'Rate limited by platform',
-            'RATE_LIMITED',
-            429
+          throw new ExternalServiceError(
+            'platform',
+            'Rate limited by platform'
           );
         }
 
         if (!response.ok) {
-          throw new ExtractionError(
-            `HTTP ${response.status}: ${response.statusText}`,
-            'FETCH_FAILED',
-            response.status
+          throw new ExternalServiceError(
+            'platform',
+            `HTTP ${response.status}: ${response.statusText}`
           );
         }
 
@@ -267,9 +253,9 @@ export async function fetchDocument(
         );
 
         if (!html || html.trim().length === 0) {
-          throw new ExtractionError(
-            'Empty response from server',
-            'EMPTY_RESPONSE'
+          throw new ExternalServiceError(
+            'platform',
+            'Empty response from server'
           );
         }
 
