@@ -5,6 +5,7 @@ import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
+import { syncAllClerkMetadata } from '@/lib/auth/clerk-sync';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { creatorProfiles, profilePhotos, users } from '@/lib/db/schema';
 import { publicEnv } from '@/lib/env-public';
@@ -451,6 +452,15 @@ export async function completeOnboarding({
     }
 
     await syncCanonicalUsernameFromApp(userId, completion.username);
+
+    // Sync Jovie metadata to Clerk (profile completion, status, etc.)
+    // This is best-effort - don't block onboarding on sync failure
+    try {
+      await syncAllClerkMetadata(userId);
+    } catch (syncError) {
+      console.error('[ONBOARDING] Failed to sync Clerk metadata:', syncError);
+      // Continue with onboarding - metadata sync is not critical
+    }
 
     if (redirectToDashboard) {
       redirect('/app/dashboard/overview');

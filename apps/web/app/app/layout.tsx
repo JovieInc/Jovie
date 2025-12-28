@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
+import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { canAccessApp, resolveUserState, UserState } from '@/lib/auth/gate';
@@ -94,6 +95,7 @@ export default async function AppShellLayout({
 
     return (
       <MyStatsig userId={userId}>
+        <ImpersonationBannerWrapper />
         <DashboardDataProvider value={dashboardData}>
           <DashboardLayoutClient
             dashboardData={dashboardData}

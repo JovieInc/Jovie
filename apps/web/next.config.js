@@ -139,6 +139,20 @@ const nextConfig = {
       },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: '/privacy',
+        destination: '/legal/privacy',
+        permanent: true,
+      },
+      {
+        source: '/terms',
+        destination: '/legal/terms',
+        permanent: true,
+      },
+    ];
+  },
   experimental: {
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
