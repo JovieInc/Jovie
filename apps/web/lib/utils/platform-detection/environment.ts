@@ -6,7 +6,7 @@
 /**
  * Production hostnames
  */
-const PRODUCTION_HOSTNAMES = ['jov.ie', 'meetjovie.com', 'app.meetjovie.com'];
+const PRODUCTION_HOSTNAMES = ['jov.ie', 'meetjovie.com'];
 
 /**
  * Preview/staging hostnames
