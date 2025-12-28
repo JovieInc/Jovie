@@ -1,13 +1,12 @@
 import { lt } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { dashboardIdempotencyKeys, db } from '@/lib/db';
+import { verifyCronSecret } from '@/lib/security/cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const CRON_SECRET = process.env.CRON_SECRET;
 
 /**
  * Cron job to clean up expired idempotency keys.
@@ -17,16 +16,13 @@ const CRON_SECRET = process.env.CRON_SECRET;
  *
  * Schedule: Daily at 4:00 AM UTC (configured in vercel.json)
  */
-export async function GET(request: Request) {
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+export async function GET(request: NextRequest) {
+  // Verify cron secret using timing-safe comparison (enforced in all environments)
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const now = new Date();

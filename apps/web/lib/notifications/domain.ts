@@ -22,6 +22,7 @@ import {
   trackUnsubscribeError,
   trackUnsubscribeSuccess,
 } from '@/lib/notifications/analytics';
+import { encryptIP } from '@/lib/utils/pii-encryption';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildInvalidRequestResponse,
@@ -197,6 +198,9 @@ export const subscribeToNotificationsDomain = async (
             notificationSubscriptions.phone,
           ];
 
+    // Note: email/phone are stored unencrypted for unique conflict detection.
+    // A future migration should add hash columns for lookups and encrypt the values.
+    // IP address is encrypted since it's not used for deduplication.
     const [insertedSubscription] = await db
       .insert(notificationSubscriptions)
       .values({
@@ -206,7 +210,7 @@ export const subscribeToNotificationsDomain = async (
         phone: channel === 'sms' ? normalizedPhone : null,
         countryCode,
         city: cityValue,
-        ipAddress,
+        ipAddress: encryptIP(ipAddress),
         source,
       })
       .onConflictDoNothing({ target: conflictTarget })

@@ -378,10 +378,16 @@ export async function deleteCreatorOrUserAction(
         updatedAt: new Date(),
       })
       .where(eq(users.id, profile.userId));
-  } else {
-    // Unclaimed creator: Hard delete profile (will cascade to social links, etc.)
-    await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
   }
+
+  // Always soft delete the profile (preserves audit trail)
+  await db
+    .update(creatorProfiles)
+    .set({
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(creatorProfiles.id, profileId));
 
   revalidatePath('/app/admin');
   revalidatePath('/app/admin/creators');

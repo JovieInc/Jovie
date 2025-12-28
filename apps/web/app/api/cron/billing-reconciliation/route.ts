@@ -13,11 +13,12 @@
  */
 
 import { sql as drizzleSql, eq, isNotNull } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { db } from '@/lib/db';
 import { billingAuditLog, users } from '@/lib/db/schema';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
+import { verifyCronSecret } from '@/lib/security/cron-auth';
 import { stripe } from '@/lib/stripe/client';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
@@ -43,9 +44,6 @@ export const maxDuration = 60; // Allow up to 60 seconds for reconciliation
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
-
 interface ReconciliationStats {
   usersChecked: number;
   mismatches: number;
@@ -67,18 +65,15 @@ interface ReconciliationResult {
  *
  * Hourly cron job to reconcile billing status between DB and Stripe
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const startTime = Date.now();
 
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  // Verify cron secret using timing-safe comparison (enforced in all environments)
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const stats: ReconciliationStats = {

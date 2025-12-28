@@ -8,6 +8,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbType } from '@/lib/db';
 import { creatorContacts, creatorProfiles, users } from '@/lib/db/schema';
+import { decryptEmail, decryptPhone, encryptEmail, encryptPhone } from '@/lib/utils/pii-encryption';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 
 function mapContact(
@@ -21,8 +22,9 @@ function mapContact(
     personName: row.personName,
     companyName: row.companyName,
     territories: row.territories ?? [],
-    email: row.email,
-    phone: row.phone,
+    // Decrypt PII fields when reading from database
+    email: decryptEmail(row.email),
+    phone: decryptPhone(row.phone),
     preferredChannel: row.preferredChannel,
     isActive: row.isActive ?? true,
     sortOrder: row.sortOrder ?? 0,
@@ -96,8 +98,9 @@ export async function saveContact(
       personName: sanitized.personName,
       companyName: sanitized.companyName,
       territories: sanitized.territories,
-      email: sanitized.email,
-      phone: sanitized.phone,
+      // Encrypt PII fields before storing in database
+      email: encryptEmail(sanitized.email),
+      phone: encryptPhone(sanitized.phone),
       preferredChannel: sanitized.preferredChannel,
       isActive: sanitized.isActive ?? true,
       sortOrder: sanitized.sortOrder ?? 0,

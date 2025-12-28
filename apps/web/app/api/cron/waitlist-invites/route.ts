@@ -5,22 +5,12 @@ import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
+import { verifyCronSecret } from '@/lib/security/cron-auth';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-const CRON_SECRET = process.env.CRON_SECRET;
-
-function isAuthorized(request: NextRequest): boolean {
-  if (!CRON_SECRET) {
-    return false;
-  }
-
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${CRON_SECRET}`;
-}
 
 const sendWindowSchema = z.object({
   sendWindowEnabled: z.boolean().default(true),
@@ -49,7 +39,7 @@ function isWithinPacificSendWindow(now: Date): boolean {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!verifyCronSecret(request)) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: NO_STORE_HEADERS }

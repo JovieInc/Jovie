@@ -7,6 +7,7 @@ import {
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { verifyCronSecretFromHeader } from '@/lib/security/cron-auth';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -15,13 +16,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET;
-
-  if (!secret) {
-    logger.error('Ingestion cron secret is not configured');
-    return false;
-  }
-
-  return request.headers.get('x-ingestion-secret') === secret;
+  return verifyCronSecretFromHeader(request, 'x-ingestion-secret', secret);
 }
 
 export async function POST(request: NextRequest) {

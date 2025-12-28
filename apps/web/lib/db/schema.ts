@@ -264,6 +264,7 @@ export const creatorProfiles = pgTable(
     theme: jsonb('theme').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
   },
   table => ({
     featuredCreatorsQueryIndex: index('idx_creator_profiles_featured_with_name')

@@ -1,15 +1,13 @@
 import { del } from '@vercel/blob';
 import { and, eq, lt, or } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db, profilePhotos } from '@/lib/db';
+import { verifyCronSecret } from '@/lib/security/cron-auth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60; // Allow up to 60 seconds for cleanup
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-// Vercel Cron secret for authentication
-const CRON_SECRET = process.env.CRON_SECRET;
 
 // Cleanup thresholds
 const FAILED_RECORD_MAX_AGE_HOURS = 24;
@@ -24,16 +22,13 @@ const UPLOADING_RECORD_MAX_AGE_HOURS = 1; // Stuck uploads older than 1 hour
  *
  * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
  */
-export async function GET(request: Request) {
-  // Verify cron secret in production
-  if (process.env.NODE_ENV === 'production') {
-    const authHeader = request.headers.get('authorization');
-    if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+export async function GET(request: NextRequest) {
+  // Verify cron secret using timing-safe comparison (enforced in all environments)
+  if (!verifyCronSecret(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const now = new Date();
