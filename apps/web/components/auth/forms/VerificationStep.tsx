@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCallback, useState } from 'react';
-import { AuthBackButton, AuthButton, OtpInput } from '../atoms';
+import { AuthButton, OtpInput } from '../atoms';
 import { ButtonSpinner } from '../ButtonSpinner';
 
 const FIELD_ERROR_CLASSES =
@@ -107,6 +107,32 @@ export function VerificationStep({
 
   return (
     <div className={STEP_TRANSITION_CLASSES}>
+      {/* Back button - positioned relative to content flow */}
+      <div className='flex justify-start mb-4'>
+        <button
+          type='button'
+          onClick={onBack}
+          className='inline-flex items-center justify-center rounded-full h-10 w-10 text-primary-token bg-surface-0/80 backdrop-blur-sm border border-subtle/50 shadow-sm hover:bg-surface-1 hover:border-subtle active:scale-95 active:bg-surface-2 transition-all duration-150 ease-out focus-ring-themed touch-manipulation select-none [-webkit-tap-highlight-color:transparent]'
+          aria-label='Use a different email'
+        >
+          <svg
+            xmlns='http://www.w3.org/2000/svg'
+            width='20'
+            height='20'
+            viewBox='0 0 24 24'
+            fill='none'
+            stroke='currentColor'
+            strokeWidth='2'
+            strokeLinecap='round'
+            strokeLinejoin='round'
+            aria-hidden='true'
+          >
+            <path d='m12 19-7-7 7-7' />
+            <path d='M19 12H5' />
+          </svg>
+        </button>
+      </div>
+
       <h1 className='text-xl sm:text-[20px] leading-7 sm:leading-6 font-medium text-primary-token mb-0 text-center'>
         Check your email
       </h1>
@@ -187,8 +213,6 @@ export function VerificationStep({
             {isResending ? 'Sending...' : 'Resend code'}
           </button>
         </div>
-
-        <AuthBackButton onClick={onBack} ariaLabel='Use a different email' />
       </form>
     </div>
   );

@@ -286,7 +286,7 @@ export function OtpInput({
                 disabled={disabled}
                 className={cn(
                   'absolute inset-0 w-full h-full bg-transparent text-center text-xl sm:text-2xl font-sans',
-                  'outline-none border-none',
+                  'outline-none border-none caret-transparent text-transparent',
                   'touch-manipulation [-webkit-tap-highlight-color:transparent]',
                   disabled && 'cursor-not-allowed'
                 )}
