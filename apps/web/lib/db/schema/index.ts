@@ -16,8 +16,6 @@
  * - infrastructure: System utilities, job queues, link wrapping
  */
 
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-
 // ============================================================================
 // Re-export all domain modules
 // ============================================================================
@@ -108,9 +106,71 @@ export {
 } from './infrastructure';
 
 // ============================================================================
-// Import tables for Zod schema and type generation
+// Re-export Zod Validation Schemas
 // ============================================================================
 
+export {
+  // Users domain
+  insertUserSchema,
+  selectUserSchema,
+  insertUserSettingsSchema,
+  selectUserSettingsSchema,
+  // Creators domain
+  insertCreatorProfileSchema,
+  selectCreatorProfileSchema,
+  insertCreatorContactSchema,
+  selectCreatorContactSchema,
+  insertSocialLinkSchema,
+  selectSocialLinkSchema,
+  insertSocialAccountSchema,
+  selectSocialAccountSchema,
+  insertProfilePhotoSchema,
+  selectProfilePhotoSchema,
+  // Catalog domain
+  insertProviderSchema,
+  selectProviderSchema,
+  insertDiscogReleaseSchema,
+  selectDiscogReleaseSchema,
+  insertDiscogTrackSchema,
+  selectDiscogTrackSchema,
+  insertProviderLinkSchema,
+  selectProviderLinkSchema,
+  insertSmartLinkTargetSchema,
+  selectSmartLinkTargetSchema,
+  // Analytics domain
+  insertAudienceMemberSchema,
+  selectAudienceMemberSchema,
+  insertClickEventSchema,
+  selectClickEventSchema,
+  // Billing domain
+  insertTipSchema,
+  selectTipSchema,
+  insertStripeWebhookEventSchema,
+  selectStripeWebhookEventSchema,
+  insertBillingAuditLogSchema,
+  selectBillingAuditLogSchema,
+  // Notifications domain
+  insertNotificationSubscriptionSchema,
+  selectNotificationSubscriptionSchema,
+  // Waitlist domain
+  insertWaitlistEntrySchema,
+  selectWaitlistEntrySchema,
+  insertWaitlistInviteSchema,
+  selectWaitlistInviteSchema,
+  // Infrastructure domain
+  insertDashboardIdempotencyKeySchema,
+  selectDashboardIdempotencyKeySchema,
+  insertSignedLinkAccessSchema,
+  selectSignedLinkAccessSchema,
+  insertWrappedLinkSchema,
+  selectWrappedLinkSchema,
+  insertIngestionJobSchema,
+  selectIngestionJobSchema,
+  insertScraperConfigSchema,
+  selectScraperConfigSchema,
+} from './validation';
+
+// Import tables for TypeScript type generation
 import { users, userSettings } from './users';
 import {
   creatorProfiles,
@@ -137,106 +197,6 @@ import {
   ingestionJobs,
   scraperConfigs,
 } from './infrastructure';
-
-// ============================================================================
-// Zod Validation Schemas
-// ============================================================================
-
-// Users
-export const insertUserSchema = createInsertSchema(users);
-export const selectUserSchema = createSelectSchema(users);
-
-// Providers
-export const insertProviderSchema = createInsertSchema(providers);
-export const selectProviderSchema = createSelectSchema(providers);
-
-// Creator Profiles
-export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
-export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
-
-// Discog Releases
-export const insertDiscogReleaseSchema = createInsertSchema(discogReleases);
-export const selectDiscogReleaseSchema = createSelectSchema(discogReleases);
-
-// Discog Tracks
-export const insertDiscogTrackSchema = createInsertSchema(discogTracks);
-export const selectDiscogTrackSchema = createSelectSchema(discogTracks);
-
-// Provider Links
-export const insertProviderLinkSchema = createInsertSchema(providerLinks);
-export const selectProviderLinkSchema = createSelectSchema(providerLinks);
-
-// Smart Link Targets
-export const insertSmartLinkTargetSchema = createInsertSchema(smartLinkTargets);
-export const selectSmartLinkTargetSchema = createSelectSchema(smartLinkTargets);
-
-// Social Links
-export const insertSocialLinkSchema = createInsertSchema(socialLinks);
-export const selectSocialLinkSchema = createSelectSchema(socialLinks);
-
-// Creator Contacts
-export const insertCreatorContactSchema = createInsertSchema(creatorContacts);
-export const selectCreatorContactSchema = createSelectSchema(creatorContacts);
-
-// Click Events
-export const insertClickEventSchema = createInsertSchema(clickEvents);
-export const selectClickEventSchema = createSelectSchema(clickEvents);
-
-// Notification Subscriptions
-export const insertNotificationSubscriptionSchema = createInsertSchema(
-  notificationSubscriptions
-);
-export const selectNotificationSubscriptionSchema = createSelectSchema(
-  notificationSubscriptions
-);
-
-// Tips
-export const insertTipSchema = createInsertSchema(tips);
-export const selectTipSchema = createSelectSchema(tips);
-
-// Signed Link Access
-export const insertSignedLinkAccessSchema =
-  createInsertSchema(signedLinkAccess);
-export const selectSignedLinkAccessSchema =
-  createSelectSchema(signedLinkAccess);
-
-// Wrapped Links
-export const insertWrappedLinkSchema = createInsertSchema(wrappedLinks);
-export const selectWrappedLinkSchema = createSelectSchema(wrappedLinks);
-
-// Stripe Webhook Events
-export const insertStripeWebhookEventSchema =
-  createInsertSchema(stripeWebhookEvents);
-export const selectStripeWebhookEventSchema =
-  createSelectSchema(stripeWebhookEvents);
-
-// Profile Photos
-export const insertProfilePhotoSchema = createInsertSchema(profilePhotos);
-export const selectProfilePhotoSchema = createSelectSchema(profilePhotos);
-
-// Social Accounts
-export const insertSocialAccountSchema = createInsertSchema(socialAccounts);
-export const selectSocialAccountSchema = createSelectSchema(socialAccounts);
-
-// Ingestion Jobs
-export const insertIngestionJobSchema = createInsertSchema(ingestionJobs);
-export const selectIngestionJobSchema = createSelectSchema(ingestionJobs);
-
-// Scraper Configs
-export const insertScraperConfigSchema = createInsertSchema(scraperConfigs);
-export const selectScraperConfigSchema = createSelectSchema(scraperConfigs);
-
-// Waitlist Entries
-export const insertWaitlistEntrySchema = createInsertSchema(waitlistEntries);
-export const selectWaitlistEntrySchema = createSelectSchema(waitlistEntries);
-
-// Waitlist Invites
-export const insertWaitlistInviteSchema = createInsertSchema(waitlistInvites);
-export const selectWaitlistInviteSchema = createSelectSchema(waitlistInvites);
-
-// Billing Audit Log
-export const insertBillingAuditLogSchema = createInsertSchema(billingAuditLog);
-export const selectBillingAuditLogSchema = createSelectSchema(billingAuditLog);
 
 // ============================================================================
 // TypeScript Types (inferred from tables)
