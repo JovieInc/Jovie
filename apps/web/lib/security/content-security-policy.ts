@@ -18,6 +18,7 @@ export const buildContentSecurityPolicy = ({
     [
       "script-src 'self'",
       `'nonce-${nonce}'`,
+      "'strict-dynamic'", // Required for Clerk's dynamically loaded scripts
       isDev ? "'unsafe-eval'" : null,
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',
@@ -59,9 +60,10 @@ export const buildContentSecurityPolicy = ({
       'https://*.clerk.accounts.dev',
       'https://api.stripe.com',
       'https://*.ingest.sentry.io',
+      'wss://*.clerk.com', // Clerk WebSocket connections
     ].join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];
