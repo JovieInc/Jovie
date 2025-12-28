@@ -60,7 +60,7 @@ export function EmailStep({
     inputRef.current?.focus();
   }, []);
 
-  const validateEmail = (value: string): boolean => {
+  const validateEmail = useCallback((value: string): boolean => {
     if (!value.trim()) {
       setLocalError('Please enter your email address.');
       return false;
@@ -75,7 +75,7 @@ export function EmailStep({
 
     setLocalError(null);
     return true;
-  };
+  }, []);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -87,7 +87,7 @@ export function EmailStep({
 
       await onSubmit(email);
     },
-    [email, onSubmit]
+    [email, onSubmit, validateEmail]
   );
 
   const handleChange = useCallback(

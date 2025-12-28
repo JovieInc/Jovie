@@ -2,10 +2,12 @@
 
 import { useClerk } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
+import type { AuthMethod } from '@/lib/auth/types';
+
+// Re-export type for backwards compatibility
+export type { AuthMethod } from '@/lib/auth/types';
 
 const LAST_AUTH_METHOD_STORAGE_KEY = 'jovie.last_auth_method';
-
-export type AuthMethod = 'email' | 'google' | 'spotify';
 
 interface ClerkClientLastAuthStrategyAccess {
   client?: {

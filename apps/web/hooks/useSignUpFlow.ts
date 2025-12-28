@@ -11,20 +11,16 @@ import {
   isSignInSuggested,
   parseClerkError,
 } from '@/lib/auth/clerk-errors';
+import type { AuthMethod, LoadingState } from '@/lib/auth/types';
+
+// Re-export types for backwards compatibility
+export type { AuthMethod, LoadingState } from '@/lib/auth/types';
 
 // Storage keys (matching existing implementation)
 const LAST_AUTH_METHOD_STORAGE_KEY = 'jovie.last_auth_method';
 const AUTH_REDIRECT_URL_STORAGE_KEY = 'jovie.auth_redirect_url';
 
 export type SignUpStep = 'method' | 'email' | 'verification';
-export type AuthMethod = 'email' | 'google' | 'spotify';
-
-export type LoadingState =
-  | { type: 'idle' }
-  | { type: 'submitting' }
-  | { type: 'verifying' }
-  | { type: 'resending' }
-  | { type: 'oauth'; provider: 'google' | 'spotify' };
 
 export interface UseSignUpFlowReturn {
   // Clerk loaded state

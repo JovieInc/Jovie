@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import * as React from 'react';
 import { useMemo } from 'react';
-import type { LoadingState } from '@/hooks/useSignInFlow';
+import type { AuthMethod, LoadingState } from '@/lib/auth/types';
 import {
   AuthButton,
   AuthGoogleIcon,
@@ -18,8 +18,6 @@ const OAUTH_BUTTON_MOBILE_CLASSES =
   'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] active:scale-[0.98] transition-transform duration-150';
 const FOOTER_LINK_CLASSES =
   'text-primary-token hover:underline focus-ring-themed focus-visible:ring-offset-(--color-bg-base) rounded-md touch-manipulation';
-
-export type AuthMethod = 'email' | 'google' | 'spotify';
 
 interface MethodSelectorProps {
   /**

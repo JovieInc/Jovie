@@ -92,7 +92,7 @@ const handleCodeSubmit = async (code: string) => {
 
 ### New Component Structure
 
-```
+```text
 components/auth/
 ├── forms/
 │   ├── SignInForm.tsx          # Main sign-in orchestrator
