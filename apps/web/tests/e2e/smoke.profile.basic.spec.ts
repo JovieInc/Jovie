@@ -1,31 +1,39 @@
 import { expect, test } from '@playwright/test';
+import {
+  SMOKE_TIMEOUTS,
+  smokeNavigate,
+  TEST_PROFILES,
+} from './utils/smoke-test-utils';
 
-// Basic profile smoke tests - simplified for reliability
-test.describe('Basic Profile smoke tests', () => {
-  test('taylorswift profile page loads with correct title', async ({
+/**
+ * Basic profile smoke tests - simplified for reliability
+ * These are lightweight tests that validate core profile functionality.
+ */
+test.describe('Basic Profile smoke tests @smoke', () => {
+  test('taylorswift profile page loads with correct title @smoke', async ({
     page,
   }) => {
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
-    });
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Should not redirect to 404
-    await expect(page).toHaveURL(/\/taylorswift/);
+    await expect(page).toHaveURL(/\/taylorswift/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Check that the page title includes artist name
-    await expect(page).toHaveTitle(/Taylor Swift/);
+    await expect(page).toHaveTitle(/Taylor Swift/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Check that we don't get a 404 error
-    const notFoundText = page.locator('text=404');
-    await expect(notFoundText).not.toBeVisible();
+    const notFoundText = page.locator('h1').filter({ hasText: /not found/i });
+    await expect(notFoundText).not.toBeVisible({
+      timeout: SMOKE_TIMEOUTS.QUICK,
+    });
   });
 
-  test('profile page responds correctly', async ({ page }) => {
-    const response = await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
-    });
+  test('profile page responds correctly @smoke', async ({ page }) => {
+    const response = await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Should get 200 OK response
     expect(response?.status()).toBe(200);
@@ -35,43 +43,45 @@ test.describe('Basic Profile smoke tests', () => {
     expect(contentType).toContain('text/html');
   });
 
-  test('non-existent profile returns 404', async ({ page }) => {
-    await page.goto('/nonexistentprofile123456', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('non-existent profile returns 404 @smoke', async ({ page }) => {
+    await smokeNavigate(page, '/nonexistentprofile123456');
 
-    // Should show 404 content - use a more specific selector
+    // Should show 404 content
     const notFoundHeading = page
       .locator('h1')
       .filter({ hasText: /not found/i });
-    await expect(notFoundHeading).toBeVisible();
+    await expect(notFoundHeading).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  test('listen mode URL works', async ({ page }) => {
-    await page.goto('/taylorswift?mode=listen', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
-    });
+  test('listen mode URL works @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=listen`);
 
     // Should stay on listen mode URL
-    await expect(page).toHaveURL(/\/taylorswift.*mode=listen/);
-
-    // Should not be 404
-    const notFoundText = page.locator('text=404');
-    await expect(notFoundText).not.toBeVisible();
-  });
-
-  test('tip mode URL works', async ({ page }) => {
-    await page.goto('/taylorswift?mode=tip', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
+    await expect(page).toHaveURL(/\/taylorswift.*mode=listen/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
+    // Should not be 404
+    const notFoundText = page.locator('h1').filter({ hasText: /not found/i });
+    await expect(notFoundText).not.toBeVisible({
+      timeout: SMOKE_TIMEOUTS.QUICK,
+    });
+  });
+
+  test('tip mode URL works @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=tip`);
+
     // Should stay on tip mode URL
-    await expect(page).toHaveURL(/\/taylorswift.*mode=tip/);
+    await expect(page).toHaveURL(/\/taylorswift.*mode=tip/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Should not be 404
-    const notFoundText = page.locator('text=404');
-    await expect(notFoundText).not.toBeVisible();
+    const notFoundText = page.locator('h1').filter({ hasText: /not found/i });
+    await expect(notFoundText).not.toBeVisible({
+      timeout: SMOKE_TIMEOUTS.QUICK,
+    });
   });
 });

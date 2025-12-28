@@ -1,47 +1,65 @@
 import { expect, test } from '@playwright/test';
+import {
+  assertNoCriticalErrors,
+  SMOKE_TIMEOUTS,
+  setupPageMonitoring,
+  smokeNavigate,
+  TEST_PROFILES,
+} from './utils/smoke-test-utils';
 
-// Smoke tests for profile pages to ensure basic functionality works
-test.describe('Profile smoke tests', () => {
-  // Test that profile pages load correctly
-  test('profile page loads and displays artist information', async ({
+/**
+ * Profile smoke tests - verify profile page functionality
+ * Tests mode switching, responsiveness, and core UI elements.
+ */
+test.describe('Profile smoke tests @smoke', () => {
+  test('profile page loads and displays artist information @smoke', async ({
     page,
-  }) => {
-    // Navigate to a known seeded profile
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-    // Should not redirect (profile exists)
-    await expect(page).toHaveURL(/\/taylorswift/);
+    try {
+      await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
-    // Check for essential profile elements
-    // Artist name should be visible
-    const artistName = page
-      .locator('h1, h2')
-      .filter({ hasText: /taylor swift/i });
-    await expect(artistName.first()).toBeVisible({ timeout: 10000 });
+      // Should not redirect (profile exists)
+      await expect(page).toHaveURL(/\/taylorswift/, {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
-    // Profile should have listen and tip buttons in default mode
-    const listenButton = page
-      .locator('a, button')
-      .filter({ hasText: /listen/i });
-    await expect(listenButton.first()).toBeVisible();
+      // Artist name should be visible
+      const artistName = page
+        .locator('h1, h2')
+        .filter({ hasText: /taylor swift/i });
+      await expect(artistName.first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
-    const tipButton = page.locator('a, button').filter({ hasText: /tip/i });
-    await expect(tipButton.first()).toBeVisible();
+      // Profile should have listen and tip buttons
+      const listenButton = page
+        .locator('a, button')
+        .filter({ hasText: /listen/i });
+      await expect(listenButton.first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      const tipButton = page.locator('a, button').filter({ hasText: /tip/i });
+      await expect(tipButton.first()).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+
+      const context = getContext();
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
+    }
   });
 
-  // Test listen mode functionality
-  test('listen mode displays DSP options', async ({ page }) => {
-    // Navigate directly to listen mode
-    await page.goto('/taylorswift?mode=listen', {
-      waitUntil: 'domcontentloaded',
+  test('listen mode displays DSP options @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=listen`);
+
+    await expect(page).toHaveURL(/\/taylorswift\?mode=listen/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    // Should stay on listen mode URL
-    await expect(page).toHaveURL(/\/taylorswift\?mode=listen/);
-
-    // Check for DSP buttons or platform options
     // At least one music platform should be visible
     const dspButtons = page
       .locator(
@@ -51,91 +69,86 @@ test.describe('Profile smoke tests', () => {
         hasText: /spotify|apple|youtube|amazon|tidal|deezer/i,
       });
 
-    // Wait for at least one DSP option to be visible
-    await expect(dspButtons.first()).toBeVisible({ timeout: 10000 });
+    await expect(dspButtons.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  // Test listen mode back button behavior
-  test('listen mode back button returns to profile', async ({ page }) => {
-    // Navigate directly to listen mode
-    await page.goto('/taylorswift?mode=listen', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('listen mode back button returns to profile @smoke', async ({
+    page,
+  }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=listen`);
 
-    // Confirm we are in listen mode
-    await expect(page).toHaveURL(/\/taylorswift\?mode=listen/);
+    await expect(page).toHaveURL(/\/taylorswift\?mode=listen/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     const backButton = page
       .locator('button[aria-label="Back to profile"]')
       .first();
 
-    await expect(backButton).toBeVisible({ timeout: 10000 });
+    await expect(backButton).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    // Click back button
     await backButton.click();
 
     // Should navigate back to the base profile URL
-    await expect(page).toHaveURL(/\/taylorswift$/);
-
-    // Back button should no longer be present once profile mode is active
-    await expect(
-      page.locator('button[aria-label="Back to profile"]')
-    ).toHaveCount(0);
-  });
-
-  // Test tip mode functionality
-  test('tip mode displays tipping interface', async ({ page }) => {
-    // Navigate directly to tip mode
-    await page.goto('/taylorswift?mode=tip', {
-      waitUntil: 'domcontentloaded',
+    await expect(page).toHaveURL(/\/taylorswift$/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
-    // Should stay on tip mode URL
-    await expect(page).toHaveURL(/\/taylorswift\?mode=tip/);
+    // Back button should no longer be present
+    await expect(
+      page.locator('button[aria-label="Back to profile"]')
+    ).toHaveCount(0, { timeout: SMOKE_TIMEOUTS.QUICK });
+  });
 
-    // Check for tip-related elements
+  test('tip mode displays tipping interface @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=tip`);
+
+    await expect(page).toHaveURL(/\/taylorswift\?mode=tip/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
     // Should have amount selectors or tip interface
     const tipInterface = page.locator('button, div').filter({
       hasText: /\$\d+|tip|venmo|payment/i,
     });
 
-    await expect(tipInterface.first()).toBeVisible({ timeout: 10000 });
+    await expect(tipInterface.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  // Test tip mode back button behavior
-  test('tip mode back button returns to profile', async ({ page }) => {
-    // Navigate directly to tip mode
-    await page.goto('/taylorswift?mode=tip', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('tip mode back button returns to profile @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}?mode=tip`);
 
-    // Confirm we are in tip mode
-    await expect(page).toHaveURL(/\/taylorswift\?mode=tip/);
+    await expect(page).toHaveURL(/\/taylorswift\?mode=tip/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     const backButton = page
       .locator('button[aria-label="Back to profile"]')
       .first();
 
-    await expect(backButton).toBeVisible({ timeout: 10000 });
+    await expect(backButton).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    // Click back button
     await backButton.click();
 
-    // Should navigate back to the base profile URL
-    await expect(page).toHaveURL(/\/taylorswift$/);
+    await expect(page).toHaveURL(/\/taylorswift$/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
-    // Back button should no longer be present once profile mode is active
     await expect(
       page.locator('button[aria-label="Back to profile"]')
-    ).toHaveCount(0);
+    ).toHaveCount(0, { timeout: SMOKE_TIMEOUTS.QUICK });
   });
 
-  // Test mode switching via buttons
-  test('can switch between profile modes', async ({ page }) => {
-    // Start at profile page
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('can switch between profile modes @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Click listen button
     const listenButton = page
@@ -145,10 +158,12 @@ test.describe('Profile smoke tests', () => {
     await listenButton.click();
 
     // Should navigate to listen mode
-    await expect(page).toHaveURL(/mode=listen/, { timeout: 10000 });
+    await expect(page).toHaveURL(/mode=listen/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Navigate back to profile
-    await page.goto('/taylorswift');
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Click tip button if available
     const tipButton = page
@@ -159,24 +174,22 @@ test.describe('Profile smoke tests', () => {
 
     if (tipButtonVisible) {
       await tipButton.click();
-      // Should navigate to tip mode
-      await expect(page).toHaveURL(/mode=tip/, { timeout: 10000 });
+      await expect(page).toHaveURL(/mode=tip/, {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
     }
   });
 
-  // Test non-existent profile handling
-  test('non-existent profile shows 404 or redirects appropriately', async ({
+  test('non-existent profile shows 404 or redirects appropriately @smoke', async ({
     page,
   }) => {
-    // Try to access a profile that doesn't exist
-    const response = await page.goto('/nonexistentprofile123456', {
-      waitUntil: 'domcontentloaded',
-    });
+    const response = await smokeNavigate(page, '/nonexistentprofile123456');
 
     // Should either show 404 or redirect
     const is404 = response?.status() === 404;
     const hasNotFound = await page
-      .locator('text=/not found|doesn.*t exist|404/i')
+      .locator('h1')
+      .filter({ hasText: /not found/i })
       .isVisible()
       .catch(() => false);
     const redirectedHome =
@@ -186,35 +199,33 @@ test.describe('Profile smoke tests', () => {
     expect(is404 || hasNotFound || redirectedHome).toBeTruthy();
   });
 
-  // Test profile page responsiveness
-  test('profile page is responsive on mobile', async ({ page }) => {
+  test('profile page is responsive on mobile @smoke', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Check that essential elements are still visible on mobile
     const artistName = page
       .locator('h1, h2')
       .filter({ hasText: /taylor swift/i });
-    await expect(artistName.first()).toBeVisible();
+    await expect(artistName.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Buttons should still be accessible
     const buttons = page
       .locator('a, button')
       .filter({ hasText: /listen|tip/i });
-    await expect(buttons.first()).toBeVisible();
+    await expect(buttons.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  // Test profile page performance
-  test('profile page loads within acceptable time', async ({ page }) => {
+  test('profile page loads within acceptable time @smoke', async ({ page }) => {
     const startTime = Date.now();
 
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     const loadTime = Date.now() - startTime;
 
@@ -230,13 +241,9 @@ test.describe('Profile smoke tests', () => {
   });
 });
 
-// Additional smoke tests for profile features
-test.describe('Profile feature smoke tests', () => {
-  // Test avatar image loading
-  test('profile avatar loads correctly', async ({ page }) => {
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+test.describe('Profile feature smoke tests @smoke', () => {
+  test('profile avatar loads correctly @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Check for avatar image
     const avatar = page
@@ -254,11 +261,8 @@ test.describe('Profile feature smoke tests', () => {
     }
   });
 
-  // Test social links if present
-  test('social links are clickable when present', async ({ page }) => {
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+  test('social links are clickable when present @smoke', async ({ page }) => {
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Check for social links
     const socialLinks = page.locator(
@@ -267,9 +271,10 @@ test.describe('Profile feature smoke tests', () => {
     const socialCount = await socialLinks.count();
 
     if (socialCount > 0) {
-      // Check that at least one social link is visible and has correct attributes
       const firstSocial = socialLinks.first();
-      await expect(firstSocial).toBeVisible();
+      await expect(firstSocial).toBeVisible({
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
 
       const href = await firstSocial.getAttribute('href');
       expect(href).toBeTruthy();
@@ -277,20 +282,19 @@ test.describe('Profile feature smoke tests', () => {
     }
   });
 
-  // Test dark mode if implemented
-  test('profile works in dark mode', async ({ page }) => {
+  test('profile works in dark mode @smoke', async ({ page }) => {
     // Set dark mode preference
     await page.emulateMedia({ colorScheme: 'dark' });
 
-    await page.goto('/taylorswift', {
-      waitUntil: 'domcontentloaded',
-    });
+    await smokeNavigate(page, `/${TEST_PROFILES.TAYLORSWIFT}`);
 
     // Check that page loads without errors
     const artistName = page
       .locator('h1, h2')
       .filter({ hasText: /taylor swift/i });
-    await expect(artistName.first()).toBeVisible();
+    await expect(artistName.first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     // Check for dark mode classes or styles
     const htmlElement = page.locator('html');
