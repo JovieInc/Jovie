@@ -8,7 +8,12 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
 import { type DbType } from '@/lib/db';
 import { creatorContacts, creatorProfiles, users } from '@/lib/db/schema';
-import { decryptEmail, decryptPhone, encryptEmail, encryptPhone } from '@/lib/utils/pii-encryption';
+import {
+  decryptEmail,
+  decryptPhone,
+  encryptEmail,
+  encryptPhone,
+} from '@/lib/utils/pii-encryption';
 import type { DashboardContact, DashboardContactInput } from '@/types/contacts';
 
 function mapContact(

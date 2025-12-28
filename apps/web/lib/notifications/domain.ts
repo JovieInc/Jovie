@@ -22,7 +22,6 @@ import {
   trackUnsubscribeError,
   trackUnsubscribeSuccess,
 } from '@/lib/notifications/analytics';
-import { encryptIP } from '@/lib/utils/pii-encryption';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildInvalidRequestResponse,
@@ -49,6 +48,7 @@ import {
   normalizeSubscriptionEmail,
   normalizeSubscriptionPhone,
 } from '@/lib/notifications/validation';
+import { encryptIP } from '@/lib/utils/pii-encryption';
 import type {
   NotificationChannel,
   NotificationContactValues,

@@ -204,6 +204,13 @@
       "when": 1766600000000,
       "tag": "0028_click_events_analytics_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1735419600000,
+      "tag": "0029_add_deleted_at_to_creator_profiles",
+      "breakpoints": false
     }
   ]
 }

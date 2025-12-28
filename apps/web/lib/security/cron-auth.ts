@@ -86,7 +86,9 @@ export function verifyCronSecretFromHeader(
   secretEnvVar: string | undefined
 ): boolean {
   if (!secretEnvVar) {
-    console.error(`[cron-auth] Secret for header ${headerName} is not configured`);
+    console.error(
+      `[cron-auth] Secret for header ${headerName} is not configured`
+    );
     return false;
   }
 
