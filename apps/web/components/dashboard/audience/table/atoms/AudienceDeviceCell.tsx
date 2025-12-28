@@ -1,0 +1,37 @@
+'use client';
+
+import { Icon } from '@/components/atoms/Icon';
+import { cn } from '@/lib/utils';
+import { getDeviceIndicator } from '@/lib/utils/audience';
+
+export interface AudienceDeviceCellProps {
+  deviceType: string | null;
+  className?: string;
+}
+
+export function AudienceDeviceCell({
+  deviceType,
+  className,
+}: AudienceDeviceCellProps) {
+  const deviceIndicator = getDeviceIndicator(deviceType);
+
+  return (
+    <td
+      className={cn(
+        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
+        className
+      )}
+    >
+      {deviceIndicator ? (
+        <Icon
+          name={deviceIndicator.iconName}
+          className='h-4 w-4 text-secondary-token'
+          aria-label={deviceIndicator.label}
+          role='img'
+        />
+      ) : (
+        <span className='text-secondary-token'>—</span>
+      )}
+    </td>
+  );
+}
