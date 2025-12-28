@@ -18,6 +18,7 @@ export const buildContentSecurityPolicy = ({
     [
       "script-src 'self'",
       `'nonce-${nonce}'`,
+      "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='", // Clerk inline script hash
       isDev ? "'unsafe-eval'" : null,
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',
