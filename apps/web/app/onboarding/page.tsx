@@ -1,9 +1,13 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
+import { currentUser } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
-import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
+import {
+  canAccessOnboarding,
+  resolveUserState,
+  UserState,
+} from '@/lib/auth/gate';
 
 interface OnboardingPageProps {
   searchParams?: Promise<{ handle?: string }>;
@@ -13,9 +17,12 @@ export default async function OnboardingPage({
   searchParams,
 }: OnboardingPageProps) {
   const resolvedSearchParams = await searchParams;
-  const { userId } = await auth();
-  if (!userId) {
-    // Require auth for onboarding; preserve destination including handle param
+
+  // Use centralized auth gate for access control
+  const authResult = await resolveUserState();
+
+  // Handle unauthenticated users
+  if (authResult.state === UserState.UNAUTHENTICATED) {
     const handleParam = resolvedSearchParams?.handle
       ? `?handle=${encodeURIComponent(resolvedSearchParams.handle)}`
       : '';
@@ -23,27 +30,34 @@ export default async function OnboardingPage({
     redirect(`/signin?redirect_url=${encodeURIComponent(redirectTarget)}`);
   }
 
-  const user = await currentUser();
-  const userEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
-  if (!userEmail) {
-    redirect('/waitlist');
-  }
-
-  const access = await getWaitlistAccessByEmail(userEmail);
-  if (
-    !access.status ||
-    access.status === 'new' ||
-    access.status === 'rejected'
-  ) {
-    redirect('/waitlist');
-  }
-
-  if (access.status === 'invited') {
-    if (access.inviteToken) {
-      redirect(`/claim/${encodeURIComponent(access.inviteToken)}`);
+  // Handle states that can't access onboarding
+  if (!canAccessOnboarding(authResult.state)) {
+    // For waitlist states, redirect appropriately
+    if (
+      authResult.state === UserState.NEEDS_WAITLIST_SUBMISSION ||
+      authResult.state === UserState.WAITLIST_PENDING
+    ) {
+      redirect('/waitlist');
     }
-    redirect('/waitlist');
+    if (
+      authResult.state === UserState.WAITLIST_INVITED &&
+      authResult.redirectTo
+    ) {
+      redirect(authResult.redirectTo);
+    }
+    if (authResult.state === UserState.BANNED) {
+      redirect('/banned');
+    }
+    // Fallback
+    if (authResult.redirectTo) {
+      redirect(authResult.redirectTo);
+    }
   }
+
+  const user = await currentUser();
+  const userEmail =
+    authResult.context.email ?? user?.emailAddresses?.[0]?.emailAddress ?? null;
+  const userId = authResult.clerkUserId!;
 
   const dashboardData = await getDashboardData();
   if (!dashboardData.needsOnboarding) {
