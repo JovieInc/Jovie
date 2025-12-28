@@ -1,30 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockWithDbSession = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockGetUserDashboardAnalytics = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
   withDbSession: mockWithDbSession,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-  audienceMembers: {},
-  clickEvents: {},
-}));
-
 vi.mock('@/lib/db/queries/analytics', () => ({
-  getAnalyticsSummary: vi.fn().mockResolvedValue({
-    totalVisits: 1000,
-    totalClicks: 500,
-    uniqueVisitors: 300,
-  }),
+  getUserDashboardAnalytics: mockGetUserDashboardAnalytics,
+}));
+
+vi.mock('@sentry/nextjs', () => ({
+  captureException: vi.fn(),
 }));
 
 describe('GET /api/dashboard/analytics', () => {
@@ -35,11 +23,12 @@ describe('GET /api/dashboard/analytics', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockWithDbSession.mockImplementation(async () => {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new Error('Unauthorized');
     });
 
     const { GET } = await import('@/app/api/dashboard/analytics/route');
-    const response = await GET();
+    const request = new Request('http://localhost/api/dashboard/analytics');
+    const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -50,21 +39,20 @@ describe('GET /api/dashboard/analytics', () => {
     mockWithDbSession.mockImplementation(async callback => {
       return callback('user_123');
     });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
-          }),
-        }),
-      }),
+    mockGetUserDashboardAnalytics.mockResolvedValue({
+      profile_views: 1000,
+      unique_users: 500,
+      top_cities: [],
+      top_countries: [],
+      top_referrers: [],
     });
 
     const { GET } = await import('@/app/api/dashboard/analytics/route');
-    const response = await GET();
+    const request = new Request('http://localhost/api/dashboard/analytics');
+    const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.analytics).toBeDefined();
+    expect(data.profile_views).toBeDefined();
   });
 });

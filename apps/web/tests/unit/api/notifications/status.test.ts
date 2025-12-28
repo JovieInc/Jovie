@@ -23,7 +23,7 @@ vi.mock('@/lib/notifications/domain', () => ({
   }),
 }));
 
-describe('GET /api/notifications/status', () => {
+describe('POST /api/notifications/status', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -33,12 +33,19 @@ describe('GET /api/notifications/status', () => {
   it('returns 429 when rate limited', async () => {
     mockCheckRateLimit.mockReturnValue(true);
 
-    const { GET } = await import('@/app/api/notifications/status/route');
+    const { POST } = await import('@/app/api/notifications/status/route');
     const request = new NextRequest(
-      'http://localhost/api/notifications/status?creatorProfileId=123&email=test@example.com'
+      'http://localhost/api/notifications/status',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          creatorProfileId: '123',
+          email: 'test@example.com',
+        }),
+      }
     );
 
-    const response = await GET(request);
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(429);
@@ -51,12 +58,19 @@ describe('GET /api/notifications/status', () => {
       status: 200,
     });
 
-    const { GET } = await import('@/app/api/notifications/status/route');
+    const { POST } = await import('@/app/api/notifications/status/route');
     const request = new NextRequest(
-      'http://localhost/api/notifications/status?creatorProfileId=123&email=test@example.com'
+      'http://localhost/api/notifications/status',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          creatorProfileId: '123',
+          email: 'test@example.com',
+        }),
+      }
     );
 
-    const response = await GET(request);
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);

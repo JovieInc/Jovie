@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
@@ -21,6 +21,7 @@ vi.mock('@/lib/stripe/client', () => ({
   stripe: {
     subscriptions: {
       retrieve: mockStripeSubscriptions,
+      list: vi.fn().mockResolvedValue({ data: [] }),
     },
   },
 }));
@@ -35,20 +36,18 @@ vi.mock('@/lib/error-tracking', () => ({
 }));
 
 describe('GET /api/cron/billing-reconciliation', () => {
-  const originalEnv = process.env.NODE_ENV;
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    process.env.CRON_SECRET = 'test-secret';
+    vi.stubEnv('CRON_SECRET', 'test-secret');
   });
 
   afterEach(() => {
-    process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 without proper authorization in production', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
     const request = new Request(
@@ -66,7 +65,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
   });
 
   it('runs reconciliation with proper authorization', async () => {
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -95,7 +94,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
   });
 
   it('handles reconciliation errors gracefully', async () => {
-    process.env.NODE_ENV = 'test';
+    vi.stubEnv('NODE_ENV', 'test');
 
     mockDbSelect.mockImplementation(() => {
       throw new Error('Database error');

@@ -1,17 +1,15 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockWithDbSession = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/auth/session', () => ({
+  withDbSession: mockWithDbSession,
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: mockDbSelect,
     update: mockDbUpdate,
   },
 }));
@@ -25,104 +23,82 @@ vi.mock('@/lib/cache/profile', () => ({
   invalidateProfileCache: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe('Artist Theme API', () => {
+vi.mock('@/lib/http/parse-json', () => ({
+  parseJsonBody: vi.fn().mockImplementation(async request => {
+    const body = await request.json();
+    return { ok: true, data: body };
+  }),
+}));
+
+describe('POST /api/artist/theme', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
   });
 
-  describe('GET /api/artist/theme', () => {
-    it('returns 401 when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
-
-      const { GET } = await import('@/app/api/artist/theme/route');
-      const response = await GET();
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
+  it('returns 401 when not authenticated', async () => {
+    mockWithDbSession.mockImplementation(async () => {
+      throw new Error('Unauthorized');
     });
 
-    it('returns theme settings for authenticated user', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockDbSelect.mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([
-                {
-                  theme: 'dark',
-                  primaryColor: '#FF5500',
-                },
-              ]),
-            }),
-          }),
-        }),
-      });
-
-      const { GET } = await import('@/app/api/artist/theme/route');
-      const response = await GET();
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.theme).toBeDefined();
+    const { POST } = await import('@/app/api/artist/theme/route');
+    const request = new NextRequest('http://localhost/api/artist/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artistId: 'artist_123', theme: 'dark' }),
     });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
   });
 
-  describe('PUT /api/artist/theme', () => {
-    it('returns 401 when not authenticated', async () => {
-      mockAuth.mockResolvedValue({ userId: null });
-
-      const { PUT } = await import('@/app/api/artist/theme/route');
-      const request = new NextRequest('http://localhost/api/artist/theme', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: 'dark' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
+  it('returns 400 when missing required fields', async () => {
+    const { POST } = await import('@/app/api/artist/theme/route');
+    const request = new NextRequest('http://localhost/api/artist/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
     });
 
-    it('updates theme successfully', async () => {
-      mockAuth.mockResolvedValue({ userId: 'user_123' });
-      mockDbSelect.mockReturnValue({
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Missing required fields');
+  });
+
+  it('updates theme successfully', async () => {
+    mockWithDbSession.mockImplementation(async callback => {
+      return callback('user_123');
+    });
+    mockDbUpdate.mockReturnValue({
+      set: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
-          innerJoin: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
-            }),
-          }),
-        }),
-      });
-      mockDbUpdate.mockReturnValue({
-        set: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
-            returning: vi.fn().mockResolvedValue([
-              {
-                theme: 'dark',
-                primaryColor: '#FF5500',
-              },
-            ]),
+            returning: vi
+              .fn()
+              .mockResolvedValue([
+                { theme: { mode: 'dark' }, usernameNormalized: 'testuser' },
+              ]),
           }),
         }),
-      });
-
-      const { PUT } = await import('@/app/api/artist/theme/route');
-      const request = new NextRequest('http://localhost/api/artist/theme', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ theme: 'dark', primaryColor: '#FF5500' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.theme).toBe('dark');
+      }),
     });
+
+    const { POST } = await import('@/app/api/artist/theme/route');
+    const request = new NextRequest('http://localhost/api/artist/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ artistId: 'artist_123', theme: 'dark' }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
   });
 });

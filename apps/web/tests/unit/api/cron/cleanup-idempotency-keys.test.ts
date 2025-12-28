@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDbDelete = vi.hoisted(() => vi.fn());
 
@@ -6,22 +6,22 @@ vi.mock('@/lib/db', () => ({
   db: {
     delete: mockDbDelete,
   },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  idempotencyKeys: {},
+  dashboardIdempotencyKeys: {},
 }));
 
 describe('GET /api/cron/cleanup-idempotency-keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    process.env.CRON_SECRET = 'test-secret';
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 without proper authorization in production', async () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import(
       '@/app/api/cron/cleanup-idempotency-keys/route'
@@ -38,8 +38,6 @@ describe('GET /api/cron/cleanup-idempotency-keys', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
-
-    process.env.NODE_ENV = originalEnv;
   });
 
   it('cleans up expired idempotency keys', async () => {

@@ -1,76 +1,70 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockIsAdmin = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockClaimPendingJobs = vi.hoisted(() => vi.fn());
+const mockProcessJob = vi.hoisted(() => vi.fn());
+const mockSucceedJob = vi.hoisted(() => vi.fn());
+const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
+vi.mock('@/lib/ingestion/processor', () => ({
+  claimPendingJobs: mockClaimPendingJobs,
+  handleIngestionJobFailure: vi.fn(),
+  processJob: mockProcessJob,
+  succeedJob: mockSucceedJob,
 }));
 
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: mockIsAdmin,
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: mockWithSystemIngestionSession,
 }));
 
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
+vi.mock('@/lib/env-server', () => ({
+  env: { INGESTION_CRON_SECRET: 'test-secret' },
 }));
 
-vi.mock('@/lib/db/schema', () => ({
-  ingestionJobs: {},
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { error: vi.fn() },
 }));
 
-describe('GET /api/ingestion/jobs', () => {
+describe('POST /api/ingestion/jobs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.stubEnv('CRON_SECRET', 'test-secret');
   });
 
-  it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
 
-    const { GET } = await import('@/app/api/ingestion/jobs/route');
-    const response = await GET();
+  it('returns 401 without proper authorization', async () => {
+    const { POST } = await import('@/app/api/ingestion/jobs/route');
+    const request = new NextRequest('http://localhost/api/ingestion/jobs', {
+      method: 'POST',
+    });
+
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
   });
 
-  it('returns 403 when user is not admin', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockIsAdmin.mockResolvedValue(false);
+  it('processes ingestion jobs with proper authorization', async () => {
+    mockWithSystemIngestionSession.mockImplementation(async fn => fn({}));
+    mockClaimPendingJobs.mockResolvedValue([]);
 
-    const { GET } = await import('@/app/api/ingestion/jobs/route');
-    const response = await GET();
-    const data = await response.json();
-
-    expect(response.status).toBe(403);
-    expect(data.error).toBe('Forbidden');
-  });
-
-  it('returns ingestion jobs for admins', async () => {
-    mockAuth.mockResolvedValue({ userId: 'admin_123' });
-    mockIsAdmin.mockResolvedValue(true);
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        orderBy: vi.fn().mockReturnValue({
-          limit: vi
-            .fn()
-            .mockResolvedValue([
-              { id: 'job_1', status: 'completed', createdAt: new Date() },
-            ]),
-        }),
-      }),
+    const { POST } = await import('@/app/api/ingestion/jobs/route');
+    const request = new NextRequest('http://localhost/api/ingestion/jobs', {
+      method: 'POST',
+      headers: { 'x-ingestion-secret': 'test-secret' },
     });
 
-    const { GET } = await import('@/app/api/ingestion/jobs/route');
-    const response = await GET();
+    const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.jobs).toBeDefined();
+    expect(data.ok).toBe(true);
+    expect(data.attempted).toBe(0);
+    expect(data.processed).toBe(0);
   });
 });

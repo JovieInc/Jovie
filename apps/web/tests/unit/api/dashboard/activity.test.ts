@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockWithDbSession = vi.hoisted(() => vi.fn());
@@ -17,6 +18,8 @@ vi.mock('@/lib/db/schema', () => ({
   creatorProfiles: {},
   audienceMembers: {},
   clickEvents: {},
+  notificationSubscriptions: {},
+  users: {},
 }));
 
 describe('GET /api/dashboard/activity/recent', () => {
@@ -27,11 +30,15 @@ describe('GET /api/dashboard/activity/recent', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockWithDbSession.mockImplementation(async () => {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new Error('Unauthorized');
     });
 
     const { GET } = await import('@/app/api/dashboard/activity/recent/route');
-    const response = await GET();
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/activity/recent?profileId=profile_123'
+    );
+
+    const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -46,10 +53,13 @@ describe('GET /api/dashboard/activity/recent', () => {
       from: vi.fn().mockReturnValue({
         innerJoin: vi.fn().mockReturnValue({
           where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([{ id: 'profile_123' }]),
+          }),
+        }),
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
             orderBy: vi.fn().mockReturnValue({
-              limit: vi
-                .fn()
-                .mockResolvedValue([{ type: 'visit', timestamp: new Date() }]),
+              limit: vi.fn().mockResolvedValue([]),
             }),
           }),
         }),
@@ -57,10 +67,14 @@ describe('GET /api/dashboard/activity/recent', () => {
     });
 
     const { GET } = await import('@/app/api/dashboard/activity/recent/route');
-    const response = await GET();
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/activity/recent?profileId=profile_123'
+    );
+
+    const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.activity).toBeDefined();
+    expect(data.activities).toBeDefined();
   });
 });

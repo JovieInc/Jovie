@@ -1,21 +1,10 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockAuth = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockGetCreatorProfileWithLinks = vi.hoisted(() => vi.fn());
 
-vi.mock('@clerk/nextjs/server', () => ({
-  auth: mockAuth,
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
-}));
-
-vi.mock('@/lib/db/schema', () => ({
-  creatorProfiles: {},
-  users: {},
+vi.mock('@/lib/db/queries', () => ({
+  getCreatorProfileWithLinks: mockGetCreatorProfileWithLinks,
 }));
 
 describe('GET /api/creator', () => {
@@ -24,60 +13,67 @@ describe('GET /api/creator', () => {
     vi.resetModules();
   });
 
-  it('returns 401 when not authenticated', async () => {
-    mockAuth.mockResolvedValue({ userId: null });
-
+  it('returns 400 when username is missing', async () => {
     const { GET } = await import('@/app/api/creator/route');
-    const response = await GET();
+    const request = new NextRequest('http://localhost/api/creator');
+    const context = { params: Promise.resolve({}) };
+
+    const response = await GET(request, context);
     const data = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(data.error).toBe('Unauthorized');
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Username is required');
   });
 
-  it('returns creator profile for authenticated user', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([
-              {
-                id: 'profile_123',
-                username: 'testcreator',
-                displayName: 'Test Creator',
-              },
-            ]),
-          }),
-        }),
-      }),
+  it('returns 404 when creator not found', async () => {
+    mockGetCreatorProfileWithLinks.mockResolvedValue(null);
+
+    const { GET } = await import('@/app/api/creator/route');
+    const request = new NextRequest(
+      'http://localhost/api/creator?username=nonexistent'
+    );
+    const context = { params: Promise.resolve({}) };
+
+    const response = await GET(request, context);
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe('Creator not found');
+  });
+
+  it('returns creator profile for valid username', async () => {
+    mockGetCreatorProfileWithLinks.mockResolvedValue({
+      id: 'profile_123',
+      username: 'testcreator',
+      usernameNormalized: 'testcreator',
+      displayName: 'Test Creator',
+      bio: 'A test creator',
+      avatarUrl: null,
+      creatorType: 'musician',
+      spotifyUrl: null,
+      appleMusicUrl: null,
+      youtubeUrl: null,
+      spotifyId: null,
+      isPublic: true,
+      isVerified: false,
+      isClaimed: true,
+      isFeatured: false,
+      marketingOptOut: false,
+      settings: {},
+      theme: {},
+      socialLinks: [],
     });
 
     const { GET } = await import('@/app/api/creator/route');
-    const response = await GET();
+    const request = new NextRequest(
+      'http://localhost/api/creator?username=testcreator'
+    );
+    const context = { params: Promise.resolve({}) };
+
+    const response = await GET(request, context);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.profile).toBeDefined();
-  });
-
-  it('returns null profile when user has no creator profile', async () => {
-    mockAuth.mockResolvedValue({ userId: 'user_123' });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
-          }),
-        }),
-      }),
-    });
-
-    const { GET } = await import('@/app/api/creator/route');
-    const response = await GET();
-    const data = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(data.profile).toBeNull();
+    expect(data.username).toBe('testcreator');
   });
 });

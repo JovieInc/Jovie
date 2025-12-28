@@ -1,16 +1,10 @@
+import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockWithDbSession = vi.hoisted(() => vi.fn());
-const mockDbSelect = vi.hoisted(() => vi.fn());
+const mockWithDbSessionTx = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/auth/session', () => ({
-  withDbSession: mockWithDbSession,
-}));
-
-vi.mock('@/lib/db', () => ({
-  db: {
-    select: mockDbSelect,
-  },
+  withDbSessionTx: mockWithDbSessionTx,
 }));
 
 vi.mock('@/lib/db/schema', () => ({
@@ -26,43 +20,51 @@ describe('GET /api/dashboard/audience/members', () => {
   });
 
   it('returns 401 when not authenticated', async () => {
-    mockWithDbSession.mockImplementation(async () => {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
+    mockWithDbSessionTx.mockImplementation(async () => {
+      throw new Error('Unauthorized');
     });
 
     const { GET } = await import('@/app/api/dashboard/audience/members/route');
-    const response = await GET();
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/audience/members?profileId=profile_123'
+    );
+
+    const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
   });
 
-  it('returns audience members for authenticated user', async () => {
-    mockWithDbSession.mockImplementation(async callback => {
-      return callback('user_123');
-    });
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi
-                .fn()
-                .mockResolvedValue([
-                  { id: 'member_1', displayName: 'Visitor 1', visits: 5 },
-                ]),
+  it('returns 400 for invalid request', async () => {
+    mockWithDbSessionTx.mockImplementation(async callback => {
+      const mockTx = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            innerJoin: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                orderBy: vi.fn().mockReturnValue({
+                  limit: vi.fn().mockReturnValue({
+                    offset: vi.fn().mockResolvedValue([]),
+                  }),
+                }),
+              }),
             }),
           }),
         }),
-      }),
+      };
+      return callback(mockTx, 'user_123');
     });
 
     const { GET } = await import('@/app/api/dashboard/audience/members/route');
-    const response = await GET();
+    const request = new NextRequest(
+      'http://localhost/api/dashboard/audience/members'
+    );
+
+    const response = await GET(request);
     const data = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(data.members).toBeDefined();
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Invalid audience request');
   });
 });

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@vercel/blob', () => ({
   del: vi.fn().mockResolvedValue(undefined),
@@ -21,12 +21,15 @@ describe('GET /api/cron/cleanup-photos', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    process.env.CRON_SECRET = 'test-secret';
+    vi.stubEnv('CRON_SECRET', 'test-secret');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 without proper authorization in production', async () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     const { GET } = await import('@/app/api/cron/cleanup-photos/route');
     const request = new Request('http://localhost/api/cron/cleanup-photos', {
@@ -38,8 +41,6 @@ describe('GET /api/cron/cleanup-photos', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
-
-    process.env.NODE_ENV = originalEnv;
   });
 
   it('runs photo cleanup', async () => {
