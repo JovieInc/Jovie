@@ -1,0 +1,321 @@
+{
+  "runs": [
+    {
+      "run": 1,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 31763,
+      "success": true
+    },
+    {
+      "run": 2,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 32184,
+      "success": true
+    },
+    {
+      "run": 3,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 35312,
+      "success": true
+    },
+    {
+      "run": 4,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 35480,
+      "success": true
+    },
+    {
+      "run": 5,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 31270,
+      "success": true
+    },
+    {
+      "run": 6,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 31736,
+      "success": true
+    },
+    {
+      "run": 7,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 33784,
+      "success": true
+    },
+    {
+      "run": 8,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 34651,
+      "success": true
+    },
+    {
+      "run": 9,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 38755,
+      "success": true
+    },
+    {
+      "run": 10,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 39510,
+      "success": true
+    },
+    {
+      "run": 11,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 31772,
+      "success": true
+    },
+    {
+      "run": 12,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 32331,
+      "success": true
+    },
+    {
+      "run": 13,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 30921,
+      "success": true
+    },
+    {
+      "run": 14,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 33140,
+      "success": true
+    },
+    {
+      "run": 15,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 37298,
+      "success": true
+    },
+    {
+      "run": 16,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 35268,
+      "success": true
+    },
+    {
+      "run": 17,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 34077,
+      "success": true
+    },
+    {
+      "run": 18,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 36635,
+      "success": true
+    },
+    {
+      "run": 19,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 39437,
+      "success": true
+    },
+    {
+      "run": 20,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 35944,
+      "success": true
+    },
+    {
+      "run": 21,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 34143,
+      "success": true
+    },
+    {
+      "run": 22,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 32461,
+      "success": true
+    },
+    {
+      "run": 23,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 31713,
+      "success": true
+    },
+    {
+      "run": 24,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 32112,
+      "success": true
+    },
+    {
+      "run": 25,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 40026,
+      "success": true
+    },
+    {
+      "run": 26,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 34910,
+      "success": true
+    },
+    {
+      "run": 27,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 36604,
+      "success": true
+    },
+    {
+      "run": 28,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 37411,
+      "success": true
+    },
+    {
+      "run": 29,
+      "exitCode": 0,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 3,
+      "duration": 67990,
+      "success": true
+    },
+    {
+      "run": 30,
+      "exitCode": 0,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 1,
+      "flaky": 0,
+      "duration": 35333,
+      "success": true
+    }
+  ],
+  "startTime": 1766924250295,
+  "totalPassed": 267,
+  "totalFailed": 0,
+  "totalSkipped": 30,
+  "passedRuns": 30,
+  "failedRuns": 0,
+  "config": {
+    "runs": 30,
+    "project": "chromium",
+    "grep": "@smoke",
+    "tests": ""
+  },
+  "endTime": 1766925324281,
+  "totalDuration": 1073986,
+  "passRate": 100,
+  "avgDuration": 35799.03333333333,
+  "avgTests": 8.9
+}
