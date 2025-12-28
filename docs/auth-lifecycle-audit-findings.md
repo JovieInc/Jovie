@@ -2,7 +2,8 @@
 
 > **Audit Date:** 2025-12-28
 > **Auditor:** Claude (Opus 4.5)
-> **Status:** Read-Only Audit Complete - Awaiting Approval for Implementation
+> **Status:** Audit Complete - Stakeholder Decisions Approved
+> **Decisions Approved:** 2025-12-28
 
 ---
 
@@ -604,26 +605,215 @@ function getCurrentUser(request: Request): { userId: string; isImpersonating: bo
 
 ---
 
-## 7. QUESTIONS FOR STAKEHOLDERS
+## 7. STAKEHOLDER DECISIONS (APPROVED)
 
-Before proceeding with implementation, please clarify:
+The following decisions have been approved and serve as requirements for implementation.
 
-1. **Multi-profile support:** Current code enforces 1 user : 1 claimed profile. Should this change?
+### 7.1 Multi-Profile Support
 
-2. **Admin impersonation in prod:** Should this be enabled by default or require explicit opt-in?
+**Decision:** Keep UX as 1 user → 1 primary profile for launch, but future-proof for multi-profile.
 
-3. **Waitlist bypass:** Should admins be able to create users who bypass waitlist entirely?
+**Requirements:**
+- Data model: 1 user → many profiles with exactly one `is_primary` profile
+- Gate logic remains user-level (waitlist/onboarding/admin are user-scoped)
+- Profile selection/management is downstream (later feature)
 
-4. **Email change handling:** If a user changes their email in Clerk, should we:
-   - a) Update the DB user email automatically?
-   - b) Keep them matched to their original waitlist entry?
-   - c) Something else?
+**Schema Impact:**
+```sql
+ALTER TABLE creator_profiles ADD COLUMN is_primary BOOLEAN DEFAULT false;
+-- Constraint: exactly one primary profile per user (enforced at app level initially)
+```
 
-5. **Soft delete behavior:** When a user is soft-deleted:
-   - Should their profile remain visible but uneditable?
-   - Should their profile be hidden?
-   - Should their Clerk account be deleted?
+### 7.2 Admin Impersonation in Production
+
+**Decision:** Require explicit opt-in; disabled by default in prod.
+
+**Requirements:**
+- Gate via env flag: `ADMIN_IMPERSONATION_ENABLED=false` (default)
+- Every impersonation requires a `reason` field
+- Short-lived tokens (15 minute TTL)
+- Full audit logging in `admin_audit_log`
+- UI must show prominent "Impersonating X" banner + "Stop impersonation" button
+
+**Implementation:**
+```typescript
+// Environment check
+const IMPERSONATION_ALLOWED = process.env.ADMIN_IMPERSONATION_ENABLED === 'true';
+
+// Required fields for impersonation request
+interface ImpersonationRequest {
+  targetUserId: string;
+  reason: string;  // Required, min 10 chars
+}
+```
+
+### 7.3 Waitlist Bypass
+
+**Decision:** Yes, explicitly and auditable.
+
+**Requirements:**
+- Admin action may create users in `accepted`/`active` state (bypassing waitlist)
+- Must be server-enforced by DB role check, never implicit
+- All bypass actions logged in `admin_audit_log` with action type `WAITLIST_BYPASS`
+- Prefer "invite + accept" flow for normal operations
+- Direct activation allowed for: partners, test accounts, demos
+
+**Audit Log Entry:**
+```typescript
+{
+  action: 'WAITLIST_BYPASS',
+  metadata: {
+    reason: string,  // Required
+    bypass_type: 'partner' | 'test' | 'demo' | 'other'
+  }
+}
+```
+
+### 7.4 Email Change Handling
+
+**Decision:** Automatically update DB email from Clerk via webhook after verification.
+
+**Requirements:**
+- Identity is `clerk_user_id`; email is an attribute
+- On Clerk `user.updated` webhook with email change:
+  - Update `users.email` to new verified email
+  - Do NOT rematch waitlist entry (keep original association)
+  - Do NOT reset waitlist/onboarding state
+- Historical emails tracked in audit log (optional enhancement)
+
+**Webhook Handler:**
+```typescript
+// user.updated event
+if (emailChanged && newEmailVerified) {
+  await db.update(users)
+    .set({ email: newEmail, updatedAt: now })
+    .where(eq(users.clerkId, clerkUserId));
+
+  // Optional: log to audit
+  await logEmailChange(clerkUserId, oldEmail, newEmail);
+}
+```
+
+### 7.5 Soft Delete Behavior
+
+**Decision:** Default soft-delete = hidden + uneditable; do NOT auto-delete Clerk account.
+
+**Requirements:**
+- When `users.deleted_at` is set:
+  - Hide public profile content (404 on profile page)
+  - Prevent edits (reject mutations at API level)
+  - Block dashboard access (redirect to error page)
+  - Set `users.status = 'deactivated'`
+- Clerk account deletion:
+  - Only on explicit user deletion request
+  - Optional grace period (e.g., 30 days)
+  - Log deletion action before executing
+
+**Status Enum Update:**
+```sql
+-- Add 'deactivated' to status check
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_status_check;
+ALTER TABLE users ADD CONSTRAINT users_status_check
+  CHECK (status IN ('active', 'banned', 'pending', 'deactivated'));
+```
+
+### 7.6 Impersonation Scope
+
+**Decision:** Full "act as user" allowed with strict constraints.
+
+**Requirements:**
+- Effective permissions = target user permissions ONLY
+- Admin privileges blocked during impersonation
+- Admin panel access must return 403 during impersonation
+- Short TTL session (15 minutes, non-renewable)
+- Explicit "Stop Impersonation" action required
+- Exhaustive audit logging of all actions during impersonation
+
+**Implementation:**
+```typescript
+// During impersonation, admin check returns false
+export async function isAdmin(userId: string): Promise<boolean> {
+  const impersonationContext = getImpersonationContext();
+  if (impersonationContext?.isImpersonating) {
+    return false;  // Block admin access during impersonation
+  }
+  // ... normal admin check
+}
+```
+
+### 7.7 Preview Environment Strategy
+
+**Decision:** Automate DB branch provisioning + seed; keep Clerk isolated from prod.
+
+**Requirements:**
+- **Neon:** Branch per preview/PR
+  - Run migrations on branch creation
+  - Seed deterministic fixtures (test admin + test user)
+  - Delete branch on PR close
+- **Clerk:** Use non-prod Clerk project for previews (preferred)
+  - If shared project: tag preview users with metadata
+  - Safe cleanup of tagged users only
+- **Safety:** Never run destructive Clerk cleanup against production
+  - Enforce via environment gating and separate project keys
+  - CI job must verify `CLERK_SECRET_KEY` is not production key before cleanup
+
+**Environment Variables:**
+```bash
+# Preview environments
+NEON_BRANCH_NAME=pr-${PR_NUMBER}
+CLERK_PROJECT_ID=preview_project_id
+CLERK_IS_PREVIEW=true
+
+# Seed data (deterministic)
+SEED_ADMIN_CLERK_ID=test_admin_${BRANCH}
+SEED_TEST_USER_CLERK_ID=test_user_${BRANCH}
+```
 
 ---
 
-*End of Audit Report*
+## 8. REVISED IMPLEMENTATION PLAN
+
+Based on the approved decisions, the implementation plan has been updated:
+
+### PR1: Schema Hardening
+**Additional Changes:**
+- Add `is_primary` to `creator_profiles` (future-proofing multi-profile)
+- Update `status` enum to include `deactivated`
+- Add `reason` field to `admin_audit_log` (required for certain actions)
+
+### PR2: Centralized Auth Gate
+**Additional Requirements:**
+- Check `users.status` for `deactivated` state
+- Block dashboard access for deactivated users
+- Ensure DB user creation captures Clerk email
+
+### PR3: Clerk Metadata Sync
+**Additional Requirements:**
+- Handle `user.updated` webhook for email changes
+- Update `users.email` on verified email change
+- Do NOT rematch waitlist entry
+
+### PR4: Admin Impersonation
+**Additional Requirements:**
+- Environment flag `ADMIN_IMPERSONATION_ENABLED` (default false)
+- Required `reason` field for impersonation
+- Block admin panel access during impersonation
+- "Stop Impersonation" action + banner
+
+### PR5: Preview Environment Hardening
+**Additional Requirements:**
+- Neon branch automation per PR
+- Deterministic seed data with test admin/user
+- Clerk project isolation (non-prod project)
+- Safety checks preventing prod cleanup
+
+### PR6: Documentation & Cleanup
+**Additional Documentation:**
+- Soft delete behavior and recovery procedures
+- Impersonation policy and audit requirements
+- Preview environment setup guide
+- Email change handling behavior
+
+---
+
+*End of Audit Report - Ready for Implementation*
