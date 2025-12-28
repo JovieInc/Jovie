@@ -52,7 +52,7 @@ jobs:
           echo "✅ .env.example looks safe (no obvious secrets)."
 
   ci-guardrails:
-    name: Guardrails (proxy + format)
+    name: Guardrails (proxy)
     # Draft PRs skip; ready PRs + pushes + merge queue enforce core repo guardrails
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -80,8 +80,36 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Next.js proxy guard
         run: pnpm --filter=@jovie/web run next:proxy-guard
-      - name: Format check (Biome)
-        run: pnpm run format:check
+
+  ci-biome:
+    name: Biome (lint + format)
+    # Single consolidated job for all Biome checks - replaces separate lint and format jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with: { fetch-depth: 1 }
+      - name: Short-circuit for docs-only / empty-diff PR updates
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No diff vs base branch (merge-only / empty PR update). Skipping Biome checks."
+            exit 0
+          fi
+
+          # Skip for docs-only changes
+          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
+            echo "Docs-only change. Skipping Biome checks."
+            exit 0
+          fi
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Run Biome CI (lint + format)
+        run: pnpm biome ci --reporter=github .
 
   ci-typecheck:
     name: Typecheck
@@ -130,47 +158,6 @@ jobs:
             ${{ runner.os }}-tsc-
       - name: Run typecheck
         run: pnpm turbo typecheck --filter=@jovie/web
-        env:
-          TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-          TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-
-  ci-lint:
-    name: Lint
-    # Draft PRs skip; ready PRs + pushes + merge queue run lint
-    # Note: Runs in parallel with typecheck for speed (no dependency on cache-warm)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with: { fetch-depth: 1 }
-      - name: Short-circuit for docs-only / empty-diff PR updates
-        if: ${{ github.event_name == 'pull_request' }}
-        run: |
-          set -euo pipefail
-
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}" HEAD)
-
-          if [ -z "$CHANGED_FILES" ]; then
-            echo "No diff vs base branch (merge-only / empty PR update). Skipping lint."
-            exit 0
-          fi
-
-          # Match the old trigger-level ignore behavior (but keep CI runnable for empty diffs)
-          if echo "$CHANGED_FILES" | grep -v -E '^(docs/|\.vscode/|.*\.md$)' | wc -l | grep -q '^0$'; then
-            echo "Docs-only change. Skipping lint."
-            exit 0
-          fi
-      - uses: ./.github/actions/setup-node-pnpm
-      - name: Cache Turbo
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-
-      - name: Run lint
-        run: pnpm turbo lint --filter=@jovie/web
         env:
           TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
           TURBO_TEAM: ${{ vars.TURBO_TEAM }}
@@ -434,13 +421,13 @@ jobs:
   ci-fast:
     name: ci-fast
     # Gate for PRs, pushes, and merge queue: aggregate fast checks
-    needs: [ci-typecheck, ci-lint, ci-guardrails]
+    needs: [ci-typecheck, ci-biome, ci-guardrails]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: All fast checks passed
         run: |
-          echo "ci-fast passed: Typecheck and Lint succeeded"
+          echo "ci-fast passed: Typecheck, Biome (lint + format), and guardrails succeeded"
 
   ci-pr-neon-migrate:
     name: DB Migrate (PR main)
@@ -975,7 +962,7 @@ jobs:
       - ci-env-example-guard
       - ci-guardrails
       - ci-typecheck
-      - ci-lint
+      - ci-biome
       - neon-db
       - drizzle-migration-guard
       - ci-drizzle-check
@@ -1066,8 +1053,8 @@ jobs:
 
             const summaryRows = [
               { label: 'Env Example Guard', jobName: 'Env Example Guard' },
-              { label: 'Guardrails', jobName: 'Guardrails (proxy + format)' },
-              { label: 'Fast Checks', jobName: 'Fast checks (typecheck + lint)' },
+              { label: 'Guardrails', jobName: 'Guardrails (proxy)' },
+              { label: 'Biome', jobName: 'Biome (lint + format)' },
               {
                 label: 'Migration Guard',
                 jobName: 'Migration Guard',
