@@ -15,14 +15,20 @@ type Story = StoryObj<typeof AuthLayout>;
 const SampleForm = () => (
   <div className='space-y-4'>
     <div className='space-y-2'>
-      <label className='text-sm font-medium text-white'>Email</label>
+      {
+        // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+        <label className='text-sm font-medium text-white'>Email</label>
+      }
       <input
         type='email'
         placeholder='you@example.com'
         className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
       />
     </div>
-    <button className='w-full py-2 bg-white text-black rounded-md font-medium'>
+    <button
+      type='button'
+      className='w-full py-2 bg-white text-black rounded-md font-medium'
+    >
       Continue
     </button>
   </div>
@@ -57,7 +63,10 @@ export const Waitlist: Story = {
     children: (
       <div className='space-y-4'>
         <div className='space-y-2'>
-          <label className='text-sm font-medium text-white'>Email</label>
+          {
+            // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+            <label className='text-sm font-medium text-white'>Email</label>
+          }
           <input
             type='email'
             placeholder='you@example.com'
@@ -65,16 +74,22 @@ export const Waitlist: Story = {
           />
         </div>
         <div className='space-y-2'>
-          <label className='text-sm font-medium text-white'>
-            Desired Handle
-          </label>
+          {
+            // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+            <label className='text-sm font-medium text-white'>
+              Desired Handle
+            </label>
+          }
           <input
             type='text'
             placeholder='@yourhandle'
             className='w-full px-3 py-2 border border-gray-700 rounded-md bg-gray-800 text-white'
           />
         </div>
-        <button className='w-full py-2 bg-white text-black rounded-md font-medium'>
+        <button
+          type='button'
+          className='w-full py-2 bg-white text-black rounded-md font-medium'
+        >
           Join Waitlist
         </button>
       </div>

@@ -158,18 +158,23 @@ export const WithNavigation: Story = {
       <SkipToContent {...args} />
       <header className='border-b p-4'>
         <nav className='flex gap-4'>
+          {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
           <a href='#' className='text-sm hover:underline'>
             Home
           </a>
+          {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
           <a href='#' className='text-sm hover:underline'>
             About
           </a>
+          {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
           <a href='#' className='text-sm hover:underline'>
             Products
           </a>
+          {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
           <a href='#' className='text-sm hover:underline'>
             Services
           </a>
+          {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
           <a href='#' className='text-sm hover:underline'>
             Contact
           </a>
@@ -179,16 +184,19 @@ export const WithNavigation: Story = {
         <h2 className='mb-2 font-semibold'>Sidebar</h2>
         <ul className='space-y-1 text-sm'>
           <li>
+            {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
             <a href='#' className='hover:underline'>
               Link 1
             </a>
           </li>
           <li>
+            {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
             <a href='#' className='hover:underline'>
               Link 2
             </a>
           </li>
           <li>
+            {/* biome-ignore lint/a11y/useValidAnchor: Story example anchor */}
             <a href='#' className='hover:underline'>
               Link 3
             </a>

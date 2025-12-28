@@ -536,6 +536,9 @@ export function DashboardAudienceTable({
                         }}
                       >
                         <td className='w-14 px-4 py-3 align-middle sm:px-6'>
+                          {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
+                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+                          {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
                           <div
                             className='relative flex h-7 w-7 items-center justify-center'
                             onClick={event => event.stopPropagation()}
@@ -657,6 +660,9 @@ export function DashboardAudienceTable({
                             <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <div className='flex items-center justify-between gap-2'>
                                 <span>{formatTimeAgo(row.lastSeenAt)}</span>
+                                {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+                                {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
+                                {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
                                 <div
                                   className={cn(
                                     'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
@@ -704,6 +710,9 @@ export function DashboardAudienceTable({
                             <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
                               <div className='flex items-center justify-between gap-2'>
                                 <span>{formatLongDate(row.lastSeenAt)}</span>
+                                {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+                                {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
+                                {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
                                 <div
                                   className={cn(
                                     'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',

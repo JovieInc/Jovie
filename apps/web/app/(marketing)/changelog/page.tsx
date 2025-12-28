@@ -36,6 +36,7 @@ export default async function ChangelogPage() {
         </header>
         <article
           className='prose prose-neutral dark:prose-invert max-w-none text-sm md:text-base'
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for markdown content rendering
           dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
       </Container>

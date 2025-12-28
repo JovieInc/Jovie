@@ -22,6 +22,7 @@ export default function GlobalError({
           content='width=device-width, initial-scale=1, viewport-fit=cover'
         />
         <style
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for dynamic CSS injection
           dangerouslySetInnerHTML={{
             __html: `
               *, *::before, *::after {
@@ -217,7 +218,7 @@ export default function GlobalError({
           </p>
 
           <div className='actions'>
-            <button onClick={reset} className='btn btn-primary'>
+            <button type='button' onClick={reset} className='btn btn-primary'>
               Try again
             </button>
             <a href='/' className='btn btn-secondary'>

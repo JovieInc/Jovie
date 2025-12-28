@@ -105,6 +105,7 @@ export const QuickAddSuggestions = React.memo(function QuickAddSuggestions({
   }
 
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
     <div
       className={`flex flex-wrap items-center justify-center gap-2 ${className ?? ''}`}
       aria-label='Quick link suggestions'

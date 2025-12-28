@@ -169,6 +169,7 @@ export function EmptyState({
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible empty state announcement
     <section
       role='status'
       aria-labelledby={headingId}

@@ -32,7 +32,7 @@ export default function VenmoTipSelector({
   );
 
   return (
-    <div className={className} role='region' aria-label='Venmo Tipping'>
+    <section className={className} aria-label='Venmo Tipping'>
       <div className='bg-surface-0 backdrop-blur-lg border border-subtle rounded-2xl p-6 shadow-xl'>
         <h2 className='text-xl font-semibold mb-4 text-primary-token'>
           Send a Tip via Venmo
@@ -42,6 +42,6 @@ export default function VenmoTipSelector({
           You&apos;ll be redirected to Venmo to complete your tip.
         </p>
       </div>
-    </div>
+    </section>
   );
 }

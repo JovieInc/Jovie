@@ -96,6 +96,7 @@ export function ProgressIndicator({
                     className='w-4 h-4 sm:w-5 sm:h-5'
                     fill='currentColor'
                     viewBox='0 0 20 20'
+                    aria-hidden='true'
                   >
                     <path
                       fillRule='evenodd'

@@ -24,6 +24,7 @@ vi.mock('@clerk/elements/common', () => ({
     children?: React.ReactNode;
     className?: string;
   }) => (
+    // biome-ignore lint/a11y/noLabelWithoutControl: Mock component for testing
     <label data-testid='clerk-label' className={className}>
       {children}
     </label>
@@ -43,6 +44,7 @@ vi.mock('@clerk/elements/common', () => ({
     length?: number;
     'aria-label'?: string;
   }) => (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Test mock component with ARIA props
     <div
       data-testid='clerk-input'
       data-type={type}
@@ -77,6 +79,7 @@ vi.mock('@clerk/elements/common', () => ({
     'aria-busy'?: boolean;
   }) => (
     <button
+      type='button'
       data-testid='clerk-connection'
       data-name={name}
       className={className}
@@ -101,6 +104,7 @@ vi.mock('@clerk/elements/sign-up', () => ({
     children: React.ReactNode;
     'aria-label'?: string;
   }) => (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: Test mock component with ARIA props
     <div data-testid={`signup-step-${name}`} aria-label={ariaLabel}>
       {children}
     </div>
@@ -124,6 +128,7 @@ vi.mock('@clerk/elements/sign-up', () => ({
     'aria-busy'?: boolean;
   }) => (
     <button
+      type='button'
       data-testid='signup-action'
       className={className}
       aria-busy={ariaBusy}

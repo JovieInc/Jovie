@@ -91,7 +91,10 @@ export const InForm: Story = {
   render: () => (
     <div className='w-80 space-y-4 p-6 border border-subtle rounded-xl'>
       <div className='space-y-2'>
-        <label className='text-sm font-medium'>Email</label>
+        {
+          // biome-ignore lint/a11y/noLabelWithoutControl: Story example - not a real form
+          <label className='text-sm font-medium'>Email</label>
+        }
         <input
           type='email'
           placeholder='you@example.com'

@@ -355,6 +355,7 @@ export function SmartHandleInput({
       </div>
 
       {/* Status message - always reserve space to prevent layout shift */}
+      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for validation status */}
       <div
         className={`text-xs min-h-5 transition-all duration-300 ${
           statusMessage

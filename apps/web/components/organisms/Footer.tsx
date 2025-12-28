@@ -179,9 +179,9 @@ export function Footer({
       'text-[11px] leading-4 font-semibold tracking-[0.04em] uppercase text-tertiary-token mb-4';
 
     return (
+      // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
         className={cn('border-t border-subtle bg-base', className)}
-        role='contentinfo'
         aria-label='Site footer'
       >
         <div
@@ -215,7 +215,7 @@ export function Footer({
                 >
                   Product
                 </h3>
-                <ul className='space-y-1' role='list'>
+                <ul className='space-y-1'>
                   {productLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>
@@ -234,7 +234,7 @@ export function Footer({
                 >
                   Company
                 </h3>
-                <ul className='space-y-1' role='list'>
+                <ul className='space-y-1'>
                   {companyLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>
@@ -256,7 +256,7 @@ export function Footer({
                 >
                   Legal
                 </h3>
-                <ul className='space-y-1' role='list'>
+                <ul className='space-y-1'>
                   {legalLinks.map(link => (
                     <li key={`${link.href}-${link.label}`}>
                       <Link href={link.href} className={footerLinkClassName}>

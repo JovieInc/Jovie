@@ -80,6 +80,7 @@ export default async function LinkInBioPage() {
       <script
         type='application/ld+json'
         nonce={nonce}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',

@@ -374,6 +374,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                   static={open}
                 >
                   {isLoading && query.length > 0 ? (
+                    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
                     <div
                       className='px-4 py-3 text-sm text-gray-500'
                       role='status'
@@ -384,6 +385,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       </div>
                     </div>
                   ) : showNoResults ? (
+                    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible search results announcement
                     <div
                       className='px-4 py-4 text-sm text-gray-500'
                       role='status'
@@ -421,6 +423,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                         id={`option-${option.id}`}
                       >
                         {({ active, selected }) => (
+                          // biome-ignore lint/a11y/useFocusableInteractive: Headless UI Combobox.Option handles interactivity
                           <div
                             className='flex items-center space-x-3'
                             role='option'

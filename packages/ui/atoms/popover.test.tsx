@@ -24,7 +24,7 @@ const TestPopover = ({
 }) => (
   <Popover open={open} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <button>{triggerText}</button>
+      <button type='button'>{triggerText}</button>
     </PopoverTrigger>
     <PopoverContent showArrow={showArrow} {...props}>
       {children}
@@ -151,11 +151,13 @@ describe('Popover', () => {
         <div>
           <TestPopover>
             <div>
-              <button>Button inside popover</button>
+              <button type='button'>Button inside popover</button>
               <input placeholder='Input inside popover' />
             </div>
           </TestPopover>
-          <button data-testid='external-button'>External button</button>
+          <button type='button' data-testid='external-button'>
+            External button
+          </button>
         </div>
       );
 
@@ -252,7 +254,9 @@ describe('Popover', () => {
       fastRender(
         <TestPopover open={true}>
           <div>
-            <button onClick={handleClick}>Interactive button</button>
+            <button type='button' onClick={handleClick}>
+              Interactive button
+            </button>
             <input placeholder='Interactive input' />
           </div>
         </TestPopover>

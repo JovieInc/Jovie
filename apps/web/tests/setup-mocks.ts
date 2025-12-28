@@ -49,7 +49,7 @@ const MockedComponents = {
     HTMLButtonElement,
     React.ComponentProps<'button'>
   >((props, ref) => {
-    return React.createElement('button', { ...props, ref });
+    return React.createElement('button', { type: 'button', ...props, ref });
   }),
   ComboboxOptions: React.forwardRef<
     HTMLDivElement,
@@ -73,7 +73,7 @@ const MockedComponents = {
     HTMLButtonElement,
     React.ComponentProps<'button'>
   >((props, ref) => {
-    return React.createElement('button', { ...props, ref });
+    return React.createElement('button', { type: 'button', ...props, ref });
   }),
   ListboxOptions: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
     (props, ref) => {
@@ -96,7 +96,7 @@ const MockedComponents = {
     HTMLButtonElement,
     React.ComponentProps<'button'>
   >((props, ref) => {
-    return React.createElement('button', { ...props, ref });
+    return React.createElement('button', { type: 'button', ...props, ref });
   }),
   MenuItems: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
     (props, ref) => {
@@ -119,7 +119,7 @@ const MockedComponents = {
     HTMLButtonElement,
     React.ComponentProps<'button'>
   >((props, ref) => {
-    return React.createElement('button', { ...props, ref });
+    return React.createElement('button', { type: 'button', ...props, ref });
   }),
   PopoverPanel: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(
     (props, ref) => {
@@ -143,7 +143,7 @@ const MockedComponents = {
   // Switch components
   Switch: React.forwardRef<HTMLButtonElement, React.ComponentProps<'button'>>(
     (props, ref) => {
-      return React.createElement('button', { ...props, ref });
+      return React.createElement('button', { type: 'button', ...props, ref });
     }
   ),
 
@@ -160,7 +160,7 @@ const MockedComponents = {
   ),
   Tab: React.forwardRef<HTMLButtonElement, React.ComponentProps<'button'>>(
     (props, ref) => {
-      return React.createElement('button', { ...props, ref });
+      return React.createElement('button', { type: 'button', ...props, ref });
     }
   ),
   TabPanels: React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(

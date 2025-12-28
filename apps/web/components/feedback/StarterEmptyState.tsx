@@ -92,6 +92,7 @@ export function StarterEmptyState({
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible empty state announcement
     <div
       role='status'
       aria-live='polite'

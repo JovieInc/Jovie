@@ -99,6 +99,7 @@ export function ThemeToggle({
           fill='none'
           stroke='currentColor'
           viewBox='0 0 24 24'
+          aria-hidden='true'
         >
           <path
             strokeLinecap='round'
@@ -116,6 +117,7 @@ export function ThemeToggle({
           fill='none'
           stroke='currentColor'
           viewBox='0 0 24 24'
+          aria-hidden='true'
         >
           <path
             strokeLinecap='round'
@@ -133,6 +135,7 @@ export function ThemeToggle({
           fill='none'
           stroke='currentColor'
           viewBox='0 0 24 24'
+          aria-hidden='true'
         >
           <path
             strokeLinecap='round'
@@ -193,8 +196,8 @@ export function ThemeToggle({
           <svg
             viewBox='0 0 20 20'
             fill='none'
-            aria-hidden='true'
             className='h-3.5 w-3.5'
+            aria-hidden='true'
           >
             <path
               stroke='currentColor'
@@ -220,8 +223,8 @@ export function ThemeToggle({
             <svg
               viewBox='0 0 20 20'
               fill='none'
-              aria-hidden='true'
               className='h-3.5 w-3.5'
+              aria-hidden='true'
             >
               <circle
                 cx='10'
@@ -256,8 +259,8 @@ export function ThemeToggle({
             <svg
               viewBox='0 0 20 20'
               fill='none'
-              aria-hidden='true'
               className='h-3.5 w-3.5'
+              aria-hidden='true'
             >
               <path
                 stroke='currentColor'

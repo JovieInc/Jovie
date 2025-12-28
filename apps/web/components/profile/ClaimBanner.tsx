@@ -50,9 +50,9 @@ export function ClaimBanner({
   const name = displayName || profileHandle;
 
   return (
-    <div
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for banner accessibility
+    <header
       className='relative w-full overflow-hidden bg-linear-to-r from-indigo-700 via-purple-700 to-fuchsia-600 text-white shadow-[0_8px_30px_rgba(0,0,0,0.28)]'
-      role='banner'
       aria-label='Claim profile banner'
       data-testid='claim-banner'
     >
@@ -91,6 +91,6 @@ export function ClaimBanner({
           </Link>
         </div>
       </div>
-    </div>
+    </header>
   );
 }

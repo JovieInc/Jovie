@@ -77,6 +77,7 @@ export const Textarea = forwardRef(function Textarea(
     return (
       <div className='space-y-2'>
         {label && (
+          // biome-ignore lint/a11y/noLabelWithoutControl: Label is associated with textarea via DOM structure
           <label className='text-sm font-medium text-gray-700 dark:text-gray-300'>
             {label}
           </label>

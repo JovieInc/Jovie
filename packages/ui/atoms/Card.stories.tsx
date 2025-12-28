@@ -99,7 +99,10 @@ export const WithFooter: Story = {
           <p>Your account settings need to be updated to continue.</p>
         </CardContent>
         <CardFooter>
-          <button className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700'>
+          <button
+            type='button'
+            className='px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700'
+          >
             Update Settings
           </button>
         </CardFooter>

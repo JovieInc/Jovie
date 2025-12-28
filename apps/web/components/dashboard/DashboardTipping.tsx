@@ -203,6 +203,7 @@ export function DashboardTipping() {
                 </Button>
               </div>
               {saveSuccess && (
+                // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible success message announcement
                 <div
                   className='rounded-lg border border-subtle bg-surface-2 px-3 py-2 text-sm text-primary-token'
                   role='status'

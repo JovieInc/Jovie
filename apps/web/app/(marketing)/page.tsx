@@ -131,6 +131,7 @@ export default async function HomePage() {
       <script
         type='application/ld+json'
         nonce={nonce}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
@@ -168,6 +169,7 @@ export default async function HomePage() {
       <script
         type='application/ld+json'
         nonce={nonce}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',
@@ -204,6 +206,7 @@ export default async function HomePage() {
       <script
         type='application/ld+json'
         nonce={nonce}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for JSON-LD schema
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             '@context': 'https://schema.org',

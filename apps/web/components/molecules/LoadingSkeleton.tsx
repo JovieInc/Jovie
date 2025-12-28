@@ -150,11 +150,15 @@ export function ProfileSkeleton() {
         role='img'
       />
       <div className='space-y-2'>
+        {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for loading skeleton accessibility */}
+        {/* biome-ignore lint/a11y/useValidAriaRole: role=text is valid for loading state */}
         <div
           className='h-8 w-48 rounded-sm skeleton motion-reduce:animate-none'
           aria-label='Loading artist name'
           role='text'
         />
+        {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA props needed for loading skeleton accessibility */}
+        {/* biome-ignore lint/a11y/useValidAriaRole: role=text is valid for loading state */}
         <div
           className='h-6 w-64 rounded-sm skeleton motion-reduce:animate-none'
           aria-label='Loading artist tagline'
@@ -167,6 +171,8 @@ export function ProfileSkeleton() {
 
 export function ButtonSkeleton() {
   return (
+    // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
+    // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
     <div
       className='h-12 w-full max-w-sm rounded-lg skeleton motion-reduce:animate-none'
       aria-label='Loading action button'
@@ -177,12 +183,15 @@ export function ButtonSkeleton() {
 
 export function SocialBarSkeleton() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Navigation skeleton placeholder
     <div
       className='flex flex-wrap justify-center gap-4'
       aria-label='Loading social media links'
       role='navigation'
     >
       {Array.from({ length: 4 }).map((_, index) => (
+        // biome-ignore lint/a11y/useFocusableInteractive: Loading skeleton, not interactive
+        // biome-ignore lint/a11y/useSemanticElements: Button skeleton placeholder
         <div
           key={index}
           className='h-12 w-12 rounded-full skeleton motion-reduce:animate-none'
@@ -196,6 +205,7 @@ export function SocialBarSkeleton() {
 
 export function AuthFormSkeleton() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
     <div
       className='space-y-4'
       aria-label='Loading authentication form'
@@ -232,6 +242,7 @@ export function CardSkeleton() {
 
 export function ListSkeleton({ items = 3 }: { items?: number }) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: skeleton placeholder for list, semantic list element not appropriate
     <div className='space-y-4' aria-label='Loading list items' role='list'>
       {Array.from({ length: items }).map((_, index) => (
         <div

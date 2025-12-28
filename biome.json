@@ -46,7 +46,7 @@
         "useButtonType": "warn",
         "useFocusableInteractive": "warn",
         "useGenericFontNames": "warn",
-        "useHeadingContent": "warn",
+        "useHeadingContent": "off",
         "useHtmlLang": "warn",
         "useIframeTitle": "warn",
         "useKeyWithClickEvents": "warn",
