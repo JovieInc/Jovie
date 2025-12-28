@@ -236,12 +236,12 @@ export function OtpInput({
       />
 
       {/* Visible digit inputs */}
-      <div
-        className='flex justify-center gap-2 sm:gap-2.5'
-        role='group'
+      <fieldset
+        className='flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0'
         aria-label={ariaLabel}
         onPaste={handlePaste}
       >
+        <legend className='sr-only'>{ariaLabel}</legend>
         {Array.from({ length: OTP_LENGTH }).map((_, index) => {
           const digit = getDigit(index);
           const isFocused = focusedIndex === index;
@@ -319,7 +319,7 @@ export function OtpInput({
             </div>
           );
         })}
-      </div>
+      </fieldset>
 
       {/* Success overlay */}
       {isComplete && (
