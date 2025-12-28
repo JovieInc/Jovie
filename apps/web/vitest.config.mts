@@ -83,10 +83,7 @@ export default defineConfig({
     server: {
       deps: {
         // Inline dependencies for faster loading and ESM/CJS compatibility
-        inline: [
-          '@testing-library/react',
-          '@testing-library/jest-dom',
-        ],
+        inline: ['@testing-library/react', '@testing-library/jest-dom'],
       },
     },
   },

@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-12-28T08:16:05.040Z",
+  "metrics": {
+    "totalDuration": 28560,
+    "setupTime": 0,
+    "testExecutionTime": 4140,
+    "environmentTime": 0,
+    "transformTime": 1880,
+    "collectTime": 4320,
+    "prepareTime": 5500,
+    "testResults": [],
+    "slowTests": [],
+    "performanceStats": {
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "average": 0,
+      "median": 0
+    }
+  },
+  "targets": {
+    "totalDuration": 60000,
+    "p95": 200,
+    "setupTime": 10000
+  }
+}
