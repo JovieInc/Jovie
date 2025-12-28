@@ -218,6 +218,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             '/settings',
             '/account',
             '/dashboard',
+            '/monitoring', // Sentry tunnel route - must not redirect to profile domain
           ];
           const isReservedPage = reservedPages.some(
             page => pathname === page || pathname.startsWith(`${page}/`)
