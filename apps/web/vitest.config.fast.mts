@@ -5,17 +5,27 @@ import { defineConfig } from 'vitest/config';
 /**
  * Optimized Vitest Configuration for Fast Test Execution
  *
- * Configured for sub-200ms p95 performance with minimal overhead.
- * Uses optimized setup file and aggressive performance settings.
+ * Key optimizations for quick feedback (<30s target):
+ * - Runs only lightweight lib/utility tests (no heavy React components)
+ * - Uses node environment (faster than jsdom) for pure logic tests
+ * - Uses forks pool with single fork (threads pool causes @jovie/ui resolution issues)
+ * - Aggressive timeouts to catch slow tests
+ * - Excludes component tests and tests requiring React/DOM
+ * - Disables coverage for speed
+ *
+ * Note: Parallel execution (maxForks > 1 or threads pool) causes module resolution
+ * issues with @jovie/ui package ("Failed to resolve import react/jsx-dev-runtime"),
+ * so we use single fork for reliability while optimizing other areas.
  */
 export default defineConfig({
   plugins: [react()],
   test: {
-    // Use optimized setup file
-    setupFiles: ['./tests/setup-optimized.ts'],
+    // Use minimal setup file for fast tests (no DOM dependencies)
+    setupFiles: ['./tests/setup-fast.ts'],
 
-    // Optimized environment settings
-    environment: 'jsdom',
+    // Use node environment for pure logic tests (faster than jsdom)
+    // Tests that need DOM should use the main config
+    environment: 'node',
 
     // Environment variables for tests
     env: {
@@ -25,56 +35,63 @@ export default defineConfig({
       NODE_ENV: 'test',
     },
 
-    // Exclude slow test categories
+    // Focus on fast, lightweight tests only
+    // Runs lib tests (pure logic) and excludes tests requiring React/DOM
+    include: ['tests/lib/**/*.test.ts'],
+
+    // Exclude slow test categories, component tests, and tests requiring React/DOM
     exclude: [
       'tests/e2e/**',
       'tests/performance/**',
       'tests/integration/**',
+      'tests/bench/**',
+      'tests/components/**',
+      'tests/lib/hooks/**', // React hooks require DOM
+      'tests/lib/stripe/**', // Uses React context/hooks
+      'tests/lib/monitoring/web-vitals.test.ts', // Browser-only (known failing)
+      // Tests that require window/document (DOM)
+      'tests/lib/deep-links.test.ts',
+      'tests/lib/environment-validation.test.ts',
+      'tests/lib/integrations.test.ts',
+      'tests/lib/admin/mercury-metrics.test.ts',
+      'tests/lib/admin/roles.test.ts',
+      'tests/lib/admin/stripe-metrics.test.ts',
+      'tests/lib/ingestion/processor.test.ts',
+      'tests/lib/utils/url-encryption.test.ts',
       'node_modules/**',
       '.next/**',
-      // Temporarily exclude known slow tests during optimization
-      'tests/lib/database-performance.test.ts',
     ],
 
-    // Performance optimizations
-    pool: 'threads', // Use threads instead of forks for better performance
+    // Use forks pool for stability with module mocking
+    // Note: threads pool causes module resolution issues with @jovie/ui package
+    pool: 'forks',
     poolOptions: {
-      threads: {
-        // Optimize thread pool
-        minThreads: 1,
-        maxThreads: 4,
-        useAtomics: true,
+      forks: {
+        minForks: 1,
+        maxForks: 1,
       },
     },
 
     // Aggressive timeouts to catch slow tests
-    testTimeout: 5000, // 5s instead of 30s
+    testTimeout: 5000, // 5s for fast feedback
     hookTimeout: 2000, // 2s for setup/teardown
 
-    // Disable coverage for speed (enable separately if needed)
+    // Disable coverage for speed (enable separately with npm run test:coverage)
     coverage: {
       enabled: false,
     },
 
     // Enable isolation to prevent mock conflicts between tests
-    // Component tests need isolation for proper mock scoping
     isolate: true,
 
-    // Reduce reporter overhead
-    reporters: [
-      [
-        'default',
-        {
-          summary: false,
-        },
-      ],
-    ],
+    // Use minimal reporter for speed (matches 'basic' behavior)
+    reporters: [['default', { summary: false }]],
 
-    // Optimize file watching
+    // Disable file watching for single run
     watch: false,
 
-    // Disable unnecessary features for speed
-    globals: false,
+    // Enable globals for cleaner test syntax
+    globals: true,
 
     // Optimize dependency handling
     server: {
