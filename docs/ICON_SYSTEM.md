@@ -161,13 +161,13 @@ import { ChevronRightIcon } from '@heroicons/react/24/outline';
 ### 3. Validation
 ```bash
 # Check for violations
-npm run lint
+pnpm lint
 
 # Run comprehensive audit
-npm run audit:icons
+pnpm audit:icons
 
 # Run tests
-npm run test
+pnpm test
 ```
 
 ## Custom SVG Approval Process
@@ -236,13 +236,13 @@ test('renders icon correctly', () => {
 ### Regular Audits
 ```bash
 # Monthly icon usage audit
-npm run audit:icons
+pnpm audit:icons
 
 # Check for new violations
-npm run lint
+pnpm lint
 
 # Update dependencies
-npm update @heroicons/react simple-icons
+pnpm update @heroicons/react simple-icons
 ```
 
 ### Version Updates
@@ -263,10 +263,10 @@ npm update @heroicons/react simple-icons
 #### ESLint Violations
 ```bash
 # Fix automatically where possible
-npm run lint:fix
+pnpm lint:fix
 
 # Check specific files
-npx eslint path/to/file.tsx
+pnpm exec eslint path/to/file.tsx
 ```
 
 #### Icon Not Found

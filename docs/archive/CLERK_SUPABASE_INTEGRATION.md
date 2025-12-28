@@ -199,7 +199,7 @@ export function MyComponent() {
 ### 1. Local Development
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ### 2. Test Authentication Flow

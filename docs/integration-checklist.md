@@ -81,7 +81,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=eyJhbGciOiJIUzI1NiIs...
 
 ```bash
 # Run the RLS verification script
-npm run db:verify  # Or manually run scripts/verify-rls.sql
+pnpm run db:verify  # Or manually run scripts/verify-rls.sql
 
 # Check health endpoints
 curl http://localhost:3001/api/health/db

@@ -47,20 +47,20 @@ The following `data-test` attributes are used for reliable element selection:
 
 ```bash
 # Run against local development server
-npm run test:e2e:golden-path
+pnpm test:e2e:golden-path
 
 # Run with UI for debugging
-npx playwright test tests/e2e/golden-path.spec.ts --ui
+pnpm exec playwright test tests/e2e/golden-path.spec.ts --ui
 ```
 
 ### Synthetic Monitoring Test
 
 ```bash
 # Run synthetic monitoring test against staging
-E2E_SYNTHETIC_MODE=true BASE_URL=https://preview.jovie.app npm run test:e2e:synthetic
+E2E_SYNTHETIC_MODE=true BASE_URL=https://preview.jovie.app pnpm test:e2e:synthetic
 
 # Run against production (requires production secrets)
-E2E_SYNTHETIC_MODE=true BASE_URL=https://jovie.app npm run test:e2e:synthetic
+E2E_SYNTHETIC_MODE=true BASE_URL=https://jovie.app pnpm test:e2e:synthetic
 ```
 
 ## Environment Variables
@@ -183,10 +183,10 @@ When modifying the golden path:
 
 ```bash
 # Run with debug logging
-DEBUG=pw:api npm run test:e2e:synthetic
+DEBUG=pw:api pnpm test:e2e:synthetic
 
 # Run with headed browser for visual debugging
-npx playwright test tests/e2e/synthetic-golden-path.spec.ts --headed
+pnpm exec playwright test tests/e2e/synthetic-golden-path.spec.ts --headed
 ```
 
 ### Log Analysis

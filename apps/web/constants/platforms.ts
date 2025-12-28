@@ -63,7 +63,7 @@
  *    },
  *    ```
  *
- * 3. **Run TypeScript compilation** to verify types: `npm run type-check`
+ * 3. **Run TypeScript compilation** to verify types: `pnpm typecheck`
  *
  * 4. **Update platforms.cjs** if you added a new platform (it's manually synced):
  *    `apps/web/constants/platforms.cjs`
