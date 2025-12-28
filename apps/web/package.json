@@ -26,6 +26,7 @@
     "test:guard": "tsx scripts/test-performance-guard.ts",
     "test:budgets": "tsx scripts/performance-budgets-guard.ts",
     "test:flaky": "tsx scripts/flaky-test-detector.ts",
+    "test:bench": "NODE_OPTIONS=--max-old-space-size=8192 vitest bench --config=vitest.config.mts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
