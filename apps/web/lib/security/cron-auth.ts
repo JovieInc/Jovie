@@ -10,6 +10,7 @@
 
 import crypto from 'crypto';
 import { NextRequest } from 'next/server';
+import { env } from '@/lib/env-server';
 
 /**
  * Timing-safe comparison of cron secret to prevent timing attacks.
@@ -59,7 +60,7 @@ export function verifyCronSecret(
   request: Request | NextRequest,
   secretEnvVar?: string
 ): boolean {
-  const expected = secretEnvVar ?? process.env.CRON_SECRET;
+  const expected = secretEnvVar ?? env.CRON_SECRET;
 
   if (!expected) {
     console.error('[cron-auth] CRON_SECRET is not configured');

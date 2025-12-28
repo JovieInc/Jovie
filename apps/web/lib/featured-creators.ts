@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
@@ -48,7 +48,8 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
       and(
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isFeatured, true),
-        eq(creatorProfiles.marketingOptOut, false)
+        eq(creatorProfiles.marketingOptOut, false),
+        isNull(creatorProfiles.deletedAt)
       )
     )
     .orderBy(creatorProfiles.displayName)

@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { clerkClient } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateUsernameChange } from '@/lib/cache/profile';
 import { creatorProfiles, users } from '@/lib/db/schema';
@@ -77,10 +77,16 @@ async function updateCanonicalUsernameInternal(
         };
       }
 
+      // Check for username conflicts, excluding soft-deleted profiles
       const [conflict] = await tx
         .select({ id: creatorProfiles.id })
         .from(creatorProfiles)
-        .where(eq(creatorProfiles.usernameNormalized, normalized))
+        .where(
+          and(
+            eq(creatorProfiles.usernameNormalized, normalized),
+            isNull(creatorProfiles.deletedAt)
+          )
+        )
         .limit(1);
 
       if (conflict && conflict.id !== profile.id) {

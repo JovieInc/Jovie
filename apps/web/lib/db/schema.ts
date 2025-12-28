@@ -279,11 +279,12 @@ export const creatorProfiles = pgTable(
       ),
     // CRITICAL: Unique constraint added in migration 0025 to prevent race conditions
     // during onboarding where two users could claim the same handle simultaneously
+    // Excludes soft-deleted profiles so usernames can be reclaimed
     usernameNormalizedUnique: uniqueIndex(
       'creator_profiles_username_normalized_unique'
     )
       .on(table.usernameNormalized)
-      .where(drizzleSql`username_normalized IS NOT NULL`),
+      .where(drizzleSql`username_normalized IS NOT NULL AND deleted_at IS NULL`),
   })
 );
 

@@ -4,7 +4,7 @@
  */
 
 import 'server-only';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
@@ -41,11 +41,15 @@ export async function checkUsernameAvailability(
 
     // Query only for existence - don't return any profile data
     // Use case-insensitive lookup to match the unique constraint
+    // Exclude soft-deleted profiles so usernames can be reclaimed
     const [existingProfile] = await db
       .select({ username: creatorProfiles.username })
       .from(creatorProfiles)
       .where(
-        eq(creatorProfiles.usernameNormalized, normalizedUsername.toLowerCase())
+        and(
+          eq(creatorProfiles.usernameNormalized, normalizedUsername.toLowerCase()),
+          isNull(creatorProfiles.deletedAt)
+        )
       )
       .limit(1);
 
@@ -90,11 +94,16 @@ export async function checkUserHasProfile(
           return false;
         }
 
-        // Check if user has any creator profiles
+        // Check if user has any active (non-deleted) creator profiles
         const [profile] = await db
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, user.id))
+          .where(
+            and(
+              eq(creatorProfiles.userId, user.id),
+              isNull(creatorProfiles.deletedAt)
+            )
+          )
           .limit(1);
 
         return !!profile;

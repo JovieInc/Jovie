@@ -211,6 +211,13 @@
       "when": 1735419600000,
       "tag": "0029_add_deleted_at_to_creator_profiles",
       "breakpoints": false
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1735419700000,
+      "tag": "0030_update_username_unique_exclude_deleted",
+      "breakpoints": false
     }
   ]
 }

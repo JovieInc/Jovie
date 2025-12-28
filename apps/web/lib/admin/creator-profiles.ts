@@ -2,12 +2,14 @@ import 'server-only';
 
 import { randomUUID } from 'crypto';
 import {
+  and,
   count,
   desc,
   sql as drizzleSql,
   eq,
   ilike,
   inArray,
+  isNull,
   or,
   type SQL,
 } from 'drizzle-orm';
@@ -116,12 +118,17 @@ export async function getAdminCreatorProfiles(
   })();
 
   // Build where clause for reuse in both queries
-  const whereClause: SQL | undefined = likePattern
+  // Always filter out soft-deleted profiles
+  const searchCondition = likePattern
     ? or(
         ilike(creatorProfiles.username, likePattern),
         ilike(creatorProfiles.displayName, likePattern)
       )
     : undefined;
+
+  const whereClause: SQL | undefined = searchCondition
+    ? and(searchCondition, isNull(creatorProfiles.deletedAt))
+    : isNull(creatorProfiles.deletedAt);
 
   try {
     // Execute queries in parallel for better performance

@@ -60,6 +60,9 @@ const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+
+  // System ingestion secret (for RLS bypass)
+  SYSTEM_INGESTION_SECRET: z.string().optional(),
 });
 
 const rawServerEnv = {
@@ -86,6 +89,7 @@ const rawServerEnv = {
   STATSIG_SERVER_API_KEY: process.env.STATSIG_SERVER_API_KEY,
   URL_ENCRYPTION_KEY: process.env.URL_ENCRYPTION_KEY,
   CRON_SECRET: process.env.CRON_SECRET,
+  SYSTEM_INGESTION_SECRET: process.env.SYSTEM_INGESTION_SECRET,
 };
 
 const parsed = ServerEnvSchema.safeParse(rawServerEnv);
@@ -168,6 +172,9 @@ export const env = {
   CRON_SECRET: parsed.success
     ? parsed.data.CRON_SECRET
     : process.env.CRON_SECRET,
+  SYSTEM_INGESTION_SECRET: parsed.success
+    ? parsed.data.SYSTEM_INGESTION_SECRET
+    : process.env.SYSTEM_INGESTION_SECRET,
 } as const;
 
 // Environment validation utilities

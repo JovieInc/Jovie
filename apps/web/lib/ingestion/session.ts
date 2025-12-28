@@ -3,6 +3,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { validateClerkUserId } from '@/lib/auth/session';
 import { type DbType, db } from '@/lib/db';
+import { env } from '@/lib/env-server';
 
 /**
  * Get the system ingestion identifier.
@@ -15,7 +16,7 @@ import { type DbType, db } from '@/lib/db';
  *   node -e "console.log('sys_ing_' + require('crypto').randomBytes(32).toString('hex'))"
  */
 function getSystemIngestionIdentifier(): string {
-  const secret = process.env.SYSTEM_INGESTION_SECRET;
+  const secret = env.SYSTEM_INGESTION_SECRET;
 
   if (!secret) {
     if (process.env.NODE_ENV === 'production') {

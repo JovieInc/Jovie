@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { db } from './index';
 import {
   CreatorContact,
@@ -25,7 +25,12 @@ export async function getCreatorProfileByUsername(username: string) {
   const [profile] = await db
     .select()
     .from(creatorProfiles)
-    .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
+    .where(
+      and(
+        eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
+        isNull(creatorProfiles.deletedAt)
+      )
+    )
     .limit(1);
   return profile || null;
 }
@@ -61,7 +66,12 @@ export async function getCreatorProfileWithLinks(username: string) {
     })
     .from(creatorProfiles)
     .leftJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(eq(creatorProfiles.usernameNormalized, username.toLowerCase()))
+    .where(
+      and(
+        eq(creatorProfiles.usernameNormalized, username.toLowerCase()),
+        isNull(creatorProfiles.deletedAt)
+      )
+    )
     .limit(1);
 
   if (!profile) return null;

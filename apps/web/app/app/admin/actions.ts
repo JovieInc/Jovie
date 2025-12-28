@@ -381,13 +381,16 @@ export async function deleteCreatorOrUserAction(
   }
 
   // Always soft delete the profile (preserves audit trail)
-  await db
+  const [deletedProfile] = await db
     .update(creatorProfiles)
     .set({
       deletedAt: new Date(),
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profileId));
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({ usernameNormalized: creatorProfiles.usernameNormalized });
+
+  await invalidateProfileCache(deletedProfile?.usernameNormalized);
 
   revalidatePath('/app/admin');
   revalidatePath('/app/admin/creators');
