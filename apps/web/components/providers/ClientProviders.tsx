@@ -78,7 +78,6 @@ interface ClientProvidersProps {
   children: React.ReactNode;
   initialThemeMode?: ThemeMode;
   publishableKey: string;
-  nonce?: string;
 }
 
 interface ClientProvidersInnerBaseProps {
@@ -281,7 +280,6 @@ export function ClientProviders({
   children,
   initialThemeMode = 'system',
   publishableKey,
-  nonce,
 }: ClientProvidersProps) {
   const pathname = usePathname();
   const marketingPrefixes = [
@@ -318,7 +316,6 @@ export function ClientProviders({
       publishableKey={publishableKey}
       appearance={clerkAppearance}
       proxyUrl={clerkProxyUrl}
-      nonce={nonce}
     >
       <ClientProvidersInner
         initialThemeMode={initialThemeMode}

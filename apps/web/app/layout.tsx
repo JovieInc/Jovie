@@ -245,7 +245,7 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        <ClientProviders publishableKey={publishableKey} nonce={nonce}>
+        <ClientProviders publishableKey={publishableKey}>
           {children}
         </ClientProviders>
 
