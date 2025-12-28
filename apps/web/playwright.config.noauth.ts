@@ -39,7 +39,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="" npm run dev',
+          command: 'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="" pnpm dev',
           url: 'http://localhost:3000',
           reuseExistingServer: !process.env.CI,
           timeout: 60000,

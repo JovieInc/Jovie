@@ -2,7 +2,7 @@
 
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useHapticFeedback } from '@/hooks/use-haptic-feedback';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 interface AuthBackButtonProps {

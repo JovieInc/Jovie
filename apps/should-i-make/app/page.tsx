@@ -397,13 +397,9 @@ function ResultScreen({ result }: { result: Result }) {
     <div className='min-h-screen flex items-center justify-center p-6'>
       <div className='w-full max-w-xl text-center'>
         <h1 className='text-5xl md:text-6xl font-bold mb-8'>{content.title}</h1>
-        <div
-          className='text-left mb-8'
-          role='region'
-          aria-label='Result details'
-        >
+        <section className='text-left mb-8' aria-label='Result details'>
           {content.body}
-        </div>
+        </section>
         <div className='flex flex-col gap-4'>
           <a
             href='https://jov.ie'
@@ -432,6 +428,7 @@ export default function Home() {
       fallback={
         <div className='min-h-screen flex items-center justify-center p-6'>
           <div className='w-full max-w-xl text-center'>
+            {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for loading indicator */}
             <div className='text-xl' role='status' aria-label='Loading quiz'>
               Loading...
             </div>

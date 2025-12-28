@@ -36,26 +36,36 @@ Jovie is a Next.js 14 application with Clerk authentication and Supabase databas
 **ALWAYS use Statsig for feature flags:**
 
 ```typescript
-// ✅ CORRECT: Use Statsig hooks for feature flags
-import { useFeatureFlags } from '@/lib/feature-flags';
+// ✅ CORRECT: Use Statsig feature gates
+import { useFeatureGate } from '@/lib/flags/client';
+import { STATSIG_FLAGS } from '@/lib/flags';
 
 export function MyComponent() {
-  const { waitlistEnabled, debugBannerEnabled } = useFeatureFlags();
-  
+  const { value: tippingEnabled } = useFeatureGate(STATSIG_FLAGS.TIPPING);
+  const { value: notificationsEnabled } = useFeatureGate(STATSIG_FLAGS.NOTIFICATIONS);
+
   return (
     <div>
-      {waitlistEnabled && <WaitlistComponent />}
-      {debugBannerEnabled && <DebugBanner />}
+      {tippingEnabled && <TippingComponent />}
+      {notificationsEnabled && <NotificationsComponent />}
     </div>
   );
 }
+
+// Server-side usage:
+import { checkGateForUser } from '@/lib/flags/server';
+import { STATSIG_FLAGS } from '@/lib/flags';
+
+const isEnabled = await checkGateForUser(STATSIG_FLAGS.TIPPING, { userID: userId });
 ```
 
-**Available feature flags:**
-- `waitlistEnabled` - Controls waitlist functionality
-- `debugBannerEnabled` - Controls debug banner visibility
-- `artistSearchEnabled` - Controls artist search functionality
-- `tipPromoEnabled` - Controls tip promotion features
+**Available feature flags (see `lib/statsig/flags.ts` for full list):**
+- `TIPPING` - Enable tipping functionality
+- `NOTIFICATIONS` - Enable notification system
+- `ARTIST_SEARCH` - Controls artist search functionality
+- `TIP_PROMO` - Controls tip promotion features
+- `CONTACTS` - Gate artist contacts manager
+- `AVATAR_UPLOADER` - Enable avatar upload with drag/drop
 
 ### 2. Clerk-Supabase Integration
 
@@ -238,15 +248,17 @@ When updating Clerk-Supabase integration:
 ### Feature Flag Usage
 
 ```typescript
-import { useFeatureFlags } from '@/lib/feature-flags';
+import { useFeatureGate } from '@/lib/flags/client';
+import { STATSIG_FLAGS } from '@/lib/flags';
 
 export function MyComponent() {
-  const { waitlistEnabled, debugBannerEnabled } = useFeatureFlags();
-  
+  const { value: tippingEnabled } = useFeatureGate(STATSIG_FLAGS.TIPPING);
+  const { value: contactsEnabled } = useFeatureGate(STATSIG_FLAGS.CONTACTS);
+
   return (
     <div>
-      {waitlistEnabled && <WaitlistComponent />}
-      {debugBannerEnabled && <DebugBanner />}
+      {tippingEnabled && <TippingComponent />}
+      {contactsEnabled && <ContactsComponent />}
     </div>
   );
 }

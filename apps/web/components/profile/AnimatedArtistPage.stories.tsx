@@ -200,6 +200,7 @@ export const InteractiveDemo: Story = {
       <div>
         <div className='fixed top-4 left-4 z-50 flex gap-2'>
           <button
+            type='button'
             onClick={() => setMode('profile')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'profile'
@@ -210,6 +211,7 @@ export const InteractiveDemo: Story = {
             Profile
           </button>
           <button
+            type='button'
             onClick={() => setMode('listen')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'listen'
@@ -220,6 +222,7 @@ export const InteractiveDemo: Story = {
             Listen
           </button>
           <button
+            type='button'
             onClick={() => setMode('tip')}
             className={`px-3 py-1 rounded text-sm ${
               mode === 'tip'

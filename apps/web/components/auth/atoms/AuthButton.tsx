@@ -2,7 +2,7 @@
 
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { useHapticFeedback } from '@/hooks/use-haptic-feedback';
+import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 const authButtonVariants = cva(

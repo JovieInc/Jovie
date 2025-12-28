@@ -1,0 +1,391 @@
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DashboardAudienceTable } from '@/components/dashboard/organisms/DashboardAudienceTable';
+import type { AudienceMember } from '@/types';
+
+// Mock the useTableMeta hook
+vi.mock('@/app/app/dashboard/DashboardLayoutClient', () => ({
+  useTableMeta: () => ({
+    tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
+    setTableMeta: vi.fn(),
+  }),
+}));
+
+// Mock the useNotifications hook
+vi.mock('@/lib/hooks/useNotifications', () => ({
+  useNotifications: () => ({
+    showToast: vi.fn(),
+    hideToast: vi.fn(),
+    clearToasts: vi.fn(),
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    undo: vi.fn(),
+    retry: vi.fn(),
+    saveSuccess: vi.fn(),
+    saveError: vi.fn(),
+    uploadSuccess: vi.fn(),
+    uploadError: vi.fn(),
+    networkError: vi.fn(),
+    genericError: vi.fn(),
+    handleError: vi.fn(),
+    withLoadingToast: vi.fn(),
+  }),
+}));
+
+// Track virtualized rows for testing
+let capturedVirtualItems: { index: number; start: number }[] = [];
+let capturedRowCount = 0;
+
+// Mock @tanstack/react-virtual to track virtualization behavior
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: (options: {
+    count: number;
+    getScrollElement: () => HTMLElement | null;
+    estimateSize: () => number;
+    overscan: number;
+  }) => {
+    capturedRowCount = options.count;
+    const estimatedRowHeight = options.estimateSize();
+    const overscan = options.overscan;
+
+    // Simulate viewport of 600px height (~10 visible rows at 60px each)
+    const viewportHeight = 600;
+    const visibleRowCount = Math.ceil(viewportHeight / estimatedRowHeight);
+
+    // Calculate virtual items: visible rows + overscan on each side
+    const totalVirtualRows = Math.min(
+      visibleRowCount + overscan * 2,
+      options.count
+    );
+
+    const virtualItems = Array.from({ length: totalVirtualRows }, (_, i) => ({
+      index: i,
+      start: i * estimatedRowHeight,
+      size: estimatedRowHeight,
+      end: (i + 1) * estimatedRowHeight,
+      key: i,
+      lane: 0,
+    }));
+
+    capturedVirtualItems = virtualItems;
+
+    return {
+      getVirtualItems: () => virtualItems,
+      getTotalSize: () => options.count * estimatedRowHeight,
+      measureElement: vi.fn(),
+      scrollOffset: 0,
+      scrollRect: { width: 1200, height: viewportHeight },
+      options,
+    };
+  },
+}));
+
+/**
+ * Generate mock audience members for testing
+ */
+function generateMockAudienceMembers(count: number): AudienceMember[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `member-${i + 1}`,
+    type: i % 3 === 0 ? 'email' : i % 3 === 1 ? 'sms' : 'anonymous',
+    displayName: `User ${i + 1}`,
+    locationLabel: 'New York, NY',
+    geoCity: 'New York',
+    geoCountry: 'US',
+    visits: Math.floor(Math.random() * 100) + 1,
+    engagementScore: Math.floor(Math.random() * 100),
+    intentLevel: i % 3 === 0 ? 'high' : i % 3 === 1 ? 'medium' : 'low',
+    latestActions: [{ label: 'Visited profile' }],
+    referrerHistory: [{ url: 'https://example.com' }],
+    email: i % 3 === 0 ? `user${i + 1}@example.com` : null,
+    phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
+    spotifyConnected: i % 5 === 0,
+    purchaseCount: Math.floor(Math.random() * 10),
+    tags: ['fan'],
+    deviceType: i % 2 === 0 ? 'mobile' : 'desktop',
+    lastSeenAt: new Date().toISOString(),
+  }));
+}
+
+const defaultProps = {
+  mode: 'members' as const,
+  total: 0,
+  page: 1,
+  pageSize: 50,
+  sort: 'lastSeen',
+  direction: 'desc' as const,
+  onPageChange: vi.fn(),
+  onPageSizeChange: vi.fn(),
+  onSortChange: vi.fn(),
+};
+
+describe('DashboardAudienceTable - Virtualization', () => {
+  beforeEach(() => {
+    capturedVirtualItems = [];
+    capturedRowCount = 0;
+    vi.clearAllMocks();
+  });
+
+  it('renders the table container with test id', () => {
+    render(<DashboardAudienceTable {...defaultProps} rows={[]} />);
+    expect(screen.getByTestId('dashboard-audience-table')).toBeInTheDocument();
+  });
+
+  it('shows empty state when no rows provided', () => {
+    render(<DashboardAudienceTable {...defaultProps} rows={[]} />);
+    expect(screen.getByText('No audience yet')).toBeInTheDocument();
+  });
+
+  describe('with large dataset (500+ rows)', () => {
+    const largeDataset = generateMockAudienceMembers(500);
+
+    it('virtualizes rows - renders significantly fewer DOM rows than total data', () => {
+      render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={largeDataset}
+          total={500}
+        />
+      );
+
+      // Verify the virtualizer received the full count
+      expect(capturedRowCount).toBe(500);
+
+      // The virtualizer should only return a small subset of items
+      // (visible rows + overscan, typically ~20 items for a 600px viewport)
+      expect(capturedVirtualItems.length).toBeLessThan(50);
+      expect(capturedVirtualItems.length).toBeLessThan(500);
+    });
+
+    it('only renders visible rows plus overscan, not all 500 rows', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={largeDataset}
+          total={500}
+        />
+      );
+
+      // Count actual tr elements in tbody (excluding thead)
+      const tbody = container.querySelector('tbody');
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+
+      // With virtualization, we should render far fewer than 500 rows
+      // Expected: ~20 rows (10 visible + 5 overscan top + 5 overscan bottom)
+      expect(renderedRows.length).toBeLessThan(100);
+      expect(renderedRows.length).toBeLessThan(largeDataset.length);
+    });
+
+    it('provides correct row count to virtualizer', () => {
+      render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={largeDataset}
+          total={500}
+        />
+      );
+
+      // The virtualizer should know about all rows
+      expect(capturedRowCount).toBe(largeDataset.length);
+    });
+
+    it('renders rows with absolute positioning for virtual scrolling', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={largeDataset}
+          total={500}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      expect(tbody).toHaveStyle({ position: 'relative' });
+
+      // Check that rendered rows have absolute positioning
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+      if (renderedRows.length > 0) {
+        const firstRow = renderedRows[0];
+        expect(firstRow).toHaveStyle({ position: 'absolute' });
+      }
+    });
+
+    it('sets tbody height based on total virtual size', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={largeDataset}
+          total={500}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      // 500 rows * 60px estimated height = 30000px
+      expect(tbody).toHaveStyle({ height: '30000px' });
+    });
+  });
+
+  describe('with exactly 500 rows (threshold)', () => {
+    const thresholdDataset = generateMockAudienceMembers(500);
+
+    it('still virtualizes at the 500 row threshold', () => {
+      render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={thresholdDataset}
+          total={500}
+        />
+      );
+
+      // Virtualizer should still be active
+      expect(capturedRowCount).toBe(500);
+      expect(capturedVirtualItems.length).toBeLessThan(500);
+    });
+  });
+
+  describe('with 1000+ rows (stress test)', () => {
+    const veryLargeDataset = generateMockAudienceMembers(1000);
+
+    it('efficiently handles 1000 rows via virtualization', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={veryLargeDataset}
+          total={1000}
+        />
+      );
+
+      // Verify virtualizer received full count
+      expect(capturedRowCount).toBe(1000);
+
+      // DOM should have far fewer than 1000 rows
+      const tbody = container.querySelector('tbody');
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+      expect(renderedRows.length).toBeLessThan(100);
+
+      // Total virtual size should reflect all rows
+      expect(tbody).toHaveStyle({ height: '60000px' }); // 1000 * 60px
+    });
+  });
+
+  describe('virtualization configuration', () => {
+    const testDataset = generateMockAudienceMembers(100);
+
+    it('uses correct estimated row height (60px)', () => {
+      render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={testDataset}
+          total={100}
+        />
+      );
+
+      // Check tbody height calculation: 100 rows * 60px = 6000px
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={testDataset}
+          total={100}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      expect(tbody).toHaveStyle({ height: '6000px' });
+    });
+
+    it('applies translateY transform to position rows', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={testDataset}
+          total={100}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+
+      // Check that rows have translateY applied
+      if (renderedRows.length > 0) {
+        const firstRow = renderedRows[0];
+        const style = firstRow.getAttribute('style') || '';
+        expect(style).toContain('translateY');
+      }
+    });
+
+    it('renders rows with data-index attribute for virtualizer', () => {
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={testDataset}
+          total={100}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+
+      // Each row should have data-index for measureElement
+      if (renderedRows.length > 0) {
+        const firstRow = renderedRows[0];
+        expect(firstRow).toHaveAttribute('data-index');
+      }
+    });
+  });
+
+  describe('small datasets (no virtualization needed but still applied)', () => {
+    it('applies virtualization even for small datasets', () => {
+      const smallDataset = generateMockAudienceMembers(10);
+
+      render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={smallDataset}
+          total={10}
+        />
+      );
+
+      // Virtualizer is still used
+      expect(capturedRowCount).toBe(10);
+
+      // For small datasets, all rows may be rendered (within viewport + overscan)
+      expect(capturedVirtualItems.length).toBeLessThanOrEqual(10);
+    });
+
+    it('renders all rows when dataset fits in viewport', () => {
+      const smallDataset = generateMockAudienceMembers(5);
+
+      const { container } = render(
+        <DashboardAudienceTable
+          {...defaultProps}
+          rows={smallDataset}
+          total={5}
+        />
+      );
+
+      const tbody = container.querySelector('tbody');
+      const renderedRows = tbody?.querySelectorAll('tr') ?? [];
+
+      // All 5 rows should be rendered since they fit in viewport
+      expect(renderedRows.length).toBe(5);
+    });
+  });
+});
+
+describe('DashboardAudienceTable - Subscribers Mode', () => {
+  it('virtualizes subscriber rows the same as member rows', () => {
+    const largeDataset = generateMockAudienceMembers(500);
+
+    render(
+      <DashboardAudienceTable
+        {...defaultProps}
+        mode='subscribers'
+        rows={largeDataset}
+        total={500}
+      />
+    );
+
+    expect(capturedRowCount).toBe(500);
+    expect(capturedVirtualItems.length).toBeLessThan(500);
+  });
+});

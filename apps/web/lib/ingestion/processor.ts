@@ -22,6 +22,7 @@ import {
 } from '@/lib/utils/platform-detection';
 import { computeLinkConfidence } from './confidence';
 import { applyProfileEnrichment } from './profile';
+import { IngestionStatusManager } from './status-manager';
 import { ExtractionError } from './strategies/base';
 import {
   extractBeacons,
@@ -169,14 +170,12 @@ export async function handleIngestionJobFailure(
 
   const creatorProfileId = getCreatorProfileIdFromJob(job);
   if (creatorProfileId) {
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ...(shouldRetry ? {} : { ingestionStatus: 'failed' as const }),
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, creatorProfileId));
+    await IngestionStatusManager.handleJobFailure(
+      tx,
+      creatorProfileId,
+      shouldRetry,
+      message
+    );
   }
 
   await failJob(tx, job, message, { reason });
@@ -210,6 +209,170 @@ const beaconsPayloadSchema = z.object({
   depth: z.number().int().min(0).max(3).default(0),
 });
 type SocialLinkRow = typeof socialLinks.$inferSelect;
+
+/**
+ * Base payload type for all ingestion jobs.
+ */
+interface BaseJobPayload {
+  creatorProfileId: string;
+  sourceUrl: string;
+  depth: number;
+  dedupKey?: string;
+}
+
+/**
+ * Profile data fetched for ingestion processing.
+ */
+interface ProfileData {
+  id: string;
+  usernameNormalized: string | null;
+  avatarUrl: string | null;
+  displayName: string | null;
+  avatarLockedByUser: boolean | null;
+  displayNameLocked: boolean | null;
+}
+
+/**
+ * Configuration for a job executor.
+ * Defines the schema, platform name, and fetch/extract logic for a job type.
+ */
+interface JobExecutorConfig<TPayload extends BaseJobPayload> {
+  /** Zod schema to validate and parse the job payload */
+  payloadSchema: z.ZodSchema<TPayload>;
+  /** Human-readable platform name for error messages */
+  platformName: string;
+  /** Platform-specific logic to fetch and extract data */
+  fetchAndExtract: (
+    payload: TPayload,
+    profile: ProfileData
+  ) => Promise<ExtractionResult>;
+}
+
+/**
+ * Generic job executor that handles the common workflow for all ingestion jobs.
+ * This reduces duplication across processLinktreeJob, processLayloJob, etc.
+ */
+async function executeIngestionJob<TPayload extends BaseJobPayload>(
+  tx: DbType,
+  jobPayload: unknown,
+  config: JobExecutorConfig<TPayload>
+): Promise<{
+  inserted: number;
+  updated: number;
+  sourceUrl: string;
+  extractedLinks: number;
+}> {
+  const parsed = config.payloadSchema.parse(jobPayload);
+
+  const [profile] = await tx
+    .select({
+      id: creatorProfiles.id,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Creator profile not found for ingestion job');
+  }
+
+  await tx
+    .update(creatorProfiles)
+    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, profile.id));
+
+  try {
+    const extraction = await config.fetchAndExtract(parsed, profile);
+    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
+
+    await enqueueFollowupIngestionJobs({
+      tx,
+      creatorProfileId: profile.id,
+      currentDepth: parsed.depth,
+      extraction,
+    });
+
+    await tx
+      .update(creatorProfiles)
+      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, profile.id));
+
+    return {
+      ...result,
+      sourceUrl: parsed.sourceUrl,
+      extractedLinks: extraction.links.length,
+    };
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : `${config.platformName} ingestion failed`;
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ingestionStatus: 'failed',
+        lastIngestionError: message,
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, profile.id));
+    throw error;
+  }
+}
+
+/**
+ * Job executor configurations for each supported platform.
+ */
+const linktreeJobConfig: JobExecutorConfig<
+  z.infer<typeof linktreePayloadSchema>
+> = {
+  payloadSchema: linktreePayloadSchema,
+  platformName: 'Linktree',
+  fetchAndExtract: async payload => {
+    const html = await fetchLinktreeDocument(payload.sourceUrl);
+    return extractLinktree(html);
+  },
+};
+
+const beaconsJobConfig: JobExecutorConfig<
+  z.infer<typeof beaconsPayloadSchema>
+> = {
+  payloadSchema: beaconsPayloadSchema,
+  platformName: 'Beacons',
+  fetchAndExtract: async payload => {
+    const html = await fetchBeaconsDocument(payload.sourceUrl);
+    return extractBeacons(html);
+  },
+};
+
+const youtubeJobConfig: JobExecutorConfig<
+  z.infer<typeof youtubePayloadSchema>
+> = {
+  payloadSchema: youtubePayloadSchema,
+  platformName: 'YouTube',
+  fetchAndExtract: async payload => {
+    const html = await fetchYouTubeAboutDocument(payload.sourceUrl);
+    return extractYouTube(html);
+  },
+};
+
+const layloJobConfig: JobExecutorConfig<z.infer<typeof layloPayloadSchema>> = {
+  payloadSchema: layloPayloadSchema,
+  platformName: 'Laylo',
+  fetchAndExtract: async (payload, profile) => {
+    const layloHandle = deriveLayloHandle(
+      payload.sourceUrl,
+      profile.usernameNormalized
+    );
+    const { profile: layloProfile, user } =
+      await fetchLayloProfile(layloHandle);
+    return extractLaylo(layloProfile, user);
+  },
+};
 
 type SupportedRecursiveJobType =
   | 'import_linktree'
@@ -600,65 +763,7 @@ export async function normalizeAndMergeExtraction(
 }
 
 export async function processLinktreeJob(tx: DbType, jobPayload: unknown) {
-  const parsed = linktreePayloadSchema.parse(jobPayload);
-
-  const [profile] = await tx
-    .select({
-      id: creatorProfiles.id,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      displayName: creatorProfiles.displayName,
-      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-      displayNameLocked: creatorProfiles.displayNameLocked,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error('Creator profile not found for ingestion job');
-  }
-
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
-
-  try {
-    const html = await fetchLinktreeDocument(parsed.sourceUrl);
-    const extraction = extractLinktree(html);
-    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
-
-    await enqueueFollowupIngestionJobs({
-      tx,
-      creatorProfileId: profile.id,
-      currentDepth: parsed.depth,
-      extraction,
-    });
-
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    return {
-      ...result,
-      sourceUrl: parsed.sourceUrl,
-      extractedLinks: extraction.links.length,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Linktree ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-    throw error;
-  }
+  return executeIngestionJob(tx, jobPayload, linktreeJobConfig);
 }
 
 /**
@@ -698,29 +803,21 @@ export async function claimPendingJobs(
       )
     );
 
-  for (const stuckJob of stuckJobs) {
-    const creatorProfileId = getCreatorProfileIdFromJob({
-      jobType: stuckJob.jobType,
-      payload: stuckJob.payload,
-    } as typeof ingestionJobs.$inferSelect);
+  const stuckProfileIds = stuckJobs
+    .map(stuckJob =>
+      getCreatorProfileIdFromJob({
+        jobType: stuckJob.jobType,
+        payload: stuckJob.payload,
+      } as typeof ingestionJobs.$inferSelect)
+    )
+    .filter((id): id is string => id !== null);
 
-    if (!creatorProfileId) continue;
-
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'idle',
-        lastIngestionError: 'Processing timeout; requeued',
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          eq(creatorProfiles.id, creatorProfileId),
-          eq(creatorProfiles.ingestionStatus, 'processing'),
-          lte(creatorProfiles.updatedAt, stuckBefore)
-        )
-      );
-  }
+  await IngestionStatusManager.handleStuckJobs(
+    tx,
+    stuckProfileIds,
+    stuckBefore,
+    'Processing timeout; requeued'
+  );
 
   const exhaustedJobs = await tx
     .select({
@@ -914,190 +1011,13 @@ export async function processJob(
   }
 }
 
-async function processBeaconsJob(tx: DbType, jobPayload: unknown) {
-  const parsed = beaconsPayloadSchema.parse(jobPayload);
-
-  const [profile] = await tx
-    .select({
-      id: creatorProfiles.id,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      displayName: creatorProfiles.displayName,
-      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-      displayNameLocked: creatorProfiles.displayNameLocked,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error('Creator profile not found for ingestion job');
-  }
-
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
-
-  try {
-    const html = await fetchBeaconsDocument(parsed.sourceUrl);
-    const extraction = extractBeacons(html);
-    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
-
-    await enqueueFollowupIngestionJobs({
-      tx,
-      creatorProfileId: profile.id,
-      currentDepth: parsed.depth,
-      extraction,
-    });
-
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    return {
-      ...result,
-      sourceUrl: parsed.sourceUrl,
-      extractedLinks: extraction.links.length,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Beacons ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-    throw error;
-  }
+function processBeaconsJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, beaconsJobConfig);
 }
-async function processYouTubeJob(tx: DbType, jobPayload: unknown) {
-  const parsed = youtubePayloadSchema.parse(jobPayload);
-
-  const [profile] = await tx
-    .select({
-      id: creatorProfiles.id,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      displayName: creatorProfiles.displayName,
-      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-      displayNameLocked: creatorProfiles.displayNameLocked,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error('Creator profile not found for ingestion job');
-  }
-
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
-
-  try {
-    const html = await fetchYouTubeAboutDocument(parsed.sourceUrl);
-    const extraction = extractYouTube(html);
-    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
-
-    await enqueueFollowupIngestionJobs({
-      tx,
-      creatorProfileId: profile.id,
-      currentDepth: parsed.depth,
-      extraction,
-    });
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    return {
-      ...result,
-      sourceUrl: parsed.sourceUrl,
-      extractedLinks: extraction.links.length,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'YouTube ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-    throw error;
-  }
+function processYouTubeJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, youtubeJobConfig);
 }
 
-async function processLayloJob(tx: DbType, jobPayload: unknown) {
-  const parsed = layloPayloadSchema.parse(jobPayload);
-
-  const [profile] = await tx
-    .select({
-      id: creatorProfiles.id,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      avatarUrl: creatorProfiles.avatarUrl,
-      displayName: creatorProfiles.displayName,
-      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-      displayNameLocked: creatorProfiles.displayNameLocked,
-    })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, parsed.creatorProfileId))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error('Creator profile not found for ingestion job');
-  }
-
-  await tx
-    .update(creatorProfiles)
-    .set({ ingestionStatus: 'processing', updatedAt: new Date() })
-    .where(eq(creatorProfiles.id, profile.id));
-
-  try {
-    const layloHandle = deriveLayloHandle(
-      parsed.sourceUrl,
-      profile.usernameNormalized
-    );
-    const { profile: layloProfile, user } =
-      await fetchLayloProfile(layloHandle);
-    const extraction = extractLaylo(layloProfile, user);
-    const result = await normalizeAndMergeExtraction(tx, profile, extraction);
-
-    await enqueueFollowupIngestionJobs({
-      tx,
-      creatorProfileId: profile.id,
-      currentDepth: parsed.depth,
-      extraction,
-    });
-    await tx
-      .update(creatorProfiles)
-      .set({ ingestionStatus: 'idle', updatedAt: new Date() })
-      .where(eq(creatorProfiles.id, profile.id));
-
-    return {
-      ...result,
-      sourceUrl: parsed.sourceUrl,
-      extractedLinks: extraction.links.length,
-    };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Laylo ingestion failed';
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ingestionStatus: 'failed',
-        lastIngestionError: message,
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, profile.id));
-    throw error;
-  }
+function processLayloJob(tx: DbType, jobPayload: unknown) {
+  return executeIngestionJob(tx, jobPayload, layloJobConfig);
 }

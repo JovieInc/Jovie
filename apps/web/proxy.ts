@@ -20,8 +20,7 @@ import { createBotResponse, detectBot } from '@/lib/utils/bot-detection';
 // Multi-Domain Routing Configuration
 // ============================================================================
 // - jov.ie (PROFILE_HOSTNAME): Public creator profiles + viewer subscription cookies
-// - meetjovie.com (MARKETING_HOSTNAME): Company/marketing site
-// - app.meetjovie.com (APP_HOSTNAME): Dashboard/app with Clerk authentication
+// - meetjovie.com (MARKETING_HOSTNAME): Marketing + Dashboard + Auth (single domain for Clerk)
 // ============================================================================
 
 /**
@@ -218,6 +217,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
             '/settings',
             '/account',
             '/dashboard',
+            '/monitoring', // Sentry tunnel route - must not redirect to profile domain
           ];
           const isReservedPage = reservedPages.some(
             page => pathname === page || pathname.startsWith(`${page}/`)

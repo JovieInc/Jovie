@@ -275,14 +275,14 @@ Use this table to find the correct Heroicon for common use cases:
 The `@jovie/icon-usage` ESLint rule will catch violations:
 
 ```bash
-npm run lint
+pnpm lint
 ```
 
 ### 2. Icon Audit Script
 Run the audit script to find all icon usage issues:
 
 ```bash
-npm run audit:icons
+pnpm audit:icons
 ```
 
 ### 3. Search and Replace Patterns
@@ -308,12 +308,12 @@ import\s+.*?\s+from\s+['"]simple-icons['"];?
 
 ### 1. Run the Audit
 ```bash
-npm run audit:icons
+pnpm audit:icons
 ```
 
 ### 2. Fix ESLint Violations
 ```bash
-npm run lint
+pnpm lint
 ```
 
 ### 3. Update Imports
@@ -342,9 +342,9 @@ Replace custom SVG imports with Heroicons:
 
 ### 8. Test Changes
 ```bash
-npm run test
-npm run lint
-npm run audit:icons
+pnpm test
+pnpm lint
+pnpm audit:icons
 ```
 
 ## Troubleshooting

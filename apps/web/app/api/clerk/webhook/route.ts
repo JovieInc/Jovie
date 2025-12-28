@@ -1,8 +1,12 @@
+import { randomBytes } from 'node:crypto';
 import { clerkClient } from '@clerk/nextjs/server';
-import { randomBytes } from 'crypto';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Webhook } from 'svix';
+import {
+  handleClerkUserDeleted,
+  syncAllClerkMetadata,
+} from '@/lib/auth/clerk-sync';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -19,9 +23,10 @@ type WebhookEvent = {
     last_name: string | null;
     private_metadata: Record<string, unknown>;
     public_metadata: Record<string, unknown>;
+    deleted?: boolean;
   };
   object: 'event';
-  type: 'user.created' | 'user.updated' | string;
+  type: 'user.created' | 'user.updated' | 'user.deleted' | string;
 };
 
 function generateRandomSuffix(length: number): string {
@@ -135,6 +140,9 @@ export async function POST(request: NextRequest) {
           },
         });
 
+        // Sync initial Jovie metadata to Clerk (user created but not yet in DB)
+        await syncAllClerkMetadata(user.id);
+
         console.log(`Post-signup processing completed for user ${user.id}`);
 
         return NextResponse.json(
@@ -193,6 +201,55 @@ export async function POST(request: NextRequest) {
         { success: true, type: evt.type },
         { headers: NO_STORE_HEADERS }
       );
+    }
+
+    // Handle user.deleted event - soft-delete the DB user
+    if (evt.type === 'user.deleted') {
+      const { data: user } = evt;
+
+      try {
+        const result = await handleClerkUserDeleted(user.id);
+
+        if (!result.success) {
+          console.error(
+            `Failed to handle user.deleted for ${user.id}:`,
+            result.error
+          );
+          // Return 200 to prevent retries - the user deletion is best-effort
+          return NextResponse.json(
+            {
+              success: false,
+              error: result.error,
+            },
+            { status: 200, headers: NO_STORE_HEADERS }
+          );
+        }
+
+        console.log(`User deletion processed for ${user.id}`);
+
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'User deletion processed',
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+      } catch (error) {
+        console.error(
+          `Failed to process user.deleted event for ${user.id}:`,
+          error
+        );
+
+        // Return 200 to prevent Clerk from retrying
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Failed to process user deletion',
+            message: error instanceof Error ? error.message : 'Unknown error',
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
     }
 
     // For other event types, just acknowledge

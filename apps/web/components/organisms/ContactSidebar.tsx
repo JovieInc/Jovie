@@ -266,7 +266,6 @@ export function ContactSidebar({
           'pointer-events-auto w-full opacity-100 translate-x-0 md:w-[300px] lg:w-[320px]'
       )}
       onKeyDown={handleKeyDown}
-      role='complementary'
     >
       <div className='flex items-center justify-between border-b border-sidebar-border px-3 py-2'>
         <p className='text-xs text-sidebar-muted'>

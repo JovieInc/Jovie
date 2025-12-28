@@ -29,9 +29,11 @@ import {
 describe('Web Vitals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset the global initialization state so each test starts fresh
-    globalThis.jovieWebVitalsInitialized = false;
+    // Reset global state
+    globalThis.jovieWebVitalsInitialized = undefined;
     globalThis.jovieWebVitalsHandlers = undefined;
+    // Mock window to ensure initWebVitals doesn't bail early
+    vi.stubGlobal('window', {});
   });
 
   describe('initWebVitals', () => {

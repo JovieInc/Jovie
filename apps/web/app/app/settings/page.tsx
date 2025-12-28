@@ -1,9 +1,10 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+
+import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardDataCached } from '../dashboard/actions';
 
 export default async function SettingsPage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/settings');

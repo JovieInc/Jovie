@@ -20,6 +20,7 @@ export function Divider({
     : { width: '1px', height: '100%' };
 
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-orientation is needed for separator role accessibility
     <div
       role={ariaHidden ? undefined : 'separator'}
       aria-hidden={ariaHidden}

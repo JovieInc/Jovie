@@ -1,0 +1,43 @@
+'use client';
+
+import { cn } from '@/lib/utils';
+import type { AudienceMemberType } from '@/types';
+
+export interface AudienceUserCellProps {
+  displayName: string | null;
+  type: AudienceMemberType;
+  email?: string | null;
+  phone?: string | null;
+  className?: string;
+}
+
+export function AudienceUserCell({
+  displayName,
+  type,
+  email,
+  phone,
+  className,
+}: AudienceUserCellProps) {
+  const getSecondaryLabel = () => {
+    if (type === 'anonymous') return null;
+    if (type === 'email') return email ?? 'Email fan';
+    if (type === 'sms') return phone ?? 'SMS fan';
+    return 'Connected fan';
+  };
+
+  const secondaryLabel = getSecondaryLabel();
+
+  return (
+    <td
+      className={cn(
+        'px-4 py-3 align-middle text-sm text-primary-token sm:px-6',
+        className
+      )}
+    >
+      <div className='font-semibold'>{displayName || 'Visitor'}</div>
+      {secondaryLabel && (
+        <div className='text-xs text-secondary-token'>{secondaryLabel}</div>
+      )}
+    </td>
+  );
+}

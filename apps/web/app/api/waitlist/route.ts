@@ -119,6 +119,18 @@ function isMissingWaitlistSchemaError(error: unknown): boolean {
   );
 }
 
+/**
+ * Check if error is specifically about missing primary_goal or selected_plan columns
+ */
+function isMissingNewColumnsError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const msg = error.message.toLowerCase();
+  return (
+    (msg.includes('primary_goal') || msg.includes('selected_plan')) &&
+    (msg.includes('does not exist') || msg.includes('column'))
+  );
+}
+
 // Request body schema
 const waitlistRequestSchema = z.object({
   primaryGoal: z.enum(['streams', 'merch', 'tickets']),
@@ -353,7 +365,14 @@ export async function POST(request: Request) {
             .set(updateValues)
             .where(eq(waitlistEntries.id, existing.id));
         } catch (error) {
-          if (!isMissingWaitlistSchemaError(error)) throw error;
+          // Only retry without new columns if the error is specifically about those columns
+          if (!isMissingNewColumnsError(error)) {
+            console.error('[Waitlist API] Update failed:', error);
+            throw error;
+          }
+          console.warn(
+            '[Waitlist API] Retrying update without primary_goal/selected_plan columns'
+          );
           const {
             primaryGoal: _primaryGoal,
             selectedPlan: _selectedPlan,
@@ -361,10 +380,18 @@ export async function POST(request: Request) {
           } = updateValues;
           void _primaryGoal;
           void _selectedPlan;
-          await db
-            .update(waitlistEntries)
-            .set(fallbackValues)
-            .where(eq(waitlistEntries.id, existing.id));
+          try {
+            await db
+              .update(waitlistEntries)
+              .set(fallbackValues)
+              .where(eq(waitlistEntries.id, existing.id));
+          } catch (fallbackError) {
+            console.error(
+              '[Waitlist API] Fallback update also failed:',
+              fallbackError
+            );
+            throw fallbackError;
+          }
         }
       }
 
@@ -392,7 +419,14 @@ export async function POST(request: Request) {
     try {
       await db.insert(waitlistEntries).values(insertValues);
     } catch (error) {
-      if (!isMissingWaitlistSchemaError(error)) throw error;
+      // Only retry without new columns if the error is specifically about those columns
+      if (!isMissingNewColumnsError(error)) {
+        console.error('[Waitlist API] Insert failed:', error);
+        throw error;
+      }
+      console.warn(
+        '[Waitlist API] Retrying insert without primary_goal/selected_plan columns'
+      );
       const {
         primaryGoal: _primaryGoal,
         selectedPlan: _selectedPlan,
@@ -400,7 +434,15 @@ export async function POST(request: Request) {
       } = insertValues;
       void _primaryGoal;
       void _selectedPlan;
-      await db.insert(waitlistEntries).values(fallbackValues);
+      try {
+        await db.insert(waitlistEntries).values(fallbackValues);
+      } catch (fallbackError) {
+        console.error(
+          '[Waitlist API] Fallback insert also failed:',
+          fallbackError
+        );
+        throw fallbackError;
+      }
     }
 
     return NextResponse.json(
@@ -410,6 +452,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('[Waitlist API] Error:', error);
 
+    // Return specific error for schema issues
     if (isMissingWaitlistSchemaError(error)) {
       const debugMsg =
         error instanceof Error
@@ -427,6 +470,11 @@ export async function POST(request: Request) {
         { status: 503, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Return user-friendly error for other issues
+    const errorMsg =
+      error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('[Waitlist API] Unhandled error:', errorMsg);
 
     return NextResponse.json(
       { success: false, error: 'Something went wrong. Please try again.' },

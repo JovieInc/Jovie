@@ -76,7 +76,7 @@ export function getTipUrl(handle: string, source?: 'qr' | 'link'): string {
 /**
  * Build an app/dashboard URL
  * @param path - Path within the app (e.g., '/dashboard', '/settings')
- * @returns Full URL like https://app.meetjovie.com/dashboard
+ * @returns Full URL like https://meetjovie.com/dashboard
  */
 export function getAppUrl(path: string = ''): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;

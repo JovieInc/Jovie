@@ -665,6 +665,9 @@ export function AdminCreatorProfilesWithSidebar({
                         aria-selected={isSelected}
                       >
                         <td className='w-14 px-4 py-3 align-middle'>
+                          {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
+                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
+                          {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
                           <div
                             className='relative flex h-7 w-7 items-center justify-center'
                             onClick={event => event.stopPropagation()}
@@ -778,6 +781,8 @@ export function AdminCreatorProfilesWithSidebar({
                             )}
                           </Badge>
                         </td>
+                        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
+                        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
                         <td
                           className='px-4 py-3 align-middle text-right'
                           onClick={e => e.stopPropagation()}

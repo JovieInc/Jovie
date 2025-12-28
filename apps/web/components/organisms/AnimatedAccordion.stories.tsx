@@ -67,6 +67,7 @@ export const Interactive: Story = {
     return (
       <div className='w-80 space-y-4'>
         <button
+          type='button'
           onClick={() => setIsOpen(!isOpen)}
           className='w-full px-4 py-2 bg-black text-white dark:bg-white dark:text-black rounded-md font-medium'
         >
@@ -113,6 +114,7 @@ export const FAQExample: Story = {
             className='border border-subtle rounded-lg overflow-hidden'
           >
             <button
+              type='button'
               onClick={() => setOpenIndex(openIndex === index ? null : index)}
               className='w-full px-4 py-3 text-left font-medium flex justify-between items-center'
             >

@@ -84,7 +84,6 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
       <SidebarContent>
         <nav
           aria-label='Admin navigation'
-          role='navigation'
           className='flex flex-1 flex-col overflow-hidden'
         >
           <SidebarMenu>

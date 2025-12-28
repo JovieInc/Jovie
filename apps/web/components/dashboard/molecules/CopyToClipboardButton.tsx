@@ -137,6 +137,7 @@ export function CopyToClipboardButton({
           idleLabel
         )}
       </Button>
+      {/* biome-ignore lint/a11y/useSemanticElements: output element not appropriate for screen reader announcement */}
       <span className='sr-only' aria-live='polite' role='status'>
         {status === 'success'
           ? 'Profile URL copied to clipboard'

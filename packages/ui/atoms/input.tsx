@@ -110,6 +110,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           >
             {/* Loading spinner */}
             {loading && (
+              // biome-ignore lint/a11y/useAriaPropsSupportedByRole: ARIA label needed for loading spinner accessibility
               <div
                 className={cn(
                   'animate-spin motion-reduce:animate-none rounded-full border-2 border-current border-t-transparent',

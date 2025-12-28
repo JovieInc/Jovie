@@ -18,6 +18,7 @@ export const buildContentSecurityPolicy = ({
     [
       "script-src 'self'",
       `'nonce-${nonce}'`,
+      "'sha256-U8qHNAYVONMkNDz+dKowqI4OkI0neY4A/sKEI0weOO8='", // Clerk inline script hash
       isDev ? "'unsafe-eval'" : null,
       'https://va.vercel-scripts.com',
       'https://vitals.vercel-insights.com',
@@ -59,9 +60,11 @@ export const buildContentSecurityPolicy = ({
       'https://*.clerk.accounts.dev',
       'https://api.stripe.com',
       'https://*.ingest.sentry.io',
+      'wss://*.clerk.com', // Clerk WebSocket connections
+      'https://jov.ie', // Monitoring endpoint
     ].join(' '),
     "font-src 'self' data:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://*.clerk.com https://*.clerk.accounts.dev",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
   ];

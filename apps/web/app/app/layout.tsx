@@ -1,8 +1,9 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
+import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { getWaitlistAccessByEmail } from '@/lib/waitlist/access';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { canAccessApp, resolveUserState, UserState } from '@/lib/auth/gate';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
@@ -12,44 +13,59 @@ import {
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import DashboardLayoutClient from './dashboard/DashboardLayoutClient';
 
-async function ensureWaitlistAccess(): Promise<void> {
-  return Sentry.startSpan(
-    { op: 'waitlist', name: 'app.waitlistAccess' },
-    async () => {
-      try {
-        const user = await currentUser();
-        const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
+/**
+ * Centralized auth gate for the app shell.
+ * Uses resolveUserState() to determine user access and redirect appropriately.
+ */
+async function ensureAppAccess(): Promise<void> {
+  return Sentry.startSpan({ op: 'auth', name: 'app.authGate' }, async () => {
+    try {
+      const authResult = await resolveUserState();
 
-        if (!emailRaw) {
-          redirect('/waitlist');
+      // Handle each state with appropriate redirect
+      if (!canAccessApp(authResult.state)) {
+        // Use redirectTo if available, otherwise apply fallback logic
+        if (authResult.redirectTo) {
+          redirect(authResult.redirectTo);
         }
 
-        const access = await getWaitlistAccessByEmail(emailRaw);
+        // Fallback redirects for edge cases where redirectTo might be null
+        if (authResult.state === UserState.UNAUTHENTICATED) {
+          redirect('/signin?redirect_url=/app/dashboard');
+        }
         if (
-          !access.status ||
-          access.status === 'new' ||
-          access.status === 'rejected'
+          authResult.state === UserState.NEEDS_WAITLIST_SUBMISSION ||
+          authResult.state === UserState.WAITLIST_PENDING
         ) {
           redirect('/waitlist');
         }
-
-        if (access.status === 'invited') {
-          if (access.inviteToken) {
-            redirect(`/claim/${encodeURIComponent(access.inviteToken)}`);
-          }
-          redirect('/waitlist');
+        if (authResult.state === UserState.WAITLIST_INVITED) {
+          redirect(
+            authResult.context.claimToken
+              ? `/claim/${encodeURIComponent(authResult.context.claimToken)}`
+              : '/waitlist'
+          );
         }
-      } catch (error) {
-        if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
-          throw error;
+        if (
+          authResult.state === UserState.NEEDS_ONBOARDING ||
+          authResult.state === UserState.NEEDS_DB_USER
+        ) {
+          redirect('/onboarding');
         }
-
-        Sentry.captureException(error, {
-          tags: { context: 'waitlist_gate' },
-        });
+        if (authResult.state === UserState.BANNED) {
+          redirect('/banned');
+        }
       }
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+        throw error;
+      }
+
+      Sentry.captureException(error, {
+        tags: { context: 'auth_gate' },
+      });
     }
-  );
+  });
 }
 
 export default async function AppShellLayout({
@@ -57,19 +73,20 @@ export default async function AppShellLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/dashboard');
   }
 
-  const waitlistPromise = ensureWaitlistAccess();
+  // Use centralized auth gate - handles all auth state checks
+  const authPromise = ensureAppAccess();
   prefetchDashboardData();
 
   try {
     const [dashboardData] = await Promise.all([
       getDashboardDataCached(),
-      waitlistPromise,
+      authPromise,
     ]);
 
     if (dashboardData.needsOnboarding) {
@@ -78,6 +95,7 @@ export default async function AppShellLayout({
 
     return (
       <MyStatsig userId={userId}>
+        <ImpersonationBannerWrapper />
         <DashboardDataProvider value={dashboardData}>
           <DashboardLayoutClient
             dashboardData={dashboardData}

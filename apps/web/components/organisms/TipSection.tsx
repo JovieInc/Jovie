@@ -112,6 +112,7 @@ export function TipSection({
       <div className={`w-full max-w-sm space-y-3 ${className}`}>
         {paymentMethod && (
           <button
+            type='button'
             onClick={() => setPaymentMethod(null)}
             className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mb-4'
           >
@@ -143,6 +144,7 @@ export function TipSection({
       <div className={`w-full max-w-sm ${className}`}>
         {paymentMethod && (
           <button
+            type='button'
             onClick={() => setPaymentMethod(null)}
             className='text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 mb-4'
           >

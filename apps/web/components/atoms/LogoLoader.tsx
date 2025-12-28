@@ -22,6 +22,7 @@ export function LogoLoader({
   'aria-label': ariaLabel = 'Loading',
 }: LogoLoaderProps) {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
     <div
       role='status'
       aria-live='polite'

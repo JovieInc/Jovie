@@ -1,12 +1,12 @@
-import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { ContactsManager } from '@/components/dashboard/organisms/ContactsManager';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardDataCached } from '../actions';
 import { getProfileContactsForOwner } from './actions';
 
 export default async function ContactsPage() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/signin?redirect_url=/app/dashboard/contacts');

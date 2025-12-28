@@ -16,6 +16,7 @@ export function VerifiedBadge({
   } as const;
 
   return (
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label is needed for accessibility on span with icon
     <span
       className={`inline-flex align-middle text-sky-600 dark:text-sky-400 ${className}`}
       title='Verified artist'

@@ -214,7 +214,7 @@ This document outlines the improvements made to ensure that images are correctly
 
 ### **Regular Tasks**
 
-- **Image validation**: Run `npm run verify-artist-images` weekly
+- **Image validation**: Run `pnpm run verify-artist-images` weekly
 - **Performance monitoring**: Check image loading times
 - **Accessibility audits**: Verify alt text and keyboard navigation
 - **Error monitoring**: Track image loading failures

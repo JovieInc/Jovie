@@ -35,6 +35,7 @@ export function LegalMarkdownReader({
           // Strong
           '[&_strong]:text-neutral-900 dark:[&_strong]:text-white [&_strong]:font-medium'
         )}
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for markdown content rendering
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </article>

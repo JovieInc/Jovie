@@ -56,7 +56,7 @@
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.6",
-    "turbo": "^2.3.0",
+    "turbo": "^2.7.2",
     "typescript": "^5"
   },
   "lint-staged": {
@@ -66,6 +66,9 @@
     ],
     "*.{js,jsx,ts,tsx}": [
       "biome check --write --no-errors-on-unmatched"
+    ],
+    "apps/web/components/**/*.{tsx,ts}": [
+      "pnpm --filter=@jovie/web run a11y:check:staged"
     ],
     "*.{json,css}": [
       "biome format --write --no-errors-on-unmatched"

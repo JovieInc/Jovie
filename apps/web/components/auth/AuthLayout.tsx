@@ -12,7 +12,7 @@ import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { useMobileKeyboard } from '@/hooks/use-mobile-keyboard';
+import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
 
 interface AuthLayoutProps {
@@ -202,7 +202,7 @@ export function AuthLayout({
       </div>
 
       {/* Title - hide when keyboard is visible on mobile */}
-      {showFormTitle && (
+      {showFormTitle && formTitle && (
         <h1
           className={cn(
             formTitleClassName,
@@ -228,7 +228,6 @@ export function AuthLayout({
           // Smooth scroll target
           'scroll-mt-4'
         )}
-        role='main'
       >
         {children}
       </main>

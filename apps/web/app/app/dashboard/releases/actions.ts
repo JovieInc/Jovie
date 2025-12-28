@@ -1,8 +1,12 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import { unstable_noStore as noStore, revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { getCachedAuth } from '@/lib/auth/cached';
+import {
+  PRIMARY_PROVIDER_KEYS,
+  PROVIDER_CONFIG,
+} from '@/lib/discography/config';
 import {
   getProviderLink,
   getReleaseById,
@@ -10,15 +14,11 @@ import {
   type ReleaseWithProviders,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
-} from '@/lib/discog/queries';
+} from '@/lib/discography/queries';
 import {
   type SpotifyImportResult,
   syncReleasesFromSpotify,
-} from '@/lib/discog/spotify-import';
-import {
-  PRIMARY_PROVIDER_KEYS,
-  PROVIDER_CONFIG,
-} from '@/lib/discography/config';
+} from '@/lib/discography/spotify-import';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { buildSmartLinkPath } from '@/lib/discography/utils';
 import { getDashboardData } from '../actions';
@@ -97,7 +97,7 @@ function mapReleaseToViewModel(
 
 export async function loadReleaseMatrix(): Promise<ReleaseViewModel[]> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     redirect('/sign-in?redirect_url=/app/dashboard/releases');
@@ -119,7 +119,7 @@ export async function saveProviderOverride(params: {
   url: string;
 }): Promise<ReleaseViewModel> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -159,7 +159,7 @@ export async function resetProviderOverride(params: {
   provider: ProviderKey;
 }): Promise<ReleaseViewModel> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -200,7 +200,7 @@ export async function syncFromSpotify(): Promise<{
   errors: string[];
 }> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -246,7 +246,7 @@ export async function checkSpotifyConnection(): Promise<{
   spotifyId: string | null;
 }> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     return { connected: false, spotifyId: null };
   }

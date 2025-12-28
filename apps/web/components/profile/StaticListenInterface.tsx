@@ -137,6 +137,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
         ) : (
           availableDSPs.map(dsp => (
             <button
+              type='button'
               key={dsp.key}
               onClick={() => handleDSPClick(dsp)}
               disabled={selectedDSP === dsp.key || isLoading}
@@ -156,6 +157,7 @@ export const StaticListenInterface = React.memo(function StaticListenInterface({
             >
               <div
                 className='shrink-0'
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: Required for DSP embed content
                 dangerouslySetInnerHTML={{ __html: dsp.config.logoSvg }}
               />
               <span>

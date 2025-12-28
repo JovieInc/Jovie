@@ -65,9 +65,9 @@ export function HeroSection({
   }, [headline, highlightText, gradientVariant]);
 
   return (
-    <section
+    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-labelledby needed for hero section accessibility
+    <header
       className={`relative flex flex-col items-center justify-center px-6 py-16 md:py-20 ${className}`}
-      role='banner'
       aria-labelledby='hero-headline'
     >
       <Container className='relative flex max-w-4xl flex-col items-center text-center'>
@@ -101,7 +101,7 @@ export function HeroSection({
 
         {/* Main content area */}
         {children && (
-          <div className='w-full max-w-xl' role='main'>
+          <main className='w-full max-w-xl'>
             <div className='relative group'>
               {/* Background glow effect */}
               {showBackgroundEffects && (
@@ -120,7 +120,7 @@ export function HeroSection({
                 {supportingText}
               </div>
             )}
-          </div>
+          </main>
         )}
 
         {/* Trust indicators */}
@@ -130,6 +130,6 @@ export function HeroSection({
           </div>
         )}
       </Container>
-    </section>
+    </header>
   );
 }

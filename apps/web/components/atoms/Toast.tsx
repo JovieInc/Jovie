@@ -75,6 +75,7 @@ export const Toast: React.FC<ToastProps> = ({
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: output element not appropriate for toast notification
     <div
       role='status'
       aria-live={type === 'error' ? 'assertive' : 'polite'}
@@ -99,6 +100,7 @@ export const Toast: React.FC<ToastProps> = ({
       <span className='text-sm'>{message}</span>
       {action && (
         <button
+          type='button'
           onClick={handleActionClick}
           className={cn('text-sm font-semibold', actionStyles[type])}
         >

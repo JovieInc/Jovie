@@ -1,8 +1,8 @@
 'use server';
 
-import { auth } from '@clerk/nextjs/server';
 import { and, asc, eq } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { sanitizeContactInput } from '@/lib/contacts/validation';
@@ -58,7 +58,7 @@ export async function getProfileContactsForOwner(
   profileId: string
 ): Promise<DashboardContact[]> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }
@@ -153,7 +153,7 @@ export async function deleteContact(
   profileId: string
 ): Promise<void> {
   noStore();
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
   }

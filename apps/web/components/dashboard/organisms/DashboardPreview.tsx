@@ -141,6 +141,7 @@ export const DashboardPreview: React.FC<DashboardPreviewProps> = ({
             fill='none'
             stroke='currentColor'
             viewBox='0 0 24 24'
+            aria-hidden='true'
           >
             <path
               strokeLinecap='round'

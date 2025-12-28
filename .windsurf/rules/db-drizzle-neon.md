@@ -17,8 +17,8 @@ This guide covers the specific integration patterns, configurations, and optimiz
 For Neon with Drizzle ORM integration, include these specific dependencies. The `ws` package is required for persistent WebSocket connections in Node.js environments older than v22.
 
 ```bash
-npm install drizzle-orm @neondatabase/serverless ws
-npm install -D drizzle-kit dotenv @types/ws
+pnpm add drizzle-orm @neondatabase/serverless ws
+pnpm add -D drizzle-kit dotenv @types/ws
 ```
 
 ## Neon Connection String

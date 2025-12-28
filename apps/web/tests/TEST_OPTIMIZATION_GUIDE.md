@@ -355,14 +355,14 @@ Run tests with timing information:
 
 ```bash
 # Run with detailed timing
-npm test -- --reporter=verbose
+pnpm test -- --reporter=verbose
 
 # Run specific slow tests
-npm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
+pnpm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
 
 # Compare before/after
-npm test -- tests/unit/ProblemSolutionSection.test.tsx
-npm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
+pnpm test -- tests/unit/ProblemSolutionSection.test.tsx
+pnpm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
 ```
 
 ## Troubleshooting

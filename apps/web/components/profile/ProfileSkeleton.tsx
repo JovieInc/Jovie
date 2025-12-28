@@ -8,6 +8,7 @@ import { Container } from '@/components/site/Container';
 
 export function ProfileSkeleton() {
   return (
+    // biome-ignore lint/a11y/useSemanticElements: status role needed for accessible loading announcement
     <div
       className='min-h-screen bg-base text-primary-token transition-colors duration-200 relative overflow-hidden'
       role='status'

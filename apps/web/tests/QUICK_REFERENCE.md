@@ -200,10 +200,10 @@ Migrating an existing slow test?
 
 ```bash
 # Run specific test
-npm test -- path/to/test.tsx
+pnpm test -- path/to/test.tsx
 
 # Run with timing info
-npm test -- --reporter=verbose
+pnpm test -- --reporter=verbose
 
 # Benchmark performance
 ./scripts/benchmark-test-performance.sh

@@ -168,6 +168,7 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
             <div className='absolute inset-0 bg-[radial-gradient(80%_60%_at_50%_0%,rgba(255,255,255,0.35),transparent_60%)]' />
           </div>
           <button
+            type='button'
             onClick={close}
             aria-label='Close'
             className='absolute top-1 right-1 text-tertiary-token hover:text-secondary-token'
@@ -183,6 +184,7 @@ export function DesktopQrOverlay({ handle }: DesktopQrOverlayProps) {
 
       {mode === 'icon' && (
         <motion.button
+          type='button'
           key='reopen'
           initial={
             prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 12 }

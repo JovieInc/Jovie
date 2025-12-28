@@ -1,7 +1,7 @@
 'server only';
 
-import { auth } from '@clerk/nextjs/server';
 import { sql as drizzleSql } from 'drizzle-orm';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbType, db } from '@/lib/db';
 
 /**
@@ -29,7 +29,7 @@ async function resolveClerkUserId(clerkUserId?: string): Promise<string> {
     return clerkUserId;
   }
 
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
 
   if (!userId) {
     throw new Error('Unauthorized');
@@ -131,7 +131,7 @@ export async function withDbSessionTx<T>(
  * Get the current user ID or throw if not authenticated
  */
 export async function requireAuth() {
-  const { userId } = await auth();
+  const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Authentication required');
   }

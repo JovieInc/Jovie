@@ -8,6 +8,11 @@ import { logger } from '@/lib/utils/logger';
 import { checkRateLimit } from '@/lib/utils/rate-limit';
 import { getWaitlistInviteByToken } from '@/lib/waitlist/access';
 
+// Note: The claim page intentionally does NOT use the full resolveUserState()
+// from lib/auth/gate.ts because it has specialized claim flow logic that needs
+// to handle users who don't have DB rows yet. The auth gate's user creation
+// side effects would interfere with the atomic claim process.
+
 interface ClaimPageProps {
   params: {
     token: string;
@@ -114,7 +119,7 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
   let dbUserId: string | null = null;
 
   const [existingUser] = await db
-    .select({ id: users.id, deletedAt: users.deletedAt })
+    .select({ id: users.id, deletedAt: users.deletedAt, status: users.status })
     .from(users)
     .where(eq(users.clerkId, userId))
     .limit(1);
@@ -128,14 +133,23 @@ export default async function ClaimPage({ params }: ClaimPageProps) {
       });
       redirect('/app/dashboard/overview');
     }
+    // Check if user is banned (auth hardening)
+    if (existingUser.status === 'banned') {
+      logger.warn('Claim attempt by banned user', {
+        clerkId: userId,
+        status: existingUser.status,
+      });
+      redirect('/banned');
+    }
     dbUserId = existingUser.id;
   } else {
-    // Create new user
+    // Create new user with active status
     const [createdUser] = await db
       .insert(users)
       .values({
         clerkId: userId,
         email: null,
+        status: 'active',
       })
       .returning({ id: users.id });
 

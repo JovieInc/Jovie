@@ -89,8 +89,10 @@ export function SocialIcon({
   const icon = platformMap[platform.toLowerCase()];
   const iconClass = className || 'h-4 w-4';
   const sizeStyle = size ? { width: size, height: size } : undefined;
-  const accessibilityProps: { 'aria-label'?: string; 'aria-hidden'?: boolean } =
-    ariaLabel ? { 'aria-label': ariaLabel } : { 'aria-hidden': true };
+  const _accessibilityProps: {
+    'aria-label'?: string;
+    'aria-hidden'?: boolean;
+  } = ariaLabel ? { 'aria-label': ariaLabel } : { 'aria-hidden': true };
 
   if (icon) {
     return (
@@ -116,7 +118,7 @@ export function SocialIcon({
       fill='none'
       stroke='currentColor'
       viewBox='0 0 24 24'
-      {...accessibilityProps}
+      aria-hidden='true'
     >
       <path
         strokeLinecap='round'
