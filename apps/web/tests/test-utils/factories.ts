@@ -44,8 +44,10 @@ export function generateUUID(): string {
   idCounter++;
   const timestamp = Date.now().toString(16).slice(-8);
   const counter = idCounter.toString(16).padStart(4, '0');
-  // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx (UUID v4)
-  return `${timestamp}-${counter.slice(0, 4)}-4000-8000-000000${counter}`;
+  // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx (UUID v4-like for testing)
+  // Note: Not cryptographically valid, deterministic for test debugging
+  const variant = ['8', '9', 'a', 'b'][idCounter % 4];
+  return `${timestamp}-${counter}-4000-${variant}000-${counter.padStart(12, '0')}`;
 }
 
 /**
@@ -61,7 +63,9 @@ export function seededUUID(seed: string): string {
     hash = hash & hash; // Convert to 32-bit integer
   }
   const hex = Math.abs(hash).toString(16).padStart(8, '0');
-  return `${hex.slice(0, 8)}-${hex.slice(0, 4)}-4000-8000-${hex.slice(0, 12)}`;
+  // Repeat hex to ensure we have enough characters for all segments
+  const hexExtended = (hex + hex + hex).slice(0, 32);
+  return `${hexExtended.slice(0, 8)}-${hexExtended.slice(8, 12)}-4000-8000-${hexExtended.slice(12, 24)}`;
 }
 
 /**
