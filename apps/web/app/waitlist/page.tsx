@@ -24,6 +24,29 @@ const BUTTON_CLASSES =
 
 const ALLOWED_PLANS = new Set(['free', 'branding', 'pro', 'growth']);
 
+// Session storage keys for waitlist form persistence
+const WAITLIST_STORAGE_KEYS = {
+  step: 'waitlist_step',
+  primaryGoal: 'waitlist_primary_goal',
+  socialPlatform: 'waitlist_social_platform',
+  primarySocialUrl: 'waitlist_primary_social_url',
+  spotifyUrl: 'waitlist_spotify_url',
+  heardAbout: 'waitlist_heard_about',
+} as const;
+
+/**
+ * Clear all waitlist form data from session storage
+ */
+function clearWaitlistStorage(): void {
+  try {
+    Object.values(WAITLIST_STORAGE_KEYS).forEach(key => {
+      window.sessionStorage.removeItem(key);
+    });
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 const SOCIAL_PLATFORM_OPTIONS: Array<{ value: SocialPlatform; label: string }> =
   [
     { value: 'instagram', label: 'Instagram' },
@@ -164,28 +187,156 @@ export default function WaitlistPage() {
     setIsHydrating(false);
   }, []);
 
+  // Load all persisted form state on mount
   useEffect(() => {
     try {
-      const stored = window.sessionStorage.getItem('waitlist_primary_goal');
-      if (stored === 'streams' || stored === 'merch' || stored === 'tickets') {
-        setPrimaryGoal(stored);
+      // Load step
+      const storedStep = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.step
+      );
+      if (storedStep === '0' || storedStep === '1' || storedStep === '2') {
+        setStep(Number.parseInt(storedStep, 10) as 0 | 1 | 2);
+      }
+
+      // Load primary goal
+      const storedGoal = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.primaryGoal
+      );
+      if (
+        storedGoal === 'streams' ||
+        storedGoal === 'merch' ||
+        storedGoal === 'tickets'
+      ) {
+        setPrimaryGoal(storedGoal);
+      }
+
+      // Load social platform
+      const storedPlatform = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.socialPlatform
+      );
+      if (
+        storedPlatform === 'instagram' ||
+        storedPlatform === 'tiktok' ||
+        storedPlatform === 'youtube' ||
+        storedPlatform === 'other'
+      ) {
+        setSocialPlatform(storedPlatform);
+      }
+
+      // Load primary social URL
+      const storedSocialUrl = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.primarySocialUrl
+      );
+      if (storedSocialUrl) {
+        setPrimarySocialUrl(storedSocialUrl);
+      }
+
+      // Load spotify URL
+      const storedSpotifyUrl = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.spotifyUrl
+      );
+      if (storedSpotifyUrl) {
+        setSpotifyUrl(storedSpotifyUrl);
+      }
+
+      // Load heard about
+      const storedHeardAbout = window.sessionStorage.getItem(
+        WAITLIST_STORAGE_KEYS.heardAbout
+      );
+      if (storedHeardAbout) {
+        setHeardAbout(storedHeardAbout);
       }
     } catch {
       // Ignore storage errors
     }
   }, []);
 
+  // Persist step changes
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(WAITLIST_STORAGE_KEYS.step, String(step));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [step]);
+
+  // Persist primary goal changes
   useEffect(() => {
     try {
       if (primaryGoal) {
-        window.sessionStorage.setItem('waitlist_primary_goal', primaryGoal);
+        window.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.primaryGoal,
+          primaryGoal
+        );
       } else {
-        window.sessionStorage.removeItem('waitlist_primary_goal');
+        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.primaryGoal);
       }
     } catch {
       // Ignore storage errors
     }
   }, [primaryGoal]);
+
+  // Persist social platform changes
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        WAITLIST_STORAGE_KEYS.socialPlatform,
+        socialPlatform
+      );
+    } catch {
+      // Ignore storage errors
+    }
+  }, [socialPlatform]);
+
+  // Persist primary social URL changes
+  useEffect(() => {
+    try {
+      if (primarySocialUrl) {
+        window.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.primarySocialUrl,
+          primarySocialUrl
+        );
+      } else {
+        window.sessionStorage.removeItem(
+          WAITLIST_STORAGE_KEYS.primarySocialUrl
+        );
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [primarySocialUrl]);
+
+  // Persist spotify URL changes
+  useEffect(() => {
+    try {
+      if (spotifyUrl) {
+        window.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.spotifyUrl,
+          spotifyUrl
+        );
+      } else {
+        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.spotifyUrl);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [spotifyUrl]);
+
+  // Persist heard about changes
+  useEffect(() => {
+    try {
+      if (heardAbout) {
+        window.sessionStorage.setItem(
+          WAITLIST_STORAGE_KEYS.heardAbout,
+          heardAbout
+        );
+      } else {
+        window.sessionStorage.removeItem(WAITLIST_STORAGE_KEYS.heardAbout);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, [heardAbout]);
 
   useEffect(() => {
     if (isHydrating) return;
@@ -233,14 +384,18 @@ export default function WaitlistPage() {
 
         if (data.hasEntry) {
           if (data.status === 'invited' && data.inviteToken) {
+            clearWaitlistStorage();
             router.replace(`/claim/${encodeURIComponent(data.inviteToken)}`);
             return;
           }
 
           if (data.status === 'claimed') {
+            clearWaitlistStorage();
             router.replace('/app/dashboard');
             return;
           }
+          // User already submitted waitlist - clear any stale form data
+          clearWaitlistStorage();
           setIsSubmitted(true);
         }
       } catch {
@@ -417,6 +572,8 @@ export default function WaitlistPage() {
         return;
       }
 
+      // Clear persisted form data on successful submission
+      clearWaitlistStorage();
       setIsSubmitted(true);
     } catch (err) {
       console.error('Waitlist signup error:', err);

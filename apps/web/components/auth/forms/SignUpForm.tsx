@@ -1,7 +1,8 @@
 'use client';
 
 import { Card, CardContent } from '@jovie/ui';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignUpFlow } from '@/hooks/useSignUpFlow';
 import { EmailStep } from './EmailStep';
@@ -34,7 +35,11 @@ export function SignUpForm() {
     goBack,
   } = useSignUpFlow();
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [lastAuthMethod] = useLastAuthMethod();
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -52,6 +57,41 @@ export function SignUpForm() {
       // Ignore errors
     }
   }, []);
+
+  // Build sign-in URL with email and redirect preserved
+  const buildSignInUrl = useCallback(
+    (emailToPass: string) => {
+      const signInUrl = new URL('/signin', window.location.origin);
+      // Pass email to prefill sign-in form
+      if (emailToPass) {
+        signInUrl.searchParams.set('email', emailToPass);
+      }
+      // Preserve original redirect URL
+      const redirectUrl = searchParams.get('redirect_url');
+      if (redirectUrl?.startsWith('/') && !redirectUrl.startsWith('//')) {
+        signInUrl.searchParams.set('redirect_url', redirectUrl);
+      }
+      return signInUrl.pathname + signInUrl.search;
+    },
+    [searchParams]
+  );
+
+  // Auto-redirect to sign-in when account already exists
+  useEffect(() => {
+    if (shouldSuggestSignIn && email && !isRedirecting) {
+      setIsRedirecting(true);
+      // Small delay so user can see the message before redirecting
+      redirectTimerRef.current = setTimeout(() => {
+        router.push(buildSignInUrl(email));
+      }, 1500);
+    }
+
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+      }
+    };
+  }, [shouldSuggestSignIn, email, isRedirecting, router, buildSignInUrl]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
@@ -130,16 +170,22 @@ export function SignUpForm() {
           />
         )}
 
-        {/* Sign in suggestion when account exists */}
+        {/* Sign in suggestion when account exists - auto-redirects */}
         {shouldSuggestSignIn && step === 'email' && (
           <p className='text-sm text-secondary-token text-center mt-4'>
-            Account already exists.{' '}
-            <a
-              href='/signin'
-              className='text-primary-token hover:underline focus-ring-themed rounded-md'
-            >
-              Sign in instead
-            </a>
+            {isRedirecting ? (
+              <>Redirecting to sign in…</>
+            ) : (
+              <>
+                Account already exists.{' '}
+                <a
+                  href={buildSignInUrl(email)}
+                  className='text-primary-token hover:underline focus-ring-themed rounded-md'
+                >
+                  Sign in instead
+                </a>
+              </>
+            )}
           </p>
         )}
       </CardContent>

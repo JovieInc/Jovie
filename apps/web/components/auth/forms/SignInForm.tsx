@@ -1,7 +1,8 @@
 'use client';
 
 import { Card, CardContent } from '@jovie/ui';
-import { useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { useLastAuthMethod } from '@/hooks/useLastAuthMethod';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { EmailStep } from './EmailStep';
@@ -34,7 +35,9 @@ export function SignInForm() {
     goBack,
   } = useSignInFlow();
 
+  const searchParams = useSearchParams();
   const [lastAuthMethod] = useLastAuthMethod();
+  const hasHandledEmailParam = useRef(false);
 
   // Store redirect URL from query params on mount
   useEffect(() => {
@@ -52,6 +55,17 @@ export function SignInForm() {
       // Ignore errors
     }
   }, []);
+
+  // Handle email query parameter (e.g., from signup redirect)
+  useEffect(() => {
+    if (hasHandledEmailParam.current) return;
+    const emailParam = searchParams.get('email');
+    if (emailParam && emailParam.includes('@')) {
+      hasHandledEmailParam.current = true;
+      setEmail(emailParam);
+      setStep('email');
+    }
+  }, [searchParams, setEmail, setStep]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
