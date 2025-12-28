@@ -113,11 +113,24 @@ test.describe('Onboarding smoke', () => {
       const uniqueHandle = `e2e-${Date.now().toString(36)}`;
       await handleInput.fill(uniqueHandle);
 
-      // Wait for the availability check indicator (green checkmark)
-      // Based on the OnboardingForm component, it shows a green circle with checkmark
-      await expect(page.locator('.bg-green-500.rounded-full')).toBeVisible({
-        timeout: 10_000,
-      });
+      // Wait for handle availability check to complete
+      // Use data-testid for stable selector, with fallback to waiting for submit button to be enabled
+      // The handle validation shows different states: checking, available, unavailable
+      await expect(
+        page.locator(
+          '[data-testid="handle-available"], [data-testid="handle-valid"]'
+        )
+      )
+        .toBeVisible({
+          timeout: 10_000,
+        })
+        .catch(async () => {
+          // Fallback: wait for submit button to become enabled (indicates handle is valid)
+          const submit = page.getByRole('button', { name: 'Create Profile' });
+          await expect
+            .poll(async () => await submit.isEnabled(), { timeout: 10_000 })
+            .toBe(true);
+        });
 
       // Wait for submit button to be enabled
       const submit = page.getByRole('button', { name: 'Create Profile' });

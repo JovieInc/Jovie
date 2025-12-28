@@ -115,10 +115,23 @@ test.describe('Dashboard Access Control', () => {
     await expect(handleInputA).toBeVisible({ timeout: 5_000 });
     await handleInputA.fill(userAHandle);
 
-    // Wait for handle validation
+    // Wait for handle validation to complete
+    // Use data-testid for stable selector, with fallback to button enabled state
     await expect(
-      page.locator('.bg-green-500.rounded-full').first()
-    ).toBeVisible({ timeout: 10_000 });
+      page
+        .locator(
+          '[data-testid="handle-available"], [data-testid="handle-valid"]'
+        )
+        .first()
+    )
+      .toBeVisible({ timeout: 10_000 })
+      .catch(async () => {
+        // Fallback: wait for submit button to become enabled (indicates handle is valid)
+        const btn = page.getByRole('button', { name: 'Create Profile' });
+        await expect
+          .poll(async () => await btn.isEnabled(), { timeout: 10_000 })
+          .toBe(true);
+      });
 
     const submitButtonA = page.getByRole('button', { name: 'Create Profile' });
     await expect
@@ -188,9 +201,23 @@ test.describe('Dashboard Access Control', () => {
     const handleInputB = page.getByLabel('Enter your desired handle');
     await handleInputB.fill(userBHandle);
 
+    // Wait for handle validation to complete
+    // Use data-testid for stable selector, with fallback to button enabled state
     await expect(
-      page.locator('.bg-green-500.rounded-full').first()
-    ).toBeVisible({ timeout: 10_000 });
+      page
+        .locator(
+          '[data-testid="handle-available"], [data-testid="handle-valid"]'
+        )
+        .first()
+    )
+      .toBeVisible({ timeout: 10_000 })
+      .catch(async () => {
+        // Fallback: wait for submit button to become enabled (indicates handle is valid)
+        const btn = page.getByRole('button', { name: 'Create Profile' });
+        await expect
+          .poll(async () => await btn.isEnabled(), { timeout: 10_000 })
+          .toBe(true);
+      });
 
     const submitButtonB = page.getByRole('button', { name: 'Create Profile' });
     await expect

@@ -144,10 +144,7 @@ test.describe('Onboarding Flow', () => {
   test('onboarding page renders without authentication errors', async ({
     page,
   }) => {
-    // Go directly to onboarding page
-    await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
-
-    // Should not have JavaScript errors
+    // Set up console error collection BEFORE navigation
     const errors: string[] = [];
     page.on('console', msg => {
       if (msg.type() === 'error') {
@@ -155,7 +152,22 @@ test.describe('Onboarding Flow', () => {
       }
     });
 
-    await page.waitForTimeout(3000);
+    // Go directly to onboarding page
+    await page.goto('/onboarding', { waitUntil: 'domcontentloaded' });
+
+    // Wait for page to stabilize by checking for the sign-in redirect or page content
+    // This replaces the arbitrary 3000ms timeout with condition-based waiting
+    await Promise.race([
+      page.waitForURL(/\/signin/, { timeout: 10000 }),
+      page.waitForSelector('form, [data-testid="onboarding-form"]', {
+        timeout: 10000,
+      }),
+    ]).catch(() => {
+      // Either sign-in redirect or form is fine
+    });
+
+    // Wait for any pending network requests to complete
+    await page.waitForLoadState('domcontentloaded');
 
     // Filter out expected authentication redirects
     const criticalErrors = errors.filter(

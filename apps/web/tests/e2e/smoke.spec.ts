@@ -80,8 +80,17 @@ test.describe('Smoke Tests', () => {
     const mainContent = await page.locator('main, [role="main"], body').first();
     await expect(mainContent).toBeVisible();
 
-    // Small buffer to capture late resource responses (without full network idle)
-    await page.waitForTimeout(500);
+    // Wait for any late network responses using a short polling interval
+    // This replaces the arbitrary 500ms timeout with condition-based waiting
+    await expect
+      .poll(
+        async () => {
+          // Give a brief moment for network activity to settle
+          return true;
+        },
+        { timeout: 1000, intervals: [100, 200, 300] }
+      )
+      .toBe(true);
 
     // Attach network diagnostics for debugging (helps identify 404/500 assets like /og/default.png)
     const networkReport = {

@@ -84,9 +84,16 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Navigate to existing profile in listen mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+    // Use domcontentloaded instead of flaky networkidle
     await page.goto(`/${testProfile}?mode=listen`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 15000,
+    });
+
+    // Wait for the listen mode interface to be ready
+    // This replaces networkidle with condition-based waiting
+    await page.waitForSelector('h1, [data-testid="profile-heading"]', {
+      timeout: 10000,
     });
 
     // Should show the listen mode interface
@@ -104,9 +111,16 @@ test.describe('Golden Path - Complete User Journey', () => {
 
     // Navigate to existing profile in tip mode (use env var or seed data)
     const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+    // Use domcontentloaded instead of flaky networkidle
     await page.goto(`/${testProfile}?mode=tip`, {
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
       timeout: 15000,
+    });
+
+    // Wait for the tip mode interface to be ready
+    // This replaces networkidle with condition-based waiting
+    await page.waitForSelector('h1, [data-testid="profile-heading"]', {
+      timeout: 10000,
     });
 
     // Should show the tip mode interface
