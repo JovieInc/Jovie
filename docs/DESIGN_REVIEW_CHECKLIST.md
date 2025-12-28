@@ -167,7 +167,7 @@ import { ChevronRightIcon } from '@heroicons/react/24/outline';
 - **Heroicons Browser**: [heroicons.com](https://heroicons.com)
 - **SimpleIcons Browser**: [simpleicons.org](https://simpleicons.org)
 - **SocialIcon Component**: [components/atoms/SocialIcon.tsx](../components/atoms/SocialIcon.tsx)
-- **Icon Audit Script**: `npm run audit:icons`
+- **Icon Audit Script**: `pnpm audit:icons`
 
 ## Automated Checks
 

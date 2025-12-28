@@ -201,13 +201,13 @@ Run these commands to validate the optimization:
 
 ```bash
 # Baseline (original test)
-time npm test -- tests/unit/ProblemSolutionSection.test.tsx
+time pnpm test -- tests/unit/ProblemSolutionSection.test.tsx
 
 # Optimized version
-time npm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
+time pnpm test -- tests/unit/ProblemSolutionSection.optimized.test.tsx
 
 # Full suite comparison
-npm test -- --reporter=verbose 2>&1 | grep "Duration:"
+pnpm test -- --reporter=verbose 2>&1 | grep "Duration:"
 ```
 
 Expected results:
@@ -228,7 +228,7 @@ If issues arise:
 
 1. **Measure baseline performance:**
    ```bash
-   npm test -- --reporter=verbose > baseline-results.txt
+   pnpm test -- --reporter=verbose > baseline-results.txt
    ```
 
 2. **Migrate top 10 slowest tests:**
