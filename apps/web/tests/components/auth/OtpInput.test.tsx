@@ -165,4 +165,139 @@ describe('OtpInput', () => {
     expect(screen.getByLabelText('Digit 1 of 6')).toHaveValue('4');
     expect(screen.getByLabelText('Digit 6 of 6')).toHaveValue('9');
   });
+
+  // New tests for enhanced functionality
+
+  it('handles paste with spaces in code', () => {
+    const onChange = vi.fn();
+    render(<OtpInput onChange={onChange} />);
+
+    const group = screen.getByRole('group', { name: 'One-time password' });
+
+    // Simulate paste with spaces (e.g., "123 456")
+    const clipboardData = {
+      getData: () => '123 456',
+    };
+    fireEvent.paste(group, { clipboardData });
+
+    expect(onChange).toHaveBeenCalledWith('123456');
+  });
+
+  it('handles paste with dashes in code', () => {
+    const onChange = vi.fn();
+    render(<OtpInput onChange={onChange} />);
+
+    const group = screen.getByRole('group', { name: 'One-time password' });
+
+    // Simulate paste with dashes (e.g., "123-456")
+    const clipboardData = {
+      getData: () => '123-456',
+    };
+    fireEvent.paste(group, { clipboardData });
+
+    expect(onChange).toHaveBeenCalledWith('123456');
+  });
+
+  it('truncates paste longer than 6 digits', () => {
+    const onChange = vi.fn();
+    render(<OtpInput onChange={onChange} />);
+
+    const group = screen.getByRole('group', { name: 'One-time password' });
+
+    // Simulate paste with more than 6 digits
+    const clipboardData = {
+      getData: () => '12345678',
+    };
+    fireEvent.paste(group, { clipboardData });
+
+    expect(onChange).toHaveBeenCalledWith('123456');
+  });
+
+  it('renders autofill overlay input with correct attributes', () => {
+    render(<OtpInput />);
+
+    const autofillInput = screen.getByTestId('otp-autofill-input');
+    expect(autofillInput).toBeInTheDocument();
+    expect(autofillInput).toHaveAttribute('autocomplete', 'one-time-code');
+    expect(autofillInput).toHaveAttribute('inputMode', 'numeric');
+  });
+
+  it('first visible input has autocomplete one-time-code', () => {
+    render(<OtpInput />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+    expect(firstInput).toHaveAttribute('autocomplete', 'one-time-code');
+  });
+
+  it('handles arrow key navigation', async () => {
+    const user = userEvent.setup();
+    render(<OtpInput value='123' />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+    const secondInput = screen.getByLabelText('Digit 2 of 6');
+
+    await user.click(firstInput);
+    await user.keyboard('{ArrowRight}');
+
+    expect(document.activeElement).toBe(secondInput);
+
+    await user.keyboard('{ArrowLeft}');
+
+    expect(document.activeElement).toBe(firstInput);
+  });
+
+  it('associates error with inputs via aria-describedby', () => {
+    const errorId = 'test-error';
+    render(<OtpInput error errorId={errorId} />);
+
+    const firstInput = screen.getByLabelText('Digit 1 of 6');
+    expect(firstInput).toHaveAttribute('aria-describedby', errorId);
+
+    const group = screen.getByRole('group', { name: 'One-time password' });
+    expect(group).toHaveAttribute('aria-describedby', errorId);
+  });
+
+  it('clears current digit on backspace when filled', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<OtpInput value='123' onChange={onChange} />);
+
+    // Focus second input which has "2"
+    const secondInput = screen.getByLabelText('Digit 2 of 6');
+    await user.click(secondInput);
+    await user.keyboard('{Backspace}');
+
+    // Should clear digit 2, resulting in "13"
+    expect(onChange).toHaveBeenCalledWith('13');
+    // Focus should stay on second input (now showing "3" due to shift)
+    expect(document.activeElement).toBe(secondInput);
+  });
+
+  it('moves to previous on backspace when current is empty', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<OtpInput value='12' onChange={onChange} />);
+
+    // Focus third input which is empty
+    const thirdInput = screen.getByLabelText('Digit 3 of 6');
+    await user.click(thirdInput);
+    await user.keyboard('{Backspace}');
+
+    // Should clear digit 2 and focus input 2
+    expect(onChange).toHaveBeenCalledWith('1');
+    const secondInput = screen.getByLabelText('Digit 2 of 6');
+    expect(document.activeElement).toBe(secondInput);
+  });
+
+  it('handles autofill input change', () => {
+    const onComplete = vi.fn();
+    render(<OtpInput onComplete={onComplete} />);
+
+    const autofillInput = screen.getByTestId('otp-autofill-input');
+
+    // Simulate autofill populating the hidden input
+    fireEvent.change(autofillInput, { target: { value: '654321' } });
+
+    expect(onComplete).toHaveBeenCalledWith('654321');
+  });
 });

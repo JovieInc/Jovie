@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +37,10 @@ interface OtpInputProps {
    * Error state
    */
   error?: boolean;
+  /**
+   * Error message ID for aria-describedby association
+   */
+  errorId?: string;
 }
 
 /**
@@ -58,16 +62,20 @@ export function OtpInput({
   'aria-label': ariaLabel = 'One-time password',
   disabled = false,
   error = false,
+  errorId,
 }: OtpInputProps) {
   // Support both controlled and uncontrolled usage
   const [internalValue, setInternalValue] = useState('');
   const value = controlledValue ?? internalValue;
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const autofillInputRef = useRef<HTMLInputElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [isComplete, setIsComplete] = useState(false);
   const haptic = useHapticFeedback();
   const lastLengthRef = useRef(0);
+  const autofillInputId = useId();
 
   // Focus first input on mount
   useEffect(() => {
@@ -78,7 +86,7 @@ export function OtpInput({
 
   // Handle value changes
   const updateValue = useCallback(
-    (newValue: string) => {
+    (newValue: string, shouldBlurOnComplete = false) => {
       const sanitized = newValue.replace(/\D/g, '').slice(0, OTP_LENGTH);
 
       // Haptic feedback
@@ -105,6 +113,13 @@ export function OtpInput({
       // Trigger onComplete when all digits entered
       if (sanitized.length === OTP_LENGTH) {
         onComplete?.(sanitized);
+        // Optionally blur to prevent accidental edits after completion
+        if (shouldBlurOnComplete) {
+          // Small delay to ensure state updates complete
+          setTimeout(() => {
+            (document.activeElement as HTMLElement)?.blur?.();
+          }, 50);
+        }
       }
     },
     [controlledValue, onChange, onComplete, haptic]
@@ -160,6 +175,27 @@ export function OtpInput({
     [value, updateValue]
   );
 
+  // Handle iOS delete via onInput (iOS sends deleteContentBackward as input event)
+  const handleInput = useCallback(
+    (index: number, event: React.FormEvent<HTMLInputElement>) => {
+      const nativeEvent = event.nativeEvent as InputEvent;
+      // Handle iOS delete when the input is already empty
+      // iOS sometimes sends deleteContentBackward without triggering keydown
+      if (
+        nativeEvent.inputType === 'deleteContentBackward' &&
+        !value[index] &&
+        index > 0
+      ) {
+        // Move to previous input and clear it
+        const chars = value.split('');
+        chars[index - 1] = '';
+        updateValue(chars.join('').replace(/\s/g, ''));
+        inputRefs.current[index - 1]?.focus();
+      }
+    },
+    [value, updateValue]
+  );
+
   // Handle paste
   const handlePaste = useCallback(
     (event: React.ClipboardEvent) => {
@@ -168,21 +204,44 @@ export function OtpInput({
       const digits = pastedData.replace(/\D/g, '').slice(0, OTP_LENGTH);
 
       if (digits) {
-        updateValue(digits);
+        // Blur on complete when pasting full code
+        updateValue(digits, digits.length === OTP_LENGTH);
 
-        // Focus the appropriate input
-        const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
-        inputRefs.current[focusIndex]?.focus();
-
-        if (digits.length === OTP_LENGTH) {
-          haptic.success();
-        } else {
+        // Focus the appropriate input (if not complete)
+        if (digits.length < OTP_LENGTH) {
+          const focusIndex = Math.min(digits.length, OTP_LENGTH - 1);
+          inputRefs.current[focusIndex]?.focus();
           haptic.medium();
         }
+        // haptic.success is already called in updateValue for complete
       }
     },
     [updateValue, haptic]
   );
+
+  // Handle autofill from the overlay input
+  const handleAutofillChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const newValue = event.target.value;
+      // Autofill typically inserts the full code at once
+      updateValue(newValue, newValue.replace(/\D/g, '').length === OTP_LENGTH);
+
+      // If partial, focus the appropriate visible input
+      const digits = newValue.replace(/\D/g, '');
+      if (digits.length < OTP_LENGTH && digits.length > 0) {
+        inputRefs.current[digits.length]?.focus();
+      }
+    },
+    [updateValue]
+  );
+
+  // When user focuses autofill input, forward focus to first visible input
+  const handleAutofillFocus = useCallback(() => {
+    // Don't forward focus if already have content - let autofill work
+    if (!value) {
+      inputRefs.current[0]?.focus();
+    }
+  }, [value]);
 
   // Handle focus
   const handleFocus = useCallback((index: number) => {
@@ -202,7 +261,7 @@ export function OtpInput({
   };
 
   return (
-    <div className='relative'>
+    <div className='relative' ref={containerRef}>
       {/* Progress indicator for mobile - shows how many digits entered */}
       <div
         className='absolute -top-6 left-0 right-0 flex justify-center gap-1.5 sm:hidden'
@@ -219,26 +278,42 @@ export function OtpInput({
         ))}
       </div>
 
-      {/* Hidden input for accessibility - announces the full code */}
-      <label className='sr-only' htmlFor='otp-hidden'>
+      {/*
+        Autofill overlay input - positioned over the visible inputs to receive
+        iOS/macOS/Android autofill suggestions. Using opacity:0 instead of sr-only
+        ensures the element is in the visual viewport for autofill detection.
+      */}
+      <label className='sr-only' htmlFor={autofillInputId}>
         {ariaLabel}
       </label>
       <input
-        id='otp-hidden'
+        ref={autofillInputRef}
+        id={autofillInputId}
         type='text'
         inputMode='numeric'
         autoComplete='one-time-code'
         value={value}
-        onChange={e => updateValue(e.target.value)}
-        className='sr-only'
+        onChange={handleAutofillChange}
+        onFocus={handleAutofillFocus}
+        disabled={disabled}
+        className={cn(
+          'absolute inset-0 w-full h-full opacity-0 cursor-text',
+          // Ensure it's behind visible inputs in stacking order
+          'z-0',
+          // Prevent any visual artifacts
+          'bg-transparent border-none outline-none'
+        )}
+        // Allow tabbing to this input for autofill, but prefer visible inputs
         tabIndex={-1}
         aria-hidden='true'
+        data-testid='otp-autofill-input'
       />
 
       {/* Visible digit inputs */}
       <fieldset
-        className='flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0'
+        className='flex justify-center gap-2 sm:gap-2.5 border-0 p-0 m-0 relative z-10'
         aria-label={ariaLabel}
+        aria-describedby={errorId}
         onPaste={handlePaste}
       >
         <legend className='sr-only'>{ariaLabel}</legend>
@@ -246,6 +321,7 @@ export function OtpInput({
           const digit = getDigit(index);
           const isFocused = focusedIndex === index;
           const isCursor = isFocused && !digit;
+          const isFirstInput = index === 0;
 
           return (
             <div
@@ -281,9 +357,12 @@ export function OtpInput({
                 value={digit}
                 onChange={e => handleInputChange(index, e.target.value)}
                 onKeyDown={e => handleKeyDown(index, e)}
+                onInput={e => handleInput(index, e)}
                 onFocus={() => handleFocus(index)}
                 onBlur={handleBlur}
                 disabled={disabled}
+                // First input also has autocomplete as fallback for direct focus
+                autoComplete={isFirstInput ? 'one-time-code' : 'off'}
                 className={cn(
                   'absolute inset-0 w-full h-full bg-transparent text-center text-xl sm:text-2xl font-sans',
                   'outline-none border-none',
@@ -291,6 +370,7 @@ export function OtpInput({
                   disabled && 'cursor-not-allowed'
                 )}
                 aria-label={`Digit ${index + 1} of ${OTP_LENGTH}`}
+                aria-describedby={errorId}
               />
 
               {/* Cursor indicator */}
