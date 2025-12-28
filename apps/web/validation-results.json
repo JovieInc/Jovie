@@ -1,0 +1,1032 @@
+{
+  "timestamp": "2025-12-28T09:43:02.756Z",
+  "testSuite": "fast",
+  "description": "Reliability validation: 100 consecutive test runs with fast test suite (pure logic tests)",
+  "totalRuns": 100,
+  "successfulRuns": 100,
+  "failedRuns": 0,
+  "passRate": 100,
+  "overallPassRate": 100,
+  "meetsTarget": true,
+  "targetPassRate": 99,
+  "averageDuration": 12121,
+  "minDuration": 11030,
+  "maxDuration": 19700,
+  "totalValidationTime": 1292419,
+  "flakinessDetected": false,
+  "testFilesPerRun": 37,
+  "individualTestsPerRun": 540,
+  "totalTestExecutions": 54000,
+  "averageTestCount": 37,
+  "passRates": [
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100,
+    100, 100, 100, 100, 100, 100, 100, 100, 100, 100
+  ],
+  "allRuns": [
+    {
+      "run": 1,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11150,
+      "status": "success"
+    },
+    {
+      "run": 2,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11540,
+      "status": "success"
+    },
+    {
+      "run": 3,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11190,
+      "status": "success"
+    },
+    {
+      "run": 4,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12020,
+      "status": "success"
+    },
+    {
+      "run": 5,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11510,
+      "status": "success"
+    },
+    {
+      "run": 6,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 13650,
+      "status": "success"
+    },
+    {
+      "run": 7,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12060,
+      "status": "success"
+    },
+    {
+      "run": 8,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12690,
+      "status": "success"
+    },
+    {
+      "run": 9,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11760,
+      "status": "success"
+    },
+    {
+      "run": 10,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12210,
+      "status": "success"
+    },
+    {
+      "run": 11,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11570,
+      "status": "success"
+    },
+    {
+      "run": 12,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12130,
+      "status": "success"
+    },
+    {
+      "run": 13,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11730,
+      "status": "success"
+    },
+    {
+      "run": 14,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12240,
+      "status": "success"
+    },
+    {
+      "run": 15,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11750,
+      "status": "success"
+    },
+    {
+      "run": 16,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12330,
+      "status": "success"
+    },
+    {
+      "run": 17,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12530,
+      "status": "success"
+    },
+    {
+      "run": 18,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11910,
+      "status": "success"
+    },
+    {
+      "run": 19,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12250,
+      "status": "success"
+    },
+    {
+      "run": 20,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12190,
+      "status": "success"
+    },
+    {
+      "run": 21,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12400,
+      "status": "success"
+    },
+    {
+      "run": 22,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11330,
+      "status": "success"
+    },
+    {
+      "run": 23,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11800,
+      "status": "success"
+    },
+    {
+      "run": 24,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11660,
+      "status": "success"
+    },
+    {
+      "run": 25,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12070,
+      "status": "success"
+    },
+    {
+      "run": 26,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11550,
+      "status": "success"
+    },
+    {
+      "run": 27,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12310,
+      "status": "success"
+    },
+    {
+      "run": 28,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11330,
+      "status": "success"
+    },
+    {
+      "run": 29,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11950,
+      "status": "success"
+    },
+    {
+      "run": 30,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11640,
+      "status": "success"
+    },
+    {
+      "run": 31,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12230,
+      "status": "success"
+    },
+    {
+      "run": 32,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11590,
+      "status": "success"
+    },
+    {
+      "run": 33,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11870,
+      "status": "success"
+    },
+    {
+      "run": 34,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12990,
+      "status": "success"
+    },
+    {
+      "run": 35,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11620,
+      "status": "success"
+    },
+    {
+      "run": 36,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12540,
+      "status": "success"
+    },
+    {
+      "run": 37,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11400,
+      "status": "success"
+    },
+    {
+      "run": 38,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12510,
+      "status": "success"
+    },
+    {
+      "run": 39,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11250,
+      "status": "success"
+    },
+    {
+      "run": 40,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11860,
+      "status": "success"
+    },
+    {
+      "run": 41,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11360,
+      "status": "success"
+    },
+    {
+      "run": 42,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12230,
+      "status": "success"
+    },
+    {
+      "run": 43,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11380,
+      "status": "success"
+    },
+    {
+      "run": 44,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11970,
+      "status": "success"
+    },
+    {
+      "run": 45,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11440,
+      "status": "success"
+    },
+    {
+      "run": 46,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12630,
+      "status": "success"
+    },
+    {
+      "run": 47,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11430,
+      "status": "success"
+    },
+    {
+      "run": 48,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12700,
+      "status": "success"
+    },
+    {
+      "run": 49,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12070,
+      "status": "success"
+    },
+    {
+      "run": 50,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11980,
+      "status": "success"
+    },
+    {
+      "run": 51,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11870,
+      "status": "success"
+    },
+    {
+      "run": 52,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11200,
+      "status": "success"
+    },
+    {
+      "run": 53,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11670,
+      "status": "success"
+    },
+    {
+      "run": 54,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11030,
+      "status": "success"
+    },
+    {
+      "run": 55,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11980,
+      "status": "success"
+    },
+    {
+      "run": 56,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11270,
+      "status": "success"
+    },
+    {
+      "run": 57,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11710,
+      "status": "success"
+    },
+    {
+      "run": 58,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11180,
+      "status": "success"
+    },
+    {
+      "run": 59,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11690,
+      "status": "success"
+    },
+    {
+      "run": 60,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11570,
+      "status": "success"
+    },
+    {
+      "run": 61,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12290,
+      "status": "success"
+    },
+    {
+      "run": 62,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11440,
+      "status": "success"
+    },
+    {
+      "run": 63,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12920,
+      "status": "success"
+    },
+    {
+      "run": 64,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11200,
+      "status": "success"
+    },
+    {
+      "run": 65,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12100,
+      "status": "success"
+    },
+    {
+      "run": 66,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11500,
+      "status": "success"
+    },
+    {
+      "run": 67,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12410,
+      "status": "success"
+    },
+    {
+      "run": 68,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12180,
+      "status": "success"
+    },
+    {
+      "run": 69,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11340,
+      "status": "success"
+    },
+    {
+      "run": 70,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12540,
+      "status": "success"
+    },
+    {
+      "run": 71,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 13990,
+      "status": "success"
+    },
+    {
+      "run": 72,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12790,
+      "status": "success"
+    },
+    {
+      "run": 73,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11510,
+      "status": "success"
+    },
+    {
+      "run": 74,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 15980,
+      "status": "success"
+    },
+    {
+      "run": 75,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 17300,
+      "status": "success"
+    },
+    {
+      "run": 76,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 19700,
+      "status": "success"
+    },
+    {
+      "run": 77,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 15510,
+      "status": "success"
+    },
+    {
+      "run": 78,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 13790,
+      "status": "success"
+    },
+    {
+      "run": 79,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11500,
+      "status": "success"
+    },
+    {
+      "run": 80,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11740,
+      "status": "success"
+    },
+    {
+      "run": 81,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11270,
+      "status": "success"
+    },
+    {
+      "run": 82,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11900,
+      "status": "success"
+    },
+    {
+      "run": 83,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11660,
+      "status": "success"
+    },
+    {
+      "run": 84,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11070,
+      "status": "success"
+    },
+    {
+      "run": 85,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11810,
+      "status": "success"
+    },
+    {
+      "run": 86,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11360,
+      "status": "success"
+    },
+    {
+      "run": 87,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12520,
+      "status": "success"
+    },
+    {
+      "run": 88,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11380,
+      "status": "success"
+    },
+    {
+      "run": 89,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11750,
+      "status": "success"
+    },
+    {
+      "run": 90,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12330,
+      "status": "success"
+    },
+    {
+      "run": 91,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11750,
+      "status": "success"
+    },
+    {
+      "run": 92,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11160,
+      "status": "success"
+    },
+    {
+      "run": 93,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11840,
+      "status": "success"
+    },
+    {
+      "run": 94,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11080,
+      "status": "success"
+    },
+    {
+      "run": 95,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12330,
+      "status": "success"
+    },
+    {
+      "run": 96,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11390,
+      "status": "success"
+    },
+    {
+      "run": 97,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12320,
+      "status": "success"
+    },
+    {
+      "run": 98,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 11610,
+      "status": "success"
+    },
+    {
+      "run": 99,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12630,
+      "status": "success"
+    },
+    {
+      "run": 100,
+      "passed": 36,
+      "failed": 0,
+      "skipped": 1,
+      "total": 37,
+      "passRate": 100,
+      "duration": 12570,
+      "status": "success"
+    }
+  ]
+}
