@@ -6,10 +6,9 @@ import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
 import { waitlistInviteSendWindowSchema } from '@/lib/validation/schemas';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

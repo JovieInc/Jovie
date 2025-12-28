@@ -4,12 +4,11 @@ import { NextResponse } from 'next/server';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { accountEmailSyncSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: Request) {
   try {

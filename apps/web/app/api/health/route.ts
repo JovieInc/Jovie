@@ -5,14 +5,13 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   checkRateLimit,
   createRateLimitHeaders,
   getClientIP,
   getRateLimitStatus,
 } from '@/lib/utils/rate-limit';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
   // Rate limit check (30 req/60s for health endpoints)

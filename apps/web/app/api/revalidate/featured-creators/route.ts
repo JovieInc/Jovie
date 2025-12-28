@@ -1,7 +1,6 @@
 import { revalidateTag, updateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export async function POST(request: Request) {
   const secret = process.env.REVALIDATE_SECRET;

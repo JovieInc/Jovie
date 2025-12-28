@@ -3,7 +3,11 @@ import 'server-only';
 import { and, desc, sql as drizzleSql, inArray } from 'drizzle-orm';
 
 import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
-import { creatorProfiles, stripeWebhookEvents } from '@/lib/db/schema';
+import {
+  creatorProfiles,
+  ingestionJobs,
+  stripeWebhookEvents,
+} from '@/lib/db/schema';
 
 const DISABLED_TABLES = new Set<string>();
 
@@ -39,6 +43,14 @@ export interface AdminActivityItem {
   action: string;
   timestamp: string;
   status: AdminActivityStatus;
+}
+
+export interface IngestionJobStatusCounts {
+  pending: number;
+  processing: number;
+  succeeded: number;
+  failed: number;
+  total: number;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -354,5 +366,63 @@ export async function getAdminActivityFeed(
   } catch (error) {
     console.error('Error loading admin activity feed', error);
     return [];
+  }
+}
+
+/**
+ * Get counts of ingestion jobs grouped by status.
+ * Returns counts for pending, processing, succeeded, and failed jobs.
+ */
+export async function getIngestionJobStatusCounts(): Promise<IngestionJobStatusCounts> {
+  const defaultCounts: IngestionJobStatusCounts = {
+    pending: 0,
+    processing: 0,
+    succeeded: 0,
+    failed: 0,
+    total: 0,
+  };
+
+  const hasIngestionJobs =
+    !DISABLED_TABLES.has(TABLE_NAMES.ingestionJobs) &&
+    (await doesTableExist(TABLE_NAMES.ingestionJobs));
+
+  if (!hasIngestionJobs) {
+    return defaultCounts;
+  }
+
+  try {
+    const rows = await db
+      .select({
+        status: ingestionJobs.status,
+        count: drizzleSql<number>`count(*)`,
+      })
+      .from(ingestionJobs)
+      .groupBy(ingestionJobs.status);
+
+    const counts: IngestionJobStatusCounts = { ...defaultCounts };
+
+    for (const row of rows) {
+      const statusCount = Number(row.count ?? 0);
+      switch (row.status) {
+        case 'pending':
+          counts.pending = statusCount;
+          break;
+        case 'processing':
+          counts.processing = statusCount;
+          break;
+        case 'succeeded':
+          counts.succeeded = statusCount;
+          break;
+        case 'failed':
+          counts.failed = statusCount;
+          break;
+      }
+      counts.total += statusCount;
+    }
+
+    return counts;
+  } catch (error) {
+    console.error('Error loading ingestion job status counts', error);
+    return defaultCounts;
   }
 }

@@ -17,10 +17,9 @@ import { db } from '@/lib/db';
 import { billingAuditLog, stripeWebhookEvents, users } from '@/lib/db/schema';
 import { captureWarning } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Health check thresholds
 const PRO_COUNT_TOLERANCE_PERCENT = 10; // Allow 10% variance between DB and Stripe

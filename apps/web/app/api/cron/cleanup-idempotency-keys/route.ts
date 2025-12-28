@@ -1,11 +1,10 @@
 import { lt } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { dashboardIdempotencyKeys, db } from '@/lib/db';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

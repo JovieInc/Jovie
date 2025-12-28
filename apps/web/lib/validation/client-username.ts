@@ -3,16 +3,18 @@
  * Reduces validation response time from 500ms+ to <50ms
  */
 
+import {
+  isReservedUsername,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from './username-constants';
+
 export interface ClientValidationResult {
   valid: boolean;
   error: string | null;
   suggestion?: string;
 }
-
-// Username validation rules (must match server-side validation)
-const USERNAME_MIN_LENGTH = 3;
-const USERNAME_MAX_LENGTH = 30;
-const USERNAME_PATTERN = /^[a-zA-Z0-9-]+$/;
 
 /**
  * Instant client-side username validation
@@ -68,37 +70,8 @@ export function validateUsernameFormat(
     };
   }
 
-  // Reserved usernames
-  const reservedUsernames = [
-    'admin',
-    'api',
-    'app',
-    'auth',
-    'blog',
-    'dashboard',
-    'help',
-    'mail',
-    'root',
-    'support',
-    'www',
-    'ftp',
-    'email',
-    'test',
-    'demo',
-    'stage',
-    'staging',
-    'dev',
-    'development',
-    'prod',
-    'production',
-    'beta',
-    'alpha',
-    'preview',
-    'cdn',
-    'assets',
-  ];
-
-  if (reservedUsernames.includes(username.toLowerCase())) {
+  // Reserved usernames (using shared constants for consistency with server)
+  if (isReservedUsername(username.toLowerCase())) {
     return {
       valid: false,
       error: 'This handle is reserved and cannot be used',

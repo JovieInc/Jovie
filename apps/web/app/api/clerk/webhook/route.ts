@@ -8,8 +8,7 @@ import {
   syncAllClerkMetadata,
 } from '@/lib/auth/clerk-sync';
 import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 type WebhookEvent = {
   data: {

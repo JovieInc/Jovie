@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
  * Cloudinary signing endpoint - DISABLED

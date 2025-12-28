@@ -4,6 +4,7 @@ import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBann
 import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { canAccessApp, resolveUserState, UserState } from '@/lib/auth/gate';
+import { fetchStatsigBootstrapData } from '@/lib/statsig/server';
 import { MyStatsig } from '../my-statsig';
 import {
   getDashboardDataCached,
@@ -83,10 +84,14 @@ export default async function AppShellLayout({
   const authPromise = ensureAppAccess();
   prefetchDashboardData();
 
+  // Fetch Statsig bootstrap data in parallel - errors are handled gracefully (returns null on failure)
+  const statsigBootstrapPromise = fetchStatsigBootstrapData(userId);
+
   try {
-    const [dashboardData] = await Promise.all([
+    const [dashboardData, , statsigBootstrapData] = await Promise.all([
       getDashboardDataCached(),
       authPromise,
+      statsigBootstrapPromise,
     ]);
 
     if (dashboardData.needsOnboarding) {
@@ -94,7 +99,7 @@ export default async function AppShellLayout({
     }
 
     return (
-      <MyStatsig userId={userId}>
+      <MyStatsig userId={userId} bootstrapData={statsigBootstrapData}>
         <ImpersonationBannerWrapper />
         <DashboardDataProvider value={dashboardData}>
           <DashboardLayoutClient

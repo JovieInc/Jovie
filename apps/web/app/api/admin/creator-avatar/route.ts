@@ -3,10 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { updateCreatorAvatarAsAdmin } from '@/app/admin/actions';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 interface AdminAvatarPayload {
   profileId?: string;

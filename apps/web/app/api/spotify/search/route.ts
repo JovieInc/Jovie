@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildSpotifyArtistUrl, searchSpotifyArtists } from '@/lib/spotify';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // Query constraints
 const MIN_QUERY_LENGTH = 2;

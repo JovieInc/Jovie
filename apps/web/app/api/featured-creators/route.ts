@@ -2,11 +2,10 @@ import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'edge';
 export const revalidate = 3600; // Cache results for 1 hour
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 async function getFeaturedCreators() {
   const timeoutPromise = new Promise<never>((_, reject) => {

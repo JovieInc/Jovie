@@ -1,6 +1,7 @@
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { waitlistEntries, waitlistInvites } from '@/lib/db/schema';
+import { normalizeEmail } from '@/lib/utils/email';
 
 export type WaitlistStatus = 'new' | 'invited' | 'claimed' | 'rejected';
 
@@ -8,10 +9,6 @@ export interface WaitlistAccessLookup {
   entryId: string | null;
   status: WaitlistStatus | null;
   inviteToken: string | null;
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
 }
 
 export async function getWaitlistAccessByEmail(

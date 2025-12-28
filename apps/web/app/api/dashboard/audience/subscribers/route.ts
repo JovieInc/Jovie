@@ -1,6 +1,7 @@
 import { and, asc, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   creatorProfiles,
   notificationSubscriptions,
@@ -9,8 +10,6 @@ import {
 import { subscribersQuerySchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const SORTABLE_COLUMNS = {
   email: notificationSubscriptions.email,

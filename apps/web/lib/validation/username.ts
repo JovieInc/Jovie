@@ -2,143 +2,13 @@
  * Username validation and reserved words checking
  */
 
-// Reserved words that cannot be used as usernames
-const RESERVED_USERNAMES = [
-  // System routes
-  'api',
-  'admin',
-  'dashboard',
-  'onboarding',
-  'settings',
-  'profile',
-  'login',
-  'signin',
-  'signup',
-  'signout',
-  'logout',
-  'register',
-  'auth',
-  'oauth',
-  'callback',
-  'verify',
-  'reset',
-  'forgot',
-
-  // Legal/company pages
-  'about',
-  'contact',
-  'privacy',
-  'terms',
-  'legal',
-  'help',
-  'support',
-  'blog',
-  'news',
-  'press',
-  'careers',
-  'jobs',
-  'team',
-  'company',
-
-  // Features
-  'pricing',
-  'features',
-  'demo',
-  'sandbox',
-  'test',
-  'staging',
-  'production',
-  'dev',
-  'development',
-  'preview',
-  'beta',
-  'alpha',
-
-  // Common reserved
-  'www',
-  'mail',
-  'ftp',
-  'email',
-  'smtp',
-  'pop',
-  'imap',
-  'http',
-  'https',
-  'app',
-  'mobile',
-  'desktop',
-  'download',
-  'downloads',
-  'assets',
-  'static',
-  'public',
-  'private',
-  'secure',
-  'cdn',
-  'media',
-  'images',
-
-  // Social/community
-  'feed',
-  'explore',
-  'discover',
-  'trending',
-  'popular',
-  'featured',
-  'search',
-  'find',
-  'browse',
-  'categories',
-  'tags',
-  'topics',
-
-  // Account related
-  'account',
-  'accounts',
-  'user',
-  'users',
-  'member',
-  'members',
-  'subscriber',
-  'subscribers',
-  'customer',
-  'customers',
-  'client',
-
-  // Music specific
-  'artist',
-  'artists',
-  'album',
-  'albums',
-  'track',
-  'tracks',
-  'playlist',
-  'playlists',
-  'genre',
-  'genres',
-  'charts',
-  'top',
-
-  // Jovie specific
-  'jovie',
-  'tip',
-  'tips',
-  'listen',
-  'share',
-  'link',
-  'links',
-  'bio',
-  'waitlist',
-  'invite',
-  'invites',
-  'referral',
-  'refer',
-];
-
-// Username validation rules
-const USERNAME_MIN_LENGTH = 3;
-const USERNAME_MAX_LENGTH = 30;
-const USERNAME_PATTERN = /^[a-zA-Z0-9-]+$/;
+import {
+  isReservedUsername,
+  startsWithReservedPattern,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from './username-constants';
 
 export interface UsernameValidationResult {
   isValid: boolean;
@@ -208,7 +78,7 @@ export function validateUsername(username: string): UsernameValidationResult {
   }
 
   // Check reserved words
-  if (RESERVED_USERNAMES.includes(normalized)) {
+  if (isReservedUsername(normalized)) {
     return {
       isValid: false,
       error: 'This username is reserved and cannot be used',
@@ -216,13 +86,7 @@ export function validateUsername(username: string): UsernameValidationResult {
   }
 
   // Check if it's a reserved pattern (e.g., starts with reserved word)
-  const startsWithReserved = RESERVED_USERNAMES.some(
-    reserved =>
-      normalized.startsWith(reserved + '_') ||
-      normalized.startsWith(reserved + '-')
-  );
-
-  if (startsWithReserved) {
+  if (startsWithReservedPattern(normalized)) {
     return {
       isValid: false,
       error: 'This username pattern is reserved',

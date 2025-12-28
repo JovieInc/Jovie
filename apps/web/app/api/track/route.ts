@@ -11,6 +11,7 @@ import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { LinkType } from '@/types/db';
 import {
   createFingerprint,
@@ -18,8 +19,6 @@ import {
   getActionWeight,
   trimHistory,
 } from '../audience/lib/audience-utils';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';

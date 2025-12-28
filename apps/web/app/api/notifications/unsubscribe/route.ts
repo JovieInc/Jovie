@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   buildInvalidRequestResponse,
   unsubscribeFromNotificationsDomain,
@@ -9,8 +10,6 @@ import {
   getClientIP,
   getRateLimitStatus,
 } from '@/lib/utils/rate-limit';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * POST handler for notification unsubscriptions

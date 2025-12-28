@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import { ActivityTable } from '@/components/admin/ActivityTable';
 import { DefaultStatusBanner } from '@/components/admin/DefaultStatusBanner';
+import { IngestionJobsKpiCard } from '@/components/admin/IngestionJobsKpiCard';
 import { KpiCards } from '@/components/admin/KpiCards';
 import { MetricsChart } from '@/components/admin/MetricsChart';
 import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
@@ -10,6 +11,7 @@ import {
   getAdminActivityFeed,
   getAdminReliabilitySummary,
   getAdminUsageSeries,
+  getIngestionJobStatusCounts,
 } from '@/lib/admin/overview';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { db, waitlistEntries } from '@/lib/db';
@@ -188,11 +190,13 @@ async function getAdminOverviewMetrics(): Promise<AdminOverviewMetrics> {
 export default async function AdminPage() {
   const metrics = await getAdminOverviewMetrics();
 
-  const [usageSeries, reliabilitySummary, activityItems] = await Promise.all([
-    getAdminUsageSeries(14),
-    getAdminReliabilitySummary(),
-    getAdminActivityFeed(20),
-  ]);
+  const [usageSeries, reliabilitySummary, activityItems, ingestionJobCounts] =
+    await Promise.all([
+      getAdminUsageSeries(14),
+      getAdminReliabilitySummary(),
+      getAdminActivityFeed(20),
+      getIngestionJobStatusCounts(),
+    ]);
 
   return (
     <div className='space-y-8'>
@@ -229,6 +233,10 @@ export default async function AdminPage() {
           stripeAvailability={metrics.stripeAvailability}
           mercuryAvailability={metrics.mercuryAvailability}
         />
+      </section>
+
+      <section id='operations' className='grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+        <IngestionJobsKpiCard counts={ingestionJobCounts} />
       </section>
 
       <section id='usage' className='grid gap-6 lg:grid-cols-3'>

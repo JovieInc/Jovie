@@ -6,8 +6,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
 import { parseJsonBody } from '@/lib/http/parse-json';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export async function POST(request: NextRequest) {
   try {

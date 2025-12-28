@@ -8,10 +8,9 @@ import {
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = env.INGESTION_CRON_SECRET ?? process.env.CRON_SECRET;

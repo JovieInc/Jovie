@@ -5,10 +5,9 @@
 
 import { NextResponse } from 'next/server';
 import { getAvailablePricing } from '@/lib/stripe/config';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET() {
   try {

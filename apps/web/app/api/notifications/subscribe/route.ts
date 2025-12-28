@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   AUDIENCE_COOKIE_NAME,
   buildInvalidRequestResponse,
@@ -13,8 +14,6 @@ import {
 
 // Resend + DB access requires Node runtime
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * POST handler for notification subscriptions

@@ -2,10 +2,9 @@ import { auth } from '@clerk/nextjs/server';
 import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db, profilePhotos, users } from '@/lib/db';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'edge';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 // UUID v4 regex pattern for validation
 const UUID_REGEX =

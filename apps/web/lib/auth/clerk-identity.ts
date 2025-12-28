@@ -1,3 +1,5 @@
+import { normalizeEmail } from '@/lib/utils/email';
+
 export interface ClerkEmailAddress {
   emailAddress?: string | null;
 }
@@ -16,10 +18,6 @@ export interface ClerkResolvedIdentity {
   email: string | null;
   displayName: string | null;
   avatarUrl: string | null;
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
 }
 
 function deriveDisplayNameFromEmail(email: string): string {

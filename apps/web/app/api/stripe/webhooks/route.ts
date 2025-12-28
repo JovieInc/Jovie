@@ -30,6 +30,7 @@ import { stripeWebhookEvents } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { stripe } from '@/lib/stripe/client';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   getHandler,
   getStripeObjectId,
@@ -39,8 +40,6 @@ import {
 
 // Force Node.js runtime for Stripe SDK compatibility
 export const runtime = 'nodejs';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const webhookSecret = env.STRIPE_WEBHOOK_SECRET!;
 
