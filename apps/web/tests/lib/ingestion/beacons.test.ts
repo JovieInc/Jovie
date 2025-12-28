@@ -370,6 +370,7 @@ describe('Beacons Strategy', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://beacons.ai/username',
       } as Response);
 
       await expect(
@@ -382,6 +383,7 @@ describe('Beacons Strategy', () => {
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        url: 'https://beacons.ai/username',
       } as Response);
 
       await expect(

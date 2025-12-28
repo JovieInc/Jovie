@@ -325,6 +325,7 @@ describe('Linktree Strategy', () => {
         ok: false,
         status: 404,
         statusText: 'Not Found',
+        url: 'https://linktr.ee/username',
       } as Response);
 
       await expect(
@@ -337,6 +338,7 @@ describe('Linktree Strategy', () => {
         ok: false,
         status: 429,
         statusText: 'Too Many Requests',
+        url: 'https://linktr.ee/username',
       } as Response);
 
       await expect(
