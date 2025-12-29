@@ -12,6 +12,13 @@ import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
 type Range = Extract<AnalyticsRange, '1d' | '7d' | '30d'>;
 
+/** Static range options - defined at module level to avoid recreation on each render */
+const RANGE_OPTIONS: readonly { label: string; value: Range }[] = [
+  { label: '1d', value: '1d' },
+  { label: '7d', value: '7d' },
+  { label: '30d', value: '30d' },
+] as const;
+
 export function DashboardAnalytics() {
   const dashboardData = useDashboardData();
   const [artist] = useState<Artist | null>(
@@ -224,21 +231,16 @@ function RangeToggle({
   tabsBaseId: string;
   panelId: string;
 }) {
-  const options: { label: string; value: Range }[] = [
-    { label: '1d', value: '1d' },
-    { label: '7d', value: '7d' },
-    { label: '30d', value: '30d' },
-  ];
-
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const focusTabByIndex = (targetIndex: number) => {
-    if (!options.length) {
+    if (!RANGE_OPTIONS.length) {
       return;
     }
 
-    const normalizedIndex = (targetIndex + options.length) % options.length;
-    const targetOption = options[normalizedIndex];
+    const normalizedIndex =
+      (targetIndex + RANGE_OPTIONS.length) % RANGE_OPTIONS.length;
+    const targetOption = RANGE_OPTIONS[normalizedIndex];
 
     if (!targetOption) {
       return;
@@ -269,7 +271,7 @@ function RangeToggle({
         break;
       case 'End':
         event.preventDefault();
-        focusTabByIndex(options.length - 1);
+        focusTabByIndex(RANGE_OPTIONS.length - 1);
         break;
       default:
         break;
@@ -282,7 +284,7 @@ function RangeToggle({
       aria-label='Select analytics range'
       className='inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5 shadow-sm'
     >
-      {options.map((opt, index) => {
+      {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
         const tabId = `${tabsBaseId}-tab-${opt.value}`;
         return (

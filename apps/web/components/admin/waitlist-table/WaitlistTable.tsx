@@ -1,7 +1,9 @@
 'use client';
 
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { ClipboardList } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import * as React from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { TableEmptyState } from '@/components/admin/table';
 import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
 import { WaitlistMobileCard } from '../WaitlistMobileCard';
@@ -11,6 +13,11 @@ import { usePagination } from './usePagination';
 import { useWaitlistColumns } from './WaitlistTableColumns';
 import { WaitlistTablePagination } from './WaitlistTablePagination';
 
+/** Estimated row height for virtualization (px) */
+const ROW_HEIGHT = 52;
+/** Number of extra rows to render above/below viewport */
+const OVERSCAN = 5;
+
 export function WaitlistTable({
   entries,
   page,
@@ -18,6 +25,8 @@ export function WaitlistTable({
   total,
 }: WaitlistTableProps) {
   const [rows, setRows] = useState<WaitlistEntryRow[]>(entries);
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setRows(entries);
@@ -46,6 +55,31 @@ export function WaitlistTable({
     onApprove: approveEntry,
   });
 
+  /**
+   * Virtual scrolling for desktop table rows.
+   * Dramatically improves performance for large datasets (500+ rows)
+   * by only rendering rows visible in viewport plus a small buffer.
+   */
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: OVERSCAN,
+  });
+
+  /**
+   * Virtual scrolling for mobile card list.
+   * Cards are taller (~120px) so we use a different estimate.
+   */
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const mobileVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => mobileContainerRef.current,
+    estimateSize: () => 120,
+    overscan: OVERSCAN,
+  });
+
   return (
     <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
       {/* Custom toolbar - sticky at top */}
@@ -58,8 +92,12 @@ export function WaitlistTable({
         </div>
       </div>
 
-      {/* Desktop Table - hidden on mobile */}
-      <div className='hidden md:block overflow-x-auto'>
+      {/* Desktop Table - hidden on mobile, virtualized for performance */}
+      <div
+        ref={tableContainerRef}
+        className='hidden md:block overflow-auto'
+        style={{ maxHeight: 'calc(100vh - 200px)' }}
+      >
         <table className='w-full min-w-[960px] table-fixed border-separate border-spacing-0 text-[13px]'>
           <caption className='sr-only'>Waitlist entries table</caption>
           <thead>
@@ -67,7 +105,7 @@ export function WaitlistTable({
               {columns.map(column => (
                 <th
                   key={column.id}
-                  className={`sticky top-12 sm:top-14 z-20 px-4 py-3 border-b border-subtle text-[13px] bg-surface-1/80 backdrop-blur text-left ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                  className={`sticky top-0 z-20 px-4 py-3 border-b border-subtle text-[13px] bg-surface-1/80 backdrop-blur text-left ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
                 >
                   <span className='text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
                     {column.header}
@@ -76,7 +114,12 @@ export function WaitlistTable({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody
+            style={{
+              position: 'relative',
+              height: `${rowVirtualizer.getTotalSize()}px`,
+            }}
+          >
             {rows.length === 0 ? (
               <TableEmptyState
                 colSpan={columns.length}
@@ -85,28 +128,44 @@ export function WaitlistTable({
                 description='New waitlist signups will appear here.'
               />
             ) : (
-              rows.map((row, index) => (
-                <tr
-                  key={row.id}
-                  className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
-                >
-                  {columns.map(column => (
-                    <td
-                      key={column.id}
-                      className={`px-4 py-3 ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
-                    >
-                      {column.cell(row, index)}
-                    </td>
-                  ))}
-                </tr>
-              ))
+              rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const row = rows[virtualRow.index];
+                return (
+                  <tr
+                    key={row.id}
+                    ref={rowVirtualizer.measureElement}
+                    data-index={virtualRow.index}
+                    className='border-b border-subtle last:border-b-0 hover:bg-surface-2/50 transition-colors'
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      width: '100%',
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    {columns.map(column => (
+                      <td
+                        key={column.id}
+                        className={`px-4 py-3 ${column.width ?? ''} ${column.hideOnMobile ? 'hidden md:table-cell' : ''} ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : ''}`}
+                      >
+                        {column.cell(row, virtualRow.index)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Mobile Card List - shown only on mobile */}
-      <div className='md:hidden p-3 space-y-3'>
+      {/* Mobile Card List - shown only on mobile, virtualized for performance */}
+      <div
+        ref={mobileContainerRef}
+        className='md:hidden overflow-auto p-3'
+        style={{ maxHeight: 'calc(100vh - 200px)' }}
+      >
         {rows.length === 0 ? (
           <TableEmptyState
             icon={<ClipboardList className='h-6 w-6' />}
@@ -114,14 +173,37 @@ export function WaitlistTable({
             description='New waitlist signups will appear here.'
           />
         ) : (
-          rows.map(entry => (
-            <WaitlistMobileCard
-              key={entry.id}
-              entry={entry}
-              approveStatus={approveStatuses[entry.id] ?? 'idle'}
-              onApprove={() => void approveEntry(entry.id)}
-            />
-          ))
+          <div
+            style={{
+              position: 'relative',
+              height: `${mobileVirtualizer.getTotalSize()}px`,
+            }}
+          >
+            {mobileVirtualizer.getVirtualItems().map(virtualRow => {
+              const entry = rows[virtualRow.index];
+              return (
+                <div
+                  key={entry.id}
+                  ref={mobileVirtualizer.measureElement}
+                  data-index={virtualRow.index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: '12px',
+                  }}
+                >
+                  <WaitlistMobileCard
+                    entry={entry}
+                    approveStatus={approveStatuses[entry.id] ?? 'idle'}
+                    onApprove={() => void approveEntry(entry.id)}
+                  />
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 
