@@ -1189,8 +1189,8 @@ jobs:
         with:
           name: homepage-smoke-report-${{ github.run_id }}
           path: |
-            playwright-report/
-            test-results/
+            apps/web/playwright-report/
+            apps/web/test-results/
           retention-days: 3
 
   deploy:
