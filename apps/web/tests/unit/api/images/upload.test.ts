@@ -57,13 +57,35 @@ vi.mock('@/lib/auth/session', () => ({
 }));
 
 vi.mock('@/lib/db', () => {
-  const select = mockSelect.mockReturnValue({
-    from: vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue([{ id: 'internal-user-id' }]),
+  // Track call count to return different results for different queries
+  let selectCallCount = 0;
+  const select = mockSelect.mockImplementation(() => {
+    selectCallCount++;
+    return {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockImplementation(() => {
+            // First call: users table (returns user id)
+            // Second call: creatorProfiles table (returns usernameNormalized)
+            if (selectCallCount === 1) {
+              return Promise.resolve([
+                { id: 'internal-user-id', clerkId: 'test-user-id' },
+              ]);
+            }
+            // Second query for creatorProfiles
+            return Promise.resolve([{ usernameNormalized: 'testuser' }]);
+          }),
+        }),
       }),
-    }),
+    };
   });
+
+  // Reset call count before each test
+  const originalMockClear = mockSelect.mockClear.bind(mockSelect);
+  mockSelect.mockClear = () => {
+    selectCallCount = 0;
+    return originalMockClear();
+  };
 
   return {
     db: {
@@ -79,11 +101,20 @@ vi.mock('@/lib/db', () => {
       id: 'id',
       clerkId: 'clerk_id',
     },
+    creatorProfiles: {
+      id: 'id',
+      userId: 'user_id',
+      usernameNormalized: 'username_normalized',
+    },
   };
 });
 
 vi.mock('drizzle-orm', () => ({
   eq: mockEq,
+}));
+
+vi.mock('@/lib/cache', () => ({
+  invalidateAvatarCache: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/rate-limit', () => ({
