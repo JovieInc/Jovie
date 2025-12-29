@@ -1,0 +1,204 @@
+'use client';
+
+import { Button, Input } from '@jovie/ui';
+import { useState } from 'react';
+
+import { Icon } from '@/components/atoms/Icon';
+import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
+import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+
+interface SendInviteDialogProps {
+  profile: AdminCreatorProfileRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+export function SendInviteDialog({
+  profile,
+  open,
+  onOpenChange,
+  onSuccess,
+}: SendInviteDialogProps) {
+  const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  if (!profile) return null;
+
+  const handleClose = () => {
+    if (!isLoading) {
+      setEmail('');
+      setError(null);
+      setSuccess(false);
+      onOpenChange(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail) {
+      setError('Please enter an email address');
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await fetch('/api/admin/creator-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creatorProfileId: profile.id,
+          email: trimmedEmail,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        ok?: boolean;
+        error?: string;
+        invite?: { id: string; email: string; status: string };
+      };
+
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to create invite');
+      }
+
+      setSuccess(true);
+      setEmail('');
+
+      // Close dialog after showing success briefly
+      setTimeout(() => {
+        handleClose();
+        onSuccess?.();
+      }, 1500);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to send invite';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={handleClose} size='md'>
+      <DialogTitle>Send Claim Invite</DialogTitle>
+      <DialogBody>
+        <form onSubmit={handleSubmit} className='space-y-4'>
+          {/* Profile info */}
+          <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-2/50 p-3'>
+            {profile.avatarUrl ? (
+              <img
+                src={profile.avatarUrl}
+                alt={profile.displayName || profile.username}
+                className='h-10 w-10 rounded-full object-cover'
+              />
+            ) : (
+              <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-3'>
+                <Icon name='User' className='h-5 w-5 text-tertiary-token' />
+              </div>
+            )}
+            <div>
+              <p className='text-sm font-medium text-primary-token'>
+                {profile.displayName || profile.username}
+              </p>
+              <p className='text-xs text-secondary-token'>
+                @{profile.username}
+              </p>
+            </div>
+          </div>
+
+          {/* Email input */}
+          <div className='space-y-2'>
+            <label
+              htmlFor='invite-email'
+              className='text-sm font-medium text-primary-token'
+            >
+              Email Address
+            </label>
+            <Input
+              id='invite-email'
+              type='email'
+              placeholder='creator@example.com'
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={isLoading || success}
+              autoFocus
+              className='w-full'
+            />
+            <p className='text-xs text-secondary-token'>
+              An invite will be queued to send to this email address
+            </p>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
+              <Icon
+                name='XCircle'
+                className='h-4 w-4 text-destructive shrink-0'
+              />
+              <p className='text-xs font-medium text-destructive'>{error}</p>
+            </div>
+          )}
+
+          {/* Success message */}
+          {success && (
+            <div className='flex items-center gap-2 rounded-lg bg-green-500/10 px-3 py-2'>
+              <Icon
+                name='CheckCircle'
+                className='h-4 w-4 text-green-600 dark:text-green-400 shrink-0'
+              />
+              <p className='text-xs font-medium text-green-600 dark:text-green-400'>
+                Invite created successfully!
+              </p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className='flex gap-3 justify-end pt-2'>
+            <Button
+              type='button'
+              variant='ghost'
+              onClick={handleClose}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type='submit'
+              variant='primary'
+              disabled={isLoading || success || !email.trim()}
+            >
+              {isLoading ? (
+                <>
+                  <Icon name='Loader2' className='mr-2 h-4 w-4 animate-spin' />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Icon name='Send' className='mr-2 h-4 w-4' />
+                  Create Invite
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogBody>
+    </Dialog>
+  );
+}
