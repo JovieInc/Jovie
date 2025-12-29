@@ -1,74 +1,29 @@
 'use client';
 
 import { BellAlertIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import {
-  Button,
-  Checkbox,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import * as React from 'react';
 import { useTableMeta } from '@/app/app/dashboard/DashboardLayoutClient';
 import { AdminPageSizeSelect } from '@/components/admin/table/AdminPageSizeSelect';
-import { SortableHeaderButton } from '@/components/admin/table/SortableHeaderButton';
 import { useRowSelection } from '@/components/admin/table/useRowSelection';
-import { Icon } from '@/components/atoms/Icon';
-import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
-import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
+import {
+  AudienceMemberRow,
+  AudienceSubscriberRow,
+  AudienceTableHeader,
+} from '@/components/dashboard/audience/table';
+import type { AudienceMode } from '@/components/dashboard/audience/table/types';
 import {
   AUDIENCE_MEMBER_SIDEBAR_WIDTH,
   AudienceMemberSidebar,
 } from '@/components/dashboard/organisms/AudienceMemberSidebar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { cn } from '@/lib/utils';
-import {
-  formatCountryLabel,
-  formatLongDate,
-  formatTimeAgo,
-  getDeviceIndicator,
-} from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 
-export type AudienceMode = 'members' | 'subscribers';
+export type { AudienceMode };
 
 type AudienceRow = AudienceMember;
-
-type MemberSortColumn =
-  | 'lastSeen'
-  | 'visits'
-  | 'intent'
-  | 'type'
-  | 'engagement'
-  | 'createdAt';
-
-type SubscriberSortColumn = 'email' | 'phone' | 'country' | 'createdAt';
-
-type MemberColumnKey = (typeof MEMBER_COLUMNS)[number]['key'];
-
-type SubscriberColumnKey = (typeof SUBSCRIBER_COLUMNS)[number]['key'];
-
-type ColumnKey = MemberColumnKey | SubscriberColumnKey;
-
-const MEMBER_COLUMNS = [
-  { key: 'displayName', label: 'User' },
-  { key: 'type', label: 'Type' },
-  { key: 'location', label: 'Location' },
-  { key: 'device', label: 'Device' },
-  { key: 'visits', label: 'Visits' },
-  { key: 'actions', label: 'Actions' },
-  { key: 'lastSeen', label: 'Last seen' },
-] as const;
-
-const SUBSCRIBER_COLUMNS = [
-  { key: 'email', label: 'Email' },
-  { key: 'phone', label: 'Phone' },
-  { key: 'country', label: 'Country' },
-  { key: 'createdAt', label: 'Signed up' },
-] as const;
 
 async function copyTextToClipboard(text: string): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
@@ -81,19 +36,6 @@ async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-function resolveAudienceActionIcon(label: string): string {
-  const normalized = label.trim().toLowerCase();
-  if (normalized.includes('visit')) return 'Eye';
-  if (normalized.includes('view')) return 'Eye';
-  if (normalized.includes('tip')) return 'HandCoins';
-  if (normalized.includes('purchase')) return 'CreditCard';
-  if (normalized.includes('subscribe')) return 'Bell';
-  if (normalized.includes('follow')) return 'UserPlus';
-  if (normalized.includes('click')) return 'MousePointerClick';
-  if (normalized.includes('link')) return 'Link';
-  return 'Sparkles';
 }
 
 export interface DashboardAudienceTableProps {
@@ -126,7 +68,6 @@ export function DashboardAudienceTable({
   const notifications = useNotifications();
   const { setTableMeta } = useTableMeta();
   const tableContainerRef = React.useRef<HTMLDivElement | null>(null);
-  const tbodyRef = React.useRef<HTMLTableSectionElement | null>(null);
   const [headerElevated, setHeaderElevated] = React.useState(false);
   const [openMenuRowId, setOpenMenuRowId] = React.useState<string | null>(null);
   const [selectedMember, setSelectedMember] =
@@ -180,8 +121,6 @@ export function DashboardAudienceTable({
   }, [rows, selectedMember, setTableMeta]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const activeColumns =
-    mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
 
   /**
    * Virtual scrolling configuration for table rows.
@@ -191,14 +130,8 @@ export function DashboardAudienceTable({
    * This reduces DOM node count from O(n) to O(viewport_height / row_height + overscan).
    *
    * Configuration choices:
-   * - estimateSize: 60px - Based on the actual rendered row height with padding (py-3 = 12px * 2)
-   *   and content. This doesn't need to be exact since we use measureElement for dynamic sizing,
-   *   but a close estimate prevents layout shifts during initial render.
-   * - overscan: 5 - Renders 5 extra rows above and below the visible area. This provides:
-   *   1. Smoother scrolling by pre-rendering rows before they become visible
-   *   2. Better keyboard navigation (rows exist in DOM before focus reaches them)
-   *   3. Reduced "blank flash" during fast scrolling
-   *   Higher values (e.g., 10) would be smoother but increase DOM size; 5 is a good balance.
+   * - estimateSize: 60px - Based on the actual rendered row height with padding
+   * - overscan: 5 - Renders 5 extra rows above and below for smoother scrolling
    *
    * @see https://tanstack.com/virtual/latest/docs/api/virtualizer
    */
@@ -209,17 +142,6 @@ export function DashboardAudienceTable({
     estimateSize: () => 60,
     overscan: 5,
   });
-
-  const sortableColumnMap: Partial<
-    Record<ColumnKey, MemberSortColumn | SubscriberSortColumn>
-  > = {
-    visits: 'visits',
-    lastSeen: 'lastSeen',
-    email: 'email',
-    phone: 'phone',
-    country: 'country',
-    createdAt: 'createdAt',
-  };
 
   const selectedRows = React.useMemo(
     () => rows.filter(row => selectedIds.has(row.id)),
@@ -269,6 +191,24 @@ export function DashboardAudienceTable({
 
     notifications.error('Failed to copy phone numbers');
   };
+
+  const bulkActions = [
+    {
+      label: 'Copy emails',
+      onClick: () => void copySelectedEmails(),
+      disabled: selectedCount === 0,
+    },
+    {
+      label: 'Copy phone numbers',
+      onClick: () => void copySelectedPhones(),
+      disabled: selectedCount === 0,
+    },
+    {
+      label: 'Clear selection',
+      onClick: () => clearSelection(),
+      disabled: selectedCount === 0,
+    },
+  ];
 
   const paginationLabel = () => {
     if (total === 0) {
@@ -386,112 +326,20 @@ export function DashboardAudienceTable({
                     ? 'Table showing all audience members with their visit history, location, and engagement data'
                     : 'Table showing all subscribers with their contact information and signup dates'}
                 </caption>
-                <thead
-                  className={cn(
-                    'sticky top-0 z-20 bg-surface-1/75 backdrop-blur-md',
-                    headerElevated &&
-                      'shadow-sm shadow-black/10 dark:shadow-black/40'
-                  )}
-                >
-                  <tr className='text-xs uppercase tracking-wide text-tertiary-token'>
-                    <th className='w-14 border-b border-subtle px-4 py-3 text-left sm:px-6'>
-                      <Checkbox
-                        aria-label='Select all'
-                        checked={headerCheckboxState}
-                        onCheckedChange={() => toggleSelectAll()}
-                      />
-                    </th>
 
-                    {activeColumns.map((column, index) => {
-                      const sortKey =
-                        sortableColumnMap[column.key as ColumnKey];
-                      const isSortable = Boolean(sortKey);
-                      const isActive = isSortable && sortKey === sort;
-                      const activeDirection = isActive ? direction : undefined;
+                <AudienceTableHeader
+                  mode={mode}
+                  sort={sort}
+                  direction={direction}
+                  headerCheckboxState={headerCheckboxState}
+                  selectedCount={selectedCount}
+                  headerElevated={headerElevated}
+                  onSortChange={onSortChange}
+                  onToggleSelectAll={toggleSelectAll}
+                  bulkActions={bulkActions}
+                />
 
-                      return (
-                        <th
-                          key={column.key}
-                          className='border-b border-subtle px-4 py-3 text-left sm:px-6'
-                        >
-                          <div className='flex items-center justify-between gap-2'>
-                            {isSortable ? (
-                              <SortableHeaderButton
-                                label={column.label}
-                                direction={
-                                  activeDirection as 'asc' | 'desc' | undefined
-                                }
-                                onClick={() =>
-                                  onSortChange(sortKey as unknown as string)
-                                }
-                              />
-                            ) : (
-                              <span className='inline-flex items-center font-semibold'>
-                                {column.label}
-                              </span>
-                            )}
-
-                            {index === 0 ? (
-                              <div
-                                className={cn(
-                                  'inline-flex items-center transition-all duration-150',
-                                  selectedCount > 0
-                                    ? 'opacity-100 translate-y-0'
-                                    : 'pointer-events-none opacity-0 -translate-y-0.5'
-                                )}
-                              >
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant='secondary'
-                                      size='sm'
-                                      className='normal-case'
-                                    >
-                                      Bulk actions
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align='end'>
-                                    <DropdownMenuItem
-                                      disabled={selectedCount === 0}
-                                      onClick={() => {
-                                        void copySelectedEmails();
-                                      }}
-                                    >
-                                      Copy emails
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      disabled={selectedCount === 0}
-                                      onClick={() => {
-                                        void copySelectedPhones();
-                                      }}
-                                    >
-                                      Copy phone numbers
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      disabled={selectedCount === 0}
-                                      onClick={() => clearSelection()}
-                                    >
-                                      Clear selection
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            ) : null}
-                          </div>
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-
-                {/*
-                  Virtualized tbody container:
-                  - position: relative - Creates positioning context for absolutely positioned rows
-                  - height: getTotalSize() - Sets total scrollable height as if all rows were rendered,
-                    enabling proper scrollbar sizing even though only visible rows exist in DOM
-                */}
                 <tbody
-                  ref={tbodyRef}
                   style={{
                     position: 'relative',
                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -499,241 +347,34 @@ export function DashboardAudienceTable({
                 >
                   {rowVirtualizer.getVirtualItems().map(virtualRow => {
                     const row = rows[virtualRow.index];
-                    const deviceIndicator = getDeviceIndicator(row.deviceType);
                     const isChecked = selectedIds.has(row.id);
                     const rowNumber =
                       (page - 1) * pageSize + virtualRow.index + 1;
 
-                    /**
-                     * Virtualized row positioning:
-                     * - data-index: Required by measureElement for row height measurement
-                     * - ref={measureElement}: Enables dynamic row height calculation
-                     * - position: absolute - Removes row from document flow
-                     * - translateY: Positions row at its calculated offset within the virtual list
-                     * - Using transform instead of top for better paint performance (GPU accelerated)
-                     */
-                    return (
-                      <tr
-                        key={row.id}
-                        data-index={virtualRow.index}
-                        ref={rowVirtualizer.measureElement}
-                        className={cn(
-                          'group cursor-pointer border-b border-subtle transition-colors duration-200 last:border-b-0 hover:bg-surface-2',
-                          selectedMember?.id === row.id && 'bg-surface-2'
-                        )}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                        onClick={() => setSelectedMember(row)}
-                        onContextMenu={event => {
-                          event.preventDefault();
-                          event.stopPropagation();
-                          setOpenMenuRowId(row.id);
-                        }}
-                      >
-                        <td className='w-14 px-4 py-3 align-middle sm:px-6'>
-                          {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Custom interactive checkbox container */}
-                          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-                          {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
-                          <div
-                            className='relative flex h-7 w-7 items-center justify-center'
-                            onClick={event => event.stopPropagation()}
-                          >
-                            <span
-                              className={cn(
-                                'text-[11px] tabular-nums text-tertiary-token select-none transition-opacity',
-                                isChecked
-                                  ? 'opacity-0'
-                                  : 'opacity-100 group-hover:opacity-0'
-                              )}
-                              aria-hidden='true'
-                            >
-                              {rowNumber}
-                            </span>
-                            <div
-                              className={cn(
-                                'absolute inset-0 transition-opacity',
-                                isChecked
-                                  ? 'opacity-100'
-                                  : 'opacity-0 group-hover:opacity-100'
-                              )}
-                            >
-                              <Checkbox
-                                aria-label={`Select ${row.displayName || 'row'}`}
-                                checked={isChecked}
-                                onCheckedChange={() => toggleSelect(row.id)}
-                              />
-                            </div>
-                          </div>
-                        </td>
+                    const commonProps = {
+                      row,
+                      rowNumber,
+                      isSelected: selectedMember?.id === row.id,
+                      isChecked,
+                      isMenuOpen: openMenuRowId === row.id,
+                      virtualRowStart: virtualRow.start,
+                      measureRef: rowVirtualizer.measureElement,
+                      dataIndex: virtualRow.index,
+                      onRowClick: () => setSelectedMember(row),
+                      onRowContextMenu: (event: React.MouseEvent) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        setOpenMenuRowId(row.id);
+                      },
+                      onToggleSelect: () => toggleSelect(row.id),
+                      onMenuOpenChange: (open: boolean) =>
+                        setOpenMenuRowId(open ? row.id : null),
+                    };
 
-                        {mode === 'members' ? (
-                          <>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='font-semibold'>
-                                {row.displayName || 'Visitor'}
-                              </div>
-                              {row.type !== 'anonymous' ? (
-                                <div className='text-xs text-secondary-token'>
-                                  {row.type === 'email'
-                                    ? (row.email ?? 'Email fan')
-                                    : row.type === 'sms'
-                                      ? (row.phone ?? 'SMS fan')
-                                      : 'Connected fan'}
-                                </div>
-                              ) : null}
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <span className='inline-flex items-center rounded-full border border-subtle bg-surface-2/40 px-2 py-0.5 text-[11px] font-medium text-secondary-token capitalize'>
-                                {row.type}
-                              </span>
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='inline-flex items-center gap-2 text-secondary-token'>
-                                <Icon
-                                  name='MapPin'
-                                  className='h-4 w-4 text-tertiary-token'
-                                  aria-hidden='true'
-                                />
-                                <span>{row.locationLabel || 'Unknown'}</span>
-                              </div>
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              {deviceIndicator ? (
-                                <Icon
-                                  name={deviceIndicator.iconName}
-                                  className='h-4 w-4 text-secondary-token'
-                                  aria-label={deviceIndicator.label}
-                                  role='img'
-                                />
-                              ) : (
-                                <span className='text-secondary-token'>—</span>
-                              )}
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='flex items-center gap-2'>
-                                <span className='font-semibold'>
-                                  {row.visits}
-                                </span>
-                                <AudienceIntentBadge
-                                  intentLevel={row.intentLevel}
-                                />
-                              </div>
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='flex items-center gap-2'>
-                                {row.latestActions
-                                  .slice(0, 3)
-                                  .map((action, idx) => {
-                                    const iconName = resolveAudienceActionIcon(
-                                      action.label
-                                    );
-                                    return (
-                                      <span
-                                        key={`${row.id}-${action.label}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${idx}`}
-                                        className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-subtle bg-surface-2/40 text-tertiary-token'
-                                        title={action.label}
-                                      >
-                                        <Icon
-                                          name={iconName}
-                                          className='h-3.5 w-3.5'
-                                          aria-hidden='true'
-                                        />
-                                        <span className='sr-only'>
-                                          {action.label}
-                                        </span>
-                                      </span>
-                                    );
-                                  })}
-                              </div>
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='flex items-center justify-between gap-2'>
-                                <span>{formatTimeAgo(row.lastSeenAt)}</span>
-                                {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-                                {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
-                                {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-                                <div
-                                  className={cn(
-                                    'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-                                    openMenuRowId === row.id &&
-                                      'opacity-100 pointer-events-auto'
-                                  )}
-                                  onClick={event => event.stopPropagation()}
-                                >
-                                  <AudienceRowActionsMenu
-                                    row={row}
-                                    open={openMenuRowId === row.id}
-                                    onOpenChange={open =>
-                                      setOpenMenuRowId(open ? row.id : null)
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              {row.displayName || 'Contact'}
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              {row.phone ?? '—'}
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='inline-flex items-center gap-2 text-secondary-token'>
-                                <Icon
-                                  name='MapPin'
-                                  className='h-4 w-4 text-tertiary-token'
-                                  aria-hidden='true'
-                                />
-                                <span>
-                                  {row.geoCountry
-                                    ? formatCountryLabel(row.geoCountry)
-                                    : 'Unknown'}
-                                </span>
-                              </div>
-                            </td>
-
-                            <td className='px-4 py-3 align-middle text-sm text-primary-token sm:px-6'>
-                              <div className='flex items-center justify-between gap-2'>
-                                <span>{formatLongDate(row.lastSeenAt)}</span>
-                                {/* biome-ignore lint/a11y/useKeyWithClickEvents: Click handler stops propagation only */}
-                                {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: Click handler stops propagation only */}
-                                {/* biome-ignore lint/a11y/noStaticElementInteractions: Click handler stops propagation only */}
-                                <div
-                                  className={cn(
-                                    'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
-                                    openMenuRowId === row.id &&
-                                      'opacity-100 pointer-events-auto'
-                                  )}
-                                  onClick={event => event.stopPropagation()}
-                                >
-                                  <AudienceRowActionsMenu
-                                    row={row}
-                                    open={openMenuRowId === row.id}
-                                    onOpenChange={open =>
-                                      setOpenMenuRowId(open ? row.id : null)
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            </td>
-                          </>
-                        )}
-                      </tr>
+                    return mode === 'members' ? (
+                      <AudienceMemberRow key={row.id} {...commonProps} />
+                    ) : (
+                      <AudienceSubscriberRow key={row.id} {...commonProps} />
                     );
                   })}
                 </tbody>
