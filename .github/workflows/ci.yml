@@ -1294,7 +1294,7 @@ jobs:
 
       - name: Slack notify (production deploy)
         if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#alerts-production'
@@ -1318,7 +1318,7 @@ jobs:
 
       - name: Slack notify (production deploy failed)
         if: ${{ (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success') && env.SLACK_WEBHOOK_URL != '' }}
-        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#alerts-critical'
