@@ -1,3 +1,18 @@
+/**
+ * useHandleApiValidation Hook
+ *
+ * Client hook for real-time handle availability validation with debouncing.
+ *
+ * IMPORTANT: This is an "Interactive UI Exception" per Section 10.1 of agents.md.
+ * Interactive handle validation requires:
+ * - Debouncing to reduce API calls during typing
+ * - AbortController for canceling in-flight requests
+ * - Constant-time responses (provided by API route) for security
+ *
+ * For form submissions (non-interactive validation), use the server action:
+ * `import { checkHandleAvailability } from '@/lib/actions/handle'`
+ */
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   type ClientValidationResult,

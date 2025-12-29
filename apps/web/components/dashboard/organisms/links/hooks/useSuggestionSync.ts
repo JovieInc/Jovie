@@ -3,11 +3,13 @@
  *
  * Custom hook for syncing link suggestions from the server.
  * Handles polling, version tracking, and accept/dismiss API calls.
+ *
+ * Uses server actions per Section 10.1 of agents.md - Data Fetching Strategy.
  */
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
+import { fetchSocialLinks, updateLinkState } from '@/lib/actions/social-links';
 import { usePollingCoordinator } from '@/lib/hooks/usePollingCoordinator';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import type { LinkItem, SuggestedLink } from '../types';
@@ -53,6 +55,8 @@ export interface UseSuggestionSyncReturn {
   handleDismissSuggestion: (
     suggestion: DetectedLink & { suggestionId?: string }
   ) => Promise<void>;
+  /** Whether an action is in progress */
+  isUpdating: boolean;
 }
 
 /**
@@ -61,7 +65,7 @@ export interface UseSuggestionSyncReturn {
  * Features:
  * - Polling with configurable interval
  * - Auto-refresh after ingestable URLs
- * - Accept/dismiss API integration
+ * - Accept/dismiss using server actions
  * - Version tracking for optimistic locking
  *
  * @example
@@ -92,6 +96,9 @@ export function useSuggestionSync({
   setLinks,
   setSuggestedLinks,
 }: UseSuggestionSyncOptions): UseSuggestionSyncReturn {
+  // Track updating state - currently not actively used but kept for interface compatibility
+  const isUpdating = false;
+
   // Abort controller for canceling in-flight requests
   const suggestionSyncAbortRef = useRef<AbortController | null>(null);
 
@@ -101,29 +108,28 @@ export function useSuggestionSync({
     [autoRefreshUntilMs]
   );
 
-  // Sync suggestions from server
+  // Sync suggestions from server using server action
   const syncSuggestionsFromServer = useCallback(async () => {
     if (!profileId || !suggestionsEnabled) return;
 
+    // Cancel any in-flight sync
     suggestionSyncAbortRef.current?.abort();
     const controller = new AbortController();
     suggestionSyncAbortRef.current = controller;
 
     try {
-      const response = await fetch(
-        `/api/dashboard/social-links?profileId=${profileId}`,
-        { cache: 'no-store', signal: controller.signal }
-      );
-      if (!response.ok) return;
+      // Use server action instead of fetch
+      const result = await fetchSocialLinks(profileId);
 
-      const data = (await response.json().catch(() => null)) as {
-        links?: ProfileSocialLink[];
-      } | null;
+      // Check if aborted
+      if (controller.signal.aborted) return;
 
-      if (!data?.links) return;
+      if (!result.success) return;
+
+      const links = result.links;
 
       // Update version from server response
-      const serverVersions = data.links
+      const serverVersions = links
         .map(l => l.version ?? 1)
         .filter(v => typeof v === 'number');
       if (serverVersions.length > 0) {
@@ -132,7 +138,7 @@ export function useSuggestionSync({
       }
 
       const nextSuggestions = convertDbLinksToSuggestions(
-        data.links.filter(link => link.state === 'suggested')
+        links.filter(link => link.state === 'suggested')
       );
       setSuggestedLinks(prev =>
         areSuggestionListsEqual(prev, nextSuggestions) ? prev : nextSuggestions
@@ -186,7 +192,7 @@ export function useSuggestionSync({
     }
   }, [pollIntervalMs, profileId, suggestionsEnabled, updateTask]);
 
-  // Handle accepting a suggestion
+  // Handle accepting a suggestion using server action
   const handleAcceptSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -196,35 +202,21 @@ export function useSuggestionSync({
         return null;
       }
 
+      const suggestionId = suggestion.suggestionId;
+      if (!suggestionId) {
+        return null;
+      }
+
       try {
-        const suggestionId = suggestion.suggestionId;
-        if (!suggestionId) {
-          return null;
+        // Use server action instead of fetch
+        const result = await updateLinkState(profileId, suggestionId, 'accept');
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to accept link');
         }
 
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            linkId: suggestionId,
-            action: 'accept',
-          }),
-        });
-
-        if (!response.ok) {
-          const data = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(data?.error || 'Failed to accept link');
-        }
-
-        const data = (await response.json()) as {
-          link?: ProfileSocialLink;
-        };
-
-        if (data.link) {
-          const [detected] = convertDbLinksToLinkItems([data.link]);
+        if (result.link) {
+          const [detected] = convertDbLinksToLinkItems([result.link]);
           setSuggestedLinks(prev =>
             prev.filter(s => s.suggestionId !== suggestionId)
           );
@@ -245,7 +237,7 @@ export function useSuggestionSync({
     [profileId, setLinks, setSuggestedLinks]
   );
 
-  // Handle dismissing a suggestion
+  // Handle dismissing a suggestion using server action
   const handleDismissSuggestion = useCallback(
     async (
       suggestion: DetectedLink & { suggestionId?: string }
@@ -260,21 +252,15 @@ export function useSuggestionSync({
       }
 
       try {
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            linkId: suggestion.suggestionId,
-            action: 'dismiss',
-          }),
-        });
+        // Use server action instead of fetch
+        const result = await updateLinkState(
+          profileId,
+          suggestion.suggestionId,
+          'dismiss'
+        );
 
-        if (!response.ok) {
-          const data = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(data?.error || 'Failed to dismiss link');
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to dismiss link');
         }
 
         setSuggestedLinks(prev =>
@@ -295,5 +281,6 @@ export function useSuggestionSync({
     syncSuggestionsFromServer,
     handleAcceptSuggestion,
     handleDismissSuggestion,
+    isUpdating,
   };
 }

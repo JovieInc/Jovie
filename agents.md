@@ -836,6 +836,155 @@ CodeRabbit is already installed in the terminal. Run it as a way to review your 
   - Currently disabled by design ("do things that dont scale").
   - Only introduce Redis/rate limiting when traffic/abuse/latency thresholds are clearly hit.
 
+## 10.1 Data Fetching Strategy (CRITICAL)
+
+**RULE: All server data fetching MUST go through Server Actions or Route Handlers. Client components MUST NOT fetch server data directly.**
+
+This ensures:
+- No duplicated fetch logic across components
+- Consistent caching via Next.js cache primitives
+- Better SEO with server-rendered data
+- Reduced client-side JavaScript
+- Proper RLS enforcement via `withDbSession`
+
+### Allowed Patterns
+
+#### 1. Server Actions (Preferred for mutations and authenticated reads)
+
+```typescript
+// lib/actions/analytics.ts
+'use server';
+
+import { getCachedAuth } from '@/lib/auth/cached';
+import { withDbSession } from '@/lib/auth/session';
+
+export async function fetchDashboardAnalytics(
+  range: AnalyticsRange,
+  view: DashboardAnalyticsView
+): Promise<DashboardAnalyticsResponse> {
+  const { userId } = await getCachedAuth();
+  if (!userId) throw new Error('Unauthorized');
+
+  return withDbSession(async (clerkUserId) => {
+    // DB query with RLS
+  });
+}
+```
+
+#### 2. Route Handlers (For external API integration, streaming, webhooks)
+
+```typescript
+// app/api/spotify/search/route.ts
+export async function GET(request: NextRequest) {
+  // External API calls, streaming responses
+}
+```
+
+#### 3. React Server Components (For initial page data)
+
+```typescript
+// app/app/dashboard/page.tsx
+import { getDashboardData } from './actions';
+
+export default async function DashboardPage() {
+  const data = await getDashboardData(); // Server action
+  return <DashboardClient initialData={data} />;
+}
+```
+
+### Forbidden Patterns
+
+#### ❌ Client-side fetching of server data
+
+```typescript
+// WRONG: Don't do this
+'use client';
+const { data } = useDashboardAnalytics(); // Fetches from API route
+
+useEffect(() => {
+  fetch('/api/dashboard/analytics').then(/* ... */);
+}, []);
+```
+
+#### ❌ Polling from client components
+
+```typescript
+// WRONG: Don't poll server data from client
+useEffect(() => {
+  const interval = setInterval(() => {
+    fetch('/api/suggestions').then(/* ... */);
+  }, 2000);
+}, []);
+```
+
+### Correct Migration Pattern
+
+When migrating client-side fetchers to server actions:
+
+1. **Create a server action** in `lib/actions/` or colocated with the feature
+2. **Use `startTransition`** for non-blocking updates in client components
+3. **Pass initial data as props** from RSC to client components
+4. **Use `useActionState`** (React 19) or `useTransition` for action state
+
+```typescript
+// Before (WRONG)
+'use client';
+function Component() {
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch('/api/data').then(r => r.json()).then(setData);
+  }, []);
+}
+
+// After (CORRECT)
+// Server Component
+async function Page() {
+  const data = await fetchData(); // Server action
+  return <Component initialData={data} />;
+}
+
+// Client Component
+'use client';
+function Component({ initialData }: { initialData: Data }) {
+  const [data, setData] = useState(initialData);
+  const [isPending, startTransition] = useTransition();
+
+  const refresh = () => {
+    startTransition(async () => {
+      const fresh = await fetchData(); // Server action
+      setData(fresh);
+    });
+  };
+}
+```
+
+### Interactive UI Exceptions
+
+Some patterns legitimately require client-side API calls:
+
+- **Real-time search** (e.g., Spotify artist search with debouncing) - Keep as API route
+- **Third-party widgets** that require client-side initialization
+- **File uploads** with progress tracking
+
+For these cases, use the existing API routes but document the exception.
+
+### Caching Strategy
+
+1. **Request-level deduplication**: Use React `cache()` for per-request memoization
+2. **Server-side caching**: Use `'use cache'` directive (Next.js 16) for cached components
+3. **Client state**: Use React state for UI state only, not server data
+4. **Invalidation**: Use `revalidateTag()` and `updateTag()` for cache busting
+
+```typescript
+// Centralized cache invalidation
+import { revalidateTag, updateTag } from 'next/cache';
+
+export async function invalidateAfterMutation() {
+  updateTag('dashboard-data'); // Immediate within request
+  revalidateTag('dashboard-data', 'max'); // Background revalidation
+}
+```
+
 ## 11. Payments (Stripe)
 
 - Stripe is Node-only; do not import `stripe` in Edge handlers or React Server Components.

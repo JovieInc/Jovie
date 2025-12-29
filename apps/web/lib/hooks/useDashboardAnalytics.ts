@@ -1,6 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+/**
+ * useDashboardAnalytics Hook
+ *
+ * Client hook for dashboard analytics that uses server actions instead of
+ * direct API calls. This ensures consistent data fetching patterns per
+ * Section 10.1 of agents.md - Data Fetching Strategy.
+ *
+ * For initial page loads, consider fetching data in a Server Component
+ * and passing it as initialData to avoid the loading state.
+ */
+
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
+import { fetchDashboardAnalytics } from '@/lib/actions/analytics';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -23,38 +42,11 @@ type CacheEntry = {
 
 const DEFAULT_TTL_MS = 5_000;
 
+/**
+ * Client-side cache for analytics data
+ * Keyed by view:range to prevent unnecessary server action calls
+ */
 const clientCache = new Map<string, CacheEntry>();
-
-type FetchAnalyticsError = Error & { status?: number };
-
-function getErrorStatus(error: unknown): number | null {
-  if (!error || typeof error !== 'object') return null;
-  const maybeStatus = (error as { status?: unknown }).status;
-  return typeof maybeStatus === 'number' ? maybeStatus : null;
-}
-
-function isAbortError(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  const name = (error as { name?: unknown }).name;
-  return name === 'AbortError';
-}
-
-async function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const id = window.setTimeout(resolve, ms);
-    const onAbort = () => {
-      window.clearTimeout(id);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-}
 
 function getKeyWithView(
   range: AnalyticsRange,
@@ -73,43 +65,35 @@ function isRange(value: string): value is AnalyticsRange {
   );
 }
 
-async function fetchAnalytics(
-  range: AnalyticsRange,
-  view: DashboardAnalyticsView,
-  signal: AbortSignal,
-  forceRefresh: boolean
-): Promise<DashboardAnalyticsResponse> {
-  const qs = new URLSearchParams({ range, view });
-  if (forceRefresh) qs.set('refresh', '1');
-
-  const res = await fetch(`/api/dashboard/analytics?${qs.toString()}`, {
-    method: 'GET',
-    signal,
-    headers: forceRefresh ? { 'Cache-Control': 'no-cache' } : undefined,
-  });
-
-  if (!res.ok) {
-    const error = new Error(
-      `Failed to fetch analytics (${res.status})`
-    ) as FetchAnalyticsError;
-    error.status = res.status;
-    throw error;
-  }
-
-  const json = (await res.json()) as unknown;
-  if (!json || typeof json !== 'object') {
-    throw new Error('Invalid analytics response');
-  }
-
-  return json as DashboardAnalyticsResponse;
-}
-
 export type UseDashboardAnalyticsOptions = {
+  /** Time range for analytics data */
   range?: AnalyticsRange;
+  /** Analytics view type */
   view?: DashboardAnalyticsView;
+  /** Cache TTL in milliseconds (default: 5000) */
   ttlMs?: number;
+  /** Initial data from server component to avoid loading state */
+  initialData?: DashboardAnalyticsResponse | null;
 };
 
+/**
+ * Hook for fetching dashboard analytics using server actions
+ *
+ * @example
+ * // Basic usage (will show loading state initially)
+ * const { data, loading, error, refresh } = useDashboardAnalytics({
+ *   range: '7d',
+ *   view: 'traffic',
+ * });
+ *
+ * @example
+ * // With initial data from server component (no loading state)
+ * const { data, refresh } = useDashboardAnalytics({
+ *   range: '7d',
+ *   view: 'traffic',
+ *   initialData: serverFetchedData,
+ * });
+ */
 export function useDashboardAnalytics(
   options: UseDashboardAnalyticsOptions = {}
 ) {
@@ -124,16 +108,47 @@ export function useDashboardAnalytics(
   }, [options.view]);
 
   const ttlMs = options.ttlMs ?? DEFAULT_TTL_MS;
+  const initialData = options.initialData ?? null;
 
-  const [state, setState] = useState<AnalyticsState>({
-    data: null,
-    error: null,
-    loading: true,
-    refreshing: false,
-    lastUpdatedAt: null,
+  // Use React's useTransition for non-blocking updates
+  const [isPending, startTransition] = useTransition();
+
+  const [state, setState] = useState<AnalyticsState>(() => {
+    // If initial data is provided, use it immediately
+    if (initialData) {
+      const key = getKeyWithView(range, view);
+      const now = Date.now();
+      clientCache.set(key, {
+        data: initialData,
+        expiresAt: now + ttlMs,
+        lastUpdatedAt: now,
+      });
+      return {
+        data: initialData,
+        error: null,
+        loading: false,
+        refreshing: false,
+        lastUpdatedAt: now,
+      };
+    }
+
+    return {
+      data: null,
+      error: null,
+      loading: true,
+      refreshing: false,
+      lastUpdatedAt: null,
+    };
   });
 
-  const abortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const load = useCallback(
     async (forceRefresh: boolean) => {
@@ -141,6 +156,7 @@ export function useDashboardAnalytics(
       const now = Date.now();
       const cached = clientCache.get(key);
 
+      // Return cached data if valid and not forcing refresh
       if (!forceRefresh && cached && cached.expiresAt > now) {
         setState(prev => ({
           ...prev,
@@ -153,6 +169,7 @@ export function useDashboardAnalytics(
         return;
       }
 
+      // Show stale data while refreshing in background
       if (!forceRefresh && cached) {
         setState(prev => ({
           ...prev,
@@ -171,54 +188,38 @@ export function useDashboardAnalytics(
         }));
       }
 
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
       try {
-        const run = async (): Promise<DashboardAnalyticsResponse> => {
-          try {
-            return await fetchAnalytics(
-              range,
-              view,
-              controller.signal,
-              forceRefresh
-            );
-          } catch (error) {
-            if (controller.signal.aborted || isAbortError(error)) throw error;
+        // Use server action instead of fetch
+        const result = await fetchDashboardAnalytics(range, view);
 
-            const status = getErrorStatus(error);
-            if (status === 401 && !forceRefresh) {
-              await sleep(200, controller.signal);
-              return await fetchAnalytics(
-                range,
-                view,
-                controller.signal,
-                forceRefresh
-              );
-            }
+        if (!mountedRef.current) return;
 
-            throw error;
-          }
-        };
+        if (result.success) {
+          const updatedAt = Date.now();
+          clientCache.set(key, {
+            data: result.data,
+            expiresAt: updatedAt + ttlMs,
+            lastUpdatedAt: updatedAt,
+          });
 
-        const result = await run();
-        const updatedAt = Date.now();
-        clientCache.set(key, {
-          data: result,
-          expiresAt: updatedAt + ttlMs,
-          lastUpdatedAt: updatedAt,
-        });
-
-        setState({
-          data: result,
-          error: null,
-          loading: false,
-          refreshing: false,
-          lastUpdatedAt: updatedAt,
-        });
+          setState({
+            data: result.data,
+            error: null,
+            loading: false,
+            refreshing: false,
+            lastUpdatedAt: updatedAt,
+          });
+        } else {
+          setState(prev => ({
+            ...prev,
+            error: result.error,
+            loading: false,
+            refreshing: false,
+          }));
+        }
       } catch (error) {
-        if (controller.signal.aborted || isAbortError(error)) return;
+        if (!mountedRef.current) return;
+
         const message =
           error instanceof Error ? error.message : 'Unable to load analytics';
         setState(prev => ({
@@ -232,15 +233,19 @@ export function useDashboardAnalytics(
     [range, ttlMs, view]
   );
 
+  // Initial load
   useEffect(() => {
+    // Skip initial load if we have initialData
+    if (options.initialData) return;
+
     void load(false);
-    return () => {
-      abortRef.current?.abort();
-    };
-  }, [load]);
+  }, [load, options.initialData]);
 
   const refresh = useCallback(async () => {
-    await load(true);
+    // Use startTransition for non-blocking refresh
+    startTransition(() => {
+      void load(true);
+    });
   }, [load]);
 
   return {
@@ -248,7 +253,7 @@ export function useDashboardAnalytics(
     data: state.data,
     error: state.error,
     loading: state.loading,
-    refreshing: state.refreshing,
+    refreshing: state.refreshing || isPending,
     lastUpdatedAt: state.lastUpdatedAt,
     refresh,
   };

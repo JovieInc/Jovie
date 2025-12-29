@@ -3,11 +3,24 @@
  *
  * Custom hook for persisting links to the server with optimistic locking,
  * debounced saves, and conflict resolution.
+ *
+ * Uses server actions per Section 10.1 of agents.md - Data Fetching Strategy.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from 'react';
 import { toast } from 'sonner';
 import type { ProfileSocialLink } from '@/app/app/dashboard/actions';
+import {
+  type LinkSavePayload,
+  saveSocialLinks,
+} from '@/lib/actions/social-links';
 import { debounce } from '@/lib/utils';
 import type { LinkItem, PlatformType, SuggestedLink } from '../types';
 import {
@@ -62,6 +75,8 @@ export interface UseLinksPersistenceReturn {
   enqueueSave: (input: LinkItem[]) => void;
   /** Ref to current links (for async access) */
   linksRef: React.RefObject<LinkItem[]>;
+  /** Whether a save is in progress */
+  isSaving: boolean;
 }
 
 /**
@@ -72,6 +87,7 @@ export interface UseLinksPersistenceReturn {
  * - Debounced saves to reduce API calls
  * - Conflict resolution on 409 responses
  * - Automatic suggestion sync after ingestable URLs
+ * - Uses server actions instead of direct fetch calls
  *
  * @example
  * ```tsx
@@ -94,6 +110,9 @@ export function useLinksPersistence({
   debounceMs = 500,
   onSyncSuggestions,
 }: UseLinksPersistenceOptions): UseLinksPersistenceReturn {
+  // Use React's useTransition for non-blocking saves
+  const [isPending, startTransition] = useTransition();
+
   // Split initial links into active and suggested
   const activeInitialLinks = useMemo(
     () => (initialLinks || []).filter(l => l.state !== 'suggested'),
@@ -148,7 +167,7 @@ export function useLinksPersistence({
   const saveLoopRunningRef = useRef(false);
   const pendingSaveRef = useRef<LinkItem[] | null>(null);
 
-  // Persist links to server
+  // Persist links to server using server action
   const persistLinks = useCallback(
     async (input: LinkItem[]): Promise<void> => {
       // Normalize the input
@@ -174,117 +193,74 @@ export function useLinksPersistence({
         };
       });
 
-      try {
-        const payload = normalized.map((l, index) => ({
-          platform: l.platform.id,
-          platformType: l.platform.category,
-          url: l.normalizedUrl,
-          sortOrder: index,
-          isActive: l.isVisible !== false,
-          displayText: l.title,
-          state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
-          confidence:
-            typeof l.confidence === 'number'
-              ? Number(l.confidence.toFixed(2))
-              : undefined,
-          sourcePlatform: l.sourcePlatform ?? undefined,
-          sourceType: l.sourceType ?? undefined,
-          evidence: l.evidence ?? undefined,
-        }));
+      if (!profileId) {
+        toast.error('Unable to save links. Please refresh and try again.');
+        return;
+      }
 
-        if (!profileId) {
-          toast.error('Unable to save links. Please refresh and try again.');
-          return;
-        }
+      // Convert LinkItems to server action payload
+      const payload: LinkSavePayload[] = normalized.map((l, index) => ({
+        platform: l.platform.id,
+        platformType: l.platform.category,
+        url: l.normalizedUrl,
+        sortOrder: index,
+        isActive: l.isVisible !== false,
+        displayText: l.title,
+        state: l.state ?? (l.isVisible ? 'active' : 'suggested'),
+        confidence:
+          typeof l.confidence === 'number'
+            ? Number(l.confidence.toFixed(2))
+            : undefined,
+        sourcePlatform: l.sourcePlatform ?? undefined,
+        sourceType: l.sourceType ?? undefined,
+        evidence: l.evidence ?? undefined,
+      }));
 
-        const response = await fetch('/api/dashboard/social-links', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId,
-            links: payload,
-            expectedVersion: linksVersion,
-          }),
-        });
+      // Use server action instead of fetch
+      const result = await saveSocialLinks(profileId, payload, linksVersion);
 
-        // Handle 409 Conflict - links were modified elsewhere
-        if (response.status === 409) {
-          const conflictData = (await response.json().catch(() => null)) as {
-            error?: string;
-            code?: string;
-            currentVersion?: number;
-          } | null;
-
-          // Update version from conflict response
-          if (
-            conflictData?.currentVersion &&
-            typeof conflictData.currentVersion === 'number'
-          ) {
-            setLinksVersion(conflictData.currentVersion);
+      if (!result.success) {
+        // Handle conflict
+        if (result.isConflict) {
+          if (result.currentVersion) {
+            setLinksVersion(result.currentVersion);
           }
-
-          // Show conflict message and trigger refresh
           toast.error(
             'Your links were updated in another tab. Refreshing to show the latest version.',
             { duration: 5000 }
           );
-
-          // Sync from server to get the latest state
           await onSyncSuggestions?.();
           return;
         }
 
-        if (!response.ok) {
-          let message = 'Failed to save links';
-          try {
-            const data = (await response.json().catch(() => null)) as {
-              error?: string;
-            } | null;
-            if (data?.error && typeof data.error === 'string') {
-              message = data.error;
-            }
-          } catch {
-            // swallow JSON parse errors and fall back to default message
-          }
-          throw new Error(message);
-        }
-
-        // Parse success response and update version
-        const successData = (await response.json().catch(() => null)) as {
-          ok?: boolean;
-          version?: number;
-        } | null;
-        if (successData?.version && typeof successData.version === 'number') {
-          setLinksVersion(successData.version);
-        }
-
-        // Keep normalized links locally; server IDs will be applied on next load
-        setLinks(prev =>
-          areLinkItemsEqual(prev, normalized) ? prev : normalized
-        );
-
-        // Check for ingestable URLs and trigger suggestion sync
-        if (suggestionsEnabled) {
-          const hasIngestableLink = normalized.some(item =>
-            isIngestableUrl(item.normalizedUrl)
-          );
-
-          if (hasIngestableLink) {
-            setAutoRefreshUntilMs(Date.now() + 20000);
-            void onSyncSuggestions?.();
-          }
-        }
-
-        const now = new Date();
-        toast.success(
-          `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
-        );
-      } catch (error) {
-        console.error('Error saving links:', error);
-        const message =
-          error instanceof Error ? error.message : 'Failed to save links';
-        toast.error(message || 'Failed to save links. Please try again.');
+        toast.error(result.error || 'Failed to save links. Please try again.');
+        return;
       }
+
+      // Update version from success response
+      setLinksVersion(result.version);
+
+      // Keep normalized links locally; server IDs will be applied on next load
+      setLinks(prev =>
+        areLinkItemsEqual(prev, normalized) ? prev : normalized
+      );
+
+      // Check for ingestable URLs and trigger suggestion sync
+      if (suggestionsEnabled) {
+        const hasIngestableLink = normalized.some(item =>
+          isIngestableUrl(item.normalizedUrl)
+        );
+
+        if (hasIngestableLink) {
+          setAutoRefreshUntilMs(Date.now() + 20000);
+          void onSyncSuggestions?.();
+        }
+      }
+
+      const now = new Date();
+      toast.success(
+        `Links saved successfully. Last saved: ${now.toLocaleTimeString()}`
+      );
     },
     [profileId, suggestionsEnabled, onSyncSuggestions, linksVersion]
   );
@@ -297,14 +273,17 @@ export function useLinksPersistence({
       if (saveLoopRunningRef.current) return;
       saveLoopRunningRef.current = true;
 
-      void (async () => {
-        while (pendingSaveRef.current) {
-          const next = pendingSaveRef.current;
-          pendingSaveRef.current = null;
-          await persistLinks(next);
-        }
-        saveLoopRunningRef.current = false;
-      })();
+      // Use startTransition for non-blocking save
+      startTransition(() => {
+        void (async () => {
+          while (pendingSaveRef.current) {
+            const next = pendingSaveRef.current;
+            pendingSaveRef.current = null;
+            await persistLinks(next);
+          }
+          saveLoopRunningRef.current = false;
+        })();
+      });
     },
     [persistLinks]
   );
@@ -346,5 +325,6 @@ export function useLinksPersistence({
     debouncedSave,
     enqueueSave,
     linksRef,
+    isSaving: isPending,
   };
 }
