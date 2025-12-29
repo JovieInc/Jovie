@@ -1,0 +1,389 @@
+'use server';
+
+import { clerkClient } from '@clerk/nextjs/server';
+import * as Sentry from '@sentry/nextjs';
+import { eq } from 'drizzle-orm';
+import { db } from '@/lib/db';
+import { adminAuditLog, creatorProfiles, users } from '@/lib/db/schema';
+
+/**
+ * Clerk metadata fields that Jovie mirrors from the database.
+ *
+ * These are read-only cached values in Clerk's publicMetadata.
+ * The source of truth is always the Neon database.
+ *
+ * NOTE: App must never trust Clerk metadata for authorization.
+ * Authorization is always enforced server-side from the database.
+ */
+export interface JovieClerkMetadata {
+  /** User role: 'user' | 'admin' */
+  jovie_role: 'user' | 'admin';
+  /** User status: 'active' | 'pending' | 'banned' */
+  jovie_status: 'active' | 'pending' | 'banned';
+  /** Whether user has a complete creator profile */
+  jovie_has_profile: boolean;
+}
+
+/**
+ * Syncs Jovie-specific metadata to Clerk's publicMetadata.
+ *
+ * This function is called when:
+ * - User completes onboarding (profile created)
+ * - Admin role is granted/revoked
+ * - User status changes (banned, etc.)
+ *
+ * IMPORTANT: This is a best-effort sync. Authorization decisions
+ * must always be made from the database, not Clerk metadata.
+ *
+ * @param clerkUserId - The Clerk user ID to sync
+ * @param data - The metadata to sync (partial, only changed fields)
+ */
+export async function syncClerkMetadata(
+  clerkUserId: string,
+  data: Partial<JovieClerkMetadata>
+): Promise<{ success: boolean; error?: string }> {
+  if (!clerkUserId) {
+    return { success: false, error: 'Missing clerkUserId' };
+  }
+
+  try {
+    const client = await clerkClient();
+
+    // Get current metadata to merge with new data
+    const user = await client.users.getUser(clerkUserId);
+    const currentMetadata = (user.publicMetadata ||
+      {}) as Partial<JovieClerkMetadata>;
+
+    // Merge new data with existing metadata
+    const updatedMetadata: Partial<JovieClerkMetadata> = {
+      ...currentMetadata,
+      ...data,
+    };
+
+    await client.users.updateUserMetadata(clerkUserId, {
+      publicMetadata: updatedMetadata,
+    });
+
+    console.info(`[clerk-sync] Synced metadata for user ${clerkUserId}:`, data);
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error(
+      `[clerk-sync] Failed to sync metadata for ${clerkUserId}:`,
+      errorMessage
+    );
+
+    Sentry.captureException(error, {
+      tags: { component: 'clerk-sync' },
+      extra: { clerkUserId, data },
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Syncs all Jovie metadata for a user based on their current database state.
+ *
+ * This performs a full refresh of all mirrored fields. Use this when:
+ * - User completes onboarding
+ * - Manual re-sync is needed
+ * - Debugging metadata drift
+ *
+ * @param clerkUserId - The Clerk user ID to sync
+ */
+export async function syncAllClerkMetadata(clerkUserId: string): Promise<{
+  success: boolean;
+  error?: string;
+  metadata?: JovieClerkMetadata;
+}> {
+  if (!clerkUserId) {
+    return { success: false, error: 'Missing clerkUserId' };
+  }
+
+  try {
+    // Query current database state
+    const [dbUser] = await db
+      .select({
+        id: users.id,
+        status: users.status,
+        isAdmin: users.isAdmin,
+      })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!dbUser) {
+      // User doesn't exist in DB yet - sync minimal state
+      const metadata: JovieClerkMetadata = {
+        jovie_role: 'user',
+        jovie_status: 'pending',
+        jovie_has_profile: false,
+      };
+
+      const result = await syncClerkMetadata(clerkUserId, metadata);
+      return { ...result, metadata };
+    }
+
+    // Check for profile
+    const [profile] = await db
+      .select({
+        id: creatorProfiles.id,
+        onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        username: creatorProfiles.username,
+        displayName: creatorProfiles.displayName,
+        isPublic: creatorProfiles.isPublic,
+      })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.userId, dbUser.id))
+      .limit(1);
+
+    // Determine if profile is complete
+    const hasCompleteProfile = Boolean(
+      profile &&
+        profile.onboardingCompletedAt &&
+        profile.username &&
+        profile.displayName &&
+        profile.isPublic !== false
+    );
+
+    // Map status - handle null case
+    const dbStatus = dbUser.status ?? 'active';
+    const clerkStatus: 'active' | 'pending' | 'banned' =
+      dbStatus === 'banned'
+        ? 'banned'
+        : dbStatus === 'pending'
+          ? 'pending'
+          : 'active';
+
+    const metadata: JovieClerkMetadata = {
+      jovie_role: dbUser.isAdmin ? 'admin' : 'user',
+      jovie_status: clerkStatus,
+      jovie_has_profile: hasCompleteProfile,
+    };
+
+    const result = await syncClerkMetadata(clerkUserId, metadata);
+    return { ...result, metadata };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error(
+      `[clerk-sync] Failed full sync for ${clerkUserId}:`,
+      errorMessage
+    );
+
+    Sentry.captureException(error, {
+      tags: { component: 'clerk-sync', operation: 'full-sync' },
+      extra: { clerkUserId },
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Handles user deletion event from Clerk webhook.
+ *
+ * When a user is deleted in Clerk, we soft-delete the corresponding
+ * database user to maintain referential integrity.
+ *
+ * @param clerkUserId - The Clerk user ID that was deleted
+ * @param adminUserId - Optional admin user ID if this was an admin action
+ */
+export async function handleClerkUserDeleted(
+  clerkUserId: string,
+  adminUserId?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!clerkUserId) {
+    return { success: false, error: 'Missing clerkUserId' };
+  }
+
+  try {
+    // Find the DB user
+    const [dbUser] = await db
+      .select({ id: users.id, deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!dbUser) {
+      console.warn(
+        `[clerk-sync] User ${clerkUserId} not found in DB for deletion`
+      );
+      return { success: true }; // Already doesn't exist
+    }
+
+    if (dbUser.deletedAt) {
+      console.info(`[clerk-sync] User ${clerkUserId} already soft-deleted`);
+      return { success: true }; // Already deleted
+    }
+
+    // Soft-delete the user
+    const now = new Date();
+    await db
+      .update(users)
+      .set({
+        deletedAt: now,
+        status: 'banned',
+        updatedAt: now,
+      })
+      .where(eq(users.id, dbUser.id));
+
+    // Log the action if we have an admin context
+    if (adminUserId) {
+      const [adminUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, adminUserId))
+        .limit(1);
+
+      if (adminUser) {
+        await db.insert(adminAuditLog).values({
+          adminUserId: adminUser.id,
+          targetUserId: dbUser.id,
+          action: 'user_deleted_from_clerk',
+          metadata: {
+            clerkUserId,
+            deletedAt: now.toISOString(),
+            source: 'clerk_webhook',
+          },
+        });
+      }
+    }
+
+    console.info(
+      `[clerk-sync] Soft-deleted user ${clerkUserId} from Clerk deletion event`
+    );
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error(
+      `[clerk-sync] Failed to handle user deletion for ${clerkUserId}:`,
+      errorMessage
+    );
+
+    Sentry.captureException(error, {
+      tags: { component: 'clerk-sync', operation: 'user-deletion' },
+      extra: { clerkUserId },
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Syncs admin role change to Clerk metadata and logs the action.
+ *
+ * @param targetClerkUserId - The Clerk user ID whose role is changing
+ * @param isAdmin - The new admin status
+ * @param adminClerkUserId - The admin making the change (for audit)
+ * @param ipAddress - Optional IP address for audit
+ * @param userAgent - Optional user agent for audit
+ */
+export async function syncAdminRoleChange(
+  targetClerkUserId: string,
+  isAdmin: boolean,
+  adminClerkUserId?: string,
+  ipAddress?: string,
+  userAgent?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!targetClerkUserId) {
+    return { success: false, error: 'Missing targetClerkUserId' };
+  }
+
+  try {
+    // Sync the role change to Clerk
+    const syncResult = await syncClerkMetadata(targetClerkUserId, {
+      jovie_role: isAdmin ? 'admin' : 'user',
+    });
+
+    if (!syncResult.success) {
+      return syncResult;
+    }
+
+    // Log the admin action if we have admin context
+    if (adminClerkUserId) {
+      const [adminUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, adminClerkUserId))
+        .limit(1);
+
+      const [targetUser] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.clerkId, targetClerkUserId))
+        .limit(1);
+
+      if (adminUser && targetUser) {
+        await db.insert(adminAuditLog).values({
+          adminUserId: adminUser.id,
+          targetUserId: targetUser.id,
+          action: isAdmin ? 'admin_role_granted' : 'admin_role_revoked',
+          metadata: {
+            targetClerkUserId,
+            newRole: isAdmin ? 'admin' : 'user',
+            changedAt: new Date().toISOString(),
+          },
+          ipAddress: ipAddress ?? null,
+          userAgent: userAgent ?? null,
+        });
+      }
+    }
+
+    console.info(
+      `[clerk-sync] Synced admin role for ${targetClerkUserId}: isAdmin=${isAdmin}`
+    );
+    return { success: true };
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error';
+    console.error(
+      `[clerk-sync] Failed to sync admin role for ${targetClerkUserId}:`,
+      errorMessage
+    );
+
+    Sentry.captureException(error, {
+      tags: { component: 'clerk-sync', operation: 'admin-role-change' },
+      extra: { targetClerkUserId, isAdmin },
+    });
+
+    return { success: false, error: errorMessage };
+  }
+}
+
+/**
+ * Syncs profile completion status to Clerk metadata.
+ *
+ * Called when a user completes onboarding.
+ *
+ * @param clerkUserId - The Clerk user ID
+ * @param hasProfile - Whether the user has a complete profile
+ */
+export async function syncProfileStatus(
+  clerkUserId: string,
+  hasProfile: boolean
+): Promise<{ success: boolean; error?: string }> {
+  return syncClerkMetadata(clerkUserId, {
+    jovie_has_profile: hasProfile,
+  });
+}
+
+/**
+ * Syncs user status change to Clerk metadata.
+ *
+ * Called when user status changes (banned, activated, etc.)
+ *
+ * @param clerkUserId - The Clerk user ID
+ * @param status - The new status
+ */
+export async function syncUserStatus(
+  clerkUserId: string,
+  status: 'active' | 'pending' | 'banned'
+): Promise<{ success: boolean; error?: string }> {
+  return syncClerkMetadata(clerkUserId, {
+    jovie_status: status,
+  });
+}
