@@ -6,8 +6,8 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextResponse } from 'next/server';
-import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { getUserBillingInfo } from '@/lib/stripe/customer-sync';
 
 export const runtime = 'nodejs';
 

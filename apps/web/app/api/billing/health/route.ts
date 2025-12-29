@@ -16,8 +16,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { billingAuditLog, stripeWebhookEvents, users } from '@/lib/db/schema';
 import { captureWarning } from '@/lib/error-tracking';
-import { stripe } from '@/lib/stripe/client';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { stripe } from '@/lib/stripe/client';
 
 export const runtime = 'nodejs';
 

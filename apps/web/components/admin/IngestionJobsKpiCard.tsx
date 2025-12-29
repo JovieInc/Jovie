@@ -1,9 +1,9 @@
 import {
+  ArrowPathIcon,
   CheckCircleIcon,
   ClockIcon,
   ExclamationCircleIcon,
   QueueListIcon,
-  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { AnalyticsCard } from '@/components/dashboard/atoms/AnalyticsCard';
 import type { IngestionJobStatusCounts } from '@/lib/admin';
@@ -15,12 +15,19 @@ interface StatusBadgeProps {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
 }
 
-function StatusBadge({ label, count, colorClassName, icon: Icon }: StatusBadgeProps) {
+function StatusBadge({
+  label,
+  count,
+  colorClassName,
+  icon: Icon,
+}: StatusBadgeProps) {
   return (
     <div className='flex items-center gap-1.5'>
       <Icon className={`size-3.5 ${colorClassName}`} aria-hidden='true' />
       <span className='text-xs text-tertiary-token'>
-        <span className='font-medium text-primary-token tabular-nums'>{count}</span>{' '}
+        <span className='font-medium text-primary-token tabular-nums'>
+          {count}
+        </span>{' '}
         {label}
       </span>
     </div>

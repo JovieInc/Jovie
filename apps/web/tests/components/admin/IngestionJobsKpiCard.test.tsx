@@ -117,7 +117,7 @@ describe('IngestionJobsKpiCard', () => {
       const section = screen.getByRole('region', {
         name: 'Ingestion Jobs metric',
       });
-      const hiddenElements = within(section).getAllByRole('img', {
+      const _hiddenElements = within(section).getAllByRole('img', {
         hidden: true,
       });
 

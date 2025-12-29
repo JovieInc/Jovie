@@ -2,11 +2,11 @@ import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles, waitlistInvites } from '@/lib/db/schema';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { sendNotification } from '@/lib/notifications/service';
 import { waitlistInviteSendWindowSchema } from '@/lib/validation/schemas';
 import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 

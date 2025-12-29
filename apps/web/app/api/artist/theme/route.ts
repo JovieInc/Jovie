@@ -5,8 +5,8 @@ import { withDbSession } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { creatorProfiles, users } from '@/lib/db/schema';
-import { parseJsonBody } from '@/lib/http/parse-json';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { parseJsonBody } from '@/lib/http/parse-json';
 
 export async function POST(request: NextRequest) {
   try {

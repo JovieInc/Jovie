@@ -29,8 +29,8 @@ import { withTransaction } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { stripe } from '@/lib/stripe/client';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { stripe } from '@/lib/stripe/client';
 import {
   getHandler,
   getStripeObjectId,

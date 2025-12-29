@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env-server';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   claimPendingJobs,
   handleIngestionJobFailure,
@@ -8,7 +9,6 @@ import {
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { logger } from '@/lib/utils/logger';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 export const runtime = 'nodejs';
 

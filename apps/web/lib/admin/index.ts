@@ -22,6 +22,6 @@ export {
   startImpersonation,
 } from './impersonation';
 export { checkIsAdmin, requireAdmin } from './middleware';
-export { clearAdminCache, invalidateAdminCache, isAdmin } from './roles';
 export type { IngestionJobStatusCounts } from './overview';
 export { getIngestionJobStatusCounts } from './overview';
+export { clearAdminCache, invalidateAdminCache, isAdmin } from './roles';

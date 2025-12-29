@@ -7,8 +7,8 @@ import {
   handleClerkUserDeleted,
   syncAllClerkMetadata,
 } from '@/lib/auth/clerk-sync';
-import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { syncUsernameFromClerkEvent } from '@/lib/username/sync';
 
 type WebhookEvent = {
   data: {
