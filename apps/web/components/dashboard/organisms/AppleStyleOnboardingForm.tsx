@@ -12,6 +12,7 @@ import {
 } from '@/components/auth';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { PROFILE_HOSTNAME, PROFILE_URL } from '@/constants/domains';
+import { useClipboard } from '@/hooks/useClipboard';
 import { identify, track } from '@/lib/analytics';
 import {
   generateUsernameSuggestions,
@@ -84,7 +85,7 @@ export function AppleStyleOnboardingForm({
   const [profileReadyHandle, setProfileReadyHandle] = useState(
     normalizedInitialHandle
   );
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const { copy, isSuccess: copied } = useClipboard({ resetDelay: 2000 });
   const [state, setState] = useState<OnboardingState>({
     step: 'validating',
     progress: 0,
@@ -455,18 +456,14 @@ export function AppleStyleOnboardingForm({
   const copyProfileLink = useCallback(() => {
     const targetHandle = profileReadyHandle || handle || handleInput;
     const link = `${PRODUCTION_PROFILE_BASE_URL}/${targetHandle}`;
-    navigator.clipboard
-      .writeText(link)
-      .then(() => {
-        setCopyFeedback('Link copied to clipboard!');
-        setTimeout(() => {
-          setCopyFeedback(null);
-        }, 2000);
-      })
-      .catch(err => {
-        console.error('Failed to copy link:', err);
-      });
-  }, [PRODUCTION_PROFILE_BASE_URL, handle, handleInput, profileReadyHandle]);
+    void copy(link);
+  }, [
+    PRODUCTION_PROFILE_BASE_URL,
+    copy,
+    handle,
+    handleInput,
+    profileReadyHandle,
+  ]);
 
   const goToDashboard = useCallback(() => {
     router.push('/app/dashboard/overview');
@@ -736,9 +733,9 @@ export function AppleStyleOnboardingForm({
                 </AuthButton>
               </div>
 
-              {copyFeedback && (
+              {copied && (
                 <div className='p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800/50 rounded-xl text-green-600 dark:text-green-400 text-sm text-center'>
-                  {copyFeedback}
+                  Link copied to clipboard!
                 </div>
               )}
             </div>
