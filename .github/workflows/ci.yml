@@ -1211,16 +1211,10 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - name: Install Vercel CLI
         run: pnpm add -g vercel@latest
-      - name: DB safety check (production - preflight)
-        run: pnpm --filter=@jovie/web run drizzle:migrate:preflight
-        env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
-          GIT_BRANCH: main
-          ALLOW_PROD_MIGRATIONS: 'true'
       - name: DB migrate (production - Drizzle)
-        run: pnpm --filter=@jovie/web run drizzle:migrate:prod
+        run: pnpm --filter=@jovie/web run drizzle:migrate:ci
         env:
-          DATABASE_URL: ${{ env.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
