@@ -153,6 +153,17 @@ export const waitlistInviteStatusEnum = pgEnum('waitlist_invite_status', [
   'failed',
 ]);
 
+// Creator Claim Invite Enums
+export const claimInviteStatusEnum = pgEnum('claim_invite_status', [
+  'pending',
+  'scheduled',
+  'sending',
+  'sent',
+  'bounced',
+  'failed',
+  'unsubscribed',
+]);
+
 // Audience & Analytics Enums
 export const notificationChannelEnum = pgEnum('notification_channel', [
   'email',

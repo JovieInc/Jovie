@@ -25,6 +25,7 @@ export interface CreatorProfileTableRowProps {
   onToggleVerification: () => Promise<void>;
   onToggleFeatured: () => Promise<void>;
   onToggleMarketing: () => Promise<void>;
+  onSendInvite?: () => void;
   onDelete: () => void | Promise<void>;
 }
 
@@ -45,6 +46,7 @@ export function CreatorProfileTableRow({
   onToggleVerification,
   onToggleFeatured,
   onToggleMarketing,
+  onSendInvite,
   onDelete,
 }: CreatorProfileTableRowProps) {
   const displayName =
@@ -184,6 +186,7 @@ export function CreatorProfileTableRow({
             onToggleVerification={onToggleVerification}
             onToggleFeatured={onToggleFeatured}
             onToggleMarketing={onToggleMarketing}
+            onSendInvite={onSendInvite}
             onDelete={onDelete}
           />
         </div>

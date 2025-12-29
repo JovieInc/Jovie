@@ -53,6 +53,14 @@ const DeleteCreatorDialog = dynamic(
   { ssr: false }
 );
 
+const SendInviteDialog = dynamic(
+  () =>
+    import('@/components/admin/SendInviteDialog').then(mod => ({
+      default: mod.SendInviteDialog,
+    })),
+  { ssr: false }
+);
+
 const ContactSidebar = dynamic(
   () =>
     import('@/components/organisms/ContactSidebar').then(mod => ({
@@ -162,6 +170,9 @@ export function AdminCreatorProfilesWithSidebar({
   const isMobile = useMediaQuery('(max-width: 767px)');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] =
+    useState<AdminCreatorProfileRow | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [profileToInvite, setProfileToInvite] =
     useState<AdminCreatorProfileRow | null>(null);
 
   const {
@@ -707,6 +718,14 @@ export function AdminCreatorProfilesWithSidebar({
                           );
                         }
                       }}
+                      onSendInvite={
+                        !profile.isClaimed && profile.claimToken
+                          ? () => {
+                              setProfileToInvite(profile);
+                              setInviteDialogOpen(true);
+                            }
+                          : undefined
+                      }
                       onDelete={() => {
                         setProfileToDelete(profile);
                         setDeleteDialogOpen(true);
@@ -753,6 +772,18 @@ export function AdminCreatorProfilesWithSidebar({
             setProfileToDelete(null);
           }
           return result;
+        }}
+      />
+      <SendInviteDialog
+        profile={profileToInvite}
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        onSuccess={() => {
+          setProfileToInvite(null);
+          showToast({
+            type: 'success',
+            message: 'Invite created successfully',
+          });
         }}
       />
     </div>
