@@ -330,9 +330,8 @@ export const LinkCategoryGrid = React.memo(function LinkCategoryGrid<
               <SortableContext items={items.map(idFor)}>
                 {items.map(link => {
                   const linkId = idFor(link);
-                  const linkIndex = links.findIndex(
-                    l => l.normalizedUrl === link.normalizedUrl
-                  );
+                  // Use pre-computed Map for O(1) lookup instead of O(n) findIndex
+                  const linkIndex = mapIdToIndex.get(linkId) ?? -1;
 
                   return (
                     <SortableLinkItem
