@@ -19,6 +19,10 @@ on:
         required: false
         default: 30
         type: number
+    outputs:
+      canary_status:
+        description: 'Canary verification status: verified, failed'
+        value: ${{ jobs.canary-health-gate.outputs.canary_status }}
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET:
         required: false
@@ -28,8 +32,11 @@ jobs:
     name: Canary health gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      canary_status: ${{ steps.canary-check.outputs.canary_status }}
     steps:
       - name: Canary health check
+        id: canary-check
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
@@ -84,6 +91,7 @@ jobs:
             fi
 
             echo "❌ Canary failed: HTTP $response_code"
+            echo "canary_status=failed" >> "$GITHUB_OUTPUT"
             exit 1
           done
 
@@ -115,44 +123,50 @@ jobs:
                 fi
 
                 echo "❌ Canary fallback failed: HTTP $response_code"
+                echo "canary_status=failed" >> "$GITHUB_OUTPUT"
                 exit 1
               done
 
               if [ "$response_code" != "200" ]; then
                 if [ "$response_code" = "429" ]; then
                   if [ -z "$BYPASS_SECRET" ]; then
-                    echo "⚠ Canary inconclusive: Vercel returned HTTP 429 Security Checkpoint even after retries."
-                    echo "⚠ Not failing deploy because bypass secret is unavailable."
-                    canary_inconclusive="true"
+                    echo "❌ Canary FAILED: Vercel returned HTTP 429 Security Checkpoint even after retries."
+                    echo "❌ CRITICAL: Cannot verify deployment health - failing to prevent unverified production deploy."
+                    echo "❌ ACTION REQUIRED: Set VERCEL_AUTOMATION_BYPASS_SECRET to enable proper canary verification."
+                    echo "canary_status=failed_unverified" >> "$GITHUB_OUTPUT"
+                    exit 1
                   else
                     echo "❌ Canary failed: HTTP 429 Security Checkpoint even though bypass secret is set."
+                    echo "canary_status=failed" >> "$GITHUB_OUTPUT"
                     exit 1
                   fi
                 else
                   echo "❌ Canary fallback failed after retries: HTTP $response_code"
+                  echo "canary_status=failed" >> "$GITHUB_OUTPUT"
                   exit 1
                 fi
               fi
             else
               echo "❌ Canary failed after retries: HTTP $response_code"
+              echo "canary_status=failed" >> "$GITHUB_OUTPUT"
               exit 1
             fi
           fi
 
-          if [ "$canary_inconclusive" = "true" ]; then
-            exit 0
-          fi
+          # Note: canary_inconclusive is no longer used - we fail fast on unverified deployments
 
           health_content=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache" "${BYPASS_ARGS[@]}" "$health_url" || echo "")
           if [[ "$health_content" != *'"status":"ok"'* ]]; then
             echo "❌ Canary failed: Health status not ok"
             echo "Health response: $health_content"
+            echo "canary_status=failed_health" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           if [[ "$health_content" != *'"database":{"ok":true'* ]]; then
             echo "❌ Canary failed: Database health not ok"
             echo "Health response: $health_content"
+            echo "canary_status=failed_database" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
@@ -167,19 +181,23 @@ jobs:
 
           if [ "$homepage_code" != "200" ]; then
             echo "❌ Canary failed: Homepage returned HTTP $homepage_code"
+            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           # Check homepage has actual content (not blank or error page)
           if [ ${#homepage_body} -lt 1000 ]; then
             echo "❌ Canary failed: Homepage body too short (${#homepage_body} chars) - likely broken"
+            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           # Check for common error indicators
           if echo "$homepage_body" | grep -qi "application error\|internal server error\|something went wrong\|error occurred"; then
             echo "❌ Canary failed: Homepage contains error message"
+            echo "canary_status=failed_homepage" >> "$GITHUB_OUTPUT"
             exit 1
           fi
 
           echo "✅ Canary passed: Deployment healthy and homepage renders"
+          echo "canary_status=verified" >> "$GITHUB_OUTPUT"
