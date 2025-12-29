@@ -4,6 +4,12 @@
  * Provides structured error logging with Sentry integration for production monitoring.
  * Uses Sentry as the primary error tracking service with PostHog as a secondary sink.
  *
+ * SDK Variant Awareness:
+ * This module works with both lite and full Sentry SDK variants:
+ * - Checks SDK initialization state before capturing errors
+ * - Includes SDK mode (lite/full) in error tags for dashboard filtering
+ * - Provides graceful fallbacks when SDK is not initialized
+ *
  * Usage:
  *   import { captureError, captureCriticalError } from '@/lib/error-tracking'
  *
@@ -19,6 +25,11 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
+import {
+  getSentryMode,
+  isSentryInitialized,
+  type SentryMode,
+} from '@/lib/sentry/init';
 
 type ErrorSeverity = 'error' | 'critical' | 'warning';
 type ErrorContext = Record<string, unknown>;
@@ -28,6 +39,7 @@ interface ErrorMetadata {
   context?: ErrorContext;
   timestamp: string;
   environment: string;
+  sentryMode: SentryMode;
 }
 
 /**
@@ -78,9 +90,15 @@ function formatError(error: unknown): {
  *
  * This function:
  * - Logs to console for debugging
- * - Sends error to Sentry for error tracking
+ * - Sends error to Sentry for error tracking (if SDK is initialized)
  * - Sends error event to PostHog for monitoring
  * - Never throws (safe to use in catch blocks)
+ *
+ * SDK Variant Awareness:
+ * - Checks if Sentry is initialized before attempting capture
+ * - Works with both lite and full SDK modes
+ * - Includes SDK mode in tags for filtering in Sentry dashboard
+ * - Provides graceful fallback logging when SDK is not ready
  *
  * @param message - Human-readable error description
  * @param error - The error object or error message
@@ -94,11 +112,15 @@ export async function captureError(
   severity: ErrorSeverity = 'error'
 ): Promise<void> {
   const errorData = formatError(error);
+  const sentryMode = getSentryMode();
+  const isInitialized = isSentryInitialized();
+
   const metadata: ErrorMetadata = {
     severity,
     context: context || {},
     timestamp: new Date().toISOString(),
     environment: getEnvironment(),
+    sentryMode,
   };
 
   // Always log to console for debugging
@@ -106,6 +128,7 @@ export async function captureError(
   const consoleData = {
     ...errorData,
     ...metadata.context,
+    sentryMode, // Include SDK mode in console logs for debugging
   };
 
   if (severity === 'critical') {
@@ -117,27 +140,42 @@ export async function captureError(
   }
 
   // Send to Sentry for error tracking (primary)
-  try {
-    const errorInstance =
-      error instanceof Error ? error : new Error(errorData.message);
+  // Check if SDK is initialized before attempting capture
+  if (isInitialized) {
+    try {
+      const errorInstance =
+        error instanceof Error ? error : new Error(errorData.message);
 
-    Sentry.captureException(errorInstance, {
-      extra: {
-        message,
-        ...metadata.context,
-      },
-      level: severity === 'critical' ? 'fatal' : severity,
-      tags: {
-        severity,
-        environment: metadata.environment,
-        ...(context?.route ? { route: String(context.route) } : {}),
-      },
-    });
-  } catch (sentryError) {
-    console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
+      Sentry.captureException(errorInstance, {
+        extra: {
+          message,
+          sentryMode, // Include SDK mode in extra for debugging
+          ...metadata.context,
+        },
+        level: severity === 'critical' ? 'fatal' : severity,
+        tags: {
+          severity,
+          environment: metadata.environment,
+          sentryMode, // Tag to filter by SDK variant in Sentry dashboard
+          ...(context?.route ? { route: String(context.route) } : {}),
+        },
+      });
+    } catch (sentryError) {
+      // Sentry capture failed - this should be rare but provides resilience
+      console.warn('[Error Tracking] Failed to send to Sentry:', sentryError);
+    }
+  } else {
+    // Sentry not initialized - log for debugging
+    // This can happen during initial load before SDK is ready, or on pages
+    // where Sentry hasn't been loaded yet
+    console.warn(
+      '[Error Tracking] Sentry not initialized, error will only be logged to console and PostHog:',
+      { message, errorType: errorData.type, sentryMode }
+    );
   }
 
   // Send to PostHog for monitoring (secondary, fire-and-forget)
+  // PostHog serves as a backup when Sentry is not initialized
   const eventName =
     severity === 'critical' ? '$exception_critical' : '$exception';
 
@@ -149,6 +187,8 @@ export async function captureError(
       error_stack: errorData.stack,
       error_severity: severity,
       error_raw_message: errorData.message,
+      sentry_mode: sentryMode, // Include SDK mode in PostHog events
+      sentry_initialized: isInitialized,
       ...metadata.context,
     },
     context?.userId as string | undefined
@@ -300,3 +340,27 @@ export function getSafeErrorMessage(
 
   return fallbackMessage;
 }
+
+/**
+ * Get the current Sentry SDK status for debugging or conditional behavior.
+ *
+ * @returns Object with SDK initialization state
+ *
+ * @example
+ * const { isReady, mode } = getSentryStatus();
+ * if (isReady) {
+ *   console.log(`Sentry initialized in ${mode} mode`);
+ * }
+ */
+export function getSentryStatus(): {
+  isReady: boolean;
+  mode: SentryMode;
+} {
+  return {
+    isReady: isSentryInitialized(),
+    mode: getSentryMode(),
+  };
+}
+
+// Re-export SDK mode utilities for consumers who need more control
+export { getSentryMode, isSentryInitialized, type SentryMode };
