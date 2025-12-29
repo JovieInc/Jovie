@@ -10,6 +10,7 @@
  * - Handles environment variable validation
  */
 
+import crypto from 'node:crypto';
 import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
@@ -270,11 +271,196 @@ async function runMigrations() {
     }
   }
 
+  async function detectAppliedThroughMillis(): Promise<number | null> {
+    type Probe = {
+      tag: string;
+      when: number;
+      existsQuery: string;
+    };
+
+    const journalPath = path.join(
+      process.cwd(),
+      'drizzle',
+      'migrations',
+      'meta',
+      '_journal.json'
+    );
+
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+      entries?: Array<{ tag: string; when: number }>;
+    };
+
+    const byTag = new Map(
+      (journal.entries ?? []).map(entry => [entry.tag, entry.when] as const)
+    );
+
+    const whenFor = (tag: string): number | null => byTag.get(tag) ?? null;
+
+    const schemaExistsResult = await (client ?? pool).query<{
+      has_schema: boolean;
+    }>(
+      "SELECT (to_regclass('public.users') IS NOT NULL OR to_regtype('public.creator_type') IS NOT NULL) AS has_schema"
+    );
+    const hasSchema = Boolean(schemaExistsResult.rows[0]?.has_schema);
+    if (!hasSchema) return null;
+
+    const probes: Probe[] = [
+      {
+        tag: '0029_auth_hardening',
+        when: whenFor('0029_auth_hardening') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.admin_audit_log') IS NOT NULL) AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='status') AS ok",
+      },
+      {
+        tag: '0028_click_events_analytics_idx',
+        when: whenFor('0028_click_events_analytics_idx') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.click_events_creator_profile_id_is_bot_created_at_idx') IS NOT NULL) AS ok",
+      },
+      {
+        tag: '0027_social_links_creator_profile_state_idx',
+        when: whenFor('0027_social_links_creator_profile_state_idx') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.social_links_creator_profile_state_idx') IS NOT NULL) AS ok",
+      },
+      {
+        tag: '0026_billing_hardening',
+        when: whenFor('0026_billing_hardening') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.billing_audit_log') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='billing_version') AS ok",
+      },
+      {
+        tag: '0025_dashboard_links_hardening',
+        when: whenFor('0025_dashboard_links_hardening') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.dashboard_idempotency_keys') IS NOT NULL) OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='social_links' AND column_name='version') AS ok",
+      },
+      {
+        tag: '0001_add_deleted_at_to_users',
+        when: whenFor('0001_add_deleted_at_to_users') ?? 0,
+        existsQuery:
+          "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='deleted_at') AS ok",
+      },
+      {
+        tag: '0002_add_claim_and_ingestion_columns',
+        when: whenFor('0002_add_claim_and_ingestion_columns') ?? 0,
+        existsQuery:
+          "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='creator_profiles' AND column_name='claim_token_expires_at') OR EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='ingestion_jobs' AND column_name='max_attempts') AS ok",
+      },
+      {
+        tag: '0003_add_waitlist_entries',
+        when: whenFor('0003_add_waitlist_entries') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.waitlist_entries') IS NOT NULL) AS ok",
+      },
+      {
+        tag: '0004_add_creator_contacts',
+        when: whenFor('0004_add_creator_contacts') ?? 0,
+        existsQuery:
+          "SELECT (to_regclass('public.creator_contacts') IS NOT NULL) AS ok",
+      },
+      {
+        tag: '0000_initial_schema',
+        when: whenFor('0000_initial_schema') ?? 0,
+        existsQuery: "SELECT (to_regclass('public.users') IS NOT NULL) AS ok",
+      },
+    ]
+      .filter(probe => probe.when > 0)
+      .sort((a, b) => b.when - a.when);
+
+    for (const probe of probes) {
+      const result = await (client ?? pool).query<{ ok: boolean }>(
+        probe.existsQuery
+      );
+      const ok = Boolean(result.rows[0]?.ok);
+      if (ok) return probe.when;
+    }
+
+    return null;
+  }
+
+  async function bootstrapMigrationHistoryIfNeeded(): Promise<void> {
+    const existing = await (client ?? pool).query<{
+      drizzle_table: string | null;
+      public_table: string | null;
+    }>(
+      "SELECT to_regclass('drizzle.__drizzle_migrations')::text AS drizzle_table, to_regclass('public.__drizzle_migrations')::text AS public_table"
+    );
+
+    if (existing.rows[0]?.drizzle_table || existing.rows[0]?.public_table) {
+      return;
+    }
+
+    const appliedThrough = await detectAppliedThroughMillis();
+    if (!appliedThrough) {
+      return;
+    }
+
+    await (client ?? pool).query('CREATE SCHEMA IF NOT EXISTS drizzle');
+    await (client ?? pool).query(
+      'CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)'
+    );
+
+    const countResult = await (client ?? pool).query<{ count: string }>(
+      'SELECT COUNT(*)::text AS count FROM drizzle.__drizzle_migrations'
+    );
+    const existingCount = Number.parseInt(
+      countResult.rows[0]?.count ?? '0',
+      10
+    );
+    if (existingCount > 0) {
+      return;
+    }
+
+    const journalPath = path.join(
+      process.cwd(),
+      'drizzle',
+      'migrations',
+      'meta',
+      '_journal.json'
+    );
+    const journal = JSON.parse(readFileSync(journalPath, 'utf8')) as {
+      entries?: Array<{ tag: string; when: number }>;
+    };
+
+    const entries = (journal.entries ?? [])
+      .filter(entry => entry.when <= appliedThrough)
+      .sort((a, b) => a.when - b.when);
+
+    if (entries.length === 0) {
+      return;
+    }
+
+    log.warning(
+      `Detected schema without migration history. Bootstrapping drizzle.__drizzle_migrations with ${entries.length} entries...`
+    );
+
+    for (const entry of entries) {
+      const migrationPath = path.join(
+        process.cwd(),
+        'drizzle',
+        'migrations',
+        `${entry.tag}.sql`
+      );
+
+      const sqlText = readFileSync(migrationPath, 'utf8');
+      const hash = crypto.createHash('sha256').update(sqlText).digest('hex');
+
+      await (client ?? pool).query(
+        'INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)',
+        [hash, entry.when]
+      );
+    }
+
+    log.success('Bootstrapped drizzle migration history');
+  }
+
   // Run migrations
   try {
     log.info('Running migrations...');
 
     migrationsSchema = await resolveMigrationsSchemaSafely();
+    await bootstrapMigrationHistoryIfNeeded();
     log.info(
       `Migrations schema: ${colors.bright}${migrationsSchema}${colors.reset}`
     );
