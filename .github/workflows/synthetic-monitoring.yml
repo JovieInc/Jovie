@@ -103,7 +103,7 @@ jobs:
 
       - name: Send Slack Alert on Failure
         if: steps.test-results.outputs.test_status != 'passed'
-        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#alerts-production'
@@ -139,7 +139,7 @@ jobs:
 
       - name: Send Slack Success Notification (Scheduled Summary)
         if: steps.test-results.outputs.test_status == 'passed' && github.event_name == 'schedule'
-        uses: 8398a7/action-slack@6655087208d67fddb447814ede164bad76184f27 # v3.1.0
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
           channel: '#monitoring'
