@@ -4,7 +4,6 @@ import crypto from 'crypto';
 import { env } from '@/lib/env-server';
 import type { EncryptionResult } from './url-encryption';
 
-const DEFAULT_KEY = 'default-key-change-in-production-32-chars';
 const ALGORITHM = 'aes-256-gcm';
 
 const isTestTime =
@@ -16,7 +15,13 @@ const isBuildTime =
 
 const ENCRYPTION_KEY = env.URL_ENCRYPTION_KEY;
 
-if (!isBuildTime && (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY)) {
+// Generate a development-only key at runtime (not hardcoded in source)
+// This key changes on each server restart, which is acceptable for development
+const DEV_FALLBACK_KEY = isTestTime
+  ? crypto.randomBytes(32).toString('base64')
+  : undefined;
+
+if (!isBuildTime && !ENCRYPTION_KEY) {
   const vercelEnv =
     process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
 
@@ -29,14 +34,16 @@ if (!isBuildTime && (!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY)) {
 
   if (vercelEnv === 'development') {
     console.warn(
-      '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set or using default value. ' +
-        'URL encryption will use a weak default key. Generate a secure key with: openssl rand -base64 32'
+      '[url-encryption] WARNING: URL_ENCRYPTION_KEY not set. ' +
+        'URL encryption will use base64 fallback. Generate a secure key with: openssl rand -base64 32'
     );
   }
 }
 
 export function encryptUrl(url: string): EncryptionResult {
-  if ((!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY) && !isTestTime) {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+
+  if (!keyMaterial) {
     console.warn(
       '[url-encryption] Using base64 fallback due to missing encryption key'
     );
@@ -50,7 +57,6 @@ export function encryptUrl(url: string): EncryptionResult {
   }
 
   try {
-    const keyMaterial = ENCRYPTION_KEY || DEFAULT_KEY;
     const iv = crypto.randomBytes(16);
     const salt = crypto.randomBytes(16);
     const key = crypto.scryptSync(keyMaterial, salt, 32);
@@ -85,13 +91,13 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
       return Buffer.from(encryptionResult.encrypted, 'base64').toString('utf8');
     }
 
-    if ((!ENCRYPTION_KEY || ENCRYPTION_KEY === DEFAULT_KEY) && !isTestTime) {
+    const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+
+    if (!keyMaterial) {
       throw new Error(
         '[url-encryption] Cannot decrypt AES-GCM encrypted URL without valid encryption key'
       );
     }
-
-    const keyMaterial = ENCRYPTION_KEY || DEFAULT_KEY;
 
     const salt = Buffer.from(encryptionResult.salt, 'hex');
     const key = crypto.scryptSync(keyMaterial, salt, 32);
