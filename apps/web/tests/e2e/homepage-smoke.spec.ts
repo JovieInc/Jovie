@@ -45,6 +45,12 @@ test.describe('Homepage Smoke @smoke @critical', () => {
 
     // Wait for page to be interactive
     await page.waitForLoadState('domcontentloaded');
+
+    // Assert no unexpected console errors
+    expect(
+      consoleErrors,
+      `Homepage has unexpected console errors: ${consoleErrors.join(', ')}`
+    ).toHaveLength(0);
   });
 
   test('homepage renders main content', async ({ page }) => {
