@@ -171,8 +171,8 @@ importers:
         specifier: ^10
         version: 10.32.1(@opentelemetry/context-async-hooks@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.2.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.2.0(@opentelemetry/api@1.9.0))(next@16.1.1(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.57.0)(babel-plugin-macros@3.1.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))(react@18.3.1)(webpack@5.103.0(@swc/core@1.15.3(@swc/helpers@0.5.17))(esbuild@0.27.2))
       '@statsig/react-bindings':
-        specifier: ^3.30.0
-        version: 3.30.2(react@18.3.1)
+        specifier: ^3.31.0
+        version: 3.31.0(react@18.3.1)
       '@statsig/session-replay':
         specifier: ^3.30.0
         version: 3.30.2
@@ -3376,14 +3376,11 @@ packages:
   '@statsig/client-core@3.31.0':
     resolution: {integrity: sha512-SuxQD6TmVszPG7FoMKwTk/uyBuVFk7XnxI3T/E0uyb7PL7GNjONtfsoh+NqBBVUJVse0CUeSFfgJPoZy1ZOslQ==}
 
-  '@statsig/js-client@3.30.2':
-    resolution: {integrity: sha512-Cjs4uzyAxt1sw44oa6qSNWuZdO11jmgrpOVBC2NajtpA55GBmAfjZ3vQdXizUffUZMRmFiEpGwxi9zmjFEG7Sw==}
-
   '@statsig/js-client@3.31.0':
     resolution: {integrity: sha512-LFa5E0LjT6sTfZv3sNGoyRLSZ1078+agdgOA+Vm1ecjG+KbSOfBLTW7hMwimrJ29slRwbYDzbtKaPJo/R37N2g==}
 
-  '@statsig/react-bindings@3.30.2':
-    resolution: {integrity: sha512-tICFOSpKXaZBiuR+nJrI17hCVOFm0d//dXt41auw9Mhkbn43GwwEdBR8LjUiwxvQ6zVvWshjRUkYi13miBnh4g==}
+  '@statsig/react-bindings@3.31.0':
+    resolution: {integrity: sha512-OPcobZqT/XX7KNNzlnLYBi+PkwSEKnImRB2Q5K5NZ48VVIN0KY6QLgOGPfh2pYmxaCwTRdmkv+Q4OuaGmJYbtA==}
     peerDependencies:
       react: ^16.6.3 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
@@ -10109,8 +10106,8 @@ packages:
   walker@1.0.8:
     resolution: {integrity: sha512-ts/8E8l5b7kY0vlWLewOkDXMmPdLcVV4GmOQLyxuSswIJsweeFZtAsMF7k1Nszz+TYBQrlYRmzOnr398y1JemQ==}
 
-  watchpack@2.4.4:
-    resolution: {integrity: sha512-c5EGNOiyxxV5qmTtAB7rbiXxi1ooX1pQKMLX/MIabJjRA0SJBQOjKF+KSVfHkr9U1cADPon0mRiVe/riyaiDUA==}
+  watchpack@2.5.0:
+    resolution: {integrity: sha512-e6vZvY6xboSwLz2GD36c16+O/2Z6fKvIf4pOXptw2rY9MVwE/TXc6RGqxD3I3x0a28lwBY7DE+76uTPSsBrrCA==}
     engines: {node: '>=10.13.0'}
 
   wcwidth@1.0.1:
@@ -10161,6 +10158,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-fetch@3.6.20:
     resolution: {integrity: sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg==}
@@ -13670,18 +13668,14 @@ snapshots:
 
   '@statsig/client-core@3.31.0': {}
 
-  '@statsig/js-client@3.30.2':
-    dependencies:
-      '@statsig/client-core': 3.30.2
-
   '@statsig/js-client@3.31.0':
     dependencies:
       '@statsig/client-core': 3.31.0
 
-  '@statsig/react-bindings@3.30.2(react@18.3.1)':
+  '@statsig/react-bindings@3.31.0(react@18.3.1)':
     dependencies:
-      '@statsig/client-core': 3.30.2
-      '@statsig/js-client': 3.30.2
+      '@statsig/client-core': 3.31.0
+      '@statsig/js-client': 3.31.0
       react: 18.3.1
 
   '@statsig/session-replay@3.30.2':
@@ -21458,7 +21452,7 @@ snapshots:
     dependencies:
       makeerror: 1.0.12
 
-  watchpack@2.4.4:
+  watchpack@2.5.0:
     dependencies:
       glob-to-regexp: 0.4.1
       graceful-fs: 4.2.11
@@ -21527,7 +21521,7 @@ snapshots:
       schema-utils: 4.3.3
       tapable: 2.3.0
       terser-webpack-plugin: 5.3.16(@swc/core@1.15.3(@swc/helpers@0.5.17))(esbuild@0.27.2)(webpack@5.103.0(@swc/core@1.15.3(@swc/helpers@0.5.17))(esbuild@0.27.2))
-      watchpack: 2.4.4
+      watchpack: 2.5.0
       webpack-sources: 3.3.3
     transitivePeerDependencies:
       - '@swc/core'
