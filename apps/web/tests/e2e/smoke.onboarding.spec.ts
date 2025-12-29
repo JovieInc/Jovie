@@ -1,18 +1,22 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test } from '@playwright/test';
+import { SMOKE_TIMEOUTS, smokeNavigate } from './utils/smoke-test-utils';
 
-// Minimal onboarding smoke: unauthenticated users should be redirected to sign-in
-// This is deterministic and requires no external inbox/service.
-
-test.describe('Onboarding smoke', () => {
-  test('unauthenticated /app/dashboard redirects to /sign-in', async ({
+/**
+ * Onboarding smoke tests
+ * Minimal smoke: unauthenticated users should be redirected to sign-in.
+ * This is deterministic and requires no external inbox/service.
+ */
+test.describe('Onboarding smoke @smoke', () => {
+  test('unauthenticated /app/dashboard redirects to /sign-in @smoke', async ({
     page,
   }) => {
-    const res = await page.goto('/app/dashboard', {
-      waitUntil: 'domcontentloaded',
-    });
+    const res = await smokeNavigate(page, '/app/dashboard');
+
     // Should land on sign-in
-    await expect(page).toHaveURL(/\/sign-in/);
+    await expect(page).toHaveURL(/\/sign-in/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
     expect(res?.ok(), 'Expected the sign-in page to respond OK').toBeTruthy();
   });
 
@@ -24,7 +28,7 @@ test.describe('Onboarding smoke', () => {
     async ({ page }) => {
       test.setTimeout(60_000);
 
-      // Skip if env not properly configured (local defaults from global-setup)
+      // Skip if env not properly configured
       const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
       const sk = process.env.CLERK_SECRET_KEY || '';
       const dbUrl = process.env.DATABASE_URL || '';
@@ -43,35 +47,32 @@ test.describe('Onboarding smoke', () => {
       await setupClerkTestingToken({ page });
 
       // 1) Load an unprotected page that initializes Clerk
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await smokeNavigate(page, '/');
 
       // Wait for Clerk to be ready
       await page.waitForFunction(
         () => {
-          // @ts-ignore
-          return window.Clerk && window.Clerk.isReady();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const clerkWindow = window as any;
+          return clerkWindow.Clerk && clerkWindow.Clerk.isReady();
         },
-        { timeout: 10_000 }
+        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
       );
 
       // 2) Programmatically sign in using Clerk's test mode
-      // This creates a test user and signs them in
       const testEmail =
         process.env.E2E_TEST_EMAIL || `playwright+${Date.now()}@example.com`;
 
-      // Use Clerk's client-side API to sign in programmatically
       await page.evaluate(async email => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const clerk = (window as unknown as { Clerk: any }).Clerk;
         if (!clerk) throw new Error('Clerk not initialized');
 
         try {
-          // Create a test user session
           await clerk.signUp?.create({
             emailAddress: email,
             password: 'TestPassword123!',
           });
-
-          // Complete the sign-up flow
           await clerk.setActive({
             session: clerk.client?.lastActiveSessionId || null,
           });
@@ -81,7 +82,6 @@ test.describe('Onboarding smoke', () => {
             identifier: email,
             password: 'TestPassword123!',
           });
-
           await clerk.setActive({
             session: clerk.client?.lastActiveSessionId || null,
           });
@@ -91,39 +91,36 @@ test.describe('Onboarding smoke', () => {
       // Wait for authentication to complete
       await page.waitForFunction(
         () => {
-          // @ts-ignore
-          return window.Clerk?.user;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (window as any).Clerk?.user;
         },
-        { timeout: 10_000 }
+        { timeout: SMOKE_TIMEOUTS.VISIBILITY }
       );
 
       // 3) Navigate to dashboard — app should redirect to onboarding if needed
-      await page.goto('/app/dashboard', { waitUntil: 'domcontentloaded' });
+      await smokeNavigate(page, '/app/dashboard');
 
-      // Use waitForURL for deterministic waiting
       await page.waitForURL('**/onboarding', {
-        timeout: 10_000,
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
         waitUntil: 'domcontentloaded',
       });
 
       // 4) Fill the onboarding form (handle)
       const handleInput = page.getByLabel('Enter your desired handle');
-      await expect(handleInput).toBeVisible({ timeout: 5_000 });
+      await expect(handleInput).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
 
       const uniqueHandle = `e2e-${Date.now().toString(36)}`;
       await handleInput.fill(uniqueHandle);
 
-      // Wait for the availability check indicator (green checkmark)
-      // Based on the OnboardingForm component, it shows a green circle with checkmark
+      // Wait for the availability check indicator
       await expect(page.locator('.bg-green-500.rounded-full')).toBeVisible({
-        timeout: 10_000,
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
 
       // Wait for submit button to be enabled
       const submit = page.getByRole('button', { name: 'Create Profile' });
       await expect(submit).toBeVisible();
 
-      // Use expect.poll for deterministic waiting on button state
       await expect
         .poll(
           async () => {
@@ -131,7 +128,7 @@ test.describe('Onboarding smoke', () => {
             return !isDisabled;
           },
           {
-            timeout: 15_000,
+            timeout: SMOKE_TIMEOUTS.NAVIGATION,
             intervals: [500, 750, 1000],
           }
         )
@@ -140,29 +137,27 @@ test.describe('Onboarding smoke', () => {
       // 5) Submit and expect redirect to dashboard overview
       await submit.click();
 
-      // Wait for URL change to dashboard overview
       await page.waitForURL('**/app/dashboard/overview', {
-        timeout: 15_000,
+        timeout: SMOKE_TIMEOUTS.NAVIGATION,
         waitUntil: 'domcontentloaded',
       });
 
       // 6) Verify dashboard UI loaded
-      // Check for dashboard-specific elements
       await expect(
         page
           .locator('h1, h2')
           .filter({ hasText: /dashboard|overview|welcome/i })
           .first()
-      ).toBeVisible({ timeout: 5_000 });
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
 
-      // Check for navigation elements that indicate successful dashboard load
       await expect(
         page.getByRole('link', { name: /profile|settings|links/i }).first()
-      ).toBeVisible({ timeout: 5_000 });
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.QUICK });
 
-      // Verify the user's handle is displayed somewhere (profile link, header, etc.)
       await expect(page.locator(`text=/${uniqueHandle}/i`).first()).toBeVisible(
-        { timeout: 5_000 }
+        {
+          timeout: SMOKE_TIMEOUTS.QUICK,
+        }
       );
     }
   );

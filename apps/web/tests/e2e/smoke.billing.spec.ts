@@ -1,390 +1,212 @@
 import { expect, test } from '@playwright/test';
+import {
+  assertNoCriticalErrors,
+  assertValidPageState,
+  isCriticalNetworkFailure,
+  setupPageMonitoring,
+  smokeNavigate,
+  waitForUrlStable,
+} from './utils/smoke-test-utils';
 
 /**
  * Billing smoke tests - verify billing flow works without crashing
  * @smoke tag for fast-path deployment eligibility
  */
+test.describe('Billing Smoke Tests @smoke', () => {
+  test('Billing dashboard loads without errors @smoke', async ({
+    page,
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-test.describe('Billing Smoke Tests', () => {
-  function isCriticalFailedResponse(res: {
-    url: string;
-    status: number;
-  }): boolean {
-    const { url, status } = res;
-
-    // 5xx is always critical
-    if (status >= 500) return true;
-
-    // Ignore expected auth failures
-    if (status === 401 || status === 403) return false;
-
-    // Only treat same-origin API failures as critical.
-    // (Asset 404s and third-party noise should not fail smoke.)
     try {
-      const parsed = new URL(url);
-      const isLocalhost =
-        parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
-      if (!isLocalhost) return false;
+      // Navigate to billing page (will redirect to sign-in if not authenticated)
+      await smokeNavigate(page, '/billing');
 
-      const path = parsed.pathname;
-      const isApiRoute = path.startsWith('/api/') || path.startsWith('/trpc/');
-      return isApiRoute && status >= 400;
-    } catch {
-      return false;
-    }
-  }
-
-  test('Billing dashboard loads without errors @smoke', async ({ page }) => {
-    // Monitor console errors
-    const errors: string[] = [];
-    const failedResponses: {
-      url: string;
-      status: number;
-      statusText: string;
-    }[] = [];
-
-    page.on('response', res => {
-      const status = res.status();
-      if (status >= 400) {
-        failedResponses.push({
-          url: res.url(),
-          status,
-          statusText: res.statusText(),
-        });
-      }
-    });
-
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
-
-    // Navigate to billing page (will redirect to sign-in if not authenticated)
-    // Avoid waitUntil: 'networkidle' here since auth/analytics can keep long-lived connections.
-    await page.goto('/billing', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
-    });
-
-    // Wait for URL to stabilize (redirect may happen)
-    try {
-      await page.waitForURL(
+      // Wait for URL to stabilize (redirect may happen)
+      await waitForUrlStable(
+        page,
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/billing'),
-        { timeout: 5000 }
+          url.pathname.includes('/sign-in') ||
+          url.pathname.includes('/sign-up') ||
+          url.pathname.includes('/billing')
       );
-    } catch {
-      // URL didn't change, continue with current URL
+
+      // Assert we're on a valid page (billing or auth redirect)
+      const { isOnAuthPage } = await assertValidPageState(page, {
+        expectedPaths: ['/billing'],
+        allowAuthRedirect: true,
+      });
+
+      // In mock Clerk mode, redirect to sign-in is sufficient for smoke
+      if (isOnAuthPage) {
+        await expect(page.locator('body')).toBeVisible();
+        return;
+      }
+
+      // Get context and check for critical errors
+      const context = getContext();
+
+      // Check for critical network failures
+      const criticalFailures =
+        context.networkDiagnostics.failedResponses.filter(
+          isCriticalNetworkFailure
+        );
+      expect(
+        criticalFailures.length,
+        `Critical API failures: ${JSON.stringify(criticalFailures)}`
+      ).toBe(0);
+
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
     }
-
-    // Check if we're on sign-in page (expected for unauthenticated user)
-    // In mock Clerk mode, may redirect to Clerk handshake URL
-    const currentUrl = page.url();
-    const isOnSignIn =
-      currentUrl.includes('/signin') ||
-      currentUrl.includes('/signup') ||
-      currentUrl.includes('/sign-in') ||
-      currentUrl.includes('/sign-up');
-    const isOnBilling = currentUrl.includes('/billing');
-    const isOnClerkHandshake =
-      currentUrl.includes('clerk') && currentUrl.includes('handshake');
-
-    // Either should be on sign-in (redirect), Clerk handshake (auth flow), or billing page (if authenticated)
-    // If neither, log the actual URL for debugging
-    if (!isOnSignIn && !isOnBilling && !isOnClerkHandshake) {
-      console.log(`Unexpected URL: ${currentUrl}`);
-    }
-    expect(isOnSignIn || isOnBilling || isOnClerkHandshake).toBe(true);
-
-    // In mock Clerk mode, /signin is not expected to fully function (we bypass ClerkProvider).
-    // For smoke purposes, a successful redirect to sign-in is sufficient.
-    if (isOnSignIn) {
-      await expect(page.locator('body')).toBeVisible();
-      return;
-    }
-
-    // Verify no critical console errors
-    // Filter out expected errors in test/mock environments
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('analytics') &&
-        !error.includes('Clerk') &&
-        !error.includes('handshake') &&
-        !error.includes('Failed to load resource') &&
-        !error.includes('test-pass-53.clerk.accounts.dev')
-    );
-
-    if (criticalErrors.length > 0) {
-      console.log('Critical errors found:', criticalErrors);
-    }
-    expect(criticalErrors.length).toBe(0);
-
-    // Verify no failed API responses (except auth-related 401s which are expected)
-    const criticalFailures = failedResponses.filter(isCriticalFailedResponse);
-
-    if (criticalFailures.length > 0) {
-      console.log('Critical API failures:', criticalFailures);
-    }
-    expect(criticalFailures.length).toBe(0);
   });
 
-  test('Account dashboard loads without errors @smoke', async ({ page }) => {
-    // Monitor console errors
-    const errors: string[] = [];
-    const failedResponses: {
-      url: string;
-      status: number;
-      statusText: string;
-    }[] = [];
+  test('Account dashboard loads without errors @smoke', async ({
+    page,
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-    page.on('response', res => {
-      const status = res.status();
-      if (status >= 400) {
-        failedResponses.push({
-          url: res.url(),
-          status,
-          statusText: res.statusText(),
-        });
-      }
-    });
-
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
-
-    // Navigate to account page (will redirect to sign-in if not authenticated)
-    // Use waitUntil: 'networkidle' to ensure redirect completes
-    await page.goto('/account', { waitUntil: 'networkidle', timeout: 15000 });
-
-    // Wait for URL to stabilize (redirect may happen)
     try {
-      await page.waitForURL(
+      // Navigate to account page (will redirect to sign-in if not authenticated)
+      await smokeNavigate(page, '/account');
+
+      // Wait for URL to stabilize
+      await waitForUrlStable(
+        page,
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/account'),
-        { timeout: 5000 }
+          url.pathname.includes('/sign-in') ||
+          url.pathname.includes('/sign-up') ||
+          url.pathname.includes('/account')
       );
-    } catch {
-      // URL didn't change, continue with current URL
+
+      // Assert we're on a valid page
+      const { isOnAuthPage } = await assertValidPageState(page, {
+        expectedPaths: ['/account'],
+        allowAuthRedirect: true,
+      });
+
+      // In mock Clerk mode, redirect to sign-in is sufficient
+      if (isOnAuthPage) {
+        await expect(page.locator('body')).toBeVisible();
+        return;
+      }
+
+      const context = getContext();
+      const criticalFailures =
+        context.networkDiagnostics.failedResponses.filter(
+          isCriticalNetworkFailure
+        );
+      expect(criticalFailures.length).toBe(0);
+
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
     }
-
-    // Check if we're on sign-in page (expected for unauthenticated user)
-    // In mock Clerk mode, may redirect to Clerk handshake URL
-    const currentUrl = page.url();
-    const isOnSignIn =
-      currentUrl.includes('/signin') ||
-      currentUrl.includes('/signup') ||
-      currentUrl.includes('/sign-in') ||
-      currentUrl.includes('/sign-up');
-    const isOnAccount = currentUrl.includes('/account');
-    const isOnClerkHandshake =
-      currentUrl.includes('clerk') && currentUrl.includes('handshake');
-
-    // Either should be on sign-in (redirect), Clerk handshake (auth flow), or account page (if authenticated)
-    // If neither, log the actual URL for debugging
-    if (!isOnSignIn && !isOnAccount && !isOnClerkHandshake) {
-      console.log(`Unexpected URL: ${currentUrl}`);
-    }
-    expect(isOnSignIn || isOnAccount || isOnClerkHandshake).toBe(true);
-
-    // In mock Clerk mode, /signin is not expected to fully function (we bypass ClerkProvider).
-    // For smoke purposes, a successful redirect to sign-in is sufficient.
-    if (isOnSignIn) {
-      await expect(page.locator('body')).toBeVisible();
-      return;
-    }
-
-    // Verify no critical console errors
-    // Filter out expected errors in test/mock environments
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('analytics') &&
-        !error.includes('Clerk') &&
-        !error.includes('handshake') &&
-        !error.includes('Failed to load resource') &&
-        !error.includes('test-pass-53.clerk.accounts.dev')
-    );
-
-    if (criticalErrors.length > 0) {
-      console.log('Critical errors found:', criticalErrors);
-    }
-    expect(criticalErrors.length).toBe(0);
-
-    // Verify no failed API responses (except auth-related 401s which are expected)
-    const criticalFailures = failedResponses.filter(isCriticalFailedResponse);
-
-    if (criticalFailures.length > 0) {
-      console.log('Critical API failures:', criticalFailures);
-    }
-    expect(criticalFailures.length).toBe(0);
   });
 
-  test('Billing success page loads without errors @smoke', async ({ page }) => {
-    // Monitor console errors
-    const errors: string[] = [];
+  test('Billing success page loads without errors @smoke', async ({
+    page,
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
-
-    // Navigate to billing success page
-    // Use waitUntil: 'networkidle' to ensure redirect completes
-    await page.goto('/billing/success', {
-      waitUntil: 'networkidle',
-      timeout: 15000,
-    });
-
-    // Wait for URL to stabilize (redirect may happen)
     try {
-      await page.waitForURL(
+      await smokeNavigate(page, '/billing/success');
+
+      await waitForUrlStable(
+        page,
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/billing/success'),
-        { timeout: 5000 }
+          url.pathname.includes('/sign-in') ||
+          url.pathname.includes('/sign-up') ||
+          url.pathname.includes('/billing/success')
       );
-    } catch {
-      // URL didn't change, continue with current URL
+
+      const { isOnAuthPage, isOnExpectedPath } = await assertValidPageState(
+        page,
+        {
+          expectedPaths: ['/billing/success'],
+          allowAuthRedirect: true,
+        }
+      );
+
+      if (isOnAuthPage) {
+        await expect(page.locator('body')).toBeVisible();
+        return;
+      }
+
+      // If on success page, verify content loads
+      if (isOnExpectedPath) {
+        await page.waitForLoadState('domcontentloaded');
+        const bodyText = await page.textContent('body');
+        expect(bodyText).toBeTruthy();
+        expect(
+          bodyText?.length,
+          'Page should have meaningful content'
+        ).toBeGreaterThan(100);
+      }
+
+      const context = getContext();
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
     }
-
-    // Should be on success page or redirected to sign-in
-    // In mock Clerk mode, may redirect to Clerk handshake URL
-    const currentUrl = page.url();
-    const isOnSignIn =
-      currentUrl.includes('/signin') ||
-      currentUrl.includes('/signup') ||
-      currentUrl.includes('/sign-in') ||
-      currentUrl.includes('/sign-up');
-    const isOnSuccess = currentUrl.includes('/billing/success');
-    const isOnClerkHandshake =
-      currentUrl.includes('clerk') && currentUrl.includes('handshake');
-
-    // If neither, log the actual URL for debugging
-    if (!isOnSignIn && !isOnSuccess && !isOnClerkHandshake) {
-      console.log(`Unexpected URL: ${currentUrl}`);
-    }
-    expect(isOnSignIn || isOnSuccess || isOnClerkHandshake).toBe(true);
-
-    // In mock Clerk mode, /signin is not expected to fully function (we bypass ClerkProvider).
-    // For smoke purposes, a successful redirect to sign-in is sufficient.
-    if (isOnSignIn) {
-      await expect(page.locator('body')).toBeVisible();
-      return;
-    }
-
-    // If on success page, verify content loads
-    if (isOnSuccess) {
-      // Verify page renders with content (not just a redirect)
-      await page.waitForLoadState('domcontentloaded');
-      const bodyText = await page.textContent('body');
-      expect(bodyText).toBeTruthy();
-      expect(bodyText?.length).toBeGreaterThan(100); // Page has meaningful content
-    }
-
-    // Verify no critical console errors
-    // Filter out expected errors in test/mock environments
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('analytics') &&
-        !error.includes('Clerk') &&
-        !error.includes('handshake') &&
-        !error.includes('Failed to load resource') &&
-        !error.includes('test-pass-53.clerk.accounts.dev')
-    );
-
-    expect(criticalErrors.length).toBe(0);
   });
 
-  test('Billing cancel page loads without errors @smoke', async ({ page }) => {
-    // Monitor console errors
-    const errors: string[] = [];
+  test('Billing cancel page loads without errors @smoke', async ({
+    page,
+  }, testInfo) => {
+    const { getContext, cleanup } = setupPageMonitoring(page);
 
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        errors.push(msg.text());
-      }
-    });
-
-    // Navigate to billing cancel page
-    // Use waitUntil: 'networkidle' to ensure redirect completes
-    await page.goto('/billing/cancel', {
-      waitUntil: 'networkidle',
-      timeout: 15000,
-    });
-
-    // Wait for URL to stabilize (redirect may happen)
     try {
-      await page.waitForURL(
+      await smokeNavigate(page, '/billing/cancel');
+
+      await waitForUrlStable(
+        page,
         url =>
           url.pathname.includes('/signin') ||
           url.pathname.includes('/signup') ||
-          url.pathname.includes('/billing/cancel'),
-        { timeout: 5000 }
+          url.pathname.includes('/sign-in') ||
+          url.pathname.includes('/sign-up') ||
+          url.pathname.includes('/billing/cancel')
       );
-    } catch {
-      // URL didn't change, continue with current URL
+
+      const { isOnAuthPage, isOnExpectedPath } = await assertValidPageState(
+        page,
+        {
+          expectedPaths: ['/billing/cancel'],
+          allowAuthRedirect: true,
+        }
+      );
+
+      if (isOnAuthPage) {
+        await expect(page.locator('body')).toBeVisible();
+        return;
+      }
+
+      // If on cancel page, verify content
+      if (isOnExpectedPath) {
+        const bodyText = await page.textContent('body');
+        const hasCancelContent =
+          bodyText !== null &&
+          (bodyText.toLowerCase().includes('cancel') ||
+            bodyText.toLowerCase().includes('dashboard') ||
+            bodyText.toLowerCase().includes('worry'));
+        expect(
+          hasCancelContent,
+          'Cancel page should have relevant content'
+        ).toBe(true);
+      }
+
+      const context = getContext();
+      await assertNoCriticalErrors(context, testInfo);
+    } finally {
+      cleanup();
     }
-
-    // Should be on cancel page or redirected to sign-in
-    // In mock Clerk mode, may redirect to Clerk handshake URL
-    const currentUrl = page.url();
-    const isOnSignIn =
-      currentUrl.includes('/signin') ||
-      currentUrl.includes('/signup') ||
-      currentUrl.includes('/sign-in') ||
-      currentUrl.includes('/sign-up');
-    const isOnCancel = currentUrl.includes('/billing/cancel');
-    const isOnClerkHandshake =
-      currentUrl.includes('clerk') && currentUrl.includes('handshake');
-
-    // If neither, log the actual URL for debugging
-    if (!isOnSignIn && !isOnCancel && !isOnClerkHandshake) {
-      console.log(`Unexpected URL: ${currentUrl}`);
-    }
-    expect(isOnSignIn || isOnCancel || isOnClerkHandshake).toBe(true);
-
-    // In mock Clerk mode, /signin is not expected to fully function (we bypass ClerkProvider).
-    // For smoke purposes, a successful redirect to sign-in is sufficient.
-    if (isOnSignIn) {
-      await expect(page.locator('body')).toBeVisible();
-      return;
-    }
-
-    // If on cancel page, verify content loads
-    if (isOnCancel) {
-      // Should have cancel messaging (case-insensitive search for "cancel" or "dashboard")
-      const bodyText = await page.textContent('body');
-      const hasCancelContent =
-        bodyText !== null &&
-        (bodyText.toLowerCase().includes('cancel') ||
-          bodyText.toLowerCase().includes('dashboard') ||
-          bodyText.toLowerCase().includes('worry'));
-      expect(hasCancelContent).toBe(true);
-    }
-
-    // Verify no critical console errors
-    // Filter out expected errors in test/mock environments
-    const criticalErrors = errors.filter(
-      error =>
-        !error.includes('Warning:') &&
-        !error.includes('analytics') &&
-        !error.includes('Clerk') &&
-        !error.includes('handshake') &&
-        !error.includes('Failed to load resource') &&
-        !error.includes('test-pass-53.clerk.accounts.dev')
-    );
-
-    expect(criticalErrors.length).toBe(0);
   });
 });

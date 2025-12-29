@@ -6,9 +6,17 @@ import { seedTestData } from './seed-test-data';
 // Load environment variables from .env.development.local
 config({ path: '.env.development.local' });
 
+const isCI = !!process.env.CI;
+const isSmokeOnly = process.env.SMOKE_ONLY === '1';
+
 async function globalSetup() {
+  const startTime = Date.now();
+  console.log('🚀 Starting E2E global setup...');
+
   // When running against an external BASE_URL in CI (e.g., Preview), skip local env overrides and warmup.
-  if (process.env.CI && process.env.BASE_URL) {
+  if (isCI && process.env.BASE_URL) {
+    console.log(`ℹ CI mode with external BASE_URL: ${process.env.BASE_URL}`);
+    console.log('  Skipping local env overrides and warmup');
     return;
   }
 
@@ -76,33 +84,52 @@ async function globalSetup() {
 
   // Seed test database with required profiles for smoke tests
   // Only seed if DATABASE_URL is available and not in CI with external BASE_URL
-  if (process.env.DATABASE_URL && !(process.env.CI && process.env.BASE_URL)) {
+  if (process.env.DATABASE_URL && !(isCI && process.env.BASE_URL)) {
     try {
+      console.log('🌱 Seeding test data...');
       await seedTestData();
+      console.log('✓ Test data seeded successfully');
     } catch (error) {
       console.warn('⚠ Failed to seed test data:', error);
       console.log('  Tests may fail if required profiles are missing');
+      // In CI, treat seeding failures as fatal for smoke tests
+      if (isCI && isSmokeOnly) {
+        console.error('❌ Seeding is required for smoke tests in CI');
+        throw error;
+      }
     }
+  } else if (!process.env.DATABASE_URL) {
+    console.log('ℹ DATABASE_URL not set, skipping test data seeding');
   }
 
   // OPTIMIZATION: Skip browser warmup for smoke tests
-  if (process.env.SMOKE_ONLY === '1') {
-    console.log('⚡ Skipping browser warmup for smoke tests');
+  if (isSmokeOnly) {
+    const elapsed = Date.now() - startTime;
+    console.log(
+      `⚡ Smoke test setup complete in ${elapsed}ms (skipping warmup)`
+    );
     return;
   }
 
-  // Start browser to warm up
+  // Start browser to warm up (non-smoke only)
+  console.log('🌐 Warming up browser...');
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
   // Navigate to the app to ensure it's ready
   const baseURL = process.env.BASE_URL || 'http://localhost:3100';
-  await page.goto(baseURL, { waitUntil: 'domcontentloaded' });
+  try {
+    await page.goto(baseURL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
+    console.log('✓ Browser warmup complete');
+  } catch (error) {
+    console.warn('⚠ Browser warmup failed (non-fatal):', error);
+  } finally {
+    await browser.close();
+  }
 
-  // Wait for the page to load completely
-  await page.waitForLoadState('domcontentloaded', { timeout: 10000 });
-
-  await browser.close();
+  const elapsed = Date.now() - startTime;
+  console.log(`✅ E2E global setup complete in ${elapsed}ms`);
 }
 
 export default globalSetup;
