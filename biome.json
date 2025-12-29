@@ -71,7 +71,12 @@
       "suspicious": {
         "noDuplicateObjectKeys": "error",
         "noDebugger": "error",
-        "noFallthroughSwitchClause": "error"
+        "noFallthroughSwitchClause": "error",
+        "noExplicitAny": "warn",
+        "noConfusingVoidType": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn"
       },
       "security": {
         "noDangerouslySetInnerHtml": "warn"
